@@ -93,13 +93,21 @@ Your prompt to the agent should usually include:
 - If you can’t proceed (missing repo, missing details, permissions), say what’s missing and what you need next.`;
 
 /**
+ * Information about the Slack user who requested the PR
+ */
+type SlackRequesterInfo = {
+  displayName: string;
+  messagePermalink?: string;
+};
+
+/**
  * Fetch the requester info for PR signatures
  * Gets the user's display name and a permalink to the triggering message
  */
 async function getSlackRequesterInfo(
   installation: PlatformIntegration,
   slackEventContext: SlackEventContext
-): Promise<{ displayName: string; messagePermalink?: string } | undefined> {
+): Promise<SlackRequesterInfo | undefined> {
   const accessToken = getAccessTokenFromInstallation(installation);
   if (!accessToken) {
     console.log('[SlackBot] No access token for requester info');

@@ -1,6 +1,5 @@
 import type OpenAI from 'openai';
 import { getToolDefinitionsForOwner, getTool, type ToolExecutionContext } from '@/lib/bot/tools';
-import type { Owner } from '@/lib/integrations/core/types';
 import {
   getInstallationByTeamId,
   getOwnerFromInstallation,

@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import { getToolDefinitionsForOwner, getTool, type ToolExecutionContext } from '@/lib/bot/tools';
+import { getTool, type ToolExecutionContext, getToolsForOwner } from '@/lib/bot/tools';
 import {
   getInstallationByTeamId,
   getOwnerFromInstallation,
@@ -255,8 +255,9 @@ export async function processKiloBotMessage(
     KILO_BOT_SYSTEM_PROMPT + slackContextForPrompt + formatGitHubRepositoriesForPrompt(repoContext);
 
   // Get available tools for this owner (based on their integrations)
-  const availableToolDefinitions = await getToolDefinitionsForOwner(owner);
-  console.log('[SlackBot] Available tools:', availableToolDefinitions.length);
+  const availableTools = await getToolsForOwner(owner);
+  const availableToolDefinitions = availableTools.map(tool => tool.definition);
+  console.log('[SlackBot] Available tools:', JSON.stringify(availableTools.map(tool => tool.name)));
 
   // Build tool execution context for later use
   const toolExecutionContext: ToolExecutionContext = {

@@ -1,4 +1,3 @@
-import type OpenAI from 'openai';
 import type { Owner } from '@/lib/integrations/core/types';
 import { getAllActiveIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { getAllTools } from './registry';
@@ -45,18 +44,4 @@ export async function getToolsForOwner(owner: Owner): Promise<BotTool[]> {
   );
 
   return availableTools;
-}
-
-/**
- * Get OpenAI tool definitions for all tools available to an owner.
- * This is the format expected by the OpenAI Chat Completions API.
- *
- * @param owner - The owner (user or org) to get tool definitions for
- * @returns Array of tool definitions in OpenAI format
- */
-export async function getToolDefinitionsForOwner(
-  owner: Owner
-): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
-  const tools = await getToolsForOwner(owner);
-  return tools.map(tool => tool.definition);
 }

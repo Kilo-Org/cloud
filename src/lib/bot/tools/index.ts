@@ -12,9 +12,6 @@
  * // Get tools available to an owner
  * const tools = await getToolsForOwner(owner);
  *
- * // Get tool definitions for OpenAI
- * const definitions = await getToolDefinitionsForOwner(owner);
- *
  * // Look up a specific tool
  * const tool = getTool('spawn_cloud_agent');
  * ```
@@ -33,7 +30,7 @@ export {
 } from './registry';
 
 // Export loader functions
-export { getToolsForOwner, getToolDefinitionsForOwner } from './tool-loader';
+export { getToolsForOwner } from './tool-loader';
 
 // Register all tool implementations
 // This runs when the module is first imported

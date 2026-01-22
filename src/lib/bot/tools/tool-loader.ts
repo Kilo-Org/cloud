@@ -1,7 +1,6 @@
 import type OpenAI from 'openai';
 import type { Owner } from '@/lib/integrations/core/types';
-import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
-import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import { getAllActiveIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { getAllTools } from './registry';
 import type { BotTool } from './types';
 
@@ -12,17 +11,10 @@ import type { BotTool } from './types';
  * @param owner - The owner (user or org) to check integrations for
  * @returns Set of platform names that the owner has active integrations for
  */
-async function getActiveIntegrationPlatforms(owner: Owner): Promise<Set<string>> {
-  const integrations = await getAllIntegrationsForOwner(owner);
+async function getActiveIntegrationPlatforms(owner: Owner): Promise<string[]> {
+  const integrations = await getAllActiveIntegrationsForOwner(owner);
 
-  const activePlatforms = new Set<string>();
-  for (const integration of integrations) {
-    if (integration.integration_status === INTEGRATION_STATUS.ACTIVE) {
-      activePlatforms.add(integration.platform);
-    }
-  }
-
-  return activePlatforms;
+  return integrations.map(integration => integration.platform);
 }
 
 /**
@@ -44,11 +36,11 @@ export async function getToolsForOwner(owner: Owner): Promise<BotTool[]> {
     }
 
     // Tools with a required integration are only available if owner has it
-    return activePlatforms.has(tool.requiredIntegration);
+    return activePlatforms.includes(tool.requiredIntegration);
   });
 
   console.log(
-    `[ToolLoader] Owner has ${activePlatforms.size} active integrations, ` +
+    `[ToolLoader] Owner has ${activePlatforms.length} active integrations, ` +
       `${availableTools.length}/${allTools.length} tools available`
   );
 

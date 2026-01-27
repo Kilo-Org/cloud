@@ -9,9 +9,21 @@ import {
 } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
+import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+
+const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
+
+const ManuallyAddedRepositoryInputSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  full_name: z.string(),
+  private: z.boolean(),
+});
 
 const SaveReviewConfigInputSchema = z.object({
+  platform: PlatformSchema,
   reviewStyle: z.enum(['strict', 'balanced', 'lenient']),
   focusAreas: z.array(z.string()),
   customInstructions: z.string().optional(),
@@ -19,6 +31,7 @@ const SaveReviewConfigInputSchema = z.object({
   modelSlug: z.string(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
+  manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
 });
 
 export const personalReviewAgentRouter = createTRPCRouter({
@@ -57,38 +70,83 @@ export const personalReviewAgentRouter = createTRPCRouter({
     }),
 
   /**
-   * Gets the review agent configuration for personal user
+   * Gets the GitLab OAuth integration status for personal user
    */
-  getReviewConfig: baseProcedure.query(async ({ ctx }) => {
+  getGitLabStatus: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
-    const config = await getAgentConfigForOwner(owner, 'code_review', 'github');
+    const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
 
-    if (!config) {
-      // Return default configuration
+    if (!integration || integration.integration_status !== 'active') {
       return {
-        isEnabled: false,
-        reviewStyle: 'balanced' as const,
-        focusAreas: [],
-        customInstructions: null,
-        maxReviewTimeMinutes: 10,
-        modelSlug: PRIMARY_DEFAULT_MODEL,
-        repositorySelectionMode: 'all' as const,
-        selectedRepositoryIds: [],
+        connected: false,
+        integration: null,
       };
     }
 
-    const cfg = config.config as CodeReviewAgentConfig;
+    // Extract webhook secret from metadata for display
+    const metadata = integration.metadata as Record<string, unknown> | null;
+    const webhookSecret = metadata?.webhook_secret as string | undefined;
+
     return {
-      isEnabled: config.is_enabled,
-      reviewStyle: cfg.review_style || 'balanced',
-      focusAreas: cfg.focus_areas || [],
-      customInstructions: cfg.custom_instructions || null,
-      maxReviewTimeMinutes: cfg.max_review_time_minutes || 10,
-      modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
-      repositorySelectionMode: cfg.repository_selection_mode || 'all',
-      selectedRepositoryIds: cfg.selected_repository_ids || [],
+      connected: true,
+      integration: {
+        accountLogin: integration.platform_account_login,
+        repositorySelection: integration.repository_access,
+        installedAt: integration.installed_at,
+        isValid: true, // GitLab OAuth doesn't have suspension concept
+        webhookSecret, // Include webhook secret for user to configure in GitLab
+        instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
+      },
     };
   }),
+
+  /**
+   * List GitLab repositories accessible by the user's personal GitLab integration
+   */
+  listGitLabRepositories: baseProcedure
+    .input(z.object({ forceRefresh: z.boolean().optional().default(false) }).optional())
+    .query(async ({ ctx, input }) => {
+      return await fetchGitLabRepositoriesForUser(ctx.user.id, input?.forceRefresh ?? false);
+    }),
+
+  /**
+   * Gets the review agent configuration for personal user
+   */
+  getReviewConfig: baseProcedure
+    .input(z.object({ platform: PlatformSchema }).optional())
+    .query(async ({ ctx, input }) => {
+      const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
+      const platform = input?.platform ?? 'github';
+      const config = await getAgentConfigForOwner(owner, 'code_review', platform);
+
+      if (!config) {
+        // Return default configuration
+        return {
+          isEnabled: false,
+          reviewStyle: 'balanced' as const,
+          focusAreas: [],
+          customInstructions: null,
+          maxReviewTimeMinutes: 10,
+          modelSlug: PRIMARY_DEFAULT_MODEL,
+          repositorySelectionMode: 'all' as const,
+          selectedRepositoryIds: [],
+          manuallyAddedRepositories: [],
+        };
+      }
+
+      const cfg = config.config as CodeReviewAgentConfig;
+      return {
+        isEnabled: config.is_enabled,
+        reviewStyle: cfg.review_style || 'balanced',
+        focusAreas: cfg.focus_areas || [],
+        customInstructions: cfg.custom_instructions || null,
+        maxReviewTimeMinutes: cfg.max_review_time_minutes || 10,
+        modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
+        repositorySelectionMode: cfg.repository_selection_mode || 'all',
+        selectedRepositoryIds: cfg.selected_repository_ids || [],
+        manuallyAddedRepositories: cfg.manually_added_repositories || [],
+      };
+    }),
 
   /**
    * Saves the review agent configuration for personal user
@@ -98,11 +156,12 @@ export const personalReviewAgentRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       try {
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
+        const platform = input.platform ?? 'github';
 
         await upsertAgentConfigForOwner({
           owner,
           agentType: 'code_review',
-          platform: 'github',
+          platform,
           config: {
             review_style: input.reviewStyle,
             focus_areas: input.focusAreas,
@@ -111,6 +170,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             model_slug: input.modelSlug,
             repository_selection_mode: input.repositorySelectionMode || 'all',
             selected_repository_ids: input.selectedRepositoryIds || [],
+            manually_added_repositories: input.manuallyAddedRepositories || [],
           },
           createdBy: ctx.user.id,
         });
@@ -131,14 +191,16 @@ export const personalReviewAgentRouter = createTRPCRouter({
   toggleReviewAgent: baseProcedure
     .input(
       z.object({
+        platform: PlatformSchema,
         isEnabled: z.boolean(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
+        const platform = input.platform ?? 'github';
 
-        await setAgentEnabledForOwner(owner, 'code_review', 'github', input.isEnabled);
+        await setAgentEnabledForOwner(owner, 'code_review', platform, input.isEnabled);
 
         return { success: true, isEnabled: input.isEnabled };
       } catch (error) {

@@ -18,7 +18,9 @@ import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { addReactionToPR } from '@/lib/integrations/platforms/github/adapter';
+import { addReactionToMR } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 
@@ -160,19 +162,45 @@ export async function POST(
         if (review.platform_integration_id) {
           try {
             const integration = await getIntegrationById(review.platform_integration_id);
-            if (integration?.platform_installation_id) {
-              const [repoOwner, repoName] = review.repo_full_name.split('/');
-              const reaction = status === 'completed' ? 'hooray' : 'confused';
-              await addReactionToPR(
-                integration.platform_installation_id,
-                repoOwner,
-                repoName,
-                review.pr_number,
-                reaction
-              );
-              logExceptInTest(
-                `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
-              );
+            if (integration) {
+              const platform = review.platform || 'github';
+
+              if (platform === 'github' && integration.platform_installation_id) {
+                // GitHub: Use installation token and addReactionToPR
+                const [repoOwner, repoName] = review.repo_full_name.split('/');
+                const reaction = status === 'completed' ? 'hooray' : 'confused';
+                await addReactionToPR(
+                  integration.platform_installation_id,
+                  repoOwner,
+                  repoName,
+                  review.pr_number,
+                  reaction
+                );
+                logExceptInTest(
+                  `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
+                );
+              } else if (platform === 'gitlab') {
+                // GitLab: Use OAuth token and addReactionToMR
+                const accessToken = await getValidGitLabToken(integration);
+                const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
+                const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+
+                // GitLab uses emoji names like 'tada' for hooray, 'confused' for confused
+                const emoji = status === 'completed' ? 'tada' : 'confused';
+
+                // For GitLab, we need the project ID from the repo_full_name
+                // The repo_full_name is the path_with_namespace (e.g., "group/project")
+                await addReactionToMR(
+                  accessToken,
+                  review.repo_full_name,
+                  review.pr_number,
+                  emoji,
+                  instanceUrl
+                );
+                logExceptInTest(
+                  `[code-review-status] Added ${emoji} reaction to GitLab MR ${review.repo_full_name}!${review.pr_number}`
+                );
+              }
             }
           } catch (reactionError) {
             // Non-blocking - log but don't fail the callback

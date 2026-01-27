@@ -16,9 +16,21 @@ import {
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
+import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+
+const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
+
+const ManuallyAddedRepositoryInputSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  full_name: z.string(),
+  private: z.boolean(),
+});
 
 const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
+  platform: PlatformSchema,
   reviewStyle: z.enum(['strict', 'balanced', 'lenient']),
   focusAreas: z.array(z.string()),
   customInstructions: z.string().optional(),
@@ -26,6 +38,7 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   modelSlug: z.string(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
+  manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
 });
 
 export const organizationReviewAgentRouter = createTRPCRouter({
@@ -68,37 +81,85 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     }),
 
   /**
-   * Gets the review agent configuration
+   * Gets the GitLab OAuth integration status for organization
    */
-  getReviewConfig: organizationMemberProcedure.query(async ({ input }) => {
-    const config = await getAgentConfig(input.organizationId, 'code_review', 'github');
+  getGitLabStatus: organizationMemberProcedure.query(async ({ input }) => {
+    const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
 
-    if (!config) {
-      // Return default configuration
+    if (!integration || integration.integration_status !== 'active') {
       return {
-        isEnabled: false,
-        reviewStyle: 'balanced' as const,
-        focusAreas: [],
-        customInstructions: null,
-        maxReviewTimeMinutes: 10,
-        modelSlug: PRIMARY_DEFAULT_MODEL,
-        repositorySelectionMode: 'all' as const,
-        selectedRepositoryIds: [],
+        connected: false,
+        integration: null,
       };
     }
 
-    const cfg = config.config as CodeReviewAgentConfig;
+    // Extract webhook secret from metadata for display
+    const metadata = integration.metadata as Record<string, unknown> | null;
+    const webhookSecret = metadata?.webhook_secret as string | undefined;
+
     return {
-      isEnabled: config.is_enabled,
-      reviewStyle: cfg.review_style || 'balanced',
-      focusAreas: cfg.focus_areas || [],
-      customInstructions: cfg.custom_instructions || null,
-      maxReviewTimeMinutes: cfg.max_review_time_minutes || 10,
-      modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
-      repositorySelectionMode: cfg.repository_selection_mode || 'all',
-      selectedRepositoryIds: cfg.selected_repository_ids || [],
+      connected: true,
+      integration: {
+        accountLogin: integration.platform_account_login,
+        repositorySelection: integration.repository_access,
+        installedAt: integration.installed_at,
+        isValid: true, // GitLab OAuth doesn't have suspension concept
+        webhookSecret, // Include webhook secret for user to configure in GitLab
+        instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
+      },
     };
   }),
+
+  /**
+   * List GitLab repositories accessible by the organization's GitLab integration
+   */
+  listGitLabRepositories: organizationMemberProcedure
+    .input(
+      OrganizationIdInputSchema.extend({
+        forceRefresh: z.boolean().optional().default(false),
+      })
+    )
+    .query(async ({ input }) => {
+      return await fetchGitLabRepositoriesForOrganization(input.organizationId, input.forceRefresh);
+    }),
+
+  /**
+   * Gets the review agent configuration
+   */
+  getReviewConfig: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.extend({ platform: PlatformSchema }))
+    .query(async ({ input }) => {
+      const platform = input.platform ?? 'github';
+      const config = await getAgentConfig(input.organizationId, 'code_review', platform);
+
+      if (!config) {
+        // Return default configuration
+        return {
+          isEnabled: false,
+          reviewStyle: 'balanced' as const,
+          focusAreas: [],
+          customInstructions: null,
+          maxReviewTimeMinutes: 10,
+          modelSlug: PRIMARY_DEFAULT_MODEL,
+          repositorySelectionMode: 'all' as const,
+          selectedRepositoryIds: [],
+          manuallyAddedRepositories: [],
+        };
+      }
+
+      const cfg = config.config as CodeReviewAgentConfig;
+      return {
+        isEnabled: config.is_enabled,
+        reviewStyle: cfg.review_style || 'balanced',
+        focusAreas: cfg.focus_areas || [],
+        customInstructions: cfg.custom_instructions || null,
+        maxReviewTimeMinutes: cfg.max_review_time_minutes || 10,
+        modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
+        repositorySelectionMode: cfg.repository_selection_mode || 'all',
+        selectedRepositoryIds: cfg.selected_repository_ids || [],
+        manuallyAddedRepositories: cfg.manually_added_repositories || [],
+      };
+    }),
 
   /**
    * Saves the review agent configuration
@@ -107,10 +168,12 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     .input(SaveReviewConfigInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
+        const platform = input.platform ?? 'github';
+
         await upsertAgentConfig({
           organizationId: input.organizationId,
           agentType: 'code_review',
-          platform: 'github',
+          platform,
           config: {
             review_style: input.reviewStyle,
             focus_areas: input.focusAreas,
@@ -119,6 +182,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             model_slug: input.modelSlug,
             repository_selection_mode: input.repositorySelectionMode || 'all',
             selected_repository_ids: input.selectedRepositoryIds || [],
+            manually_added_repositories: input.manuallyAddedRepositories || [],
           },
           createdBy: ctx.user.id,
         });
@@ -130,7 +194,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
-          message: `Updated Review Agent configuration (style: ${input.reviewStyle})`,
+          message: `Updated Review Agent configuration for ${platform} (style: ${input.reviewStyle})`,
         });
 
         return { success: true };
@@ -149,12 +213,15 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   toggleReviewAgent: organizationOwnerProcedure
     .input(
       OrganizationIdInputSchema.extend({
+        platform: PlatformSchema,
         isEnabled: z.boolean(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        await setAgentEnabled(input.organizationId, 'code_review', 'github', input.isEnabled);
+        const platform = input.platform ?? 'github';
+
+        await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
 
         // Audit log
         await createAuditLog({
@@ -163,7 +230,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
-          message: `${input.isEnabled ? 'Enabled' : 'Disabled'} AI Code Review Agent`,
+          message: `${input.isEnabled ? 'Enabled' : 'Disabled'} AI Code Review Agent for ${platform}`,
         });
 
         return { success: true, isEnabled: input.isEnabled };

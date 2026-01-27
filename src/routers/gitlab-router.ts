@@ -154,4 +154,22 @@ export const gitlabRouter = createTRPCRouter({
 
       return gitlabService.listGitLabBranches(owner, input.integrationId, input.projectPath);
     }),
+
+  regenerateWebhookSecret: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = input.organizationId
+        ? { type: 'org' as const, id: input.organizationId }
+        : { type: 'user' as const, id: ctx.user.id };
+
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+      }
+
+      return gitlabService.regenerateWebhookSecret(owner);
+    }),
 });

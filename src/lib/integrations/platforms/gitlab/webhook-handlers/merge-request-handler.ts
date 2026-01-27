@@ -1,7 +1,16 @@
+/**
+ * GitLab Merge Request Event Handler
+ *
+ * Handles merge request events that trigger code review:
+ * - open: New MR created
+ * - update: MR updated (new commits pushed)
+ * - reopen: MR reopened
+ */
+
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import type { PullRequestPayload } from '../webhook-schemas';
-import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
+import type { MergeRequestPayload } from '../webhook-schemas';
+import { GITLAB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
   createCodeReview,
@@ -14,40 +23,36 @@ import type { PlatformIntegration } from '@/db/schema';
 import type { Owner } from '@/lib/code-reviews/core';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { addReactionToPR } from '../adapter';
+import { addReactionToMR } from '../adapter';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
+import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 
 /**
- * GitHub Pull Request Event Handler
- * Handles: opened, synchronize, reopened
-
-/**
- * Handles pull request events that trigger code review
- * (opened, synchronize, reopened)
- * Triggers cloud agent code review if agent config is enabled
+ * Handles merge request events that trigger code review
+ * (open, update, reopen)
  */
-export async function handlePullRequestCodeReview(
-  payload: PullRequestPayload,
+export async function handleMergeRequestCodeReview(
+  payload: MergeRequestPayload,
   integration: PlatformIntegration
 ) {
-  const { pull_request, repository } = payload;
+  const { object_attributes: mr, project } = payload;
 
   try {
-    logExceptInTest('Pull request event received:', {
-      action: payload.action,
-      pr_number: pull_request.number,
-      repo: repository.full_name,
-      title: pull_request.title,
-      author: pull_request.user?.login,
+    logExceptInTest('Merge request event received:', {
+      action: mr.action,
+      mr_iid: mr.iid,
+      project: project.path_with_namespace,
+      title: mr.title,
+      author: payload.user?.username,
     });
 
-    // Skip draft PRs - only trigger code review for ready PRs
-    if (pull_request.draft === true) {
-      logExceptInTest('Skipping draft PR:', {
-        pr_number: pull_request.number,
-        repo: repository.full_name,
+    // Skip draft/WIP MRs - only trigger code review for ready MRs
+    if (mr.draft === true || mr.work_in_progress === true) {
+      logExceptInTest('Skipping draft/WIP MR:', {
+        mr_iid: mr.iid,
+        project: project.path_with_namespace,
       });
-      return NextResponse.json({ message: 'Skipped draft PR' }, { status: 200 });
+      return NextResponse.json({ message: 'Skipped draft MR' }, { status: 200 });
     }
 
     // Debug: Log integration fields
@@ -88,21 +93,21 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Integration missing user context' }, { status: 500 });
     }
 
-    // 2. Check if code review agent is enabled for this owner
-    const agentConfig = await getAgentConfigForOwner(owner, 'code_review', 'github');
+    // 2. Check if code review agent is enabled for this owner (GitLab platform)
+    const agentConfig = await getAgentConfigForOwner(owner, 'code_review', 'gitlab');
 
     if (!agentConfig || !agentConfig.is_enabled) {
       logExceptInTest(
-        `Code review agent not enabled for ${owner.type} ${owner.id} (repo: ${repository.full_name})`
+        `Code review agent not enabled for ${owner.type} ${owner.id} (project: ${project.path_with_namespace})`
       );
       return NextResponse.json(
-        { message: 'Code review agent not enabled for this repository' },
+        { message: 'Code review agent not enabled for this project' },
         { status: 200 }
       );
     }
 
     logExceptInTest(
-      `Code review agent enabled for ${owner.type} ${owner.id}, processing ${repository.full_name}#${pull_request.number}`
+      `Code review agent enabled for ${owner.type} ${owner.id}, processing ${project.path_with_namespace}!${mr.iid}`
     );
 
     // 3. Check if repository is in allowed list (when using selected repositories mode)
@@ -111,34 +116,45 @@ export async function handlePullRequestCodeReview(
       config?.repository_selection_mode === 'selected' &&
       Array.isArray(config?.selected_repository_ids)
     ) {
-      const isRepositoryAllowed = config.selected_repository_ids.includes(repository.id);
+      // Check both selected_repository_ids and manually_added_repositories
+      const isInSelectedList = config.selected_repository_ids.includes(project.id);
+      const isInManuallyAddedList = Array.isArray(config.manually_added_repositories)
+        ? config.manually_added_repositories.some(repo => repo.id === project.id)
+        : false;
+      const isRepositoryAllowed = isInSelectedList || isInManuallyAddedList;
 
       if (!isRepositoryAllowed) {
         logExceptInTest(
-          `Repository ${repository.full_name} (ID: ${repository.id}) not in allowed list for ${owner.type} ${owner.id}`
+          `Project ${project.path_with_namespace} (ID: ${project.id}) not in allowed list for ${owner.type} ${owner.id}`
         );
         return NextResponse.json(
-          { message: 'Repository not configured for code reviews' },
+          { message: 'Project not configured for code reviews' },
           { status: 200 }
         );
       }
 
       logExceptInTest(
-        `Repository ${repository.full_name} (ID: ${repository.id}) is in allowed list, proceeding with review`
+        `Project ${project.path_with_namespace} (ID: ${project.id}) is in allowed list, proceeding with review`
       );
     }
 
-    // 4. Cancel any existing reviews for this PR (different SHA)
+    // Get the head SHA from the last commit
+    const headSha = mr.last_commit?.id;
+    if (!headSha) {
+      logExceptInTest('No head commit SHA found in MR payload:', {
+        mr_iid: mr.iid,
+        project: project.path_with_namespace,
+      });
+      return NextResponse.json({ message: 'No head commit found' }, { status: 400 });
+    }
+
+    // 4. Cancel any existing reviews for this MR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
-    const oldReviewIds = await findActiveReviewsForPR(
-      repository.full_name,
-      pull_request.number,
-      pull_request.head.sha
-    );
+    const oldReviewIds = await findActiveReviewsForPR(project.path_with_namespace, mr.iid, headSha);
 
     if (oldReviewIds.length > 0) {
       logExceptInTest(
-        `Cancelling ${oldReviewIds.length} old review(s) for ${repository.full_name}#${pull_request.number}`
+        `Cancelling ${oldReviewIds.length} old review(s) for ${project.path_with_namespace}!${mr.iid}`
       );
 
       // Cancel each review via the orchestrator (fire-and-forget, don't block new review)
@@ -152,16 +168,12 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // 5. Check for duplicate review (same repo, PR, SHA)
-    const existingReview = await findExistingReview(
-      repository.full_name,
-      pull_request.number,
-      pull_request.head.sha
-    );
+    // 5. Check for duplicate review (same project, MR, SHA)
+    const existingReview = await findExistingReview(project.path_with_namespace, mr.iid, headSha);
 
     if (existingReview) {
       logExceptInTest(
-        `Duplicate code review detected for ${repository.full_name}#${pull_request.number} @ ${pull_request.head.sha}`
+        `Duplicate code review detected for ${project.path_with_namespace}!${mr.iid} @ ${headSha}`
       );
       return NextResponse.json(
         {
@@ -177,33 +189,30 @@ export async function handlePullRequestCodeReview(
     const reviewId = await createCodeReview({
       owner,
       platformIntegrationId: integration.id,
-      repoFullName: repository.full_name,
-      prNumber: pull_request.number,
-      prUrl: pull_request.html_url as string,
-      prTitle: pull_request.title,
-      prAuthor: pull_request.user.login,
-      prAuthorGithubId: String(pull_request.user.id),
-      baseRef: pull_request.base.ref,
-      headRef: pull_request.head.ref,
-      headSha: pull_request.head.sha,
-      platform: 'github',
+      repoFullName: project.path_with_namespace,
+      prNumber: mr.iid,
+      prUrl: mr.url,
+      prTitle: mr.title,
+      prAuthor: payload.user.username,
+      baseRef: mr.target_branch,
+      headRef: mr.source_branch,
+      headSha,
+      platform: 'gitlab',
     });
 
-    logExceptInTest(
-      `Created code review ${reviewId} for ${repository.full_name}#${pull_request.number}`
-    );
+    logExceptInTest(`Created code review ${reviewId} for ${project.path_with_namespace}!${mr.iid}`);
 
     // 7. Post 👀 reaction to show Kilo is reviewing
     try {
-      const [repoOwner, repoName] = repository.full_name.split('/');
-      await addReactionToPR(
-        integration.platform_installation_id as string,
-        repoOwner,
-        repoName,
-        pull_request.number,
-        'eyes'
-      );
-      logExceptInTest(`Added eyes reaction to ${repository.full_name}#${pull_request.number}`);
+      // Get the access token from the integration
+      const fullIntegration = await getIntegrationById(integration.id);
+      if (fullIntegration?.metadata && typeof fullIntegration.metadata === 'object') {
+        const metadata = fullIntegration.metadata as { access_token?: string };
+        if (metadata.access_token) {
+          await addReactionToMR(metadata.access_token, project.id, mr.iid, 'eyes');
+          logExceptInTest(`Added eyes reaction to ${project.path_with_namespace}!${mr.iid}`);
+        }
+      }
     } catch (reactionError) {
       // Non-blocking - log but don't fail the review
       logExceptInTest('Failed to add eyes reaction:', reactionError);
@@ -214,7 +223,7 @@ export async function handlePullRequestCodeReview(
     try {
       const dispatchResult = await tryDispatchPendingReviews(owner);
 
-      logExceptInTest(`Dispatch attempt for ${repository.full_name}#${pull_request.number}`, {
+      logExceptInTest(`Dispatch attempt for ${project.path_with_namespace}!${mr.iid}`, {
         reviewId,
         dispatched: dispatchResult.dispatched,
         pending: dispatchResult.pending,
@@ -223,11 +232,11 @@ export async function handlePullRequestCodeReview(
     } catch (dispatchError) {
       logExceptInTest('Error during dispatch:', dispatchError);
       captureException(dispatchError, {
-        tags: { source: 'pull_request_webhook_dispatch' },
+        tags: { source: 'merge_request_webhook_dispatch' },
         extra: {
           reviewId,
-          repository: repository.full_name,
-          prNumber: pull_request.number,
+          project: project.path_with_namespace,
+          mrIid: mr.iid,
           owner,
         },
       });
@@ -245,10 +254,10 @@ export async function handlePullRequestCodeReview(
   } catch (error) {
     logExceptInTest('Error processing code review:', error);
     captureException(error, {
-      tags: { source: 'pull_request_webhook' },
+      tags: { source: 'merge_request_webhook' },
       extra: {
-        repository: repository.full_name,
-        prNumber: pull_request.number,
+        project: project.path_with_namespace,
+        mrIid: mr.iid,
       },
     });
 
@@ -263,20 +272,19 @@ export async function handlePullRequestCodeReview(
 }
 
 /**
- * Main router for pull request events
+ * Main router for merge request events
  */
-export async function handlePullRequest(
-  payload: PullRequestPayload,
+export async function handleMergeRequest(
+  payload: MergeRequestPayload,
   integration: PlatformIntegration
 ) {
-  const { action } = payload;
+  const { action } = payload.object_attributes;
 
   switch (action) {
-    case GITHUB_ACTION.OPENED:
-    case GITHUB_ACTION.SYNCHRONIZE:
-    case GITHUB_ACTION.REOPENED:
-    case GITHUB_ACTION.READY_FOR_REVIEW:
-      return handlePullRequestCodeReview(payload, integration);
+    case GITLAB_ACTION.OPEN:
+    case GITLAB_ACTION.UPDATE:
+    case GITLAB_ACTION.REOPEN:
+      return handleMergeRequestCodeReview(payload, integration);
     default:
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
   }

@@ -9,10 +9,12 @@ import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
 import { logExceptInTest } from '@/lib/utils.server';
+import crypto from 'crypto';
 
 const GITLAB_CLIENT_ID = process.env.GITLAB_CLIENT_ID;
 const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
 const GITLAB_REDIRECT_URI = `${APP_URL}/api/integrations/gitlab/callback`;
+const GITLAB_WEBHOOK_SECRET = getEnvVariable('GITLAB_WEBHOOK_SECRET');
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 
@@ -349,4 +351,460 @@ export function isTokenExpired(expiresAt: string | null): boolean {
   const bufferMs = 5 * 60 * 1000; // 5 minutes buffer
 
   return now >= expiryTime - bufferMs;
+}
+
+// ============================================================================
+// Webhook Verification
+// ============================================================================
+
+/**
+ * Verifies GitLab webhook token
+ * GitLab uses a simple secret token comparison (not HMAC like GitHub)
+ *
+ * @param token - The token from X-Gitlab-Token header
+ * @param expectedToken - The expected webhook secret (optional, uses env var if not provided)
+ */
+export function verifyGitLabWebhookToken(token: string, expectedToken?: string): boolean {
+  const secret = expectedToken || GITLAB_WEBHOOK_SECRET;
+
+  if (!secret) {
+    logExceptInTest('GitLab webhook secret not configured');
+    return false;
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
+// Merge Request API Functions
+// ============================================================================
+
+/**
+ * GitLab MR Note (comment) type
+ */
+export type GitLabNote = {
+  id: number;
+  body: string;
+  author: {
+    id: number;
+    username: string;
+    name: string;
+  };
+  created_at: string;
+  updated_at: string;
+  system: boolean;
+  noteable_id: number;
+  noteable_type: string;
+  noteable_iid: number;
+  resolvable: boolean;
+  resolved?: boolean;
+  resolved_by?: {
+    id: number;
+    username: string;
+    name: string;
+  };
+  position?: {
+    base_sha: string;
+    start_sha: string;
+    head_sha: string;
+    old_path: string;
+    new_path: string;
+    position_type: string;
+    old_line: number | null;
+    new_line: number | null;
+  };
+};
+
+/**
+ * GitLab MR Discussion type (threaded comments)
+ */
+export type GitLabDiscussion = {
+  id: string;
+  individual_note: boolean;
+  notes: GitLabNote[];
+};
+
+/**
+ * GitLab Merge Request type
+ */
+export type GitLabMergeRequest = {
+  id: number;
+  iid: number;
+  title: string;
+  description: string | null;
+  state: 'opened' | 'closed' | 'merged' | 'locked';
+  source_branch: string;
+  target_branch: string;
+  sha: string;
+  diff_refs: {
+    base_sha: string;
+    head_sha: string;
+    start_sha: string;
+  };
+  web_url: string;
+  author: {
+    id: number;
+    username: string;
+    name: string;
+  };
+};
+
+/**
+ * Finds an existing Kilo review note on a GitLab MR
+ * Looks for the <!-- kilo-review --> marker in MR notes
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function findKiloReviewNote(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<{ noteId: number; body: string } | null> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const notes: GitLabNote[] = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const response = await fetch(
+      `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes?per_page=${perPage}&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      logExceptInTest('GitLab MR notes fetch failed:', { status: response.status, error });
+      throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
+    }
+
+    const data = (await response.json()) as GitLabNote[];
+    notes.push(...data);
+
+    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    if (page >= totalPages) break;
+    page++;
+  }
+
+  logExceptInTest('[findKiloReviewNote] Fetched notes', {
+    projectId,
+    mrIid,
+    totalNotes: notes.length,
+  });
+
+  // Look for notes with the kilo-review marker
+  const markedNotes = notes.filter(n => n.body?.includes('<!-- kilo-review -->') && !n.system);
+
+  if (markedNotes.length > 0) {
+    // Sort by updated_at descending and pick the latest
+    const latestNote = markedNotes.sort((a, b) => {
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    })[0];
+
+    logExceptInTest('[findKiloReviewNote] Found note with marker', {
+      projectId,
+      mrIid,
+      noteId: latestNote.id,
+      markedNotesCount: markedNotes.length,
+    });
+
+    return { noteId: latestNote.id, body: latestNote.body };
+  }
+
+  logExceptInTest('[findKiloReviewNote] No existing Kilo review note found', {
+    projectId,
+    mrIid,
+    totalNotes: notes.length,
+  });
+
+  return null;
+}
+
+/**
+ * Fetches existing inline comments (discussions) on a GitLab MR
+ * Used to detect duplicates and track outdated comments
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function fetchMRInlineComments(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<
+  Array<{
+    id: number;
+    discussionId: string;
+    path: string;
+    line: number | null;
+    body: string;
+    isOutdated: boolean;
+    user: { username: string };
+  }>
+> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const discussions: GitLabDiscussion[] = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const response = await fetch(
+      `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/discussions?per_page=${perPage}&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      logExceptInTest('GitLab MR discussions fetch failed:', { status: response.status, error });
+      throw new Error(`GitLab MR discussions fetch failed: ${response.status}`);
+    }
+
+    const data = (await response.json()) as GitLabDiscussion[];
+    discussions.push(...data);
+
+    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    if (page >= totalPages) break;
+    page++;
+  }
+
+  // Extract inline comments from discussions
+  const inlineComments: Array<{
+    id: number;
+    discussionId: string;
+    path: string;
+    line: number | null;
+    body: string;
+    isOutdated: boolean;
+    user: { username: string };
+  }> = [];
+
+  for (const discussion of discussions) {
+    // Skip individual notes (non-threaded comments)
+    if (discussion.individual_note) continue;
+
+    for (const note of discussion.notes) {
+      // Only include notes with position (inline comments)
+      if (note.position) {
+        inlineComments.push({
+          id: note.id,
+          discussionId: discussion.id,
+          path: note.position.new_path || note.position.old_path,
+          line: note.position.new_line ?? note.position.old_line,
+          body: note.body,
+          // In GitLab, resolved discussions are considered "outdated" for our purposes
+          isOutdated: note.resolved === true,
+          user: { username: note.author.username },
+        });
+      }
+    }
+  }
+
+  logExceptInTest('[fetchMRInlineComments] Fetched inline comments', {
+    projectId,
+    mrIid,
+    totalDiscussions: discussions.length,
+    inlineComments: inlineComments.length,
+  });
+
+  return inlineComments;
+}
+
+/**
+ * Gets the HEAD commit SHA for a GitLab MR
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function getMRHeadCommit(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<string> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
+    throw new Error(`GitLab MR fetch failed: ${response.status}`);
+  }
+
+  const mr = (await response.json()) as GitLabMergeRequest;
+
+  logExceptInTest('[getMRHeadCommit] Got HEAD commit', {
+    projectId,
+    mrIid,
+    headSha: mr.sha.substring(0, 8),
+  });
+
+  return mr.sha;
+}
+
+/**
+ * Gets the diff refs (base, head, start SHA) for a GitLab MR
+ * Required for creating inline comments
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function getMRDiffRefs(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<{ baseSha: string; headSha: string; startSha: string }> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
+    throw new Error(`GitLab MR fetch failed: ${response.status}`);
+  }
+
+  const mr = (await response.json()) as GitLabMergeRequest;
+
+  logExceptInTest('[getMRDiffRefs] Got diff refs', {
+    projectId,
+    mrIid,
+    baseSha: mr.diff_refs.base_sha.substring(0, 8),
+    headSha: mr.diff_refs.head_sha.substring(0, 8),
+    startSha: mr.diff_refs.start_sha.substring(0, 8),
+  });
+
+  return {
+    baseSha: mr.diff_refs.base_sha,
+    headSha: mr.diff_refs.head_sha,
+    startSha: mr.diff_refs.start_sha,
+  };
+}
+
+/**
+ * Adds an award emoji (reaction) to a GitLab MR
+ * Used to show that Kilo is reviewing an MR (e.g., 👀 eyes reaction)
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param emoji - Emoji name (e.g., 'eyes', 'thumbsup', 'thumbsdown')
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function addReactionToMR(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  emoji: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<void> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/award_emoji`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: emoji }),
+    }
+  );
+
+  if (!response.ok) {
+    // 404 might mean the emoji already exists, which is fine
+    if (response.status === 404) {
+      logExceptInTest('[addReactionToMR] Emoji may already exist or MR not found', {
+        projectId,
+        mrIid,
+        emoji,
+      });
+      return;
+    }
+
+    const error = await response.text();
+    logExceptInTest('GitLab add reaction failed:', { status: response.status, error });
+    throw new Error(`GitLab add reaction failed: ${response.status}`);
+  }
+
+  logExceptInTest('[addReactionToMR] Added reaction', {
+    projectId,
+    mrIid,
+    emoji,
+  });
+}
+
+/**
+ * Gets a GitLab project by path
+ *
+ * @param accessToken - OAuth access token
+ * @param projectPath - Project path (e.g., "group/project")
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function getGitLabProject(
+  accessToken: string,
+  projectPath: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabProject> {
+  const encodedPath = encodeURIComponent(projectPath);
+
+  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedPath}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab project fetch failed:', { status: response.status, error });
+    throw new Error(`GitLab project fetch failed: ${response.status}`);
+  }
+
+  return (await response.json()) as GitLabProject;
 }

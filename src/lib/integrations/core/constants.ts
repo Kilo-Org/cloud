@@ -91,6 +91,55 @@ export const GITHUB_ACTION = {
 } as const;
 
 /**
+ * GitLab webhook event types
+ * These are the event names sent in the X-Gitlab-Event header
+ */
+export const GITLAB_EVENT = {
+  // Merge request events
+  MERGE_REQUEST: 'Merge Request Hook',
+
+  // Push events
+  PUSH: 'Push Hook',
+  TAG_PUSH: 'Tag Push Hook',
+
+  // Note (comment) events
+  NOTE: 'Note Hook',
+
+  // Issue events
+  ISSUE: 'Issue Hook',
+
+  // Pipeline events
+  PIPELINE: 'Pipeline Hook',
+  JOB: 'Job Hook',
+
+  // Wiki events
+  WIKI_PAGE: 'Wiki Page Hook',
+
+  // Deployment events
+  DEPLOYMENT: 'Deployment Hook',
+
+  // Release events
+  RELEASE: 'Release Hook',
+} as const;
+
+/**
+ * GitLab webhook action types
+ * These are the action values within merge request webhook payloads
+ */
+export const GITLAB_ACTION = {
+  // Merge request actions
+  OPEN: 'open',
+  CLOSE: 'close',
+  REOPEN: 'reopen',
+  UPDATE: 'update',
+  MERGE: 'merge',
+  APPROVED: 'approved',
+  UNAPPROVED: 'unapproved',
+  APPROVAL: 'approval',
+  UNAPPROVAL: 'unapproval',
+} as const;
+
+/**
  * Platform types
  */
 export const PLATFORM = {
@@ -113,5 +162,7 @@ export type PendingApprovalStatus =
   (typeof PENDING_APPROVAL_STATUS)[keyof typeof PENDING_APPROVAL_STATUS];
 export type GitHubEvent = (typeof GITHUB_EVENT)[keyof typeof GITHUB_EVENT];
 export type GitHubAction = (typeof GITHUB_ACTION)[keyof typeof GITHUB_ACTION];
+export type GitLabEvent = (typeof GITLAB_EVENT)[keyof typeof GITLAB_EVENT];
+export type GitLabAction = (typeof GITLAB_ACTION)[keyof typeof GITLAB_ACTION];
 export type Platform = (typeof PLATFORM)[keyof typeof PLATFORM];
 export type RepositorySelection = (typeof REPOSITORY_SELECTION)[keyof typeof REPOSITORY_SELECTION];

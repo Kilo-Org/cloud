@@ -601,3 +601,56 @@ export async function upsertPlatformIntegrationForOwner(
     });
   }
 }
+
+/**
+ * Find GitLab integration by project path
+ * GitLab webhooks include the project path, so we need to find the integration
+ * that has access to this project (either via 'all' repository access or selected repos)
+ *
+ * For MVP: We look up by webhook secret token stored in metadata
+ */
+export async function findGitLabIntegrationByWebhookToken(webhookToken: string) {
+  // GitLab integrations store webhook_secret in metadata
+  // We need to find the integration where metadata.webhook_secret matches
+  const integrations = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.platform, PLATFORM.GITLAB));
+
+  // Find the integration with matching webhook token
+  for (const integration of integrations) {
+    const metadata = integration.metadata as { webhook_secret?: string } | null;
+    if (metadata?.webhook_secret === webhookToken) {
+      return integration;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find GitLab integration by project ID
+ * Used when we know the GitLab project ID from the webhook payload
+ */
+export async function findGitLabIntegrationByProjectId(projectId: number) {
+  // Find integrations that have this project in their repositories list
+  const integrations = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.platform, PLATFORM.GITLAB));
+
+  for (const integration of integrations) {
+    // Check if repository_access is 'all' or if project is in selected repos
+    if (integration.repository_access === 'all') {
+      return integration;
+    }
+
+    // Check if project is in the repositories list
+    const repos = integration.repositories;
+    if (repos?.some(repo => repo.id === projectId)) {
+      return integration;
+    }
+  }
+
+  return null;
+}

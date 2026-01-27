@@ -21,8 +21,11 @@ import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect, type Repository } from './RepositoryMultiSelect';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
 
-type ReviewConfigFormProps = {
+type Platform = 'github' | 'gitlab';
+
+export type ReviewConfigFormProps = {
   organizationId?: string;
+  platform?: Platform;
 };
 
 const FOCUS_AREAS = [
@@ -52,8 +55,11 @@ const REVIEW_STYLES = [
   },
 ] as const;
 
-export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
+export function ReviewConfigForm({ organizationId, platform = 'github' }: ReviewConfigFormProps) {
   const trpc = useTRPC();
+  const isGitLab = platform === 'gitlab';
+  const platformLabel = isGitLab ? 'GitLab' : 'GitHub';
+  const prLabel = isGitLab ? 'merge requests' : 'pull requests';
 
   // Fetch current config
   const {
@@ -64,24 +70,34 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
     organizationId
       ? trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
           organizationId,
+          platform,
         })
-      : trpc.personalReviewAgent.getReviewConfig.queryOptions()
+      : trpc.personalReviewAgent.getReviewConfig.queryOptions({ platform })
   );
 
-  // Fetch GitHub repositories (cached by default)
+  // Fetch repositories based on platform (cached by default)
   const {
     data: repositoriesData,
     isLoading: isLoadingRepositories,
     error: repositoriesError,
   } = useQuery(
     organizationId
-      ? trpc.organizations.reviewAgent.listGitHubRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.personalReviewAgent.listGitHubRepositories.queryOptions({
-          forceRefresh: false,
-        })
+      ? isGitLab
+        ? trpc.organizations.reviewAgent.listGitLabRepositories.queryOptions({
+            organizationId,
+            forceRefresh: false,
+          })
+        : trpc.organizations.reviewAgent.listGitHubRepositories.queryOptions({
+            organizationId,
+            forceRefresh: false,
+          })
+      : isGitLab
+        ? trpc.personalReviewAgent.listGitLabRepositories.queryOptions({
+            forceRefresh: false,
+          })
+        : trpc.personalReviewAgent.listGitHubRepositories.queryOptions({
+            forceRefresh: false,
+          })
   );
 
   // Refresh repositories hook
@@ -89,26 +105,44 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
     getRefreshQueryOptions: useCallback(
       () =>
         organizationId
-          ? trpc.organizations.reviewAgent.listGitHubRepositories.queryOptions({
-              organizationId,
-              forceRefresh: true,
-            })
-          : trpc.personalReviewAgent.listGitHubRepositories.queryOptions({
-              forceRefresh: true,
-            }),
-      [organizationId, trpc]
+          ? isGitLab
+            ? trpc.organizations.reviewAgent.listGitLabRepositories.queryOptions({
+                organizationId,
+                forceRefresh: true,
+              })
+            : trpc.organizations.reviewAgent.listGitHubRepositories.queryOptions({
+                organizationId,
+                forceRefresh: true,
+              })
+          : isGitLab
+            ? trpc.personalReviewAgent.listGitLabRepositories.queryOptions({
+                forceRefresh: true,
+              })
+            : trpc.personalReviewAgent.listGitHubRepositories.queryOptions({
+                forceRefresh: true,
+              }),
+      [organizationId, trpc, isGitLab]
     ),
     getCacheQueryKey: useCallback(
       () =>
         organizationId
-          ? trpc.organizations.reviewAgent.listGitHubRepositories.queryKey({
-              organizationId,
-              forceRefresh: false,
-            })
-          : trpc.personalReviewAgent.listGitHubRepositories.queryKey({
-              forceRefresh: false,
-            }),
-      [organizationId, trpc]
+          ? isGitLab
+            ? trpc.organizations.reviewAgent.listGitLabRepositories.queryKey({
+                organizationId,
+                forceRefresh: false,
+              })
+            : trpc.organizations.reviewAgent.listGitHubRepositories.queryKey({
+                organizationId,
+                forceRefresh: false,
+              })
+          : isGitLab
+            ? trpc.personalReviewAgent.listGitLabRepositories.queryKey({
+                forceRefresh: false,
+              })
+            : trpc.personalReviewAgent.listGitHubRepositories.queryKey({
+                forceRefresh: false,
+              }),
+      [organizationId, trpc, isGitLab]
     ),
   });
 
@@ -124,6 +158,8 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
+  // Manually added repositories (for GitLab where pagination limits results)
+  const [manuallyAddedRepos, setManuallyAddedRepos] = useState<Repository[]>([]);
 
   // Update local state when config loads
   useEffect(() => {
@@ -136,6 +172,17 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
       setSelectedModel(configData.modelSlug);
       setRepositorySelectionMode(configData.repositorySelectionMode || 'all');
       setSelectedRepositoryIds(configData.selectedRepositoryIds || []);
+      // Load manually added repositories from config
+      if (configData.manuallyAddedRepositories) {
+        setManuallyAddedRepos(
+          configData.manuallyAddedRepositories.map(repo => ({
+            id: repo.id,
+            name: repo.name,
+            full_name: repo.full_name,
+            private: repo.private,
+          }))
+        );
+      }
     }
   }, [configData]);
 
@@ -143,12 +190,12 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
   const orgToggleMutation = useMutation(
     trpc.organizations.reviewAgent.toggleReviewAgent.mutationOptions({
       onSuccess: async data => {
-        toast.success(data.isEnabled ? 'Code Reviewer enabled' : 'Code Reviewer disabled');
+        toast.success(data.isEnabled ? 'Code Reviews enabled' : 'Code Reviews disabled');
         setIsEnabled(data.isEnabled);
         await refetch();
       },
       onError: error => {
-        toast.error('Failed to toggle Code Reviewer', {
+        toast.error('Failed to toggle code reviews', {
           description: error.message,
         });
       },
@@ -173,12 +220,12 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
   const personalToggleMutation = useMutation(
     trpc.personalReviewAgent.toggleReviewAgent.mutationOptions({
       onSuccess: async data => {
-        toast.success(data.isEnabled ? 'Code Reviewer enabled' : 'Code Reviewer disabled');
+        toast.success(data.isEnabled ? 'Code Reviews enabled' : 'Code Reviews disabled');
         setIsEnabled(data.isEnabled);
         await refetch();
       },
       onError: error => {
-        toast.error('Failed to toggle Code Reviewer', {
+        toast.error('Failed to toggle code reviews', {
           description: error.message,
         });
       },
@@ -203,19 +250,30 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
     if (organizationId) {
       orgToggleMutation.mutate({
         organizationId,
+        platform,
         isEnabled: checked,
       });
     } else {
       personalToggleMutation.mutate({
+        platform,
         isEnabled: checked,
       });
     }
   };
 
   const handleSave = () => {
+    // Convert manually added repos to the format expected by the API
+    const manuallyAddedRepositories = manuallyAddedRepos.map(repo => ({
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.full_name,
+      private: repo.private,
+    }));
+
     if (organizationId) {
       orgSaveMutation.mutate({
         organizationId,
+        platform,
         reviewStyle,
         focusAreas,
         customInstructions: customInstructions.trim() || undefined,
@@ -223,9 +281,11 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
         modelSlug: selectedModel,
         repositorySelectionMode,
         selectedRepositoryIds,
+        manuallyAddedRepositories,
       });
     } else {
       personalSaveMutation.mutate({
+        platform,
         reviewStyle,
         focusAreas,
         customInstructions: customInstructions.trim() || undefined,
@@ -233,6 +293,7 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
         modelSlug: selectedModel,
         repositorySelectionMode,
         selectedRepositoryIds,
+        manuallyAddedRepositories,
       });
     }
   };
@@ -271,7 +332,7 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
           Review Configuration
         </CardTitle>
         <CardDescription>
-          Customize how Code Reviewer analyzes your pull requests and the AI model
+          Customize how the Code Reviews analyze your {prLabel} and the AI model
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -283,7 +344,7 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
                 Enable AI Code Review
               </Label>
               <p className="text-muted-foreground text-sm">
-                Automatically review pull requests when they are opened or updated
+                Automatically review {prLabel} when they are opened or updated
               </p>
             </div>
             <Switch
@@ -372,14 +433,14 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
                 <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
                   <p className="text-sm text-yellow-200">
                     {repositoriesData?.errorMessage ||
-                      'GitHub integration is not connected. Please connect GitHub in the Integrations page to configure repository selection.'}
+                      `${platformLabel} integration is not connected. Please connect ${platformLabel} in the Integrations page to configure repository selection.`}
                   </p>
                 </div>
               ) : repositoriesData.repositories.length === 0 ? (
                 <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
                   <p className="text-sm text-yellow-200">
-                    No repositories found. Please ensure the GitHub App has access to your
-                    repositories.
+                    No repositories found. Please ensure the {platformLabel}{' '}
+                    {isGitLab ? 'integration' : 'App'} has access to your repositories.
                   </p>
                 </div>
               ) : (
@@ -407,15 +468,24 @@ export function ReviewConfigForm({ organizationId }: ReviewConfigFormProps) {
                     <div className="mt-4">
                       <RepositoryMultiSelect
                         repositories={
-                          repositoriesData.repositories.map(repo => ({
-                            id: repo.id,
-                            name: repo.name,
-                            full_name: repo.fullName,
-                            private: repo.private,
-                          })) as Repository[]
+                          [
+                            ...repositoriesData.repositories.map(repo => ({
+                              id: repo.id,
+                              name: repo.name,
+                              full_name: repo.fullName,
+                              private: repo.private,
+                            })),
+                            ...manuallyAddedRepos,
+                          ] as Repository[]
                         }
                         selectedIds={selectedRepositoryIds}
                         onSelectionChange={setSelectedRepositoryIds}
+                        allowManualAdd={isGitLab}
+                        onManualAdd={repo => {
+                          // Add to manually added repos and auto-select it
+                          setManuallyAddedRepos(prev => [...prev, repo]);
+                          setSelectedRepositoryIds(prev => [...prev, repo.id]);
+                        }}
                       />
                     </div>
                   )}

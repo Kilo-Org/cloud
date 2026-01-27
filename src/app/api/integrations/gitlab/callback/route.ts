@@ -15,6 +15,14 @@ import {
   calculateTokenExpiry,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { APP_URL } from '@/lib/constants';
+import { randomBytes } from 'crypto';
+
+/**
+ * Generates a secure random webhook secret for GitLab webhook verification
+ */
+function generateWebhookSecret(): string {
+  return randomBytes(32).toString('hex');
+}
 
 /**
  * GitLab OAuth Callback
@@ -91,19 +99,6 @@ export async function GET(request: NextRequest) {
 
     const tokenExpiresAt = calculateTokenExpiry(tokens.created_at, tokens.expires_in);
 
-    // TODO: Implement token/credential encryption?
-    const metadata: Record<string, unknown> = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      token_expires_at: tokenExpiresAt,
-      gitlab_instance_url: instanceUrl !== 'https://gitlab.com' ? instanceUrl : undefined,
-    };
-
-    if (customCredentials) {
-      metadata.client_id = customCredentials.clientId;
-      metadata.client_secret = customCredentials.clientSecret;
-    }
-
     const ownershipCondition =
       owner.type === 'user'
         ? eq(platform_integrations.owned_by_user_id, owner.id)
@@ -114,6 +109,24 @@ export async function GET(request: NextRequest) {
       .from(platform_integrations)
       .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.GITLAB)))
       .limit(1);
+
+    // Preserve existing webhook secret on update, generate new one on insert
+    const existingMetadata = existing?.metadata as Record<string, unknown> | null;
+    const webhookSecret = existingMetadata?.webhook_secret ?? generateWebhookSecret();
+
+    // TODO: Implement token/credential encryption?
+    const metadata: Record<string, unknown> = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_expires_at: tokenExpiresAt,
+      gitlab_instance_url: instanceUrl !== 'https://gitlab.com' ? instanceUrl : undefined,
+      webhook_secret: webhookSecret, // For GitLab webhook verification
+    };
+
+    if (customCredentials) {
+      metadata.client_id = customCredentials.clientId;
+      metadata.client_secret = customCredentials.clientSecret;
+    }
 
     if (existing) {
       await db

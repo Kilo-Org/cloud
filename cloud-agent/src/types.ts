@@ -65,6 +65,10 @@ export type SessionContext = {
   botId?: string;
   githubRepo?: string;
   githubToken?: string;
+  /** Generic git URL (e.g., GitLab, Bitbucket) */
+  gitUrl?: string;
+  /** Token for generic git authentication (e.g., GitLab token) */
+  gitToken?: string;
   envVars?: Record<string, string>;
 };
 /** Result of interrupting a session's running processes */

@@ -411,6 +411,8 @@ export class SessionService {
       botId: options.botId,
       githubRepo: options.githubRepo,
       githubToken: options.githubToken,
+      gitUrl: options.gitUrl,
+      gitToken: options.gitToken,
     };
   }
 
@@ -424,7 +426,9 @@ export class SessionService {
     githubToken?: string,
     githubRepo?: string,
     encryptedSecrets?: EncryptedSecrets,
-    createdOnPlatform?: string
+    createdOnPlatform?: string,
+    gitUrl?: string,
+    gitToken?: string
   ): Record<string, string> {
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
@@ -463,6 +467,34 @@ export class SessionService {
     // Set GH_TOKEN for GitHub repos only, respecting user overrides
     if (githubToken && githubRepo && !baseEnvVars.GH_TOKEN) {
       envVars.GH_TOKEN = githubToken;
+    }
+
+    // Set GITLAB_TOKEN for GitLab repos (detected by gitUrl containing gitlab), respecting user overrides
+    // This is used by the glab CLI and Kilocode for GitLab operations
+    if (gitToken && gitUrl && gitUrl.includes('gitlab') && !baseEnvVars.GITLAB_TOKEN) {
+      envVars.GITLAB_TOKEN = gitToken;
+
+      // Also set GITLAB_HOST for the glab CLI to know which instance to authenticate against
+      // Extract host from gitUrl (e.g., "https://gitlab.example.com/owner/repo.git" -> "gitlab.example.com")
+      if (!baseEnvVars.GITLAB_HOST) {
+        try {
+          const url = new URL(gitUrl);
+          envVars.GITLAB_HOST = url.host;
+        } catch {
+          // If URL parsing fails, default to gitlab.com
+          envVars.GITLAB_HOST = 'gitlab.com';
+        }
+      }
+
+      // Debug logging for GitLab token setup - FULL TOKEN for debugging
+      logger
+        .withFields({
+          gitUrl,
+          gitlabHost: envVars.GITLAB_HOST,
+          gitToken: gitToken, // FULL TOKEN for debugging
+          gitTokenLength: gitToken.length,
+        })
+        .info('[GITLAB-DEBUG] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
     }
 
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)
@@ -505,7 +537,9 @@ export class SessionService {
       context.githubToken,
       context.githubRepo,
       encryptedSecrets,
-      createdOnPlatform
+      createdOnPlatform,
+      context.gitUrl,
+      context.gitToken
     );
 
     const session = await sandbox.createSession({

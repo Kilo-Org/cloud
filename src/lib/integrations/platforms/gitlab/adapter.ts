@@ -1162,3 +1162,158 @@ export async function getGitLabProject(
 
   return (await response.json()) as GitLabProject;
 }
+
+// ============================================================================
+// Instance Validation
+// ============================================================================
+
+/**
+ * GitLab version response type
+ */
+export type GitLabVersion = {
+  version: string;
+  revision: string;
+  kas: {
+    enabled: boolean;
+    externalUrl: string | null;
+    version: string | null;
+  };
+  enterprise: boolean;
+};
+
+/**
+ * Result of validating a GitLab instance
+ */
+export type GitLabInstanceValidationResult = {
+  valid: boolean;
+  version?: string;
+  revision?: string;
+  enterprise?: boolean;
+  error?: string;
+};
+
+/**
+ * Validates that a URL points to a valid GitLab instance
+ *
+ * Uses the public /api/v4/version endpoint which doesn't require authentication.
+ * This allows users to verify their self-hosted GitLab URL before attempting OAuth.
+ *
+ * @param instanceUrl - The GitLab instance URL to validate
+ * @returns Validation result with version info if successful
+ */
+export async function validateGitLabInstance(
+  instanceUrl: string
+): Promise<GitLabInstanceValidationResult> {
+  // Normalize the URL
+  let normalizedUrl = instanceUrl.trim();
+
+  // Remove trailing slash if present
+  if (normalizedUrl.endsWith('/')) {
+    normalizedUrl = normalizedUrl.slice(0, -1);
+  }
+
+  // Validate URL format
+  try {
+    const url = new URL(normalizedUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return {
+        valid: false,
+        error: 'Invalid URL protocol. Must be http or https.',
+      };
+    }
+  } catch {
+    return {
+      valid: false,
+      error: 'Invalid URL format.',
+    };
+  }
+
+  try {
+    // The /api/v4/version endpoint is public and doesn't require authentication
+    const response = await fetch(`${normalizedUrl}/api/v4/version`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      // Set a reasonable timeout for the request
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      // 401/403 still indicates a valid GitLab instance (just requires auth for version)
+      // Some self-hosted instances may restrict the version endpoint
+      if (response.status === 401 || response.status === 403) {
+        logExceptInTest(
+          '[validateGitLabInstance] Version endpoint requires auth, but instance is valid',
+          {
+            instanceUrl: normalizedUrl,
+            status: response.status,
+          }
+        );
+        return {
+          valid: true,
+          error: 'GitLab instance found, but version info requires authentication.',
+        };
+      }
+
+      logExceptInTest('[validateGitLabInstance] Invalid response from instance', {
+        instanceUrl: normalizedUrl,
+        status: response.status,
+      });
+
+      return {
+        valid: false,
+        error: `GitLab instance returned status ${response.status}. Please verify the URL.`,
+      };
+    }
+
+    const data = (await response.json()) as GitLabVersion;
+
+    // Validate that the response looks like a GitLab version response
+    if (!data.version || typeof data.version !== 'string') {
+      return {
+        valid: false,
+        error: 'Response does not appear to be from a GitLab instance.',
+      };
+    }
+
+    logExceptInTest('[validateGitLabInstance] Valid GitLab instance found', {
+      instanceUrl: normalizedUrl,
+      version: data.version,
+      enterprise: data.enterprise,
+    });
+
+    return {
+      valid: true,
+      version: data.version,
+      revision: data.revision,
+      enterprise: data.enterprise,
+    };
+  } catch (error) {
+    // Handle timeout
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return {
+        valid: false,
+        error: 'Connection timed out. Please verify the URL is accessible.',
+      };
+    }
+
+    // Handle network errors
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return {
+        valid: false,
+        error: 'Could not connect to the GitLab instance. Please verify the URL is accessible.',
+      };
+    }
+
+    logExceptInTest('[validateGitLabInstance] Error validating instance', {
+      instanceUrl: normalizedUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      valid: false,
+      error: 'Failed to validate GitLab instance. Please verify the URL is correct and accessible.',
+    };
+  }
+}

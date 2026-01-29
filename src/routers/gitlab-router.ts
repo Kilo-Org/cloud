@@ -3,8 +3,23 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import * as gitlabService from '@/lib/integrations/gitlab-service';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { validateGitLabInstance } from '@/lib/integrations/platforms/gitlab/adapter';
 
 export const gitlabRouter = createTRPCRouter({
+  /**
+   * Validates that a URL points to a valid GitLab instance.
+   * Used to verify self-hosted GitLab URLs before OAuth setup.
+   */
+  validateInstance: baseProcedure
+    .input(
+      z.object({
+        instanceUrl: z.string().url(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return validateGitLabInstance(input.instanceUrl);
+    }),
+
   getInstallation: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
     const integration = await gitlabService.getGitLabIntegration(owner);

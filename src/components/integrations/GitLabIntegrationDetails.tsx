@@ -14,15 +14,26 @@ import {
   ExternalLink,
   RefreshCw,
   Server,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useGitLabQueries } from './GitLabContext';
+import { useMutation } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
 
 type GitLabIntegrationDetailsProps = {
   organizationId?: string;
   organizationName?: string;
   success?: boolean;
+  error?: string;
+};
+
+type InstanceValidationState = {
+  status: 'idle' | 'validating' | 'valid' | 'invalid';
+  version?: string;
+  enterprise?: boolean;
   error?: string;
 };
 
@@ -35,12 +46,81 @@ export function GitLabIntegrationDetails({
   const [showSelfHosted, setShowSelfHosted] = useState(false);
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [instanceValidation, setInstanceValidation] = useState<InstanceValidationState>({
+    status: 'idle',
+  });
+
+  const trpc = useTRPC();
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isSelfHostedInput = Boolean(
     instanceUrl && instanceUrl !== 'https://gitlab.com' && instanceUrl !== ''
   );
 
   const { queries, mutations } = useGitLabQueries();
+
+  // Instance validation mutation
+  const { mutate: validateInstanceMutate } = useMutation(
+    trpc.gitlab.validateInstance.mutationOptions({
+      onSuccess: result => {
+        if (result.valid) {
+          setInstanceValidation({
+            status: 'valid',
+            version: result.version,
+            enterprise: result.enterprise,
+            error: result.error, // May have a warning even if valid
+          });
+        } else {
+          setInstanceValidation({
+            status: 'invalid',
+            error: result.error,
+          });
+        }
+      },
+      onError: err => {
+        setInstanceValidation({
+          status: 'invalid',
+          error: err.message || 'Failed to validate GitLab instance',
+        });
+      },
+    })
+  );
+
+  // Validate instance URL when it changes (with debounce)
+  useEffect(() => {
+    // Clear any pending validation
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    if (!isSelfHostedInput) {
+      setInstanceValidation({ status: 'idle' });
+      return;
+    }
+
+    // Basic URL validation before making the request
+    try {
+      new URL(instanceUrl);
+    } catch {
+      setInstanceValidation({
+        status: 'invalid',
+        error: 'Invalid URL format',
+      });
+      return;
+    }
+
+    setInstanceValidation({ status: 'validating' });
+
+    validationTimeoutRef.current = setTimeout(() => {
+      validateInstanceMutate({ instanceUrl });
+    }, 500);
+
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, [instanceUrl, isSelfHostedInput, validateInstanceMutate]);
 
   const { data: installationData, isLoading } = queries.getInstallation();
 
@@ -62,7 +142,7 @@ export function GitLabIntegrationDetails({
 
   const handleConnect = () => {
     if (isSelfHostedInput && (!clientId || !clientSecret)) {
-      toast.error('Please enter your GitLab Application ID and Secret');
+      toast.error('Please enter your GitLab Client ID and Secret');
       return;
     }
 
@@ -303,71 +383,117 @@ export function GitLabIntegrationDetails({
                           placeholder="https://gitlab.example.com"
                           value={instanceUrl}
                           onChange={e => setInstanceUrl(e.target.value)}
+                          className={
+                            instanceValidation.status === 'valid'
+                              ? 'border-green-500 pr-10'
+                              : instanceValidation.status === 'invalid'
+                                ? 'border-red-500 pr-10'
+                                : instanceValidation.status === 'validating'
+                                  ? 'pr-10'
+                                  : ''
+                          }
                         />
+                        {instanceValidation.status === 'validating' && (
+                          <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
+                        )}
+                        {instanceValidation.status === 'valid' && (
+                          <CheckCircle2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-green-500" />
+                        )}
+                        {instanceValidation.status === 'invalid' && (
+                          <AlertCircle className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-red-500" />
+                        )}
+                      </div>
+
+                      {/* Validation status message */}
+                      {instanceValidation.status === 'valid' && instanceValidation.version && (
+                        <p className="flex items-center gap-1 text-xs text-green-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          GitLab {instanceValidation.version} detected
+                          {instanceValidation.enterprise && ' (Enterprise Edition)'}
+                        </p>
+                      )}
+                      {instanceValidation.status === 'valid' && instanceValidation.error && (
+                        <p className="text-muted-foreground text-xs">{instanceValidation.error}</p>
+                      )}
+                      {instanceValidation.status === 'invalid' && instanceValidation.error && (
+                        <p className="flex items-center gap-1 text-xs text-red-600">
+                          <AlertCircle className="h-3 w-3" />
+                          {instanceValidation.error}
+                        </p>
+                      )}
+                      {instanceValidation.status === 'idle' && (
                         <p className="text-muted-foreground text-xs">
                           Enter your self-hosted GitLab instance URL.
                         </p>
-                      </div>
-
-                      {isSelfHostedInput && (
-                        <>
-                          <Alert>
-                            <AlertDescription className="text-sm">
-                              For self-hosted GitLab, you need to create an OAuth application on
-                              your instance:
-                              <ol className="mt-2 list-inside list-decimal space-y-1">
-                                <li>
-                                  Go to <strong>Admin Area → Applications</strong> (or User Settings
-                                  → Applications)
-                                </li>
-                                <li>
-                                  Create a new application with:
-                                  <ul className="mt-1 ml-4 list-inside list-disc text-xs">
-                                    <li>
-                                      Redirect URI:{' '}
-                                      <code className="bg-muted rounded px-1">
-                                        http://localhost:3000/api/integrations/gitlab/callback
-                                      </code>
-                                    </li>
-                                    <li>
-                                      Scopes: <code className="bg-muted rounded px-1">api</code>,{' '}
-                                      <code className="bg-muted rounded px-1">read_user</code>,{' '}
-                                      <code className="bg-muted rounded px-1">read_repository</code>
-                                    </li>
-                                  </ul>
-                                </li>
-                                <li>Copy the Application ID and Secret below</li>
-                              </ol>
-                            </AlertDescription>
-                          </Alert>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="clientId">Application ID</Label>
-                            <Input
-                              id="clientId"
-                              type="text"
-                              placeholder="Your GitLab Application ID"
-                              value={clientId}
-                              onChange={e => setClientId(e.target.value)}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="clientSecret">Application Secret</Label>
-                            <Input
-                              id="clientSecret"
-                              type="password"
-                              placeholder="Your GitLab Application Secret"
-                              value={clientSecret}
-                              onChange={e => setClientSecret(e.target.value)}
-                            />
-                            <p className="text-muted-foreground text-xs">
-                              Your credentials are encrypted and stored securely.
-                            </p>
-                          </div>
-                        </>
+                      )}
+                      {instanceValidation.status === 'validating' && (
+                        <p className="text-muted-foreground text-xs">
+                          Validating GitLab instance...
+                        </p>
                       )}
                     </div>
+
+                    {isSelfHostedInput && instanceValidation.status === 'valid' && (
+                      <>
+                        <Alert>
+                          <AlertDescription className="text-sm">
+                            For self-hosted GitLab, you need to create an OAuth application on your
+                            instance:
+                            <ol className="mt-2 list-inside list-decimal space-y-1">
+                              <li>
+                                Go to <strong>Admin Area → Applications</strong> (or User Settings →
+                                Applications)
+                              </li>
+                              <li>
+                                Create a new application with:
+                                <ul className="mt-1 ml-4 list-inside list-disc text-xs">
+                                  <li>
+                                    Redirect URI:{' '}
+                                    <code className="bg-muted rounded px-1">
+                                      {typeof window !== 'undefined'
+                                        ? `${window.location.origin}/api/integrations/gitlab/callback`
+                                        : 'https://app.kilo.ai/api/integrations/gitlab/callback'}
+                                    </code>
+                                  </li>
+                                  <li>
+                                    Scopes: <code className="bg-muted rounded px-1">api</code>,{' '}
+                                    <code className="bg-muted rounded px-1">read_user</code>,{' '}
+                                    <code className="bg-muted rounded px-1">read_repository</code>,{' '}
+                                    <code className="bg-muted rounded px-1">write_repository</code>
+                                  </li>
+                                </ul>
+                              </li>
+                              <li>Copy the Client ID and Secret below</li>
+                            </ol>
+                          </AlertDescription>
+                        </Alert>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="clientId">Client ID</Label>
+                          <Input
+                            id="clientId"
+                            type="text"
+                            placeholder="Your GitLab Client ID"
+                            value={clientId}
+                            onChange={e => setClientId(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="clientSecret">Client Secret</Label>
+                          <Input
+                            id="clientSecret"
+                            type="password"
+                            placeholder="Your GitLab Client Secret"
+                            value={clientSecret}
+                            onChange={e => setClientSecret(e.target.value)}
+                          />
+                          <p className="text-muted-foreground text-xs">
+                            Your credentials are encrypted and stored securely.
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -376,7 +502,10 @@ export function GitLabIntegrationDetails({
                 onClick={handleConnect}
                 size="lg"
                 className="w-full"
-                disabled={isSelfHostedInput && (!clientId || !clientSecret)}
+                disabled={
+                  isSelfHostedInput &&
+                  (!clientId || !clientSecret || instanceValidation.status !== 'valid')
+                }
               >
                 <GitBranch className="mr-2 h-4 w-4" />
                 Connect {isSelfHostedInput ? 'Self-Hosted ' : ''}GitLab

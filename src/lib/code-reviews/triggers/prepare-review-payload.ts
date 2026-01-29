@@ -8,7 +8,6 @@
  */
 
 import { captureException } from '@sentry/nextjs';
-import { debugLog, logTokenInfo, logReviewStart } from '../debug-logger';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -102,9 +101,7 @@ export async function prepareReviewPayload(
 ): Promise<CodeReviewPayload> {
   const { reviewId, owner, agentConfig, platform = 'github' } = params;
 
-  // Debug logging for GitLab reviews
-  logReviewStart(reviewId, platform);
-  debugLog('prepareReviewPayload', 'Starting payload preparation', {
+  logExceptInTest('[prepareReviewPayload] Starting payload preparation', {
     reviewId,
     platform,
     ownerType: owner.type,
@@ -118,7 +115,7 @@ export async function prepareReviewPayload(
       throw new Error(`Review ${reviewId} not found`);
     }
 
-    debugLog('prepareReviewPayload', 'Found review in DB', {
+    logExceptInTest('[prepareReviewPayload] Found review in DB', {
       reviewId,
       repoFullName: review.repo_full_name,
       prNumber: review.pr_number,
@@ -207,22 +204,18 @@ export async function prepareReviewPayload(
           // GitLab: Use OAuth token from metadata
           const metadata = integration.metadata as GitLabOAuthMetadata | null;
 
-          debugLog('prepareReviewPayload', 'GitLab integration found', {
+          logExceptInTest('[prepareReviewPayload] GitLab integration found', {
             integrationId: integration.id,
             hasMetadata: !!metadata,
             hasAccessToken: !!metadata?.access_token,
             hasRefreshToken: !!metadata?.refresh_token,
             instanceUrl: metadata?.instance_url,
-            tokenExpiresAt: metadata?.token_expires_at,
           });
 
           if (metadata?.access_token) {
             gitlabToken = metadata.access_token;
             gitlabInstanceUrl = metadata.instance_url || 'https://gitlab.com';
             const instanceUrl = gitlabInstanceUrl;
-
-            logTokenInfo('prepareReviewPayload', 'GitLab OAuth Token', gitlabToken);
-            debugLog('prepareReviewPayload', 'GitLab instance URL', { instanceUrl });
 
             // Check if token needs refresh
             if (isTokenExpired(metadata.token_expires_at ?? null) && metadata.refresh_token) {
@@ -382,16 +375,14 @@ export async function prepareReviewPayload(
             upstreamBranch: review.head_ref,
           };
 
-    // Debug log the session input for GitLab
+    // Log the session input for GitLab
     if (platform === 'gitlab') {
-      debugLog('prepareReviewPayload', 'GitLab session input prepared', {
+      logExceptInTest('[prepareReviewPayload] GitLab session input prepared', {
         gitUrl: sessionInput.gitUrl,
         hasGitToken: !!sessionInput.gitToken,
-        gitTokenLength: sessionInput.gitToken?.length,
         upstreamBranch: sessionInput.upstreamBranch,
         model: sessionInput.model,
       });
-      logTokenInfo('prepareReviewPayload', 'Session gitToken', sessionInput.gitToken);
     }
 
     // 7. Build complete payload

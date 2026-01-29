@@ -654,3 +654,59 @@ export async function findGitLabIntegrationByProjectId(projectId: number) {
 
   return null;
 }
+
+/**
+ * Updates the metadata for a platform integration
+ * Used for storing webhook configuration, tokens, etc.
+ */
+export async function updateIntegrationMetadata(
+  integrationId: string,
+  metadata: Record<string, unknown>
+) {
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integrationId));
+}
+
+/**
+ * Updates the metadata for a platform integration owned by a specific owner
+ * Merges new metadata with existing metadata
+ */
+export async function updateIntegrationMetadataForOwner(
+  owner: Owner,
+  platform: string,
+  metadataUpdates: Record<string, unknown>
+) {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(platform_integrations.owned_by_user_id, owner.id)
+      : eq(platform_integrations.owned_by_organization_id, owner.id);
+
+  // Get existing integration to merge metadata
+  const [existing] = await db
+    .select()
+    .from(platform_integrations)
+    .where(and(ownershipCondition, eq(platform_integrations.platform, platform)))
+    .limit(1);
+
+  if (!existing) {
+    throw new Error(`No ${platform} integration found for owner`);
+  }
+
+  const existingMetadata = (existing.metadata as Record<string, unknown>) || {};
+  const mergedMetadata = { ...existingMetadata, ...metadataUpdates };
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: mergedMetadata,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, existing.id));
+
+  return mergedMetadata;
+}

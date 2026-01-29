@@ -7,7 +7,10 @@ import {
   OrganizationIdInputSchema,
 } from './utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import {
+  getIntegrationForOrganization,
+  updateIntegrationMetadata,
+} from '@/lib/integrations/db/platform-integrations';
 import {
   getAgentConfig,
   upsertAgentConfig,
@@ -19,6 +22,12 @@ import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import {
+  syncWebhooksForRepositories,
+  type ConfiguredWebhook,
+} from '@/lib/integrations/platforms/gitlab/webhook-sync';
+import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import { logExceptInTest } from '@/lib/utils.server';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -39,6 +48,8 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
+  // GitLab-specific: auto-configure webhooks
+  autoConfigureWebhooks: z.boolean().optional().default(true),
 });
 
 export const organizationReviewAgentRouter = createTRPCRouter({
@@ -163,6 +174,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
   /**
    * Saves the review agent configuration
+   * For GitLab: optionally syncs webhooks for selected repositories
    */
   saveReviewConfig: organizationOwnerProcedure
     .input(SaveReviewConfigInputSchema)
@@ -170,6 +182,13 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       try {
         const platform = input.platform ?? 'github';
 
+        // Get previous config to determine which repos were previously selected
+        const previousConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
+        const previousRepoIds =
+          (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
+          [];
+
+        // Save the agent config
         await upsertAgentConfig({
           organizationId: input.organizationId,
           agentType: 'code_review',
@@ -187,6 +206,80 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           createdBy: ctx.user.id,
         });
 
+        // For GitLab: sync webhooks if auto-configure is enabled
+        let webhookSyncResult = null;
+        if (
+          platform === 'gitlab' &&
+          input.autoConfigureWebhooks !== false &&
+          input.repositorySelectionMode === 'selected'
+        ) {
+          const integration = await getIntegrationForOrganization(
+            input.organizationId,
+            PLATFORM.GITLAB
+          );
+          if (integration) {
+            const metadata = integration.metadata as Record<string, unknown> | null;
+            const webhookSecret = metadata?.webhook_secret as string | undefined;
+            const instanceUrl =
+              (metadata?.gitlab_instance_url as string | undefined) || 'https://gitlab.com';
+            const configuredWebhooks =
+              (metadata?.configured_webhooks as Record<string, ConfiguredWebhook>) || {};
+
+            if (webhookSecret) {
+              try {
+                // Get a valid access token (handles refresh if expired)
+                const accessToken = await getValidGitLabToken(integration);
+
+                const { result, updatedWebhooks } = await syncWebhooksForRepositories(
+                  accessToken,
+                  webhookSecret,
+                  input.selectedRepositoryIds || [],
+                  previousRepoIds,
+                  configuredWebhooks,
+                  instanceUrl
+                );
+
+                // Update integration metadata with new webhook configuration
+                const existingMetadata = (integration.metadata as Record<string, unknown>) || {};
+                await updateIntegrationMetadata(integration.id, {
+                  ...existingMetadata,
+                  configured_webhooks: updatedWebhooks,
+                });
+
+                webhookSyncResult = {
+                  created: result.created.length,
+                  updated: result.updated.length,
+                  deleted: result.deleted.length,
+                  errors: result.errors,
+                };
+
+                logExceptInTest(
+                  '[saveReviewConfig] Webhook sync completed for organization',
+                  webhookSyncResult
+                );
+              } catch (webhookError) {
+                // Log but don't fail the config save
+                logExceptInTest('[saveReviewConfig] Webhook sync failed for organization', {
+                  error:
+                    webhookError instanceof Error ? webhookError.message : String(webhookError),
+                });
+                webhookSyncResult = {
+                  created: 0,
+                  updated: 0,
+                  deleted: 0,
+                  errors: [
+                    {
+                      projectId: 0,
+                      error: webhookError instanceof Error ? webhookError.message : 'Unknown error',
+                      operation: 'sync' as const,
+                    },
+                  ],
+                };
+              }
+            }
+          }
+        }
+
         // Audit log
         await createAuditLog({
           organization_id: input.organizationId,
@@ -194,10 +287,13 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
-          message: `Updated Review Agent configuration for ${platform} (style: ${input.reviewStyle})`,
+          message: `Updated Review Agent configuration for ${platform} (style: ${input.reviewStyle})${webhookSyncResult ? `, webhooks: ${webhookSyncResult.created} created, ${webhookSyncResult.deleted} deleted` : ''}`,
         });
 
-        return { success: true };
+        return {
+          success: true,
+          webhookSync: webhookSyncResult,
+        };
       } catch (error) {
         console.error('Error saving review config:', error);
         throw new TRPCError({

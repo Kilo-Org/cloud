@@ -8,19 +8,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Rocket,
-  ExternalLink,
-  Settings2,
-  ListChecks,
-  Copy,
-  Check,
-  Info,
-  RefreshCw,
-} from 'lucide-react';
+import { Rocket, ExternalLink, Settings2, ListChecks } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
@@ -39,11 +29,7 @@ export function ReviewAgentPageClient({
   errorMessage,
 }: ReviewAgentPageClientProps) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('github');
-  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
-  const [copiedWebhookSecret, setCopiedWebhookSecret] = useState(false);
-  const [regeneratedSecret, setRegeneratedSecret] = useState<string | null>(null);
 
   // Fetch GitHub App installation status
   const { data: githubStatusData } = useQuery(
@@ -55,48 +41,9 @@ export function ReviewAgentPageClient({
     trpc.personalReviewAgent.getGitLabStatus.queryOptions()
   );
 
-  // Mutation for regenerating webhook secret
-  const regenerateSecretMutation = useMutation(
-    trpc.gitlab.regenerateWebhookSecret.mutationOptions({
-      onSuccess: data => {
-        setRegeneratedSecret(data.webhookSecret);
-        toast.success('Webhook secret regenerated successfully');
-        // Invalidate the GitLab status query to refresh the data
-        void queryClient.invalidateQueries({
-          queryKey: trpc.personalReviewAgent.getGitLabStatus.queryKey(),
-        });
-      },
-      onError: error => {
-        toast.error('Failed to regenerate webhook secret', {
-          description: error.message,
-        });
-      },
-    })
-  );
-
-  const handleRegenerateSecret = () => {
-    setRegeneratedSecret(null); // Clear any previously shown secret
-    regenerateSecretMutation.mutate({});
-  };
-
-  const handleCopyRegeneratedSecret = async () => {
-    if (regeneratedSecret) {
-      await navigator.clipboard.writeText(regeneratedSecret);
-      setCopiedWebhookSecret(true);
-      toast.success('New webhook secret copied to clipboard');
-      setTimeout(() => setCopiedWebhookSecret(false), 2000);
-    }
-  };
-
   const isGitHubAppInstalled =
     githubStatusData?.connected && githubStatusData?.integration?.isValid;
   const isGitLabConnected = gitlabStatusData?.connected && gitlabStatusData?.integration?.isValid;
-
-  // Get webhook URL for GitLab
-  const webhookUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/api/webhooks/gitlab`
-      : '/api/webhooks/gitlab';
 
   // Show toast messages from URL params
   useEffect(() => {
@@ -112,23 +59,6 @@ export function ReviewAgentPageClient({
       });
     }
   }, [successMessage, errorMessage]);
-
-  const handleCopyWebhookUrl = async () => {
-    await navigator.clipboard.writeText(webhookUrl);
-    setCopiedWebhookUrl(true);
-    toast.success('Webhook URL copied to clipboard');
-    setTimeout(() => setCopiedWebhookUrl(false), 2000);
-  };
-
-  const handleCopyWebhookSecret = async () => {
-    const secret = gitlabStatusData?.integration?.webhookSecret;
-    if (secret) {
-      await navigator.clipboard.writeText(secret);
-      setCopiedWebhookSecret(true);
-      toast.success('Webhook secret copied to clipboard');
-      setTimeout(() => setCopiedWebhookSecret(false), 2000);
-    }
-  };
 
   return (
     <PageContainer>
@@ -269,141 +199,6 @@ export function ReviewAgentPageClient({
             </Alert>
           )}
 
-          {/* GitLab Webhook Setup Card - Show when connected */}
-          {isGitLabConnected && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Info className="h-5 w-5" />
-                  Webhook Configuration
-                </CardTitle>
-                <CardDescription>
-                  Configure a webhook in your GitLab project to enable automatic code reviews on
-                  merge requests
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Webhook URL</label>
-                  <div className="flex items-center gap-2">
-                    <code className="bg-muted flex-1 rounded px-3 py-2 font-mono text-sm break-all">
-                      {webhookUrl}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCopyWebhookUrl}
-                      className="shrink-0"
-                    >
-                      {copiedWebhookUrl ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Secret Token</label>
-                  {regeneratedSecret ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <code className="bg-muted flex-1 rounded px-3 py-2 font-mono text-sm break-all">
-                          {regeneratedSecret}
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCopyRegeneratedSecret}
-                          className="shrink-0"
-                        >
-                          {copiedWebhookSecret ? (
-                            <Check className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-2">
-                        <p className="text-xs text-yellow-200">
-                          <strong>Important:</strong> Copy this secret now! It won't be shown again.
-                          Update your GitLab webhook settings with this new secret.
-                        </p>
-                      </div>
-                    </>
-                  ) : gitlabStatusData?.integration?.webhookSecret ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <code className="bg-muted flex-1 rounded px-3 py-2 font-mono text-sm">
-                          ••••••••••••••••
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCopyWebhookSecret}
-                          className="shrink-0"
-                        >
-                          {copiedWebhookSecret ? (
-                            <Check className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      <p className="text-muted-foreground text-xs">
-                        Use this secret token in your GitLab webhook configuration for security
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">
-                      No webhook secret configured. Click regenerate to create one.
-                    </p>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRegenerateSecret}
-                    disabled={regenerateSecretMutation.isPending}
-                    className="mt-2"
-                  >
-                    <RefreshCw
-                      className={`mr-2 h-4 w-4 ${regenerateSecretMutation.isPending ? 'animate-spin' : ''}`}
-                    />
-                    {regenerateSecretMutation.isPending ? 'Regenerating...' : 'Regenerate Secret'}
-                  </Button>
-                  <p className="text-muted-foreground text-xs">
-                    Lost your webhook secret? Regenerate it here and update your GitLab webhook
-                    settings.
-                  </p>
-                </div>
-
-                <div className="rounded-md border border-blue-500/30 bg-blue-500/10 p-3">
-                  <p className="text-sm text-blue-200">
-                    <strong>Setup Instructions:</strong>
-                  </p>
-                  <ol className="mt-2 list-inside list-decimal space-y-1 text-sm text-blue-200/80">
-                    <li>Go to your GitLab project → Settings → Webhooks</li>
-                    <li>Paste the Webhook URL above</li>
-                    <li>Add the Secret Token for security</li>
-                    <li>Select "Merge request events" as the trigger</li>
-                    <li>Click "Add webhook"</li>
-                  </ol>
-                </div>
-
-                <a
-                  href={`${gitlabStatusData?.integration?.instanceUrl || 'https://gitlab.com'}/-/profile/applications`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
-                >
-                  Open GitLab Settings
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </CardContent>
-            </Card>
-          )}
-
           {/* GitLab Configuration Tabs */}
           <Tabs defaultValue="config" className="w-full">
             <TabsList className="grid w-full max-w-2xl grid-cols-2">
@@ -422,7 +217,23 @@ export function ReviewAgentPageClient({
             </TabsList>
 
             <TabsContent value="config" className="mt-6 space-y-4">
-              <ReviewConfigForm platform="gitlab" />
+              <ReviewConfigForm
+                platform="gitlab"
+                gitlabStatusData={
+                  gitlabStatusData
+                    ? {
+                        connected: gitlabStatusData.connected,
+                        integration: gitlabStatusData.integration
+                          ? {
+                              isValid: gitlabStatusData.integration.isValid,
+                              webhookSecret: gitlabStatusData.integration.webhookSecret,
+                              instanceUrl: gitlabStatusData.integration.instanceUrl,
+                            }
+                          : undefined,
+                      }
+                    : undefined
+                }
+              />
             </TabsContent>
 
             <TabsContent value="jobs" className="mt-6 space-y-4">

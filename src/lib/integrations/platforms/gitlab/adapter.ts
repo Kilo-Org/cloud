@@ -381,6 +381,360 @@ export function verifyGitLabWebhookToken(token: string, expectedToken?: string):
 }
 
 // ============================================================================
+// Webhook Management API Functions
+// ============================================================================
+
+/**
+ * Custom error class for webhook permission issues
+ * Thrown when user doesn't have Maintainer+ role on a project
+ */
+export class GitLabWebhookPermissionError extends Error {
+  constructor(
+    public projectId: string | number,
+    public statusCode: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabWebhookPermissionError';
+  }
+}
+
+/**
+ * GitLab Project Webhook type
+ */
+export type GitLabWebhook = {
+  id: number;
+  url: string;
+  project_id: number;
+  push_events: boolean;
+  push_events_branch_filter: string;
+  issues_events: boolean;
+  confidential_issues_events: boolean;
+  merge_requests_events: boolean;
+  tag_push_events: boolean;
+  note_events: boolean;
+  confidential_note_events: boolean;
+  job_events: boolean;
+  pipeline_events: boolean;
+  wiki_page_events: boolean;
+  deployment_events: boolean;
+  releases_events: boolean;
+  subgroup_events: boolean;
+  member_events: boolean;
+  enable_ssl_verification: boolean;
+  created_at: string;
+};
+
+/**
+ * Lists all webhooks for a GitLab project
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ */
+export async function listProjectWebhooks(
+  accessToken: string,
+  projectId: string | number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabWebhook[]> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedProjectId}/hooks`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab list webhooks failed:', {
+      status: response.status,
+      error,
+      projectId,
+    });
+
+    // 401/403 indicate permission issues - user doesn't have Maintainer+ role
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabWebhookPermissionError(
+        projectId,
+        response.status,
+        `Insufficient permissions to manage webhooks for project ${projectId}. Requires Maintainer role or higher.`
+      );
+    }
+
+    throw new Error(`GitLab list webhooks failed: ${response.status}`);
+  }
+
+  return (await response.json()) as GitLabWebhook[];
+}
+
+/**
+ * Creates a webhook for a GitLab project
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param webhookUrl - URL to receive webhook events
+ * @param webhookSecret - Secret token for webhook verification
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ */
+export async function createProjectWebhook(
+  accessToken: string,
+  projectId: string | number,
+  webhookUrl: string,
+  webhookSecret: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabWebhook> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedProjectId}/hooks`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: 'Kilo Code Reviews',
+      description: 'Auto-configured webhook for Kilo AI code reviews',
+      url: webhookUrl,
+      token: webhookSecret,
+      merge_requests_events: true,
+      push_events: false,
+      issues_events: false,
+      confidential_issues_events: false,
+      tag_push_events: false,
+      note_events: false,
+      confidential_note_events: false,
+      job_events: false,
+      pipeline_events: false,
+      wiki_page_events: false,
+      deployment_events: false,
+      releases_events: false,
+      enable_ssl_verification: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab create webhook failed:', {
+      status: response.status,
+      error,
+      projectId,
+    });
+
+    // 401/403 indicate permission issues - user doesn't have Maintainer+ role
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabWebhookPermissionError(
+        projectId,
+        response.status,
+        `Insufficient permissions to create webhook for project ${projectId}. Requires Maintainer role or higher.`
+      );
+    }
+
+    throw new Error(`GitLab create webhook failed: ${response.status} - ${error}`);
+  }
+
+  const webhook = (await response.json()) as GitLabWebhook;
+
+  logExceptInTest('[createProjectWebhook] Created webhook', {
+    projectId,
+    webhookId: webhook.id,
+    url: webhookUrl,
+  });
+
+  return webhook;
+}
+
+/**
+ * Updates an existing webhook for a GitLab project
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param hookId - ID of the webhook to update
+ * @param webhookUrl - URL to receive webhook events
+ * @param webhookSecret - Secret token for webhook verification
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ */
+export async function updateProjectWebhook(
+  accessToken: string,
+  projectId: string | number,
+  hookId: number,
+  webhookUrl: string,
+  webhookSecret: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabWebhook> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/hooks/${hookId}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: 'Kilo Code Reviews',
+        description: 'Auto-configured webhook for Kilo AI code reviews',
+        url: webhookUrl,
+        token: webhookSecret,
+        merge_requests_events: true,
+        push_events: false,
+        issues_events: false,
+        confidential_issues_events: false,
+        tag_push_events: false,
+        note_events: false,
+        confidential_note_events: false,
+        job_events: false,
+        pipeline_events: false,
+        wiki_page_events: false,
+        deployment_events: false,
+        releases_events: false,
+        enable_ssl_verification: true,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab update webhook failed:', {
+      status: response.status,
+      error,
+      projectId,
+      hookId,
+    });
+
+    // 401/403 indicate permission issues - user doesn't have Maintainer+ role
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabWebhookPermissionError(
+        projectId,
+        response.status,
+        `Insufficient permissions to update webhook for project ${projectId}. Requires Maintainer role or higher.`
+      );
+    }
+
+    throw new Error(`GitLab update webhook failed: ${response.status} - ${error}`);
+  }
+
+  const webhook = (await response.json()) as GitLabWebhook;
+
+  logExceptInTest('[updateProjectWebhook] Updated webhook', {
+    projectId,
+    webhookId: webhook.id,
+    url: webhookUrl,
+  });
+
+  return webhook;
+}
+
+/**
+ * Deletes a webhook from a GitLab project
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param hookId - ID of the webhook to delete
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function deleteProjectWebhook(
+  accessToken: string,
+  projectId: string | number,
+  hookId: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<void> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/hooks/${hookId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  // 404 means webhook already deleted, which is fine
+  if (!response.ok && response.status !== 404) {
+    const error = await response.text();
+    logExceptInTest('GitLab delete webhook failed:', {
+      status: response.status,
+      error,
+      projectId,
+      hookId,
+    });
+    throw new Error(`GitLab delete webhook failed: ${response.status} - ${error}`);
+  }
+
+  logExceptInTest('[deleteProjectWebhook] Deleted webhook', {
+    projectId,
+    hookId,
+    wasAlreadyDeleted: response.status === 404,
+  });
+}
+
+/**
+ * Normalizes a URL for comparison by decoding percent-encoded characters
+ * and ensuring consistent formatting
+ */
+function normalizeUrlForComparison(url: string): string {
+  try {
+    // Decode the URL to handle percent-encoded characters
+    const decoded = decodeURIComponent(url);
+    // Parse and re-stringify to normalize the URL format
+    const parsed = new URL(decoded);
+    return parsed.toString();
+  } catch {
+    // If URL parsing fails, return the original URL
+    return url;
+  }
+}
+
+/**
+ * Finds an existing Kilo webhook on a GitLab project by URL
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param kiloWebhookUrl - The Kilo webhook URL to search for
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function findKiloWebhook(
+  accessToken: string,
+  projectId: string | number,
+  kiloWebhookUrl: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabWebhook | null> {
+  const webhooks = await listProjectWebhooks(accessToken, projectId, instanceUrl);
+
+  // Normalize the target URL for comparison
+  const normalizedTargetUrl = normalizeUrlForComparison(kiloWebhookUrl);
+
+  // Find webhook by comparing normalized URLs
+  const kiloWebhook = webhooks.find(
+    hook => normalizeUrlForComparison(hook.url) === normalizedTargetUrl
+  );
+
+  if (kiloWebhook) {
+    logExceptInTest('[findKiloWebhook] Found existing Kilo webhook', {
+      projectId,
+      webhookId: kiloWebhook.id,
+    });
+  } else {
+    logExceptInTest('[findKiloWebhook] No existing Kilo webhook found', {
+      projectId,
+      totalWebhooks: webhooks.length,
+    });
+  }
+
+  return kiloWebhook || null;
+}
+
+// ============================================================================
 // Merge Request API Functions
 // ============================================================================
 

@@ -279,6 +279,180 @@ export async function fetchGitLabProjects(
 }
 
 /**
+ * Normalizes a search query by extracting the project path from a GitLab URL if provided.
+ * Supports multiple input formats:
+ * - Full URL: https://gitlab.com/group123/project123
+ * - Path format: group123/project123
+ * - Project name only: project123
+ *
+ * @param query - The search query (may be a URL, path, or project name)
+ * @returns The normalized search query (project path or name)
+ */
+export function normalizeGitLabSearchQuery(query: string): string {
+  const trimmedQuery = query.trim();
+
+  // Check if it looks like a URL
+  if (trimmedQuery.startsWith('http://') || trimmedQuery.startsWith('https://')) {
+    try {
+      const url = new URL(trimmedQuery);
+      // Extract the pathname and remove leading slash
+      // e.g., /group123/project123 -> group123/project123
+      const path = url.pathname.replace(/^\//, '').replace(/\/$/, '');
+
+      // Remove common GitLab URL suffixes like /-/tree/main, /-/merge_requests, etc.
+      const cleanPath = path.replace(/\/-\/.*$/, '');
+
+      if (cleanPath) {
+        logExceptInTest('Normalized GitLab URL to path', {
+          originalQuery: trimmedQuery,
+          extractedPath: cleanPath,
+        });
+        return cleanPath;
+      }
+    } catch {
+      // Not a valid URL, use as-is
+    }
+  }
+
+  // Return the query as-is (could be a path like "group/project" or just "project")
+  return trimmedQuery;
+}
+
+/**
+ * Fetches a GitLab project by path and returns it as a PlatformRepository
+ * Returns null if the project is not found or user doesn't have access
+ *
+ * @param accessToken - OAuth access token
+ * @param projectPath - Project path (e.g., "group/project")
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+async function fetchProjectByPath(
+  accessToken: string,
+  projectPath: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<PlatformRepository | null> {
+  const encodedPath = encodeURIComponent(projectPath);
+
+  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedPath}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    // 404 means project not found or no access - this is expected
+    if (response.status === 404) {
+      logExceptInTest('GitLab project not found by path', { projectPath });
+      return null;
+    }
+    // Other errors - log but don't throw, we'll fall back to search
+    logExceptInTest('GitLab project fetch by path failed:', {
+      status: response.status,
+      projectPath,
+    });
+    return null;
+  }
+
+  const project = (await response.json()) as GitLabProject;
+
+  // Skip archived projects
+  if (project.archived) {
+    logExceptInTest('GitLab project found but is archived', { projectPath });
+    return null;
+  }
+
+  logExceptInTest('GitLab project found by path', {
+    projectPath,
+    projectId: project.id,
+    name: project.name,
+  });
+
+  return {
+    id: project.id,
+    name: project.name,
+    full_name: project.path_with_namespace,
+    private: project.visibility === 'private',
+  };
+}
+
+/**
+ * Searches GitLab projects by name using the GitLab API
+ * Used when users have 100+ repositories and need to find specific ones
+ *
+ * Supports multiple input formats:
+ * - Full URL: https://gitlab.com/group123/project123
+ * - Path format: group123/project123
+ * - Project name only: project123
+ *
+ * When a URL or path is provided, the function first tries to fetch the project
+ * directly by path. If that fails, it falls back to a text search.
+ *
+ * @param accessToken - OAuth access token
+ * @param query - Search query string (URL, path, or project name - minimum 2 characters recommended)
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @param limit - Maximum number of results to return (default 20)
+ */
+export async function searchGitLabProjects(
+  accessToken: string,
+  query: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL,
+  limit: number = 20
+): Promise<PlatformRepository[]> {
+  // Normalize the query to handle URLs
+  const normalizedQuery = normalizeGitLabSearchQuery(query);
+
+  // If the query looks like a project path (contains /), try direct lookup first
+  if (normalizedQuery.includes('/')) {
+    const directProject = await fetchProjectByPath(accessToken, normalizedQuery, instanceUrl);
+    if (directProject) {
+      logExceptInTest('GitLab search: returning direct path match', {
+        originalQuery: query,
+        normalizedQuery,
+        projectId: directProject.id,
+      });
+      return [directProject];
+    }
+    // If direct lookup failed, fall through to search
+    logExceptInTest('GitLab search: direct path lookup failed, falling back to search', {
+      originalQuery: query,
+      normalizedQuery,
+    });
+  }
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects?membership=true&search=${encodeURIComponent(normalizedQuery)}&per_page=${limit}&archived=false`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab projects search failed:', { status: response.status, error });
+    throw new Error(`GitLab projects search failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as GitLabProject[];
+
+  const projects = data.map(project => ({
+    id: project.id,
+    name: project.name,
+    full_name: project.path_with_namespace,
+    private: project.visibility === 'private',
+  }));
+
+  logExceptInTest('GitLab projects search completed', {
+    originalQuery: query,
+    normalizedQuery,
+    count: projects.length,
+  });
+
+  return projects;
+}
+
+/**
  * Fetches all branches for a GitLab project
  *
  * @param accessToken - OAuth access token

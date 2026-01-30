@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const expectedToken = metadata?.webhook_secret;
 
     // Verify the token matches (double-check)
-    if (!expectedToken || !verifyGitLabWebhookToken(webhookToken, expectedToken)) {
+    if (!verifyGitLabWebhookToken(webhookToken, expectedToken)) {
       logExceptInTest('Webhook token verification failed');
       return new NextResponse('Unauthorized', { status: 401 });
     }

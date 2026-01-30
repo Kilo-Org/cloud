@@ -14,7 +14,6 @@ import crypto from 'crypto';
 const GITLAB_CLIENT_ID = process.env.GITLAB_CLIENT_ID;
 const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
 const GITLAB_REDIRECT_URI = `${APP_URL}/api/integrations/gitlab/callback`;
-const GITLAB_WEBHOOK_SECRET = getEnvVariable('GITLAB_WEBHOOK_SECRET');
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 
@@ -365,16 +364,14 @@ export function isTokenExpired(expiresAt: string | null): boolean {
  * @param expectedToken - The expected webhook secret (optional, uses env var if not provided)
  */
 export function verifyGitLabWebhookToken(token: string, expectedToken?: string): boolean {
-  const secret = expectedToken || GITLAB_WEBHOOK_SECRET;
-
-  if (!secret) {
+  if (!expectedToken) {
     logExceptInTest('GitLab webhook secret not configured');
     return false;
   }
 
   // Use timing-safe comparison to prevent timing attacks
   try {
-    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedToken));
   } catch {
     return false;
   }

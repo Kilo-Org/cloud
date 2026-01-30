@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ReviewConfigForm } from '@/components/code-reviews/ReviewConfigForm';
 import { CodeReviewJobsCard } from '@/components/code-reviews/CodeReviewJobsCard';
@@ -12,6 +12,8 @@ import { Rocket, ExternalLink, Settings2, ListChecks } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { GitLabLogo } from '@/components/auth/GitLabLogo';
+import { GitHubLogo } from '@/components/auth/GitHubLogo';
 
 type ReviewAgentPageClientProps = {
   organizationId: string;
@@ -20,6 +22,8 @@ type ReviewAgentPageClientProps = {
   errorMessage?: string;
 };
 
+type Platform = 'github' | 'gitlab';
+
 export function ReviewAgentPageClient({
   organizationId,
   organizationName,
@@ -27,20 +31,33 @@ export function ReviewAgentPageClient({
   errorMessage,
 }: ReviewAgentPageClientProps) {
   const trpc = useTRPC();
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('github');
 
   // Fetch GitHub App installation status
-  const { data: statusData } = useQuery(
+  const { data: githubStatusData } = useQuery(
     trpc.organizations.reviewAgent.getGitHubStatus.queryOptions({
       organizationId,
     })
   );
 
-  const isGitHubAppInstalled = statusData?.connected && statusData?.integration?.isValid;
+  // Fetch GitLab OAuth integration status
+  const { data: gitlabStatusData } = useQuery(
+    trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
+      organizationId,
+    })
+  );
+
+  const isGitHubAppInstalled =
+    githubStatusData?.connected && githubStatusData?.integration?.isValid;
+  const isGitLabConnected = gitlabStatusData?.connected && gitlabStatusData?.integration?.isValid;
 
   // Show toast messages from URL params
   useEffect(() => {
     if (successMessage === 'github_connected') {
       toast.success('GitHub account connected successfully');
+    }
+    if (successMessage === 'gitlab_connected') {
+      toast.success('GitLab account connected successfully');
     }
     if (errorMessage) {
       toast.error('An error occurred', {
@@ -71,95 +88,174 @@ export function ReviewAgentPageClient({
         </a>
       </div>
 
-      {/* GitHub App Required Alert */}
-      {!isGitHubAppInstalled && (
-        <Alert>
-          <Rocket className="h-4 w-4" />
-          <AlertTitle>GitHub App Required</AlertTitle>
-          <AlertDescription className="space-y-3">
-            <p>
-              The Kilo GitHub App must be installed to use Code Reviewer. The app automatically
-              manages workflows and triggers reviews on your pull requests.
-            </p>
-            <Link href={`/organizations/${organizationId}/integrations/github`}>
-              <Button variant="default" size="sm">
-                Install GitHub App
-                <ExternalLink className="ml-2 h-3 w-3" />
-              </Button>
-            </Link>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Tabbed Content */}
-      <Tabs defaultValue="config" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-2">
-          {/* <TabsTrigger value="setup" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            Setup
-          </TabsTrigger> */}
-          <TabsTrigger value="config" className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4" />
-            Config
+      {/* Platform Selection Tabs */}
+      <Tabs
+        value={selectedPlatform}
+        onValueChange={v => setSelectedPlatform(v as Platform)}
+        className="w-full"
+      >
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="github" className="flex items-center gap-2">
+            <GitHubLogo className="h-4 w-4" />
+            GitHub
+            {isGitHubAppInstalled && (
+              <Badge
+                variant="outline"
+                className="ml-1 border-green-500/30 bg-green-500/10 text-xs text-green-400"
+              >
+                Connected
+              </Badge>
+            )}
           </TabsTrigger>
-          <TabsTrigger
-            value="jobs"
-            className="flex items-center gap-2"
-            disabled={!isGitHubAppInstalled}
-          >
-            <ListChecks className="h-4 w-4" />
-            Jobs
+          <TabsTrigger value="gitlab" className="flex items-center gap-2">
+            <GitLabLogo className="h-4 w-4" />
+            GitLab
+            {isGitLabConnected && (
+              <Badge
+                variant="outline"
+                className="ml-1 border-green-500/30 bg-green-500/10 text-xs text-green-400"
+              >
+                Connected
+              </Badge>
+            )}
           </TabsTrigger>
-          {/* <TabsTrigger
-            value="activity"
-            className="flex items-center gap-2"
-            disabled={!isGitHubAppInstalled}
-          >
-            <Activity className="h-4 w-4" />
-            Activity
-          </TabsTrigger> */}
         </TabsList>
 
-        {/* Setup Tab */}
-        {/* <TabsContent value="setup" className="mt-6 space-y-4">
-          <SetupInstructionsCard organizationId={organizationId} />
-        </TabsContent> */}
-
-        {/* Configuration Tab */}
-        <TabsContent value="config" className="mt-6 space-y-4">
-          <ReviewConfigForm organizationId={organizationId} />
-        </TabsContent>
-
-        {/* Jobs Tab */}
-        <TabsContent value="jobs" className="mt-6 space-y-4">
-          {isGitHubAppInstalled ? (
-            <CodeReviewJobsCard organizationId={organizationId} />
-          ) : (
+        {/* GitHub Tab Content */}
+        <TabsContent value="github" className="mt-6 space-y-6">
+          {/* GitHub App Required Alert */}
+          {!isGitHubAppInstalled && (
             <Alert>
-              <ListChecks className="h-4 w-4" />
-              <AlertTitle>No Jobs Yet</AlertTitle>
-              <AlertDescription>
-                Install the GitHub App and configure your review settings to see code review jobs
-                here.
+              <Rocket className="h-4 w-4" />
+              <AlertTitle>GitHub App Required</AlertTitle>
+              <AlertDescription className="space-y-3">
+                <p>
+                  The Kilo GitHub App must be installed to use Code Reviewer. The app automatically
+                  manages workflows and triggers reviews on your pull requests.
+                </p>
+                <Link href={`/organizations/${organizationId}/integrations/github`}>
+                  <Button variant="default" size="sm">
+                    Install GitHub App
+                    <ExternalLink className="ml-2 h-3 w-3" />
+                  </Button>
+                </Link>
               </AlertDescription>
             </Alert>
           )}
+
+          {/* GitHub Configuration Tabs */}
+          <Tabs defaultValue="config" className="w-full">
+            <TabsList className="grid w-full max-w-2xl grid-cols-2">
+              <TabsTrigger value="config" className="flex items-center gap-2">
+                <Settings2 className="h-4 w-4" />
+                Config
+              </TabsTrigger>
+              <TabsTrigger
+                value="jobs"
+                className="flex items-center gap-2"
+                disabled={!isGitHubAppInstalled}
+              >
+                <ListChecks className="h-4 w-4" />
+                Jobs
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="config" className="mt-6 space-y-4">
+              <ReviewConfigForm organizationId={organizationId} platform="github" />
+            </TabsContent>
+
+            <TabsContent value="jobs" className="mt-6 space-y-4">
+              {isGitHubAppInstalled ? (
+                <CodeReviewJobsCard organizationId={organizationId} platform="github" />
+              ) : (
+                <Alert>
+                  <ListChecks className="h-4 w-4" />
+                  <AlertTitle>No Jobs Yet</AlertTitle>
+                  <AlertDescription>
+                    Install the GitHub App and configure your review settings to see code review
+                    jobs here.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        {/* Recent Activity Tab */}
-        {/* <TabsContent value="activity" className="mt-6 space-y-4">
-          {isGitHubAppInstalled ? (
-            <RecentTriggersCard organizationId={organizationId} />
-          ) : (
+        {/* GitLab Tab Content */}
+        <TabsContent value="gitlab" className="mt-6 space-y-6">
+          {/* GitLab Connection Required Alert */}
+          {!isGitLabConnected && (
             <Alert>
-              <Activity className="h-4 w-4" />
-              <AlertTitle>No Activity Yet</AlertTitle>
-              <AlertDescription>
-                Install the GitHub App and configure your review settings to see activity here.
+              <Rocket className="h-4 w-4" />
+              <AlertTitle>GitLab Connection Required</AlertTitle>
+              <AlertDescription className="space-y-3">
+                <p>
+                  Connect your GitLab account to use Code Reviews for GitLab. You'll also need to
+                  configure a webhook in your GitLab project settings.
+                </p>
+                <Link href={`/organizations/${organizationId}/integrations/gitlab`}>
+                  <Button variant="default" size="sm">
+                    Connect GitLab
+                    <ExternalLink className="ml-2 h-3 w-3" />
+                  </Button>
+                </Link>
               </AlertDescription>
             </Alert>
           )}
-        </TabsContent> */}
+
+          {/* GitLab Configuration Tabs */}
+          <Tabs defaultValue="config" className="w-full">
+            <TabsList className="grid w-full max-w-2xl grid-cols-2">
+              <TabsTrigger value="config" className="flex items-center gap-2">
+                <Settings2 className="h-4 w-4" />
+                Config
+              </TabsTrigger>
+              <TabsTrigger
+                value="jobs"
+                className="flex items-center gap-2"
+                disabled={!isGitLabConnected}
+              >
+                <ListChecks className="h-4 w-4" />
+                Jobs
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="config" className="mt-6 space-y-4">
+              <ReviewConfigForm
+                organizationId={organizationId}
+                platform="gitlab"
+                gitlabStatusData={
+                  gitlabStatusData
+                    ? {
+                        connected: gitlabStatusData.connected,
+                        integration: gitlabStatusData.integration
+                          ? {
+                              isValid: gitlabStatusData.integration.isValid,
+                              webhookSecret: gitlabStatusData.integration.webhookSecret,
+                              instanceUrl: gitlabStatusData.integration.instanceUrl,
+                            }
+                          : undefined,
+                      }
+                    : undefined
+                }
+              />
+            </TabsContent>
+
+            <TabsContent value="jobs" className="mt-6 space-y-4">
+              {isGitLabConnected ? (
+                <CodeReviewJobsCard organizationId={organizationId} platform="gitlab" />
+              ) : (
+                <Alert>
+                  <ListChecks className="h-4 w-4" />
+                  <AlertTitle>No Jobs Yet</AlertTitle>
+                  <AlertDescription>
+                    Connect GitLab and configure your review settings to see code review jobs here.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
       </Tabs>
     </>
   );

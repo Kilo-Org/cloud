@@ -19,7 +19,10 @@ import {
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
-import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import {
+  fetchGitLabRepositoriesForOrganization,
+  searchGitLabRepositoriesForOrganization,
+} from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -132,6 +135,20 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       return await fetchGitLabRepositoriesForOrganization(input.organizationId, input.forceRefresh);
+    }),
+
+  /**
+   * Search GitLab repositories by query string
+   * Used when organizations have 100+ repositories and need to find specific ones
+   */
+  searchGitLabRepositories: organizationMemberProcedure
+    .input(
+      OrganizationIdInputSchema.extend({
+        query: z.string().min(2),
+      })
+    )
+    .query(async ({ input }) => {
+      return await searchGitLabRepositoriesForOrganization(input.organizationId, input.query);
     }),
 
   /**

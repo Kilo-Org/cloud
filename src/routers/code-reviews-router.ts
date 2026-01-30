@@ -12,7 +12,10 @@ import {
 } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
-import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import {
+  fetchGitLabRepositoriesForUser,
+  searchGitLabRepositoriesForUser,
+} from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -118,6 +121,16 @@ export const personalReviewAgentRouter = createTRPCRouter({
     .input(z.object({ forceRefresh: z.boolean().optional().default(false) }).optional())
     .query(async ({ ctx, input }) => {
       return await fetchGitLabRepositoriesForUser(ctx.user.id, input?.forceRefresh ?? false);
+    }),
+
+  /**
+   * Search GitLab repositories by query string
+   * Used when users have 100+ repositories and need to find specific ones
+   */
+  searchGitLabRepositories: baseProcedure
+    .input(z.object({ query: z.string().min(2) }))
+    .query(async ({ ctx, input }) => {
+      return await searchGitLabRepositoriesForUser(ctx.user.id, input.query);
     }),
 
   /**

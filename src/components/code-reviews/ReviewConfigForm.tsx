@@ -21,7 +21,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback } from 'react';
@@ -83,6 +83,7 @@ export function ReviewConfigForm({
   gitlabStatusData,
 }: ReviewConfigFormProps) {
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const isGitLab = platform === 'gitlab';
   const platformLabel = isGitLab ? 'GitLab' : 'GitHub';
@@ -267,7 +268,9 @@ export function ReviewConfigForm({
       setCustomInstructions(configData.customInstructions || '');
       setMaxReviewTime([configData.maxReviewTimeMinutes]);
       setSelectedModel(configData.modelSlug);
-      setRepositorySelectionMode(configData.repositorySelectionMode || 'all');
+      // For GitLab, default to 'selected' mode since 'all' is not supported
+      const repoMode = configData.repositorySelectionMode || 'all';
+      setRepositorySelectionMode(isGitLab ? 'selected' : repoMode);
       setSelectedRepositoryIds(configData.selectedRepositoryIds || []);
       // Load manually added repositories from config
       if (configData.manuallyAddedRepositories) {
@@ -281,7 +284,7 @@ export function ReviewConfigForm({
         );
       }
     }
-  }, [configData]);
+  }, [configData, isGitLab]);
 
   // Organization mutations
   const orgToggleMutation = useMutation(
@@ -583,26 +586,32 @@ export function ReviewConfigForm({
                 </div>
               ) : (
                 <>
-                  <RadioGroup
-                    value={repositorySelectionMode}
-                    onValueChange={value => setRepositorySelectionMode(value as 'all' | 'selected')}
-                    className="space-y-3"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <RadioGroupItem value="all" id="all-repos" />
-                      <Label htmlFor="all-repos" className="cursor-pointer font-normal">
-                        All repositories ({repositoriesData.repositories.length})
-                      </Label>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <RadioGroupItem value="selected" id="selected-repos" className="mt-1" />
-                      <Label htmlFor="selected-repos" className="cursor-pointer font-normal">
-                        Selected repositories
-                      </Label>
-                    </div>
-                  </RadioGroup>
+                  {/* For GitLab, only show "Selected repositories" since "All" is not supported */}
+                  {!isGitLab && (
+                    <RadioGroup
+                      value={repositorySelectionMode}
+                      onValueChange={value =>
+                        setRepositorySelectionMode(value as 'all' | 'selected')
+                      }
+                      className="space-y-3"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="all" id="all-repos" />
+                        <Label htmlFor="all-repos" className="cursor-pointer font-normal">
+                          All repositories ({repositoriesData.repositories.length})
+                        </Label>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <RadioGroupItem value="selected" id="selected-repos" className="mt-1" />
+                        <Label htmlFor="selected-repos" className="cursor-pointer font-normal">
+                          Selected repositories
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  )}
 
-                  {repositorySelectionMode === 'selected' && (
+                  {/* For GitLab, always show the multi-select; for GitHub, only when 'selected' mode */}
+                  {(isGitLab || repositorySelectionMode === 'selected') && (
                     <div className="mt-4">
                       <RepositoryMultiSelect
                         repositories={
@@ -624,6 +633,41 @@ export function ReviewConfigForm({
                           setManuallyAddedRepos(prev => [...prev, repo]);
                           setSelectedRepositoryIds(prev => [...prev, repo.id]);
                         }}
+                        onSearch={
+                          isGitLab
+                            ? async (query: string) => {
+                                // Call the appropriate search endpoint based on context
+                                if (organizationId) {
+                                  const result =
+                                    await trpcClient.organizations.reviewAgent.searchGitLabRepositories.query(
+                                      {
+                                        organizationId,
+                                        query,
+                                      }
+                                    );
+                                  return result.repositories.map(repo => ({
+                                    id: repo.id,
+                                    name: repo.name,
+                                    full_name: repo.fullName,
+                                    private: repo.private,
+                                  }));
+                                } else {
+                                  const result =
+                                    await trpcClient.personalReviewAgent.searchGitLabRepositories.query(
+                                      {
+                                        query,
+                                      }
+                                    );
+                                  return result.repositories.map(repo => ({
+                                    id: repo.id,
+                                    name: repo.name,
+                                    full_name: repo.fullName,
+                                    private: repo.private,
+                                  }));
+                                }
+                              }
+                            : undefined
+                        }
                       />
                     </div>
                   )}

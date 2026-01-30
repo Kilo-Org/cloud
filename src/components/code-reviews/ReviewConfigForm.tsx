@@ -287,12 +287,12 @@ export function ReviewConfigForm({
   const orgToggleMutation = useMutation(
     trpc.organizations.reviewAgent.toggleReviewAgent.mutationOptions({
       onSuccess: async data => {
-        toast.success(data.isEnabled ? 'Code Reviews enabled' : 'Code Reviews disabled');
+        toast.success(data.isEnabled ? 'Code Reviewer enabled' : 'Code Reviewer disabled');
         setIsEnabled(data.isEnabled);
         await refetch();
       },
       onError: error => {
-        toast.error('Failed to toggle code reviews', {
+        toast.error('Failed to toggle Code Reviewer', {
           description: error.message,
         });
       },
@@ -334,12 +334,12 @@ export function ReviewConfigForm({
   const personalToggleMutation = useMutation(
     trpc.personalReviewAgent.toggleReviewAgent.mutationOptions({
       onSuccess: async data => {
-        toast.success(data.isEnabled ? 'Code Reviews enabled' : 'Code Reviews disabled');
+        toast.success(data.isEnabled ? 'Code Reviewer enabled' : 'Code Reviewer disabled');
         setIsEnabled(data.isEnabled);
         await refetch();
       },
       onError: error => {
-        toast.error('Failed to toggle code reviews', {
+        toast.error('Failed to toggle Code Reviewer', {
           description: error.message,
         });
       },
@@ -470,7 +470,7 @@ export function ReviewConfigForm({
           Review Configuration
         </CardTitle>
         <CardDescription>
-          Customize how the Code Reviews analyze your {prLabel} and the AI model
+          Customize how Code Reviewer analyzes your {prLabel} and the AI model
         </CardDescription>
       </CardHeader>
       <CardContent>

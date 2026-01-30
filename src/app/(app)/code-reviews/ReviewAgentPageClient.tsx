@@ -65,11 +65,11 @@ export function ReviewAgentPageClient({
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold">Code Reviews</h1>
-          <Badge variant="beta">beta</Badge>
+          <h1 className="text-3xl font-bold">Code Reviewer</h1>
+          <Badge variant="new">new</Badge>
         </div>
         <p className="text-muted-foreground">
-          Automate code reviews with AI-powered analysis for your repositories
+          Automate code reviews with AI-powered analysis for your personal repositories
         </p>
         <a
           href="https://kilo.ai/docs/advanced-usage/code-reviews"
@@ -126,8 +126,8 @@ export function ReviewAgentPageClient({
               <AlertTitle>GitHub App Required</AlertTitle>
               <AlertDescription className="space-y-3">
                 <p>
-                  The Kilo GitHub App must be installed to use Code Reviews for GitHub. The app
-                  automatically manages workflows and triggers reviews on your pull requests.
+                  The Kilo GitHub App must be installed to use Code Reviewer. The app automatically
+                  manages workflows and triggers reviews on your pull requests.
                 </p>
                 <Link href="/integrations/github">
                   <Button variant="default" size="sm">

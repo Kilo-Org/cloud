@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { ReviewConfigForm } from '@/components/code-reviews/ReviewConfigForm';
 import { CodeReviewJobsCard } from '@/components/code-reviews/CodeReviewJobsCard';
@@ -12,26 +12,41 @@ import { Rocket, ExternalLink, Settings2, ListChecks } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GitHubLogo } from '@/components/auth/GitHubLogo';
+
+type Platform = 'github' | 'gitlab';
 
 type ReviewAgentPageClientProps = {
   organizationId: string;
   organizationName: string;
   successMessage?: string;
   errorMessage?: string;
+  initialPlatform?: Platform;
 };
-
-type Platform = 'github' | 'gitlab';
 
 export function ReviewAgentPageClient({
   organizationId,
   organizationName,
   successMessage,
   errorMessage,
+  initialPlatform = 'github',
 }: ReviewAgentPageClientProps) {
   const trpc = useTRPC();
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('github');
+  const router = useRouter();
+  const selectedPlatform = initialPlatform;
+
+  const handlePlatformChange = (platform: Platform) => {
+    const params = new URLSearchParams();
+    if (platform !== 'github') {
+      params.set('platform', platform);
+    }
+    const queryString = params.toString();
+    router.push(
+      `/organizations/${organizationId}/code-reviews${queryString ? `?${queryString}` : ''}`
+    );
+  };
 
   // Fetch GitHub App installation status
   const { data: githubStatusData } = useQuery(
@@ -91,7 +106,7 @@ export function ReviewAgentPageClient({
       {/* Platform Selection Tabs */}
       <Tabs
         value={selectedPlatform}
-        onValueChange={v => setSelectedPlatform(v as Platform)}
+        onValueChange={v => handlePlatformChange(v as Platform)}
         className="w-full"
       >
         <TabsList className="grid w-full max-w-md grid-cols-2">

@@ -377,31 +377,33 @@ export function GitLabIntegrationDetails({
                     <div className="space-y-4 rounded-lg border p-4">
                       <div className="space-y-2">
                         <Label htmlFor="instanceUrl">GitLab Instance URL</Label>
-                        <Input
-                          id="instanceUrl"
-                          type="url"
-                          placeholder="https://gitlab.example.com"
-                          value={instanceUrl}
-                          onChange={e => setInstanceUrl(e.target.value)}
-                          className={
-                            instanceValidation.status === 'valid'
-                              ? 'border-green-500 pr-10'
-                              : instanceValidation.status === 'invalid'
-                                ? 'border-red-500 pr-10'
-                                : instanceValidation.status === 'validating'
-                                  ? 'pr-10'
-                                  : ''
-                          }
-                        />
-                        {instanceValidation.status === 'validating' && (
-                          <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
-                        )}
-                        {instanceValidation.status === 'valid' && (
-                          <CheckCircle2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-green-500" />
-                        )}
-                        {instanceValidation.status === 'invalid' && (
-                          <AlertCircle className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-red-500" />
-                        )}
+                        <div className="relative">
+                          <Input
+                            id="instanceUrl"
+                            type="url"
+                            placeholder="https://gitlab.example.com"
+                            value={instanceUrl}
+                            onChange={e => setInstanceUrl(e.target.value)}
+                            className={
+                              instanceValidation.status === 'valid'
+                                ? 'border-green-500 pr-10'
+                                : instanceValidation.status === 'invalid'
+                                  ? 'border-red-500 pr-10'
+                                  : instanceValidation.status === 'validating'
+                                    ? 'pr-10'
+                                    : ''
+                            }
+                          />
+                          {instanceValidation.status === 'validating' && (
+                            <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
+                          )}
+                          {instanceValidation.status === 'valid' && (
+                            <CheckCircle2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-green-500" />
+                          )}
+                          {instanceValidation.status === 'invalid' && (
+                            <AlertCircle className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-red-500" />
+                          )}
+                        </div>
                       </div>
 
                       {/* Validation status message */}

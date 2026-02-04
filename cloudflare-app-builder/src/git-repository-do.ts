@@ -1,6 +1,6 @@
 /**
- * Git Repository Agent
- * Stores git repositories in SQLite and provides export functionality
+ * Git Repository Durable Object
+ * Thin RPC wrapper around GitVersionControl for durable persistence
  * Uses RPC for communication with workers
  */
 
@@ -35,7 +35,7 @@ export class GitRepositoryDO extends DurableObject<Env> {
   private _initialized = false;
 
   /**
-   * Initialize the git filesystem (internal method)
+   * Get or create the GitVersionControl instance
    */
   private async initializeFS(): Promise<void> {
     if (this.fs) return;
@@ -261,6 +261,146 @@ export class GitRepositoryDO extends DurableObject<Env> {
       this.fs = null;
 
       logger.info('Repository deleted successfully');
+    });
+  }
+
+  /**
+   * Get directory tree contents at a specific path (RPC method)
+   * @param ref - Branch name (e.g., "main", "HEAD") or commit SHA
+   * @param path - Optional path to a subdirectory (defaults to root)
+   * @returns Array of tree entries with name, type, oid, and mode
+   */
+  async getTree(
+    ref: string,
+    path?: string
+  ): Promise<{
+    entries: Array<{ name: string; type: 'blob' | 'tree'; oid: string; mode: string }>;
+    commitSha: string;
+  }> {
+    return withLogTags({ source: 'GitRepositoryDO' }, async () => {
+      if (!this.fs) {
+        await this.initializeFS();
+      }
+
+      if (!this._initialized || !this.fs) {
+        throw new Error('Repository not initialized');
+      }
+
+      // Resolve the ref to a commit SHA
+      const commitSha = await git.resolveRef({ fs: this.fs, dir: '/', ref });
+
+      // Read the commit to get the tree SHA
+      const { commit } = await git.readCommit({ fs: this.fs, dir: '/', oid: commitSha });
+      let treeSha = commit.tree;
+
+      // If a path is specified, navigate to that subtree
+      if (path && path.length > 0) {
+        const pathParts = path.split('/').filter(p => p.length > 0);
+        for (const part of pathParts) {
+          const { tree } = await git.readTree({ fs: this.fs, dir: '/', oid: treeSha });
+          const entry = tree.find((e: { path: string }) => e.path === part);
+          if (!entry || entry.type !== 'tree') {
+            throw new Error(`Path not found: ${path}`);
+          }
+          treeSha = entry.oid;
+        }
+      }
+
+      // Read the tree
+      const { tree } = await git.readTree({ fs: this.fs, dir: '/', oid: treeSha });
+
+      const entries = tree.map(
+        (entry: { path: string; type: string; oid: string; mode: string }) => ({
+          name: entry.path,
+          type: entry.type as 'blob' | 'tree',
+          oid: entry.oid,
+          mode: entry.mode,
+        })
+      );
+
+      // Return commit SHA (not tree SHA) - more useful for consumers to know which commit was resolved
+      return { entries, commitSha };
+    });
+  }
+
+  /**
+   * Get blob (file) contents at a specific path (RPC method)
+   * @param ref - Branch name (e.g., "main", "HEAD") or commit SHA
+   * @param path - Path to the file
+   * @returns File content (utf-8 or base64 encoded), encoding type, size, and blob SHA
+   */
+  async getBlob(
+    ref: string,
+    path: string
+  ): Promise<{
+    content: string;
+    encoding: 'utf-8' | 'base64';
+    size: number;
+    sha: string;
+  }> {
+    return withLogTags({ source: 'GitRepositoryDO' }, async () => {
+      if (!this.fs) {
+        await this.initializeFS();
+      }
+
+      if (!this._initialized || !this.fs) {
+        throw new Error('Repository not initialized');
+      }
+
+      // Resolve the ref to a commit SHA
+      const commitSha = await git.resolveRef({ fs: this.fs, dir: '/', ref });
+
+      // Read the commit to get the tree SHA
+      const { commit } = await git.readCommit({ fs: this.fs, dir: '/', oid: commitSha });
+      let treeSha = commit.tree;
+
+      // Navigate to the file's parent directory
+      const pathParts = path.split('/').filter(p => p.length > 0);
+      const fileName = pathParts.pop();
+      if (!fileName) {
+        throw new Error('Invalid path: no filename specified');
+      }
+
+      for (const part of pathParts) {
+        const { tree } = await git.readTree({ fs: this.fs, dir: '/', oid: treeSha });
+        const entry = tree.find((e: { path: string }) => e.path === part);
+        if (!entry || entry.type !== 'tree') {
+          throw new Error(`Path not found: ${path}`);
+        }
+        treeSha = entry.oid;
+      }
+
+      // Find the file in the tree
+      const { tree } = await git.readTree({ fs: this.fs, dir: '/', oid: treeSha });
+      const fileEntry = tree.find((e: { path: string }) => e.path === fileName);
+      if (!fileEntry || fileEntry.type !== 'blob') {
+        throw new Error(`File not found: ${path}`);
+      }
+
+      // Read the blob
+      const { blob } = await git.readBlob({ fs: this.fs, dir: '/', oid: fileEntry.oid });
+
+      // Detect binary content by checking for null bytes
+      const isBinary = blob.some((byte: number) => byte === 0);
+
+      if (isBinary) {
+        // Base64 encode binary content
+        return {
+          content: Buffer.from(blob).toString('base64'),
+          encoding: 'base64',
+          size: blob.length,
+          sha: fileEntry.oid,
+        };
+      } else {
+        // UTF-8 decode text content
+        const textDecoder = new TextDecoder('utf-8');
+        return {
+          content: textDecoder.decode(blob),
+          encoding: 'utf-8',
+          size: blob.length,
+          sha: fileEntry.oid,
+        };
+      }
     });
   }
 }

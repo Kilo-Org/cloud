@@ -339,9 +339,15 @@ export class SqliteFS {
     void this.sql`DELETE FROM git_objects WHERE path = ${normalized}`;
   }
 
-  async stat(
-    path: string
-  ): Promise<{ type: 'file' | 'dir'; mode: number; size: number; mtimeMs: number }> {
+  async stat(path: string): Promise<{
+    type: 'file' | 'dir';
+    mode: number;
+    size: number;
+    mtimeMs: number;
+    isFile: () => boolean;
+    isDirectory: () => boolean;
+    isSymbolicLink: () => boolean;
+  }> {
     const normalized = path.replace(/^\/+/, '');
     const result = this.sql<{
       data: string;

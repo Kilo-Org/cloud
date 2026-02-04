@@ -33,6 +33,7 @@ const config: Config = {
     '<rootDir>/cloud-agent/',
     '<rootDir>/cloudflare-webhook-agent-ingest/',
     '<rootDir>/cloudflare-session-ingest/',
+    '<rootDir>/cloudflare-app-builder/',
   ],
   transformIgnorePatterns: [
     'node_modules/.pnpm/(?!(@octokit|universal-user-agent|before-after-hook|bottleneck))',

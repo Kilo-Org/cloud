@@ -13,6 +13,7 @@ import {
   handleStreamBuildLogs,
   handleTriggerBuild,
 } from './handlers/preview';
+import { handleGetTree, handleGetBlob } from './handlers/files';
 import { logger, withLogTags } from './utils/logger';
 
 // Export Durable Objects
@@ -28,6 +29,8 @@ const PREVIEW_STATUS_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/previe
 const BUILD_TRIGGER_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/build$`);
 const BUILD_LOGS_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/build/logs$`);
 const DELETE_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})$`);
+const TREE_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/tree/([^/]+)$`);
+const BLOB_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/blob/([^/]+)/(.+)$`);
 
 // Dev Mode
 let previewAppId: string | null = null;
@@ -132,6 +135,21 @@ export default {
       const deleteMatch = pathname.match(DELETE_PATTERN);
       if (deleteMatch && request.method === 'DELETE') {
         return handleDelete(request, env, deleteMatch[1]);
+      }
+
+      // Handle tree requests (GET /apps/{app_id}/tree/{ref})
+      const treeMatch = pathname.match(TREE_PATTERN);
+      if (treeMatch && request.method === 'GET') {
+        const decodedRef = decodeURIComponent(treeMatch[2]);
+        return handleGetTree(request, env, treeMatch[1], decodedRef);
+      }
+
+      // Handle blob requests (GET /apps/{app_id}/blob/{ref}/{path})
+      const blobMatch = pathname.match(BLOB_PATTERN);
+      if (blobMatch && request.method === 'GET') {
+        const decodedRef = decodeURIComponent(blobMatch[2]);
+        const decodedPath = decodeURIComponent(blobMatch[3]);
+        return handleGetBlob(request, env, blobMatch[1], decodedRef, decodedPath);
       }
 
       // Handle git protocol requests

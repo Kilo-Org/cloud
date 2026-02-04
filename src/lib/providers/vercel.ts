@@ -63,7 +63,6 @@ const vercelModelIdMapping = {
   'google/gemini-3-flash-preview': 'google/gemini-3-flash',
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
-  'mistralai/devstral-2512:free': 'mistral/devstral-2',
 } as Record<string, string>;
 
 export function applyVercelSettings(

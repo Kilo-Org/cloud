@@ -5,7 +5,7 @@
 import { arcee_trinity_large_preview_free_model } from '@/lib/providers/arcee';
 import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
-import { devstral_2512_free_model, devstral_small_2512_free_model } from '@/lib/providers/mistral';
+import { devstral_small_2512_free_model } from '@/lib/providers/mistral';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { kat_coder_pro_free_model } from '@/lib/providers/streamlake';
 import { recommendedModels } from '@/lib/providers/recommended-models';
@@ -32,7 +32,6 @@ export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {
 
 export const kiloFreeModels = [
   arcee_trinity_large_preview_free_model,
-  devstral_2512_free_model,
   devstral_small_2512_free_model,
   giga_potato_model,
   kat_coder_pro_free_model,

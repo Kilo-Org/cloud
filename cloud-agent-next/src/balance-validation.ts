@@ -1,44 +1,36 @@
-import { validateKiloToken } from './auth.js';
 import { DEFAULT_BACKEND_URL } from './constants.js';
 import { logger } from './logger.js';
 import type { Env } from './types.js';
 import type { PersistenceEnv } from './persistence/types.js';
 import { fetchSessionMetadata } from './session-service.js';
 
-/**
- * Result of balance validation - either success or failure with HTTP status
- */
-export type BalanceValidationResult =
-  | { success: true; userId: string; token: string; botId?: string }
-  | { success: false; status: 401 | 402 | 500; message: string };
-
 const MIN_BALANCE_DOLLARS = 1;
 
 /**
- * Validates authentication and balance for subscription endpoints.
- * Returns proper HTTP status codes that can be used before opening SSE streams.
+ * Result of balance validation - either success or failure with HTTP status.
+ * Used when auth has already been validated by middleware.
+ */
+export type BalanceOnlyResult =
+  | { success: true }
+  | { success: false; status: 402 | 500; message: string };
+
+/**
+ * Validates balance only, skipping JWT validation.
+ * Use this when auth has already been validated by middleware.
  *
- * @param authHeader - Authorization header from the request
+ * @param token - The already-validated JWT token
  * @param orgId - Optional organization ID for org-specific balance check
  * @param env - Worker environment with secrets and bindings
  */
-export async function validateAuthAndBalance(
-  authHeader: string | null,
+export async function validateBalanceOnly(
+  token: string,
   orgId: string | undefined,
   env: Env
-): Promise<BalanceValidationResult> {
-  // Validate JWT first
-  const authResult = validateKiloToken(authHeader, env.NEXTAUTH_SECRET);
-  if (!authResult.success) {
-    return { success: false, status: 401, message: authResult.error };
-  }
-
-  // Use configured backend URL or fall back to production API
+): Promise<BalanceOnlyResult> {
   const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
 
-  // Call balance endpoint
   const headers = new Headers({
-    Authorization: `Bearer ${authResult.token}`,
+    Authorization: `Bearer ${token}`,
   });
   if (orgId) {
     headers.set('X-KiloCode-OrganizationId', orgId);
@@ -55,10 +47,6 @@ export async function validateAuthAndBalance(
       .withFields({ error: error instanceof Error ? error.message : String(error) })
       .error('Failed to fetch balance');
     return { success: false, status: 500, message: 'Failed to verify balance' };
-  }
-
-  if (response.status === 401) {
-    return { success: false, status: 401, message: 'Authentication failed' };
   }
 
   if (!response.ok) {
@@ -79,12 +67,7 @@ export async function validateAuthAndBalance(
     return { success: false, status: 402, message: 'Insufficient credits: $1 minimum required' };
   }
 
-  return {
-    success: true,
-    userId: authResult.userId,
-    token: authResult.token,
-    botId: authResult.botId,
-  };
+  return { success: true };
 }
 
 /**

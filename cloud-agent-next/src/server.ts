@@ -7,7 +7,7 @@ import type { HonoContext } from './hono-context.js';
 import { logger, withLogTags } from './logger.js';
 import { validateStreamTicket, validateKiloToken } from './auth.js';
 import {
-  validateAuthAndBalance,
+  validateBalanceOnly,
   extractProcedureName,
   fetchOrgIdForSession,
   BALANCE_REQUIRED_MUTATIONS,
@@ -126,7 +126,6 @@ app.use('/trpc/*', async (c: Context<HonoContext>, next: Next) => {
   }
 
   const skipBalanceCheck = c.req.header('x-skip-balance-check') === 'true';
-  const authHeader = c.req.header('authorization');
 
   if (skipBalanceCheck) {
     logger.withFields({ procedure: procedureName }).info('Skipping balance check per header');
@@ -151,29 +150,32 @@ app.use('/trpc/*', async (c: Context<HonoContext>, next: Next) => {
     return buildTrpcErrorResponse(400, 'Invalid request body', procedureName);
   }
 
-  if (procedureName === 'sendMessageV2' && !orgId && sessionId) {
-    const userId = c.get('userId');
+  // Auth already validated by authMiddleware, reuse userId/token from context
+  const userId = c.get('userId');
+  const authToken = c.get('authToken');
+
+  // authMiddleware runs before this, so authToken should always be set for /trpc/* routes
+  if (!authToken) {
+    return buildTrpcErrorResponse(401, 'Missing auth token', procedureName);
+  }
+
+  if (
+    (procedureName === 'sendMessageV2' || procedureName === 'initiateFromKilocodeSessionV2') &&
+    !orgId &&
+    sessionId &&
+    userId
+  ) {
     orgId = await fetchOrgIdForSession(c.env, userId, sessionId);
   }
 
-  if (procedureName === 'initiateFromKilocodeSessionV2' && !orgId && sessionId) {
-    const userId = c.get('userId');
-    orgId = await fetchOrgIdForSession(c.env, userId, sessionId);
-  }
-
-  const validationResult = await validateAuthAndBalance(authHeader ?? null, orgId, c.env);
+  // Use balance-only validation since auth was already done by authMiddleware
+  const validationResult = await validateBalanceOnly(authToken, orgId, c.env);
   if (!validationResult.success) {
     logger
       .withFields({ status: validationResult.status, procedure: procedureName })
-      .warn('Pre-flight validation failed for V2 mutation');
+      .warn('Pre-flight balance validation failed for V2 mutation');
 
     return buildTrpcErrorResponse(validationResult.status, validationResult.message, procedureName);
-  }
-
-  c.set('userId', validationResult.userId);
-  c.set('authToken', validationResult.token);
-  if (validationResult.botId) {
-    c.set('botId', validationResult.botId);
   }
 
   await next();

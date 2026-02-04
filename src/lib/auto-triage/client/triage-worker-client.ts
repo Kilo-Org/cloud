@@ -45,16 +45,27 @@ export interface DispatchTriageResponse {
  * Handles all communication with the Cloudflare Worker for auto triage
  */
 class TriageWorkerClient {
-  private readonly baseUrl: string;
-  private readonly authToken: string;
+  private _baseUrl: string | null = null;
+  private _authToken: string | null = null;
 
-  constructor() {
-    if (!AUTO_TRIAGE_URL || !AUTO_TRIAGE_AUTH_TOKEN) {
-      throw new Error('AUTO_TRIAGE_URL or AUTO_TRIAGE_AUTH_TOKEN not configured');
+  private get baseUrl(): string {
+    if (!this._baseUrl) {
+      if (!AUTO_TRIAGE_URL) {
+        throw new Error('AUTO_TRIAGE_URL not configured');
+      }
+      this._baseUrl = AUTO_TRIAGE_URL;
     }
+    return this._baseUrl;
+  }
 
-    this.baseUrl = AUTO_TRIAGE_URL;
-    this.authToken = AUTO_TRIAGE_AUTH_TOKEN;
+  private get authToken(): string {
+    if (!this._authToken) {
+      if (!AUTO_TRIAGE_AUTH_TOKEN) {
+        throw new Error('AUTO_TRIAGE_AUTH_TOKEN not configured');
+      }
+      this._authToken = AUTO_TRIAGE_AUTH_TOKEN;
+    }
+    return this._authToken;
   }
 
   /**

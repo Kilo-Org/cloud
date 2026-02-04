@@ -8,7 +8,9 @@
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
     "typecheck": "tsc --noEmit",
-    "test:git": "tsx src/_integration_tests/test-git-integration.ts"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:git:all": "./src/_integration_tests/run-all-tests.sh"
   },
   "dependencies": {
     "@ashishkumar472/cf-git": "1.0.5",
@@ -18,13 +20,16 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.9",
     "@cloudflare/containers": "^0.0.30",
     "@cloudflare/sandbox": "0.6.7",
     "@cloudflare/workers-types": "^4.20251014.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.10.1",
+    "better-sqlite3": "^12.6.0",
     "tsx": "^4.7.0",
     "typescript": "^5.9.3",
+    "vitest": "^2.1.9",
     "wrangler": "4.45.3"
   }
 }

@@ -85,6 +85,25 @@ export interface GitShowResult {
   diffs?: FileDiff[];
 }
 
+export interface TreeEntry {
+  name: string;
+  type: 'blob' | 'tree';
+  oid: string;
+  mode: string;
+}
+
+export interface TreeResult {
+  entries: TreeEntry[];
+  sha: string;
+}
+
+/** Internal git blob result - raw binary content. The DO/API layer converts this to string + encoding. */
+export interface BlobResult {
+  content: Uint8Array;
+  size: number;
+  sha: string;
+}
+
 // ============================================
 // Filesystem Error Types (Node.js-compatible for isomorphic-git)
 // ============================================

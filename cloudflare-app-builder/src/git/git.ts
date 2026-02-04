@@ -5,7 +5,15 @@
 import git from '@ashishkumar472/cf-git';
 import { SqliteFS } from './fs-adapter';
 import * as Diff from 'diff';
-import type { CommitInfo, FileDiff, GitShowResult, SqlExecutor } from '../types';
+import type {
+  CommitInfo,
+  FileDiff,
+  GitShowResult,
+  SqlExecutor,
+  TreeEntry,
+  TreeResult,
+  BlobResult,
+} from '../types';
 
 /**
  * Represents a file snapshot with path and contents
@@ -356,5 +364,190 @@ export class GitVersionControl {
     largestObject: { path: string; size: number } | null;
   } {
     return this.fs.getStorageStats();
+  }
+
+  /**
+   * Check if the repository has been initialized (has a .git directory)
+   */
+  async isInitialized(): Promise<boolean> {
+    try {
+      await this.fs.stat('.git');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Create initial commit with the provided files
+   * @param files - Record of path to content (Uint8Array)
+   */
+  async createInitialCommit(files: Record<string, Uint8Array>): Promise<string> {
+    // Ensure repo is initialized
+    await this.init();
+
+    console.log(`[Git] Creating initial commit with ${Object.keys(files).length} files`);
+
+    // Write files and stage them
+    for (const [path, content] of Object.entries(files)) {
+      const normalizedPath = this.normalizePath(path);
+      await this.fs.writeFile(normalizedPath, content);
+      await git.add({ ...this.gitConfig, filepath: normalizedPath });
+    }
+
+    // Commit
+    const oid = await git.commit({
+      ...this.gitConfig,
+      message: 'Initial commit',
+      author: {
+        name: this.author.name,
+        email: this.author.email,
+        timestamp: Math.floor(Date.now() / 1000),
+      },
+    });
+
+    console.log(`[Git] Initial commit created: ${oid}`);
+    return oid;
+  }
+
+  /**
+   * Export all git objects for cloning
+   * Returns raw binary data for each object
+   */
+  exportGitObjects(): Array<{ path: string; data: Uint8Array }> {
+    return this.fs.exportGitObjects();
+  }
+
+  /**
+   * Import git objects (e.g., from a push operation)
+   * Writes all objects to the filesystem
+   */
+  async importGitObjects(objects: Array<{ path: string; data: Uint8Array }>): Promise<void> {
+    // Ensure repo is initialized
+    const initialized = await this.isInitialized();
+    if (!initialized) {
+      await this.init();
+    }
+
+    console.log(`[Git] Importing ${objects.length} git objects`);
+
+    for (const obj of objects) {
+      await this.fs.writeFile(obj.path, obj.data);
+    }
+
+    console.log('[Git] Git objects imported successfully');
+  }
+
+  /**
+   * Get directory tree contents at a specific ref and path
+   * @param ref - Branch name (e.g., "main", "HEAD") or commit SHA
+   * @param path - Optional path to a subdirectory (defaults to root)
+   */
+  async getTree(ref: string, path?: string): Promise<TreeResult> {
+    // Resolve ref to commit OID
+    const commitOid = await git.resolveRef({ ...this.gitConfig, ref });
+
+    // Read commit to get root tree OID
+    const commit = await git.readCommit({ ...this.gitConfig, oid: commitOid });
+    let treeOid = commit.commit.tree;
+
+    // Navigate to subdirectory if path is provided
+    const normalizedPath = path?.replace(/^\/+|\/+$/g, '') || '';
+    if (normalizedPath) {
+      const pathParts = normalizedPath.split('/');
+
+      for (const part of pathParts) {
+        const tree = await git.readTree({ ...this.gitConfig, oid: treeOid });
+        const entry = tree.tree.find((e: { path: string }) => e.path === part);
+
+        if (!entry) {
+          throw new Error(`Path not found: ${normalizedPath}`);
+        }
+
+        if (entry.type !== 'tree') {
+          throw new Error(`Path is not a directory: ${normalizedPath}`);
+        }
+
+        treeOid = entry.oid;
+      }
+    }
+
+    // Read tree entries at current path
+    const tree = await git.readTree({ ...this.gitConfig, oid: treeOid });
+
+    const entries: TreeEntry[] = tree.tree.map(
+      (entry: { path: string; type: string; oid: string; mode: string }) => ({
+        name: entry.path,
+        type: entry.type as 'blob' | 'tree',
+        oid: entry.oid,
+        mode: entry.mode,
+      })
+    );
+
+    return { entries, sha: commitOid };
+  }
+
+  /**
+   * Get blob (file) contents at a specific ref and path
+   * @param ref - Branch name (e.g., "main", "HEAD") or commit SHA
+   * @param path - Path to the file
+   */
+  async getBlob(ref: string, path: string): Promise<BlobResult> {
+    // Resolve ref to commit OID
+    const commitOid = await git.resolveRef({ ...this.gitConfig, ref });
+
+    // Read commit to get root tree OID
+    const commit = await git.readCommit({ ...this.gitConfig, oid: commitOid });
+    let treeOid = commit.commit.tree;
+
+    // Navigate to file
+    const normalizedPath = path.replace(/^\/+|\/+$/g, '');
+    if (!normalizedPath) {
+      throw new Error('Path is required for blob');
+    }
+
+    const pathParts = normalizedPath.split('/');
+    const fileName = pathParts.pop();
+
+    if (!fileName) {
+      throw new Error('Invalid path');
+    }
+
+    // Navigate to parent directory
+    for (const part of pathParts) {
+      const tree = await git.readTree({ ...this.gitConfig, oid: treeOid });
+      const entry = tree.tree.find((e: { path: string }) => e.path === part);
+
+      if (!entry) {
+        throw new Error(`Path not found: ${normalizedPath}`);
+      }
+
+      if (entry.type !== 'tree') {
+        throw new Error(`Path is not a directory: ${part}`);
+      }
+
+      treeOid = entry.oid;
+    }
+
+    // Find the blob entry
+    const tree = await git.readTree({ ...this.gitConfig, oid: treeOid });
+    const blobEntry = tree.tree.find((e: { path: string }) => e.path === fileName);
+
+    if (!blobEntry) {
+      throw new Error(`File not found: ${normalizedPath}`);
+    }
+
+    if (blobEntry.type !== 'blob') {
+      throw new Error(`Path is a directory, not a file: ${normalizedPath}`);
+    }
+
+    // Read blob content
+    const blob = await git.readBlob({ ...this.gitConfig, oid: blobEntry.oid });
+
+    return {
+      content: blob.blob,
+      size: blob.blob.length,
+      sha: blobEntry.oid,
+    };
   }
 }

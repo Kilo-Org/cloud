@@ -17,6 +17,7 @@ jobs:
       cloud_agent: ${{ steps.filter.outputs.cloud_agent }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
       webhook_agent: ${{ steps.filter.outputs.webhook_agent }}
+      app_builder: ${{ steps.filter.outputs.app_builder }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +34,8 @@ jobs:
               - 'cloud-agent-next/**'
             webhook_agent:
               - 'cloudflare-webhook-agent-ingest/**'
+            app_builder:
+              - 'cloudflare-app-builder/**'
 
   test:
     runs-on: ubuntu-24.04-8core
@@ -296,6 +299,37 @@ jobs:
       - name: Run webhook-agent-ingest tests
         run: pnpm --filter cloudflare-webhook-agent-ingest test
 
+  app-builder:
+    needs: changes
+    if: needs.changes.outputs.app_builder == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          ref: ${{ github.head_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (app-builder)
+        run: pnpm --filter app-builder typecheck
+
+      - name: Run app-builder tests
+        run: pnpm --filter app-builder test
+
   cloudflare:
     strategy:
       fail-fast: false
@@ -305,8 +339,6 @@ jobs:
             filter: kilo-deploy-builder
           - name: deploy-dispatcher
             filter: deploy-dispatcher
-          - name: app-builder
-            filter: app-builder
           - name: code-review
             filter: kilo-code-review-worker
     name: cloudflare-${{ matrix.name }}

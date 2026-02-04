@@ -15,4 +15,7 @@ export type {
   CommitInfo,
   FileDiff,
   GitShowResult,
+  TreeEntry,
+  TreeResult,
+  BlobResult,
 } from '../types';

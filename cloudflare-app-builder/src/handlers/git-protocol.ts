@@ -18,10 +18,11 @@ export type { Env } from '../types';
 
 /**
  * Git protocol route patterns
+ * Note: App ID pattern requires 20+ characters to match the main router in index.ts
  */
-const GIT_INFO_REFS_PATTERN = /^\/apps\/([a-z0-9_-]+)\.git\/info\/refs$/;
-const GIT_UPLOAD_PACK_PATTERN = /^\/apps\/([a-z0-9_-]+)\.git\/git-upload-pack$/;
-const GIT_RECEIVE_PACK_PATTERN = /^\/apps\/([a-z0-9_-]+)\.git\/git-receive-pack$/;
+const GIT_INFO_REFS_PATTERN = /^\/apps\/([a-z0-9_-]{20,})\.git\/info\/refs$/;
+const GIT_UPLOAD_PACK_PATTERN = /^\/apps\/([a-z0-9_-]{20,})\.git\/git-upload-pack$/;
+const GIT_RECEIVE_PACK_PATTERN = /^\/apps\/([a-z0-9_-]{20,})\.git\/git-receive-pack$/;
 
 /**
  * Check if request is a Git protocol request
@@ -75,14 +76,25 @@ async function handleInfoRefs(
     // Check if repository is initialized (RPC call)
     const isInitialized = await repoStub.isInitialized();
 
-    // For receive-pack on empty repo, we need to advertise capabilities
-    // For upload-pack on empty repo, return empty advertisement
+    // For upload-pack or receive-pack on non-initialized repo, return 404
+    // Repositories must be explicitly initialized via the /init endpoint
+    // This prevents auto-initialization after deletion
     if (!isInitialized) {
-      if (isReceivePack) {
-        // For receive-pack, initialize the repo first and return empty refs with capabilities (RPC call)
-        await repoStub.initialize();
+      return new Response('Repository not found', { status: 404 });
+    }
 
-        // Return empty repo advertisement for receive-pack
+    // Get git objects from DO (RPC call)
+    const gitObjects = await repoStub.exportGitObjects();
+
+    // Convert base64 data back to Uint8Array
+    const processedObjects = gitObjects.map(obj => ({
+      path: obj.path,
+      data: Uint8Array.from(atob(obj.data), c => c.charCodeAt(0)),
+    }));
+
+    if (processedObjects.length === 0) {
+      if (isReceivePack) {
+        // Return empty repo advertisement for receive-pack (allows initial push)
         const capabilities =
           'report-status report-status-v2 delete-refs side-band-64k quiet atomic ofs-delta agent=git/isomorphic-git';
         const zeroOid = '0000000000000000000000000000000000000000';
@@ -98,28 +110,15 @@ async function handleInfoRefs(
           },
         });
       } else {
-        return new Response('Repository not found', { status: 404 });
+        // Return empty advertisement for repos with no commits (upload-pack)
+        return new Response('001e# service=git-upload-pack\n0000', {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/x-git-upload-pack-advertisement',
+            'Cache-Control': 'no-cache',
+          },
+        });
       }
-    }
-
-    // Get git objects from DO (RPC call)
-    const gitObjects = await repoStub.exportGitObjects();
-
-    // Convert base64 data back to Uint8Array
-    const processedObjects = gitObjects.map(obj => ({
-      path: obj.path,
-      data: Uint8Array.from(atob(obj.data), c => c.charCodeAt(0)),
-    }));
-
-    if (processedObjects.length === 0 && !isReceivePack) {
-      // Return empty advertisement for repos with no commits (upload-pack only)
-      return new Response('001e# service=git-upload-pack\n0000', {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/x-git-upload-pack-advertisement',
-          'Cache-Control': 'no-cache',
-        },
-      });
     }
 
     // Build repository in worker
@@ -224,12 +223,13 @@ async function handleReceivePack(
     // Check if repository is initialized (RPC call)
     const isInitialized = await repoStub.isInitialized();
 
-    // For push to new repo, initialize first (RPC call)
+    // Repositories must be explicitly initialized via the /init endpoint
+    // This prevents auto-initialization after deletion
     if (!isInitialized) {
-      await repoStub.initialize();
+      return new Response('Repository not found', { status: 404 });
     }
 
-    // Get existing git objects from DO (may be empty for new repo) (RPC call)
+    // Get existing git objects from DO (RPC call)
     const existingObjects = await repoStub.exportGitObjects();
 
     // Convert base64 data back to Uint8Array

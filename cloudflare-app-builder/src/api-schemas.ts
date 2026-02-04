@@ -143,3 +143,41 @@ export const ApiErrorResponseSchema = z.object({
 });
 
 export type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>;
+
+// ============================================
+// Tree Endpoint Schemas
+// GET /apps/{app_id}/tree/{ref}
+// ============================================
+
+export const TreeEntrySchema = z.object({
+  name: z.string(),
+  type: z.enum(['blob', 'tree']),
+  oid: z.string(),
+  mode: z.string(),
+});
+
+export type TreeEntry = z.infer<typeof TreeEntrySchema>;
+
+export const GetTreeResponseSchema = z.object({
+  entries: z.array(TreeEntrySchema),
+  path: z.string(),
+  ref: z.string(),
+  commitSha: z.string(),
+});
+
+export type GetTreeResponse = z.infer<typeof GetTreeResponseSchema>;
+
+// ============================================
+// Blob Endpoint Schemas
+// GET /apps/{app_id}/blob/{ref}/{path}
+// ============================================
+
+export const GetBlobResponseSchema = z.object({
+  content: z.string(),
+  encoding: z.enum(['utf-8', 'base64']),
+  size: z.number(),
+  path: z.string(),
+  sha: z.string(), // blob SHA
+});
+
+export type GetBlobResponse = z.infer<typeof GetBlobResponseSchema>;

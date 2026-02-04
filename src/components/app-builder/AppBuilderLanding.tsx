@@ -114,17 +114,21 @@ function ProjectCard({
 
   return (
     <>
-      <Card className="group hover:bg-accent cursor-pointer transition-colors">
+      <Card className="group hover:bg-accent relative transition-colors">
+        <Link href={href} className="absolute inset-0 z-0" aria-label={project.title} />
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-4">
-            <Link href={href} className="min-w-0 flex-1">
-              <CardTitle className="truncate text-base font-medium">{project.title}</CardTitle>
-            </Link>
+            <CardTitle className="min-w-0 flex-1 truncate text-base font-medium">
+              {project.title}
+            </CardTitle>
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-              onClick={() => setShowDeleteDialog(true)}
+              className="relative z-10 h-7 w-7 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+              onClick={e => {
+                e.stopPropagation();
+                setShowDeleteDialog(true);
+              }}
               disabled={isDeleting}
             >
               {isDeleting ? (
@@ -137,12 +141,10 @@ function ProjectCard({
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <Link href={href}>
-            <div className="text-muted-foreground flex items-center gap-1 text-xs">
-              <Clock className="h-3 w-3" />
-              <span>{timeAgo}</span>
-            </div>
-          </Link>
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
+            <Clock className="h-3 w-3" />
+            <span>{timeAgo}</span>
+          </div>
         </CardContent>
       </Card>
 

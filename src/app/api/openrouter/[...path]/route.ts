@@ -282,13 +282,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
 
     // Organization model allow list check.
-    if (!requestedAutoModel) {
-      const modelRestrictionError = checkOrganizationModelRestrictions({
-        modelId: requestedAutoModel ? KILO_AUTO_MODEL_ID : originalModelIdLowerCased,
-        settings,
-      });
-      if (modelRestrictionError) return modelRestrictionError;
-    }
+    const modelRestrictionError = checkOrganizationModelRestrictions({
+      modelId: requestedAutoModel ? KILO_AUTO_MODEL_ID : originalModelIdLowerCased,
+      settings,
+    });
+    if (modelRestrictionError) return modelRestrictionError;
 
     if (settings) {
       // Set up provider object with both allow list and data collection

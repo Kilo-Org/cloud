@@ -8,29 +8,48 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AgentMode } from '@/components/cloud-agent/types';
 
 /**
- * Mode options for cloud agent sessions.
- * Same as MODES in ResumeConfigModal but exported for shared use.
+ * Mode option type for customizable mode lists.
  */
-export const MODE_OPTIONS = [
-  { value: 'code' as const, label: 'Code', description: 'Write and modify code' },
-  { value: 'architect' as const, label: 'Architect', description: 'Plan and design solutions' },
-  { value: 'ask' as const, label: 'Ask', description: 'Get answers and explanations' },
-  { value: 'debug' as const, label: 'Debug', description: 'Find and fix issues' },
-  {
-    value: 'orchestrator' as const,
-    label: 'Orchestrator',
-    description: 'Coordinate complex tasks',
-  },
-] as const;
+export type ModeOption<T extends string = string> = {
+  value: T;
+  label: string;
+  description: string;
+};
 
-export type ModeComboboxProps = {
+/**
+ * Legacy mode options for cloud-agent (existing implementation).
+ */
+export const LEGACY_MODE_OPTIONS: ModeOption<
+  'code' | 'architect' | 'ask' | 'debug' | 'orchestrator'
+>[] = [
+  { value: 'code', label: 'Code', description: 'Write and modify code' },
+  { value: 'architect', label: 'Architect', description: 'Plan and design solutions' },
+  { value: 'ask', label: 'Ask', description: 'Get answers and explanations' },
+  { value: 'debug', label: 'Debug', description: 'Find and fix issues' },
+  { value: 'orchestrator', label: 'Orchestrator', description: 'Coordinate complex tasks' },
+];
+
+/**
+ * New mode options for cloud-agent-next.
+ */
+export const NEXT_MODE_OPTIONS: ModeOption<'plan' | 'build'>[] = [
+  { value: 'build', label: 'Build', description: 'Write and modify code' },
+  { value: 'plan', label: 'Plan', description: 'Plan and design solutions' },
+];
+
+/**
+ * Default mode options (legacy modes for backward compatibility).
+ * @deprecated Use LEGACY_MODE_OPTIONS or NEXT_MODE_OPTIONS explicitly.
+ */
+export const MODE_OPTIONS = LEGACY_MODE_OPTIONS;
+
+export type ModeComboboxProps<T extends string = string> = {
   label?: string;
   helperText?: string;
-  value?: AgentMode;
-  onValueChange: (value: AgentMode) => void;
+  value?: T;
+  onValueChange: (value: T) => void;
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
@@ -38,23 +57,26 @@ export type ModeComboboxProps = {
   variant?: 'full' | 'compact';
   /** Optional className for the trigger button */
   className?: string;
+  /** Mode options to display. Defaults to LEGACY_MODE_OPTIONS for backward compatibility. */
+  options?: ModeOption<T>[];
 };
 
-export function ModeCombobox({
+export function ModeCombobox<T extends string = string>({
   label = 'Mode',
   helperText,
-  value = 'code',
+  value,
   onValueChange,
   isLoading,
   disabled,
   placeholder = 'Select mode',
   variant = 'full',
   className,
-}: ModeComboboxProps) {
+  options = LEGACY_MODE_OPTIONS as unknown as ModeOption<T>[],
+}: ModeComboboxProps<T>) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const selectedMode = MODE_OPTIONS.find(mode => mode.value === value);
+  const selectedMode = options.find(mode => mode.value === value);
   const isCompact = variant === 'compact';
   const showLabel = !isCompact && label;
 
@@ -94,7 +116,7 @@ export function ModeCombobox({
           <Command>
             <CommandList className="max-h-64 overflow-auto">
               <CommandGroup>
-                {MODE_OPTIONS.map(mode => (
+                {options.map(mode => (
                   <CommandItem
                     key={mode.value}
                     value={mode.value}
@@ -154,7 +176,7 @@ export function ModeCombobox({
           <Command>
             <CommandList className="max-h-64 overflow-auto">
               <CommandGroup>
-                {MODE_OPTIONS.map(mode => (
+                {options.map(mode => (
                   <CommandItem
                     key={mode.value}
                     value={mode.value}

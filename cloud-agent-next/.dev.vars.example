@@ -1,0 +1,72 @@
+# Shared secret for JWT token validation (same as NextAuth.js secret)
+NEXTAUTH_SECRET=your-nextauth-secret-here
+
+# Shared secret for internal API calls, same as .env.development.
+INTERNAL_API_SECRET=your-internal-api-secret-here
+
+# Optional: Override Kilocode credentials in session environment variables used during kilocode invocation
+# These do NOT affect authentication - authentication always uses the original token from the API request
+# Use these to inject test/dev credentials while maintaining proper authentication with credentials sent
+# Affects:
+#   - Session environment variables (KILOCODE_TOKEN and KILOCODE_ORG_ID)
+# 
+# Note: With the introduction of server backed sessionsthese should probably not be used any more, 
+# you should set KILOCODE_BACKEND_BASE_URL instead and use local dev only.
+#KILOCODE_TOKEN_OVERRIDE=your-override-token-here
+#KILOCODE_ORG_ID_OVERRIDE=your-override-org-id-here
+
+# Kilocode backend base URL and KILO_OPENROUTER_BASE for API calls and session environment variables
+# For local development, point to your local kilocode-backend
+# Note: you wanna use your actual privatenet address here and not "localhost"
+# pnpm run dev of kilocode-backend usually gives you both addrs on boot.
+KILOCODE_BACKEND_BASE_URL=http://192.168.200.70:3000
+KILO_OPENROUTER_BASE=http://192.168.200.70:3000/api
+
+# Worker base URL used by the wrapper to connect to /ingest.
+# Use a host-reachable IP (not localhost) so sandbox containers can connect back.
+WORKER_URL=http://192.168.200.72:8794
+
+# Timeout overrides (optional)
+WRAPPER_IDLE_TIMEOUT_MS=120000
+CLI_TIMEOUT_SECONDS=700
+REAPER_INTERVAL_MS=300000
+STALE_THRESHOLD_MS=600000
+PENDING_START_TIMEOUT_MS=300000
+
+# GitHub App credentials for git commit attribution
+# These identify commits as coming from the Kilo Code GitHub App
+# Format for git config:
+#   user.name: {GITHUB_APP_SLUG}[bot]
+#   user.email: {GITHUB_APP_BOT_USER_ID}+{GITHUB_APP_SLUG}[bot]@users.noreply.github.com
+GITHUB_APP_SLUG=kiloconnect-development
+GITHUB_APP_BOT_USER_ID=242397087
+
+# GitHub App credentials for generating installation access tokens
+# Used by GitHubTokenService to authenticate with GitHub API on behalf of app installations
+# GITHUB_APP_ID: The numeric App ID from GitHub App settings
+# GITHUB_APP_PRIVATE_KEY: The raw PKCS#8 private key (use \n for newlines in env var)
+# Note that the nextjs app uses PKCS#1 but the worker uses WebCrypto and requires a PKCS#8
+GITHUB_APP_ID=2245043
+GITHUB_APP_PRIVATE_KEY=
+
+# GitHub Lite App credentials (for OSS organizations with read-only permissions)
+# Same format as standard app credentials above
+GITHUB_LITE_APP_ID=
+GITHUB_LITE_APP_PRIVATE_KEY=
+
+# Agent Environment Profile Secrets Decryption
+# Used to decrypt encrypted secrets from agent environment profiles at session execution time.
+# This is a RSA private key that pairs with AGENT_ENV_VARS_PUBLIC_KEY in the backend.
+#
+# The development private key is available in 1pass as 'Agent Env Vars Profile Private key'
+AGENT_ENV_VARS_PRIVATE_KEY=""
+
+#
+# R2 Attachments Bucket Readonly Access
+# 1pass (Cloudflare - R2 Cloud Agents Attachments Read Only)
+R2_ENDPOINT=""
+R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID=""
+R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
+
+# Local dev worker origins allowed to connect to /stream
+WS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8794

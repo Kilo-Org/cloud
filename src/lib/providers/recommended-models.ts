@@ -1,4 +1,5 @@
 import type { ModelSettings, VersionedSettings } from '@/lib/organizations/organization-types';
+import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import { minimax_m21_free_model } from '@/lib/providers/minimax';
 import { zai_glm47_free_model } from '@/lib/providers/zai';
@@ -10,6 +11,11 @@ export type RecommendedModel = {
 };
 
 export const recommendedModels = [
+  {
+    public_id: KILO_AUTO_MODEL_ID,
+    tool_choice_required: false,
+    random_vercel_routing: true,
+  },
   {
     public_id: minimax_m21_free_model.is_enabled
       ? minimax_m21_free_model.public_id

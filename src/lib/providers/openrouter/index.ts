@@ -9,6 +9,15 @@ import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloModel } from '@/lib/providers/kilo-free-model';
 import { getModelSettings, getVersionedModelSettings } from '@/lib/providers/recommended-models';
+import {
+  KILO_AUTO_MODEL_COMPLETION_PRICE,
+  KILO_AUTO_MODEL_CONTEXT_LENGTH,
+  KILO_AUTO_MODEL_DESCRIPTION,
+  KILO_AUTO_MODEL_ID,
+  KILO_AUTO_MODEL_MAX_COMPLETION_TOKENS,
+  KILO_AUTO_MODEL_NAME,
+  KILO_AUTO_MODEL_PROMPT_PRICE,
+} from '@/lib/kilo-auto-model';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/model-utils';
@@ -17,7 +26,37 @@ export function isRateLimitedToDeathFree(model: string) {
   return model.endsWith(':free') && !isFreeModel(model);
 }
 
+function buildAutoModel(): OpenRouterModel {
+  return {
+    id: KILO_AUTO_MODEL_ID,
+    name: KILO_AUTO_MODEL_NAME,
+    created: 0,
+    description: KILO_AUTO_MODEL_DESCRIPTION,
+    architecture: {
+      input_modalities: ['text'],
+      output_modalities: ['text'],
+      tokenizer: 'Other',
+    },
+    top_provider: {
+      is_moderated: false,
+      context_length: KILO_AUTO_MODEL_CONTEXT_LENGTH,
+      max_completion_tokens: KILO_AUTO_MODEL_MAX_COMPLETION_TOKENS,
+    },
+    pricing: {
+      prompt: KILO_AUTO_MODEL_PROMPT_PRICE,
+      completion: KILO_AUTO_MODEL_COMPLETION_PRICE,
+      request: '0',
+      image: '0',
+      web_search: '0',
+      internal_reasoning: '0',
+    },
+    context_length: KILO_AUTO_MODEL_CONTEXT_LENGTH,
+    supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
+  };
+}
+
 function enhancedModelList(models: OpenRouterModel[]) {
+  const autoModel = buildAutoModel();
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
@@ -25,14 +64,17 @@ function enhancedModelList(models: OpenRouterModel[]) {
         !kiloFreeModels.some(m => m.public_id === model.id && m.is_enabled)
     )
     .concat(kiloFreeModels.filter(m => m.is_enabled).map(model => convertFromKiloModel(model)))
+    .concat([autoModel])
     .map((model: OpenRouterModel) => {
-      const preferredIndex = preferredModels.indexOf(model.id);
+      const preferredIndex =
+        model.id === KILO_AUTO_MODEL_ID ? -1 : preferredModels.indexOf(model.id);
       const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
       const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
       return {
         ...model,
         name: isNew ? model.name + ' (new)' : model.name,
-        preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
+        preferredIndex:
+          preferredIndex >= 0 || model.id === KILO_AUTO_MODEL_ID ? preferredIndex : undefined,
         settings: getModelSettings(model.id),
         versioned_settings: getVersionedModelSettings(model.id),
       };

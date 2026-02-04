@@ -13,6 +13,12 @@ import {
   type OpenRouterModel,
 } from '@/lib/providers/openrouter/openrouter-types';
 import * as z from 'zod';
+import {
+  KILO_AUTO_MODEL_CONTEXT_LENGTH,
+  KILO_AUTO_MODEL_DESCRIPTION,
+  KILO_AUTO_MODEL_ID,
+  KILO_AUTO_MODEL_NAME,
+} from '@/lib/kilo-auto-model';
 
 interface OpenRouterProvider {
   name: string;
@@ -70,6 +76,38 @@ interface OpenRouterData {
   total_providers: number;
   total_models: number;
   generated_at: string;
+}
+
+function buildKiloAutoModel(): OpenRouterModel {
+  const epochIso = new Date(0).toISOString();
+  return {
+    slug: KILO_AUTO_MODEL_ID,
+    hf_slug: null,
+    updated_at: epochIso,
+    created_at: epochIso,
+    hf_updated_at: null,
+    name: KILO_AUTO_MODEL_NAME,
+    short_name: KILO_AUTO_MODEL_NAME,
+    author: 'Kilo',
+    description: KILO_AUTO_MODEL_DESCRIPTION,
+    model_version_group_id: null,
+    context_length: KILO_AUTO_MODEL_CONTEXT_LENGTH,
+    input_modalities: ['text'],
+    output_modalities: ['text'],
+    has_text_output: true,
+    group: 'other',
+    instruct_type: null,
+    default_system: null,
+    default_stops: [],
+    hidden: false,
+    router: null,
+    warning_message: null,
+    permaslug: KILO_AUTO_MODEL_ID,
+    reasoning_config: null,
+    features: null,
+    default_parameters: null,
+    endpoint: null,
+  };
 }
 
 export function useOpenRouterModels() {
@@ -169,7 +207,9 @@ export function useOpenRouterModelsAndProviders() {
       }
     }
 
-    return [...modelBySlug.values()];
+    const modelsWithEndpoints = [...modelBySlug.values()];
+    const hasAutoAlready = modelsWithEndpoints.some(model => model.slug === KILO_AUTO_MODEL_ID);
+    return hasAutoAlready ? modelsWithEndpoints : [buildKiloAutoModel(), ...modelsWithEndpoints];
   }, [query.data]);
 
   return {

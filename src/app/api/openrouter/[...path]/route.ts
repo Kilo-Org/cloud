@@ -49,10 +49,9 @@ import {
 } from '@/lib/anonymous';
 import { checkFreeModelRateLimit, logFreeModelRequest } from '@/lib/free-model-rate-limiter';
 import { classifyAbuse } from '@/lib/abuse-service';
+import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
-
-const AUTO_MODEL_ID = 'kilo/auto';
 
 const OPUS = 'anthropic/claude-opus-4.5';
 const SONNET = 'anthropic/claude-sonnet-4.5';
@@ -119,7 +118,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
-  const requestedAutoModel = requestBodyParsed.model.trim().toLowerCase() === AUTO_MODEL_ID;
+  const requestedAutoModel = requestBodyParsed.model.trim().toLowerCase() === KILO_AUTO_MODEL_ID;
 
   // "kilo/auto" is a quasi-model id that resolves to a real model based on x-kilocode-mode.
   // After this resolution, the rest of the proxy flow behaves as if the client requested
@@ -283,15 +282,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
 
     // Organization model allow list check.
-    // For `kilo/auto`, we intentionally skip model allow list enforcement so that teams can
-    // enable auto-mode routing without maintaining per-model allow lists.
-    if (!requestedAutoModel) {
-      const modelRestrictionError = checkOrganizationModelRestrictions({
-        modelId: originalModelIdLowerCased,
-        settings,
-      });
-      if (modelRestrictionError) return modelRestrictionError;
-    }
+    const modelRestrictionError = checkOrganizationModelRestrictions({
+      modelId: requestedAutoModel ? KILO_AUTO_MODEL_ID : originalModelIdLowerCased,
+      settings,
+    });
+    if (modelRestrictionError) return modelRestrictionError;
 
     if (settings) {
       // Set up provider object with both allow list and data collection

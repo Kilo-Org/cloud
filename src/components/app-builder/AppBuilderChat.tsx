@@ -197,6 +197,8 @@ export function AppBuilderChat({ onNewProject, organizationId }: AppBuilderChatP
   const [messageUuid, setMessageUuid] = useState(() => crypto.randomUUID());
   const [selectedModel, setSelectedModel] = useState<string>(projectModel ?? '');
   const [hasImages, setHasImages] = useState(false);
+  // Track the initial projectModel to detect when a new project loads
+  const initialProjectModelRef = useRef(projectModel);
   const trpc = useTRPC();
 
   // Fetch eligibility to check if user can use App Builder
@@ -278,33 +280,33 @@ export function AppBuilderChat({ onNewProject, organizationId }: AppBuilderChatP
   // Warning state: user uploaded images but model doesn't support them
   const hasImageWarning = hasImages && !modelSupportsImages;
 
-  // Sync selectedModel with projectModel when it changes (e.g., when loading a project)
-  // This takes priority over default selection - always apply projectModel when it arrives
+  // Sync selectedModel when a different project loads (projectModel changes from initial)
   useEffect(() => {
-    if (projectModel) {
+    if (projectModel && projectModel !== initialProjectModelRef.current) {
+      initialProjectModelRef.current = projectModel;
       setSelectedModel(projectModel);
     }
   }, [projectModel]);
 
-  // Set fallback model when available and not yet selected (and no projectModel)
+  // Set fallback model when models load and no valid selection exists
   useEffect(() => {
     if (modelOptions.length === 0) {
-      if (selectedModel) {
-        setSelectedModel('');
-      }
       return;
     }
 
-    // If no model selected yet and no projectModel provided, select the default or first available
-    if (!selectedModel && !projectModel) {
-      const defaultModel = defaultsData?.defaultModel;
-      const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
-      const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
-      if (newModel) {
-        setSelectedModel(newModel);
-      }
+    // If current selection is valid, keep it
+    if (selectedModel && modelOptions.some(m => m.id === selectedModel)) {
+      return;
     }
-  }, [defaultsData?.defaultModel, modelOptions, selectedModel, projectModel]);
+
+    // Pick a default model
+    const defaultModel = defaultsData?.defaultModel;
+    const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
+    const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
+    if (newModel) {
+      setSelectedModel(newModel);
+    }
+  }, [defaultsData?.defaultModel, modelOptions, selectedModel]);
 
   // Filter messages to show only important ones for cleaner UX
   const filteredMessages = useMemo(() => filterAppBuilderMessages(messages), [messages]);

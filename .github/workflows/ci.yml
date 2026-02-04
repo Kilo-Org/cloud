@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       cloud_agent: ${{ steps.filter.outputs.cloud_agent }}
+      cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
       webhook_agent: ${{ steps.filter.outputs.webhook_agent }}
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +29,8 @@ jobs:
           filters: |
             cloud_agent:
               - 'cloud-agent/**'
+            cloud_agent_next:
+              - 'cloud-agent-next/**'
             webhook_agent:
               - 'cloudflare-webhook-agent-ingest/**'
 
@@ -215,6 +218,49 @@ jobs:
 
       - name: Run cloud-agent tests
         run: pnpm --filter cloud-agent test:all
+
+  cloud-agent-next:
+    needs: changes
+    if: needs.changes.outputs.cloud_agent_next == 'true'
+    runs-on: ubuntu-24.04-8core
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          ref: ${{ github.head_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build wrapper bundle
+        working-directory: cloud-agent-next/wrapper
+        run: bun run build.ts
+
+      - name: Typecheck (cloud-agent-next)
+        run: pnpm --filter cloud-agent-next typecheck
+
+      - name: Lint (cloud-agent-next)
+        run: pnpm --filter cloud-agent-next lint
+
+      - name: Run cloud-agent-next tests
+        run: pnpm --filter cloud-agent-next test:all
 
   webhook-agent:
     needs: changes

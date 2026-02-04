@@ -286,7 +286,19 @@ export function AppBuilderProjectsTable() {
               </TableRow>
             ) : (
               projects.map(project => (
-                <TableRow key={project.id}>
+                <TableRow
+                  key={project.id}
+                  className="hover:bg-muted/50 cursor-pointer"
+                  tabIndex={0}
+                  role="link"
+                  onClick={() => router.push(`/admin/app-builder/${project.id}`)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      router.push(`/admin/app-builder/${project.id}`);
+                    }
+                  }}
+                >
                   <TableCell className="font-medium">
                     <span
                       className="block truncate"
@@ -302,6 +314,7 @@ export function AppBuilderProjectsTable() {
                       <Link
                         href={`/admin/users/${project.owned_by_user_id}`}
                         className="text-blue-600 hover:underline"
+                        onClick={e => e.stopPropagation()}
                       >
                         {project.owner_email || project.owned_by_user_id}
                       </Link>
@@ -309,6 +322,7 @@ export function AppBuilderProjectsTable() {
                       <Link
                         href={`/admin/organizations/${project.owned_by_organization_id}`}
                         className="text-blue-600 hover:underline"
+                        onClick={e => e.stopPropagation()}
                       >
                         {project.owner_org_name || project.owned_by_organization_id}
                       </Link>
@@ -347,7 +361,10 @@ export function AppBuilderProjectsTable() {
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => handleDeleteClick(project)}
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleDeleteClick(project);
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

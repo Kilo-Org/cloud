@@ -5,6 +5,7 @@ import {
   app_builder_messages,
   kilocode_users,
   organizations,
+  cliSessions,
 } from '@/db/schema';
 import * as z from 'zod';
 import { eq, and, or, ilike, desc, asc, count, isNotNull, type SQL } from 'drizzle-orm';
@@ -24,10 +25,15 @@ const DeleteProjectSchema = z.object({
   id: z.string().uuid(),
 });
 
+const GetProjectSchema = z.object({
+  id: z.string().uuid(),
+});
+
 export type AdminAppBuilderProject = {
   id: string;
   title: string;
   model_id: string;
+  template: string | null;
   session_id: string | null;
   deployment_id: string | null;
   created_by_user_id: string | null;
@@ -42,7 +48,80 @@ export type AdminAppBuilderProject = {
   is_deployed: boolean;
 };
 
+export type AdminAppBuilderProjectDetail = AdminAppBuilderProject & {
+  cli_session_id: string | null;
+};
+
 export const adminAppBuilderRouter = createTRPCRouter({
+  get: adminProcedure.input(GetProjectSchema).query(async ({ input }) => {
+    const { id: projectId } = input;
+
+    // Query project with joins for owner info
+    const [result] = await db
+      .select({
+        project: app_builder_projects,
+        owner_user: {
+          id: kilocode_users.id,
+          email: kilocode_users.google_user_email,
+        },
+        owner_org: {
+          id: organizations.id,
+          name: organizations.name,
+        },
+      })
+      .from(app_builder_projects)
+      .leftJoin(kilocode_users, eq(app_builder_projects.owned_by_user_id, kilocode_users.id))
+      .leftJoin(organizations, eq(app_builder_projects.owned_by_organization_id, organizations.id))
+      .where(eq(app_builder_projects.id, projectId))
+      .limit(1);
+
+    if (!result) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Project not found',
+      });
+    }
+
+    // Get message count
+    const [messageCountResult] = await db
+      .select({ count: count() })
+      .from(app_builder_messages)
+      .where(eq(app_builder_messages.project_id, projectId));
+
+    // Look up the CLI session by cloud_agent_session_id
+    let cliSessionId: string | null = null;
+    if (result.project.session_id) {
+      const [cliSession] = await db
+        .select({ session_id: cliSessions.session_id })
+        .from(cliSessions)
+        .where(eq(cliSessions.cloud_agent_session_id, result.project.session_id))
+        .limit(1);
+      cliSessionId = cliSession?.session_id ?? null;
+    }
+
+    const projectDetail: AdminAppBuilderProjectDetail = {
+      id: result.project.id,
+      title: result.project.title,
+      model_id: result.project.model_id,
+      template: result.project.template,
+      session_id: result.project.session_id,
+      deployment_id: result.project.deployment_id,
+      created_by_user_id: result.project.created_by_user_id,
+      owned_by_user_id: result.project.owned_by_user_id,
+      owned_by_organization_id: result.project.owned_by_organization_id,
+      created_at: result.project.created_at,
+      updated_at: result.project.updated_at,
+      last_message_at: result.project.last_message_at,
+      owner_email: result.owner_user?.email ?? null,
+      owner_org_name: result.owner_org?.name ?? null,
+      message_count: messageCountResult?.count ?? 0,
+      is_deployed: result.project.deployment_id !== null,
+      cli_session_id: cliSessionId,
+    };
+
+    return projectDetail;
+  }),
+
   list: adminProcedure.input(ListProjectsSchema).query(async ({ input }) => {
     const { offset, limit, sortBy, sortOrder, search, ownerType } = input;
     const searchTerm = search?.trim() || '';
@@ -141,6 +220,7 @@ export const adminAppBuilderRouter = createTRPCRouter({
       id: row.project.id,
       title: row.project.title,
       model_id: row.project.model_id,
+      template: row.project.template,
       session_id: row.project.session_id,
       deployment_id: row.project.deployment_id,
       created_by_user_id: row.project.created_by_user_id,

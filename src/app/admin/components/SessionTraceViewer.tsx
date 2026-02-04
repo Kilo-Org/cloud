@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Input } from '@/components/ui/input';
@@ -44,9 +45,21 @@ function convertToMessage(cloudMessage: CloudMessage): Message & {
 }
 
 export function SessionTraceViewer() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const sessionIdFromUrl = searchParams.get('sessionId');
+
   const [inputValue, setInputValue] = useState('');
   const [searchedSessionId, setSearchedSessionId] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Initialize from URL parameter on mount
+  useEffect(() => {
+    if (sessionIdFromUrl && UUID_REGEX.test(sessionIdFromUrl)) {
+      setInputValue(sessionIdFromUrl);
+      setSearchedSessionId(sessionIdFromUrl);
+    }
+  }, [sessionIdFromUrl]);
 
   const sessionQuery = useAdminSessionTrace(searchedSessionId);
   const messagesQuery = useAdminSessionMessages(searchedSessionId);
@@ -66,6 +79,8 @@ export function SessionTraceViewer() {
     }
     setValidationError(null);
     setSearchedSessionId(trimmed);
+    // Update URL to make the link shareable (replace to avoid growing history stack)
+    router.replace(`/admin/session-traces?sessionId=${trimmed}`);
   };
 
   const downloadJson = (data: unknown, filename: string) => {

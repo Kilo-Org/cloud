@@ -19,6 +19,8 @@ import { updateCodeReviewStatus } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import type { CodeReviewPlatform } from '../core/schemas';
 
 const MAX_CONCURRENT_REVIEWS_PER_OWNER = 20;
 
@@ -148,16 +150,22 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
  * Dispatch a single review to Cloudflare Worker
  */
 async function dispatchReview(review: CloudAgentCodeReview, owner: Owner): Promise<void> {
+  // Get platform from review (defaults to 'github' for backward compatibility)
+  const platform = (review.platform || 'github') as CodeReviewPlatform;
+
   logExceptInTest('[dispatchReview] Dispatching review', {
     reviewId: review.id,
     owner,
+    platform,
   });
 
-  // 1. Get agent config for owner
-  const agentConfig = await getAgentConfigForOwner(owner, 'code_review', 'github');
+  // 1. Get agent config for owner (use platform from review)
+  const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
 
   if (!agentConfig) {
-    throw new Error(`Agent config not found for owner ${owner.type}:${owner.id}`);
+    throw new Error(
+      `Agent config not found for owner ${owner.type}:${owner.id} on platform ${platform}`
+    );
   }
 
   // 2. Prepare complete payload for cloud agent
@@ -165,6 +173,7 @@ async function dispatchReview(review: CloudAgentCodeReview, owner: Owner): Promi
     reviewId: review.id,
     owner,
     agentConfig,
+    platform,
   });
 
   // 3. Update status to "queued" (no longer pending)
@@ -178,5 +187,6 @@ async function dispatchReview(review: CloudAgentCodeReview, owner: Owner): Promi
 
   logExceptInTest('[dispatchReview] Review dispatched successfully', {
     reviewId: review.id,
+    platform,
   });
 }

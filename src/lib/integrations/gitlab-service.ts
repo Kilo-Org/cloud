@@ -14,6 +14,7 @@ import {
   isTokenExpired,
   calculateTokenExpiry,
 } from '@/lib/integrations/platforms/gitlab/adapter';
+import { randomBytes } from 'crypto';
 
 /**
  * GitLab Integration Service
@@ -245,4 +246,56 @@ export async function disconnectGitLabIntegration(owner: Owner) {
     .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.GITLAB)));
 
   return { success: true };
+}
+
+/**
+ * Regenerate webhook secret for a GitLab integration
+ * This is useful when the user has lost the webhook secret and needs to reconfigure
+ * their GitLab webhook settings
+ */
+export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSecret: string }> {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(platform_integrations.owned_by_user_id, owner.id)
+      : eq(platform_integrations.owned_by_organization_id, owner.id);
+
+  // Get the integration
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        ownershipCondition,
+        eq(platform_integrations.platform, PLATFORM.GITLAB),
+        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
+      )
+    )
+    .limit(1);
+
+  if (!integration) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'GitLab integration not found',
+    });
+  }
+
+  // Generate new webhook secret
+  const newWebhookSecret = randomBytes(32).toString('hex');
+
+  // Update the metadata with the new webhook secret
+  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
+  const updatedMetadata = {
+    ...existingMetadata,
+    webhook_secret: newWebhookSecret,
+  };
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: updatedMetadata,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integration.id));
+
+  return { webhookSecret: newWebhookSecret };
 }

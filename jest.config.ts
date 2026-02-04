@@ -31,6 +31,7 @@ const config: Config = {
   testMatch: ['**/src/**/*.test.ts'],
   testPathIgnorePatterns: [
     '<rootDir>/cloud-agent/',
+    '<rootDir>/cloud-agent-next/',
     '<rootDir>/cloudflare-webhook-agent-ingest/',
     '<rootDir>/cloudflare-session-ingest/',
   ],

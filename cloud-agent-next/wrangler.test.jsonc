@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cloud-agent-test",
+  "main": "test/test-worker.ts",
+  "compatibility_date": "2025-09-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "CloudAgentSession",
+        "name": "CLOUD_AGENT_SESSION",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["CloudAgentSession"],
+      "tag": "v2",
+    },
+  ],
+  "queues": {
+    "producers": [{ "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" }],
+    "consumers": [
+      {
+        "queue": "cloud-agent-executions",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "cloud-agent-executions-dlq",
+        "max_concurrency": 10,
+      },
+    ],
+  },
+}

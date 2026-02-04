@@ -1,0 +1,14 @@
+{
+  "name": "@kilocode/cloud-agent-wrapper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

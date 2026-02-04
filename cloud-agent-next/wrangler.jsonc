@@ -1,0 +1,268 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cloud-agent-next",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "preview_urls": false,
+  "workers_dev": true,
+  "dev": {
+    "port": 8794,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "cloud-agent-next.kilosessions.ai",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
+    "GITHUB_APP_SLUG": "kiloconnect",
+    "GITHUB_APP_BOT_USER_ID": "240665456",
+    "GITHUB_APP_ID": "2193792",
+    "GITHUB_LITE_APP_ID": "2745442",
+    "GITHUB_LITE_APP_SLUG": "kiloconnect-lite",
+    "GITHUB_LITE_APP_BOT_USER_ID": "257753004",
+    "WORKER_URL": "https://cloud-agent-next.kilosessions.ai",
+    "WRAPPER_IDLE_TIMEOUT_MS": "120000",
+    "CLI_TIMEOUT_SECONDS": "900",
+    "REAPER_INTERVAL_MS": "300000",
+    "STALE_THRESHOLD_MS": "600000",
+    "PENDING_START_TIMEOUT_MS": "300000",
+    "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
+    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai",
+  },
+  "placement": { "mode": "smart" },
+  /**
+   * Bindings
+   * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
+   * databases, object storage, AI inference, real-time communication and more.
+   * https://developers.cloudflare.com/workers/runtime-apis/bindings/
+   */
+  /**
+   * Environment Variables
+   * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
+   */
+  // "vars": { "MY_VARIABLE": "production_value" }
+  /**
+   * Note: Use secrets to store sensitive data.
+   * https://developers.cloudflare.com/workers/configuration/secrets/
+   */
+  /**
+   * Static Assets
+   * https://developers.cloudflare.com/workers/static-assets/binding/
+   */
+  // "assets": { "directory": "./public/", "binding": "ASSETS" }
+  /**
+   * Service Bindings (communicate between multiple Workers)
+   * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+   */
+  // "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
+  /**
+   * Smart Placement
+   * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
+   */
+  // "placement": { "mode": "smart" }
+  /**
+   * Bindings
+   * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
+   * databases, object storage, AI inference, real-time communication and more.
+   * https://developers.cloudflare.com/workers/runtime-apis/bindings/
+   */
+  /**
+   * Environment Variables
+   * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
+   */
+  // "vars": { "MY_VARIABLE": "production_value" }
+  /**
+   * Note: Use secrets to store sensitive data.
+   * https://developers.cloudflare.com/workers/configuration/secrets/
+   */
+  /**
+   * Static Assets
+   * https://developers.cloudflare.com/workers/static-assets/binding/
+   */
+  // "assets": { "directory": "./public/", "binding": "ASSETS" }
+  /**
+   * Service Bindings (communicate between multiple Workers)
+   * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+   */
+  // "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "kilocode-sessions",
+    },
+  ],
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "image": "./Dockerfile",
+      "instance_type": "standard-4",
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "v0.26.0",
+      },
+      "max_instances": 10,
+      "rollout_active_grace_period": 1800,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "Sandbox",
+        "name": "Sandbox",
+      },
+      {
+        "class_name": "CloudAgentSession",
+        "name": "CLOUD_AGENT_SESSION",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["Sandbox"],
+      "tag": "v1",
+    },
+    {
+      "new_sqlite_classes": ["CloudAgentSession"],
+      "tag": "v2",
+    },
+  ],
+  /**
+   * Hyperdrive Bindings
+   * https://developers.cloudflare.com/hyperdrive/
+   */
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  /**
+   * KV Namespace Bindings
+   */
+  "kv_namespaces": [
+    {
+      "binding": "GITHUB_TOKEN_CACHE",
+      "id": "ab4d777d134a43248639044613ea29ef",
+    },
+  ],
+  /**
+   * Queue Bindings
+   * https://developers.cloudflare.com/queues/configuration/configure-queues/
+   */
+  "queues": {
+    "producers": [
+      {
+        "binding": "CALLBACK_QUEUE",
+        "queue": "cloud-agent-next-callback-queue",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "cloud-agent-next-callback-queue",
+        "max_batch_size": 5,
+        "max_retries": 0,
+        "type": "unbound",
+      },
+    ],
+  },
+  /**
+   * Named Environments
+   * https://developers.cloudflare.com/workers/wrangler/configuration/#named-environments
+   */
+  "env": {
+    "dev": {
+      "name": "cloud-agent-next-dev",
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "GITHUB_TOKEN_CACHE",
+          "id": "33b5f1f1be064e919934bee83df4067c",
+        },
+      ],
+      "vars": {
+        "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
+        "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
+        "GITHUB_APP_SLUG": "kiloconnect-development",
+        "GITHUB_APP_BOT_USER_ID": "242397087",
+        "GITHUB_APP_ID": "2245043",
+        "GITHUB_LITE_APP_ID": "",
+        "GITHUB_LITE_APP_SLUG": "",
+        "GITHUB_LITE_APP_BOT_USER_ID": "",
+        "WORKER_URL": "http://localhost:8794",
+        "WRAPPER_IDLE_TIMEOUT_MS": "120000",
+        "CLI_TIMEOUT_SECONDS": "900",
+        "REAPER_INTERVAL_MS": "300000",
+        "STALE_THRESHOLD_MS": "600000",
+        "PENDING_START_TIMEOUT_MS": "300000",
+        "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
+        "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://192.168.200.174:3000",
+      },
+      "r2_buckets": [
+        {
+          "binding": "R2_BUCKET",
+          "bucket_name": "kilocode-sessions-dev",
+        },
+      ],
+      "containers": [
+        {
+          "class_name": "Sandbox",
+          "image": "./Dockerfile.dev",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "next",
+          },
+          "max_instances": 10,
+          "rollout_active_grace_period": 60,
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "class_name": "Sandbox",
+            "name": "Sandbox",
+          },
+          {
+            "class_name": "CloudAgentSession",
+            "name": "CLOUD_AGENT_SESSION",
+          },
+        ],
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CALLBACK_QUEUE",
+            "queue": "cloud-agent-next-callback-queue-dev",
+          },
+        ],
+        "consumers": [
+          {
+            "queue": "cloud-agent-next-callback-queue-dev",
+            "max_batch_size": 5,
+            "max_retries": 0,
+            "type": "unbound",
+          },
+        ],
+      },
+    },
+  },
+}

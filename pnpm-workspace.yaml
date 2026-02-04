@@ -7,6 +7,8 @@ packages:
   - 'cloudflare-auto-fix-infra'
   - 'cloud-agent'
   - 'cloud-agent/wrapper'
+  - 'cloud-agent-next'
+  - 'cloud-agent-next/wrapper'
   - 'cloudflare-app-builder'
   - 'cloudflare-ai-attribution'
   - 'cloudflare-db-proxy'

@@ -34,8 +34,10 @@ import {
   basePrepareLegacySessionSchema,
   basePrepareLegacySessionOutputSchema,
   isPreparedSessionInput,
+  fimAutocompleteSchema,
 } from './cloud-agent-schemas';
 import { getBalanceForUser } from '@/lib/user.balance';
+import { getFimCompletion } from '@/lib/cloud-agent/chat-completion';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
 import { cliSessions } from '@/db/schema';
@@ -464,6 +466,31 @@ export const cloudAgentRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error; // unreachable
+      }
+    }),
+
+  /**
+   * Get FIM autocomplete suggestion for the chat input using prefix/suffix
+   */
+  getFimAutocomplete: baseProcedure
+    .input(fimAutocompleteSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Use internalApiUse to bypass abuse heuristics for autocomplete
+      const authToken = generateApiToken(ctx.user, { internalApiUse: true });
+
+      try {
+        const suggestion = await getFimCompletion({
+          prefix: input.prefix,
+          suffix: input.suffix,
+          authToken,
+        });
+        return { suggestion };
+      } catch (error) {
+        console.error('[cloudAgent.getFimAutocomplete] failed', {
+          error,
+          prefixLength: input.prefix.length,
+        });
+        return { suggestion: '' };
       }
     }),
 });

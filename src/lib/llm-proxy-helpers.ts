@@ -567,20 +567,35 @@ export async function sendProxiedChatCompletion<T>(
     headers.set('X-KiloCode-OrganizationId', request.organizationId);
   }
 
-  const response = await fetch(`${APP_URL}/api/openrouter/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      ...request.body,
-      stream: false,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${APP_URL}/api/openrouter/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ...request.body,
+        stream: false,
+      }),
+    });
+  } catch (error) {
+    console.error('[sendProxiedChatCompletion] fetch failed', {
+      error,
+      appUrl: APP_URL,
+      model: request.body.model,
+    });
+    return { ok: false, status: 0, error: String(error) };
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
     return { ok: false, status: response.status, error: errorText };
   }
 
-  const data: T = await response.json();
-  return { ok: true, data };
+  try {
+    const data: T = await response.json();
+    return { ok: true, data };
+  } catch (error) {
+    console.error('[sendProxiedChatCompletion] failed to parse json', { error });
+    return { ok: false, status: response.status, error: String(error) };
+  }
 }

@@ -239,3 +239,10 @@ export function isPreparedSessionInput(
 
   return hasCloudAgentSessionId && !hasLegacyFields;
 }
+
+// Schema for FIM autocomplete requests (prefix/suffix based)
+export const fimAutocompleteSchema = z.object({
+  prefix: z.string().min(1).max(2000),
+  suffix: z.string().max(2000).optional(),
+  requestId: z.string().min(1).max(20),
+});

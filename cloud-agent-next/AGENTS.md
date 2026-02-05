@@ -76,7 +76,7 @@ Agents should NOT add environment variables with top-level validation that throw
 
 ```ts
 if (!process.env.ENV_VAR) {
-  throw new Error("ENV_VAR is required")
+  throw new Error('ENV_VAR is required');
 }
 ```
 

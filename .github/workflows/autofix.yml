@@ -54,5 +54,5 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add .
-          git commit -m "ci: auto-fix formatting and linting"
+          git commit --no-verify -m "ci: auto-fix formatting and linting"
           git push

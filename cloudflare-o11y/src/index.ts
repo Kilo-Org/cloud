@@ -2,10 +2,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zodJsonValidator } from './util/validation';
 import { getClientName } from './client-secrets';
+import { captureApiMetrics } from './posthog';
 
 const app = new Hono<{ Bindings: Env }>();
 
-const ApiMetricsParamsSchema = z.object({
+export const ApiMetricsParamsSchema = z.object({
 	clientSecret: z.string().min(1),
 	kiloUserId: z.string().min(1),
 	organizationId: z.string().min(1).optional(),
@@ -42,7 +43,7 @@ app.post('/ingest/api-metrics', zodJsonValidator(ApiMetricsParamsSchema), async 
 		return c.json({ success: false, error: 'Unknown clientSecret' }, 403);
 	}
 
-	// TODO(phase-1a): emit/forward metrics to storage/analytics backend.
+	c.executionCtx.waitUntil(captureApiMetrics(params, clientName, c.env));
 	return c.body(null, 204);
 });
 

@@ -20,6 +20,14 @@
 	 * Secrets Store
 	 * https://developers.cloudflare.com/workers/configuration/secrets/#secrets-store
 	 */
+	"vars": {
+		"POSTHOG_API_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
+		"POSTHOG_HOST": "https://us.i.posthog.com",
+	},
+	/**
+	 * Secrets Store
+	 * https://developers.cloudflare.com/workers/configuration/secrets/#secrets-store
+	 */
 	"secrets_store_secrets": [
 		{
 			"binding": "O11Y_KILO_GATEWAY_CLIENT_SECRET",

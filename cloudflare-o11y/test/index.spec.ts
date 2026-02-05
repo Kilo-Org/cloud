@@ -2,8 +2,6 @@ import { createExecutionContext, waitOnExecutionContext, SELF } from 'cloudflare
 import { describe, it, expect } from 'vitest';
 import worker from '../src/index';
 
-// For now, you'll need to do something like this to get a correctly-typed
-// `Request` to pass to `worker.fetch()`.
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 const TEST_CLIENT_SECRET = 'test-client-secret-value';
@@ -13,10 +11,12 @@ function makeTestEnv(): Env {
 		O11Y_KILO_GATEWAY_CLIENT_SECRET: {
 			get: async () => TEST_CLIENT_SECRET,
 		},
+		POSTHOG_API_KEY: 'phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z',
+		POSTHOG_HOST: 'https://us.i.posthog.com',
 	};
 }
 
-describe('Hello World worker', () => {
+describe('o11y worker', () => {
 	it('responds with Hello World! (unit style)', async () => {
 		const request = new IncomingRequest('http://example.com');
 		const ctx = createExecutionContext();
@@ -30,7 +30,7 @@ describe('Hello World worker', () => {
 		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
 	});
 
-	it('validates /ingest/api-metrics payload shape', async () => {
+	it('accepts valid /ingest/api-metrics and returns 204', async () => {
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },

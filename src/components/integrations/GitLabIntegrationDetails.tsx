@@ -16,6 +16,7 @@ import {
   Server,
   Loader2,
   AlertCircle,
+  Key,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState, useRef } from 'react';
@@ -37,29 +38,60 @@ type InstanceValidationState = {
   error?: string;
 };
 
+type PATValidationState = {
+  status: 'idle' | 'validating' | 'valid' | 'invalid';
+  user?: {
+    id: number;
+    username: string;
+    name: string;
+  };
+  tokenInfo?: {
+    id: number;
+    name: string;
+    scopes: string[];
+    expiresAt: string | null;
+    active: boolean;
+    lastUsedAt: string | null;
+  };
+  error?: string;
+  missingScopes?: string[];
+  warnings?: string[];
+};
+
 export function GitLabIntegrationDetails({
   organizationId,
   success,
   error,
 }: GitLabIntegrationDetailsProps) {
+  // Shared state between OAuth and PAT
   const [instanceUrl, setInstanceUrl] = useState('https://gitlab.com');
   const [showSelfHosted, setShowSelfHosted] = useState(false);
+  const [instanceValidation, setInstanceValidation] = useState<InstanceValidationState>({
+    status: 'idle',
+  });
+
+  // OAuth-specific state
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [instanceValidation, setInstanceValidation] = useState<InstanceValidationState>({
+
+  // PAT-specific state
+  const [connectionMethod, setConnectionMethod] = useState<'oauth' | 'pat'>('oauth');
+  const [patToken, setPatToken] = useState('');
+  const [patValidation, setPATValidation] = useState<PATValidationState>({
     status: 'idle',
   });
 
   const trpc = useTRPC();
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const patValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isSelfHostedInput = Boolean(
-    instanceUrl && instanceUrl !== 'https://gitlab.com' && instanceUrl !== ''
+    showSelfHosted && instanceUrl && instanceUrl !== 'https://gitlab.com' && instanceUrl !== ''
   );
 
   const { queries, mutations } = useGitLabQueries();
 
-  // Instance validation mutation
+  // Instance validation mutation (shared between OAuth and PAT)
   const { mutate: validateInstanceMutate } = useMutation(
     trpc.gitlab.validateInstance.mutationOptions({
       onSuccess: result => {
@@ -86,7 +118,86 @@ export function GitLabIntegrationDetails({
     })
   );
 
-  // Validate instance URL when it changes (with debounce)
+  // PAT validation mutation
+  const { mutate: validatePATMutate } = useMutation(
+    trpc.gitlab.validatePAT.mutationOptions({
+      onSuccess: result => {
+        if (result.valid && result.user) {
+          setPATValidation({
+            status: 'valid',
+            user: result.user,
+            tokenInfo: result.tokenInfo,
+            warnings: result.warnings,
+          });
+        } else {
+          setPATValidation({
+            status: 'invalid',
+            error: result.error,
+            missingScopes: result.missingScopes,
+          });
+        }
+      },
+      onError: err => {
+        setPATValidation({
+          status: 'invalid',
+          error: err.message || 'Failed to validate Personal Access Token',
+        });
+      },
+    })
+  );
+
+  // Connect with PAT mutation
+  const { mutate: connectWithPATMutate, isPending: isConnectingWithPAT } = useMutation(
+    trpc.gitlab.connectWithPAT.mutationOptions({
+      onSuccess: () => {
+        toast.success('GitLab connected successfully!');
+        // Reset PAT form
+        setPatToken('');
+        setPATValidation({ status: 'idle' });
+        setConnectionMethod('oauth');
+        // Reload the page to refresh the installation data
+        window.location.reload();
+      },
+      onError: err => {
+        toast.error('Failed to connect', { description: err.message });
+      },
+    })
+  );
+
+  // PAT validation effect (with debounce)
+  useEffect(() => {
+    // Clear any pending validation
+    if (patValidationTimeoutRef.current) {
+      clearTimeout(patValidationTimeoutRef.current);
+    }
+
+    // Only validate if we have a token that looks valid (at least 20 chars for GitLab PATs)
+    if (!patToken || patToken.length < 20) {
+      if (patToken.length > 0 && patToken.length < 20) {
+        setPATValidation({
+          status: 'idle',
+        });
+      } else {
+        setPATValidation({ status: 'idle' });
+      }
+      return;
+    }
+
+    setPATValidation({ status: 'validating' });
+
+    patValidationTimeoutRef.current = setTimeout(() => {
+      // Use the shared instanceUrl for PAT validation
+      validatePATMutate({ token: patToken, instanceUrl });
+    }, 500);
+
+    return () => {
+      if (patValidationTimeoutRef.current) {
+        clearTimeout(patValidationTimeoutRef.current);
+      }
+    };
+  }, [patToken, instanceUrl, validatePATMutate]);
+
+  // Validate instance URL when it changes (with debounce) - shared between OAuth and PAT
   useEffect(() => {
     // Clear any pending validation
     if (validationTimeoutRef.current) {
@@ -211,6 +322,7 @@ export function GitLabIntegrationDetails({
   const installation = installationData?.installation;
   const gitlabInstanceUrl = installation?.instanceUrl || 'https://gitlab.com';
   const isSelfHosted = gitlabInstanceUrl !== 'https://gitlab.com';
+  const authType = (installation as { authType?: 'oauth' | 'pat' } | null)?.authType ?? 'oauth';
 
   return (
     <div className="space-y-6">
@@ -254,6 +366,22 @@ export function GitLabIntegrationDetails({
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Account:</span>
                   <span className="text-sm">{installation.accountLogin}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Auth Method:</span>
+                  <Badge variant={authType === 'pat' ? 'secondary' : 'outline'}>
+                    {authType === 'pat' ? (
+                      <>
+                        <Key className="mr-1 h-3 w-3" />
+                        Personal Access Token
+                      </>
+                    ) : (
+                      <>
+                        <GitBranch className="mr-1 h-3 w-3" />
+                        OAuth
+                      </>
+                    )}
+                  </Badge>
                 </div>
                 {isSelfHosted && (
                   <div className="flex items-center justify-between">
@@ -301,11 +429,20 @@ export function GitLabIntegrationDetails({
                 <Button
                   variant="outline"
                   onClick={() => {
-                    window.open(`${gitlabInstanceUrl}/-/profile/applications`, '_blank');
+                    // For PAT connections, link to Access Tokens page; for OAuth, link to Applications
+                    const targetUrl =
+                      authType === 'pat'
+                        ? `${gitlabInstanceUrl}/-/user_settings/personal_access_tokens`
+                        : `${gitlabInstanceUrl}/-/profile/applications`;
+                    window.open(targetUrl, '_blank');
                   }}
                 >
-                  <Settings className="mr-2 h-4 w-4" />
-                  Manage on GitLab
+                  {authType === 'pat' ? (
+                    <Key className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Settings className="mr-2 h-4 w-4" />
+                  )}
+                  {authType === 'pat' ? 'Manage Access Token' : 'Manage on GitLab'}
                   <ExternalLink className="ml-2 h-3 w-3" />
                 </Button>
                 <Button
@@ -344,97 +481,133 @@ export function GitLabIntegrationDetails({
                 </ul>
               </div>
 
-              {/* Self-hosted GitLab option */}
-              <div className="space-y-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowSelfHosted(!showSelfHosted)}
-                  className="text-muted-foreground"
-                >
-                  <Server className="mr-2 h-4 w-4" />
-                  {showSelfHosted ? 'Hide' : 'Using'} self-hosted GitLab?
-                </Button>
+              {/* Connection Method Toggle */}
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Button
+                    variant={connectionMethod === 'oauth' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setConnectionMethod('oauth')}
+                  >
+                    <GitBranch className="mr-2 h-4 w-4" />
+                    OAuth
+                  </Button>
+                  <Button
+                    variant={connectionMethod === 'pat' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setConnectionMethod('pat')}
+                  >
+                    <Key className="mr-2 h-4 w-4" />
+                    Personal Access Token
+                  </Button>
+                </div>
 
-                {showSelfHosted && (
-                  <>
-                    <p className="text-muted-foreground mb-2 text-sm">
-                      Using a self-hosted GitLab instance is a{' '}
-                      <a
-                        href="https://kilo.ai/docs/automate/integrations"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline"
-                      >
-                        feature of Kilo Code Enterprise
-                      </a>
-                      . Contact{' '}
-                      <a href="mailto:sales@kilocode.ai" className="text-primary underline">
-                        Sales
-                      </a>{' '}
-                      to learn more.
-                    </p>
-                    <div className="space-y-4 rounded-lg border p-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="instanceUrl">GitLab Instance URL</Label>
-                        <div className="relative">
-                          <Input
-                            id="instanceUrl"
-                            type="url"
-                            placeholder="https://gitlab.example.com"
-                            value={instanceUrl}
-                            onChange={e => setInstanceUrl(e.target.value)}
-                            className={
-                              instanceValidation.status === 'valid'
-                                ? 'border-green-500 pr-10'
-                                : instanceValidation.status === 'invalid'
-                                  ? 'border-red-500 pr-10'
-                                  : instanceValidation.status === 'validating'
-                                    ? 'pr-10'
-                                    : ''
-                            }
-                          />
-                          {instanceValidation.status === 'validating' && (
-                            <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
-                          )}
-                          {instanceValidation.status === 'valid' && (
-                            <CheckCircle2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-green-500" />
-                          )}
-                          {instanceValidation.status === 'invalid' && (
-                            <AlertCircle className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-red-500" />
-                          )}
+                {/* Self-hosted GitLab option - shared between OAuth and PAT */}
+                <div className="space-y-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowSelfHosted(!showSelfHosted);
+                      if (showSelfHosted) {
+                        // Reset to gitlab.com when hiding
+                        setInstanceUrl('https://gitlab.com');
+                        setInstanceValidation({ status: 'idle' });
+                      }
+                    }}
+                    className="text-muted-foreground"
+                  >
+                    <Server className="mr-2 h-4 w-4" />
+                    {showSelfHosted ? 'Hide' : 'Using'} self-hosted GitLab?
+                  </Button>
+
+                  {showSelfHosted && (
+                    <>
+                      <p className="text-muted-foreground mb-2 text-sm">
+                        Using a self-hosted GitLab instance is a{' '}
+                        <a
+                          href="https://kilo.ai/docs/automate/integrations"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline"
+                        >
+                          feature of Kilo Code Enterprise
+                        </a>
+                        . Contact{' '}
+                        <a href="mailto:sales@kilocode.ai" className="text-primary underline">
+                          Sales
+                        </a>{' '}
+                        to learn more.
+                      </p>
+                      <div className="space-y-4 rounded-lg border p-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="instanceUrl">GitLab Instance URL</Label>
+                          <div className="relative">
+                            <Input
+                              id="instanceUrl"
+                              type="url"
+                              placeholder="https://gitlab.example.com"
+                              value={instanceUrl}
+                              onChange={e => setInstanceUrl(e.target.value)}
+                              className={
+                                instanceValidation.status === 'valid'
+                                  ? 'border-green-500 pr-10'
+                                  : instanceValidation.status === 'invalid'
+                                    ? 'border-red-500 pr-10'
+                                    : instanceValidation.status === 'validating'
+                                      ? 'pr-10'
+                                      : ''
+                              }
+                            />
+                            {instanceValidation.status === 'validating' && (
+                              <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
+                            )}
+                            {instanceValidation.status === 'valid' && (
+                              <CheckCircle2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-green-500" />
+                            )}
+                            {instanceValidation.status === 'invalid' && (
+                              <AlertCircle className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-red-500" />
+                            )}
+                          </div>
                         </div>
+
+                        {/* Validation status message */}
+                        {instanceValidation.status === 'valid' && instanceValidation.version && (
+                          <p className="flex items-center gap-1 text-xs text-green-600">
+                            <CheckCircle2 className="h-3 w-3" />
+                            GitLab {instanceValidation.version} detected
+                            {instanceValidation.enterprise && ' (Enterprise Edition)'}
+                          </p>
+                        )}
+                        {instanceValidation.status === 'valid' && instanceValidation.error && (
+                          <p className="text-muted-foreground text-xs">
+                            {instanceValidation.error}
+                          </p>
+                        )}
+                        {instanceValidation.status === 'invalid' && instanceValidation.error && (
+                          <p className="flex items-center gap-1 text-xs text-red-600">
+                            <AlertCircle className="h-3 w-3" />
+                            {instanceValidation.error}
+                          </p>
+                        )}
+                        {instanceValidation.status === 'idle' && (
+                          <p className="text-muted-foreground text-xs">
+                            Enter your self-hosted GitLab instance URL.
+                          </p>
+                        )}
+                        {instanceValidation.status === 'validating' && (
+                          <p className="text-muted-foreground text-xs">
+                            Validating GitLab instance...
+                          </p>
+                        )}
                       </div>
+                    </>
+                  )}
+                </div>
 
-                      {/* Validation status message */}
-                      {instanceValidation.status === 'valid' && instanceValidation.version && (
-                        <p className="flex items-center gap-1 text-xs text-green-600">
-                          <CheckCircle2 className="h-3 w-3" />
-                          GitLab {instanceValidation.version} detected
-                          {instanceValidation.enterprise && ' (Enterprise Edition)'}
-                        </p>
-                      )}
-                      {instanceValidation.status === 'valid' && instanceValidation.error && (
-                        <p className="text-muted-foreground text-xs">{instanceValidation.error}</p>
-                      )}
-                      {instanceValidation.status === 'invalid' && instanceValidation.error && (
-                        <p className="flex items-center gap-1 text-xs text-red-600">
-                          <AlertCircle className="h-3 w-3" />
-                          {instanceValidation.error}
-                        </p>
-                      )}
-                      {instanceValidation.status === 'idle' && (
-                        <p className="text-muted-foreground text-xs">
-                          Enter your self-hosted GitLab instance URL.
-                        </p>
-                      )}
-                      {instanceValidation.status === 'validating' && (
-                        <p className="text-muted-foreground text-xs">
-                          Validating GitLab instance...
-                        </p>
-                      )}
-                    </div>
-
+                {connectionMethod === 'oauth' ? (
+                  <>
+                    {/* OAuth Flow - Client ID/Secret only needed for self-hosted */}
                     {isSelfHostedInput && instanceValidation.status === 'valid' && (
                       <>
                         <Alert>
@@ -496,22 +669,132 @@ export function GitLabIntegrationDetails({
                         </div>
                       </>
                     )}
+
+                    <Button
+                      onClick={handleConnect}
+                      size="lg"
+                      className="w-full"
+                      disabled={
+                        isSelfHostedInput &&
+                        (!clientId || !clientSecret || instanceValidation.status !== 'valid')
+                      }
+                    >
+                      <GitBranch className="mr-2 h-4 w-4" />
+                      Connect {isSelfHostedInput ? 'Self-Hosted ' : ''}GitLab
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {/* PAT Flow */}
+                    <div className="space-y-4">
+                      {/* PAT Input */}
+                      <div className="space-y-2">
+                        <Label htmlFor="patToken">Personal Access Token</Label>
+                        <div className="relative">
+                          <Input
+                            id="patToken"
+                            type="password"
+                            placeholder="glpat-xxxxxxxxxxxx"
+                            value={patToken}
+                            onChange={e => setPatToken(e.target.value)}
+                            className={
+                              patValidation.status === 'valid'
+                                ? 'border-green-500 pr-10'
+                                : patValidation.status === 'invalid'
+                                  ? 'border-red-500 pr-10'
+                                  : patValidation.status === 'validating'
+                                    ? 'pr-10'
+                                    : ''
+                            }
+                          />
+                          {patValidation.status === 'validating' && (
+                            <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
+                          )}
+                          {patValidation.status === 'valid' && (
+                            <CheckCircle2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-green-500" />
+                          )}
+                          {patValidation.status === 'invalid' && (
+                            <AlertCircle className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-red-500" />
+                          )}
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                          Create a token at GitLab → User Settings → Access Tokens with{' '}
+                          <code className="bg-muted rounded px-1">api</code> scope.
+                        </p>
+                      </div>
+
+                      {/* Validation Status */}
+                      {patValidation.status === 'valid' && patValidation.user && (
+                        <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-green-700 dark:text-green-300">
+                              Token valid for @{patValidation.user.username}
+                            </span>
+                          </div>
+                          {patValidation.tokenInfo?.expiresAt && (
+                            <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                              Expires:{' '}
+                              {new Date(patValidation.tokenInfo.expiresAt).toLocaleDateString()}
+                            </p>
+                          )}
+                          {patValidation.warnings?.map((warning, i) => (
+                            <p key={i} className="mt-1 text-xs text-amber-600">
+                              ⚠️ {warning}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      {patValidation.status === 'invalid' && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-red-600" />
+                            <span className="font-medium text-red-700 dark:text-red-300">
+                              {patValidation.error}
+                            </span>
+                          </div>
+                          {patValidation.missingScopes &&
+                            patValidation.missingScopes.length > 0 && (
+                              <p className="mt-1 text-xs text-red-600">
+                                Missing scopes: {patValidation.missingScopes.join(', ')}
+                              </p>
+                            )}
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={() =>
+                          connectWithPATMutate({
+                            token: patToken,
+                            instanceUrl,
+                            organizationId,
+                          })
+                        }
+                        size="lg"
+                        className="w-full"
+                        disabled={
+                          patValidation.status !== 'valid' ||
+                          isConnectingWithPAT ||
+                          (isSelfHostedInput && instanceValidation.status !== 'valid')
+                        }
+                      >
+                        {isConnectingWithPAT ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Connecting...
+                          </>
+                        ) : (
+                          <>
+                            <Key className="mr-2 h-4 w-4" />
+                            Connect {isSelfHostedInput ? 'Self-Hosted ' : ''}GitLab with PAT
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </>
                 )}
               </div>
-
-              <Button
-                onClick={handleConnect}
-                size="lg"
-                className="w-full"
-                disabled={
-                  isSelfHostedInput &&
-                  (!clientId || !clientSecret || instanceValidation.status !== 'valid')
-                }
-              >
-                <GitBranch className="mr-2 h-4 w-4" />
-                Connect {isSelfHostedInput ? 'Self-Hosted ' : ''}GitLab
-              </Button>
             </>
           )}
         </CardContent>

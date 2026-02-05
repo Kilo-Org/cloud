@@ -1984,3 +1984,213 @@ export async function validateProjectAccessToken(
     return true;
   }
 }
+
+// ============================================================================
+// Personal Access Token (PAT) Validation
+// ============================================================================
+
+/**
+ * Required scopes for PAT-based authentication
+ * - api: Full API access (needed for webhooks, MR comments, PrAT creation)
+ *
+ * We always require 'api' scope as it covers all needed operations:
+ * - Creating webhooks
+ * - Posting MR comments
+ * - Creating Project Access Tokens
+ * - Reading repositories
+ */
+export const GITLAB_PAT_REQUIRED_SCOPES = ['api'] as const;
+
+/**
+ * GitLab Personal Access Token info response type
+ * @see https://docs.gitlab.com/ee/api/personal_access_tokens.html#get-single-personal-access-token
+ */
+export type GitLabPersonalAccessTokenInfo = {
+  id: number;
+  name: string;
+  revoked: boolean;
+  created_at: string;
+  scopes: string[];
+  user_id: number;
+  last_used_at: string | null;
+  active: boolean;
+  expires_at: string | null;
+};
+
+/**
+ * Result of validating a Personal Access Token
+ */
+export type GitLabPATValidationResult = {
+  valid: boolean;
+  user?: GitLabUser;
+  tokenInfo?: {
+    id: number;
+    name: string;
+    scopes: string[];
+    expiresAt: string | null;
+    active: boolean;
+    lastUsedAt: string | null;
+  };
+  error?: string;
+  missingScopes?: string[];
+  warnings?: string[];
+};
+
+/**
+ * Validates a GitLab Personal Access Token
+ *
+ * This function:
+ * 1. Calls /api/v4/personal_access_tokens/self to get token info (requires GitLab 14.0+)
+ * 2. Validates that 'api' scope is present
+ * 3. Fetches user info from /api/v4/user
+ * 4. Checks for expiration and adds warnings if expiring soon
+ *
+ * @param token - The Personal Access Token to validate
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @returns Validation result with user info, scopes, and any warnings
+ */
+export async function validatePersonalAccessToken(
+  token: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabPATValidationResult> {
+  const warnings: string[] = [];
+
+  // Step 1: Get token info from /api/v4/personal_access_tokens/self
+  // This endpoint requires GitLab 14.0+
+  const tokenInfoResponse = await fetch(`${instanceUrl}/api/v4/personal_access_tokens/self`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!tokenInfoResponse.ok) {
+    if (tokenInfoResponse.status === 401) {
+      logExceptInTest('[validatePersonalAccessToken] Invalid token (401)');
+      return {
+        valid: false,
+        error: 'Invalid Personal Access Token. Please check the token and try again.',
+      };
+    }
+
+    if (tokenInfoResponse.status === 404) {
+      logExceptInTest('[validatePersonalAccessToken] Endpoint not found (404) - GitLab < 14.0?');
+      return {
+        valid: false,
+        error:
+          'GitLab 14.0 or higher is required for PAT authentication. Please use OAuth instead or upgrade your GitLab instance.',
+      };
+    }
+
+    const errorText = await tokenInfoResponse.text();
+    logExceptInTest('[validatePersonalAccessToken] Token info fetch failed', {
+      status: tokenInfoResponse.status,
+      error: errorText,
+    });
+    return {
+      valid: false,
+      error: `Failed to validate token: ${tokenInfoResponse.status}`,
+    };
+  }
+
+  const tokenInfo = (await tokenInfoResponse.json()) as GitLabPersonalAccessTokenInfo;
+
+  // Check if token is revoked or inactive
+  if (tokenInfo.revoked || !tokenInfo.active) {
+    logExceptInTest('[validatePersonalAccessToken] Token is revoked or inactive', {
+      revoked: tokenInfo.revoked,
+      active: tokenInfo.active,
+    });
+    return {
+      valid: false,
+      error: 'This Personal Access Token has been revoked or is inactive.',
+    };
+  }
+
+  // Step 2: Validate required scopes
+  const missingScopes = GITLAB_PAT_REQUIRED_SCOPES.filter(
+    scope => !tokenInfo.scopes.includes(scope)
+  );
+
+  if (missingScopes.length > 0) {
+    logExceptInTest('[validatePersonalAccessToken] Missing required scopes', {
+      required: GITLAB_PAT_REQUIRED_SCOPES,
+      actual: tokenInfo.scopes,
+      missing: missingScopes,
+    });
+    return {
+      valid: false,
+      error: `Token is missing required scope(s): ${missingScopes.join(', ')}. Please create a new token with the 'api' scope.`,
+      missingScopes: [...missingScopes],
+    };
+  }
+
+  // Step 3: Check expiration and add warnings
+  if (tokenInfo.expires_at) {
+    const expiresAt = new Date(tokenInfo.expires_at);
+    const now = new Date();
+    const daysUntilExpiry = Math.floor(
+      (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (daysUntilExpiry < 0) {
+      logExceptInTest('[validatePersonalAccessToken] Token has expired', {
+        expiresAt: tokenInfo.expires_at,
+      });
+      return {
+        valid: false,
+        error: 'This Personal Access Token has expired. Please create a new token.',
+      };
+    }
+
+    if (daysUntilExpiry <= 30) {
+      warnings.push(
+        `Token expires in ${daysUntilExpiry} day${daysUntilExpiry === 1 ? '' : 's'}. Consider creating a new token with a longer expiration.`
+      );
+    }
+  }
+
+  // Step 4: Fetch user info
+  const userResponse = await fetch(`${instanceUrl}/api/v4/user`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!userResponse.ok) {
+    const errorText = await userResponse.text();
+    logExceptInTest('[validatePersonalAccessToken] User fetch failed', {
+      status: userResponse.status,
+      error: errorText,
+    });
+    return {
+      valid: false,
+      error: `Failed to fetch user info: ${userResponse.status}`,
+    };
+  }
+
+  const user = (await userResponse.json()) as GitLabUser;
+
+  logExceptInTest('[validatePersonalAccessToken] Token validated successfully', {
+    userId: user.id,
+    username: user.username,
+    tokenId: tokenInfo.id,
+    tokenName: tokenInfo.name,
+    scopes: tokenInfo.scopes,
+    expiresAt: tokenInfo.expires_at,
+    warnings,
+  });
+
+  return {
+    valid: true,
+    user,
+    tokenInfo: {
+      id: tokenInfo.id,
+      name: tokenInfo.name,
+      scopes: tokenInfo.scopes,
+      expiresAt: tokenInfo.expires_at,
+      active: tokenInfo.active,
+      lastUsedAt: tokenInfo.last_used_at,
+    },
+    warnings: warnings.length > 0 ? warnings : undefined,
+  };
+}

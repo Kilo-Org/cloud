@@ -110,7 +110,6 @@ export async function GET(request: NextRequest) {
       .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.GITLAB)))
       .limit(1);
 
-    // Preserve existing webhook secret on update, generate new one on insert
     const existingMetadata = existing?.metadata as Record<string, unknown> | null;
     const webhookSecret = existingMetadata?.webhook_secret ?? generateWebhookSecret();
 
@@ -121,6 +120,9 @@ export async function GET(request: NextRequest) {
       token_expires_at: tokenExpiresAt,
       gitlab_instance_url: instanceUrl !== 'https://gitlab.com' ? instanceUrl : undefined,
       webhook_secret: webhookSecret, // For GitLab webhook verification
+      auth_type: 'oauth', // Track authentication method
+      configured_webhooks: existingMetadata?.configured_webhooks,
+      project_tokens: existingMetadata?.project_tokens,
     };
 
     if (customCredentials) {

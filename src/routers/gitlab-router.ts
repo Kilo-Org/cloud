@@ -4,6 +4,7 @@ import * as z from 'zod';
 import * as gitlabService from '@/lib/integrations/gitlab-service';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { validateGitLabInstance } from '@/lib/integrations/platforms/gitlab/adapter';
+import { validatePersonalAccessToken } from '@/lib/integrations/platforms/gitlab/adapter';
 
 export const gitlabRouter = createTRPCRouter({
   /**
@@ -20,6 +21,45 @@ export const gitlabRouter = createTRPCRouter({
       return validateGitLabInstance(input.instanceUrl);
     }),
 
+  /**
+   * Validates a Personal Access Token before connecting.
+   * Returns token info, user details, and any warnings.
+   */
+  validatePAT: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1, 'Token is required'),
+        instanceUrl: z.string().url().optional().default('https://gitlab.com'),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return validatePersonalAccessToken(input.token, input.instanceUrl);
+    }),
+
+  /**
+   * Connects GitLab using a Personal Access Token.
+   * Creates or updates the platform_integration record.
+   */
+  connectWithPAT: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1, 'Token is required'),
+        instanceUrl: z.string().url().optional().default('https://gitlab.com'),
+        organizationId: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = input.organizationId
+        ? { type: 'org' as const, id: input.organizationId }
+        : { type: 'user' as const, id: ctx.user.id };
+
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+      }
+
+      return gitlabService.connectWithPAT(owner, input.token, input.instanceUrl);
+    }),
+
   getInstallation: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
     const integration = await gitlabService.getGitLabIntegration(owner);
@@ -34,6 +74,7 @@ export const gitlabRouter = createTRPCRouter({
     const metadata = integration.metadata as {
       gitlab_instance_url?: string;
       token_expires_at?: string;
+      auth_type?: 'oauth' | 'pat';
     } | null;
 
     const isInstalled = integration.integration_status === 'active';
@@ -49,6 +90,7 @@ export const gitlabRouter = createTRPCRouter({
         repositoriesSyncedAt: integration.repositories_synced_at,
         installedAt: integration.installed_at,
         tokenExpiresAt: metadata?.token_expires_at ?? null,
+        authType: metadata?.auth_type ?? 'oauth',
       },
     };
   }),
@@ -67,7 +109,7 @@ export const gitlabRouter = createTRPCRouter({
   getIntegration: baseProcedure
     .input(
       z.object({
-        organizationId: z.uuid().optional(),
+        organizationId: z.string().uuid().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -87,6 +129,7 @@ export const gitlabRouter = createTRPCRouter({
       const metadata = integration.metadata as {
         gitlab_instance_url?: string;
         token_expires_at?: string;
+        auth_type?: 'oauth' | 'pat';
       } | null;
 
       return {
@@ -100,6 +143,7 @@ export const gitlabRouter = createTRPCRouter({
           repositoriesSyncedAt: integration.repositories_synced_at,
           installedAt: integration.installed_at,
           tokenExpiresAt: metadata?.token_expires_at,
+          authType: metadata?.auth_type ?? 'oauth',
         },
       };
     }),

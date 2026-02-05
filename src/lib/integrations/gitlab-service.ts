@@ -20,7 +20,9 @@ import {
   calculateProjectAccessTokenExpiry,
   isProjectAccessTokenExpiringSoon,
   validateProjectAccessToken,
+  validatePersonalAccessToken,
   type GitLabProjectAccessToken,
+  type GitLabPATValidationResult,
   GitLabProjectAccessTokenPermissionError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { randomBytes } from 'crypto';
@@ -53,20 +55,12 @@ export async function getGitLabIntegration(owner: Owner): Promise<PlatformIntegr
 
 /**
  * Get a valid access token for a GitLab integration
- * Automatically refreshes the token if expired
  *
  * @param integration - The GitLab integration record
  * @returns Valid access token
  */
 export async function getValidGitLabToken(integration: PlatformIntegration): Promise<string> {
-  const metadata = integration.metadata as {
-    access_token?: string;
-    refresh_token?: string;
-    token_expires_at?: string;
-    gitlab_instance_url?: string;
-    client_id?: string;
-    client_secret?: string;
-  } | null;
+  const metadata = integration.metadata as GitLabIntegrationMetadata | null;
 
   if (!metadata?.access_token) {
     throw new TRPCError({
@@ -75,6 +69,15 @@ export async function getValidGitLabToken(integration: PlatformIntegration): Pro
     });
   }
 
+  // PAT tokens don't expire in the same way as OAuth tokens
+  // They have a fixed expiration date set at creation
+  if (metadata.auth_type === 'pat') {
+    // For PAT, we can't refresh - just return the token
+    // The user will need to create a new PAT if it expires
+    return metadata.access_token;
+  }
+
+  // OAuth token refresh logic
   if (metadata.token_expires_at && isTokenExpired(metadata.token_expires_at)) {
     if (!metadata.refresh_token) {
       throw new TRPCError({
@@ -221,6 +224,11 @@ export async function listGitLabBranches(
 
 /**
  * Disconnect GitLab integration for an owner
+ *
+ * Instead of deleting the integration record, we mark it as disconnected.
+ * This preserves the webhook_secret, configured_webhooks, and project_tokens
+ * so that when the user reconnects (via OAuth or PAT), existing webhook
+ * configurations continue to work.
  */
 export async function disconnectGitLabIntegration(owner: Owner) {
   const ownershipCondition =
@@ -248,12 +256,50 @@ export async function disconnectGitLabIntegration(owner: Owner) {
     });
   }
 
-  // Delete from database
-  // Note: Unlike GitHub Apps, we don't need to call GitLab API to revoke
-  // The OAuth token will simply expire or user can revoke from GitLab settings
+  // Mark as disconnected instead of deleting
+  // This preserves webhook_secret, configured_webhooks, and project_tokens
+  // so reconnecting (via OAuth or PAT) will keep existing webhook configurations working
+  const existingMetadata = (integration.metadata || {}) as GitLabIntegrationMetadata;
+
+  // Clear sensitive tokens but preserve webhook configuration
+  const updatedMetadata: GitLabIntegrationMetadata = {
+    // Clear tokens
+    access_token: undefined,
+    refresh_token: undefined,
+    token_expires_at: undefined,
+    // Preserve instance URL for reconnection
+    gitlab_instance_url: existingMetadata.gitlab_instance_url,
+    // Clear OAuth credentials
+    client_id: undefined,
+    client_secret: undefined,
+    // PRESERVE webhook secret so existing webhooks continue to work
+    webhook_secret: existingMetadata.webhook_secret,
+    // Clear auth type (will be set on reconnect)
+    auth_type: undefined,
+    // PRESERVE configured webhooks
+    configured_webhooks: existingMetadata.configured_webhooks,
+    // PRESERVE project tokens (they're still valid on GitLab)
+    project_tokens: existingMetadata.project_tokens,
+  };
+
   await db
-    .delete(platform_integrations)
-    .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.GITLAB)));
+    .update(platform_integrations)
+    .set({
+      integration_status: INTEGRATION_STATUS.SUSPENDED,
+      metadata: updatedMetadata,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integration.id));
+
+  logExceptInTest(
+    '[disconnectGitLabIntegration] Integration suspended (preserved webhook config)',
+    {
+      integrationId: integration.id,
+      preservedWebhookSecret: !!existingMetadata.webhook_secret,
+      preservedWebhooks: Object.keys(existingMetadata.configured_webhooks || {}).length,
+      preservedProjectTokens: Object.keys(existingMetadata.project_tokens || {}).length,
+    }
+  );
 
   return { success: true };
 }
@@ -726,4 +772,178 @@ export async function importExistingProjectAccessToken(
   }
 
   return existingToken;
+}
+
+// ============================================================================
+// Personal Access Token (PAT) Connection
+// ============================================================================
+
+/**
+ * Re-export validatePersonalAccessToken for use in tRPC router
+ */
+export { validatePersonalAccessToken, type GitLabPATValidationResult };
+
+/**
+ * Connects GitLab using a Personal Access Token
+ *
+ * This is an alternative to OAuth for users who prefer PAT-based auth.
+ * The PAT is used for:
+ * - Account connection and identity verification
+ * - Listing accessible repositories
+ * - Creating webhooks (requires Maintainer role)
+ * - Creating Project Access Tokens for code reviews
+ *
+ * Code reviews use Project Access Tokens (PrAT) so comments appear as a bot.
+ *
+ * If an existing integration exists, this function will update it instead of
+ * creating a new one. This preserves webhook secrets and configured webhooks
+ * so existing webhook configurations continue to work.
+ *
+ * @param owner - User or organization owner
+ * @param token - Personal Access Token
+ * @param instanceUrl - GitLab instance URL
+ */
+export async function connectWithPAT(
+  owner: Owner,
+  token: string,
+  instanceUrl: string = 'https://gitlab.com'
+): Promise<{
+  success: boolean;
+  integration: {
+    id: string;
+    accountLogin: string;
+    accountId: string;
+    instanceUrl: string;
+  };
+  warnings?: string[];
+}> {
+  // 1. Validate the PAT
+  const validation = await validatePersonalAccessToken(token, instanceUrl);
+
+  if (!validation.valid || !validation.user) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: validation.error || 'Invalid Personal Access Token',
+    });
+  }
+
+  // 2. Check for existing integration - update it instead of creating new
+  const existingIntegration = await getGitLabIntegration(owner);
+
+  if (existingIntegration) {
+    // Update existing integration, preserving webhook_secret, configured_webhooks, and project_tokens
+    const existingMetadata = (existingIntegration.metadata || {}) as GitLabIntegrationMetadata;
+
+    const updatedMetadata: GitLabIntegrationMetadata = {
+      access_token: token,
+      // No refresh_token for PAT (PATs don't refresh)
+      gitlab_instance_url: instanceUrl,
+      // Preserve existing webhook secret so configured webhooks continue to work
+      webhook_secret: existingMetadata.webhook_secret || randomBytes(32).toString('hex'),
+      auth_type: 'pat',
+      // Preserve configured webhooks
+      configured_webhooks: existingMetadata.configured_webhooks,
+      // Preserve project access tokens
+      project_tokens: existingMetadata.project_tokens,
+    };
+
+    await db
+      .update(platform_integrations)
+      .set({
+        integration_type: 'pat',
+        platform_installation_id: String(validation.user.id),
+        platform_account_id: String(validation.user.id),
+        platform_account_login: validation.user.username,
+        scopes: validation.tokenInfo?.scopes ?? ['api'],
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: updatedMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(platform_integrations.id, existingIntegration.id));
+
+    logExceptInTest('[connectWithPAT] Integration updated (preserved webhook config)', {
+      integrationId: existingIntegration.id,
+      userId: validation.user.id,
+      username: validation.user.username,
+      instanceUrl,
+      authType: 'pat',
+      preservedWebhookSecret: !!existingMetadata.webhook_secret,
+      preservedWebhooks: Object.keys(existingMetadata.configured_webhooks || {}).length,
+    });
+
+    // Fetch and cache repositories
+    const repos = await fetchGitLabProjects(token, instanceUrl);
+    await updateRepositoriesForIntegration(existingIntegration.id, repos);
+
+    return {
+      success: true,
+      integration: {
+        id: existingIntegration.id,
+        accountLogin: validation.user.username,
+        accountId: String(validation.user.id),
+        instanceUrl,
+      },
+      warnings: validation.warnings,
+    };
+  }
+
+  // 3. No existing integration - create new one with fresh webhook secret
+  const webhookSecret = randomBytes(32).toString('hex');
+
+  // 4. Prepare metadata
+  const metadata: GitLabIntegrationMetadata = {
+    access_token: token,
+    // No refresh_token for PAT (PATs don't refresh)
+    gitlab_instance_url: instanceUrl,
+    webhook_secret: webhookSecret,
+    auth_type: 'pat',
+  };
+
+  // 5. Create integration
+  const [integration] = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_user_id: owner.type === 'user' ? owner.id : null,
+      owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+      platform: PLATFORM.GITLAB,
+      integration_type: 'pat',
+      platform_installation_id: String(validation.user.id), // Use GitLab user ID as "installation" ID
+      platform_account_id: String(validation.user.id),
+      platform_account_login: validation.user.username,
+      permissions: null, // PAT doesn't have granular permissions like GitHub Apps
+      scopes: validation.tokenInfo?.scopes ?? ['api'],
+      repository_access: 'all', // PAT grants access to all user's projects
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      metadata,
+      installed_at: new Date().toISOString(),
+    })
+    .returning();
+
+  logExceptInTest('[connectWithPAT] Integration created', {
+    integrationId: integration.id,
+    userId: validation.user.id,
+    username: validation.user.username,
+    instanceUrl,
+    authType: 'pat',
+  });
+
+  // 6. Fetch and cache repositories
+  const repos = await fetchGitLabProjects(token, instanceUrl);
+  await updateRepositoriesForIntegration(integration.id, repos);
+
+  logExceptInTest('[connectWithPAT] Repositories cached', {
+    integrationId: integration.id,
+    repoCount: repos.length,
+  });
+
+  return {
+    success: true,
+    integration: {
+      id: integration.id,
+      accountLogin: validation.user.username,
+      accountId: String(validation.user.id),
+      instanceUrl,
+    },
+    warnings: validation.warnings,
+  };
 }

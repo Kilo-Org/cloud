@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { kilocode_users, type User } from '@/db/schema';
-import { sql, gt, and } from 'drizzle-orm';
+import { sql, gt, and, isNull } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -39,8 +39,10 @@ export async function grantCreditsToCohort(options: {
 
   while (hasMore) {
     const cohortFilter = sql`${kilocode_users.cohorts} ? ${options.cohortName}`;
+    const notBlocked = isNull(kilocode_users.blocked_reason);
+    const baseFilter = and(cohortFilter, notBlocked);
     const users: User[] = await db.query.kilocode_users.findMany({
-      where: lastUserId ? and(cohortFilter, gt(kilocode_users.id, lastUserId)) : cohortFilter,
+      where: lastUserId ? and(baseFilter, gt(kilocode_users.id, lastUserId)) : baseFilter,
       orderBy: (kilocode_users, { asc }) => [asc(kilocode_users.id)],
       limit: 1000,
     });

@@ -30,6 +30,12 @@ describe('Hello World worker', () => {
 			},
 			body: JSON.stringify({
 				clientSecret: 'TODO',
+				kiloUserId: 'user_123',
+				organizationId: 'org_456',
+				isAnonymous: false,
+				isStreaming: true,
+				userByok: false,
+				mode: 'build',
 				provider: 'openai',
 				requestedModel: 'kilo/auto',
 				resolvedModel: 'anthropic/claude-sonnet-4.5',

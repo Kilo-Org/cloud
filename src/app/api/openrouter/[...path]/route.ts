@@ -376,6 +376,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   emitApiMetricsForResponse(
     {
       clientSecret: 'TODO',
+      kiloUserId: user.id,
+      organizationId,
+      isAnonymous: isAnonymousContext(user),
+      isStreaming: requestBodyParsed.stream === true,
+      userByok: !!userByok,
+      mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
       provider: provider.id,
       requestedModel: requestedModelLowerCased,
       resolvedModel: requestBodyParsed.model,

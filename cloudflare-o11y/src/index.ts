@@ -8,6 +8,12 @@ const app = new Hono();
 const ApiMetricsParamsSchema = z
 	.object({
 		clientSecret: z.string().min(1),
+		kiloUserId: z.string().min(1),
+		organizationId: z.string().min(1).optional(),
+		isAnonymous: z.boolean(),
+		isStreaming: z.boolean(),
+		userByok: z.boolean(),
+		mode: z.string().min(1).optional(),
 		provider: z.string().min(1),
 		requestedModel: z.string().min(1),
 		resolvedModel: z.string().min(1),

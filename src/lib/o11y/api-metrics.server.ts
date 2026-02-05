@@ -13,6 +13,12 @@ export type ApiMetricsTokens = {
 
 export type ApiMetricsParams = {
   clientSecret: string;
+  kiloUserId: string;
+  organizationId?: string;
+  isAnonymous: boolean;
+  isStreaming: boolean;
+  userByok: boolean;
+  mode?: string;
   provider: string;
   requestedModel: string;
   resolvedModel: string;

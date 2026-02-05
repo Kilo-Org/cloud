@@ -109,7 +109,6 @@ export const ENABLE_MILVUS_DUAL_WRITE = true;
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');
 
 // Abuse Detection Service
-export const ABUSE_SERVICE_SECRET = getEnvVariable('ABUSE_SERVICE_SECRET');
 export const ABUSE_SERVICE_CF_ACCESS_CLIENT_ID = getEnvVariable(
   'ABUSE_SERVICE_CF_ACCESS_CLIENT_ID'
 );

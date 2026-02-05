@@ -19,7 +19,7 @@
   "dependencies": {
     "hono": "^4.11.4",
     "hono-rate-limiter": "^0.5.3",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.3",
     "zod": "^4.1.12"
   }
 }

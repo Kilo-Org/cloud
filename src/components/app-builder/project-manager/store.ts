@@ -28,6 +28,7 @@ export function createInitialState(
     previewStatus: 'idle',
     deploymentId,
     model: modelId ?? 'anthropic/claude-sonnet-4',
+    currentIframeUrl: null,
   };
 }
 

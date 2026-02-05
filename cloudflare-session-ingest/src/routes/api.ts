@@ -277,6 +277,38 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
   return c.json({ success: true }, 200);
 });
 
+api.get('/session/:sessionId/export', async c => {
+  const rawSessionId = c.req.param('sessionId');
+  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  const db = getDb(c.env.HYPERDRIVE);
+  const kiloUserId = c.get('user_id');
+
+  const session = await db
+    .selectFrom('cli_sessions_v2')
+    .select(['session_id'])
+    .where('session_id', '=', parsed.data)
+    .where('kilo_user_id', '=', kiloUserId)
+    .executeTakeFirst();
+
+  if (!session) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+
+  const json = await withDORetry(
+    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+    stub => stub.getAll(),
+    'SessionIngestDO.getAll'
+  );
+
+  return c.body(json, 200, {
+    'content-type': 'application/json; charset=utf-8',
+  });
+});
+
 api.post('/session/:sessionId/share', async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);

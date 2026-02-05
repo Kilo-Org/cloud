@@ -342,7 +342,6 @@ export async function deleteUserDatabaseRecords(userId: string) {
     await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
     await tx.delete(sharedCliSessions).where(eq(sharedCliSessions.kilo_user_id, userId));
     await tx.delete(cliSessions).where(eq(cliSessions.kilo_user_id, userId));
-    // app_builder_messages cascade-deletes when app_builder_projects are deleted
     await tx.delete(app_builder_projects).where(eq(app_builder_projects.owned_by_user_id, userId));
     await tx.delete(kilocode_users).where(eq(kilocode_users.id, userId));
     //TODO: OrbEvent deletion - not implementable yet?

@@ -248,7 +248,6 @@ export function AppBuilderProjectsTable() {
               </TableHead>
               <TableHead>Model</TableHead>
               <TableHead>Owner</TableHead>
-              <TableHead>Messages</TableHead>
               <TableHead
                 className="hover:bg-muted/50 cursor-pointer"
                 onClick={() => handleSort('created_at')}
@@ -330,7 +329,6 @@ export function AppBuilderProjectsTable() {
                       <span className="text-muted-foreground">Unknown</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-center">{project.message_count}</TableCell>
                   <TableCell
                     className="text-muted-foreground text-sm"
                     title={new Date(project.created_at).toLocaleString()}

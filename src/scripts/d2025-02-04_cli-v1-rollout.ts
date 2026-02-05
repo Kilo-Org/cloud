@@ -8,11 +8,6 @@ import * as path from 'node:path';
 
 const isDryRun = !process.argv.includes('--apply');
 
-// Resume support: If script crashes, you can resume from the last processed user ID
-// Example: pnpm script src/scripts/d2025-02-04_cli-v1-rollout.ts --resume=user-abc-123
-const resumeFromArg = process.argv.find(arg => arg.startsWith('--resume='));
-const RESUME_FROM_USER_ID = resumeFromArg ? resumeFromArg.split('=')[1] : null;
-
 const BATCH_SIZE = 10;
 const SLEEP_AFTER_BATCH_MS = 1000;
 const CONCURRENT = 10;
@@ -80,12 +75,8 @@ async function run() {
   const failedUserIds: string[] = [];
   const limit = pLimit(CONCURRENT);
   let globalBatchNumber = 0;
-  let lastUserId: string | null = RESUME_FROM_USER_ID;
+  let lastUserId: string | null = null;
   let hasMore = true;
-
-  if (RESUME_FROM_USER_ID) {
-    console.log(`RESUMING from user ID: ${RESUME_FROM_USER_ID}\n`);
-  }
 
   console.log('Starting cursor-based pagination...\n');
 
@@ -198,8 +189,6 @@ async function run() {
       console.log(`   Skipped (never used Kilo): ${stats.skippedNeverUsed}`);
       console.log(`   Failed: ${stats.failed}`);
       console.log(`   Rate: ${usersPerSecond.toFixed(2)} users/sec`);
-      console.log(`   Last user ID: ${lastUserId}`);
-      console.log(`   To resume from this point: --resume=${lastUserId}`);
 
       if (hasMore || i + BATCH_SIZE < users.length) {
         await sleep(SLEEP_AFTER_BATCH_MS);
@@ -226,7 +215,7 @@ async function run() {
     console.log('\nThis was a DRY RUN. No actual changes were made.');
     console.log('To apply changes, run with --apply flag');
   } else {
-    console.log(`\nTotal credits granted: $${stats.successful.toFixed(2)}`);
+    console.log(`\nTotal credits granted: ${stats.successful} users ($${stats.successful})`);
   }
 
   if (failedUserIds.length > 0) {

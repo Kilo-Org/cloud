@@ -16,7 +16,6 @@ const ApiMetricsParamsSchema = z
 		ttfbMs: z.number().int().nonnegative(),
 		completeRequestMs: z.number().int().nonnegative(),
 		statusCode: z.number().int().min(100).max(599),
-		success: z.boolean(),
 		errorMessage: z.string().optional(),
 		tokens: z
 			.object({
@@ -37,13 +36,13 @@ const ApiMetricsParamsSchema = z
 			});
 		}
 
-		if (value.success) return;
+		if (value.statusCode < 400) return;
 		if (value.errorMessage && value.errorMessage.trim().length > 0) return;
 
 		ctx.addIssue({
 			code: 'custom',
 			path: ['errorMessage'],
-			message: 'errorMessage is required when success=false',
+			message: 'errorMessage is required when statusCode indicates failure',
 		});
 	})
 	.transform((value) => {

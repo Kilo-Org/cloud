@@ -146,7 +146,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           setupCommands: merged.setupCommands,
         });
 
-        // TODO: cloud-agent-next
         // Insert cli_sessions_v2 with session IDs
         await db
           .insert(cli_sessions_v2)
@@ -154,11 +153,15 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
             session_id: result.kiloSessionId,
             kilo_user_id: ctx.user.id,
             cloud_agent_session_id: result.cloudAgentSessionId,
+            organization_id: organizationId,
             version: 0,
           })
           .onConflictDoUpdate({
             target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
-            set: { cloud_agent_session_id: result.cloudAgentSessionId },
+            set: {
+              cloud_agent_session_id: result.cloudAgentSessionId,
+              organization_id: organizationId,
+            },
           });
 
         return result;

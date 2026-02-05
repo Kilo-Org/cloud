@@ -60,7 +60,7 @@ export function UserAdminCreditGrant({
   const hasExpirationFromCategory =
     selectedCreditCategory?.expiry_hours != null ||
     selectedCreditCategory?.credit_expiry_date != null;
-  const hasExpirationFromForm = expirationDate.trim() !== '' || expiryHours.trim() !== '';
+  const hasExpirationFromForm = expirationDate.trim() !== '' || Number(expiryHours) > 0;
   const hasExpiration = hasExpirationFromCategory || hasExpirationFromForm || neverExpire;
 
   // Form validation - credit category required; description required for negative amount categories

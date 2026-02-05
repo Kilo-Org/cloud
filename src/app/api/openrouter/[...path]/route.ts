@@ -205,26 +205,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
   console.debug(`Routing request to ${provider.id}`);
 
-  // Fire-and-forget abuse classification as early as possible
-  void classifyAbuse(request, requestBodyParsed, {
+  // Start abuse classification early (non-blocking) - we'll await it before creating usage context
+  const classifyPromise = classifyAbuse(request, requestBodyParsed, {
     kiloUserId: user.id,
     organizationId,
     projectId,
     provider: provider.id,
     isByok: !!userByok,
-  }).then(result => {
-    if (result) {
-      console.log('Abuse classification result:', {
-        verdict: result.verdict,
-        risk_score: result.risk_score,
-        signals: result.signals,
-        identity_key: result.context.identity_key,
-        kilo_user_id: user.id,
-        requested_model: originalModelIdLowerCased,
-        rps: result.context.requests_per_second,
-      });
-    }
   });
+
   // large responses may run longer than the 800s serverless function timeout, usually this value is set to 8192 tokens
   if (requestBodyParsed.max_tokens && requestBodyParsed.max_tokens > MAX_TOKENS_LIMIT) {
     console.warn(`SECURITY: Max tokens limit exceeded: ${user.id}`, {
@@ -392,6 +381,28 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
+
+  // Await abuse classification (with timeout) to get request_id for cost tracking correlation
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const classifyResult = await Promise.race([
+    classifyPromise.finally(() => timeoutId && clearTimeout(timeoutId)),
+    new Promise<null>(resolve => {
+      timeoutId = setTimeout(() => resolve(null), 2000);
+    }),
+  ]);
+  if (classifyResult) {
+    console.log('Abuse classification result:', {
+      verdict: classifyResult.verdict,
+      risk_score: classifyResult.risk_score,
+      signals: classifyResult.signals,
+      identity_key: classifyResult.context.identity_key,
+      kilo_user_id: user.id,
+      requested_model: originalModelIdLowerCased,
+      rps: classifyResult.context.requests_per_second,
+      request_id: classifyResult.request_id,
+    });
+    usageContext.abuse_request_id = classifyResult.request_id;
+  }
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 

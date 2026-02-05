@@ -4,7 +4,6 @@
 
 import { type NextRequest } from 'next/server';
 import {
-  ABUSE_SERVICE_SECRET,
   ABUSE_SERVICE_CF_ACCESS_CLIENT_ID,
   ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET,
   ABUSE_SERVICE_URL,
@@ -117,6 +116,8 @@ export type AbuseClassificationResponse = {
   action_metadata: ActionMetadata;
   /** State context for debugging headers */
   context: ClassificationContext;
+  /** Request ID for correlating with cost updates. 0 indicates an error during classification. */
+  request_id: number;
 };
 
 /**
@@ -202,18 +203,12 @@ export async function classifyRequest(
     return null;
   }
 
-  if (!ABUSE_SERVICE_SECRET) {
-    console.warn('ABUSE_SERVICE_SECRET not configured, skipping abuse classification');
-    return null;
-  }
-
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Service-Secret': ABUSE_SERVICE_SECRET,
     };
 
-    // Add Cloudflare Access headers in production (validated at startup in config.server.ts)
+    // Add Cloudflare Access headers for authentication
     if (ABUSE_SERVICE_CF_ACCESS_CLIENT_ID && ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET) {
       headers['CF-Access-Client-Id'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_ID;
       headers['CF-Access-Client-Secret'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET;
@@ -234,6 +229,87 @@ export async function classifyRequest(
   } catch (error) {
     // Fail-open: don't block requests if abuse service is down
     console.error('Abuse classification failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Request payload for reporting cost to the abuse service after request completion.
+ * Enables spend-based heuristics like free_tier_exhausted.
+ */
+type CostUpdatePayload = {
+  // Identity fields (must match what was sent to /classify)
+  kilo_user_id?: string | null;
+  ip_address?: string | null;
+  ja4_digest?: string | null;
+  user_agent?: string | null;
+
+  // Request identification (REQUIRED)
+  request_id: number; // From classify response, for correlation
+  message_id: string; // From LLM response, for analytics
+
+  // Cost data (REQUIRED, in microdollars)
+  cost: number;
+  requested_model?: string | null;
+
+  // Token counts (optional but recommended)
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_write_tokens?: number | null;
+  cache_hit_tokens?: number | null;
+};
+
+/**
+ * Response from the cost update endpoint
+ */
+export type CostUpdateResponse = {
+  success: boolean;
+  identity_key?: string;
+  message_id?: string;
+  do_updated?: boolean;
+  error?: string;
+};
+
+/**
+ * Report cost to the abuse service after a request completes.
+ * This enables spend-based heuristics like free_tier_exhausted.
+ *
+ * This is fire-and-forget - failures are logged but don't affect the user.
+ *
+ * @param payload - Cost and identity data to report
+ * @returns Response or null if service unavailable/failed
+ */
+export async function reportCost(payload: CostUpdatePayload): Promise<CostUpdateResponse | null> {
+  if (!ABUSE_SERVICE_URL) {
+    return null;
+  }
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add Cloudflare Access headers in production
+    if (ABUSE_SERVICE_CF_ACCESS_CLIENT_ID && ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET) {
+      headers['CF-Access-Client-Id'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_ID;
+      headers['CF-Access-Client-Secret'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET;
+    }
+
+    const response = await fetch(`${ABUSE_SERVICE_URL}/api/usage/cost`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error(`[Abuse] Cost update failed (${response.status}): ${await response.text()}`);
+      return null;
+    }
+
+    return (await response.json()) as CostUpdateResponse;
+  } catch (error) {
+    // Log but don't throw - this shouldn't affect user experience
+    console.error('[Abuse] Failed to report cost:', error);
     return null;
   }
 }
@@ -291,4 +367,56 @@ export async function classifyAbuse(
   };
 
   return classifyRequest(payload);
+}
+
+/**
+ * Report cost to the abuse service after a request completes.
+ * Call this after the LLM response is processed and usage stats are available.
+ *
+ * Requires usageContext.abuse_request_id (from classify response) and
+ * usageStats.messageId (from LLM response). Skips if either is missing
+ * or if abuse_request_id is 0 (indicates classification error).
+ *
+ * Use fire-and-forget pattern since this shouldn't block:
+ *   reportAbuseCost(usageContext, usageStats).catch(console.error)
+ */
+export async function reportAbuseCost(
+  usageContext: {
+    kiloUserId: string;
+    fraudHeaders: {
+      http_x_forwarded_for: string | null;
+      http_x_vercel_ja4_digest: string | null;
+      http_user_agent: string | null;
+    };
+    requested_model: string;
+    abuse_request_id?: number;
+  },
+  usageStats: {
+    messageId: string | null;
+    cost_mUsd: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheWriteTokens: number;
+    cacheHitTokens: number;
+  }
+): Promise<CostUpdateResponse | null> {
+  // Skip if missing required fields or request_id is 0 (classification error)
+  if (!usageContext.abuse_request_id || !usageStats.messageId) {
+    return null;
+  }
+
+  return reportCost({
+    kilo_user_id: usageContext.kiloUserId,
+    ip_address: usageContext.fraudHeaders.http_x_forwarded_for,
+    ja4_digest: usageContext.fraudHeaders.http_x_vercel_ja4_digest,
+    user_agent: usageContext.fraudHeaders.http_user_agent,
+    request_id: usageContext.abuse_request_id,
+    message_id: usageStats.messageId,
+    cost: usageStats.cost_mUsd,
+    requested_model: usageContext.requested_model,
+    input_tokens: usageStats.inputTokens,
+    output_tokens: usageStats.outputTokens,
+    cache_write_tokens: usageStats.cacheWriteTokens,
+    cache_hit_tokens: usageStats.cacheHitTokens,
+  });
 }

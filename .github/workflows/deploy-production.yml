@@ -196,3 +196,27 @@ jobs:
     secrets: inherit
     with:
       environment: prod
+
+  check-o11y-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs.o11y }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for o11y changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            o11y:
+              - 'cloudflare-o11y/**'
+
+  deploy-o11y:
+    needs: [check-o11y-changes]
+    if: needs.check-o11y-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-o11y.yml
+    secrets: inherit
+    with:
+      environment: prod

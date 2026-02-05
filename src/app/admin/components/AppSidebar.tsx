@@ -87,11 +87,8 @@ const menuSections: MenuSection[] = [
       { title: 'Session Traces', url: '/admin/session-traces', icon: FileSearch },
       { title: 'Feature Interest', url: '/admin/feature-interest', icon: Sparkles },
       { title: 'Free Model Usage', url: '/admin/free-model-usage', icon: UserX },
+      { title: 'Alerting', url: '/admin/alerting', icon: Bell },
     ],
-  },
-  {
-    label: 'Operations',
-    items: [{ title: 'Alerting', url: '/admin/alerting', icon: Bell }],
   },
 ];
 

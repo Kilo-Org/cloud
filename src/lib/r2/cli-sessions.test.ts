@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 
 jest.mock('./client', () => ({
   r2Client: { send: jest.fn() },
-  getR2CliSessionsBucketName: () => 'test-bucket',
+  r2CliSessionsBucketName: 'test-bucket',
 }));
 
 jest.mock('@aws-sdk/s3-request-presigner', () => ({

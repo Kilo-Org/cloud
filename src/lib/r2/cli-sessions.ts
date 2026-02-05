@@ -7,7 +7,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'node:stream';
-import { r2Client, getR2CliSessionsBucketName } from './client';
+import { r2Client, r2CliSessionsBucketName } from './client';
 import type { CliSession } from '@/db/schema';
 
 export type FolderName = 'sessions' | 'shared-sessions';
@@ -41,7 +41,7 @@ export async function uploadBlob(
   const key = getBlobKey(sessionId, folderName, filename);
 
   const command = {
-    Bucket: getR2CliSessionsBucketName(),
+    Bucket: r2CliSessionsBucketName,
     Key: key,
     Body: rawContent,
     ContentType: 'application/json',
@@ -70,7 +70,7 @@ export async function generateSignedUploadUrl(
   const key = getBlobKey(sessionId, folderName, filename);
 
   const command = new PutObjectCommand({
-    Bucket: getR2CliSessionsBucketName(),
+    Bucket: r2CliSessionsBucketName,
     Key: key,
     ContentType: 'application/json',
     ContentLength: contentLength,
@@ -100,7 +100,7 @@ export async function generateSignedUrls(
   const urlPromises = filenames.map(async filename => {
     const key = getBlobKey(sessionId, folderName, filename);
     const command = new GetObjectCommand({
-      Bucket: getR2CliSessionsBucketName(),
+      Bucket: r2CliSessionsBucketName,
       Key: key,
     });
 
@@ -129,7 +129,7 @@ export async function deleteBlobs(
 
   await r2Client.send(
     new DeleteObjectsCommand({
-      Bucket: getR2CliSessionsBucketName(),
+      Bucket: r2CliSessionsBucketName,
       Delete: {
         Objects: objects,
         Quiet: true,
@@ -141,7 +141,7 @@ export async function deleteBlobs(
 export async function getBlobContent(blobKey: string): Promise<unknown> {
   const response = await r2Client.send(
     new GetObjectCommand({
-      Bucket: getR2CliSessionsBucketName(),
+      Bucket: r2CliSessionsBucketName,
       Key: blobKey,
     })
   );
@@ -169,7 +169,7 @@ export async function copyBlobs(
     try {
       await r2Client.send(
         new HeadObjectCommand({
-          Bucket: getR2CliSessionsBucketName(),
+          Bucket: r2CliSessionsBucketName,
           Key: sourceKey,
         })
       );
@@ -177,11 +177,10 @@ export async function copyBlobs(
       return null;
     }
 
-    const bucketName = getR2CliSessionsBucketName();
     await r2Client.send(
       new CopyObjectCommand({
-        Bucket: bucketName,
-        CopySource: `${bucketName}/${sourceKey}`,
+        Bucket: r2CliSessionsBucketName,
+        CopySource: `${r2CliSessionsBucketName}/${sourceKey}`,
         Key: destinationKey,
       })
     );

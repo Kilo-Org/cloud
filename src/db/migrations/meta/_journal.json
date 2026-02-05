@@ -22,6 +22,13 @@
       "when": 1769719616232,
       "tag": "0002_fat_lester",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770309949809,
+      "tag": "0003_bizarre_sabra",
+      "breakpoints": true
     }
   ]
 }

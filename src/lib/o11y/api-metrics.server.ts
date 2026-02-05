@@ -8,6 +8,7 @@ export type ApiMetricsParams = {
   requestedModel: string;
   resolvedModel: string;
   toolsAvailable: string[];
+  toolsUsed: string[];
 };
 
 export function getToolsAvailable(
@@ -28,6 +29,36 @@ export function getToolsAvailable(
 
     return 'unknown:unknown';
   });
+}
+
+export function getToolsUsed(
+  messages: Array<OpenAI.Chat.Completions.ChatCompletionMessageParam> | undefined
+): string[] {
+  if (!messages) return [];
+
+  const used = new Array<string>();
+
+  for (const message of messages) {
+    if (message.role !== 'assistant') continue;
+
+    for (const toolCall of message.tool_calls ?? []) {
+      if (toolCall.type === 'function') {
+        const toolName = toolCall.function.name.trim();
+        used.push(toolName ? `function:${toolName}` : 'function:unknown');
+        continue;
+      }
+
+      if (toolCall.type === 'custom') {
+        const toolName = toolCall.custom.name.trim();
+        used.push(toolName ? `custom:${toolName}` : 'custom:unknown');
+        continue;
+      }
+
+      used.push('unknown:unknown');
+    }
+  }
+
+  return used;
 }
 
 const apiMetricsUrl = (() => {

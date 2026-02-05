@@ -27,6 +27,7 @@ import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
+import { reportAbuseCost } from '@/lib/abuse-service';
 
 const posthogClient = PostHogClient();
 
@@ -171,6 +172,8 @@ export type MicrodollarUsageContext = {
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
   has_tools: boolean;
+  /** Request ID from abuse service classify response, for cost tracking correlation. 0 means skip. */
+  abuse_request_id?: number;
 };
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
@@ -915,6 +918,12 @@ async function processTokenData(
   ) {
     usageStats.model = usageContext.requested_model;
   }
+
+  // Report upstream cost to abuse service BEFORE zeroing for free/BYOK
+  // (abuse service needs actual spend for heuristics like free_tier_exhausted)
+  reportAbuseCost(usageContext, usageStats).catch(error => {
+    console.error('[Abuse] Failed to report cost:', error);
+  });
 
   if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;

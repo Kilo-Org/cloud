@@ -1,4 +1,4 @@
-import { Pool, types } from 'pg';
+import { Client, types } from 'pg';
 
 import type { CreateDatabaseConnection, Database } from './database.js';
 
@@ -10,21 +10,21 @@ types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
 // types.setTypeParser(types.builtins.TIMESTAMPTZ, (val) => new Date(val))
 // types.setTypeParser(types.builtins.TIMESTAMP, (val) => new Date(val))
 
+/**
+ * Creates a new database connection for each invocation.
+ */
 export const createNodePostgresConnection: CreateDatabaseConnection = connectionString => {
-  const pool = new Pool({
-    connectionString,
-    max: 10,
-    connectionTimeoutMillis: 5000,
-    statement_timeout: 10 * 1000,
-  });
-
-  pool.on('error', error => console.error('Pool:error - Unexpected error on idle client', error));
+  // Helper to create and connect a new client
+  const createConnectedClient = async (): Promise<Client> => {
+    const client = new Client({ connectionString });
+    await client.connect();
+    return client;
+  };
 
   return {
     __kind: 'Database',
     begin: async transactionFn => {
-      // Pull an available client from pg-pool
-      const client = await pool.connect();
+      const client = await createConnectedClient();
 
       try {
         // Start the transaction
@@ -52,18 +52,22 @@ export const createNodePostgresConnection: CreateDatabaseConnection = connection
         await client.query('rollback');
         throw e;
       } finally {
-        // Always release the client back to the pool!
-        client.release();
+        // Always close the client connection
+        await client.end();
       }
     },
     end: async () => {
-      // no-op with node-postgres since we just query from the pool
+      // no-op - each operation manages its own client
     },
     query: async (text, values = {}) => {
-      const result = await pool.query(text, Object.values(values));
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return result.rows ?? [];
+      const client = await createConnectedClient();
+      try {
+        const result = await client.query(text, Object.values(values));
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return result.rows ?? [];
+      } finally {
+        await client.end();
+      }
     },
-    // casting as Database here so we don't have to manually fill in function args
   } satisfies Database;
 };

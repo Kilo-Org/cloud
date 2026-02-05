@@ -5,7 +5,7 @@ import {
   CLOUD_AGENT_IMAGE_PRESIGNED_URL_EXPIRY_SECONDS,
 } from '@/lib/cloud-agent/constants';
 import type { CloudAgentImageAllowedType } from '@/lib/cloud-agent/constants';
-import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
+import { r2Client, getR2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
 
 type Service = 'app-builder';
 
@@ -50,7 +50,7 @@ export async function generateImageUploadUrl({
   const key = getImageKey(service, userId, messageUuid, imageId, contentType);
 
   const command = new PutObjectCommand({
-    Bucket: r2CloudAgentAttachmentsBucketName,
+    Bucket: getR2CloudAgentAttachmentsBucketName(),
     Key: key,
     ContentType: contentType,
     ContentLength: contentLength,

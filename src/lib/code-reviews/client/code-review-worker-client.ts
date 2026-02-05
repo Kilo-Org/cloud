@@ -67,16 +67,27 @@ export interface CancelReviewResponse {
  * Handles all communication with the Cloudflare Worker for code reviews
  */
 class CodeReviewWorkerClient {
-  private readonly baseUrl: string;
-  private readonly authToken: string;
+  private _baseUrl: string | null = null;
+  private _authToken: string | null = null;
 
-  constructor() {
-    if (!CODE_REVIEW_WORKER_URL || !CODE_REVIEW_WORKER_AUTH_TOKEN) {
-      throw new Error('CODE_REVIEW_WORKER_URL or CODE_REVIEW_WORKER_AUTH_TOKEN not configured');
+  private get baseUrl(): string {
+    if (!this._baseUrl) {
+      if (!CODE_REVIEW_WORKER_URL) {
+        throw new Error('CODE_REVIEW_WORKER_URL not configured');
+      }
+      this._baseUrl = CODE_REVIEW_WORKER_URL;
     }
+    return this._baseUrl;
+  }
 
-    this.baseUrl = CODE_REVIEW_WORKER_URL;
-    this.authToken = CODE_REVIEW_WORKER_AUTH_TOKEN;
+  private get authToken(): string {
+    if (!this._authToken) {
+      if (!CODE_REVIEW_WORKER_AUTH_TOKEN) {
+        throw new Error('CODE_REVIEW_WORKER_AUTH_TOKEN not configured');
+      }
+      this._authToken = CODE_REVIEW_WORKER_AUTH_TOKEN;
+    }
+    return this._authToken;
   }
 
   /**

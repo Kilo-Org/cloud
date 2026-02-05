@@ -98,7 +98,8 @@ export function emitApiMetricsForResponse(
   after(async () => {
     try {
       // Draining the body lets us measure the full upstream response time.
-      await drainResponseBody(responseToDrain);
+      // Cap this so we don't keep background work running forever for SSE.
+      await drainResponseBody(responseToDrain, 60_000);
     } catch {
       // Ignore body read errors; we still emit a timing.
     }
@@ -120,17 +121,47 @@ export function emitApiMetricsForResponse(
   });
 }
 
-async function drainResponseBody(response: Response): Promise<void> {
+async function drainResponseBody(response: Response, timeoutMs: number): Promise<void> {
   const body = response.body;
   if (!body) return;
 
   const reader = body.getReader();
   try {
+    const startedAt = performance.now();
+
     while (true) {
-      const { done } = await reader.read();
-      if (done) return;
+      const elapsedMs = performance.now() - startedAt;
+      const remainingMs = timeoutMs - elapsedMs;
+      if (remainingMs <= 0) {
+        try {
+          await reader.cancel();
+        } catch {
+          /** intentionally empty */
+        }
+        return;
+      }
+
+      const result = await Promise.race([
+        reader.read(),
+        sleep(remainingMs).then(() => ({ timeout: true as const })),
+      ]);
+
+      if ('timeout' in result) {
+        try {
+          await reader.cancel();
+        } catch {
+          /** intentionally empty */
+        }
+        return;
+      }
+
+      if (result.done) return;
     }
   } finally {
     reader.releaseLock();
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

@@ -375,7 +375,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   emitApiMetricsForResponse(
     {
-      clientSecret: 'TODO',
       kiloUserId: user.id,
       organizationId,
       isAnonymous: isAnonymousContext(user),

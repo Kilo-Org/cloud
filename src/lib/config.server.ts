@@ -151,3 +151,4 @@ export const CREDIT_CATEGORIES_ENCRYPTION_KEY = getEnvVariable('CREDIT_CATEGORIE
 
 // Agent observability ingest service
 export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
+export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');

@@ -1,5 +1,5 @@
 import { after } from 'next/server';
-import { O11Y_SERVICE_URL } from '@/lib/config.server';
+import { O11Y_KILO_GATEWAY_CLIENT_SECRET, O11Y_SERVICE_URL } from '@/lib/config.server';
 import type OpenAI from 'openai';
 import type { CompletionUsage } from 'openai/resources/completions';
 
@@ -130,11 +130,12 @@ export function emitApiMetrics(params: ApiMetricsParams) {
 }
 
 export function emitApiMetricsForResponse(
-  params: Omit<ApiMetricsParams, 'completeRequestMs'>,
+  params: Omit<ApiMetricsParams, 'clientSecret' | 'completeRequestMs'>,
   responseToDrain: Response,
   requestStartedAt: number
 ) {
   if (!apiMetricsUrl) return;
+  if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
 
   after(async () => {
     try {
@@ -154,6 +155,7 @@ export function emitApiMetricsForResponse(
       },
       body: JSON.stringify({
         ...params,
+        clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
         completeRequestMs,
       } satisfies ApiMetricsParams),
     }).catch(() => {

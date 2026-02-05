@@ -2,7 +2,7 @@
  * Utility functions for working with AI models
  */
 
-import { opus_45_free_slackbot_model } from '@/lib/providers/anthropic';
+import { opus_46_free_slackbot_model } from '@/lib/providers/anthropic';
 import { arcee_trinity_large_preview_free_model } from '@/lib/providers/arcee';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
@@ -40,7 +40,7 @@ export const kiloFreeModels = [
   kat_coder_pro_free_model,
   minimax_m21_free_model,
   minimax_m21_free_slackbot_model,
-  opus_45_free_slackbot_model,
+  opus_46_free_slackbot_model,
   zai_glm47_free_model,
 ] as KiloFreeModel[];
 

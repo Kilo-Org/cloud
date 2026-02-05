@@ -10,14 +10,14 @@ import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { WebClient } from '@slack/web-api';
 import type { OAuthV2Response } from '@slack/oauth';
-import { opus_45_free_slackbot_model } from '@/lib/providers/anthropic';
+import { opus_46_free_slackbot_model } from '@/lib/providers/anthropic';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { createProviderAwareModelAllowPredicate } from '@/lib/model-allow.server';
 
 // Default model for Slack integrations - separate from the global platform default
-const SLACK_DEFAULT_MODEL = opus_45_free_slackbot_model.is_enabled
-  ? opus_45_free_slackbot_model.public_id
+const SLACK_DEFAULT_MODEL = opus_46_free_slackbot_model.is_enabled
+  ? opus_46_free_slackbot_model.public_id
   : 'minimax/minimax-m2.1';
 
 // Slack OAuth scopes for the integration

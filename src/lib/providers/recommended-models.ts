@@ -44,7 +44,7 @@ export const recommendedModels = [
     random_vercel_routing: true,
   },
   {
-    public_id: 'anthropic/claude-opus-4.5',
+    public_id: 'anthropic/claude-opus-4.6',
     tool_choice_required: false,
     random_vercel_routing: false, // not yet allowed pending strict tool use support
   },

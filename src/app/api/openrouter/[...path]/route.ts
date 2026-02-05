@@ -53,7 +53,7 @@ import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
-const OPUS = 'anthropic/claude-opus-4.5';
+const OPUS = 'anthropic/claude-opus-4.6';
 const SONNET = 'anthropic/claude-sonnet-4.5';
 
 // Mode → model mappings for kilo/auto routing.

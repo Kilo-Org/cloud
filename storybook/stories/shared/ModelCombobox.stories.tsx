@@ -10,7 +10,7 @@ import {
 const sortingDemoModels: ModelOption[] = [
   // Some preferred models (will appear in "Recommended" section)
   { id: 'x-ai/grok-code-fast-1', name: 'Grok Code Fast 1' },
-  { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5' },
+  { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6' },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
   { id: 'openai/gpt-5.1', name: 'GPT-5.1' },
 

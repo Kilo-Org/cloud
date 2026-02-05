@@ -12,7 +12,7 @@ import type { SecurityAgentConfig } from './types';
  */
 export const SECURITY_AGENT_MODELS = [
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', free: false },
-  { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5', free: false },
+  { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6', free: false },
   { id: 'x-ai/grok-code-fast-1', name: 'Grok Code Fast 1 (free)', free: true },
 ] as const;
 

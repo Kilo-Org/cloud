@@ -4,15 +4,15 @@ import { normalizeToolCallIds } from '@/lib/tool-calling';
 import type OpenAI from 'openai';
 
 export const opus_45_free_slackbot_model = {
-  public_id: 'anthropic/claude-opus-4.5:slackbot',
-  display_name: 'Claude Opus 4.5 (Free for Kilo for Slack)',
-  description: 'Free version of Claude Opus 4.5 for use in Kilo for Slack only',
+  public_id: 'anthropic/claude-opus-4.6:slackbot',
+  display_name: 'Claude Opus 4.6 (Free for Kilo for Slack)',
+  description: 'Free version of Claude Opus 4.6 for use in Kilo for Slack only',
   context_length: 200000,
   max_completion_tokens: 32000,
   is_enabled: true,
   flags: ['reasoning', 'vision'],
   gateway: 'vercel',
-  internal_id: 'anthropic/claude-opus-4.5',
+  internal_id: 'anthropic/claude-opus-4.6',
   inference_providers: ['anthropic'],
   slackbot_only: true,
 } as KiloFreeModel;

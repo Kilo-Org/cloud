@@ -18,6 +18,17 @@ pnpm run cf-typegen
 This worker validates Kilo user JWTs in `src/middleware/kilo-jwt-auth.ts` using the `NEXTAUTH_SECRET`
 Secrets Store binding.
 
+## Session export (authenticated)
+
+Use a Kilo user JWT to fetch session data by `session_id`:
+
+```http
+GET /api/session/:sessionId/export
+Authorization: Bearer <user-jwt>
+```
+
+Returns the session ingest payload from the SessionIngestDO for that user.
+
 For local development, Wrangler uses a local Secrets Store (no `--remote`). You can set the local
 secret value to match either `.env.development` or `.env.production`.
 

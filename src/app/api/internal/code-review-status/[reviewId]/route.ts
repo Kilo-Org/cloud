@@ -20,10 +20,12 @@ import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { addReactionToPR } from '@/lib/integrations/platforms/github/adapter';
 import { addReactionToMR } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import {
+  getValidGitLabToken,
+  getStoredProjectAccessToken,
+} from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
-
 interface StatusUpdatePayload {
   sessionId?: string; // Cloud agent session ID (agent_xxx) - may not be available yet for 'running' status
   cliSessionId?: string; // CLI session UUID (from session_created event)
@@ -180,10 +182,24 @@ export async function POST(
                   `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
                 );
               } else if (platform === 'gitlab') {
-                // GitLab: Use OAuth token and addReactionToMR
-                const accessToken = await getValidGitLabToken(integration);
+                // GitLab: Use PrAT for bot identity, fall back to OAuth token
                 const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
                 const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+
+                // Use the stored platform_project_id from the review record
+                // This is the numeric GitLab project ID stored when the review was created
+                const projectId = review.platform_project_id;
+                const storedPrat = projectId
+                  ? getStoredProjectAccessToken(integration, projectId)
+                  : null;
+                let accessToken: string;
+
+                if (storedPrat) {
+                  accessToken = storedPrat.token;
+                } else {
+                  // Fallback to OAuth token
+                  accessToken = await getValidGitLabToken(integration);
+                }
 
                 // GitLab uses emoji names like 'tada' for hooray, 'confused' for confused
                 const emoji = status === 'completed' ? 'tada' : 'confused';

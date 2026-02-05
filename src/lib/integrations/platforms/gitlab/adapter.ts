@@ -1488,3 +1488,499 @@ export async function validateGitLabInstance(
     };
   }
 }
+
+// ============================================================================
+// Project Access Token (PrAT) Management
+// ============================================================================
+
+/**
+ * GitLab access level constants
+ * @see https://docs.gitlab.com/ee/api/members.html#valid-access-levels
+ */
+export const GITLAB_ACCESS_LEVELS = {
+  NO_ACCESS: 0,
+  MINIMAL_ACCESS: 5,
+  GUEST: 10,
+  REPORTER: 20,
+  DEVELOPER: 30,
+  MAINTAINER: 40,
+  OWNER: 50,
+} as const;
+
+/**
+ * GitLab Project Access Token type
+ * @see https://docs.gitlab.com/ee/api/project_access_tokens.html
+ */
+export type GitLabProjectAccessToken = {
+  id: number;
+  name: string;
+  /** Only present on creation - must be stored immediately */
+  token?: string;
+  expires_at: string;
+  scopes: string[];
+  access_level: number;
+  active: boolean;
+  revoked: boolean;
+  created_at: string;
+  last_used_at: string | null;
+  user_id: number;
+};
+
+/**
+ * Custom error class for Project Access Token permission issues
+ * Thrown when user doesn't have Maintainer+ role on a project
+ */
+export class GitLabProjectAccessTokenPermissionError extends Error {
+  constructor(
+    public projectId: string | number,
+    public statusCode: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabProjectAccessTokenPermissionError';
+  }
+}
+
+/**
+ * Creates a Project Access Token for a GitLab project
+ *
+ * Project Access Tokens allow bot-like access to a project without using a user's credentials.
+ * Comments made with a PrAT appear as "project_XXX_bot" or the custom name.
+ *
+ * Requirements:
+ * - User must have Maintainer+ role on the project
+ * - GitLab Free tier or higher (available on all tiers)
+ * - Token expires in max 1 year
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param tokenName - Name for the token (e.g., "Kilo Code Review Bot")
+ * @param expiresAt - Expiration date in YYYY-MM-DD format (max 1 year from now)
+ * @param scopes - Token scopes (default: ['api', 'self_rotate'])
+ * @param accessLevel - Access level for the token (default: DEVELOPER = 30)
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role
+ *
+ * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#create-a-project-access-token
+ */
+export async function createProjectAccessToken(
+  accessToken: string,
+  projectId: string | number,
+  tokenName: string,
+  expiresAt: string,
+  scopes: string[] = ['api', 'self_rotate'],
+  accessLevel: number = GITLAB_ACCESS_LEVELS.DEVELOPER,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabProjectAccessToken> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: tokenName,
+      scopes,
+      access_level: accessLevel,
+      expires_at: expiresAt,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('[createProjectAccessToken] Failed:', {
+      status: response.status,
+      error,
+      projectId,
+    });
+
+    // 401/403 indicate permission issues - user doesn't have Maintainer+ role
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabProjectAccessTokenPermissionError(
+        projectId,
+        response.status,
+        `Insufficient permissions to create Project Access Token for project ${projectId}. Requires Maintainer role or higher.`
+      );
+    }
+
+    // 404 might mean the project doesn't exist or feature is disabled
+    if (response.status === 404) {
+      throw new Error(
+        `Project ${projectId} not found or Project Access Tokens are disabled for this project.`
+      );
+    }
+
+    throw new Error(`GitLab create Project Access Token failed: ${response.status} - ${error}`);
+  }
+
+  const token = (await response.json()) as GitLabProjectAccessToken;
+
+  logExceptInTest('[createProjectAccessToken] Created token', {
+    projectId,
+    tokenId: token.id,
+    tokenName: token.name,
+    expiresAt: token.expires_at,
+    // Note: token.token is only available on creation and should be stored securely
+    hasToken: !!token.token,
+  });
+
+  return token;
+}
+
+/**
+ * Lists all Project Access Tokens for a GitLab project
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role
+ *
+ * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#list-project-access-tokens
+ */
+export async function listProjectAccessTokens(
+  accessToken: string,
+  projectId: string | number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabProjectAccessToken[]> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(`${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('[listProjectAccessTokens] Failed:', {
+      status: response.status,
+      error,
+      projectId,
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabProjectAccessTokenPermissionError(
+        projectId,
+        response.status,
+        `Insufficient permissions to list Project Access Tokens for project ${projectId}. Requires Maintainer role or higher.`
+      );
+    }
+
+    throw new Error(`GitLab list Project Access Tokens failed: ${response.status}`);
+  }
+
+  const tokens = (await response.json()) as GitLabProjectAccessToken[];
+
+  logExceptInTest('[listProjectAccessTokens] Listed tokens', {
+    projectId,
+    count: tokens.length,
+  });
+
+  return tokens;
+}
+
+/**
+ * Gets a specific Project Access Token by ID
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param tokenId - ID of the Project Access Token
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ *
+ * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#get-a-project-access-token
+ */
+export async function getProjectAccessToken(
+  accessToken: string,
+  projectId: string | number,
+  tokenId: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabProjectAccessToken | null> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      logExceptInTest('[getProjectAccessToken] Token not found', {
+        projectId,
+        tokenId,
+      });
+      return null;
+    }
+
+    const error = await response.text();
+    logExceptInTest('[getProjectAccessToken] Failed:', {
+      status: response.status,
+      error,
+      projectId,
+      tokenId,
+    });
+
+    throw new Error(`GitLab get Project Access Token failed: ${response.status}`);
+  }
+
+  return (await response.json()) as GitLabProjectAccessToken;
+}
+
+/**
+ * Rotates (refreshes) a Project Access Token
+ *
+ * This creates a new token with a new expiration date and revokes the old one.
+ * The new token value is returned and must be stored immediately.
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param tokenId - ID of the Project Access Token to rotate
+ * @param expiresAt - New expiration date in YYYY-MM-DD format (max 1 year from now)
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ *
+ * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#rotate-a-project-access-token
+ */
+export async function rotateProjectAccessToken(
+  accessToken: string,
+  projectId: string | number,
+  tokenId: number,
+  expiresAt: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabProjectAccessToken> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}/rotate`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        expires_at: expiresAt,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('[rotateProjectAccessToken] Failed:', {
+      status: response.status,
+      error,
+      projectId,
+      tokenId,
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabProjectAccessTokenPermissionError(
+        projectId,
+        response.status,
+        `Insufficient permissions to rotate Project Access Token for project ${projectId}. Requires Maintainer role or higher.`
+      );
+    }
+
+    if (response.status === 404) {
+      throw new Error(`Project Access Token ${tokenId} not found in project ${projectId}.`);
+    }
+
+    throw new Error(`GitLab rotate Project Access Token failed: ${response.status} - ${error}`);
+  }
+
+  const token = (await response.json()) as GitLabProjectAccessToken;
+
+  logExceptInTest('[rotateProjectAccessToken] Rotated token', {
+    projectId,
+    oldTokenId: tokenId,
+    newTokenId: token.id,
+    expiresAt: token.expires_at,
+    hasToken: !!token.token,
+  });
+
+  return token;
+}
+
+/**
+ * Revokes (deletes) a Project Access Token
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param tokenId - ID of the Project Access Token to revoke
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ *
+ * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#revoke-a-project-access-token
+ */
+export async function revokeProjectAccessToken(
+  accessToken: string,
+  projectId: string | number,
+  tokenId: number,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<void> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/access_tokens/${tokenId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  // 404 means token already deleted, which is fine
+  if (!response.ok && response.status !== 404) {
+    const error = await response.text();
+    logExceptInTest('[revokeProjectAccessToken] Failed:', {
+      status: response.status,
+      error,
+      projectId,
+      tokenId,
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new GitLabProjectAccessTokenPermissionError(
+        projectId,
+        response.status,
+        `Insufficient permissions to revoke Project Access Token for project ${projectId}. Requires Maintainer role or higher.`
+      );
+    }
+
+    throw new Error(`GitLab revoke Project Access Token failed: ${response.status} - ${error}`);
+  }
+
+  logExceptInTest('[revokeProjectAccessToken] Revoked token', {
+    projectId,
+    tokenId,
+    wasAlreadyRevoked: response.status === 404,
+  });
+}
+
+/**
+ * Finds an existing Kilo Code Review Bot token on a GitLab project
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role)
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param tokenName - Name of the token to find (default: "Kilo Code Review Bot")
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
+export async function findKiloProjectAccessToken(
+  accessToken: string,
+  projectId: string | number,
+  tokenName: string = 'Kilo Code Review Bot',
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<GitLabProjectAccessToken | null> {
+  const tokens = await listProjectAccessTokens(accessToken, projectId, instanceUrl);
+
+  // Find active token with matching name
+  const kiloToken = tokens.find(t => t.name === tokenName && t.active && !t.revoked);
+
+  if (kiloToken) {
+    logExceptInTest('[findKiloProjectAccessToken] Found existing token', {
+      projectId,
+      tokenId: kiloToken.id,
+      expiresAt: kiloToken.expires_at,
+    });
+  } else {
+    logExceptInTest('[findKiloProjectAccessToken] No existing token found', {
+      projectId,
+      totalTokens: tokens.length,
+    });
+  }
+
+  return kiloToken || null;
+}
+
+/**
+ * Calculates the expiration date for a new Project Access Token
+ * GitLab allows max 1 year expiration
+ *
+ * @param daysFromNow - Number of days from now (default: 365, max: 365)
+ * @returns Date string in YYYY-MM-DD format
+ */
+export function calculateProjectAccessTokenExpiry(daysFromNow: number = 365): string {
+  const maxDays = 365;
+  const days = Math.min(daysFromNow, maxDays);
+
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + days);
+
+  return expiryDate.toISOString().split('T')[0];
+}
+
+/**
+ * Checks if a Project Access Token is expiring soon (within specified days)
+ *
+ * @param expiresAt - Expiration date in YYYY-MM-DD format
+ * @param withinDays - Number of days to consider "soon" (default: 7)
+ * @returns true if token expires within the specified days
+ */
+export function isProjectAccessTokenExpiringSoon(
+  expiresAt: string,
+  withinDays: number = 7
+): boolean {
+  const expiryDate = new Date(expiresAt);
+  const now = new Date();
+  const daysUntilExpiry = Math.floor(
+    (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  return daysUntilExpiry <= withinDays;
+}
+
+/**
+ * Validates a Project Access Token by making a test API call
+ *
+ * This is useful to check if a stored token is still valid on GitLab
+ * (e.g., it might have been manually revoked by the user)
+ *
+ * @param token - The Project Access Token to validate
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @returns true if the token is valid, false otherwise
+ */
+export async function validateProjectAccessToken(
+  token: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<boolean> {
+  try {
+    // Use the /user endpoint to validate the token
+    // This is a lightweight call that works with any valid token
+    const response = await fetch(`${instanceUrl}/api/v4/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      logExceptInTest('[validateProjectAccessToken] Token is valid');
+      return true;
+    }
+
+    if (response.status === 401) {
+      logExceptInTest('[validateProjectAccessToken] Token is invalid (401)');
+      return false;
+    }
+
+    // Other errors - log but assume token might still be valid
+    logExceptInTest('[validateProjectAccessToken] Unexpected response', {
+      status: response.status,
+    });
+    return true;
+  } catch (error) {
+    // Network errors - assume token might still be valid
+    logExceptInTest('[validateProjectAccessToken] Error validating token', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return true;
+  }
+}

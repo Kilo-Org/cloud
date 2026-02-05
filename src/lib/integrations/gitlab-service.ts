@@ -13,8 +13,18 @@ import {
   refreshGitLabOAuthToken,
   isTokenExpired,
   calculateTokenExpiry,
+  createProjectAccessToken,
+  findKiloProjectAccessToken,
+  rotateProjectAccessToken,
+  revokeProjectAccessToken,
+  calculateProjectAccessTokenExpiry,
+  isProjectAccessTokenExpiringSoon,
+  validateProjectAccessToken,
+  type GitLabProjectAccessToken,
+  GitLabProjectAccessTokenPermissionError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { randomBytes } from 'crypto';
+import { logExceptInTest } from '@/lib/utils.server';
 
 /**
  * GitLab Integration Service
@@ -298,4 +308,422 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
     .where(eq(platform_integrations.id, integration.id));
 
   return { webhookSecret: newWebhookSecret };
+}
+
+// ============================================================================
+// Project Access Token (PrAT) Management
+// ============================================================================
+
+/**
+ * Stored Project Access Token metadata
+ * This is stored per-project in the integration metadata
+ */
+export type StoredProjectAccessToken = {
+  /** GitLab token ID (for rotation/revocation) */
+  token_id: number;
+  /** The actual token value (should be encrypted in production) */
+  token: string;
+  /** Expiration date in YYYY-MM-DD format */
+  expires_at: string;
+  /** When the token was created */
+  created_at: string;
+  /** Token name for identification */
+  name: string;
+};
+
+/**
+ * GitLab integration metadata type with PrAT support
+ */
+export type GitLabIntegrationMetadata = {
+  access_token?: string;
+  refresh_token?: string;
+  token_expires_at?: string;
+  gitlab_instance_url?: string;
+  client_id?: string;
+  client_secret?: string;
+  webhook_secret?: string;
+  auth_type?: 'oauth' | 'pat';
+  /** Configured webhooks per project */
+  configured_webhooks?: Record<
+    string,
+    {
+      hook_id: number;
+      created_at: string;
+    }
+  >;
+  /** Project Access Tokens per project (keyed by project ID) */
+  project_tokens?: Record<string, StoredProjectAccessToken>;
+};
+
+/**
+ * Default name for Kilo Code Review Bot tokens
+ */
+const KILO_BOT_TOKEN_NAME = 'Kilo Code Review Bot';
+
+/**
+ * Gets or creates a Project Access Token for a GitLab project
+ *
+ * This function:
+ * 1. Checks if a PrAT already exists for the project in metadata
+ * 2. If exists and not expiring soon, returns it
+ * 3. If exists but expiring soon, rotates it
+ * 4. If doesn't exist, creates a new one
+ *
+ * @param integration - The GitLab integration record
+ * @param projectId - GitLab project ID
+ * @returns The Project Access Token to use for API calls
+ */
+export async function getOrCreateProjectAccessToken(
+  integration: PlatformIntegration,
+  projectId: string | number
+): Promise<string> {
+  const metadata = integration.metadata as GitLabIntegrationMetadata | null;
+
+  if (!metadata?.access_token) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'GitLab integration missing access token',
+    });
+  }
+
+  const instanceUrl = metadata.gitlab_instance_url || 'https://gitlab.com';
+  const projectIdStr = String(projectId);
+
+  // Check if we already have a stored token for this project
+  const storedToken = metadata.project_tokens?.[projectIdStr];
+
+  if (storedToken) {
+    // Check if token is expiring soon (within 7 days)
+    const isExpiringSoon = isProjectAccessTokenExpiringSoon(storedToken.expires_at, 7);
+
+    if (!isExpiringSoon) {
+      // Validate the token is still valid on GitLab (might have been manually revoked)
+      const isValid = await validateProjectAccessToken(storedToken.token, instanceUrl);
+
+      if (isValid) {
+        logExceptInTest('[getOrCreateProjectAccessToken] Using existing token', {
+          projectId,
+          tokenId: storedToken.token_id,
+          expiresAt: storedToken.expires_at,
+        });
+        return storedToken.token;
+      }
+
+      // Token is invalid (revoked), remove from storage and create a new one
+      logExceptInTest('[getOrCreateProjectAccessToken] Stored token is invalid, creating new one', {
+        projectId,
+        tokenId: storedToken.token_id,
+      });
+
+      // Remove the invalid token from storage and skip to creating a new one
+      await removeInvalidStoredToken(integration.id, projectIdStr, metadata);
+      // Don't try to rotate - fall through to create new token below
+    } else {
+      // Token is expiring soon, try to rotate it
+      logExceptInTest('[getOrCreateProjectAccessToken] Token expiring soon, rotating', {
+        projectId,
+        tokenId: storedToken.token_id,
+        expiresAt: storedToken.expires_at,
+      });
+
+      try {
+        // Get a valid user token for the rotation API call
+        const userToken = await getValidGitLabToken(integration);
+        const newExpiresAt = calculateProjectAccessTokenExpiry(365);
+
+        const rotatedToken = await rotateProjectAccessToken(
+          userToken,
+          projectId,
+          storedToken.token_id,
+          newExpiresAt,
+          instanceUrl
+        );
+
+        // Token value is only returned on rotation
+        if (!rotatedToken.token) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'GitLab did not return token value after rotation',
+          });
+        }
+
+        // Update stored token
+        await updateStoredProjectAccessToken(integration.id, projectIdStr, {
+          token_id: rotatedToken.id,
+          token: rotatedToken.token,
+          expires_at: rotatedToken.expires_at,
+          created_at: new Date().toISOString(),
+          name: rotatedToken.name,
+        });
+
+        logExceptInTest('[getOrCreateProjectAccessToken] Token rotated successfully', {
+          projectId,
+          newTokenId: rotatedToken.id,
+          newExpiresAt: rotatedToken.expires_at,
+        });
+
+        return rotatedToken.token;
+      } catch (error) {
+        // If rotation fails, try to create a new token
+        logExceptInTest('[getOrCreateProjectAccessToken] Rotation failed, creating new token', {
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  // No existing token or rotation failed, create a new one
+  logExceptInTest('[getOrCreateProjectAccessToken] Creating new token', {
+    projectId,
+  });
+
+  const userToken = await getValidGitLabToken(integration);
+  const expiresAt = calculateProjectAccessTokenExpiry(365);
+
+  try {
+    const newToken = await createProjectAccessToken(
+      userToken,
+      projectId,
+      KILO_BOT_TOKEN_NAME,
+      expiresAt,
+      ['api', 'self_rotate'], // api for full access, self_rotate for token rotation
+      30, // Developer access level
+      instanceUrl
+    );
+
+    // Token value is only returned on creation
+    if (!newToken.token) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'GitLab did not return token value after creation',
+      });
+    }
+
+    // Store the new token
+    await updateStoredProjectAccessToken(integration.id, projectIdStr, {
+      token_id: newToken.id,
+      token: newToken.token,
+      expires_at: newToken.expires_at,
+      created_at: new Date().toISOString(),
+      name: newToken.name,
+    });
+
+    logExceptInTest('[getOrCreateProjectAccessToken] Token created successfully', {
+      projectId,
+      tokenId: newToken.id,
+      expiresAt: newToken.expires_at,
+    });
+
+    return newToken.token;
+  } catch (error) {
+    if (error instanceof GitLabProjectAccessTokenPermissionError) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: `Cannot create bot token for project ${projectId}. You need Maintainer role or higher.`,
+        cause: error,
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Removes an invalid stored token from the integration metadata
+ * Called when a stored token is found to be invalid (e.g., manually revoked on GitLab)
+ */
+async function removeInvalidStoredToken(
+  integrationId: string,
+  projectId: string,
+  metadata: GitLabIntegrationMetadata
+): Promise<void> {
+  const projectTokens = { ...metadata.project_tokens };
+  delete projectTokens[projectId];
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: {
+        ...metadata,
+        project_tokens: projectTokens,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integrationId));
+
+  logExceptInTest('[removeInvalidStoredToken] Removed invalid token from storage', {
+    integrationId,
+    projectId,
+  });
+}
+
+/**
+ * Updates the stored Project Access Token for a project in the integration metadata
+ */
+async function updateStoredProjectAccessToken(
+  integrationId: string,
+  projectId: string,
+  tokenData: StoredProjectAccessToken
+): Promise<void> {
+  // Get current metadata
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.id, integrationId))
+    .limit(1);
+
+  if (!integration) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Integration not found',
+    });
+  }
+
+  const metadata = (integration.metadata || {}) as GitLabIntegrationMetadata;
+  const projectTokens = metadata.project_tokens || {};
+
+  // Update the token for this project
+  projectTokens[projectId] = tokenData;
+
+  // Save back to database
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: {
+        ...metadata,
+        project_tokens: projectTokens,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integrationId));
+}
+
+/**
+ * Removes the stored Project Access Token for a project
+ * Called when a project is removed from code reviews
+ */
+export async function removeStoredProjectAccessToken(
+  integration: PlatformIntegration,
+  projectId: string | number
+): Promise<void> {
+  const metadata = integration.metadata as GitLabIntegrationMetadata | null;
+  const projectIdStr = String(projectId);
+
+  if (!metadata?.project_tokens?.[projectIdStr]) {
+    // No token stored, nothing to do
+    return;
+  }
+
+  const storedToken = metadata.project_tokens[projectIdStr];
+  const instanceUrl = metadata.gitlab_instance_url || 'https://gitlab.com';
+
+  // Try to revoke the token in GitLab
+  try {
+    const userToken = await getValidGitLabToken(integration);
+    await revokeProjectAccessToken(userToken, projectId, storedToken.token_id, instanceUrl);
+    logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
+      projectId,
+      tokenId: storedToken.token_id,
+    });
+  } catch (error) {
+    // Log but don't fail - the token might already be revoked
+    logExceptInTest('[removeStoredProjectAccessToken] Failed to revoke token in GitLab', {
+      projectId,
+      tokenId: storedToken.token_id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // Remove from metadata
+  const projectTokens = { ...metadata.project_tokens };
+  delete projectTokens[projectIdStr];
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: {
+        ...metadata,
+        project_tokens: projectTokens,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integration.id));
+
+  logExceptInTest('[removeStoredProjectAccessToken] Token removed from metadata', {
+    projectId,
+  });
+}
+
+/**
+ * Gets the stored Project Access Token for a project (if exists)
+ * Returns null if no token is stored
+ */
+export function getStoredProjectAccessToken(
+  integration: PlatformIntegration,
+  projectId: string | number
+): StoredProjectAccessToken | null {
+  const metadata = integration.metadata as GitLabIntegrationMetadata | null;
+  const projectIdStr = String(projectId);
+
+  return metadata?.project_tokens?.[projectIdStr] || null;
+}
+
+/**
+ * Checks if a Project Access Token exists and is valid for a project
+ */
+export function hasValidProjectAccessToken(
+  integration: PlatformIntegration,
+  projectId: string | number
+): boolean {
+  const storedToken = getStoredProjectAccessToken(integration, projectId);
+
+  if (!storedToken) {
+    return false;
+  }
+
+  // Check if token is not expiring within 1 day
+  return !isProjectAccessTokenExpiringSoon(storedToken.expires_at, 1);
+}
+
+/**
+ * Finds an existing Kilo bot token on GitLab and imports it into metadata
+ * Useful for recovering from lost metadata or migrating existing tokens
+ */
+export async function importExistingProjectAccessToken(
+  integration: PlatformIntegration,
+  projectId: string | number
+): Promise<GitLabProjectAccessToken | null> {
+  const metadata = integration.metadata as GitLabIntegrationMetadata | null;
+
+  if (!metadata?.access_token) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'GitLab integration missing access token',
+    });
+  }
+
+  const instanceUrl = metadata.gitlab_instance_url || 'https://gitlab.com';
+  const userToken = await getValidGitLabToken(integration);
+
+  // Find existing Kilo token on GitLab
+  const existingToken = await findKiloProjectAccessToken(
+    userToken,
+    projectId,
+    KILO_BOT_TOKEN_NAME,
+    instanceUrl
+  );
+
+  if (existingToken) {
+    logExceptInTest('[importExistingProjectAccessToken] Found existing token on GitLab', {
+      projectId,
+      tokenId: existingToken.id,
+      expiresAt: existingToken.expires_at,
+    });
+
+    // Note: We can't get the token value from the API, only on creation
+    // So we can only store the metadata, not the actual token
+    // The caller will need to rotate the token to get a new value
+  }
+
+  return existingToken;
 }

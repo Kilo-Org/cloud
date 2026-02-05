@@ -26,6 +26,7 @@ import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { addReactionToMR } from '../adapter';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { getOrCreateProjectAccessToken } from '@/lib/integrations/gitlab-service';
 
 /**
  * Handles merge request events that trigger code review
@@ -198,27 +199,40 @@ export async function handleMergeRequestCodeReview(
       headRef: mr.source_branch,
       headSha,
       platform: 'gitlab',
+      platformProjectId: project.id,
     });
 
     logExceptInTest(`Created code review ${reviewId} for ${project.path_with_namespace}!${mr.iid}`);
 
-    // 7. Post 👀 reaction to show Kilo is reviewing
-    try {
-      // Get the access token from the integration
-      const fullIntegration = await getIntegrationById(integration.id);
-      if (fullIntegration?.metadata && typeof fullIntegration.metadata === 'object') {
-        const metadata = fullIntegration.metadata as { access_token?: string };
-        if (metadata.access_token) {
-          await addReactionToMR(metadata.access_token, project.id, mr.iid, 'eyes');
-          logExceptInTest(`Added eyes reaction to ${project.path_with_namespace}!${mr.iid}`);
-        }
+    // 7. Get or create Project Access Token (PrAT) for bot identity
+    // This is also used later in prepare-review-payload.ts for the actual review
+    const fullIntegration = await getIntegrationById(integration.id);
+    const metadata = fullIntegration?.metadata as {
+      gitlab_instance_url?: string;
+    } | null;
+    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+
+    // 8. Post 👀 reaction to show Kilo is reviewing (using PrAT for bot identity)
+    if (fullIntegration) {
+      try {
+        const pratToken = await getOrCreateProjectAccessToken(fullIntegration, project.id);
+        logExceptInTest(`Got PrAT for project ${project.path_with_namespace}`, {
+          projectId: project.id,
+        });
+
+        await addReactionToMR(pratToken, project.id, mr.iid, 'eyes', instanceUrl);
+        logExceptInTest(`Added eyes reaction to ${project.path_with_namespace}!${mr.iid}`);
+      } catch (reactionError) {
+        // Non-blocking - log but don't fail the review
+        // If this is a PrAT permission error, the review will fail later with a clear message
+        logExceptInTest('Failed to add eyes reaction (PrAT may not be available):', {
+          projectId: project.id,
+          error: reactionError instanceof Error ? reactionError.message : String(reactionError),
+        });
       }
-    } catch (reactionError) {
-      // Non-blocking - log but don't fail the review
-      logExceptInTest('Failed to add eyes reaction:', reactionError);
     }
 
-    // 8. Try to dispatch pending reviews (including this new one)
+    // 9. Try to dispatch pending reviews (including this new one)
     // Review is created with status='pending' and dispatch will pick it up if slots available
     try {
       const dispatchResult = await tryDispatchPendingReviews(owner);
@@ -243,7 +257,7 @@ export async function handleMergeRequestCodeReview(
       // Don't throw - review record created as pending, will be picked up later
     }
 
-    // 9. Return 202 Accepted (always succeeds, review queued as pending)
+    // 10. Return 202 Accepted (always succeeds, review queued as pending)
     return NextResponse.json(
       {
         message: 'Code review queued',

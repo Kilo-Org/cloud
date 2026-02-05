@@ -34,6 +34,7 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
         head_ref: params.headRef,
         head_sha: params.headSha,
         platform: params.platform ?? 'github',
+        platform_project_id: params.platformProjectId ?? null,
         status: 'pending',
       })
       .returning({ id: cloud_agent_code_reviews.id });

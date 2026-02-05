@@ -473,13 +473,6 @@ export class SessionService {
     // This is used by the glab CLI and Kilocode for GitLab operations
     if (gitToken && gitUrl && gitUrl.includes('gitlab') && !baseEnvVars.GITLAB_TOKEN) {
       envVars.GITLAB_TOKEN = gitToken;
-
-      // Set GLAB_IS_OAUTH2=true for glab CLI to properly authenticate with OAuth2 tokens
-      // This is required because our GitLab tokens are OAuth2 tokens, not personal access tokens
-      if (!baseEnvVars.GLAB_IS_OAUTH2) {
-        envVars.GLAB_IS_OAUTH2 = 'true';
-      }
-
       // Also set GITLAB_HOST for the glab CLI to know which instance to authenticate against
       // Extract host from gitUrl (e.g., "https://gitlab.example.com/owner/repo.git" -> "gitlab.example.com")
       if (!baseEnvVars.GITLAB_HOST) {
@@ -492,17 +485,14 @@ export class SessionService {
         }
       }
 
-      // Debug logging for GitLab token setup - FULL TOKEN for debugging
+      // Debug logging for GitLab token setup
       logger
         .withFields({
           gitUrl,
           gitlabHost: envVars.GITLAB_HOST,
-          gitToken: gitToken, // FULL TOKEN for debugging
           gitTokenLength: gitToken.length,
         })
-        .info(
-          '[GITLAB-DEBUG] Setting GITLAB_TOKEN, GLAB_IS_OAUTH2, and GITLAB_HOST for GitLab session'
-        );
+        .info('[GITLAB] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
     }
 
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)

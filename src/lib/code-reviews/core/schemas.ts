@@ -125,6 +125,7 @@ export const CreateReviewParamsSchema = z.object({
   headRef: z.string().min(1),
   headSha: z.string().min(1),
   platform: CodeReviewPlatformSchema.default('github'),
+  platformProjectId: z.number().int().positive().optional(),
 });
 
 /**

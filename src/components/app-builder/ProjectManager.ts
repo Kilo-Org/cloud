@@ -41,6 +41,8 @@ export type ProjectState = {
   previewStatus: PreviewStatus;
   deploymentId: string | null;
   model: string;
+  /** Current URL the user is viewing in the preview iframe (tracked via postMessage) */
+  currentIframeUrl: string | null;
 };
 
 export type ProjectManagerConfig = {
@@ -173,6 +175,14 @@ export class ProjectManager {
    */
   sendMessage(message: string, images?: Images, model?: string): void {
     this.streamingCoordinator.sendMessage(message, images, model);
+  }
+
+  /**
+   * Update the current iframe URL (called from preview component via postMessage listener).
+   * @param url - The current URL in the preview iframe, or null to clear
+   */
+  setCurrentIframeUrl(url: string | null): void {
+    this.store.setState({ currentIframeUrl: url });
   }
 
   /** Interrupt the current streaming response. */

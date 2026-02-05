@@ -53,6 +53,7 @@ describe('createProjectStore', () => {
     previewStatus: 'idle',
     deploymentId: null,
     model: 'anthropic/claude-sonnet-4',
+    currentIframeUrl: null,
   };
 
   describe('getState', () => {

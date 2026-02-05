@@ -70,6 +70,18 @@ Cloudflare Worker that powers Kilocode Cloud Agents. It exposes a tRPC API for s
 - `.dev.vars.example` - Local dev env template
 - `worker-configuration.d.ts` - Auto-generated types. Do not edit; regenerate with `pnpm run types`.
 
+## Environment Variables
+
+Agents should NOT add environment variables with top-level validation that throws errors, like:
+
+```ts
+if (!process.env.ENV_VAR) {
+  throw new Error('ENV_VAR is required');
+}
+```
+
+This pattern blocks API endpoints from running for external contributors who don't have all environment variables configured. Instead, handle missing environment variables gracefully at the point of use, or make features degrade gracefully when optional env vars are missing.
+
 ## Development Guidelines
 
 ### Code Style

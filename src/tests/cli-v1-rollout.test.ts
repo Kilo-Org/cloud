@@ -18,7 +18,7 @@ async function getUserCohorts(userId: string): Promise<Record<string, number>> {
   return rows[0].cohorts;
 }
 
-async function getUserCredits(userId: string, category: string) {
+async function getUserCredits(userId: string) {
   return db.select().from(credit_transactions).where(eq(credit_transactions.kilo_user_id, userId));
 }
 
@@ -189,13 +189,13 @@ describe('CLI V1 Rollout', () => {
       const user = await insertTestUser();
       // No cohort tag
 
-      const result = await grantCreditsToCohort({
+      await grantCreditsToCohort({
         cohortName: COHORT_NAME,
         creditCategory: 'cli-v1-rollout',
       });
 
       // Should not have processed this user at all
-      const credits = await getUserCredits(user.id, 'cli-v1-rollout');
+      const credits = await getUserCredits(user.id);
       const relevant = credits.filter(c => c.credit_category === 'cli-v1-rollout');
       expect(relevant).toHaveLength(0);
     });
@@ -243,13 +243,13 @@ describe('CLI V1 Rollout', () => {
       expect(grantResult.failed).toBe(0);
 
       // Verify only inactive user got credits
-      const inactiveCredits = await getUserCredits(inactiveUser.id, 'cli-v1-rollout');
+      const inactiveCredits = await getUserCredits(inactiveUser.id);
       expect(inactiveCredits.filter(c => c.credit_category === 'cli-v1-rollout')).toHaveLength(1);
 
-      const activeCredits = await getUserCredits(activeUser.id, 'cli-v1-rollout');
+      const activeCredits = await getUserCredits(activeUser.id);
       expect(activeCredits.filter(c => c.credit_category === 'cli-v1-rollout')).toHaveLength(0);
 
-      const neverUsedCredits = await getUserCredits(neverUsedUser.id, 'cli-v1-rollout');
+      const neverUsedCredits = await getUserCredits(neverUsedUser.id);
       expect(neverUsedCredits.filter(c => c.credit_category === 'cli-v1-rollout')).toHaveLength(0);
     });
   });

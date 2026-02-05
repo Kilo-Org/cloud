@@ -177,6 +177,13 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     is_idempotent: true,
     expiry_hours: 30 * 24,
   },
+  {
+    credit_category: 'cli-v1-rollout',
+    description: 'CLI V1 Rollout - $1 credit with 7 day expiry',
+    amount_usd: 1,
+    is_idempotent: true,
+    expiry_hours: 7 * 24,
+  },
 
   {
     credit_category: 'payment-tripled',

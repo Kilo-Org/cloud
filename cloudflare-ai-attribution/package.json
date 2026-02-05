@@ -22,12 +22,12 @@
     "jest": "^29.7.0",
     "typescript": "^5.7.2",
     "@types/jsonwebtoken": "^9.0.10",
-    "wrangler": "^4.54.0"
+    "wrangler": "^4.61.0"
   },
   "dependencies": {
     "hono": "^4.11.4",
     "workers-tagged-logger": "^1.0.0",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.3",
     "zod": "^4.1.12"
   }
 }

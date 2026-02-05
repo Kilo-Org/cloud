@@ -31,6 +31,6 @@
     "ts-jest": "^29.1.2",
     "tsx": "^4.7.0",
     "typescript": "^5.8.3",
-    "wrangler": "^4.51.0"
+    "wrangler": "^4.61.0"
   }
 }

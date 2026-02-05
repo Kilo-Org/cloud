@@ -41,16 +41,16 @@
     "@ai-sdk/gateway": "^3.0.16",
     "@ai-sdk/mistral": "^2.0.23",
     "@ai-sdk/openai": "^2.0.52",
-    "@aws-sdk/client-s3": "^3.933.0",
-    "@aws-sdk/s3-request-presigner": "^3.933.0",
+    "@aws-sdk/client-s3": "^3.980.0",
+    "@aws-sdk/s3-request-presigner": "^3.980.0",
     "@lottiefiles/dotlottie-react": "^0.17.6",
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",
     "@mistralai/mistralai": "^1.10.0",
     "@monaco-editor/react": "^4.7.0",
     "@next/bundle-analyzer": "^16.0.3",
-    "@next/mdx": "^15.5.7",
-    "@next/third-parties": "^15.5.7",
+    "@next/mdx": "^15.5.10",
+    "@next/third-parties": "^15.5.10",
     "@octokit/auth-app": "^8.1.2",
     "@octokit/oauth-methods": "^6.0.2",
     "@octokit/rest": "^22.0.0",
@@ -103,7 +103,7 @@
     "jotai-minidb": "^0.0.8",
     "js-cookie": "^3.0.5",
     "js-yaml": "^4.1.1",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.552.0",
     "motion": "^12.23.24",
     "next": "^15.5.10",
@@ -133,7 +133,7 @@
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.39.1",
     "@jest/globals": "^30.2.0",
-    "@next/eslint-plugin-next": "^15.5.7",
+    "@next/eslint-plugin-next": "^15.5.10",
     "@playwright/test": "^1.57.0",
     "@swc/jest": "^0.2.39",
     "@tailwindcss/postcss": "^4.1.16",
@@ -151,7 +151,7 @@
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9.39.1",
-    "eslint-config-next": "^15.5.7",
+    "eslint-config-next": "^15.5.10",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-drizzle": "^0.2.3",
     "eslint-plugin-n": "^17.23.1",
@@ -179,7 +179,8 @@
     "overrides": {
       "mdast-util-to-hast": "^13.2.1",
       "storybook": "^9.1.17",
-      "next": "^15.5.10"
+      "next": "^15.5.10",
+      "preact": "10.28.3"
     }
   }
 }

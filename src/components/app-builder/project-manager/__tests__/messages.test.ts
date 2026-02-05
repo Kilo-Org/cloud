@@ -22,6 +22,7 @@ function createMockStore(initialMessages: CloudMessage[] = []): ProjectStore {
       previewStatus: 'idle' as const,
       deploymentId: null,
       model: 'anthropic/claude-sonnet-4',
+      currentIframeUrl: null,
     }),
     setState: jest.fn(partial => {
       if (partial.messages) {

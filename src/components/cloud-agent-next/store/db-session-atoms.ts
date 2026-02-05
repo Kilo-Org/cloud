@@ -328,13 +328,12 @@ export type DbSessionDetails = {
   session_id: string;
   title: string | null;
   cloud_agent_session_id: string | null;
+  organization_id: string | null;
   created_at: Date;
   updated_at: Date;
-  version: number;
   // V1-only fields (optional for V2 compatibility)
   kilo_user_id?: string;
   git_url?: string | null;
-  organization_id?: string | null;
   created_on_platform?: string | null;
   forked_from?: string | null;
   api_conversation_history_blob_url?: string | null;
@@ -687,14 +686,9 @@ export const loadSessionToIndexedDbAtom = atom(
     // Extract repository from git URL
     const repository = extractRepoFromGitUrl(session.git_url);
 
-    // Determine if we need org context prompt
-    // For sessions with version >= 2, the organization_id field is reliable:
-    // - If organization_id is set, we know it's an org session
-    // - If organization_id is null, we know it's a personal session
-    // For older sessions (version < 2), we need to prompt if not confirmed
-    const knowsOrgContextFromDb = session.version >= 2;
-    const needsOrgContextPrompt =
-      !knowsOrgContextFromDb && (!existingData || !existingData.orgContextConfirmed);
+    // cli_sessions_v2 always has a reliable organization_id (set during prepareSession),
+    // so we never need to prompt the user for org context.
+    const needsOrgContextPrompt = false;
 
     // Create or merge session data
     let sessionData: IndexedDbSessionData;
@@ -728,12 +722,10 @@ export const loadSessionToIndexedDbAtom = atom(
         lastModel: session.last_model ?? existingData.lastModel,
       };
     } else {
-      // Create new session data
-      // For sessions with version >= 2, auto-set org context from DB
-      const orgContextFromDb: OrgContext | null =
-        knowsOrgContextFromDb && session.organization_id
-          ? { organizationId: session.organization_id }
-          : null;
+      // Create new session data, using organization_id from DB
+      const orgContextFromDb: OrgContext | null = session.organization_id
+        ? { organizationId: session.organization_id }
+        : null;
 
       sessionData = createSessionData(
         {
@@ -742,7 +734,7 @@ export const loadSessionToIndexedDbAtom = atom(
           title: session.title,
           gitUrl: session.git_url,
           orgContext: orgContextFromDb,
-          orgContextConfirmed: knowsOrgContextFromDb, // Auto-confirm if we know from DB
+          orgContextConfirmed: true,
           createdAt: session.created_at.toISOString(),
           dbUpdatedAt: session.updated_at.toISOString(),
           lastMode: session.last_mode,

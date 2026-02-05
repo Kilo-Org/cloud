@@ -21,7 +21,6 @@ function createDbSession(overrides: Partial<DbSessionDetails> = {}): DbSessionDe
     updated_at: new Date(),
     last_mode: null,
     last_model: null,
-    version: 2,
     organization_id: null,
     kilo_user_id: 'user-123',
     forked_from: null,

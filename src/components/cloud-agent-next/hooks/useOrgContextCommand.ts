@@ -76,7 +76,6 @@ export function useOrgContextCommand(organizationId?: string) {
             git_state_blob_url: null,
             last_mode: pendingSession.lastMode,
             last_model: pendingSession.lastModel,
-            version: 0,
             // Use the newly confirmed orgContext, not the old pendingSession.orgContext
             organization_id: orgContext?.organizationId ?? null,
           };

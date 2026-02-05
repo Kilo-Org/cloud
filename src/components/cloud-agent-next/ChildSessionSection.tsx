@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { ChevronRight, ChevronDown, Bot, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { SubtaskPart, StoredMessage, ToolPart } from './types';
+import type { ReactNode } from 'react';
+import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
 import { isMessageStreaming, isToolPart } from './types';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
-import { PartRenderer } from './PartRenderer';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -34,6 +34,14 @@ function DevDebugInfo({ messageId, sessionId }: { messageId: string; sessionId: 
  */
 const MAX_NESTING_DEPTH = 5;
 
+/** Render function for a single part, injected to avoid circular imports */
+export type RenderPartFn = (props: {
+  part: Part;
+  isStreaming?: boolean;
+  childSessionMessages?: Map<string, StoredMessage[]>;
+  getChildMessages?: (sessionId: string) => StoredMessage[];
+}) => ReactNode;
+
 type ChildSessionSectionProps = {
   subtaskPart?: SubtaskPart;
   /** For task tool parts, the tool part itself */
@@ -48,6 +56,8 @@ type ChildSessionSectionProps = {
   onExpand?: () => void;
   /** Function to get messages for a child session ID (for nested sessions) */
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  /** Render function for individual parts (injected to avoid circular dependency) */
+  renderPart: RenderPartFn;
 };
 
 /**
@@ -65,6 +75,7 @@ export function ChildSessionSection({
   depth = 0,
   onExpand,
   getChildMessages,
+  renderPart,
 }: ChildSessionSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -163,6 +174,7 @@ export function ChildSessionSection({
                     message={msg}
                     depth={depth}
                     getChildMessages={getChildMessages}
+                    renderPart={renderPart}
                   />
                 </MessageErrorBoundary>
               ))
@@ -190,10 +202,12 @@ function ChildSessionMessage({
   message,
   depth,
   getChildMessages,
+  renderPart,
 }: {
   message: StoredMessage;
   depth: number;
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  renderPart: RenderPartFn;
 }) {
   const isStreaming = isMessageStreaming(message);
 
@@ -223,11 +237,16 @@ function ChildSessionMessage({
                 childMessages={nestedChildMessages || []}
                 depth={depth + 1}
                 getChildMessages={getChildMessages}
+                renderPart={renderPart}
               />
             );
           }
 
-          return <PartRenderer key={part.id || index} part={part} isStreaming={isStreaming} />;
+          return (
+            <MessageErrorBoundary key={part.id || index}>
+              {renderPart({ part, isStreaming })}
+            </MessageErrorBoundary>
+          );
         })}
       </div>
     </div>

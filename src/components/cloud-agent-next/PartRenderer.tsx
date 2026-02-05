@@ -18,6 +18,7 @@ import { TodoReadToolCard } from './TodoReadToolCard';
 import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolCard } from './QuestionToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
+import type { RenderPartFn } from './ChildSessionSection';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import type { Part, ToolExecution, StoredMessage } from './types';
@@ -153,6 +154,12 @@ function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
 }
 
 /**
+ * Adapter that delegates to the exported PartRenderer component,
+ * used as a callback prop in ChildSessionSection to break the circular dependency.
+ */
+const renderPartFn: RenderPartFn = props => <PartRenderer {...props} />;
+
+/**
  * Renders a ToolPart using ToolExecutionCard
  * Converts V2 ToolPart format to V1 ToolExecution format for compatibility
  * Special handling for task tools to render as ChildSessionSection
@@ -184,6 +191,7 @@ function ToolPartRenderer({
         sessionId={sessionId}
         childMessages={childMessages}
         getChildMessages={getChildMessages}
+        renderPart={renderPartFn}
       />
     );
   }

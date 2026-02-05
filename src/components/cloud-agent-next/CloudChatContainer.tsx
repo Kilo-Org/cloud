@@ -379,9 +379,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
             session_id: sessionData.session_id,
             title: sessionData.title,
             cloud_agent_session_id: sessionData.cloud_agent_session_id,
+            organization_id: sessionData.organization_id,
             created_at: new Date(sessionData.created_at),
             updated_at: new Date(sessionData.updated_at),
-            version: sessionData.version,
             // Include mode/model from DO runtime state so needsResumeConfigModal works correctly
             last_mode: runtimeState?.mode,
             last_model: runtimeState?.model,
@@ -669,9 +669,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
           session_id: sessionData.session_id,
           title: sessionData.title,
           cloud_agent_session_id: sessionData.cloud_agent_session_id,
+          organization_id: sessionData.organization_id,
           created_at: new Date(sessionData.created_at),
           updated_at: new Date(sessionData.updated_at),
-          version: sessionData.version,
         };
 
         // Parse messages from R2 blob

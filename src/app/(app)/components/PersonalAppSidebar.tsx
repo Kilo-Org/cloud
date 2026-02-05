@@ -23,6 +23,7 @@ import {
   Key,
   Wrench,
   Webhook,
+  Network,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -139,6 +140,20 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       : []),
   ];
 
+  // Gateway group
+  const gatewayItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url: string;
+    className?: string;
+  }> = [
+    {
+      title: 'Gateway',
+      icon: Network,
+      url: '/gateway',
+    },
+  ];
+
   // Account group
   const accountItems: Array<{
     title: string;
@@ -212,6 +227,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       <SidebarContent>
         <SidebarMenuList label="Dashboard" items={dashboardItems} />
         {cloudItems.length > 0 && <SidebarMenuList label="Cloud" items={cloudItems} />}
+        <SidebarMenuList label="Gateway" items={gatewayItems} />
         <SidebarMenuList label="Account" items={accountItems} />
         <SidebarMenuList label="Start" items={startItems} />
       </SidebarContent>

@@ -210,15 +210,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const toolsAvailable = getToolsAvailable(requestBodyParsed.tools);
   const toolsUsed = getToolsUsed(requestBodyParsed.messages);
-
-  emitApiMetrics({
-    clientSecret: 'TODO',
-    provider: provider.id,
-    requestedModel: requestedModelLowerCased,
-    resolvedModel: requestBodyParsed.model,
-    toolsAvailable,
-    toolsUsed,
-  });
   console.debug(`Routing request to ${provider.id}`);
 
   // Fire-and-forget abuse classification as early as possible
@@ -375,6 +366,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     extraHeaders,
     provider,
     signal: request.signal,
+  });
+  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+
+  emitApiMetrics({
+    clientSecret: 'TODO',
+    provider: provider.id,
+    requestedModel: requestedModelLowerCased,
+    resolvedModel: requestBodyParsed.model,
+    toolsAvailable,
+    toolsUsed,
+    ttfbMs,
   });
   usageContext.status_code = response.status;
 

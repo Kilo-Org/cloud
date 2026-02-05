@@ -9,6 +9,11 @@ import { Webhook, Plus } from 'lucide-react';
 type WebhookTriggersHeaderProps = {
   createUrl: string;
   disabled?: boolean;
+  title?: string;
+  description?: string;
+  hideCreate?: boolean;
+  createLabel?: string;
+  badgeLabel?: string;
 };
 
 /**
@@ -18,25 +23,30 @@ type WebhookTriggersHeaderProps = {
 export const WebhookTriggersHeader = memo(function WebhookTriggersHeader({
   createUrl,
   disabled,
+  title = 'Webhook Triggers',
+  description = 'Manage webhook triggers that automatically start cloud agent sessions.',
+  hideCreate = false,
+  createLabel = 'Create Trigger',
+  badgeLabel = 'new',
 }: WebhookTriggersHeaderProps) {
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Webhook className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Webhook Triggers</h1>
-          <Badge variant="new">new</Badge>
+          <h1 className="text-3xl font-bold">{title}</h1>
+          {badgeLabel && <Badge variant="new">{badgeLabel}</Badge>}
         </div>
-        <Button asChild disabled={disabled}>
-          <Link href={disabled ? '#' : createUrl}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Trigger
-          </Link>
-        </Button>
+        {!hideCreate && (
+          <Button asChild disabled={disabled}>
+            <Link href={disabled ? '#' : createUrl}>
+              <Plus className="mr-2 h-4 w-4" />
+              {createLabel}
+            </Link>
+          </Button>
+        )}
       </div>
-      <p className="text-muted-foreground mt-2">
-        Manage webhook triggers that automatically start cloud agent sessions.
-      </p>
+      <p className="text-muted-foreground mt-2">{description}</p>
     </div>
   );
 });

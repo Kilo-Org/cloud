@@ -11,6 +11,7 @@ import ResetToMagicLinkLoginButton from './ResetToMagicLinkLoginButton';
 import CheckKiloPassButton from './CheckKiloPassButton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { Webhook } from 'lucide-react';
 
 type UserAdminAccountInfoProps = UserDetailProps;
 
@@ -54,6 +55,12 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
             <Button variant="outline" size="sm" asChild>
               <Link href={`/admin/users/${encodeURIComponent(user.id)}/heuristic-abuse`}>
                 View usage + abuse
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/admin/users/${encodeURIComponent(user.id)}/webhooks`}>
+                <Webhook className="mr-2 h-4 w-4" />
+                View webhooks
               </Link>
             </Button>
           </div>

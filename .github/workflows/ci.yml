@@ -58,13 +58,22 @@ jobs:
       JEST_MAX_WORKERS: 4
 
     steps:
+      - name: Check if fork PR
+        id: check-fork
+        run: |
+          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ] && [ -n "${{ github.event.pull_request.head.repo.full_name }}" ]; then
+            echo "is_fork=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_fork=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: actions/checkout@v4
         with:
           lfs: true
           fetch-depth: 0
           # For internal PRs, checkout the head branch so we can push auto-fixes
-          # For fork PRs, use the merge commit (default) - auto-fixes won't be pushed
-          ref: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.head_ref || '' }}
+          # For fork PRs, use the merge commit (default)
+          ref: ${{ steps.check-fork.outputs.is_fork == 'false' && github.head_ref || '' }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -84,10 +93,22 @@ jobs:
       - name: Typecheck (fail fast)
         run: pnpm run typecheck
 
+      # For external contributions: just check, don't fix
+      - name: Lint and format check (external contributions)
+        if: steps.check-fork.outputs.is_fork == 'true'
+        run: |
+          pnpm run lint
+          pnpm run format:check
+
+      - name: Run tests (external contributions)
+        if: steps.check-fork.outputs.is_fork == 'true'
+        run: pnpm run test
+
+      # For internal PRs: auto-fix and commit
       - name: Fix Formatting, Lint, Run Tests, and Commit Changes
+        if: steps.check-fork.outputs.is_fork == 'false'
         shell: bash
         run: |
-
           echo building message in ${{ runner.temp }}/TMP_CI_commit_msg.txt
           # Prepare the commit message file from the start
           echo "ci: auto-fix formatting, linting, and snapshot updates" > ${{ runner.temp }}/TMP_CI_commit_msg.txt
@@ -122,21 +143,20 @@ jobs:
 
           echo "Changes detected, committing..."
           git commit -n -F ${{ runner.temp }}/TMP_CI_commit_msg.txt
-
-          # Only push for internal PRs (not forks) - we don't have write access to fork repos
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" = "${{ github.repository }}" ]; then
-            git push
-          else
-            echo "::warning::Auto-fix changes detected but cannot push to fork PR. Please apply the fixes manually."
-          fi
+          git push
 
           exit $TEST_EXIT_CODE
 
       - name: Lints after autofixes
+        if: steps.check-fork.outputs.is_fork == 'false'
         run: |
           pnpm run typecheck
           pnpm run lint
           pnpm run dependency-cycle-check
+
+      - name: Dependency cycle check (external contributions)
+        if: steps.check-fork.outputs.is_fork == 'true'
+        run: pnpm run dependency-cycle-check
 
   build:
     runs-on: ubuntu-24.04-8core

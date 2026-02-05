@@ -17,6 +17,7 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   extraRequiredProviders,
   isDeadFreeModel,
+  isSlackbotOnlyModel,
   isStealthModelOnKiloCodeOnly,
 } from '@/lib/models';
 import {
@@ -41,7 +42,6 @@ import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
 import { isRateLimitedToDeathFree } from '@/lib/providers/openrouter';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
 import { redactedModelResponse } from '@/lib/redactedModelResponse';
-import { minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -238,7 +238,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return alphaPeriodEndedResponse();
   }
 
-  if (originalModelIdLowerCased === minimax_m21_free_slackbot_model.public_id && !internalApiUse) {
+  // Slackbot-only models are only available through Kilo for Slack (internalApiUse)
+  if (isSlackbotOnlyModel(originalModelIdLowerCased) && !internalApiUse) {
     return modelDoesNotExistResponse();
   }
 

@@ -14,6 +14,8 @@ export type KiloFreeModel = {
   gateway: ProviderId;
   internal_id: string;
   inference_providers: [OpenRouterInferenceProviderId, ...OpenRouterInferenceProviderId[]];
+  /** If true, this model is only available through Kilo for Slack (internalApiUse) and hidden from public model list */
+  slackbot_only?: boolean;
 };
 
 export function convertFromKiloModel(model: KiloFreeModel) {

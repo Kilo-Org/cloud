@@ -26,6 +26,7 @@ export const minimax_m21_free_slackbot_model = {
   gateway: 'vercel',
   internal_id: 'minimax/minimax-m2.1',
   inference_providers: ['minimax'],
+  slackbot_only: true,
 } as KiloFreeModel;
 
 export function applyMinimaxProviderSettings(requestToMutate: OpenRouterChatCompletionRequest) {

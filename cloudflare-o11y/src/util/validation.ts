@@ -18,6 +18,7 @@ export function zodJsonValidator<T extends ZodTypeAny>(
 
 	return validator('json', (value, c: Context<Env>) => {
 		const parsed = schema.safeParse(value);
+
 		if (!parsed.success) {
 			return c.json(
 				{
@@ -28,6 +29,7 @@ export function zodJsonValidator<T extends ZodTypeAny>(
 				400,
 			);
 		}
+
 		return parsed.data;
 	});
 }

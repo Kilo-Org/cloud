@@ -16,7 +16,15 @@ export class SqlStore {
     try {
       return await this.db.query(query, params);
     } catch (e) {
-      logger.error('error executing query', { error: e });
+      const errorDetails =
+        e instanceof Error
+          ? { name: e.name, message: e.message, stack: e.stack }
+          : { message: String(e) };
+      logger.error('error executing query', {
+        error: errorDetails,
+        query,
+        paramsCount: Object.keys(params ?? {}).length,
+      });
       throw e;
     }
   }

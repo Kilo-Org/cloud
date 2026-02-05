@@ -29,8 +29,7 @@ describe('Hello World worker', () => {
 				'content-type': 'application/json',
 			},
 			body: JSON.stringify({
-				clientName: 'kilo-cli',
-				clientSecret: 'test-secret',
+				clientSecret: 'TODO',
 				provider: 'openai',
 				requestedModel: 'kilo/auto',
 				resolvedModel: 'anthropic/claude-sonnet-4.5',
@@ -65,6 +64,6 @@ describe('Hello World worker', () => {
 
 		expect(response.status).toBe(400);
 		const json = await response.json();
-		expect(json).toMatchObject({ error: 'Invalid input' });
+		expect(json).toMatchObject({ error: 'Invalid request body' });
 	});
 });

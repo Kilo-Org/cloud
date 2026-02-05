@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zodJsonValidator } from './util/validation';
+import { getClientNameFromSecret } from './client-secrets';
 
 const app = new Hono();
 
 const ApiMetricsParamsSchema = z
 	.object({
-		clientName: z.string().min(1),
 		clientSecret: z.string().min(1),
 		provider: z.string().min(1),
 		requestedModel: z.string().min(1),
@@ -29,6 +29,14 @@ const ApiMetricsParamsSchema = z
 			.optional(),
 	})
 	.superRefine((value, ctx) => {
+		if (!getClientNameFromSecret(value.clientSecret)) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['clientSecret'],
+				message: 'Unknown clientSecret',
+			});
+		}
+
 		if (value.success) return;
 		if (value.errorMessage && value.errorMessage.trim().length > 0) return;
 
@@ -37,6 +45,15 @@ const ApiMetricsParamsSchema = z
 			path: ['errorMessage'],
 			message: 'errorMessage is required when success=false',
 		});
+	})
+	.transform((value) => {
+		const clientName = getClientNameFromSecret(value.clientSecret);
+		if (!clientName) throw new Error('Unknown clientSecret');
+
+		return {
+			...value,
+			clientName,
+		};
 	});
 
 app.get('/', (c) => c.text('Hello World!'));

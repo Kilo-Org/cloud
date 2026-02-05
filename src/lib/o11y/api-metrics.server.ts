@@ -2,7 +2,6 @@ import { after } from 'next/server';
 import { O11Y_SERVICE_URL } from '@/lib/config.server';
 
 export type ApiMetricsParams = {
-  clientName: string;
   clientSecret: string;
   provider: string;
   requestedModel: string;

@@ -44,16 +44,27 @@ export interface DispatchFixResponse {
  * Handles all communication with the Cloudflare Worker for auto fix
  */
 class AutoFixWorkerClient {
-  private readonly baseUrl: string;
-  private readonly authToken: string;
+  private _baseUrl: string | null = null;
+  private _authToken: string | null = null;
 
-  constructor() {
-    if (!AUTO_FIX_URL || !AUTO_FIX_AUTH_TOKEN) {
-      throw new Error('AUTO_FIX_URL or AUTO_FIX_AUTH_TOKEN not configured');
+  private get baseUrl(): string {
+    if (!this._baseUrl) {
+      if (!AUTO_FIX_URL) {
+        throw new Error('AUTO_FIX_URL not configured');
+      }
+      this._baseUrl = AUTO_FIX_URL;
     }
+    return this._baseUrl;
+  }
 
-    this.baseUrl = AUTO_FIX_URL;
-    this.authToken = AUTO_FIX_AUTH_TOKEN;
+  private get authToken(): string {
+    if (!this._authToken) {
+      if (!AUTO_FIX_AUTH_TOKEN) {
+        throw new Error('AUTO_FIX_AUTH_TOKEN not configured');
+      }
+      this._authToken = AUTO_FIX_AUTH_TOKEN;
+    }
+    return this._authToken;
   }
 
   /**

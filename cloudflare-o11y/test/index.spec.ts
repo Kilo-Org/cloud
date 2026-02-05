@@ -60,9 +60,7 @@ describe('o11y worker', () => {
 			}),
 		});
 
-		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, makeTestEnv(), ctx);
-		await waitOnExecutionContext(ctx);
+		const response = await worker.fetch(request, makeTestEnv(), createExecutionContext());
 		expect(response.status).toBe(204);
 	});
 
@@ -87,9 +85,7 @@ describe('o11y worker', () => {
 			}),
 		});
 
-		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, makeTestEnv(), ctx);
-		await waitOnExecutionContext(ctx);
+		const response = await worker.fetch(request, makeTestEnv(), createExecutionContext());
 		expect(response.status).toBe(403);
 		const json = await response.json();
 		expect(json).toMatchObject({ error: 'Unknown clientSecret' });
@@ -102,9 +98,7 @@ describe('o11y worker', () => {
 			body: JSON.stringify({}),
 		});
 
-		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, makeTestEnv(), ctx);
-		await waitOnExecutionContext(ctx);
+		const response = await worker.fetch(request, makeTestEnv(), createExecutionContext());
 		expect(response.status).toBe(400);
 		const json = await response.json();
 		expect(json).toMatchObject({ error: 'Invalid request body' });

@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 jobs:
@@ -58,22 +58,9 @@ jobs:
       JEST_MAX_WORKERS: 4
 
     steps:
-      - name: Check if fork PR
-        id: check-fork
-        run: |
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ] && [ -n "${{ github.event.pull_request.head.repo.full_name }}" ]; then
-            echo "is_fork=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_fork=false" >> $GITHUB_OUTPUT
-          fi
-
       - uses: actions/checkout@v4
         with:
           lfs: true
-          fetch-depth: 0
-          # For internal PRs, checkout the head branch so we can push auto-fixes
-          # For fork PRs, use the merge commit (default)
-          ref: ${{ steps.check-fork.outputs.is_fork == 'false' && github.head_ref || '' }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -90,73 +77,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck (fail fast)
+      - name: Typecheck
         run: pnpm run typecheck
 
-      # For external contributions: just check, don't fix
-      - name: Lint and format check (external contributions)
-        if: steps.check-fork.outputs.is_fork == 'true'
-        run: |
-          pnpm run lint
-          pnpm run format:check
+      - name: Lint
+        run: pnpm run lint
 
-      - name: Run tests (external contributions)
-        if: steps.check-fork.outputs.is_fork == 'true'
-        run: pnpm run test
+      - name: Format check
+        run: pnpm run format:check
 
-      # For internal PRs: auto-fix and commit
-      - name: Fix Formatting, Lint, Run Tests, and Commit Changes
-        if: steps.check-fork.outputs.is_fork == 'false'
-        shell: bash
-        run: |
-          echo building message in ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          # Prepare the commit message file from the start
-          echo "ci: auto-fix formatting, linting, and snapshot updates" > ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          echo "" >> ${{ runner.temp }}/TMP_CI_commit_msg.txt
-
-          echo "--- Linter Output ---" >> ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          (pnpm run lint --fix 2>&1 || true) | tee -a ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          #...and we DO ignore errors, since we'll relint later on and we want to commit what we can
-
-          echo "" >> ${{ runner.temp }}/TMP_CI_commit_msg.txt # Add a separator
-
-          echo "--- Formatter Output ---" >> ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          pnpm run format 2>&1 | tee -a ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          #...but here, do NOT ignore errors, since mere reformats don't count as error
-
-          TEST_EXIT_CODE=0
-          pnpm run test || TEST_EXIT_CODE=$?
-
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add .
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit $TEST_EXIT_CODE
-          fi
-
-          if [ "$(git log -1 --pretty=format:'%ae')" = "action@github.com" ]; then
-            echo "::error::CI autofix produced changes on a CI-generated commit. Committing could cause an infinite loop."
-            exit 1
-          fi
-
-          echo "Changes detected, committing..."
-          git commit -n -F ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          git push
-
-          exit $TEST_EXIT_CODE
-
-      - name: Lints after autofixes
-        if: steps.check-fork.outputs.is_fork == 'false'
-        run: |
-          pnpm run typecheck
-          pnpm run lint
-          pnpm run dependency-cycle-check
-
-      - name: Dependency cycle check (external contributions)
-        if: steps.check-fork.outputs.is_fork == 'true'
+      - name: Dependency cycle check
         run: pnpm run dependency-cycle-check
+
+      - name: Run tests
+        run: pnpm run test
 
   build:
     runs-on: ubuntu-24.04-8core

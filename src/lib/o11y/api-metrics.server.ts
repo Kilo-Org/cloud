@@ -11,6 +11,7 @@ export type ApiMetricsParams = {
   toolsUsed: string[];
   ttfbMs: number;
   completeRequestMs: number;
+  statusCode: number;
 };
 
 export function getToolsAvailable(

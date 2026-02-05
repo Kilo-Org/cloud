@@ -382,6 +382,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       toolsAvailable,
       toolsUsed,
       ttfbMs,
+      statusCode: response.status,
     },
     response.clone(),
     requestStartedAt

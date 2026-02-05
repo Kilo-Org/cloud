@@ -13,7 +13,7 @@ types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
 export const createNodePostgresConnection: CreateDatabaseConnection = connectionString => {
   const pool = new Pool({
     connectionString,
-    max: 5,
+    max: 10,
     connectionTimeoutMillis: 5000,
     statement_timeout: 10 * 1000,
   });

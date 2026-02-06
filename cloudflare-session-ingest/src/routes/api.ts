@@ -27,6 +27,8 @@ const ingestSessionSchema = SessionSyncInputSchema;
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
+const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
+
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
 
@@ -199,7 +201,7 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
     );
   }
 
-  const ingestVersion = Number(c.req.query('v')) || 0;
+  const ingestVersion = ingestVersionSchema.parse(c.req.query('v') ?? 0);
 
   const split = splitIngestBatchForDO(ingestBody.data);
   if (split.droppedOversizeItems > 0) {

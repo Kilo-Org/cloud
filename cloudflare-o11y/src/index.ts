@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { zodJsonValidator } from './util/validation';
 import { getClientName } from './client-secrets';
 import { captureApiMetrics } from './posthog';
+import { writeApiMetricsDataPoint } from './o11y-analytics';
+import { evaluateAlerts } from './alerting/evaluate';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -45,7 +47,13 @@ app.post('/ingest/api-metrics', zodJsonValidator(ApiMetricsParamsSchema), async 
 	}
 
 	c.executionCtx.waitUntil(captureApiMetrics(params, clientName, c.env));
+	writeApiMetricsDataPoint(params, clientName, c.env);
 	return c.body(null, 204);
 });
 
-export default app;
+export default {
+	fetch: app.fetch,
+	async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+		ctx.waitUntil(evaluateAlerts(env));
+	},
+};

@@ -9,6 +9,13 @@ declare namespace Cloudflare {
 		O11Y_KILO_GATEWAY_CLIENT_SECRET: SecretsStoreSecret;
 		POSTHOG_API_KEY: 'phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z';
 		POSTHOG_HOST: 'https://us.i.posthog.com';
+		O11Y_API_METRICS: AnalyticsEngineDataset;
+		O11Y_ALERT_STATE: KVNamespace;
+		O11Y_CF_ACCOUNT_ID: string;
+		O11Y_APP_BASE_URL: string;
+		O11Y_CF_AE_API_TOKEN: SecretsStoreSecret;
+		O11Y_SLACK_WEBHOOK_PAGE: SecretsStoreSecret;
+		O11Y_SLACK_WEBHOOK_TICKET: SecretsStoreSecret;
 	}
 }
 interface Env extends Cloudflare.Env {}
@@ -16,7 +23,8 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, 'POSTHOG_API_KEY' | 'POSTHOG_HOST'>> {}
+	interface ProcessEnv
+		extends StringifyValues<Pick<Cloudflare.Env, 'POSTHOG_API_KEY' | 'POSTHOG_HOST' | 'O11Y_CF_ACCOUNT_ID' | 'O11Y_APP_BASE_URL'>> {}
 }
 
 // Begin runtime types

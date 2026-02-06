@@ -6,7 +6,7 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "o11y",
 	"main": "src/index.ts",
-	"compatibility_date": "2025-09-27",
+	"compatibility_date": "2026-02-01",
 	"observability": {
 		"enabled": true,
 	},

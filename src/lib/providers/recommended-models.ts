@@ -34,6 +34,11 @@ export const recommendedModels = [
     random_vercel_routing: false,
   },
   {
+    public_id: 'openrouter/pony-alpha',
+    tool_choice_required: false,
+    random_vercel_routing: false,
+  },
+  {
     public_id: giga_potato_model.public_id,
     tool_choice_required: false,
     random_vercel_routing: false,

@@ -156,10 +156,15 @@ api.delete('/session/:sessionId', async c => {
 
 api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), async c => {
   const rawSessionId = c.req.param('sessionId');
-  const parsed = sessionIdSchema.safeParse(rawSessionId);
-  if (!parsed.success) {
-    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  const sessionIdParseResult = sessionIdSchema.safeParse(rawSessionId);
+  if (!sessionIdParseResult.success) {
+    return c.json(
+      { success: false, error: 'Invalid sessionId', issues: sessionIdParseResult.error.issues },
+      400
+    );
   }
+
+  const sessionId = sessionIdParseResult.data;
 
   const ingestBody = c.req.valid('json');
 
@@ -170,7 +175,7 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
 
   const hasAccess = await withDORetry(
     sessionCacheStubFactory,
-    sessionCache => sessionCache.has(parsed.data),
+    sessionCache => sessionCache.has(sessionId),
     'SessionAccessCacheDO.has'
   );
 
@@ -178,7 +183,7 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
     const session = await db
       .selectFrom('cli_sessions_v2')
       .select(['session_id'])
-      .where('session_id', '=', parsed.data)
+      .where('session_id', '=', sessionId)
       .where('kilo_user_id', '=', kiloUserId)
       .executeTakeFirst();
 
@@ -189,10 +194,12 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
     // Backfill so subsequent ingests can skip Postgres.
     await withDORetry(
       sessionCacheStubFactory,
-      sessionCache => sessionCache.add(parsed.data),
+      sessionCache => sessionCache.add(sessionId),
       'SessionAccessCacheDO.add'
     );
   }
+
+  const ingestVersion = Number(c.req.query('v')) || 0;
 
   const split = splitIngestBatchForDO(ingestBody.data);
   if (split.droppedOversizeItems > 0) {
@@ -206,8 +213,8 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
   const mergedChanges = new Map<string, string | null>();
   for (const chunk of split.chunks) {
     const ingestResult = await withDORetry(
-      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-      stub => stub.ingest(chunk, kiloUserId, parsed.data),
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: sessionId }),
+      stub => stub.ingest(chunk, kiloUserId, sessionId, ingestVersion),
       'SessionIngestDO.ingest'
     );
 
@@ -216,47 +223,47 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
     }
   }
 
-  const titleValue = mergedChanges.has('title') ? (mergedChanges.get('title') ?? null) : undefined;
-  const platformValue = mergedChanges.has('platform')
+  const title = mergedChanges.has('title') ? (mergedChanges.get('title') ?? null) : undefined;
+  const platform = mergedChanges.has('platform')
     ? (mergedChanges.get('platform') ?? null)
     : undefined;
-  const orgIdValue = mergedChanges.has('orgId') ? (mergedChanges.get('orgId') ?? null) : undefined;
+  const orgId = mergedChanges.has('orgId') ? (mergedChanges.get('orgId') ?? null) : undefined;
 
   let hasSessionUpdate = false;
   let sessionUpdate = db.updateTable('cli_sessions_v2');
-  if (titleValue !== undefined) {
+  if (title !== undefined) {
     hasSessionUpdate = true;
-    sessionUpdate = sessionUpdate.set({ title: titleValue });
+    sessionUpdate = sessionUpdate.set({ title: title });
   }
-  if (platformValue !== undefined) {
+  if (platform !== undefined) {
     hasSessionUpdate = true;
-    sessionUpdate = sessionUpdate.set({ created_on_platform: platformValue });
+    sessionUpdate = sessionUpdate.set({ created_on_platform: platform });
   }
-  if (orgIdValue !== undefined) {
+  if (orgId !== undefined) {
     hasSessionUpdate = true;
-    sessionUpdate = sessionUpdate.set({ organization_id: orgIdValue });
+    sessionUpdate = sessionUpdate.set({ organization_id: orgId });
   }
 
   if (hasSessionUpdate) {
     await sessionUpdate
-      .where('session_id', '=', parsed.data)
+      .where('session_id', '=', sessionId)
       .where('kilo_user_id', '=', kiloUserId)
       .execute();
   }
 
-  const parentIdValue = mergedChanges.has('parentId')
+  const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
-  if (parentIdValue !== undefined) {
-    if (parentIdValue === parsed.data) {
+  if (parentSessionId !== undefined) {
+    if (parentSessionId === sessionId) {
       return c.json({ success: false, error: 'parent_session_id_cannot_be_self' }, 400);
     }
 
-    if (parentIdValue) {
+    if (parentSessionId) {
       const parent = await db
         .selectFrom('cli_sessions_v2')
         .select(['session_id'])
-        .where('session_id', '=', parentIdValue)
+        .where('session_id', '=', parentSessionId)
         .where('kilo_user_id', '=', kiloUserId)
         .executeTakeFirst();
 
@@ -267,10 +274,10 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
 
     await db
       .updateTable('cli_sessions_v2')
-      .set({ parent_session_id: parentIdValue })
-      .where('session_id', '=', parsed.data)
+      .set({ parent_session_id: parentSessionId })
+      .where('session_id', '=', sessionId)
       .where('kilo_user_id', '=', kiloUserId)
-      .where('parent_session_id', 'is distinct from', parentIdValue)
+      .where('parent_session_id', 'is distinct from', parentSessionId)
       .execute();
   }
 

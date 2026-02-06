@@ -104,7 +104,8 @@ export class SessionIngestDO extends DurableObject<Env> {
   async ingest(
     payload: IngestBatch,
     kiloUserId: string,
-    sessionId: string
+    sessionId: string,
+    ingestVersion = 0
   ): Promise<{
     changes: Changes;
   }> {
@@ -168,20 +169,20 @@ export class SessionIngestDO extends DurableObject<Env> {
       }
     }
 
-    // session_open means a new turn is starting. Clear prior close state so
-    // metrics are re-computed on the next alarm. For legacy clients that
-    // never send open/close, the inactivity alarm handles abandonment.
-    if (hasSessionOpen) {
-      this.sql.exec(`DELETE FROM ingest_meta WHERE key IN ('metricsEmitted', 'closeReason')`);
-    }
-
-    if (closeReason) {
-      // Persist the close reason so alarm() can read it after hibernation.
-      writeIngestMetaIfChanged(this.sql, { key: 'closeReason', incomingValue: closeReason });
-      // Short drain delay to capture any late-arriving data before emitting metrics.
-      await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
+    if (ingestVersion >= 1) {
+      // v1 clients send explicit open/close pairs. Only those events drive alarms.
+      if (hasSessionOpen) {
+        // New turn starting — clear prior emission so metrics are re-computed.
+        this.sql.exec(`DELETE FROM ingest_meta WHERE key IN ('metricsEmitted', 'closeReason')`);
+        await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+      }
+      if (closeReason) {
+        writeIngestMetaIfChanged(this.sql, { key: 'closeReason', incomingValue: closeReason });
+        await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
+      }
+      // Events without open/close (stragglers) don't touch the alarm.
     } else {
-      // Reset the inactivity alarm; if it fires, metrics emit with 'abandoned'.
+      // v0 (legacy): no open/close signals, rely on inactivity timeout.
       await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
     }
 

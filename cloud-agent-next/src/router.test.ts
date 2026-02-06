@@ -275,6 +275,9 @@ describe('router sessionId validation', () => {
                   getExecution: vi.fn().mockResolvedValue(null),
                 })),
               } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+              SESSION_INGEST: {
+                fetch: vi.fn(),
+              } as unknown as TRPCContext['env']['SESSION_INGEST'],
               NEXTAUTH_SECRET: 'test-secret',
             },
           };
@@ -613,6 +616,9 @@ describe('router sessionId validation', () => {
                 getExecution: vi.fn().mockResolvedValue(null),
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+            SESSION_INGEST: {
+              fetch: vi.fn(),
+            } as unknown as TRPCContext['env']['SESSION_INGEST'],
             NEXTAUTH_SECRET: 'test-secret',
           },
         };

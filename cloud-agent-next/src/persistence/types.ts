@@ -167,6 +167,8 @@ export type PersistenceEnv = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
+  /** Service binding for the session ingest worker */
+  SESSION_INGEST: Fetcher;
   /** Shared secret for JWT token validation */
   NEXTAUTH_SECRET: string;
   /** Comma-separated list of allowed Origins for /stream WebSocket connections */

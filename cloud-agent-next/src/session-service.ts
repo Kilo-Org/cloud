@@ -38,6 +38,15 @@ const SANDBOX_RETRY_DEFAULTS = {
   baseBackoffMs: 100,
   maxBackoffMs: 5000,
 };
+class SessionSnapshotRestoreError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number
+  ) {
+    super(message);
+    this.name = 'SessionSnapshotRestoreError';
+  }
+}
 
 export function determineBranchName(sessionId: string, upstreamBranch?: string): string {
   return upstreamBranch ?? `session/${sessionId}`;
@@ -772,6 +781,94 @@ export class SessionService {
     };
   }
 
+  private async restoreSessionSnapshot(
+    session: ExecutionSession,
+    sessionId: string,
+    authToken: string,
+    env: PersistenceEnv,
+    userId: string
+  ): Promise<void> {
+    const tmpPath = `/tmp/kilo-session-export-${sessionId}.json`;
+    let wroteSnapshot = false;
+    try {
+      const response = await env.SESSION_INGEST.fetch(
+        `https://session-ingest/api/session/${sessionId}/export`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!response) {
+        throw new Error('Session ingest fetch returned no response');
+      }
+
+      if (response.status === 401 || response.status === 404) {
+        throw new SessionSnapshotRestoreError(
+          `Session snapshot restore failed with status ${response.status}`,
+          response.status
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(`Session ingest returned ${response.status}`);
+      }
+
+      const payload = await response.text();
+      await session.writeFile(tmpPath, payload);
+      wroteSnapshot = true;
+
+      const importResult = await session.exec(`kilo import "${tmpPath}"`);
+      if (importResult.exitCode !== 0) {
+        logger
+          .withFields({
+            sessionId,
+            userId,
+            exitCode: importResult.exitCode,
+            stderr: importResult.stderr,
+            stdout: importResult.stdout,
+          })
+          .error('Session snapshot import failed');
+        throw new Error(`Session snapshot import failed with exit code ${importResult.exitCode}`);
+      }
+    } catch (error) {
+      if (error instanceof SessionSnapshotRestoreError) {
+        logger
+          .withFields({
+            sessionId,
+            userId,
+            status: error.status,
+            error: error.message,
+          })
+          .error('Session snapshot restore failed');
+        throw error;
+      }
+      logger
+        .withFields({
+          sessionId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('Session snapshot restore failed');
+      throw error instanceof Error ? error : new Error(String(error));
+    } finally {
+      if (wroteSnapshot) {
+        try {
+          await session.deleteFile(tmpPath);
+        } catch (error) {
+          logger
+            .withFields({
+              sessionId,
+              userId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .debug('Failed to delete session snapshot temp file');
+        }
+      }
+    }
+  }
+
   /**
    * Initialize a cloud-agent session by resuming an existing kilo session.
    *
@@ -1083,59 +1180,26 @@ export class SessionService {
     // Check if workspace repo exists - if not, we may need to reclone
     const repoCheck = await session.exec(`test -d ${workspacePath}/.git && echo exists`);
     const repoExists = repoCheck.stdout?.includes('exists') ?? false;
+    const isColdStart = !repoExists;
 
     // Check disk space for observability (logs warning if low)
     await checkDiskSpace(session);
 
-    if (!repoExists) {
-      if (metadata) {
-        if (metadata?.gitUrl) {
-          const effectiveGitToken = freshGitToken ?? metadata.gitToken;
-          logger
-            .withTags({ gitUrl: metadata.gitUrl, hasFreshToken: !!freshGitToken })
-            .info('Recloning missing repository (generic git)');
-
-          // Reclone the repository using generic git
-          await cloneGitRepo(session, workspacePath, metadata.gitUrl, effectiveGitToken);
-        } else if (metadata?.githubRepo) {
-          const effectiveGithubToken = freshGithubToken ?? metadata.githubToken;
-          logger
-            .withTags({ githubRepo: metadata.githubRepo, hasFreshToken: !!freshGithubToken })
-            .info('Recloning missing repository');
-
-          // Reclone the repository
-          await cloneGitHubRepo(
-            session,
-            workspacePath,
-            metadata.githubRepo,
-            effectiveGithubToken,
-            getGitAuthorEnv(env, metadata.githubAppType)
-          );
-        } else {
-          throw new Error(
-            `Session ${sessionId} workspace is missing and no repository metadata found. Please re-initiate the session.`
-          );
-        }
-      } else {
-        throw new Error(
-          `Session ${sessionId} workspace is missing and metadata could not be retrieved. Please re-initiate the session.`
-        );
-      }
-    }
-
     // Only re-run setup if we had to reclone (cold start)
     // Note: We don't checkout branch here - kilocode CLI will restore workspace state when it runs
-    if (!repoExists) {
-      // Re-run setup commands (fresh clone, need to reinstall)
-      if (metadata?.setupCommands && metadata.setupCommands.length > 0) {
-        logger.info('Re-running setup commands after fresh clone');
-        await runSetupCommands(session, context, metadata.setupCommands, false); // lenient
-      }
-
-      // Re-write MCP settings (fresh clone)
-      if (metadata?.mcpServers && Object.keys(metadata.mcpServers).length > 0) {
-        await writeMCPSettings(sandbox, context.sessionHome, metadata.mcpServers);
-      }
+    if (isColdStart) {
+      await this.handleColdStartResume({
+        session,
+        sessionId,
+        userId,
+        sandbox,
+        context,
+        metadata,
+        env,
+        kilocodeToken,
+        freshGithubToken,
+        freshGitToken,
+      });
     }
 
     return {
@@ -1161,6 +1225,78 @@ export class SessionService {
           env
         ),
     };
+  }
+
+  private async handleColdStartResume({
+    session,
+    sessionId,
+    userId,
+    sandbox,
+    context,
+    metadata,
+    env,
+    kilocodeToken,
+    freshGithubToken,
+    freshGitToken,
+  }: {
+    session: ExecutionSession;
+    sessionId: string;
+    userId: string;
+    sandbox: SandboxInstance;
+    context: SessionContext;
+    metadata: CloudAgentSessionState | null;
+    env: PersistenceEnv;
+    kilocodeToken: string;
+    freshGithubToken?: string;
+    freshGitToken?: string;
+  }): Promise<void> {
+    if (!metadata) {
+      throw new Error(
+        `Session ${sessionId} workspace is missing and metadata could not be retrieved. Please re-initiate the session.`
+      );
+    }
+
+    // Cold-start resume must restore snapshot or fail.
+    await this.restoreSessionSnapshot(session, sessionId, kilocodeToken, env, userId);
+
+    if (metadata.gitUrl) {
+      const effectiveGitToken = freshGitToken ?? metadata.gitToken;
+      logger
+        .withTags({ gitUrl: metadata.gitUrl, hasFreshToken: !!freshGitToken })
+        .info('Recloning missing repository (generic git)');
+
+      // Reclone the repository using generic git
+      await cloneGitRepo(session, context.workspacePath, metadata.gitUrl, effectiveGitToken);
+    } else if (metadata.githubRepo) {
+      const effectiveGithubToken = freshGithubToken ?? metadata.githubToken;
+      logger
+        .withTags({ githubRepo: metadata.githubRepo, hasFreshToken: !!freshGithubToken })
+        .info('Recloning missing repository');
+
+      // Reclone the repository
+      await cloneGitHubRepo(
+        session,
+        context.workspacePath,
+        metadata.githubRepo,
+        effectiveGithubToken,
+        getGitAuthorEnv(env, metadata.githubAppType)
+      );
+    } else {
+      throw new Error(
+        `Session ${sessionId} workspace is missing and no repository metadata found. Please re-initiate the session.`
+      );
+    }
+
+    // Re-run setup commands (fresh clone, need to reinstall)
+    if (metadata.setupCommands && metadata.setupCommands.length > 0) {
+      logger.info('Re-running setup commands after fresh clone');
+      await runSetupCommands(session, context, metadata.setupCommands, false); // lenient
+    }
+
+    // Re-write MCP settings (fresh clone)
+    if (metadata.mcpServers && Object.keys(metadata.mcpServers).length > 0) {
+      await writeMCPSettings(sandbox, context.sessionHome, metadata.mcpServers);
+    }
   }
 
   /**

@@ -43,6 +43,11 @@ import type { PersistenceEnv, CloudAgentSessionState } from './persistence/types
 describe('SessionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEnv.SESSION_INGEST.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: vi.fn().mockResolvedValue(JSON.stringify({ info: {}, messages: [] })),
+    }) as unknown as PersistenceEnv['SESSION_INGEST']['fetch'];
   });
 
   const mockedSetupWorkspace = vi.mocked(mockSetupWorkspace);
@@ -65,6 +70,9 @@ describe('SessionService', () => {
       }),
     } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
     NEXTAUTH_SECRET: 'mock-secret',
+    SESSION_INGEST: {
+      fetch: vi.fn(),
+    } as unknown as PersistenceEnv['SESSION_INGEST'],
   };
 
   const createMetadataEnv = (
@@ -157,6 +165,60 @@ describe('SessionService', () => {
       );
       expect(result.context.sessionId).toBe(sessionId);
       expect(result.streamKilocodeExec).toBeDefined();
+    });
+
+    it('does not restore session snapshot during initiate (no fetch)', async () => {
+      const payload = JSON.stringify({ info: {}, messages: [] });
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: vi.fn().mockResolvedValue(payload),
+      });
+      const envWithIngest: PersistenceEnv = {
+        ...mockEnv,
+        SESSION_INGEST: {
+          fetch: fetchMock,
+        } as unknown as PersistenceEnv['SESSION_INGEST'],
+      };
+
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '', stderr: '' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const sessionId: SessionId = 'agent_restore_test_skip';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: envWithIngest,
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(fakeSession.writeFile).not.toHaveBeenCalled();
+      expect(fakeSession.exec).not.toHaveBeenCalledWith(
+        `kilo import "/tmp/kilo-session-export-${sessionId}.json"`
+      );
+      expect(fakeSession.deleteFile).not.toHaveBeenCalledWith(
+        `/tmp/kilo-session-export-${sessionId}.json`
+      );
     });
 
     it('uses manageBranch for upstream branches during initiate', async () => {
@@ -503,6 +565,8 @@ describe('SessionService', () => {
           .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check fails
           .mockResolvedValue({ success: true, exitCode: 0 }), // subsequent calls succeed
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
       };
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
@@ -570,6 +634,8 @@ describe('SessionService', () => {
           .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check fails
           .mockResolvedValue({ success: true, exitCode: 0 }), // subsequent calls succeed
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
       };
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
@@ -633,6 +699,8 @@ describe('SessionService', () => {
           .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' }) // repo check fails
           .mockResolvedValue({ success: true, exitCode: 0 }), // subsequent calls succeed
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
       };
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
@@ -727,19 +795,19 @@ describe('SessionService', () => {
       ).rejects.toThrow('workspace is missing and metadata could not be retrieved');
     });
 
-    it('should load repo metadata even when restore fails but workspace exists', async () => {
+    it('restores session snapshot before reclone when workspace is missing', async () => {
       const mockDOGetMetadata = vi.fn();
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: 'exists' }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-      };
-      const sandbox = {
-        createSession: vi.fn().mockResolvedValue(fakeSession),
-        mkdir: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-
-      const testEnv = {
+      const payload = JSON.stringify({ info: {}, messages: [] });
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: vi.fn().mockResolvedValue(payload),
+      });
+      const envWithIngest: PersistenceEnv = {
         ...mockEnv,
+        SESSION_INGEST: {
+          fetch: fetchMock,
+        } as unknown as PersistenceEnv['SESSION_INGEST'],
         CLOUD_AGENT_SESSION: {
           idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
           get: vi.fn(() => ({
@@ -749,6 +817,19 @@ describe('SessionService', () => {
           })),
         } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
       };
+      const fakeSession = {
+        exec: vi
+          .fn()
+          .mockResolvedValueOnce({ success: true, exitCode: 1, stdout: '', stderr: '' })
+          .mockResolvedValue({ success: true, exitCode: 0, stdout: '', stderr: '' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandbox = {
+        createSession: vi.fn().mockResolvedValue(fakeSession),
+        mkdir: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
 
       const metadata = {
         version: 123456789,
@@ -770,12 +851,29 @@ describe('SessionService', () => {
         sessionId,
         kilocodeToken: 'test-token',
         kilocodeModel: 'test-model',
-        env: testEnv,
+        env: envWithIngest,
       });
 
+      expect(fetchMock).toHaveBeenCalledWith(
+        `https://session-ingest/api/session/${sessionId}/export`,
+        {
+          headers: {
+            Authorization: 'Bearer test-token',
+          },
+        }
+      );
+      expect(fakeSession.writeFile).toHaveBeenCalledWith(
+        `/tmp/kilo-session-export-${sessionId}.json`,
+        payload
+      );
+      expect(fakeSession.exec).toHaveBeenCalledWith(
+        `kilo import "/tmp/kilo-session-export-${sessionId}.json"`
+      );
+      expect(fakeSession.deleteFile).toHaveBeenCalledWith(
+        `/tmp/kilo-session-export-${sessionId}.json`
+      );
       expect(result.context.githubRepo).toBe('facebook/react');
       expect(result.context.githubToken).toBe('test-token');
-      expect(mockCloneGitHubRepo).not.toHaveBeenCalled();
     });
   });
 
@@ -1158,6 +1256,7 @@ describe('SessionService', () => {
 
       const execResults = [
         { success: true, exitCode: 0, stdout: '' }, // repo check - repo doesn't exist
+        { success: true, exitCode: 0, stdout: '' }, // kilo import succeeds
         { success: true, exitCode: 0, stdout: 'command 1 ok', stderr: '' }, // npm install
         { success: false, exitCode: 1, stdout: '', stderr: 'command 2 failed' }, // npm run build fails
         { success: true, exitCode: 0, stdout: 'command 3 ok', stderr: '' }, // npm test
@@ -1169,8 +1268,11 @@ describe('SessionService', () => {
           .mockResolvedValueOnce(execResults[0])
           .mockResolvedValueOnce(execResults[1])
           .mockResolvedValueOnce(execResults[2])
-          .mockResolvedValueOnce(execResults[3]),
+          .mockResolvedValueOnce(execResults[3])
+          .mockResolvedValueOnce(execResults[4]),
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
       };
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
@@ -1193,16 +1295,16 @@ describe('SessionService', () => {
       });
 
       // All three setup commands should be executed (after the initial repo check)
-      expect(fakeSession.exec).toHaveBeenCalledTimes(4); // 1 repo check + 3 setup commands
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(2, 'npm install', {
+      expect(fakeSession.exec).toHaveBeenCalledTimes(5); // 1 repo check + 1 import + 3 setup commands
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(3, 'npm install', {
         cwd: `/workspace/org/user/sessions/${sessionId}`,
         timeout: 120000,
       });
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(3, 'npm run build', {
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(4, 'npm run build', {
         cwd: `/workspace/org/user/sessions/${sessionId}`,
         timeout: 120000,
       });
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(4, 'npm test', {
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(5, 'npm test', {
         cwd: `/workspace/org/user/sessions/${sessionId}`,
         timeout: 120000,
       });
@@ -1787,6 +1889,8 @@ describe('SessionService', () => {
       const fakeSession = {
         exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '' }), // repo doesn't exist
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
       };
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
@@ -1835,6 +1939,8 @@ describe('SessionService', () => {
       const fakeSession = {
         exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '' }), // repo doesn't exist
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
       };
       const sandboxExec = vi.fn().mockResolvedValue({ exitCode: 0 });
       const sandboxWriteFile = vi.fn().mockResolvedValue(undefined);
@@ -1937,6 +2043,8 @@ describe('SessionService', () => {
       const fakeSession = {
         exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0, stdout: '' }), // repo doesn't exist
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
       };
       const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
       const sandboxExec = vi.fn().mockResolvedValue({ exitCode: 0 });

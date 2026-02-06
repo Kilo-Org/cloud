@@ -86,6 +86,8 @@ export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
+  /** Service binding for the session ingest worker */
+  SESSION_INGEST: Fetcher;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** KV namespace for caching GitHub installation tokens */

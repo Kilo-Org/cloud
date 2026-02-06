@@ -68,7 +68,12 @@
    * Service Bindings (communicate between multiple Workers)
    * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
    */
-  // "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
+  "services": [
+    {
+      "binding": "SESSION_INGEST",
+      "service": "session-ingest",
+    },
+  ],
   /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
@@ -217,6 +222,12 @@
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://192.168.200.174:3000",
       },
+      "services": [
+        {
+          "binding": "SESSION_INGEST",
+          "service": "session-ingest",
+        },
+      ],
       "r2_buckets": [
         {
           "binding": "R2_BUCKET",

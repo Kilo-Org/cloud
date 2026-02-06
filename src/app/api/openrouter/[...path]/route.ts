@@ -212,8 +212,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId
   );
 
-  const toolsAvailable = getToolsAvailable(requestBodyParsed.tools);
-  const toolsUsed = getToolsUsed(requestBodyParsed.messages);
   console.debug(`Routing request to ${provider.id}`);
 
   // Fire-and-forget abuse classification as early as possible
@@ -352,6 +350,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (ENABLE_TOOL_REPAIR) {
     repairTools(requestBodyParsed);
   }
+
+  const toolsAvailable = getToolsAvailable(requestBodyParsed.tools);
+  const toolsUsed = getToolsUsed(requestBodyParsed.messages);
 
   const extraHeaders: Record<string, string> = {};
   applyProviderSpecificLogic(

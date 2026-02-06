@@ -62,12 +62,12 @@ export function getToolsAvailable(
 
   return tools.map((tool): string => {
     if (tool.type === 'function') {
-      const toolName = tool.function.name.trim();
+      const toolName = typeof tool.function?.name === 'string' ? tool.function.name.trim() : '';
       return toolName ? `function:${toolName}` : 'function:unknown';
     }
 
     if (tool.type === 'custom') {
-      const toolName = tool.custom.name.trim();
+      const toolName = typeof tool.custom?.name === 'string' ? tool.custom.name.trim() : '';
       return toolName ? `custom:${toolName}` : 'custom:unknown';
     }
 
@@ -87,13 +87,15 @@ export function getToolsUsed(
 
     for (const toolCall of message.tool_calls ?? []) {
       if (toolCall.type === 'function') {
-        const toolName = toolCall.function.name.trim();
+        const toolName =
+          typeof toolCall.function?.name === 'string' ? toolCall.function.name.trim() : '';
         used.push(toolName ? `function:${toolName}` : 'function:unknown');
         continue;
       }
 
       if (toolCall.type === 'custom') {
-        const toolName = toolCall.custom.name.trim();
+        const toolName =
+          typeof toolCall.custom?.name === 'string' ? toolCall.custom.name.trim() : '';
         used.push(toolName ? `custom:${toolName}` : 'custom:unknown');
         continue;
       }

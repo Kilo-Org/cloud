@@ -50,26 +50,31 @@ import {
 import { checkFreeModelRateLimit, logFreeModelRequest } from '@/lib/free-model-rate-limiter';
 import { classifyAbuse } from '@/lib/abuse-service';
 import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
+import {
+  emitApiMetricsForResponse,
+  getToolsAvailable,
+  getToolsUsed,
+} from '@/lib/o11y/api-metrics.server';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
-const OPUS = 'anthropic/claude-opus-4.5';
+const OPUS = 'anthropic/claude-opus-4.6';
 const SONNET = 'anthropic/claude-sonnet-4.5';
 
 // Mode → model mappings for kilo/auto routing.
 // Add/remove/modify entries here to change routing behavior.
 const MODE_TO_MODEL = new Map<string, string>([
-  // Opus modes (planning, reasoning, orchestration)
+  // Opus modes (planning, reasoning, orchestration, debugging)
   ['plan', OPUS],
   ['general', OPUS],
   ['architect', OPUS],
   ['orchestrator', OPUS],
   ['ask', OPUS],
-  // Sonnet modes (implementation, exploration, debugging)
+  ['debug', OPUS],
+  // Sonnet modes (implementation, exploration)
   ['build', SONNET],
   ['explore', SONNET],
   ['code', SONNET],
-  ['debug', SONNET],
 ]);
 
 const DEFAULT_AUTO_MODEL = SONNET;
@@ -118,7 +123,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
-  const requestedAutoModel = requestBodyParsed.model.trim().toLowerCase() === KILO_AUTO_MODEL_ID;
+  const requestedModel = requestBodyParsed.model.trim();
+  const requestedModelLowerCased = requestedModel.toLowerCase();
+
+  const requestedAutoModel = requestedModelLowerCased === KILO_AUTO_MODEL_ID;
 
   // "kilo/auto" is a quasi-model id that resolves to a real model based on x-kilocode-mode.
   // After this resolution, the rest of the proxy flow behaves as if the client requested
@@ -203,6 +211,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     organizationId,
     taskId
   );
+
   console.debug(`Routing request to ${provider.id}`);
 
   // Start abuse classification early (non-blocking) - we'll await it before creating usage context
@@ -332,6 +341,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     repairTools(requestBodyParsed);
   }
 
+  const toolsAvailable = getToolsAvailable(requestBodyParsed.tools);
+  const toolsUsed = getToolsUsed(requestBodyParsed.messages);
+
   const extraHeaders: Record<string, string> = {};
   applyProviderSpecificLogic(
     provider,
@@ -350,6 +362,28 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider,
     signal: request.signal,
   });
+  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+
+  emitApiMetricsForResponse(
+    {
+      kiloUserId: user.id,
+      organizationId,
+      isAnonymous: isAnonymousContext(user),
+      isStreaming: requestBodyParsed.stream === true,
+      userByok: !!userByok,
+      mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
+      provider: provider.id,
+      requestedModel: requestedModelLowerCased,
+      resolvedModel: requestBodyParsed.model.toLowerCase(),
+      toolsAvailable,
+      toolsUsed,
+      ttfbMs,
+      statusCode: response.status,
+      ipAddress,
+    },
+    response.clone(),
+    requestStartedAt
+  );
   usageContext.status_code = response.status;
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.

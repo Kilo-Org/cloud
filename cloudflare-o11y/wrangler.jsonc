@@ -1,0 +1,73 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "o11y",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-02-01",
+	"observability": {
+		"enabled": true,
+	},
+	"compatibility_flags": ["nodejs_compat"],
+	/**
+	 * Smart Placement
+	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
+	 */
+	"placement": { "mode": "smart" },
+	"routes": [
+		{
+			"pattern": "o11y.kiloapps.io",
+			"custom_domain": true,
+		},
+	],
+	/**
+	 * Cron Triggers — run alert evaluation every minute
+	 * https://developers.cloudflare.com/workers/configuration/cron-triggers/
+	 */
+	"triggers": {
+		"crons": ["* * * * *"],
+	},
+	/**
+	 * Analytics Engine — time-series storage for API metrics used by alerting
+	 * https://developers.cloudflare.com/analytics/analytics-engine/get-started/
+	 */
+	"analytics_engine_datasets": [{ "binding": "O11Y_API_METRICS", "dataset": "o11y_api_metrics" }],
+	/**
+	 * KV Namespace — stores alert dedup state and cached recommended models
+	 */
+	"kv_namespaces": [{ "binding": "O11Y_ALERT_STATE", "id": "aef43060c5334b9995450a780eea94fb" }],
+	"vars": {
+		"POSTHOG_API_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
+		"POSTHOG_HOST": "https://us.i.posthog.com",
+		"O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+		"O11Y_API_BASE_URL": "https://api.kilo.ai",
+	},
+	/**
+	 * Secrets Store
+	 * https://developers.cloudflare.com/workers/configuration/secrets/#secrets-store
+	 */
+	"secrets_store_secrets": [
+		{
+			"binding": "O11Y_KILO_GATEWAY_CLIENT_SECRET",
+			"store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+			"secret_name": "O11Y_KILO_GATEWAY_CLIENT_SECRET",
+		},
+		{
+			"binding": "O11Y_CF_AE_API_TOKEN",
+			"store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+			"secret_name": "O11Y_CF_AE_API_TOKEN",
+		},
+		{
+			"binding": "O11Y_SLACK_WEBHOOK_PAGE",
+			"store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+			"secret_name": "O11Y_SLACK_WEBHOOK_PAGE",
+		},
+		{
+			"binding": "O11Y_SLACK_WEBHOOK_TICKET",
+			"store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+			"secret_name": "O11Y_SLACK_WEBHOOK_TICKET",
+		},
+	],
+}

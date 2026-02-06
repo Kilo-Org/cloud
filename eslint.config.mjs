@@ -22,7 +22,13 @@ export default defineConfig([
   eslintPluginNext.flatConfig.coreWebVitals,
   ...tanstackQueryPlugin.configs['flat/recommended'],
   {
-    ignores: ['.next/**', 'node_modules/**', 'build/**', 'supabase/functions/**'],
+    ignores: [
+      '.next/**',
+      'node_modules/**',
+      'build/**',
+      'supabase/functions/**',
+      'src/types/opencode.gen.ts',
+    ],
   },
   {
     files: ['**/*.ts', '**/*.tsx'],

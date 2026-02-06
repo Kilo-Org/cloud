@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
 
 import { Button } from '@/components/ui/button';
+import { CopyTextButton } from '@/components/admin/CopyEmailButton';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +42,8 @@ import {
 type WebhookRequestsContentProps = {
   params: Promise<{ triggerId: string }>;
   organizationId?: string;
+  adminPathBase?: string;
+  adminUserId?: string;
 };
 
 type RequestStatus = 'captured' | 'inprogress' | 'success' | 'failed';
@@ -98,7 +101,24 @@ function formatTimestamp(isoString: string): { absolute: string; relative: strin
   };
 }
 
-export function WebhookRequestsContent({ params, organizationId }: WebhookRequestsContentProps) {
+function maskHeaderValue(value: string): string {
+  if (!value) return '';
+  if (value.length <= 4) return '****';
+  return `${'*'.repeat(Math.min(value.length, 8))}`;
+}
+
+function maskHeaders(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [key, maskHeaderValue(value)])
+  );
+}
+
+export function WebhookRequestsContent({
+  params,
+  organizationId,
+  adminPathBase,
+  adminUserId,
+}: WebhookRequestsContentProps) {
   const { triggerId } = use(params);
   const trpc = useTRPC();
 
@@ -108,6 +128,43 @@ export function WebhookRequestsContent({ params, organizationId }: WebhookReques
 
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
+  const isAdminView = !!adminPathBase;
+  const adminRoutes = adminPathBase
+    ? {
+        list: adminPathBase,
+        edit: `${adminPathBase}/${triggerId}`,
+      }
+    : null;
+  const listHref = adminRoutes?.list ?? routes.list;
+  const editHref = adminRoutes?.edit ?? routes.edit(triggerId);
+
+  // Resolve admin scope — org or user, null when not in admin view.
+  // If admin view is active but neither ID is provided (should be impossible given
+  // caller constraints), adminScope stays null and the non-admin query paths run
+  // instead, which will surface a proper tRPC error in the existing error UI.
+  const adminScope = !isAdminView
+    ? null
+    : organizationId
+      ? ({ scope: 'organization', organizationId } as const)
+      : adminUserId
+        ? ({ scope: 'user', userId: adminUserId } as const)
+        : null;
+
+  if (isAdminView && !adminScope) {
+    return (
+      <div className="rounded-lg border p-6">
+        <h2 className="text-lg font-semibold">Admin context missing</h2>
+        <p className="text-muted-foreground mt-2">
+          This page requires either an organization or user scope.
+        </p>
+        {adminPathBase && (
+          <Button asChild className="mt-4" variant="outline" size="sm">
+            <Link href={adminPathBase}>Back to admin list</Link>
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   // Fetch trigger data to get the inbound URL
   const {
@@ -115,10 +172,12 @@ export function WebhookRequestsContent({ params, organizationId }: WebhookReques
     isLoading: isLoadingTrigger,
     error: triggerError,
   } = useQuery(
-    trpc.webhookTriggers.get.queryOptions({
-      triggerId,
-      organizationId: organizationId ?? undefined,
-    })
+    adminScope
+      ? trpc.admin.webhookTriggers.get.queryOptions({ ...adminScope, triggerId })
+      : trpc.webhookTriggers.get.queryOptions({
+          triggerId,
+          organizationId: organizationId ?? undefined,
+        })
   );
 
   // Fetch requests with auto-refresh every 10 seconds
@@ -129,11 +188,17 @@ export function WebhookRequestsContent({ params, organizationId }: WebhookReques
     error: requestsError,
     refetch: refetchRequests,
   } = useQuery({
-    ...trpc.webhookTriggers.listRequests.queryOptions({
-      triggerId,
-      organizationId: organizationId ?? undefined,
-      limit: 50,
-    }),
+    ...(adminScope
+      ? trpc.admin.webhookTriggers.listRequests.queryOptions({
+          ...adminScope,
+          triggerId,
+          limit: 50,
+        })
+      : trpc.webhookTriggers.listRequests.queryOptions({
+          triggerId,
+          organizationId: organizationId ?? undefined,
+          limit: 50,
+        })),
     refetchOnMount: 'always', // Always fetch fresh data on navigation
     refetchInterval: 10000, // Auto-refresh every 10 seconds
   });
@@ -216,7 +281,7 @@ export function WebhookRequestsContent({ params, organizationId }: WebhookReques
         <div className="mb-6">
           <div className="mb-4">
             <Button variant="ghost" size="sm" asChild>
-              <Link href={routes.list}>
+              <Link href={listHref}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Webhook Triggers
               </Link>
@@ -237,7 +302,7 @@ export function WebhookRequestsContent({ params, organizationId }: WebhookReques
           </CardHeader>
           <CardContent>
             <Button variant="outline" asChild>
-              <Link href={routes.list}>
+              <Link href={listHref}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to List
               </Link>
@@ -254,7 +319,7 @@ export function WebhookRequestsContent({ params, organizationId }: WebhookReques
       <div className="mb-6">
         <div className="mb-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href={routes.edit(triggerId)}>
+            <Link href={editHref}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Trigger
             </Link>
@@ -414,6 +479,28 @@ export function WebhookRequestsContent({ params, organizationId }: WebhookReques
                         {request.kiloSessionId ? (
                           (() => {
                             const sessionId = request.kiloSessionId;
+                            if (isAdminView) {
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto p-0"
+                                    asChild
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    <Link href={`/admin/session-traces?sessionId=${sessionId}`}>
+                                      <ExternalLink className="mr-1 h-3 w-3" />
+                                      {shortId(sessionId)}
+                                    </Link>
+                                  </Button>
+                                  <span onClick={e => e.stopPropagation()}>
+                                    <CopyTextButton text={sessionId} />
+                                  </span>
+                                </div>
+                              );
+                            }
+
                             return organizationId ? (
                               // Org context: show share button (bot sessions aren't directly accessible)
                               <Button
@@ -472,27 +559,40 @@ export function WebhookRequestsContent({ params, organizationId }: WebhookReques
                             <div>
                               <p className="mb-2 text-sm font-medium">Headers</p>
                               <pre className="bg-muted max-h-48 overflow-auto rounded-md p-3 text-xs">
-                                <code>{JSON.stringify(request.headers, null, 2)}</code>
+                                <code>
+                                  {JSON.stringify(
+                                    isAdminView ? maskHeaders(request.headers) : request.headers,
+                                    null,
+                                    2
+                                  )}
+                                </code>
                               </pre>
                             </div>
 
                             {/* Body */}
                             <div>
                               <p className="mb-2 text-sm font-medium">Body</p>
-                              <pre className="bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs">
-                                <code>
-                                  {(() => {
-                                    try {
-                                      // Try to parse and format JSON
-                                      const parsed = JSON.parse(request.body);
-                                      return JSON.stringify(parsed, null, 2);
-                                    } catch {
-                                      // Show raw text if not JSON
-                                      return request.body || '(empty)';
-                                    }
-                                  })()}
-                                </code>
-                              </pre>
+                              {isAdminView ? (
+                                <p className="text-muted-foreground text-xs">
+                                  Payload body length:{' '}
+                                  {new TextEncoder().encode(request.body).byteLength} bytes
+                                </p>
+                              ) : (
+                                <pre className="bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs">
+                                  <code>
+                                    {(() => {
+                                      try {
+                                        // Try to parse and format JSON
+                                        const parsed = JSON.parse(request.body);
+                                        return JSON.stringify(parsed, null, 2);
+                                      } catch {
+                                        // Show raw text if not JSON
+                                        return request.body || '(empty)';
+                                      }
+                                    })()}
+                                  </code>
+                                </pre>
+                              )}
                             </div>
                           </div>
                         </TableCell>

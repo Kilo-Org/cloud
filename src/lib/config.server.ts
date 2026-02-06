@@ -147,3 +147,7 @@ export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_U
 export const GOOGLE_WEB_RISK_API_KEY = getEnvVariable('GOOGLE_WEB_RISK_API_KEY');
 
 export const CREDIT_CATEGORIES_ENCRYPTION_KEY = getEnvVariable('CREDIT_CATEGORIES_ENCRYPTION_KEY');
+
+// Agent observability ingest service
+export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
+export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');

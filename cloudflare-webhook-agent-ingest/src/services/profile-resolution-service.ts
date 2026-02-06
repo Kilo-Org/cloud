@@ -15,18 +15,8 @@ type ResolveProfileParams = {
   orgId?: string | null;
 };
 
-// Singleton instance for connection pooling
-let singleton: ProfileResolutionService | null = null;
-
-/**
- * Get or create the singleton ProfileResolutionService instance.
- * This ensures we reuse the database connection pool across messages.
- */
 export function getProfileResolutionService(env: ProfileResolutionEnv): ProfileResolutionService {
-  if (!singleton) {
-    singleton = new ProfileResolutionService(env);
-  }
-  return singleton;
+  return new ProfileResolutionService(env);
 }
 
 /**

@@ -28,8 +28,8 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
 		O11Y_KILO_GATEWAY_CLIENT_SECRET: {
 			get: async () => TEST_CLIENT_SECRET,
 		} as SecretsStoreSecret,
-		POSTHOG_API_KEY: 'phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z',
-		POSTHOG_HOST: 'https://us.i.posthog.com',
+		POSTHOG_API_KEY: 'phk_test_fake_key' as never,
+		POSTHOG_HOST: 'http://localhost:0' as never,
 		O11Y_API_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_SESSION_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_ALERT_STATE: makeKvMock(),

@@ -98,12 +98,18 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   async ingest(
     payload: IngestBatch,
-    clientIp: string | null
+    clientIp: string | null,
+    kiloUserId: string,
+    sessionId: string
   ): Promise<{
     changes: Changes;
     hasSessionClose: boolean;
   }> {
     this.initSchema();
+
+    // Persist identity so alarm() can recover kiloUserId/sessionId after hibernation
+    writeIngestMetaIfChanged(this.sql, { key: 'kiloUserId', incomingValue: kiloUserId });
+    writeIngestMetaIfChanged(this.sql, { key: 'sessionId', incomingValue: sessionId });
 
     const incomingByKey: Record<IngestMetaKey, string | null | undefined> = {
       title: undefined,
@@ -285,15 +291,19 @@ export class SessionIngestDO extends DurableObject<Env> {
    * Emit metrics with 'abandoned' reason as fallback.
    */
   async alarm(): Promise<void> {
-    // The alarm fires for abandoned sessions. Extract the user/session IDs from the DO name.
-    const doName = this.ctx.id.name;
-    if (!doName) return;
+    this.initSchema();
 
-    const slashIdx = doName.indexOf('/');
-    if (slashIdx < 0) return;
+    const metaRows = this.sql
+      .exec<{
+        key: string;
+        value: string | null;
+      }>(`SELECT key, value FROM ingest_meta WHERE key IN ('kiloUserId', 'sessionId')`)
+      .toArray();
 
-    const kiloUserId = doName.slice(0, slashIdx);
-    const sessionId = doName.slice(slashIdx + 1);
+    const meta = Object.fromEntries(metaRows.map(r => [r.key, r.value]));
+    const kiloUserId = meta['kiloUserId'];
+    const sessionId = meta['sessionId'];
+
     if (!kiloUserId || !sessionId) return;
 
     try {

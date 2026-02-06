@@ -210,7 +210,7 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
   for (const chunk of split.chunks) {
     const ingestResult = await withDORetry(
       () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-      stub => stub.ingest(chunk, clientIp),
+      stub => stub.ingest(chunk, clientIp, kiloUserId, parsed.data),
       'SessionIngestDO.ingest'
     );
 

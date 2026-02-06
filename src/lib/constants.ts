@@ -38,6 +38,9 @@ export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 
 // Cloud Agent WebSocket URL (client-side, inlined at build time)
 export const CLOUD_AGENT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_WS_URL ?? '';
+// Cloud Agent Next WebSocket URL (client-side, inlined at build time)
+// Separate URL for the new cloud-agent-next implementation
+export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL ?? '';
 
 // Free model rate limits (applies to both anonymous and authenticated users)
 export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;

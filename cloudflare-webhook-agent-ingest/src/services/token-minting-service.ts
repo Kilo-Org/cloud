@@ -27,18 +27,8 @@ type MintTokenResult = {
 // Fixed botId for webhook tokens - used for attribution/analytics
 const WEBHOOK_BOT_ID = 'webhook-bot';
 
-// Singleton instance for connection pooling
-let singleton: TokenMintingService | null = null;
-
-/**
- * Get or create the singleton TokenMintingService instance.
- * This ensures we reuse the database connection pool across messages.
- */
 export function getTokenMintingService(env: TokenMintingEnv): TokenMintingService {
-  if (!singleton) {
-    singleton = new TokenMintingService(env);
-  }
-  return singleton;
+  return new TokenMintingService(env);
 }
 
 /**

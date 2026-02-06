@@ -66,51 +66,57 @@ describe('dedup', () => {
 	});
 
 	it('does not suppress when no prior alert exists', async () => {
-		const result = await shouldSuppress(kv, 'page', 'error_rate', 'openai', 'gpt-4');
+		const result = await shouldSuppress(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
 		expect(result).toBe(false);
 	});
 
 	it('suppresses when a prior alert exists', async () => {
-		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4');
-		const result = await shouldSuppress(kv, 'page', 'error_rate', 'openai', 'gpt-4');
+		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+		const result = await shouldSuppress(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
 		expect(result).toBe(true);
 	});
 
 	it('does not suppress a different dimension', async () => {
-		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4');
-		const result = await shouldSuppress(kv, 'page', 'error_rate', 'anthropic', 'claude-sonnet-4.5');
+		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+		const result = await shouldSuppress(kv, 'page', 'error_rate', 'anthropic', 'claude-sonnet-4.5', 'kilo-gateway');
+		expect(result).toBe(false);
+	});
+
+	it('does not suppress a different client for the same provider:model', async () => {
+		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+		const result = await shouldSuppress(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'other-client');
 		expect(result).toBe(false);
 	});
 
 	it('page suppresses ticket for the same dimension', async () => {
-		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4');
-		const result = await shouldSuppress(kv, 'ticket', 'error_rate', 'openai', 'gpt-4');
+		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+		const result = await shouldSuppress(kv, 'ticket', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
 		expect(result).toBe(true);
 	});
 
 	it('ticket does not suppress page', async () => {
-		await recordAlertFired(kv, 'ticket', 'error_rate', 'openai', 'gpt-4');
-		const result = await shouldSuppress(kv, 'page', 'error_rate', 'openai', 'gpt-4');
+		await recordAlertFired(kv, 'ticket', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+		const result = await shouldSuppress(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
 		expect(result).toBe(false);
 	});
 
 	it('records alert with TTL', async () => {
-		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4');
-		expect(putSpy).toHaveBeenCalledWith('o11y:alert:page:error_rate:openai:gpt-4', expect.any(String), {
+		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+		expect(putSpy).toHaveBeenCalledWith('o11y:alert:page:error_rate:openai:gpt-4:kilo-gateway', expect.any(String), {
 			expirationTtl: 15 * 60,
 		});
 	});
 
 	it('ticket cooldown is 4 hours', async () => {
-		await recordAlertFired(kv, 'ticket', 'error_rate', 'openai', 'gpt-4');
-		expect(putSpy).toHaveBeenCalledWith('o11y:alert:ticket:error_rate:openai:gpt-4', expect.any(String), {
+		await recordAlertFired(kv, 'ticket', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+		expect(putSpy).toHaveBeenCalledWith('o11y:alert:ticket:error_rate:openai:gpt-4:kilo-gateway', expect.any(String), {
 			expirationTtl: 4 * 60 * 60,
 		});
 	});
 
 	it('different alert types are independent', async () => {
-		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4');
-		const result = await shouldSuppress(kv, 'page', 'latency_p50', 'openai', 'gpt-4');
+		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+		const result = await shouldSuppress(kv, 'page', 'latency_p50', 'openai', 'gpt-4', 'kilo-gateway');
 		expect(result).toBe(false);
 	});
 });

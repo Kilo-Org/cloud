@@ -14,6 +14,7 @@ packages:
   - 'cloudflare-db-proxy'
   - 'cloudflare-webhook-agent-ingest'
   - 'cloudflare-session-ingest'
+  - 'cloudflare-o11y'
 
 ignoredBuiltDependencies:
   - '@sentry/cli'

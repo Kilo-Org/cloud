@@ -9,8 +9,8 @@
 import type { AlertSeverity } from './slo-config';
 import { PAGE_COOLDOWN_SECONDS, TICKET_COOLDOWN_SECONDS } from './slo-config';
 
-function alertKey(severity: AlertSeverity, alertType: string, provider: string, model: string): string {
-	return `o11y:alert:${severity}:${alertType}:${provider}:${model}`;
+function alertKey(severity: AlertSeverity, alertType: string, provider: string, model: string, clientName: string): string {
+	return `o11y:alert:${severity}:${alertType}:${provider}:${model}:${clientName}`;
 }
 
 function cooldownForSeverity(severity: AlertSeverity): number {
@@ -29,15 +29,16 @@ export async function shouldSuppress(
 	alertType: string,
 	provider: string,
 	model: string,
+	clientName: string,
 ): Promise<boolean> {
-	const key = alertKey(severity, alertType, provider, model);
+	const key = alertKey(severity, alertType, provider, model, clientName);
 	const existing = await kv.get(key);
 	if (existing) return true;
 
 	// If this is a ticket, also check if a page-level alert is active
 	// (page suppresses ticket for the same dimension).
 	if (severity === 'ticket') {
-		const pageKey = alertKey('page', alertType, provider, model);
+		const pageKey = alertKey('page', alertType, provider, model, clientName);
 		const pageExisting = await kv.get(pageKey);
 		if (pageExisting) return true;
 	}
@@ -54,7 +55,8 @@ export async function recordAlertFired(
 	alertType: string,
 	provider: string,
 	model: string,
+	clientName: string,
 ): Promise<void> {
-	const key = alertKey(severity, alertType, provider, model);
+	const key = alertKey(severity, alertType, provider, model, clientName);
 	await kv.put(key, String(Date.now()), { expirationTtl: cooldownForSeverity(severity) });
 }

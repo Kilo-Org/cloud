@@ -43,12 +43,7 @@ function rowsToMap<T extends { provider: string; model: string; client_name: str
  * Pages are only for recommended models on kilo-gateway.
  * Everything else is a ticket at most.
  */
-function effectiveSeverity(
-	baseSeverity: AlertSeverity,
-	clientName: string,
-	model: string,
-	recommendedModels: Set<string>,
-): AlertSeverity | null {
+function effectiveSeverity(baseSeverity: AlertSeverity, clientName: string, model: string, recommendedModels: Set<string>): AlertSeverity {
 	if (baseSeverity === 'page') {
 		if (clientName === 'kilo-gateway' && recommendedModels.has(model)) {
 			return 'page';
@@ -93,9 +88,15 @@ async function evaluateErrorRateWindow(window: BurnRateWindow, recommendedModels
 
 		// Both windows tripped — determine severity and fire
 		const severity = effectiveSeverity(window.severity, longRow.client_name, longRow.model, recommendedModels);
-		if (!severity) continue;
 
-		const suppressed = await shouldSuppress(env.O11Y_ALERT_STATE, severity, 'error_rate', longRow.provider, longRow.model);
+		const suppressed = await shouldSuppress(
+			env.O11Y_ALERT_STATE,
+			severity,
+			'error_rate',
+			longRow.provider,
+			longRow.model,
+			longRow.client_name,
+		);
 		if (suppressed) continue;
 
 		const longErrorRate = longRow.weighted_errors / longRow.weighted_total;
@@ -116,7 +117,7 @@ async function evaluateErrorRateWindow(window: BurnRateWindow, recommendedModels
 		};
 
 		await sendAlertNotification(alert, env);
-		await recordAlertFired(env.O11Y_ALERT_STATE, severity, 'error_rate', longRow.provider, longRow.model);
+		await recordAlertFired(env.O11Y_ALERT_STATE, severity, 'error_rate', longRow.provider, longRow.model, longRow.client_name);
 	}
 }
 
@@ -159,9 +160,15 @@ async function evaluateLatencyWindow(
 		if (shortBurnRate < window.burnRate) continue;
 
 		const severity = effectiveSeverity(window.severity, longRow.client_name, longRow.model, recommendedModels);
-		if (!severity) continue;
 
-		const suppressed = await shouldSuppress(env.O11Y_ALERT_STATE, severity, alertType, longRow.provider, longRow.model);
+		const suppressed = await shouldSuppress(
+			env.O11Y_ALERT_STATE,
+			severity,
+			alertType,
+			longRow.provider,
+			longRow.model,
+			longRow.client_name,
+		);
 		if (suppressed) continue;
 
 		const longSlowFraction = longRow.weighted_slow / longRow.weighted_total;
@@ -182,7 +189,7 @@ async function evaluateLatencyWindow(
 		};
 
 		await sendAlertNotification(alert, env);
-		await recordAlertFired(env.O11Y_ALERT_STATE, severity, alertType, longRow.provider, longRow.model);
+		await recordAlertFired(env.O11Y_ALERT_STATE, severity, alertType, longRow.provider, longRow.model, longRow.client_name);
 	}
 }
 

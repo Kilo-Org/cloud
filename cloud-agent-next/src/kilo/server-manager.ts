@@ -279,13 +279,14 @@ export async function ensureKiloServer(
   for (let attempt = 0; attempt < MAX_PORT_RETRY_ATTEMPTS; attempt++) {
     const port = await findAvailablePort(sandbox, sessionId);
     const command = buildKiloServeCommand(sessionId, port);
+    let proc: Process | undefined;
 
     logger
       .withFields({ sessionId, port, attempt: attempt + 1, command })
       .info('Starting new kilo server');
 
     try {
-      const proc = await session.startProcess(command, {
+      proc = await session.startProcess(command, {
         cwd: workspacePath,
       });
 
@@ -302,6 +303,22 @@ export async function ensureKiloServer(
       return port;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      let stderr: string | undefined;
+      let stdout: string | undefined;
+      if (proc) {
+        try {
+          const logs = await proc.getLogs();
+          stdout = logs.stdout;
+          stderr = logs.stderr;
+        } catch (logError) {
+          logger.debug('Failed to read kilo server process logs', {
+            sessionId,
+            port,
+            processId: proc.id,
+            error: logError instanceof Error ? logError.message : String(logError),
+          });
+        }
+      }
 
       // Check if this might be a port collision (race condition)
       // Another session may have grabbed the port between our check and bind
@@ -325,6 +342,8 @@ export async function ensureKiloServer(
           port,
           attempt: attempt + 1,
           error: lastError.message,
+          stdout,
+          stderr,
         })
         .error('Failed to start kilo server');
     }

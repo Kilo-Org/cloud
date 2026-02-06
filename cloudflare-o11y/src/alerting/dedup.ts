@@ -58,5 +58,5 @@ export async function recordAlertFired(
 	clientName: string,
 ): Promise<void> {
 	const key = alertKey(severity, alertType, provider, model, clientName);
-	await kv.put(key, String(Date.now()), { expirationTtl: cooldownForSeverity(severity) });
+	await kv.put(key, new Date().toISOString(), { expirationTtl: cooldownForSeverity(severity) });
 }

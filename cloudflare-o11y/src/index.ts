@@ -43,7 +43,7 @@ app.post('/ingest/api-metrics', zodJsonValidator(ApiMetricsParamsSchema), async 
 
 	const clientName = await getClientName(params.clientSecret, c.env);
 	if (!clientName) {
-		return c.json({ success: false, error: 'Unknown clientSecret' }, 403);
+		return c.json({ success: false, error: 'Authentication failed' }, 403);
 	}
 
 	c.executionCtx.waitUntil(captureApiMetrics(params, clientName, c.env));

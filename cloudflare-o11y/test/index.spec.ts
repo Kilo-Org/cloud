@@ -1,6 +1,6 @@
 import { createExecutionContext, waitOnExecutionContext, SELF } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
-import worker from '../src/index';
+import Worker from '../src/index';
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
@@ -31,6 +31,7 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
 		POSTHOG_API_KEY: 'phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z',
 		POSTHOG_HOST: 'https://us.i.posthog.com',
 		O11Y_API_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
+		O11Y_SESSION_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_ALERT_STATE: makeKvMock(),
 		O11Y_CF_ACCOUNT_ID: 'test-account-id' as never,
 		O11Y_API_BASE_URL: 'https://api.kilo.ai',
@@ -69,11 +70,17 @@ function makeValidApiMetricsBody(overrides?: Record<string, unknown>) {
 	};
 }
 
+/** Helper to invoke the worker's fetch handler with a given env (unit-style). */
+async function workerFetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	const instance = new Worker(ctx, env);
+	return instance.fetch(request);
+}
+
 describe('o11y worker', () => {
 	it('responds with Hello World! (unit style)', async () => {
 		const request = new IncomingRequest('http://example.com');
 		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, makeTestEnv(), ctx);
+		const response = await workerFetch(request, makeTestEnv(), ctx);
 		await waitOnExecutionContext(ctx);
 		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
 	});
@@ -91,7 +98,7 @@ describe('o11y worker', () => {
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 429 })),
 		});
 
-		const response = await worker.fetch(request, env, createExecutionContext());
+		const response = await workerFetch(request, env, createExecutionContext());
 		expect(response.status).toBe(204);
 	});
 
@@ -105,7 +112,7 @@ describe('o11y worker', () => {
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 200 })),
 		});
 
-		await worker.fetch(request, env, createExecutionContext());
+		await workerFetch(request, env, createExecutionContext());
 
 		expect(aeSpy.writeDataPoint).toHaveBeenCalledOnce();
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
@@ -124,7 +131,7 @@ describe('o11y worker', () => {
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 500 })),
 		});
 
-		await worker.fetch(request, env, createExecutionContext());
+		await workerFetch(request, env, createExecutionContext());
 
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
 		expect(call.blobs[3]).toBe('1'); // isError
@@ -138,7 +145,7 @@ describe('o11y worker', () => {
 			body: JSON.stringify(makeValidApiMetricsBody({ clientSecret: 'wrong-secret' })),
 		});
 
-		const response = await worker.fetch(request, makeTestEnv(), createExecutionContext());
+		const response = await workerFetch(request, makeTestEnv(), createExecutionContext());
 		expect(response.status).toBe(403);
 		const json = await response.json();
 		expect(json).toMatchObject({ error: 'Unknown clientSecret' });
@@ -154,7 +161,7 @@ describe('o11y worker', () => {
 			body: JSON.stringify(makeValidApiMetricsBody({ clientSecret: 'wrong-secret' })),
 		});
 
-		await worker.fetch(request, env, createExecutionContext());
+		await workerFetch(request, env, createExecutionContext());
 		expect(aeSpy.writeDataPoint).not.toHaveBeenCalled();
 	});
 
@@ -165,9 +172,92 @@ describe('o11y worker', () => {
 			body: JSON.stringify({}),
 		});
 
-		const response = await worker.fetch(request, makeTestEnv(), createExecutionContext());
+		const response = await workerFetch(request, makeTestEnv(), createExecutionContext());
 		expect(response.status).toBe(400);
 		const json = await response.json();
 		expect(json).toMatchObject({ error: 'Invalid request body' });
+	});
+});
+
+describe('session metrics RPC', () => {
+	function makeValidSessionMetrics() {
+		return {
+			kiloUserId: 'user_123',
+			organizationId: 'org_456',
+			sessionId: 'ses_01234567890123456789012345',
+			platform: 'cli',
+			sessionDurationMs: 60000,
+			timeToFirstResponseMs: 1500,
+			totalTurns: 5,
+			totalSteps: 12,
+			toolCallsByType: { read_file: 3, write_file: 2 },
+			toolErrorsByType: { write_file: 1 },
+			totalErrors: 2,
+			errorsByType: { APIError: 1, UnknownError: 1 },
+			stuckToolCallCount: 0,
+			totalTokens: {
+				input: 10000,
+				output: 5000,
+				reasoning: 2000,
+				cacheRead: 3000,
+				cacheWrite: 1000,
+			},
+			totalCost: 0.15,
+			compactionCount: 1,
+			autoCompactionCount: 1,
+			terminationReason: 'completed' as const,
+		};
+	}
+
+	it('writes session metrics to Analytics Engine', async () => {
+		const aeSpy = makeWriteDataPointSpy();
+		const env = makeTestEnv({ O11Y_SESSION_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+		const ctx = createExecutionContext();
+		const instance = new Worker(ctx, env);
+
+		await instance.ingestSessionMetrics(makeValidSessionMetrics());
+		await waitOnExecutionContext(ctx);
+
+		expect(aeSpy.writeDataPoint).toHaveBeenCalledOnce();
+		const call = aeSpy.writeDataPoint.mock.calls[0][0];
+		expect(call.indexes).toEqual(['cli']);
+		expect(call.blobs).toEqual(['completed', 'cli', 'org_456']);
+		expect(call.doubles).toEqual([60000, 1500, 5, 12, 2, 21000, 0.15, 1, 0]);
+	});
+
+	it('uses empty string for missing organizationId in AE', async () => {
+		const aeSpy = makeWriteDataPointSpy();
+		const env = makeTestEnv({ O11Y_SESSION_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+		const ctx = createExecutionContext();
+		const instance = new Worker(ctx, env);
+
+		const params = makeValidSessionMetrics();
+		delete (params as Record<string, unknown>).organizationId;
+		await instance.ingestSessionMetrics(params);
+
+		const call = aeSpy.writeDataPoint.mock.calls[0][0];
+		expect(call.blobs[2]).toBe('');
+	});
+
+	it('uses -1 for missing timeToFirstResponseMs', async () => {
+		const aeSpy = makeWriteDataPointSpy();
+		const env = makeTestEnv({ O11Y_SESSION_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+		const ctx = createExecutionContext();
+		const instance = new Worker(ctx, env);
+
+		const params = makeValidSessionMetrics();
+		delete (params as Record<string, unknown>).timeToFirstResponseMs;
+		await instance.ingestSessionMetrics(params);
+
+		const call = aeSpy.writeDataPoint.mock.calls[0][0];
+		expect(call.doubles[1]).toBe(-1);
+	});
+
+	it('rejects invalid session metrics', async () => {
+		const env = makeTestEnv();
+		const ctx = createExecutionContext();
+		const instance = new Worker(ctx, env);
+
+		await expect(instance.ingestSessionMetrics({} as never)).rejects.toThrow();
 	});
 });

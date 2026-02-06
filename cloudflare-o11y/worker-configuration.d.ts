@@ -8,6 +8,7 @@ declare namespace Cloudflare {
 	interface Env {
 		O11Y_ALERT_STATE: KVNamespace;
 		O11Y_API_METRICS: AnalyticsEngineDataset;
+		O11Y_SESSION_METRICS: AnalyticsEngineDataset;
 		O11Y_KILO_GATEWAY_CLIENT_SECRET: SecretsStoreSecret;
 		O11Y_CF_AE_API_TOKEN: SecretsStoreSecret;
 		O11Y_SLACK_WEBHOOK_PAGE: SecretsStoreSecret;

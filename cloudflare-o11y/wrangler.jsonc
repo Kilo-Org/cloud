@@ -33,7 +33,10 @@
 	 * Analytics Engine — time-series storage for API metrics used by alerting
 	 * https://developers.cloudflare.com/analytics/analytics-engine/get-started/
 	 */
-	"analytics_engine_datasets": [{ "binding": "O11Y_API_METRICS", "dataset": "o11y_api_metrics" }],
+	"analytics_engine_datasets": [
+		{ "binding": "O11Y_API_METRICS", "dataset": "o11y_api_metrics" },
+		{ "binding": "O11Y_SESSION_METRICS", "dataset": "o11y_session_metrics" },
+	],
 	/**
 	 * KV Namespace — stores alert dedup state and cached recommended models
 	 */

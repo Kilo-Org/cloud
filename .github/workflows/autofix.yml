@@ -11,6 +11,26 @@ jobs:
   autofix:
     runs-on: ubuntu-24.04-8core
 
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      NODE_ENV: test
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      POSTGRES_CONNECT_TIMEOUT: 30000
+      POSTGRES_MAX_QUERY_TIME: 30000
+      JEST_MAX_WORKERS: 4
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,6 +59,9 @@ jobs:
       - name: Run formatter
         run: pnpm run format
 
+      - name: Run tests (to update snapshots)
+        run: pnpm run test || true
+
       - name: Check for changes
         id: changes
         run: |
@@ -48,11 +71,19 @@ jobs:
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Guard against infinite loop
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          if [ "$(git log -1 --pretty=format:'%ae')" = "action@github.com" ]; then
+            echo "::error::CI autofix produced changes on a CI-generated commit. Committing could cause an infinite loop."
+            exit 1
+          fi
+
       - name: Commit and push fixes
         if: steps.changes.outputs.has_changes == 'true'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add .
-          git commit --no-verify -m "ci: auto-fix formatting and linting"
+          git commit --no-verify -m "ci: auto-fix formatting, linting, and snapshot updates"
           git push

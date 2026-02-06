@@ -56,13 +56,13 @@ export function queryErrorRates(windowMinutes: number, minRequests: number, env:
 			blob1 AS provider,
 			blob2 AS model,
 			blob3 AS client_name,
-			SUM(_sample_interval * toUInt64(blob4 = '1')) AS weighted_errors,
+			SUM(_sample_interval * IF(blob4 = '1', 1, 0)) AS weighted_errors,
 			SUM(_sample_interval) AS weighted_total
 		FROM o11y_api_metrics
 		WHERE timestamp > NOW() - INTERVAL '${windowMinutes}' MINUTE
 		GROUP BY provider, model, client_name
 		HAVING weighted_total >= ${minRequests}
-		FORMAT JSONEachRow
+		FORMAT JSON
 	`;
 	return queryAnalyticsEngine<ErrorRateRow>(sql, env);
 }
@@ -82,13 +82,13 @@ export function querySlowRequestRates(
 			blob1 AS provider,
 			blob2 AS model,
 			blob3 AS client_name,
-			SUM(_sample_interval * toUInt64(double2 > ${thresholdMs})) AS weighted_slow,
+			SUM(_sample_interval * IF(double2 > ${thresholdMs}, 1, 0)) AS weighted_slow,
 			SUM(_sample_interval) AS weighted_total
 		FROM o11y_api_metrics
 		WHERE timestamp > NOW() - INTERVAL '${windowMinutes}' MINUTE
 		GROUP BY provider, model, client_name
 		HAVING weighted_total >= ${minRequests}
-		FORMAT JSONEachRow
+		FORMAT JSON
 	`;
 	return queryAnalyticsEngine<LatencyRow>(sql, env);
 }

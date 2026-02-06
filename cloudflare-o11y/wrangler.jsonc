@@ -36,7 +36,7 @@
 		"POSTHOG_API_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
 		"POSTHOG_HOST": "https://us.i.posthog.com",
 		"O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
-		"O11Y_APP_BASE_URL": "https://api.kilo.ai",
+		"O11Y_API_BASE_URL": "https://api.kilo.ai",
 	},
 	/**
 	 * Secrets Store

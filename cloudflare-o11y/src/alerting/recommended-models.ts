@@ -18,7 +18,7 @@ const KV_TTL_SECONDS = 3600; // 1 hour
 
 type RecommendedModelsEnv = {
 	O11Y_ALERT_STATE: KVNamespace;
-	O11Y_APP_BASE_URL: string;
+	O11Y_API_BASE_URL: string;
 };
 
 export async function getRecommendedModels(env: RecommendedModelsEnv): Promise<Set<string>> {
@@ -32,7 +32,7 @@ export async function getRecommendedModels(env: RecommendedModelsEnv): Promise<S
 	}
 
 	// 2. Fetch from the app
-	const response = await fetch(`${env.O11Y_APP_BASE_URL}/api/recommended-models`, {
+	const response = await fetch(`${env.O11Y_API_BASE_URL}/api/recommended-models`, {
 		headers: { Accept: 'application/json' },
 		signal: AbortSignal.timeout(5_000),
 	});

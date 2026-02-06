@@ -86,10 +86,6 @@ const ToolPartSchema = z.object({
   state: ToolStateWithStatusSchema,
 });
 
-const StepFinishPartSchema = z.object({
-  type: z.literal('step-finish'),
-});
-
 const CompactionPartSchema = z.object({
   type: z.literal('compaction'),
   auto: z.boolean(),
@@ -209,7 +205,7 @@ function processPart(acc: Accumulator, raw: unknown) {
 
   switch (typeResult.data.type) {
     case 'step-finish': {
-      if (StepFinishPartSchema.safeParse(raw).success) acc.totalSteps++;
+      acc.totalSteps++;
       break;
     }
     case 'tool': {

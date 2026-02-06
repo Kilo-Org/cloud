@@ -59,17 +59,17 @@ const SONNET = 'anthropic/claude-sonnet-4.5';
 // Mode → model mappings for kilo/auto routing.
 // Add/remove/modify entries here to change routing behavior.
 const MODE_TO_MODEL = new Map<string, string>([
-  // Opus modes (planning, reasoning, orchestration)
+  // Opus modes (planning, reasoning, orchestration, debugging)
   ['plan', OPUS],
   ['general', OPUS],
   ['architect', OPUS],
   ['orchestrator', OPUS],
   ['ask', OPUS],
-  // Sonnet modes (implementation, exploration, debugging)
+  ['debug', OPUS],
+  // Sonnet modes (implementation, exploration)
   ['build', SONNET],
   ['explore', SONNET],
   ['code', SONNET],
-  ['debug', SONNET],
 ]);
 
 const DEFAULT_AUTO_MODEL = SONNET;

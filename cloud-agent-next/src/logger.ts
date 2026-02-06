@@ -11,6 +11,7 @@ export type CloudAgentTags = {
   orgId?: string;
   executionId?: string;
   botId?: string;
+  inflightId?: string;
 
   // Execution context
   mode?: 'plan' | 'code' | 'build' | 'orchestrator' | 'architect' | 'ask' | 'custom';

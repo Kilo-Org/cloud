@@ -4,7 +4,6 @@
  * This module handles workspace preparation and execution, called directly
  * from the DO when a client sends a prompt.
  *
- * The key insight is that executionId === messageId for correlation.
  */
 
 import type {
@@ -178,19 +177,15 @@ export class ExecutionOrchestrator {
     }
 
     // 7. Send prompt (async - returns messageId immediately)
-    // Pass executionId as messageId to satisfy "executionId === messageId" invariant
     // Normalize mode to internal mode (e.g., 'architect' -> 'plan', 'orchestrator' -> 'code')
     const normalizedMode = normalizeAgentMode(mode);
-    let messageId: string;
     try {
       const result = await wrapperClient.prompt({
         prompt,
         model: wrapper.model,
         agent: normalizedMode,
-        messageId: executionId,
       });
-      messageId = result.messageId;
-      logger.withFields({ messageId }).info('Prompt sent to wrapper');
+      logger.withFields({ inflightId: result.messageId }).info('Prompt sent to wrapper');
     } catch (error) {
       throw ExecutionError.wrapperStartFailed(
         `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`,
@@ -199,7 +194,7 @@ export class ExecutionOrchestrator {
     }
 
     logger.info('ExecutionOrchestrator execution started successfully');
-    return { messageId, kiloSessionId };
+    return { kiloSessionId };
   }
 
   // ---------------------------------------------------------------------------
@@ -232,7 +227,7 @@ export class ExecutionOrchestrator {
           userId,
           sessionId: sessionId as ServiceSessionId,
           kilocodeToken: resumeContext.kilocodeToken,
-          kilocodeModel: 'default',
+          kilocodeModel: resumeContext.kilocodeModel ?? 'default',
           env: this.deps.env,
           githubToken: resumeContext.githubToken,
           gitToken: resumeContext.gitToken,

@@ -361,7 +361,7 @@ export type GetSessionResponse = z.infer<typeof GetSessionOutput>;
  */
 export const ExecutionResponse = z.object({
   cloudAgentSessionId: z.string().describe('Cloud agent session ID'),
-  executionId: z.string().describe('Execution ID (same as messageId sent to wrapper)'),
+  executionId: z.string().describe('Execution ID for streaming and ingest'),
   status: z.literal('started').describe('Execution has started'),
   streamUrl: z.string().describe('WebSocket URL for streaming output'),
 });

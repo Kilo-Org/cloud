@@ -80,6 +80,13 @@ async function main() {
   const kiloServerPort = getOptionalEnvInt('KILO_SERVER_PORT', 4000);
   const workspacePath = getRequiredEnv('WORKSPACE_PATH');
 
+  const args = process.argv.slice(2);
+  const agentSessionFlagIndex = args.indexOf('--agent-session');
+  const agentSessionId =
+    agentSessionFlagIndex >= 0 && args.length > agentSessionFlagIndex + 1
+      ? args[agentSessionFlagIndex + 1]
+      : undefined;
+
   const autoCommit = getOptionalEnvBool('AUTO_COMMIT', false);
   const condenseOnComplete = getOptionalEnvBool('CONDENSE_ON_COMPLETE', false);
   const upstreamBranch = getOptionalEnv('UPSTREAM_BRANCH', '');
@@ -96,6 +103,9 @@ async function main() {
   logToFile(
     `config: wrapperPort=${wrapperPort} kiloServerPort=${kiloServerPort} workspacePath=${workspacePath}`
   );
+  if (agentSessionId) {
+    logToFile(`config: agentSession=${agentSessionId}`);
+  }
   logToFile(
     `config: autoCommit=${autoCommit} condenseOnComplete=${condenseOnComplete} maxRuntimeMs=${maxRuntimeMs} idleTimeoutMs=${idleTimeoutMs}`
   );
@@ -119,6 +129,7 @@ async function main() {
     process.exit(1);
   }
 
+  let lifecycleManager!: ReturnType<typeof createLifecycleManager>;
   // Create connection manager
   const connectionManager = createConnectionManager(
     state,
@@ -190,7 +201,7 @@ async function main() {
   );
 
   // Create lifecycle manager
-  const lifecycleManager = createLifecycleManager(
+  lifecycleManager = createLifecycleManager(
     {
       maxRuntimeMs,
       idleTimeoutMs,

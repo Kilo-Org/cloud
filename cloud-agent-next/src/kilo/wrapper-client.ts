@@ -227,7 +227,7 @@ export class WrapperClient {
     // Start the wrapper process using startProcess so it's trackable via listProcesses()
     // The command includes a session marker so we can find this wrapper later
     const sessionMarker = getWrapperSessionMarker(sessionId);
-    const command = `${sessionMarker} WRAPPER_PORT=${this.port} KILO_SERVER_PORT=${kiloServerPort} WORKSPACE_PATH=${workspacePath} bun run ${wrapperPath}`;
+    const command = `WRAPPER_PORT=${this.port} KILO_SERVER_PORT=${kiloServerPort} WORKSPACE_PATH=${workspacePath} bun run ${wrapperPath} ${sessionMarker}`;
 
     logger.debug('WrapperClient: starting wrapper process', { command, port: this.port });
 

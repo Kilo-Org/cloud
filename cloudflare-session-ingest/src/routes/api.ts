@@ -203,13 +203,11 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
     });
   }
 
-  const clientIp = c.req.header('cf-connecting-ip') ?? null;
-
   const mergedChanges = new Map<string, string | null>();
   for (const chunk of split.chunks) {
     const ingestResult = await withDORetry(
       () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-      stub => stub.ingest(chunk, clientIp, kiloUserId, parsed.data),
+      stub => stub.ingest(chunk, kiloUserId, parsed.data),
       'SessionIngestDO.ingest'
     );
 

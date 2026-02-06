@@ -103,7 +103,6 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   async ingest(
     payload: IngestBatch,
-    clientIp: string | null,
     kiloUserId: string,
     sessionId: string
   ): Promise<{
@@ -172,9 +171,6 @@ export class SessionIngestDO extends DurableObject<Env> {
     if (!closeReason) {
       this.sql.exec(`DELETE FROM ingest_meta WHERE key = 'metricsEmitted'`);
     }
-
-    // Store (or clear) the client IP so metrics emission forwards the latest value
-    writeIngestMetaIfChanged(this.sql, { key: 'clientIp', incomingValue: clientIp });
 
     if (closeReason) {
       // Persist the close reason so alarm() can read it after hibernation.
@@ -252,20 +248,11 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const metrics = computeSessionMetrics(rows, closeReason);
 
-    // Read stored client IP for PostHog geo-IP forwarding
-    const ipRows = this.sql
-      .exec<{
-        value: string | null;
-      }>(`SELECT value FROM ingest_meta WHERE key = 'clientIp' LIMIT 1`)
-      .toArray();
-    const clientIp = ipRows[0]?.value ?? null;
-
     await this.env.O11Y.ingestSessionMetrics({
       kiloUserId,
       sessionId,
       organizationId: metrics.organizationId,
       platform: metrics.platform,
-      ipAddress: clientIp,
       sessionDurationMs: metrics.sessionDurationMs,
       timeToFirstResponseMs: metrics.timeToFirstResponseMs,
       totalTurns: metrics.totalTurns,

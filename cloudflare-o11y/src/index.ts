@@ -3,13 +3,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zodJsonValidator } from './util/validation';
 import { getClientName } from './client-secrets';
-import { captureApiMetrics } from './posthog';
 import { writeApiMetricsDataPoint } from './o11y-analytics';
 import { evaluateAlerts } from './alerting/evaluate';
 import { SessionMetricsParamsSchema } from './session-metrics-schema';
 import type { SessionMetricsParams } from './session-metrics-schema';
 import { writeSessionMetricsDataPoint } from './session-metrics-analytics';
-import { captureSessionMetrics } from './session-metrics-posthog';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -29,7 +27,6 @@ export const ApiMetricsParamsSchema = z.object({
 	ttfbMs: z.number().int().nonnegative(),
 	completeRequestMs: z.number().int().nonnegative(),
 	statusCode: z.number().int().min(100).max(599),
-	ipAddress: z.union([z.ipv4(), z.ipv6()]).optional(),
 	tokens: z
 		.object({
 			inputTokens: z.number().int().nonnegative().optional(),
@@ -51,7 +48,6 @@ app.post('/ingest/api-metrics', zodJsonValidator(ApiMetricsParamsSchema), async 
 		return c.json({ success: false, error: 'Unknown clientSecret' }, 403);
 	}
 
-	c.executionCtx.waitUntil(captureApiMetrics(params, clientName, c.env));
 	writeApiMetricsDataPoint(params, clientName, c.env);
 	return c.body(null, 204);
 });
@@ -69,6 +65,5 @@ export default class extends WorkerEntrypoint<Env> {
 	async ingestSessionMetrics(params: SessionMetricsParams): Promise<void> {
 		const parsed = SessionMetricsParamsSchema.parse(params);
 		writeSessionMetricsDataPoint(parsed, this.env);
-		this.ctx.waitUntil(captureSessionMetrics(parsed, this.env));
 	}
 }

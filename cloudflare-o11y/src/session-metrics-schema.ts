@@ -7,7 +7,6 @@ export const SessionMetricsParamsSchema = z.object({
 	organizationId: z.string().min(1).optional(),
 	sessionId: z.string().min(1),
 	platform: z.string().min(1),
-	ipAddress: z.union([z.ipv4(), z.ipv6()]).nullish(),
 
 	sessionDurationMs: z.number().int().nonnegative(),
 	timeToFirstResponseMs: z.number().int().nonnegative().optional(),

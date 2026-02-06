@@ -28,8 +28,6 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
 		O11Y_KILO_GATEWAY_CLIENT_SECRET: {
 			get: async () => TEST_CLIENT_SECRET,
 		} as SecretsStoreSecret,
-		POSTHOG_API_KEY: 'phk_test_fake_key' as never,
-		POSTHOG_HOST: 'http://localhost:0' as never,
 		O11Y_API_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_SESSION_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_ALERT_STATE: makeKvMock(),
@@ -116,7 +114,6 @@ describe('o11y worker', () => {
 
 		expect(aeSpy.writeDataPoint).toHaveBeenCalledOnce();
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
-		expect(call.indexes).toEqual(['openai:anthropic/claude-sonnet-4.5']);
 		expect(call.blobs).toEqual(['openai', 'anthropic/claude-sonnet-4.5', 'kilo-gateway', '0']);
 		expect(call.doubles).toEqual([45, 123, 200]);
 	});

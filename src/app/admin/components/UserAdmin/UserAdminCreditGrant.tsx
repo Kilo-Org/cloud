@@ -45,6 +45,7 @@ export function UserAdminCreditGrant({
   const [customDescription, setCustomDescription] = useState<string>('');
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [expiryHours, setExpiryHours] = useState<string>('');
+  const [neverExpires, setNeverExpires] = useState(false);
 
   // API state
   const [isGrantingCredit, setIsGrantingCredit] = useState(false);
@@ -55,8 +56,17 @@ export function UserAdminCreditGrant({
   );
   const expectNegative = selectedCreditCategory?.expect_negative_amount ?? false;
 
-  // Form validation - credit category required; description required for negative amount categories
-  const isFormValid = selectedCredit && (!expectNegative || customDescription.trim().length > 0);
+  // Check if expiration is set (either via date or hours)
+  const hasExpiration = expirationDate.trim() !== '' || expiryHours.trim() !== '';
+
+  // Form validation:
+  // - credit category required
+  // - description required for negative amount categories
+  // - expiration required unless "Never expires" is checked (only for non-negative categories)
+  const isFormValid =
+    selectedCredit &&
+    (!expectNegative || customDescription.trim().length > 0) &&
+    (expectNegative || neverExpires || hasExpiration);
 
   const handleCreditTypeChange = (value: string) => {
     setSelectedCredit(value);
@@ -65,6 +75,7 @@ export function UserAdminCreditGrant({
     setCustomDescription('');
     setExpirationDate('');
     setExpiryHours('');
+    setNeverExpires(false);
   };
 
   const handleGrantCredit = async () => {
@@ -109,6 +120,7 @@ export function UserAdminCreditGrant({
         setCustomDescription('');
         setExpirationDate('');
         setExpiryHours('');
+        setNeverExpires(false);
         await queryClient.invalidateQueries({ queryKey: ['admin-user-credit-transactions', id] });
       } else {
         setCreditMessage({
@@ -220,7 +232,7 @@ export function UserAdminCreditGrant({
             <>
               <div>
                 <Label className="text-sm font-medium" htmlFor="expiry-hours">
-                  Expiry Hours
+                  Expiry Hours{!neverExpires && !expirationDate ? ' (required)' : ''}
                 </Label>
                 <Input
                   type="number"
@@ -230,12 +242,12 @@ export function UserAdminCreditGrant({
                   min="0"
                   step="0.01"
                   id="expiry-hours"
-                  disabled={!selectedCredit}
+                  disabled={!selectedCredit || neverExpires}
                 />
               </div>
               <div>
                 <Label className="text-sm font-medium" htmlFor="date">
-                  Expiration Date
+                  Expiration Date{!neverExpires && !expiryHours ? ' (required)' : ''}
                 </Label>
                 <Input
                   type="date"
@@ -244,7 +256,25 @@ export function UserAdminCreditGrant({
                   }
                   onChange={e => setExpirationDate(e.target.value)}
                   id="date"
+                  disabled={!selectedCredit || neverExpires}
                 />
+              </div>
+              <div className="flex items-end">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={neverExpires}
+                    onChange={e => {
+                      setNeverExpires(e.target.checked);
+                      if (e.target.checked) {
+                        setExpirationDate('');
+                        setExpiryHours('');
+                      }
+                    }}
+                    disabled={!selectedCredit}
+                  />
+                  Never expires
+                </Label>
               </div>
             </>
           )}

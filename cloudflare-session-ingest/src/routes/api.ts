@@ -29,7 +29,6 @@ const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
-  console.log('POST /session', { sessionId: body.sessionId });
 
   // Persist a placeholder session row.
   // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
@@ -62,7 +61,6 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
 });
 
 api.delete('/session/:sessionId', async c => {
-  console.log('DELETE /session/:sessionId', { sessionId: c.req.param('sessionId') });
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -157,7 +155,6 @@ api.delete('/session/:sessionId', async c => {
 });
 
 api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), async c => {
-  console.log('POST /session/:sessionId/ingest', { sessionId: c.req.param('sessionId') });
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -281,7 +278,6 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
 });
 
 api.get('/session/:sessionId/export', async c => {
-  console.log('GET /session/:sessionId/export', { sessionId: c.req.param('sessionId') });
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -314,7 +310,6 @@ api.get('/session/:sessionId/export', async c => {
 });
 
 api.post('/session/:sessionId/share', async c => {
-  console.log('POST /session/:sessionId/share', { sessionId: c.req.param('sessionId') });
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -367,7 +362,6 @@ api.post('/session/:sessionId/share', async c => {
 });
 
 api.post('/session/:sessionId/unshare', async c => {
-  console.log('POST /session/:sessionId/unshare', { sessionId: c.req.param('sessionId') });
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {

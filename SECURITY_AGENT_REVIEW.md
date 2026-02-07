@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The security agent is a well-structured feature with a clear three-tier architecture (triage → sandbox → extraction), solid database operations, and proper separation of concerns. However, several **significant implementation quality issues** would need to be addressed before this can be considered production-ready at scale. The most critical concerns are around race conditions in the analysis pipeline, the massive code duplication between the personal-user and organization routers, extremely weak test coverage, and a fire-and-forget background processing pattern that has no observability or recovery mechanism.
+The security agent is a well-structured feature with a clear three-tier architecture (triage → sandbox → extraction), solid database operations, and proper separation of concerns. However, several **significant implementation quality issues** would need to be addressed before this can be considered production-ready at scale. The most critical concerns are around race conditions in the analysis pipeline, the massive code duplication between the personal-user and organization routers, extremely weak test coverage, a fire-and-forget background processing pattern with no recovery mechanism, and a near-total absence of operational observability — no LLM call timing or cost tracking, no heartbeat monitoring on cron jobs, no correlation IDs across the multi-tier analysis pipeline, and no usage of the metrics infrastructure (`emitApiMetrics`, `sentryLogger`) that exists elsewhere in the codebase.
 
 ---
 
@@ -222,6 +222,85 @@ For a feature that involves background processing, multi-tier LLM calls, and cro
 
 ---
 
+## 15. HIGH: No Operational Observability Across Any Workflow
+
+The security agent has basic **error capture** (Sentry `captureException`) and **debug logging** (`console.log`), but lacks any form of **operational observability**. You can investigate a specific failure after the fact via Sentry, but you cannot answer routine operational questions about the system's health, performance, or cost.
+
+### 15a. What exists today
+
+| Mechanism | Status | Details |
+|-----------|--------|---------|
+| Sentry `captureException` | Present | 38 calls across 7 files; covers most `catch` blocks |
+| Console logging | Present | ~76 `console.log`/`console.error` calls with manual `[prefix]` tags |
+| Duration timing | Minimal | Only 1 location: `runFullSync` in `sync-service.ts` |
+| Cron response body | Present | Both cron routes return JSON with `success`, `timestamp`, counts |
+
+### 15b. What's missing — by workflow
+
+#### Sync Workflow (cron + manual trigger)
+
+- **No per-repository timing.** If one repo takes 30 seconds out of a 5-minute sync, there's no way to identify it. `sync-service.ts:142-163` iterates repos in a serial loop with no per-iteration timing.
+- **No GitHub API rate limit tracking.** `dependabot-api.ts` calls `octokit.paginate` which can issue many requests. There is no parsing of `X-RateLimit-Remaining` headers and no proactive alerting before rate limit exhaustion. A rate limit error would surface as a generic Octokit exception.
+- **No heartbeat monitoring.** The BetterStack heartbeat is explicitly TODO'd out (`sync-security-alerts/route.ts:7-8, 42-43, 55-56`). If the cron silently stops running, nobody is notified. For a security feature, this means vulnerabilities stop being tracked with zero alerting.
+- **No queryable metrics.** Counts for "alerts synced per run" and "new findings per run" are logged to `console.log` and returned in the HTTP response body, but not emitted to any metrics system. There is no way to chart sync volume over time or set thresholds.
+
+#### Triage Workflow (Tier 1 — LLM call)
+
+- **No LLM call timing.** `triage-service.ts` calls `sendProxiedChatCompletion` with no measurement of latency. You can't tell if triage is taking 2 seconds or 20.
+- **No token usage tracking.** The codebase has `emitApiMetrics` infrastructure in `src/lib/o11y/api-metrics.server.ts` that tracks `inputTokens`, `outputTokens`, `cacheHitTokens`, TTFB, and total request duration — but this is **only wired into** `src/app/api/openrouter/[...path]/route.ts`. The triage service discards all usage data from the LLM response. Cost is completely untracked.
+- **No triage outcome distribution tracking.** There is no metric for what percentage of triages result in `dismiss` vs `analyze_codebase` vs `manual_review`. This is critical for tuning the prompt and understanding if triage is being overly aggressive or conservative over time.
+- **No fallback rate tracking.** `createFallbackTriage` is called on any LLM failure, but there's no counter. A silent degradation where 50% of triages fall back to default `analyze_codebase` would go unnoticed until someone queries Sentry manually.
+
+#### Sandbox Analysis Workflow (Tier 2 — cloud agent)
+
+This is the most complex and expensive workflow and has the **least observability**:
+
+- **No end-to-end analysis duration measurement.** The entire flow from `processAnalysisStream` start to `finalizeAnalysis` completion is untimed. Given this can run for minutes, there's no baseline for normal vs degraded performance.
+- **No R2 retry loop instrumentation.** `analysis-service.ts:383-391` has a 5-attempt retry loop with exponential backoff to fetch results from R2. There is no tracking of which attempt succeeds, making it impossible to know if the hardcoded delays (1.5s → 3s → 6s → 12s → 15s) are appropriate or if they should be tuned.
+- **No correlation ID.** The `findingId` is logged in individual `console.log` calls, but there is no trace or span connecting the triage → sandbox → extraction steps of a single analysis. Correlating logs for a single analysis requires manual grepping.
+- **No sandbox success/failure rate metric.** There's no way to know what percentage of sandbox analyses succeed, fail, or time out without querying Sentry or the database directly.
+
+#### Extraction Workflow (Tier 3 — LLM call)
+
+- **Same gaps as triage:** No LLM call timing, no token usage tracking, no outcome distribution.
+- **No extraction fallback rate tracking.** `createFallbackExtraction` in `extraction-service.ts` is called on any failure. A high fallback rate would mean users see "Analysis completed but structured extraction failed. Review raw output" frequently — a degraded experience with no alerting.
+
+#### Auto-Dismiss Workflow
+
+- **No dismiss rate metric.** There's no tracking of "auto-dismissed findings per day" or what percentage of findings are auto-dismissed. This is important for understanding the feature's value and catching misconfigurations.
+- **Errors are swallowed silently.** Auto-dismiss is called with `void ... .catch()` in two locations (`analysis-service.ts:293`, `analysis-service.ts:549`). Failures log to console and Sentry but there's no failure-rate metric or alert.
+
+#### Stale Analysis Cleanup (cron)
+
+- **No anomaly detection.** The cleanup route uses `sentryLogger` (the only part of the feature that does) but doesn't alert if the cleaned count is abnormally high. A spike in stale analyses indicates a systemic problem with analysis completion — this should trigger an alert, not just a log line.
+
+### 15c. Comparison with codebase standards
+
+The security agent is **below the observability bar** set by other features in the same codebase:
+
+| Capability | Used elsewhere | Used by security agent |
+|------------|---------------|----------------------|
+| `sentryLogger()` (log + Sentry message) | 18 files across the codebase | 1 of 15 security agent files |
+| `emitApiMetrics()` (LLM metrics to o11y service) | `openrouter/[...path]/route.ts` | Not used for triage/extraction LLM calls |
+| Sentry `startSpan` / `withScope` | `processUsage.ts`, PostHog integration | Not used |
+| BetterStack heartbeats | Other cron jobs in the codebase | TODO'd out in both cron files |
+| GitHub API rate limit handling | — | Not implemented |
+
+### 15d. Summary of observability gaps
+
+You **cannot** currently:
+
+1. **Know if the system is healthy** — no heartbeats, no health checks, no success-rate metrics
+2. **Understand performance** — no timing on any LLM call, no per-repo sync duration, no end-to-end analysis duration
+3. **Track costs** — no token usage metrics despite the `emitApiMetrics` infrastructure existing in the codebase
+4. **Detect degradation** — no triage/extraction fallback rate, no auto-dismiss failure rate, no R2 retry distribution
+5. **Correlate across tiers** — no trace or correlation ID linking a finding through triage → sandbox → extraction → auto-dismiss
+6. **Be alerted proactively** — no alerting on sync failure, no alerting on high stale-analysis counts, no rate-limit exhaustion warnings
+
+**Recommendation:** At minimum before production: (1) implement BetterStack heartbeats on both cron jobs, (2) add LLM call duration + token tracking using the existing `emitApiMetrics` infrastructure, (3) adopt `sentryLogger` across all services for dual console+Sentry logging, (4) add a correlation ID that flows through the triage → sandbox → extraction pipeline for a single finding.
+
+---
+
 ## Summary Table
 
 | # | Severity | Issue | Location |
@@ -232,6 +311,7 @@ For a feature that involves background processing, multi-tier LLM calls, and cro
 | 4 | HIGH | Upsert may overwrite user-dismissed status | `security-findings.ts:141-168` |
 | 5 | HIGH | Only 2 test files; triage tests are no-ops | `*.test.ts` |
 | 6 | HIGH | `toOwner` duplicated 4 times | 4 files |
+| 15 | HIGH | No operational observability across any workflow | All services, cron jobs |
 | 7 | MEDIUM | Sequential sync with no parallelism | `sync-service.ts:142-163` |
 | 8 | MEDIUM | No server-side model validation | `schemas.ts:228-231` |
 | 9 | MEDIUM | No heartbeat monitoring on cron jobs | `sync-security-alerts/route.ts` |

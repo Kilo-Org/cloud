@@ -13,5 +13,5 @@ export const pony_alpha_free_model = {
   flags: ['reasoning'],
   gateway: 'openrouter',
   internal_id: 'openrouter/pony-alpha',
-  inference_providers: ['openrouter'],
+  inference_providers: ['stealth'],
 } as KiloFreeModel;

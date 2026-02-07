@@ -28,7 +28,6 @@ export type ApiMetricsParams = {
   completeRequestMs: number;
   statusCode: number;
   tokens?: ApiMetricsTokens;
-  ipAddress?: string;
 };
 
 export function getTokensFromCompletionUsage(

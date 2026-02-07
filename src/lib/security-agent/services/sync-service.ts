@@ -69,9 +69,11 @@ export async function syncDependabotAlertsForRepo(params: {
 
     // Fetch all alerts from Dependabot
     const alerts = await fetchAllDependabotAlerts(installationId, repoOwner, repoName);
+    log(`Fetched ${alerts.length} alerts from GitHub for ${repoFullName}`);
 
     // Parse alerts to our internal format
     const findings = parseDependabotAlerts(alerts, repoFullName);
+    log(`Parsed ${findings.length} findings for ${repoFullName}`);
 
     // Get SLA config for this owner
     const config = await getSecurityAgentConfig(toAgentConfigOwner(owner));

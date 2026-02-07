@@ -163,12 +163,25 @@ async function fetchLastAssistantMessage(
       return null;
     }
 
+    log('Fetched messages from R2', {
+      correlationId,
+      cliSessionId,
+      messageCount: messages.length,
+      lastFewTypes: messages.slice(-5).map(m => ({ type: m.type, say: m.say, ask: m.ask })),
+    });
+
     // Prefer completion_result as the final analysis output.
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.type === 'say' && msg.say === 'completion_result') {
         const content = getCliMessageContent(msg);
         if (content) {
+          log('Found completion_result message', {
+            correlationId,
+            cliSessionId,
+            messageIndex: i,
+            contentLength: content.length,
+          });
           return content;
         }
       }
@@ -180,6 +193,12 @@ async function fetchLastAssistantMessage(
       if (msg.type === 'say' && msg.say === 'text') {
         const content = getCliMessageContent(msg);
         if (content) {
+          log('Found last text message', {
+            correlationId,
+            cliSessionId,
+            messageIndex: i,
+            contentLength: content.length,
+          });
           return content;
         }
       }
@@ -191,6 +210,13 @@ async function fetchLastAssistantMessage(
       if (msg.type === 'say' && msg.say !== 'user_feedback') {
         const content = getCliMessageContent(msg);
         if (content) {
+          log('Found fallback say message', {
+            correlationId,
+            cliSessionId,
+            messageIndex: i,
+            messageSay: msg.say,
+            contentLength: content.length,
+          });
           return content;
         }
       }

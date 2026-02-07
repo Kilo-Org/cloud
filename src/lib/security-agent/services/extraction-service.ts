@@ -164,26 +164,32 @@ function parseExtractionResult(
     const parsed = JSON.parse(args);
 
     if (typeof parsed.isExploitable !== 'boolean' && parsed.isExploitable !== 'unknown') {
+      logError('Invalid isExploitable', { value: parsed.isExploitable });
       return null;
     }
 
     if (typeof parsed.exploitabilityReasoning !== 'string') {
+      logError('Invalid exploitabilityReasoning', { value: parsed.exploitabilityReasoning });
       return null;
     }
 
     if (!Array.isArray(parsed.usageLocations)) {
+      logError('Invalid usageLocations', { value: parsed.usageLocations });
       return null;
     }
 
     if (typeof parsed.suggestedFix !== 'string') {
+      logError('Invalid suggestedFix', { value: parsed.suggestedFix });
       return null;
     }
 
     if (!VALID_SUGGESTED_ACTIONS.includes(parsed.suggestedAction)) {
+      logError('Invalid suggestedAction', { value: parsed.suggestedAction });
       return null;
     }
 
     if (typeof parsed.summary !== 'string') {
+      logError('Invalid summary', { value: parsed.summary });
       return null;
     }
 
@@ -197,7 +203,8 @@ function parseExtractionResult(
       rawMarkdown,
       analysisAt: new Date().toISOString(),
     };
-  } catch {
+  } catch (error) {
+    logError('Failed to parse tool arguments', { error });
     return null;
   }
 }

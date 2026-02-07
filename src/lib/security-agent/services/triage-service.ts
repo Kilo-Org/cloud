@@ -137,20 +137,24 @@ function parseTriageResult(args: string): SecurityFindingTriage | null {
 
     // Validate required fields
     if (typeof parsed.needsSandboxAnalysis !== 'boolean') {
+      logError('Invalid needsSandboxAnalysis', { value: parsed.needsSandboxAnalysis });
       return null;
     }
 
     if (typeof parsed.needsSandboxReasoning !== 'string') {
+      logError('Invalid needsSandboxReasoning', { value: parsed.needsSandboxReasoning });
       return null;
     }
 
     const validActions = ['dismiss', 'analyze_codebase', 'manual_review'];
     if (!validActions.includes(parsed.suggestedAction)) {
+      logError('Invalid suggestedAction', { value: parsed.suggestedAction });
       return null;
     }
 
     const validConfidences = ['high', 'medium', 'low'];
     if (!validConfidences.includes(parsed.confidence)) {
+      logError('Invalid confidence', { value: parsed.confidence });
       return null;
     }
 
@@ -161,7 +165,8 @@ function parseTriageResult(args: string): SecurityFindingTriage | null {
       confidence: parsed.confidence,
       triageAt: new Date().toISOString(),
     };
-  } catch {
+  } catch (error) {
+    logError('Failed to parse tool arguments', { error });
     return null;
   }
 }

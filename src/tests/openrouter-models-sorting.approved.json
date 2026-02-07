@@ -144,6 +144,49 @@
       }
     },
     {
+      "id": "openrouter/pony-alpha",
+      "canonical_slug": "openrouter/pony-alpha",
+      "hugging_face_id": "",
+      "name": "Pony Alpha (free)",
+      "created": 1756238927,
+      "description": "Pony Alpha is a stealth model optimized for speed and enhanced reasoning capabilities. It is provided free of charge in Kilo Code for a limited time.\n**Note:** Prompts and completions are logged and may be used to improve the model.",
+      "context_length": 200000,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000000",
+        "completion": "0.0000000",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 200000,
+        "max_completion_tokens": 32000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "default_parameters": {},
+      "preferredIndex": 4
+    },
+    {
       "id": "giga-potato",
       "canonical_slug": "giga-potato",
       "hugging_face_id": "",

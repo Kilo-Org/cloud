@@ -714,10 +714,10 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         findingId: input.findingId,
         model,
         forceSandbox: input.forceSandbox ?? false,
-        triageOnly: false,
+        triageOnly: result.triageOnly ?? false,
       });
 
-      return { success: true };
+      return { success: true, triageOnly: result.triageOnly };
     }),
 
   /**

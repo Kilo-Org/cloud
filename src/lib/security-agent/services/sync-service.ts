@@ -5,6 +5,7 @@
  */
 
 import { captureException } from '@sentry/nextjs';
+import { trackSecurityAgentFullSync } from '../posthog-tracking';
 import { db } from '@/lib/drizzle';
 import { platform_integrations, agent_configs } from '@/db/schema';
 import { eq, and, isNotNull } from 'drizzle-orm';
@@ -332,6 +333,14 @@ export async function runFullSync(): Promise<{
   console.log(
     `[sync-service] Full sync completed in ${duration}ms: ${totalSynced} alerts synced, ${totalErrors} errors, ${configs.length} configs processed`
   );
+
+  trackSecurityAgentFullSync({
+    distinctId: 'system-cron',
+    configsProcessed: configs.length,
+    totalSynced,
+    totalErrors,
+    durationMs: duration,
+  });
 
   return {
     totalSynced,

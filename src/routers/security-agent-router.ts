@@ -53,6 +53,13 @@ import {
   DeleteFindingsByRepoInputSchema,
 } from '@/lib/security-agent/core/schemas';
 import { DEFAULT_SECURITY_AGENT_MODEL } from '@/lib/security-agent/core/constants';
+import {
+  trackSecurityAgentEnabled,
+  trackSecurityAgentConfigSaved,
+  trackSecurityAgentSync,
+  trackSecurityAgentAnalysisStarted,
+  trackSecurityAgentFindingDismissed,
+} from '@/lib/security-agent/posthog-tracking';
 
 /**
  * Security Agent Router for personal users
@@ -152,6 +159,17 @@ export const securityAgentRouter = createTRPCRouter({
         },
         ctx.user.id
       );
+
+      trackSecurityAgentConfigSaved({
+        distinctId: ctx.user.id,
+        userId: ctx.user.id,
+        autoSyncEnabled: input.autoSyncEnabled,
+        autoDismissEnabled: input.autoDismissEnabled,
+        autoDismissConfidenceThreshold: input.autoDismissConfidenceThreshold,
+        modelSlug: input.modelSlug,
+        repositorySelectionMode: input.repositorySelectionMode,
+        selectedRepoCount: input.selectedRepositoryIds?.length,
+      });
 
       return { success: true };
     }),
@@ -254,6 +272,16 @@ export const securityAgentRouter = createTRPCRouter({
             `[security-agent] Sync completed: synced=${syncResult.synced}, errors=${syncResult.errors}`
           );
 
+          trackSecurityAgentEnabled({
+            distinctId: ctx.user.id,
+            userId: ctx.user.id,
+            isEnabled: input.isEnabled,
+            repositorySelectionMode: selectionMode,
+            selectedRepoCount: repositoriesToSync.length,
+            syncedCount: syncResult.synced,
+            syncErrors: syncResult.errors,
+          });
+
           return {
             success: true,
             syncResult: {
@@ -268,6 +296,14 @@ export const securityAgentRouter = createTRPCRouter({
         console.log(`[security-agent] No installation ID found`);
       }
     }
+
+    trackSecurityAgentEnabled({
+      distinctId: ctx.user.id,
+      userId: ctx.user.id,
+      isEnabled: input.isEnabled,
+      repositorySelectionMode: selectionMode,
+      selectedRepoCount: selectedIds.length,
+    });
 
     return { success: true };
   }),
@@ -425,6 +461,15 @@ export const securityAgentRouter = createTRPCRouter({
         repoFullName: input.repoFullName,
       });
 
+      trackSecurityAgentSync({
+        distinctId: ctx.user.id,
+        userId: ctx.user.id,
+        syncType: 'single_repo',
+        repoCount: 1,
+        synced: result.synced,
+        errors: result.errors,
+      });
+
       return {
         success: true,
         synced: result.synced,
@@ -459,6 +504,15 @@ export const securityAgentRouter = createTRPCRouter({
       platformIntegrationId: integration.id,
       installationId,
       repositories: repositoriesToSync,
+    });
+
+    trackSecurityAgentSync({
+      distinctId: ctx.user.id,
+      userId: ctx.user.id,
+      syncType: 'all_repos',
+      repoCount: repositoriesToSync.length,
+      synced: result.synced,
+      errors: result.errors,
     });
 
     return {
@@ -540,6 +594,15 @@ export const securityAgentRouter = createTRPCRouter({
         ignoredBy: ctx.user.google_user_email,
       });
 
+      trackSecurityAgentFindingDismissed({
+        distinctId: ctx.user.id,
+        userId: ctx.user.id,
+        findingId: input.findingId,
+        reason: input.reason,
+        source: finding.source,
+        severity: finding.severity,
+      });
+
       return { success: true };
     }),
 
@@ -617,6 +680,15 @@ export const securityAgentRouter = createTRPCRouter({
         message: result.error || 'Failed to start analysis',
       });
     }
+
+    trackSecurityAgentAnalysisStarted({
+      distinctId: ctx.user.id,
+      userId: ctx.user.id,
+      findingId: input.findingId,
+      model,
+      forceSandbox: input.forceSandbox ?? false,
+      triageOnly: result.triageOnly ?? false,
+    });
 
     return { success: true, triageOnly: result.triageOnly };
   }),

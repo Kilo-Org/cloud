@@ -18,6 +18,7 @@ import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types
 import type { User, SecurityFinding } from '@/db/schema';
 import type { StreamEvent, SystemKilocodeEvent } from '@/components/cloud-agent/types';
 import { captureException } from '@sentry/nextjs';
+import { trackSecurityAgentAnalysisCompleted } from '../posthog-tracking';
 import { db } from '@/lib/drizzle';
 import { cliSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -288,6 +289,23 @@ async function finalizeAnalysis(
 
   await updateAnalysisStatus(findingId, 'completed', { analysis });
 
+  const triggeredBy = existingAnalysis?.triggeredByUserId ?? userId;
+  trackSecurityAgentAnalysisCompleted({
+    distinctId: triggeredBy,
+    userId: triggeredBy,
+    organizationId,
+    findingId,
+    model,
+    triageOnly: false,
+    needsSandboxAnalysis: existingAnalysis?.triage?.needsSandboxAnalysis,
+    triageSuggestedAction: existingAnalysis?.triage?.suggestedAction,
+    triageConfidence: existingAnalysis?.triage?.confidence,
+    isExploitable: sandboxAnalysis.isExploitable,
+    durationMs: finding.analysis_started_at
+      ? Date.now() - new Date(finding.analysis_started_at).getTime()
+      : 0,
+  });
+
   // Attempt auto-dismiss after sandbox analysis if isExploitable === false
   if (sandboxAnalysis.isExploitable === false) {
     void maybeAutoDismissAnalysis(findingId, analysis, owner, userId).catch((error: unknown) => {
@@ -503,6 +521,8 @@ export async function startSecurityAnalysis(params: {
   // Mark as pending
   await updateAnalysisStatus(findingId, 'pending');
 
+  const analysisStartTime = Date.now();
+
   try {
     // Generate auth token for LLM calls
     const authToken = generateApiToken(user);
@@ -541,6 +561,19 @@ export async function startSecurityAnalysis(params: {
       };
 
       await updateAnalysisStatus(findingId, 'completed', { analysis });
+
+      trackSecurityAgentAnalysisCompleted({
+        distinctId: user.id,
+        userId: user.id,
+        organizationId,
+        findingId,
+        model,
+        triageOnly: true,
+        needsSandboxAnalysis: triage.needsSandboxAnalysis,
+        triageSuggestedAction: triage.suggestedAction,
+        triageConfidence: triage.confidence,
+        durationMs: Date.now() - analysisStartTime,
+      });
 
       // Attempt auto-dismiss if configured (off by default)
       const owner: SecurityReviewOwner = organizationId ? { organizationId } : { userId: user.id };

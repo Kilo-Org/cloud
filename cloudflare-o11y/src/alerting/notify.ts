@@ -42,7 +42,7 @@ function formatPercent(value: number): string {
 	return `${(value * 100).toFixed(2)}%`;
 }
 
-function buildSlackMessage(alert: AlertPayload): object {
+function _buildSlackMessage(alert: AlertPayload): object {
 	const severityLabel = alert.severity === 'page' ? ':rotating_light: PAGE' : ':ticket: TICKET';
 	const typeLabel = formatAlertType(alert.alertType);
 
@@ -83,30 +83,31 @@ function buildSlackMessage(alert: AlertPayload): object {
 	};
 }
 
-export async function sendAlertNotification(alert: AlertPayload, env: NotifyEnv): Promise<void> {
-	const webhookSecret = alert.severity === 'page' ? env.O11Y_SLACK_WEBHOOK_PAGE : env.O11Y_SLACK_WEBHOOK_TICKET;
-
-	const webhookUrl = await webhookSecret.get();
-	if (!webhookUrl) {
-		console.error(`No Slack webhook configured for severity: ${alert.severity}`);
-		return;
-	}
-
-	const body = buildSlackMessage(alert);
-
-	try {
-		const response = await fetch(webhookUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body),
-			signal: AbortSignal.timeout(5_000),
-		});
-
-		if (!response.ok) {
-			const text = await response.text();
-			console.error(`Slack webhook failed (${response.status}): ${text}`);
-		}
-	} catch (err) {
-		console.error(`Slack webhook request failed: ${err instanceof Error ? err.message : err}`);
-	}
+export async function sendAlertNotification(_alert: AlertPayload, _env: NotifyEnv): Promise<void> {
+	// Slack alerting temporarily disabled — will be re-enabled in the future.
+	// const webhookSecret = alert.severity === 'page' ? env.O11Y_SLACK_WEBHOOK_PAGE : env.O11Y_SLACK_WEBHOOK_TICKET;
+	//
+	// const webhookUrl = await webhookSecret.get();
+	// if (!webhookUrl) {
+	// 	console.error(`No Slack webhook configured for severity: ${alert.severity}`);
+	// 	return;
+	// }
+	//
+	// const body = buildSlackMessage(alert);
+	//
+	// try {
+	// 	const response = await fetch(webhookUrl, {
+	// 		method: 'POST',
+	// 		headers: { 'Content-Type': 'application/json' },
+	// 		body: JSON.stringify(body),
+	// 		signal: AbortSignal.timeout(5_000),
+	// 	});
+	//
+	// 	if (!response.ok) {
+	// 		const text = await response.text();
+	// 		console.error(`Slack webhook failed (${response.status}): ${text}`);
+	// 	}
+	// } catch (err) {
+	// 	console.error(`Slack webhook request failed: ${err instanceof Error ? err.message : err}`);
+	// }
 }

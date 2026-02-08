@@ -11,6 +11,12 @@ import {
   extractNormalizedPlatformFromItem,
   extractNormalizedTitleFromItem,
 } from './session-ingest-extractors';
+import {
+  computeSessionMetrics,
+  INACTIVITY_TIMEOUT_MS,
+  POST_CLOSE_DRAIN_MS,
+  type TerminationReason,
+} from './session-metrics';
 
 function writeIngestMetaIfChanged(
   sql: SqlStorage,
@@ -95,10 +101,19 @@ export class SessionIngestDO extends DurableObject<Env> {
     this.initialized = true;
   }
 
-  async ingest(payload: IngestBatch): Promise<{
+  async ingest(
+    payload: IngestBatch,
+    kiloUserId: string,
+    sessionId: string,
+    ingestVersion = 0
+  ): Promise<{
     changes: Changes;
   }> {
     this.initSchema();
+
+    // Persist identity so alarm() can recover kiloUserId/sessionId after hibernation
+    writeIngestMetaIfChanged(this.sql, { key: 'kiloUserId', incomingValue: kiloUserId });
+    writeIngestMetaIfChanged(this.sql, { key: 'sessionId', incomingValue: sessionId });
 
     const incomingByKey: Record<IngestMetaKey, string | null | undefined> = {
       title: undefined,
@@ -106,6 +121,9 @@ export class SessionIngestDO extends DurableObject<Env> {
       platform: undefined,
       orgId: undefined,
     };
+
+    let hasSessionOpen = false;
+    let closeReason: string | undefined;
 
     for (const item of payload) {
       const { item_id, item_type } = getItemIdentity(item);
@@ -131,6 +149,12 @@ export class SessionIngestDO extends DurableObject<Env> {
           incomingByKey[extractor.key] = maybeValue;
         }
       }
+
+      if (item.type === 'session_open') {
+        hasSessionOpen = true;
+      } else if (item.type === 'session_close') {
+        closeReason = item.data.reason;
+      }
     }
 
     const changes: Changes = [];
@@ -143,6 +167,23 @@ export class SessionIngestDO extends DurableObject<Env> {
       if (meta.changed) {
         changes.push({ name: key, value: meta.value });
       }
+    }
+
+    if (ingestVersion >= 1) {
+      // v1 clients send explicit open/close pairs. Only those events drive alarms.
+      if (hasSessionOpen) {
+        // New turn starting — clear prior emission so metrics are re-computed.
+        this.sql.exec(`DELETE FROM ingest_meta WHERE key IN ('metricsEmitted', 'closeReason')`);
+        await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+      }
+      if (closeReason) {
+        writeIngestMetaIfChanged(this.sql, { key: 'closeReason', incomingValue: closeReason });
+        await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
+      }
+      // Events without open/close (stragglers) don't touch the alarm.
+    } else {
+      // v0 (legacy): no open/close signals, rely on inactivity timeout.
+      await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
     }
 
     return {
@@ -176,7 +217,84 @@ export class SessionIngestDO extends DurableObject<Env> {
     return JSON.stringify(snapshot);
   }
 
+  /**
+   * Compute and emit session metrics to the o11y worker.
+   * Returns true if metrics were emitted, false if already emitted.
+   */
+  private async emitSessionMetrics(
+    kiloUserId: string,
+    sessionId: string,
+    closeReason: TerminationReason
+  ): Promise<boolean> {
+    this.initSchema();
+
+    // Check if metrics have already been emitted
+    const emittedRows = this.sql
+      .exec<{
+        value: string | null;
+      }>(`SELECT value FROM ingest_meta WHERE key = 'metricsEmitted' LIMIT 1`)
+      .toArray();
+    if (emittedRows[0]?.value === 'true') {
+      return false;
+    }
+
+    const rows = this.sql
+      .exec<{
+        item_type: string;
+        item_data: string;
+      }>('SELECT item_type, item_data FROM ingest_items')
+      .toArray();
+
+    // Skip emission if the session has no meaningful data
+    if (rows.length === 0) {
+      return false;
+    }
+
+    const metrics = computeSessionMetrics(rows, closeReason);
+
+    await this.env.O11Y.ingestSessionMetrics({ kiloUserId, sessionId, ...metrics });
+
+    // Mark metrics as emitted to prevent duplicates
+    this.sql.exec(
+      `INSERT INTO ingest_meta (key, value) VALUES ('metricsEmitted', 'true')
+       ON CONFLICT(key) DO UPDATE SET value = 'true'`
+    );
+
+    await this.ctx.storage.deleteAlarm();
+
+    return true;
+  }
+
+  /**
+   * Alarm fires either after POST_CLOSE_DRAIN_MS (session closed) or
+   * INACTIVITY_TIMEOUT_MS (no activity). Reads the close reason from
+   * ingest_meta if present, otherwise falls back to 'abandoned'.
+   */
+  async alarm(): Promise<void> {
+    this.initSchema();
+
+    const metaRows = this.sql
+      .exec<{
+        key: string;
+        value: string | null;
+      }>(
+        `SELECT key, value FROM ingest_meta WHERE key IN ('kiloUserId', 'sessionId', 'closeReason')`
+      )
+      .toArray();
+
+    const meta = Object.fromEntries(metaRows.map(r => [r.key, r.value]));
+    const kiloUserId = meta['kiloUserId'];
+    const sessionId = meta['sessionId'];
+
+    if (!kiloUserId || !sessionId) return;
+
+    const closeReason = (meta['closeReason'] ?? 'abandoned') as TerminationReason;
+
+    await this.emitSessionMetrics(kiloUserId, sessionId, closeReason);
+  }
+
   async clear(): Promise<void> {
+    await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
 
     this.initialized = false;

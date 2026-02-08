@@ -20,6 +20,10 @@ export function getItemIdentity(item: SessionDataItem): {
       return { item_id: 'model', item_type: 'model' };
     case 'kilo_meta':
       return { item_id: 'kilo_meta', item_type: 'kilo_meta' };
+    case 'session_open':
+      return { item_id: 'session_open', item_type: 'session_open' };
+    case 'session_close':
+      return { item_id: 'session_close', item_type: 'session_close' };
     default:
       throw new Error(`Unknown item type: ${item['type']}`);
   }

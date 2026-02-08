@@ -200,8 +200,9 @@ await client.initiateFromKilocodeSessionV2.mutate({
 **Lifecycle:**
 
 1. Session initiation → Config stored in Durable Object
-2. Session resume → Config restored; setup/MCP only re-applied if repo was recloned
-3. Environment variables → Always injected into every execution
+2. Session resume (warm) → Workspace intact, execution session reattached
+3. Session resume (cold start) → Sandbox was recycled: restore Kilo CLI session snapshot, reclone repo, checkout branch, re-run setup commands, re-write MCP settings
+4. Environment variables → Always injected into every execution
 
 ### Encrypted Secrets (Backend-to-Backend)
 
@@ -777,8 +778,14 @@ The `SessionService` orchestrates session lifecycle:
 - **Resume (V2: `sendMessageV2`)**
   - Rehydrates the `SessionContext` for an existing workspace
   - Refreshes runtime config for the requested model/token
-  - Reattaches/creates the Cloudflare session (branch ops only for prepared sessions)
-  - Re-runs setup commands only on cold starts (when repo was recloned)
+  - Reattaches/creates the Cloudflare session
+  - **Warm start** (workspace `.git` exists): no additional setup needed
+  - **Cold start** (sandbox recycled, workspace gone):
+    1. Restores Kilo CLI session snapshot from the session-ingest service (`kilo import`)
+    2. Reclones the repository using stored metadata (prefers fresh tokens over stale ones)
+    3. Checks out the correct branch via `restoreWorkspace` — if the branch exists on the remote it creates a local tracking branch, otherwise creates a new local branch
+    4. Re-runs setup commands (lenient — failures warn instead of aborting)
+    5. Re-writes MCP server settings
 
 ### Session Linking
 

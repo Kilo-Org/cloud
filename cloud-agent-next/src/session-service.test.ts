@@ -9,6 +9,7 @@ vi.mock('./workspace.js', () => {
   const cloneGitHubRepo = vi.fn();
   const cloneGitRepo = vi.fn();
   const manageBranch = vi.fn();
+  const restoreWorkspace = vi.fn();
   const checkDiskSpace = vi.fn().mockResolvedValue({ availableMB: 5000, totalMB: 10000 });
 
   return {
@@ -16,6 +17,7 @@ vi.mock('./workspace.js', () => {
     cloneGitHubRepo,
     cloneGitRepo,
     manageBranch,
+    restoreWorkspace,
     checkDiskSpace,
     getSessionHomePath: (sessionId: string) => `/home/${sessionId}`,
     getSessionWorkspacePath: (orgId: string, userId: string, sessionId: string) =>
@@ -35,6 +37,7 @@ import {
   setupWorkspace as mockSetupWorkspace,
   cloneGitHubRepo as mockCloneGitHubRepo,
   manageBranch as mockManageBranch,
+  restoreWorkspace as mockRestoreWorkspace,
 } from './workspace.js';
 import { InvalidSessionMetadataError, SessionService } from './session-service.js';
 import type { SandboxInstance, SessionId, SessionContext, ExecutionSession } from './types.js';
@@ -610,17 +613,16 @@ describe('SessionService', () => {
         env: testEnv,
       });
 
-      // Verify cloneGitHubRepo was called
-      expect(mockCloneGitHubRepo).toHaveBeenCalledWith(
+      // Verify restoreWorkspace was called with correct options
+      expect(mockRestoreWorkspace).toHaveBeenCalledWith(
         fakeSession,
         `/workspace/${orgId}/${userId}/sessions/${sessionId}`,
-        'facebook/react',
-        'test-token',
-        { GITHUB_APP_SLUG: undefined, GITHUB_APP_BOT_USER_ID: undefined }
+        `session/${sessionId}`,
+        expect.objectContaining({
+          githubRepo: 'facebook/react',
+          githubToken: 'test-token',
+        })
       );
-
-      // manageBranch should NOT be called - kilocode CLI handles branch restoration
-      expect(mockManageBranch).not.toHaveBeenCalled();
 
       // Verify context includes repo info
       expect(result.context.githubRepo).toBe('facebook/react');
@@ -682,13 +684,15 @@ describe('SessionService', () => {
         githubToken: freshToken,
       });
 
-      // Verify cloneGitHubRepo was called with FRESH token, not stale metadata token
-      expect(mockCloneGitHubRepo).toHaveBeenCalledWith(
+      // Verify restoreWorkspace was called with FRESH token, not stale metadata token
+      expect(mockRestoreWorkspace).toHaveBeenCalledWith(
         fakeSession,
         `/workspace/${orgId}/${userId}/sessions/${sessionId}`,
-        'facebook/react',
-        freshToken, // Should use fresh token, not 'stale-token-from-metadata'
-        { GITHUB_APP_SLUG: undefined, GITHUB_APP_BOT_USER_ID: undefined }
+        `session/${sessionId}`,
+        expect.objectContaining({
+          githubRepo: 'facebook/react',
+          githubToken: freshToken, // Should use fresh token, not 'stale-token-from-metadata'
+        })
       );
     });
 
@@ -745,13 +749,15 @@ describe('SessionService', () => {
         // No fresh token provided
       });
 
-      // Verify cloneGitHubRepo was called with metadata token as fallback
-      expect(mockCloneGitHubRepo).toHaveBeenCalledWith(
+      // Verify restoreWorkspace was called with metadata token as fallback
+      expect(mockRestoreWorkspace).toHaveBeenCalledWith(
         fakeSession,
         `/workspace/${orgId}/${userId}/sessions/${sessionId}`,
-        'facebook/react',
-        'metadata-token', // Should fall back to metadata token
-        { GITHUB_APP_SLUG: undefined, GITHUB_APP_BOT_USER_ID: undefined }
+        `session/${sessionId}`,
+        expect.objectContaining({
+          githubRepo: 'facebook/react',
+          githubToken: 'metadata-token', // Should fall back to metadata token
+        })
       );
     });
 

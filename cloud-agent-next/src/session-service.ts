@@ -18,6 +18,7 @@ import {
   getSessionHomePath,
   getSessionWorkspacePath,
   manageBranch,
+  restoreWorkspace,
   setupWorkspace,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
@@ -1190,7 +1191,6 @@ export class SessionService {
     await checkDiskSpace(session);
 
     // Only re-run setup if we had to reclone (cold start)
-    // Note: We don't checkout branch here - kilocode CLI will restore workspace state when it runs
     if (isColdStart) {
       await this.handleColdStartResume({
         session,
@@ -1263,33 +1263,13 @@ export class SessionService {
     // Cold-start resume must restore snapshot or fail.
     await this.restoreSessionSnapshot(session, sessionId, kilocodeToken, env, userId);
 
-    if (metadata.gitUrl) {
-      const effectiveGitToken = freshGitToken ?? metadata.gitToken;
-      logger
-        .withTags({ gitUrl: metadata.gitUrl, hasFreshToken: !!freshGitToken })
-        .info('Recloning missing repository (generic git)');
-
-      // Reclone the repository using generic git
-      await cloneGitRepo(session, context.workspacePath, metadata.gitUrl, effectiveGitToken);
-    } else if (metadata.githubRepo) {
-      const effectiveGithubToken = freshGithubToken ?? metadata.githubToken;
-      logger
-        .withTags({ githubRepo: metadata.githubRepo, hasFreshToken: !!freshGithubToken })
-        .info('Recloning missing repository');
-
-      // Reclone the repository
-      await cloneGitHubRepo(
-        session,
-        context.workspacePath,
-        metadata.githubRepo,
-        effectiveGithubToken,
-        getGitAuthorEnv(env, metadata.githubAppType)
-      );
-    } else {
-      throw new Error(
-        `Session ${sessionId} workspace is missing and no repository metadata found. Please re-initiate the session.`
-      );
-    }
+    await restoreWorkspace(session, context.workspacePath, context.branchName, {
+      githubRepo: metadata.githubRepo,
+      githubToken: freshGithubToken ?? metadata.githubToken,
+      gitUrl: metadata.gitUrl,
+      gitToken: freshGitToken ?? metadata.gitToken,
+      gitAuthorEnv: getGitAuthorEnv(env, metadata.githubAppType),
+    });
 
     // Re-run setup commands (fresh clone, need to reinstall)
     if (metadata.setupCommands && metadata.setupCommands.length > 0) {

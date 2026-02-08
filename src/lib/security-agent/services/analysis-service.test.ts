@@ -4,6 +4,8 @@ import type * as securityAnalysisModule from '@/lib/security-agent/db/security-a
 import type * as triageModule from './triage-service';
 import type * as tokensModule from '@/lib/tokens';
 import type { StreamEvent } from '@/components/cloud-agent/types';
+import type { User } from '@/db/schema';
+import type { startSecurityAnalysis as startSecurityAnalysisType } from './analysis-service';
 
 const mockGetSecurityFindingById = jest.fn() as jest.MockedFunction<
   typeof securityFindingsModule.getSecurityFindingById
@@ -49,10 +51,10 @@ jest.mock('./extraction-service', () => ({
   extractSandboxAnalysis: jest.fn(() => Promise.resolve()),
 }));
 
-let startSecurityAnalysis: typeof import('./analysis-service').startSecurityAnalysis;
+let startSecurityAnalysis: typeof startSecurityAnalysisType;
 
-beforeAll(() => {
-  ({ startSecurityAnalysis } = require('./analysis-service'));
+beforeAll(async () => {
+  ({ startSecurityAnalysis } = await import('./analysis-service'));
 });
 
 describe('analysis-service', () => {
@@ -63,7 +65,7 @@ describe('analysis-service', () => {
   it('passes organization id to cloud agent sandbox analysis', async () => {
     const organizationId = 'org-123';
     const findingId = 'finding-123';
-    const user = { id: 'user-1', google_user_email: 'test@example.com' };
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
 
     const mockFinding = {
       id: findingId,
@@ -98,7 +100,7 @@ describe('analysis-service', () => {
 
     const result = await startSecurityAnalysis({
       findingId,
-      user: user as any,
+      user,
       githubRepo: 'acme/repo',
       githubToken: 'gh-token',
       model: 'anthropic/claude-sonnet-4',

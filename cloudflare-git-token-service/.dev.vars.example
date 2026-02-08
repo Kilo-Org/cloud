@@ -1,0 +1,10 @@
+# GITHUB_APP_ID: The numeric App ID from GitHub App settings
+# GITHUB_APP_PRIVATE_KEY: The PEM-encoded private key (base64 encoded for env var storage)
+
+GITHUB_APP_ID=
+GITHUB_APP_PRIVATE_KEY=
+
+# GitHub Lite App credentials (for OSS organizations with read-only permissions)
+# Same format as standard app credentials above
+GITHUB_LITE_APP_ID=
+GITHUB_LITE_APP_PRIVATE_KEY=

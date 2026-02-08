@@ -583,6 +583,7 @@ export async function startSecurityAnalysis(params: {
     const streamGenerator = client.initiateSessionStream({
       githubRepo,
       githubToken,
+      kilocodeOrganizationId: organizationId,
       prompt,
       mode: 'code', // Use code mode so agent can search files
       model,

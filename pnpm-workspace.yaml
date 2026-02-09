@@ -16,6 +16,7 @@ packages:
   - 'cloudflare-session-ingest'
   - 'cloudflare-o11y'
   - 'cloudflare-git-token-service'
+  - 'kiloclaw'
 
 ignoredBuiltDependencies:
   - '@sentry/cli'

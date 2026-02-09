@@ -1,0 +1,39 @@
+{
+  "name": "kiloclaw",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Multi-tenant OpenClaw in Cloudflare Sandbox containers",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev",
+    "types": "wrangler types",
+    "typecheck": "tsgo --noEmit --incremental false",
+    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
+    "lint:fix": "eslint --config eslint.config.mjs --cache --fix 'src/**/*.ts'",
+    "format": "prettier --write 'src/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "hono": "^4.11.6",
+    "jose": "^6.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/sandbox": "*",
+    "@eslint/js": "^9.38.0",
+    "@types/node": "^22.0.0",
+    "@typescript/native-preview": "7.0.0-dev.20251019.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^9.38.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.46.2",
+    "vitest": "^4.0.18",
+    "wrangler": "^4.50.0"
+  },
+  "author": "",
+  "license": "Apache-2.0"
+}

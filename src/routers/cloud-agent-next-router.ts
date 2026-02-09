@@ -77,6 +77,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
           githubRepo?: string;
           gitUrl?: string;
           gitToken?: string;
+          platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
@@ -90,10 +91,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
           }
           const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken };
+          gitParams = { gitUrl, gitToken, platform: 'gitlab' };
         } else {
           // GitHub flow: use githubRepo (token will be fetched in cloud-agent-next)
-          gitParams = { githubRepo };
+          gitParams = { githubRepo, platform: 'github' };
         }
 
         const result = await client.prepareSession({

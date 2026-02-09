@@ -229,6 +229,8 @@ export async function POST(request: Request) {
         // GitLab-specific params (only set for GitLab projects)
         gitUrl,
         gitToken,
+        // Platform detection: explicit instead of URL-based
+        platform: input.gitlabProject ? 'gitlab' : 'github',
         // Common params
         kilocodeOrganizationId,
         envVars: mergedEnvVars,

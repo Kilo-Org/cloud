@@ -662,6 +662,7 @@ export class CloudAgentSession extends DurableObject {
     githubAppType?: 'standard' | 'lite';
     gitUrl?: string;
     gitToken?: string;
+    platform?: 'github' | 'gitlab';
     envVars?: Record<string, string>;
     encryptedSecrets?: EncryptedSecrets;
     setupCommands?: string[];

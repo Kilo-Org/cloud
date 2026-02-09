@@ -156,6 +156,22 @@ export const REPOSITORY_SELECTION = {
   SELECTED: 'selected',
 } as const;
 
+/**
+ * Git-specific platforms (subset of all platforms).
+ * Used for repository operations, cloud sessions, code reviews, etc.
+ */
+export const GIT_PLATFORM = {
+  GITHUB: 'github',
+  GITLAB: 'gitlab',
+} as const;
+
+/**
+ * Type guard to check if a string is a valid git platform
+ */
+export function isGitPlatform(platform: string): platform is GitPlatform {
+  return platform === GIT_PLATFORM.GITHUB || platform === GIT_PLATFORM.GITLAB;
+}
+
 // Type exports for use throughout the codebase
 export type IntegrationStatus = (typeof INTEGRATION_STATUS)[keyof typeof INTEGRATION_STATUS];
 export type PendingApprovalStatus =
@@ -165,4 +181,5 @@ export type GitHubAction = (typeof GITHUB_ACTION)[keyof typeof GITHUB_ACTION];
 export type GitLabEvent = (typeof GITLAB_EVENT)[keyof typeof GITLAB_EVENT];
 export type GitLabAction = (typeof GITLAB_ACTION)[keyof typeof GITLAB_ACTION];
 export type Platform = (typeof PLATFORM)[keyof typeof PLATFORM];
+export type GitPlatform = (typeof GIT_PLATFORM)[keyof typeof GIT_PLATFORM];
 export type RepositorySelection = (typeof REPOSITORY_SELECTION)[keyof typeof REPOSITORY_SELECTION];

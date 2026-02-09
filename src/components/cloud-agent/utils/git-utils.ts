@@ -51,29 +51,16 @@ export function extractRepoFromGitUrl(gitUrl: string | null | undefined): string
   return undefined;
 }
 
-export function isGitLabUrl(gitUrl: string | null | undefined): boolean {
-  if (!gitUrl) return false;
-
-  if (gitUrl.startsWith('git@')) {
-    return gitUrl.includes('gitlab.');
-  }
-
-  try {
-    const url = new URL(gitUrl);
-    return url.hostname.includes('gitlab');
-  } catch {
-    return gitUrl.includes('gitlab');
-  }
-}
+export type GitPlatform = 'github' | 'gitlab';
 
 export function buildPrepareSessionRepoParams(options: {
   repo?: string | null;
-  gitUrl?: string | null;
+  platform: GitPlatform;
 }): { githubRepo?: string; gitlabProject?: string } | null {
   const repo = options.repo?.trim();
   if (!repo) return null;
 
-  if (isGitLabUrl(options.gitUrl)) {
+  if (options.platform === 'gitlab') {
     return { gitlabProject: repo };
   }
 

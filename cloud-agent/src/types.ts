@@ -69,6 +69,8 @@ export type SessionContext = {
   gitUrl?: string;
   /** Token for generic git authentication (e.g., GitLab token) */
   gitToken?: string;
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
 };
 /** Result of interrupting a session's running processes */

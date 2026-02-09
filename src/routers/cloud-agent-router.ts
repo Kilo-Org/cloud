@@ -138,6 +138,7 @@ export const cloudAgentRouter = createTRPCRouter({
           githubToken?: string;
           gitUrl?: string;
           gitToken?: string;
+          platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
@@ -151,11 +152,11 @@ export const cloudAgentRouter = createTRPCRouter({
           }
           const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken };
+          gitParams = { gitUrl, gitToken, platform: 'gitlab' };
         } else {
           // GitHub flow: use githubRepo + githubToken
           const githubToken = await getGitHubTokenForUser(ctx.user.id);
-          gitParams = { githubRepo, githubToken };
+          gitParams = { githubRepo, githubToken, platform: 'github' };
         }
 
         return await client.prepareSession({
@@ -202,6 +203,7 @@ export const cloudAgentRouter = createTRPCRouter({
           githubToken?: string;
           gitUrl?: string;
           gitToken?: string;
+          platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
@@ -214,10 +216,10 @@ export const cloudAgentRouter = createTRPCRouter({
           }
           const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken };
+          gitParams = { gitUrl, gitToken, platform: 'gitlab' };
         } else {
           const githubToken = await getGitHubTokenForUser(ctx.user.id);
-          gitParams = { githubRepo, githubToken };
+          gitParams = { githubRepo, githubToken, platform: 'github' };
         }
 
         return await client.prepareLegacySession({

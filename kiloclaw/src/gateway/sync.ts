@@ -21,7 +21,7 @@ export type SyncResult = {
  * 4. Writes a timestamp file for tracking
  *
  * Syncs three directories:
- * - Config: /root/.openclaw/ (or /root/.clawdbot/) -> R2:/openclaw/
+ * - Config: /root/.openclaw/ -> R2:/openclaw/
  * - Workspace: /root/clawd/ -> R2:/workspace/ (IDENTITY.md, MEMORY.md, memory/, assets/)
  * - Skills: /root/clawd/skills/ -> R2:/skills/
  *
@@ -41,25 +41,17 @@ export async function syncToR2(sandbox: Sandbox, env: KiloClawEnv): Promise<Sync
     return { success: false, error: 'Failed to mount R2 storage' };
   }
 
-  // Determine which config directory exists
-  // Check new path first, fall back to legacy
-  // Use exit code (0 = exists) rather than stdout parsing to avoid log-flush races
-  let configDir = '/root/.openclaw';
+  // Verify config exists before syncing
+  const configDir = '/root/.openclaw';
   try {
-    const checkNew = await sandbox.startProcess('test -f /root/.openclaw/openclaw.json');
-    await waitForProcess(checkNew, 5000);
-    if (checkNew.exitCode !== 0) {
-      const checkLegacy = await sandbox.startProcess('test -f /root/.clawdbot/clawdbot.json');
-      await waitForProcess(checkLegacy, 5000);
-      if (checkLegacy.exitCode === 0) {
-        configDir = '/root/.clawdbot';
-      } else {
-        return {
-          success: false,
-          error: 'Sync aborted: no config file found',
-          details: 'Neither openclaw.json nor clawdbot.json found in config directory.',
-        };
-      }
+    const check = await sandbox.startProcess('test -f /root/.openclaw/openclaw.json');
+    await waitForProcess(check, 5000);
+    if (check.exitCode !== 0) {
+      return {
+        success: false,
+        error: 'Sync aborted: no config file found',
+        details: 'openclaw.json not found in /root/.openclaw/',
+      };
     }
   } catch (err) {
     return {
@@ -69,8 +61,6 @@ export async function syncToR2(sandbox: Sandbox, env: KiloClawEnv): Promise<Sync
     };
   }
 
-  // Sync to the new openclaw/ R2 prefix (even if source is legacy .clawdbot)
-  // Also sync workspace directory (excluding skills since they're synced separately)
   const syncCmd = `rsync -r --no-times --delete --exclude='*.lock' --exclude='*.log' --exclude='*.tmp' ${configDir}/ ${R2_MOUNT_PATH}/openclaw/ && rsync -r --no-times --delete --exclude='skills' /root/clawd/ ${R2_MOUNT_PATH}/workspace/ && rsync -r --no-times --delete /root/clawd/skills/ ${R2_MOUNT_PATH}/skills/ && date -Iseconds > ${R2_MOUNT_PATH}/.last-sync`;
 
   try {

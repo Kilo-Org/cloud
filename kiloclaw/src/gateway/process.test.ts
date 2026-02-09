@@ -67,32 +67,6 @@ describe('findExistingGatewayProcess', () => {
     expect(result).toBe(gatewayProcess);
   });
 
-  it('matches legacy clawdbot gateway command (transition compat)', async () => {
-    const gatewayProcess = createFullMockProcess({
-      id: 'gateway-1',
-      command: 'clawdbot gateway --port 18789',
-      status: 'running',
-    });
-    const { sandbox, listProcessesMock } = createMockSandbox();
-    listProcessesMock.mockResolvedValue([gatewayProcess]);
-
-    const result = await findExistingGatewayProcess(sandbox);
-    expect(result).toBe(gatewayProcess);
-  });
-
-  it('matches legacy start-moltbot.sh command (transition compat)', async () => {
-    const gatewayProcess = createFullMockProcess({
-      id: 'gateway-1',
-      command: '/usr/local/bin/start-moltbot.sh',
-      status: 'running',
-    });
-    const { sandbox, listProcessesMock } = createMockSandbox();
-    listProcessesMock.mockResolvedValue([gatewayProcess]);
-
-    const result = await findExistingGatewayProcess(sandbox);
-    expect(result).toBe(gatewayProcess);
-  });
-
   it('ignores completed gateway processes', async () => {
     const processes = [
       createFullMockProcess({ command: 'openclaw gateway', status: 'completed' }),

@@ -17,7 +17,14 @@ export async function POST(
 
   if (authFailedResponse) return authFailedResponse;
 
-  const { credit_category } = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+  }
+
+  const { credit_category } = body as { credit_category?: unknown };
 
   if (!credit_category || typeof credit_category !== 'string') {
     return NextResponse.json({ error: 'Promotional code is required' }, { status: 400 });

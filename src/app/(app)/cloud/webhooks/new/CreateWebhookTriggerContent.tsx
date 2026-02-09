@@ -16,8 +16,6 @@ import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
-import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
-import { useCloudAgentEligibility } from '@/hooks/useCloudAgentEligibility';
 import { ArrowLeft, Webhook, AlertCircle } from 'lucide-react';
 
 type CreateWebhookTriggerContentProps = {
@@ -37,7 +35,6 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     : '/integrations';
 
   // Fetch eligibility to check if user can create webhook triggers (requires credits)
-  const { hasInsufficientBalance, eligibilityData } = useCloudAgentEligibility(organizationId);
 
   // Fetch GitHub repositories
   const {
@@ -180,39 +177,6 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
                 Refresh
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      </>
-    );
-  }
-
-  // If insufficient balance, show banner and block form submission
-  if (hasInsufficientBalance && eligibilityData) {
-    return (
-      <>
-        {headerContent}
-        <div className="mb-6">
-          <InsufficientBalanceBanner
-            balance={eligibilityData.balance}
-            organizationId={organizationId}
-            content={{ type: 'productName', productName: 'Webhook Triggers' }}
-          />
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Cannot Create Trigger</CardTitle>
-            <CardDescription>
-              You need sufficient credits to create webhook triggers. Each time a webhook trigger
-              fires, it starts a cloud agent session which uses credits.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" asChild>
-              <Link href={routes.list}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Webhook Triggers
-              </Link>
-            </Button>
           </CardContent>
         </Card>
       </>

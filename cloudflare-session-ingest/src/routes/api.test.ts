@@ -470,6 +470,69 @@ describe('api routes', () => {
     expect(selectExecuteTakeFirst).toHaveBeenCalled();
   });
 
+  it('GET /session/:sessionId/export returns 400 for invalid sessionId', async () => {
+    const { db } = makeDbFakes();
+    vi.mocked(getDb).mockReturnValue(db);
+
+    const app = makeApiApp();
+    const invalid = 'not-a-session';
+    const res = await app.fetch(
+      new Request(`http://local/session/${invalid}/export`, {
+        method: 'GET',
+      }),
+      { HYPERDRIVE: { connectionString: 'postgres://test' } }
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid sessionId' });
+  });
+
+  it('GET /session/:sessionId/export returns 404 when session missing', async () => {
+    const { db, fns } = makeDbFakes();
+    const { selectExecuteTakeFirst } = fns;
+    vi.mocked(getDb).mockReturnValue(db);
+    selectExecuteTakeFirst.mockResolvedValueOnce(undefined);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/export', {
+        method: 'GET',
+      }),
+      { HYPERDRIVE: { connectionString: 'postgres://test' } }
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ success: false, error: 'session_not_found' });
+  });
+
+  it('GET /session/:sessionId/export returns DO payload for valid session', async () => {
+    const { db, fns } = makeDbFakes();
+    const { selectExecuteTakeFirst } = fns;
+    vi.mocked(getDb).mockReturnValue(db);
+    selectExecuteTakeFirst.mockResolvedValueOnce({ session_id: 'ses_12345678901234567890123456' });
+
+    const payload = JSON.stringify({ success: true, events: [] });
+    const ingestStub = {
+      getAll: vi.fn(async () => payload),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/export', {
+        method: 'GET',
+      }),
+      { HYPERDRIVE: { connectionString: 'postgres://test' } }
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(await res.text()).toBe(payload);
+    expect(ingestStub.getAll).toHaveBeenCalled();
+  });
+
   it('POST /session/:sessionId/ingest backfills cache on cache miss + existing session', async () => {
     const { db, fns } = makeDbFakes();
     const { selectExecuteTakeFirst } = fns;

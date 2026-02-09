@@ -26,11 +26,14 @@
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.6.7",
+    "@hono/trpc-server": "^0.4.2",
     "@octokit/auth-app": "^8.1.2",
     "@trpc/server": "^11.0.0",
     "aws4fetch": "^1.0.20",
+    "hono": "^4.11.7",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.3",
+    "ulid": "3.0.1",
     "workers-tagged-logger": "^0.13.7",
     "zod": "^4.1.0"
   },

@@ -21,6 +21,7 @@ import {
   serial,
   vector,
   type AnyPgColumn,
+  bigserial,
 } from 'drizzle-orm/pg-core';
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -42,7 +43,6 @@ import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
 } from '@/lib/providers/openrouter/openrouter-types';
-import type { CloudMessage } from '@/components/cloud-agent/types';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import type Stripe from 'stripe';
 import {
@@ -613,6 +613,22 @@ export const microdollar_usage_metadata = pgTable(
     has_tools: boolean(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
+);
+
+export const api_request_log = pgTable(
+  'api_request_log',
+  {
+    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    kilo_user_id: text(),
+    organization_id: text(),
+    provider: text(),
+    model: text(),
+    status_code: integer(),
+    request: jsonb(),
+    response: text(),
+  },
+  table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
 export const http_user_agent = pgTable(
@@ -2147,30 +2163,6 @@ export const app_builder_projects = pgTable(
 );
 
 export type AppBuilderProject = typeof app_builder_projects.$inferSelect;
-
-// App Builder Messages - stores raw cloud agent messages as JSONB
-export const app_builder_messages = pgTable(
-  'app_builder_messages',
-  {
-    id: uuid()
-      .default(sql`gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    project_id: uuid()
-      .notNull()
-      .references(() => app_builder_projects.id, { onDelete: 'cascade' }),
-    data: jsonb().$type<CloudMessage>().notNull(), // Raw cloud agent message
-    sequence: serial().notNull(), // Auto-incrementing sequence for guaranteed ordering
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('IDX_app_builder_messages_project_id').on(table.project_id),
-    index('IDX_app_builder_messages_sequence').on(table.sequence),
-    unique('UQ_app_builder_messages_project_created_at').on(table.project_id, table.created_at),
-  ]
-);
-
-export type AppBuilderMessage = typeof app_builder_messages.$inferSelect;
 
 export const app_reported_messages = pgTable('app_reported_messages', {
   report_id: uuid()

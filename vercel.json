@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/sync-providers",
-      "schedule": "30 * * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/cleanup-device-auth",
@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/cleanup-stale-analyses",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-api-request-log",
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",

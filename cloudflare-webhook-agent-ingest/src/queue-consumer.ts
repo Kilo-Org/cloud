@@ -289,17 +289,29 @@ async function processWebhookMessage(
         callbackUrl,
       });
 
-      const prepareResponse = await env.CLOUD_AGENT.fetch(
-        new Request('https://cloud-agent/trpc/prepareSession', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-            'x-internal-api-key': internalApiSecret,
-          },
-          body: JSON.stringify(prepareSessionBody),
-        })
-      );
+      let prepareResponse: Response;
+      try {
+        prepareResponse = await env.CLOUD_AGENT.fetch(
+          new Request('https://cloud-agent/trpc/prepareSession', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+              'x-internal-api-key': internalApiSecret,
+              'x-skip-balance-check': 'true',
+            },
+            body: JSON.stringify(prepareSessionBody),
+          })
+        );
+      } catch (error) {
+        logger.error('prepareSession request failed', {
+          requestId: webhook.requestId,
+          namespace: webhook.namespace,
+          triggerId: webhook.triggerId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
 
       if (!prepareResponse.ok) {
         const errorBody = await prepareResponse.text();
@@ -365,17 +377,30 @@ async function processWebhookMessage(
       }
     }
 
-    const initiateResponse = await env.CLOUD_AGENT.fetch(
-      new Request('https://cloud-agent/trpc/initiateFromKilocodeSessionV2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          'x-internal-api-key': internalApiSecret,
-        },
-        body: JSON.stringify({ cloudAgentSessionId }),
-      })
-    );
+    let initiateResponse: Response;
+    try {
+      initiateResponse = await env.CLOUD_AGENT.fetch(
+        new Request('https://cloud-agent/trpc/initiateFromKilocodeSessionV2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'x-internal-api-key': internalApiSecret,
+            'x-skip-balance-check': 'true',
+          },
+          body: JSON.stringify({ cloudAgentSessionId }),
+        })
+      );
+    } catch (error) {
+      logger.error('initiateFromKilocodeSessionV2 request failed', {
+        requestId: webhook.requestId,
+        namespace: webhook.namespace,
+        triggerId: webhook.triggerId,
+        cloudAgentSessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
 
     if (!initiateResponse.ok) {
       const errorBody = await initiateResponse.text();

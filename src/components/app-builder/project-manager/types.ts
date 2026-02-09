@@ -29,6 +29,8 @@ export type ProjectState = {
   previewStatus: PreviewStatus;
   deploymentId: string | null;
   model: string;
+  /** Current URL the user is viewing in the preview iframe (tracked via postMessage) */
+  currentIframeUrl: string | null;
 };
 
 // =============================================================================

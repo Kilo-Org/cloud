@@ -96,15 +96,15 @@ describe('WebSocket Filters', () => {
     });
 
     it('should match when executionId is in executionIds list', () => {
-      const event = createEvent({ execution_id: 'msg_2' });
-      const filters = createFilters({ executionIds: ['msg_1', 'msg_2'] as ExecutionId[] });
+      const event = createEvent({ execution_id: 'exc_2' });
+      const filters = createFilters({ executionIds: ['exc_1', 'exc_2'] as ExecutionId[] });
 
       expect(matchesFilters(event, filters)).toBe(true);
     });
 
     it('should not match when executionId is not in executionIds list', () => {
-      const event = createEvent({ execution_id: 'msg_3' });
-      const filters = createFilters({ executionIds: ['msg_1', 'msg_2'] as ExecutionId[] });
+      const event = createEvent({ execution_id: 'exc_3' });
+      const filters = createFilters({ executionIds: ['exc_1', 'exc_2'] as ExecutionId[] });
 
       expect(matchesFilters(event, filters)).toBe(false);
     });
@@ -153,13 +153,13 @@ describe('WebSocket Filters', () => {
 
     it('should require all filters to match (AND logic)', () => {
       const event = createEvent({
-        execution_id: 'msg_1',
+        execution_id: 'exc_1',
         stream_event_type: 'output',
         timestamp: 1500,
       });
 
       const filters = createFilters({
-        executionIds: ['msg_1'] as ExecutionId[],
+        executionIds: ['exc_1'] as ExecutionId[],
         eventTypes: ['output'],
         startTime: 1000,
         endTime: 2000,
@@ -170,13 +170,13 @@ describe('WebSocket Filters', () => {
 
     it('should not match if any filter fails', () => {
       const event = createEvent({
-        execution_id: 'msg_1',
+        execution_id: 'exc_1',
         stream_event_type: 'error', // Wrong type
         timestamp: 1500,
       });
 
       const filters = createFilters({
-        executionIds: ['msg_1'] as ExecutionId[],
+        executionIds: ['exc_1'] as ExecutionId[],
         eventTypes: ['output'], // Requires 'output' but event is 'error'
         startTime: 1000,
         endTime: 2000,

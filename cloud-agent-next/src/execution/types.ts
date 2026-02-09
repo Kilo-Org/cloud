@@ -2,7 +2,6 @@
  * Types for the cloud-agent execution system.
  *
  * This module defines the core types for direct execution without queuing.
- * The key insight is that executionId === messageId for correlation.
  *
  * NOTE: Queue-specific types (ExecutionMessage, WrapperLaunchPlan) have been removed
  * as part of the migration to direct execution.
@@ -311,7 +310,7 @@ export type WrapperPlan = {
  * Contains all information needed to set up and execute.
  */
 export type ExecutionPlan = {
-  /** Unique execution ID (msg_<uuid> format, same as messageId) */
+  /** Unique execution ID (exc_<ulid> format) */
   executionId: ExecutionId;
   /** Cloud-agent session ID */
   sessionId: SessionId;
@@ -341,8 +340,6 @@ export type ExecutionPlan = {
  * Actual completion is tracked via SSE events.
  */
 export type ExecutionResult = {
-  /** Message ID from wrapper.prompt() - same as executionId */
-  messageId: string;
   /** Kilo session ID (created or resumed) */
   kiloSessionId: string;
 };

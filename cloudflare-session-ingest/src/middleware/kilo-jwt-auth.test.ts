@@ -4,18 +4,16 @@ import jwt from 'jsonwebtoken';
 import { kiloJwtAuthMiddleware } from './kilo-jwt-auth';
 
 type TestEnv = {
-  NEXTAUTH_SECRET: {
+  NEXTAUTH_SECRET_PROD: {
     get: () => Promise<string>;
   };
-  NEXTAUTH_SECRET_RAW?: string;
 };
 
 function makeEnv(secret: string): TestEnv {
   return {
-    NEXTAUTH_SECRET: {
+    NEXTAUTH_SECRET_PROD: {
       get: async () => secret,
     },
-    NEXTAUTH_SECRET_RAW: undefined,
   };
 }
 

@@ -42,9 +42,15 @@
       "new_sqlite_classes": ["SessionIngestDO", "SessionAccessCacheDO"],
     },
   ],
+  "services": [
+    {
+      "binding": "O11Y",
+      "service": "o11y",
+    },
+  ],
   "secrets_store_secrets": [
     {
-      "binding": "NEXTAUTH_SECRET",
+      "binding": "NEXTAUTH_SECRET_PROD",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "NEXTAUTH_SECRET_PROD",
     },

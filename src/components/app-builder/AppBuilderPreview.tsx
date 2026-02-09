@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, useEffect, useRef, memo } from 'react';
 import Link from 'next/link';
 import {
   Loader2,
@@ -18,6 +18,9 @@ import {
   ExternalLink,
   AlertCircle,
   Rocket,
+  Home,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -111,8 +114,13 @@ function IframeLoadingOverlay() {
 
 type PreviewFrameProps = {
   url: string;
+  currentPath: string;
+  isAtRoot: boolean;
   isFullscreen: boolean;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
   onRefresh: () => void;
+  onGoHome: () => void;
+  onCopyUrl: () => Promise<boolean>;
   onToggleFullscreen: () => void;
   onOpenExternal: () => void;
 };
@@ -121,18 +129,50 @@ type PreviewFrameProps = {
  * Preview frame controls bar
  */
 function PreviewControls({
-  url,
+  currentPath,
+  isAtRoot,
   isFullscreen,
   onRefresh,
+  onGoHome,
+  onCopyUrl,
   onToggleFullscreen,
   onOpenExternal,
-}: PreviewFrameProps) {
+}: Omit<PreviewFrameProps, 'url' | 'iframeRef'>) {
+  const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear timeout on unmount to prevent setState on unmounted component
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    const success = await onCopyUrl();
+    if (success) {
+      setCopied(true);
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
+    }
+  }, [onCopyUrl]);
+
   return (
     <div className="flex items-center justify-between gap-4 border-b px-4 py-2">
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">{url}</span>
+        <Button variant="ghost" size="sm" onClick={onGoHome} disabled={isAtRoot} title="Go to home">
+          <Home className="h-4 w-4" />
+        </Button>
+        <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">{currentPath}</span>
       </div>
       <div className="flex items-center gap-1">
+        <Button variant="ghost" size="sm" onClick={handleCopy} title="Copy URL">
+          {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+        </Button>
         <Button variant="ghost" size="sm" onClick={onRefresh} title="Refresh preview">
           <RefreshCw className="h-4 w-4" />
         </Button>
@@ -152,29 +192,22 @@ function PreviewControls({
   );
 }
 
-const isDev = process.env.NODE_ENV === 'development';
-
-/** In dev, remove subdomain: "https://app-id.builder.kiloapps.io/path" -> "https://builder.kiloapps.io/" */
-function getPreviewUrl(url: string): string {
-  if (!isDev) return url;
-  try {
-    const parsed = new URL(url);
-    const parts = parsed.hostname.split('.');
-    if (parts.length > 2) {
-      parsed.hostname = parts.slice(1).join('.');
-    }
-    parsed.pathname = '/';
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-}
-
 /**
  * Preview iframe with controls - renders dev or production iframe based on environment
  */
 function PreviewFrame(props: PreviewFrameProps) {
-  const { url, isFullscreen } = props;
+  const {
+    url,
+    currentPath,
+    isAtRoot,
+    isFullscreen,
+    iframeRef,
+    onRefresh,
+    onGoHome,
+    onCopyUrl,
+    onToggleFullscreen,
+    onOpenExternal,
+  } = props;
   const [isIframeLoading, setIsIframeLoading] = useState(true);
 
   // Reset loading state when URL changes
@@ -188,11 +221,21 @@ function PreviewFrame(props: PreviewFrameProps) {
 
   return (
     <div className={cn('flex h-full flex-col', isFullscreen && 'bg-background fixed inset-0 z-50')}>
-      <PreviewControls {...props} />
+      <PreviewControls
+        currentPath={currentPath}
+        isAtRoot={isAtRoot}
+        isFullscreen={isFullscreen}
+        onRefresh={onRefresh}
+        onGoHome={onGoHome}
+        onCopyUrl={onCopyUrl}
+        onToggleFullscreen={onToggleFullscreen}
+        onOpenExternal={onOpenExternal}
+      />
       <div className="relative flex-1">
         {isIframeLoading && <IframeLoadingOverlay />}
         <iframe
-          src={getPreviewUrl(url)}
+          ref={iframeRef}
+          src={url}
           className="h-full w-full border-0"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           title="App Preview"
@@ -311,6 +354,15 @@ function DeploymentControls({ state, onDeploy }: { state: DeploymentState; onDep
   }
 }
 
+/** Extract pathname from URL, stripping query params */
+function getPathFromUrl(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return '/';
+  }
+}
+
 /**
  * Main preview component
  */
@@ -319,12 +371,59 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
 }: AppBuilderPreviewProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
-  const { previewUrl, previewStatus, deploymentId } = state;
+  const { previewUrl, previewStatus, deploymentId, currentIframeUrl } = state;
   const projectId = manager.projectId;
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const [isCreatingDeployment, setIsCreatingDeployment] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Derive current path from tracked URL or fall back to previewUrl
+  const currentPath = currentIframeUrl
+    ? getPathFromUrl(currentIframeUrl)
+    : previewUrl
+      ? getPathFromUrl(previewUrl)
+      : '/';
+  const isAtRoot = currentPath === '/';
+
+  // Listen for postMessage navigation events from the preview iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Validate origin: only accept messages from the preview iframe's origin
+      // and verify the message comes from the iframe's content window
+      if (!previewUrl) return;
+      let previewOrigin: string;
+      try {
+        previewOrigin = new URL(previewUrl).origin;
+      } catch {
+        return;
+      }
+      if (event.origin !== previewOrigin) return;
+      if (event.source !== iframeRef.current?.contentWindow) return;
+
+      if (event.data?.type === 'kilo-preview-navigation') {
+        // Validate that the reported URL's origin matches the preview origin
+        // to prevent a compromised app from injecting arbitrary external URLs
+        try {
+          const reportedUrl = event.data.url;
+          if (typeof reportedUrl === 'string' && new URL(reportedUrl).origin === previewOrigin) {
+            manager.setCurrentIframeUrl(reportedUrl);
+          }
+        } catch {
+          // Invalid URL, ignore
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [manager, previewUrl]);
+
+  // Reset currentIframeUrl when previewUrl changes
+  useEffect(() => {
+    manager.setCurrentIframeUrl(null);
+  }, [previewUrl, manager]);
 
   // Get tRPC for queries
   const trpc = useTRPC();
@@ -385,18 +484,50 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
   }, [previewUrl, previewStatus]);
 
   const handleRefresh = useCallback(() => {
+    manager.setCurrentIframeUrl(null);
     setIframeKey(prev => prev + 1);
-  }, []);
+  }, [manager]);
 
   const handleToggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => !prev);
   }, []);
 
   const handleOpenExternal = useCallback(() => {
-    if (previewUrl) {
-      window.open(previewUrl, '_blank');
+    const urlToOpen = currentIframeUrl || previewUrl;
+    if (urlToOpen) {
+      window.open(urlToOpen, '_blank', 'noopener,noreferrer');
+    }
+  }, [currentIframeUrl, previewUrl]);
+
+  const handleGoHome = useCallback(() => {
+    if (previewUrl && iframeRef.current?.contentWindow) {
+      try {
+        const baseUrl = new URL(previewUrl);
+        baseUrl.pathname = '/';
+        baseUrl.search = '';
+        iframeRef.current.contentWindow.postMessage(
+          { type: 'kilo-preview-navigate', url: baseUrl.toString() },
+          baseUrl.origin
+        );
+      } catch {
+        // Invalid previewUrl, ignore
+      }
     }
   }, [previewUrl]);
+
+  const handleCopyUrl = useCallback(async (): Promise<boolean> => {
+    const urlToCopy = currentIframeUrl || previewUrl;
+    if (urlToCopy) {
+      try {
+        await navigator.clipboard.writeText(urlToCopy);
+        return true;
+      } catch {
+        toast.error('Failed to copy URL to clipboard');
+        return false;
+      }
+    }
+    return false;
+  }, [currentIframeUrl, previewUrl]);
 
   // Handle deploy using ProjectManager
   const handleDeploy = useCallback(async () => {
@@ -445,8 +576,13 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
           <PreviewFrame
             key={iframeKey}
             url={previewUrl}
+            currentPath={currentPath}
+            isAtRoot={isAtRoot}
             isFullscreen={isFullscreen}
+            iframeRef={iframeRef}
             onRefresh={handleRefresh}
+            onGoHome={handleGoHome}
+            onCopyUrl={handleCopyUrl}
             onToggleFullscreen={handleToggleFullscreen}
             onOpenExternal={handleOpenExternal}
           />

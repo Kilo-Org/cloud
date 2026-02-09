@@ -1312,7 +1312,7 @@ export class CloudAgentSession extends DurableObject {
       workspace,
       wrapper: {
         kiloSessionId: params.kiloSessionId,
-        model: params.model ? { modelID: params.model } : undefined,
+        model: params.model ? { modelID: params.model.replace(/^kilo\//, '') } : undefined,
         autoCommit: params.autoCommit,
         condenseOnComplete: params.condenseOnComplete,
       },

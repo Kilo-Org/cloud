@@ -1,0 +1,50 @@
+name: Deploy O11y
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Choose an environment to deploy to: dev or prod'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - prod
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Choose an environment to deploy to: dev or prod'
+        required: false
+        default: 'prod'
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy O11y
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: cloudflare-o11y
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: cloudflare-o11y
+          command: ${{ inputs.environment == 'dev' && 'deploy --env dev' || 'deploy' }}

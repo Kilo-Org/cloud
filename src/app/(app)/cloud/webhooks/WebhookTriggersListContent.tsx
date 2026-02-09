@@ -3,9 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
-import { useCloudAgentEligibility } from '@/hooks/useCloudAgentEligibility';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
-import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import {
   useWebhookTriggers,
   useGitHubIntegration,
@@ -45,7 +43,6 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
     : '/integrations';
 
   // Data fetching
-  const { hasInsufficientBalance, eligibilityData } = useCloudAgentEligibility(organizationId);
   const { isIntegrationMissing, errorMessage } = useGitHubIntegration(organizationId);
   const { triggers, isLoading, isError, error, refetch, deleteTrigger, isDeleting } =
     useWebhookTriggers(organizationId);
@@ -105,19 +102,8 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
 
   return (
     <>
-      {/* Insufficient Balance Banner */}
-      {hasInsufficientBalance && eligibilityData && (
-        <div className="mb-6">
-          <InsufficientBalanceBanner
-            balance={eligibilityData.balance}
-            organizationId={organizationId}
-            content={{ type: 'productName', productName: 'Webhook Triggers' }}
-          />
-        </div>
-      )}
-
       {/* Header */}
-      <WebhookTriggersHeader createUrl={routes.create} disabled={hasInsufficientBalance} />
+      <WebhookTriggersHeader createUrl={routes.create} />
 
       {/* Filter */}
       <StatusFilter

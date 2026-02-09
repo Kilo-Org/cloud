@@ -17,6 +17,7 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   extraRequiredProviders,
   isDeadFreeModel,
+  isSlackbotOnlyModel,
   isStealthModelOnKiloCodeOnly,
 } from '@/lib/models';
 import {
@@ -41,7 +42,6 @@ import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
 import { isRateLimitedToDeathFree } from '@/lib/providers/openrouter';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
 import { redactedModelResponse } from '@/lib/redactedModelResponse';
-import { minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -50,26 +50,32 @@ import {
 import { checkFreeModelRateLimit, logFreeModelRequest } from '@/lib/free-model-rate-limiter';
 import { classifyAbuse } from '@/lib/abuse-service';
 import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
+import {
+  emitApiMetricsForResponse,
+  getToolsAvailable,
+  getToolsUsed,
+} from '@/lib/o11y/api-metrics.server';
+import { handleRequestLogging } from '@/lib/handleRequestLogging';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
-const OPUS = 'anthropic/claude-opus-4.5';
+const OPUS = 'anthropic/claude-opus-4.6';
 const SONNET = 'anthropic/claude-sonnet-4.5';
 
 // Mode → model mappings for kilo/auto routing.
 // Add/remove/modify entries here to change routing behavior.
 const MODE_TO_MODEL = new Map<string, string>([
-  // Opus modes (planning, reasoning, orchestration)
+  // Opus modes (planning, reasoning, orchestration, debugging)
   ['plan', OPUS],
   ['general', OPUS],
   ['architect', OPUS],
   ['orchestrator', OPUS],
   ['ask', OPUS],
-  // Sonnet modes (implementation, exploration, debugging)
+  ['debug', OPUS],
+  // Sonnet modes (implementation, exploration)
   ['build', SONNET],
   ['explore', SONNET],
   ['code', SONNET],
-  ['debug', SONNET],
 ]);
 
 const DEFAULT_AUTO_MODEL = SONNET;
@@ -118,7 +124,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
-  const requestedAutoModel = requestBodyParsed.model.trim().toLowerCase() === KILO_AUTO_MODEL_ID;
+  const requestedModel = requestBodyParsed.model.trim();
+  const requestedModelLowerCased = requestedModel.toLowerCase();
+
+  const requestedAutoModel = requestedModelLowerCased === KILO_AUTO_MODEL_ID;
 
   // "kilo/auto" is a quasi-model id that resolves to a real model based on x-kilocode-mode.
   // After this resolution, the rest of the proxy flow behaves as if the client requested
@@ -203,28 +212,18 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     organizationId,
     taskId
   );
+
   console.debug(`Routing request to ${provider.id}`);
 
-  // Fire-and-forget abuse classification as early as possible
-  void classifyAbuse(request, requestBodyParsed, {
+  // Start abuse classification early (non-blocking) - we'll await it before creating usage context
+  const classifyPromise = classifyAbuse(request, requestBodyParsed, {
     kiloUserId: user.id,
     organizationId,
     projectId,
     provider: provider.id,
     isByok: !!userByok,
-  }).then(result => {
-    if (result) {
-      console.log('Abuse classification result:', {
-        verdict: result.verdict,
-        risk_score: result.risk_score,
-        signals: result.signals,
-        identity_key: result.context.identity_key,
-        kilo_user_id: user.id,
-        requested_model: originalModelIdLowerCased,
-        rps: result.context.requests_per_second,
-      });
-    }
   });
+
   // large responses may run longer than the 800s serverless function timeout, usually this value is set to 8192 tokens
   if (requestBodyParsed.max_tokens && requestBodyParsed.max_tokens > MAX_TOKENS_LIMIT) {
     console.warn(`SECURITY: Max tokens limit exceeded: ${user.id}`, {
@@ -238,7 +237,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return alphaPeriodEndedResponse();
   }
 
-  if (originalModelIdLowerCased === minimax_m21_free_slackbot_model.public_id && !internalApiUse) {
+  // Slackbot-only models are only available through Kilo for Slack (internalApiUse)
+  if (isSlackbotOnlyModel(originalModelIdLowerCased) && !internalApiUse) {
     return modelDoesNotExistResponse();
   }
 
@@ -342,6 +342,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     repairTools(requestBodyParsed);
   }
 
+  const toolsAvailable = getToolsAvailable(requestBodyParsed.tools);
+  const toolsUsed = getToolsUsed(requestBodyParsed.messages);
+
   const extraHeaders: Record<string, string> = {};
   applyProviderSpecificLogic(
     provider,
@@ -360,6 +363,27 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider,
     signal: request.signal,
   });
+  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+
+  emitApiMetricsForResponse(
+    {
+      kiloUserId: user.id,
+      organizationId,
+      isAnonymous: isAnonymousContext(user),
+      isStreaming: requestBodyParsed.stream === true,
+      userByok: !!userByok,
+      mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
+      provider: provider.id,
+      requestedModel: requestedModelLowerCased,
+      resolvedModel: requestBodyParsed.model.toLowerCase(),
+      toolsAvailable,
+      toolsUsed,
+      ttfbMs,
+      statusCode: response.status,
+    },
+    response.clone(),
+    requestStartedAt
+  );
   usageContext.status_code = response.status;
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.
@@ -392,7 +416,38 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 
+  // Await abuse classification (with timeout) to get request_id for cost tracking correlation
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const classifyResult = await Promise.race([
+    classifyPromise.finally(() => timeoutId && clearTimeout(timeoutId)),
+    new Promise<null>(resolve => {
+      timeoutId = setTimeout(() => resolve(null), 2000);
+    }),
+  ]);
+  if (classifyResult) {
+    console.log('Abuse classification result:', {
+      verdict: classifyResult.verdict,
+      risk_score: classifyResult.risk_score,
+      signals: classifyResult.signals,
+      identity_key: classifyResult.context.identity_key,
+      kilo_user_id: user.id,
+      requested_model: originalModelIdLowerCased,
+      rps: classifyResult.context.requests_per_second,
+      request_id: classifyResult.request_id,
+    });
+    usageContext.abuse_request_id = classifyResult.request_id;
+  }
+
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+
+  handleRequestLogging({
+    clonedResponse: response.clone(),
+    user: maybeUser,
+    organization_id: organizationId || null,
+    provider: provider.id,
+    model: originalModelIdLowerCased,
+    request: requestBodyParsed,
+  });
 
   {
     const errorResponse = await makeErrorReadable({

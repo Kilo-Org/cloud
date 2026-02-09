@@ -810,3 +810,9 @@ export function createAppBuilderCloudAgentClient(authToken: string): CloudAgentC
     skipBalanceCheck: true,
   });
 }
+
+export function createCloudChatClient(authToken: string): CloudAgentClient {
+  return new CloudAgentClient(authToken, {
+    skipBalanceCheck: true,
+  });
+}

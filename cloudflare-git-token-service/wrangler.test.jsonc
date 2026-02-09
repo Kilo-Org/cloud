@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "git-token-service-test",
+  "main": "test/test-worker.ts",
+  "compatibility_date": "2025-09-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    "port": 8795,
+  },
+  // Service binding to the git-token-service-dev worker
+  // The test worker calls git-token-service via RPC over this binding
+  "services": [
+    {
+      "binding": "GIT_TOKEN_SERVICE",
+      "service": "git-token-service-dev",
+      "entrypoint": "GitTokenRPCEntrypoint",
+    },
+  ],
+}

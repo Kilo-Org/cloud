@@ -52,7 +52,6 @@ import {
   type RepositoryPlatform,
 } from '@/components/shared/RepositoryCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
 import { cn } from '@/lib/utils';
 import { MODES } from './ResumeConfigModal';
@@ -74,24 +73,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
 
-  // Fetch eligibility to check if user can use Cloud Agent
-  // Use separate queries for personal vs org context to ensure correct balance is checked
-  const personalEligibilityQuery = useQuery({
-    ...trpc.cloudAgent.checkEligibility.queryOptions(),
-    enabled: !organizationId,
-  });
-  const orgEligibilityQuery = useQuery({
-    ...trpc.organizations.cloudAgent.checkEligibility.queryOptions({
-      organizationId: organizationId || '',
-    }),
-    enabled: !!organizationId,
-  });
-  const eligibilityData = organizationId ? orgEligibilityQuery.data : personalEligibilityQuery.data;
-  const isEligibilityLoading = organizationId
-    ? orgEligibilityQuery.isPending
-    : personalEligibilityQuery.isPending;
-  const hasInsufficientBalance =
-    !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
+  const hasInsufficientBalance = false;
 
   // Fetch organization configuration and models
   const { data: organizationData } = useOrganizationWithMembers(organizationId || '', {
@@ -654,16 +636,6 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
   const content = (
     <>
-      {/* Insufficient Balance Banner */}
-      {hasInsufficientBalance && eligibilityData && (
-        <div className="mb-6">
-          <InsufficientBalanceBanner
-            balance={eligibilityData.balance}
-            content={{ type: 'productName', productName: 'Cloud Agent' }}
-          />
-        </div>
-      )}
-
       {/* New Session Form */}
       <Card>
         <CardHeader>

@@ -1,6 +1,5 @@
-import { TRPCError } from '@trpc/server';
 import jwt from 'jsonwebtoken';
-import type { Env, TokenPayload } from './types.js';
+import type { TokenPayload } from './types.js';
 
 type StreamTicketPayload = {
   type: 'stream_ticket';
@@ -88,26 +87,4 @@ export function validateStreamTicket(
     }
     return { success: false, error: 'Ticket validation failed' };
   }
-}
-
-/**
- * Validates JWT token and extracts user ID for tRPC context
- * @throws {TRPCError} If authentication fails
- */
-export function authenticate(
-  request: Request,
-  env: Env
-): { userId: string; token: string; botId?: string } {
-  const authHeader = request.headers.get('authorization');
-
-  const result = validateKiloToken(authHeader, env.NEXTAUTH_SECRET);
-
-  if (!result.success) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: result.error,
-    });
-  }
-
-  return { userId: result.userId, token: result.token, botId: result.botId };
 }

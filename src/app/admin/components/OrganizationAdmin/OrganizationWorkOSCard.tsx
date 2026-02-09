@@ -424,24 +424,39 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <p className="text-muted-foreground text-sm">
-            This organization is eligible for WorkOS integration. Enroll to enable Single Sign-On
-            and advanced user management features.
-          </p>
-
           <div className="space-y-2">
-            <div className="text-muted-foreground flex items-center text-sm">
-              <Shield className="mr-2 h-4 w-4" />
-              Single Sign-On (SSO) capabilities
-            </div>
-            <div className="text-muted-foreground flex items-center text-sm">
-              <Shield className="mr-2 h-4 w-4" />
-              Domain verification and management
-            </div>
-            <div className="text-muted-foreground flex items-center text-sm">
-              <Shield className="mr-2 h-4 w-4" />
-              Advanced user provisioning
-            </div>
+            <p className="text-sm font-medium">Configure SSO Integration</p>
+            <ol className="text-muted-foreground list-decimal space-y-1 pl-5 text-sm">
+              <li>
+                Click the button below to{' '}
+                <code className="bg-muted rounded px-1">Enroll in WorkOS</code>.
+              </li>
+              <li>Copy the email of this organization's owner.</li>
+              <li>
+                Navigate to{' '}
+                <a
+                  href="https://dashboard.workos.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline"
+                >
+                  https://dashboard.workos.com/
+                </a>
+                .
+              </li>
+              <li>
+                Go to the <code className="bg-muted rounded px-1">Production</code> section and
+                click <code className="bg-muted rounded px-1">Organizations.</code>
+              </li>
+              <li>
+                Under this organization name, click{' '}
+                <code className="bg-muted rounded px-1">Manage</code> and{' '}
+                <code className="bg-muted rounded px-1">Invite Admin</code>.
+              </li>
+              <li>Click only the top two (Domain Verification and SSO).</li>
+              <li>Copy the link and email to the admin.</li>
+              <li>Once they have activated the domain, put it in the Organization SSO Domain.</li>
+            </ol>
           </div>
 
           <div className="space-y-2">

@@ -31,7 +31,7 @@ describe('CloudAgentSession.startExecutionV2', () => {
         timestamp: now,
       });
 
-      const activeId = 'exec_active' as ExecutionId;
+      const activeId = 'exc_active' as ExecutionId;
       await instance.addExecution({
         executionId: activeId,
         mode: 'build',
@@ -59,7 +59,7 @@ describe('CloudAgentSession.startExecutionV2', () => {
     if (result.startResult.success) return;
 
     expect(result.startResult.code).toBe('EXECUTION_IN_PROGRESS');
-    expect(result.startResult.activeExecutionId).toBe('exec_active');
+    expect(result.startResult.activeExecutionId).toBe('exc_active');
     expect(result.plan).toBeNull();
   });
 

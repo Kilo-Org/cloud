@@ -18,6 +18,7 @@ import {
   GitPullRequest,
   UserX,
   Coins,
+  Bell,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
@@ -87,6 +88,10 @@ const menuSections: MenuSection[] = [
       { title: 'Feature Interest', url: '/admin/feature-interest', icon: Sparkles },
       { title: 'Free Model Usage', url: '/admin/free-model-usage', icon: UserX },
     ],
+  },
+  {
+    label: 'Operations',
+    items: [{ title: 'Alerting', url: '/admin/alerting', icon: Bell }],
   },
 ];
 

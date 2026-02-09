@@ -67,6 +67,11 @@ type AutoDismissSource = 'triage' | 'sandbox';
  * 1. If sandboxAnalysis exists and isExploitable === false -> dismiss (no confidence threshold)
  * 2. If triage.suggestedAction === 'dismiss' -> dismiss (with confidence threshold)
  *
+ * @param options.findingId - The ID of the finding to potentially dismiss
+ * @param options.analysis - The full analysis result (triage + optional sandbox)
+ * @param options.owner - The security review owner (org or user)
+ * @param options.userId - The user performing the action (for audit/permissions)
+ * @param options.correlationId - Correlation ID for tracing across the analysis pipeline
  * @returns Object with dismissed status and source
  */
 export async function maybeAutoDismissAnalysis(options: {

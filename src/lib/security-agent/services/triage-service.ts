@@ -187,6 +187,13 @@ function createFallbackTriage(reason: string): SecurityFindingTriage {
 /**
  * Triage a security finding using direct LLM call with function calling.
  * Returns a triage result that can be stored in the analysis field.
+ *
+ * @param options.finding - The security finding to triage
+ * @param options.authToken - Auth token for the LLM proxy
+ * @param options.model - Model to use for triage (default: anthropic/claude-sonnet-4)
+ * @param options.correlationId - Correlation ID for tracing across the analysis pipeline
+ * @param options.userId - User ID for metrics tracking
+ * @param options.organizationId - Optional organization ID for usage tracking
  */
 export async function triageSecurityFinding(options: {
   finding: SecurityFinding;

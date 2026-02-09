@@ -231,6 +231,14 @@ function createFallbackExtraction(
 /**
  * Extract structured analysis fields from raw markdown output.
  * Uses direct LLM call with function calling to parse the unstructured analysis.
+ *
+ * @param options.finding - The security finding being analyzed
+ * @param options.rawMarkdown - Raw markdown output from sandbox analysis
+ * @param options.authToken - Auth token for the LLM proxy
+ * @param options.model - Model to use for extraction (default: anthropic/claude-sonnet-4)
+ * @param options.correlationId - Correlation ID for tracing across the analysis pipeline
+ * @param options.userId - User ID for metrics tracking
+ * @param options.organizationId - Optional organization ID for usage tracking
  */
 export async function extractSandboxAnalysis(options: {
   finding: SecurityFinding;

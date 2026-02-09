@@ -34,6 +34,7 @@ const config: Config = {
     '<rootDir>/cloud-agent-next/',
     '<rootDir>/cloudflare-webhook-agent-ingest/',
     '<rootDir>/cloudflare-session-ingest/',
+    '<rootDir>/kiloclaw/',
   ],
   transformIgnorePatterns: [
     'node_modules/.pnpm/(?!(@octokit|universal-user-agent|before-after-hook|bottleneck))',

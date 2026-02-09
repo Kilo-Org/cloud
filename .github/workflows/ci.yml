@@ -17,6 +17,7 @@ jobs:
       cloud_agent: ${{ steps.filter.outputs.cloud_agent }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
       webhook_agent: ${{ steps.filter.outputs.webhook_agent }}
+      kiloclaw: ${{ steps.filter.outputs.kiloclaw }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +34,8 @@ jobs:
               - 'cloud-agent-next/**'
             webhook_agent:
               - 'cloudflare-webhook-agent-ingest/**'
+            kiloclaw:
+              - 'kiloclaw/**'
 
   test:
     runs-on: ubuntu-24.04-8core
@@ -251,6 +254,39 @@ jobs:
 
       - name: Run webhook-agent-ingest tests
         run: pnpm --filter cloudflare-webhook-agent-ingest test
+
+  kiloclaw:
+    needs: changes
+    if: needs.changes.outputs.kiloclaw == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (kiloclaw)
+        run: pnpm --filter kiloclaw typecheck
+
+      - name: Lint (kiloclaw)
+        run: pnpm --filter kiloclaw lint
+
+      - name: Run kiloclaw tests
+        run: pnpm --filter kiloclaw test
 
   cloudflare:
     strategy:

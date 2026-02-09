@@ -32,7 +32,7 @@ export function writeSessionMetricsDataPoint(params: SessionMetricsParams, env: 
 
 	env.O11Y_SESSION_METRICS.writeDataPoint({
 		indexes: [params.platform],
-		blobs: [params.terminationReason, params.platform, params.organizationId ?? '', params.kiloUserId, params.model ?? ''],
+		blobs: [params.terminationReason, params.platform, params.organizationId, params.kiloUserId, params.model],
 		doubles: [
 			params.sessionDurationMs,
 			params.timeToFirstResponseMs ?? -1,

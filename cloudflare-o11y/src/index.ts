@@ -20,7 +20,7 @@ export const ApiMetricsParamsSchema = z.object({
 	userByok: z.boolean(),
 	mode: z.string().min(1).optional(),
 	provider: z.string().min(1),
-	inferenceProvider: z.string().min(1).optional(),
+	inferenceProvider: z.string().min(1).optional().default(''),
 	requestedModel: z.string().min(1),
 	resolvedModel: z.string().min(1),
 	toolsAvailable: z.array(z.string().min(1)),

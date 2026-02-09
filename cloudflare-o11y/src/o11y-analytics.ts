@@ -18,7 +18,7 @@ type ApiMetricsParams = z.infer<typeof ApiMetricsParamsSchema>;
  */
 export function writeApiMetricsDataPoint(params: ApiMetricsParams, clientName: string, env: Env): void {
 	env.O11Y_API_METRICS.writeDataPoint({
-		blobs: [params.provider, params.resolvedModel, clientName, params.statusCode >= 400 ? '1' : '0', params.inferenceProvider ?? ''],
+		blobs: [params.provider, params.resolvedModel, clientName, params.statusCode >= 400 ? '1' : '0', params.inferenceProvider],
 		doubles: [params.ttfbMs, params.completeRequestMs, params.statusCode],
 	});
 }

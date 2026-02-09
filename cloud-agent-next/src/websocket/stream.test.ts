@@ -8,7 +8,7 @@ const SESSION_ID = 'sess_test' as SessionId;
 
 function makeEvent(id: number, payload = '{}'): StoredEvent {
   return {
-    id: id as EventId,
+    id: id,
     execution_id: 'exec_1',
     session_id: SESSION_ID,
     stream_event_type: 'output',
@@ -154,6 +154,7 @@ describe('stream handler replayEvents', () => {
 
   it('sends an error message on query failure', async () => {
     const eq = makeFakeEventQueries([]);
+    // eslint-disable-next-line require-yield
     vi.spyOn(eq, 'iterateByFilters').mockImplementation(function* () {
       throw new Error('SQLite error');
     });

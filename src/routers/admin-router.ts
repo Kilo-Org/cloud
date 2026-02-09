@@ -18,6 +18,7 @@ import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router'
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
+import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
@@ -582,6 +583,8 @@ export const adminRouter = createTRPCRouter({
   }),
 
   deployments: adminDeploymentsRouter,
+
+  alerting: adminAlertingRouter,
 
   featureInterest: adminFeatureInterestRouter,
 

@@ -226,7 +226,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         // For GitLab: sync webhooks if auto-configure is enabled
         let webhookSyncResult = null;
         if (
-          platform === 'gitlab' &&
+          platform === PLATFORM.GITLAB &&
           input.autoConfigureWebhooks !== false &&
           input.repositorySelectionMode === 'selected'
         ) {

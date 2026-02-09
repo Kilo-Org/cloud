@@ -19,6 +19,7 @@ import DEFAULT_PROMPT_TEMPLATE_GITLAB from '@/lib/code-reviews/prompts/default-p
 import { logExceptInTest } from '@/lib/utils.server';
 import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-helpers';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 /**
  * Inline comment info for duplicate detection
@@ -81,7 +82,7 @@ function getDefaultTemplate(platform: CodeReviewPlatform): PromptTemplate {
   switch (platform) {
     case 'github':
       return DEFAULT_PROMPT_TEMPLATE_GITHUB as PromptTemplate;
-    case 'gitlab':
+    case PLATFORM.GITLAB:
       return DEFAULT_PROMPT_TEMPLATE_GITLAB as PromptTemplate;
     default: {
       const _exhaustive: never = platform;
@@ -197,11 +198,11 @@ export async function generateReviewPrompt(
 
   // 6. Dynamic context section (separator)
   prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';
-  prompt += `**${platform === 'gitlab' ? 'Project' : 'Repository'}:** ${repository}\n`;
+  prompt += `**${platform === PLATFORM.GITLAB ? 'Project' : 'Repository'}:** ${repository}\n`;
   prompt += `**${platformConfig.prTerm} Number:** ${pr}\n\n`;
 
   // Add GitLab-specific SHA context if available
-  if (platform === 'gitlab' && gitlabContext) {
+  if (platform === PLATFORM.GITLAB && gitlabContext) {
     prompt += `**Diff Context (for inline comments):**\n`;
     prompt += `- Base SHA: \`${gitlabContext.baseSha}\`\n`;
     prompt += `- Start SHA: \`${gitlabContext.startSha}\`\n`;

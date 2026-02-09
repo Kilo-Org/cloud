@@ -93,6 +93,8 @@ export type CloudAgentSessionState = {
   gitUrl?: string;
   /** Git token for authentication (username is always 'x-access-token') */
   gitToken?: string;
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
   /** Environment variables to inject into sandbox execution sessions (plaintext) */
   envVars?: Record<string, string>;
   /**

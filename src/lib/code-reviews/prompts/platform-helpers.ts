@@ -6,6 +6,7 @@
  */
 
 import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 /**
  * Platform-specific configuration for code review prompts
@@ -82,7 +83,7 @@ export function getPlatformConfig(platform: CodeReviewPlatform): PlatformConfig 
   switch (platform) {
     case 'github':
       return githubConfig;
-    case 'gitlab':
+    case PLATFORM.GITLAB:
       return gitlabConfig;
     default: {
       // Exhaustive check
@@ -168,7 +169,7 @@ export function getPromptTemplateFeatureFlag(platform: CodeReviewPlatform): stri
   switch (platform) {
     case 'github':
       return 'code-review-prompt-template';
-    case 'gitlab':
+    case PLATFORM.GITLAB:
       return 'code-review-prompt-template-gitlab';
     default: {
       const _exhaustive: never = platform;

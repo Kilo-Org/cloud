@@ -28,6 +28,7 @@ import {
   mergeProfileConfiguration,
   ProfileNotFoundError,
 } from '@/lib/agent/profile-session-config';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 function handleTRPCError(error: unknown): NextResponse {
   if (error instanceof TRPCError) {
@@ -230,7 +231,7 @@ export async function POST(request: Request) {
         gitUrl,
         gitToken,
         // Platform detection: explicit instead of URL-based
-        platform: input.gitlabProject ? 'gitlab' : 'github',
+        platform: input.gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB,
         // Common params
         kilocodeOrganizationId,
         envVars: mergedEnvVars,

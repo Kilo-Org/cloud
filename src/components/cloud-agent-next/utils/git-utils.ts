@@ -5,6 +5,8 @@
  * This module has no dependencies on other cloud-agent-next modules to avoid circular imports.
  */
 
+import { PLATFORM } from '@/lib/integrations/core/constants';
+
 /**
  * Extract owner/repo or group/project from a git URL
  *
@@ -60,7 +62,7 @@ export function buildPrepareSessionRepoParams(options: {
   const repo = options.repo?.trim();
   if (!repo) return null;
 
-  if (options.platform === 'gitlab') {
+  if (options.platform === PLATFORM.GITLAB) {
     return { gitlabProject: repo };
   }
 

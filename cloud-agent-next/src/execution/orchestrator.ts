@@ -351,6 +351,7 @@ export class ExecutionOrchestrator {
         upstreamBranch: initContext.upstreamBranch,
         botId: initContext.botId,
         githubAppType: initContext.githubAppType,
+        platform: initContext.platform,
       });
     } catch (error) {
       if (error instanceof ExecutionError) throw error;

@@ -40,6 +40,7 @@ import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import type { CodeReviewPlatform } from '../core/schemas';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 /**
  * GitLab integration metadata stored in platform_integrations.metadata
  */
@@ -193,7 +194,7 @@ export async function prepareReviewPayload(
               error: stateLookupError,
             });
           }
-        } else if (platform === 'gitlab' && integration) {
+        } else if (platform === PLATFORM.GITLAB && integration) {
           // GitLab: Use Project Access Token (PrAT) for all operations
           // PrAT is required for the glab CLI and Kilocode to work correctly
           const metadata = integration.metadata as GitLabIntegrationMetadata | null;
@@ -336,7 +337,7 @@ export async function prepareReviewPayload(
     // GitHub: uses githubRepo (owner/repo format) + githubToken
     // GitLab: uses gitUrl (full HTTPS URL) + gitToken
     const sessionInput: SessionInput =
-      platform === 'gitlab'
+      platform === PLATFORM.GITLAB
         ? {
             // GitLab: use full git URL for cloning
             gitUrl: `${gitlabInstanceUrl || 'https://gitlab.com'}/${review.repo_full_name}.git`,
@@ -359,7 +360,7 @@ export async function prepareReviewPayload(
           };
 
     // Log the session input for GitLab
-    if (platform === 'gitlab') {
+    if (platform === PLATFORM.GITLAB) {
       logExceptInTest('[prepareReviewPayload] GitLab session input prepared', {
         gitUrl: sessionInput.gitUrl,
         hasGitToken: !!sessionInput.gitToken,

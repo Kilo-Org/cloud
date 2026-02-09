@@ -26,6 +26,7 @@ import {
 } from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 interface StatusUpdatePayload {
   sessionId?: string; // Cloud agent session ID (agent_xxx) - may not be available yet for 'running' status
   cliSessionId?: string; // CLI session UUID (from session_created event)
@@ -181,7 +182,7 @@ export async function POST(
                 logExceptInTest(
                   `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
                 );
-              } else if (platform === 'gitlab') {
+              } else if (platform === PLATFORM.GITLAB) {
                 // GitLab: Use PrAT for bot identity, fall back to OAuth token
                 const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
                 const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';

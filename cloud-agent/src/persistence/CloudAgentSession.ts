@@ -1483,6 +1483,7 @@ export class CloudAgentSession extends DurableObject {
           mcpServers: request.mcpServers,
           upstreamBranch: request.upstreamBranch,
           botId: request.botId,
+          platform: request.platform,
         };
 
         const message: ExecutionMessage = {
@@ -1567,6 +1568,7 @@ export class CloudAgentSession extends DurableObject {
           kiloSessionId: metadata.kiloSessionId,
           isPreparedSession: true,
           githubAppType: metadata.githubAppType,
+          platform: metadata.platform,
         };
 
         const message: ExecutionMessage = {

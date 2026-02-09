@@ -10,7 +10,7 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import type { MergeRequestPayload } from '../webhook-schemas';
-import { GITLAB_ACTION } from '@/lib/integrations/core/constants';
+import { GITLAB_ACTION, PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
   createCodeReview,
@@ -95,7 +95,7 @@ export async function handleMergeRequestCodeReview(
     }
 
     // 2. Check if code review agent is enabled for this owner (GitLab platform)
-    const agentConfig = await getAgentConfigForOwner(owner, 'code_review', 'gitlab');
+    const agentConfig = await getAgentConfigForOwner(owner, 'code_review', PLATFORM.GITLAB);
 
     if (!agentConfig || !agentConfig.is_enabled) {
       logExceptInTest(
@@ -198,7 +198,7 @@ export async function handleMergeRequestCodeReview(
       baseRef: mr.target_branch,
       headRef: mr.source_branch,
       headSha,
-      platform: 'gitlab',
+      platform: PLATFORM.GITLAB,
       platformProjectId: project.id,
     });
 

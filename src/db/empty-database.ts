@@ -1,3 +1,4 @@
+import '../lib/load-env';
 import { sql } from 'drizzle-orm';
 import { db } from '../lib/drizzle';
 

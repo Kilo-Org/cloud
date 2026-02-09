@@ -263,7 +263,29 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const metrics = computeSessionMetrics(rows, closeReason);
 
-    await this.env.O11Y.ingestSessionMetrics({ kiloUserId, sessionId, ingestVersion, ...metrics });
+    const modelRow = this.sql
+      .exec<{
+        item_data: string;
+      }>(`SELECT item_data FROM ingest_items WHERE item_id = 'model' LIMIT 1`)
+      .toArray()[0];
+    let model: string | undefined;
+    if (modelRow) {
+      const arr = JSON.parse(modelRow.item_data) as Extract<
+        SessionDataItem,
+        { type: 'model' }
+      >['data'];
+      if (arr.length > 0) {
+        model = arr[arr.length - 1].id;
+      }
+    }
+
+    await this.env.O11Y.ingestSessionMetrics({
+      kiloUserId,
+      sessionId,
+      ingestVersion,
+      model,
+      ...metrics,
+    });
 
     // Mark metrics as emitted to prevent duplicates
     this.sql.exec(

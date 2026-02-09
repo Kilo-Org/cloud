@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/sync-providers",
-      "schedule": "30 * * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/cleanup-device-auth",

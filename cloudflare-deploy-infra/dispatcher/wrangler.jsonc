@@ -10,13 +10,18 @@
   "compatibility_date": "2025-10-11",
   "compatibility_flags": ["nodejs_compat"],
   /**
-   * KV namespace for password protection storage.
-   * Stores password hashes for deployed workers.
+   * KV namespaces:
+   * - DEPLOY_AUTH_KV: Password protection storage (password hashes for deployed workers)
+   * - SLUG_MAPPINGS_KV: Custom slug/domain mappings (public slug -> internal worker name)
    */
   "kv_namespaces": [
     {
       "binding": "DEPLOY_AUTH_KV",
       "id": "c8d39d486e4246eb8784744bf24b9909",
+    },
+    {
+      "binding": "SLUG_MAPPINGS_KV",
+      "id": "TODO_CREATE_KV_NAMESPACE", // Create with: wrangler kv:namespace create "SLUG_MAPPINGS_KV"
     },
   ],
   "ratelimits": [
@@ -67,6 +72,10 @@
         {
           "binding": "DEPLOY_AUTH_KV",
           "id": "c8d39d486e4246eb8784744bf24b9909",
+        },
+        {
+          "binding": "SLUG_MAPPINGS_KV",
+          "id": "TODO_CREATE_KV_NAMESPACE", // Create with: wrangler kv:namespace create "SLUG_MAPPINGS_KV"
         },
       ],
       "ratelimits": [

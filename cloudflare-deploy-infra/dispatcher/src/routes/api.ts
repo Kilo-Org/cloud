@@ -7,7 +7,12 @@ import { bearerAuth } from 'hono/bearer-auth';
 import type { Env } from '../types';
 import { hashPassword } from '../auth/password';
 import { getPasswordRecord, setPasswordRecord, deletePasswordRecord } from '../auth/password-store';
-import { workerNameSchema, setPasswordRequestSchema } from '../schemas';
+import {
+  workerNameSchema,
+  setPasswordRequestSchema,
+  slugParamSchema,
+  setSlugMappingRequestSchema,
+} from '../schemas';
 
 export const api = new Hono<{ Bindings: Env }>();
 
@@ -84,4 +89,69 @@ api.get('/password/:worker', async c => {
   }
 
   return c.json({ protected: false });
+});
+
+// ============================================================================
+// Slug Mapping Routes
+// Maps public slugs to internal worker names for custom subdomain support
+// ============================================================================
+
+// Slug param validation middleware
+api.use('/slug-mapping/:slug', async (c, next) => {
+  const slug = c.req.param('slug');
+  const result = slugParamSchema.safeParse(slug);
+  if (!result.success) {
+    return c.json({ error: 'Invalid slug' }, 400);
+  }
+  await next();
+});
+
+/**
+ * Set a slug mapping.
+ * Maps a public slug to an internal worker name.
+ */
+api.put('/slug-mapping/:slug', async c => {
+  const slug = c.req.param('slug');
+
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const result = setSlugMappingRequestSchema.safeParse(rawBody);
+  if (!result.success) {
+    return c.json({ error: 'Missing workerName in body' }, 400);
+  }
+
+  await c.env.SLUG_MAPPINGS_KV.put(slug, result.data.workerName);
+
+  return c.json({ success: true });
+});
+
+/**
+ * Delete a slug mapping.
+ */
+api.delete('/slug-mapping/:slug', async c => {
+  const slug = c.req.param('slug');
+
+  await c.env.SLUG_MAPPINGS_KV.delete(slug);
+
+  return c.json({ success: true });
+});
+
+/**
+ * Get a slug mapping.
+ */
+api.get('/slug-mapping/:slug', async c => {
+  const slug = c.req.param('slug');
+
+  const workerName = await c.env.SLUG_MAPPINGS_KV.get(slug);
+
+  if (workerName) {
+    return c.json({ exists: true, workerName });
+  }
+
+  return c.json({ exists: false });
 });

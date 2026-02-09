@@ -11,7 +11,7 @@ import type { GetPasswordStatusResponse } from './password-client';
  */
 export type CreateDeploymentResult =
   | { success: true; deploymentId: string; deploymentSlug: string; deploymentUrl: string }
-  | { success: false; error: 'payment_required'; message: string };
+  | { success: false; error: 'payment_required' | 'invalid_slug' | 'slug_taken'; message: string };
 
 /**
  * Represents an owner that can be either a user or an organization

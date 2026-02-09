@@ -1382,6 +1382,7 @@ export const deployments = pgTable(
     owned_by_user_id: text().references(() => kilocode_users.id),
     owned_by_organization_id: uuid().references(() => organizations.id),
     deployment_slug: text().notNull(),
+    internal_worker_name: text(), // Actual CF worker name (null = use deployment_slug directly)
     repository_source: text().notNull(),
     branch: text().notNull(),
     deployment_url: text().notNull(),

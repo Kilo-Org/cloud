@@ -13,8 +13,11 @@ import { createLoginRateLimiter } from '../auth/rate-limit';
 import { returnPathSchema, authFormSchema } from '../schemas';
 
 // Auth router - will be mounted at /__auth
-// We use a variable to store workerName from middleware
-export const auth = new Hono<{ Bindings: Env; Variables: { workerName: string } }>();
+// Uses publicSlug for password lookup (not internal workerName)
+export const auth = new Hono<{
+  Bindings: Env;
+  Variables: { publicSlug: string; workerName: string };
+}>();
 
 /**
  * GET /__auth?return=/path
@@ -22,11 +25,11 @@ export const auth = new Hono<{ Bindings: Env; Variables: { workerName: string } 
  * If no password is set for the worker, redirects to the return path.
  */
 auth.get('/', async c => {
-  const workerName = c.get('workerName');
+  const publicSlug = c.get('publicSlug');
   const returnPath = returnPathSchema.parse(c.req.query('return') ?? '/');
 
-  // Check if password is set for this worker
-  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_AUTH_KV, workerName);
+  // Check if password is set for this deployment (keyed by public slug)
+  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_AUTH_KV, publicSlug);
 
   if (!passwordRecord) {
     // No password set - redirect to target path since there's nothing to authenticate
@@ -35,7 +38,7 @@ auth.get('/', async c => {
 
   return c.html(
     renderLoginForm({
-      workerName,
+      workerName: publicSlug, // Display the public slug to user
       returnPath,
     })
   );
@@ -47,7 +50,7 @@ auth.get('/', async c => {
  * Rate limited.
  */
 auth.post('/', createLoginRateLimiter(), async c => {
-  const workerName = c.get('workerName');
+  const publicSlug = c.get('publicSlug');
 
   // Parse form data
   let formData: FormData;
@@ -56,7 +59,7 @@ auth.post('/', createLoginRateLimiter(), async c => {
   } catch {
     return c.html(
       renderLoginForm({
-        workerName,
+        workerName: publicSlug,
         returnPath: '/',
         error: 'Invalid request',
       }),
@@ -73,7 +76,7 @@ auth.post('/', createLoginRateLimiter(), async c => {
     const returnPath = returnPathSchema.parse(formData.get('return') ?? '/');
     return c.html(
       renderLoginForm({
-        workerName,
+        workerName: publicSlug,
         returnPath,
         error: 'Password is required',
       }),
@@ -83,15 +86,15 @@ auth.post('/', createLoginRateLimiter(), async c => {
 
   const { password, return: returnPath } = formResult.data;
 
-  // Get password record from KV
-  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_AUTH_KV, workerName);
+  // Get password record from KV (keyed by public slug)
+  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_AUTH_KV, publicSlug);
 
   if (!passwordRecord) {
     // No password set means worker shouldn't be protected
     // This is an unexpected state - just deny access
     return c.html(
       renderLoginForm({
-        workerName,
+        workerName: publicSlug,
         returnPath,
         error: 'Authentication not configured',
       }),
@@ -105,7 +108,7 @@ auth.post('/', createLoginRateLimiter(), async c => {
   if (!isValid) {
     return c.html(
       renderLoginForm({
-        workerName,
+        workerName: publicSlug,
         returnPath,
         error: 'Invalid password',
       }),
@@ -113,11 +116,11 @@ auth.post('/', createLoginRateLimiter(), async c => {
     );
   }
 
-  // Password is valid - sign JWT
+  // Password is valid - sign JWT (using public slug as the worker identifier)
   const sessionDuration = c.env.SESSION_DURATION_SECONDS;
   const jwt = signJwt(
     {
-      worker: workerName,
+      worker: publicSlug,
       passwordSetAt: passwordRecord.createdAt,
     },
     c.env.JWT_SECRET,

@@ -2,7 +2,7 @@ import 'server-only';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import { organizationMemberProcedure } from './utils';
-import { branchSchema, repoNameSchema } from '@/lib/user-deployments/validation';
+import { branchSchema, repoNameSchema, slugSchema } from '@/lib/user-deployments/validation';
 import * as deploymentsService from '@/lib/user-deployments/deployments-service';
 import * as envVarsService from '@/lib/user-deployments/env-vars-service';
 import { passwordClient } from '@/lib/user-deployments/password-client';
@@ -113,6 +113,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
         repositoryFullName: repoNameSchema,
         branch: branchSchema,
         envVars: z.array(plaintextEnvVarSchema).optional(),
+        slug: slugSchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -126,6 +127,33 @@ export const organizationDeploymentsRouter = createTRPCRouter({
         branch: input.branch,
         createdByUserId: ctx.user.id,
         envVars: input.envVars,
+        slug: input.slug,
+      });
+    }),
+
+  checkSlugAvailability: organizationMemberProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid(),
+        slug: slugSchema,
+      })
+    )
+    .query(async ({ input }) => {
+      return deploymentsService.checkSlugAvailability(input.slug);
+    }),
+
+  renameDeployment: organizationMemberProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid(),
+        deploymentId: z.string().uuid(),
+        newSlug: slugSchema,
+      })
+    )
+    .mutation(async ({ input }) => {
+      return deploymentsService.renameDeployment(input.deploymentId, input.newSlug, {
+        type: 'org',
+        id: input.organizationId,
       });
     }),
 

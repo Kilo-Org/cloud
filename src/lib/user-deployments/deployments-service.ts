@@ -8,7 +8,7 @@ import {
   platform_integrations,
   app_builder_projects,
 } from '@/db/schema';
-import { eq, and, desc, gt, inArray } from 'drizzle-orm';
+import { eq, and, desc, gt, inArray, ne } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { CreateDeploymentResponse } from '@/lib/user-deployments/deployment-builder-client';
 import { apiClient as deployApiClient } from '@/lib/user-deployments/deployment-builder-client';
@@ -33,8 +33,17 @@ import { encryptEnvVars } from '@/lib/user-deployments/env-vars-service';
 import { isHTTPsUrl, extractRepoNameFromUrl } from './git-url-utils';
 import { encryptAuthToken, decryptAuthToken } from './auth-token-encryption';
 import { hasUserEverPaid, hasOrganizationEverPaid } from '@/lib/creditTransactions';
+import { slugSchema } from './validation';
+import { slugMappingsClient } from './slug-mappings-client';
 
 type PaymentCheckResult = { hasPaid: true } | { hasPaid: false };
+
+/** Detect Postgres unique constraint violations (error code 23505) by constraint name. */
+function isUniqueConstraintError(error: unknown, constraintName: string): boolean {
+  if (error === null || typeof error !== 'object') return false;
+  const err = error as { code?: string; constraint?: string };
+  return err.code === '23505' && err.constraint === constraintName;
+}
 
 async function checkOwnerHasEverPaid(owner: Owner): Promise<PaymentCheckResult> {
   const hasPaid =
@@ -47,7 +56,19 @@ async function checkOwnerHasEverPaid(owner: Owner): Promise<PaymentCheckResult> 
 
 export type CreateDeploymentResult =
   | { success: true; deploymentId: string; deploymentSlug: string; deploymentUrl: string }
-  | { success: false; error: 'payment_required'; message: string };
+  | { success: false; error: 'payment_required' | 'invalid_slug' | 'slug_taken'; message: string };
+
+export type RenameDeploymentResult =
+  | { success: true; deploymentUrl: string }
+  | {
+      success: false;
+      error: 'not_found' | 'invalid_slug' | 'slug_taken' | 'build_in_progress';
+      message: string;
+    };
+
+export type CheckSlugAvailabilityResult =
+  | { available: true }
+  | { available: false; reason: 'invalid_slug' | 'slug_taken'; message: string };
 
 // Resolved source details ready for deployment
 type ResolvedSourceDetails = {
@@ -427,6 +448,66 @@ export async function redeploy(deployment: Deployment) {
 const DEFAULT_DEPLOYMENT_DOMAIN = 'd.kiloapps.io';
 
 /**
+ * Check if a slug is available for use.
+ * Validates format, reserved words, and database uniqueness.
+ */
+export async function checkSlugAvailability(slug: string): Promise<CheckSlugAvailabilityResult> {
+  // Validate format using zod schema (includes reserved word check)
+  const parseResult = slugSchema.safeParse(slug);
+  if (!parseResult.success) {
+    return {
+      available: false,
+      reason: 'invalid_slug',
+      message: parseResult.error.issues[0]?.message ?? 'Invalid slug format',
+    };
+  }
+
+  // Check database uniqueness
+  const existing = await db
+    .select({ id: deployments.id })
+    .from(deployments)
+    .where(eq(deployments.deployment_slug, slug))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return { available: false, reason: 'slug_taken', message: 'This subdomain is already taken' };
+  }
+
+  return { available: true };
+}
+
+/**
+ * Check if a slug is available, excluding a specific deployment (for rename operations).
+ */
+async function checkSlugAvailabilityExcluding(
+  slug: string,
+  excludeDeploymentId: string
+): Promise<CheckSlugAvailabilityResult> {
+  // Validate format using zod schema (includes reserved word check)
+  const parseResult = slugSchema.safeParse(slug);
+  if (!parseResult.success) {
+    return {
+      available: false,
+      reason: 'invalid_slug',
+      message: parseResult.error.issues[0]?.message ?? 'Invalid slug format',
+    };
+  }
+
+  // Check database uniqueness, excluding the current deployment
+  const existing = await db
+    .select({ id: deployments.id })
+    .from(deployments)
+    .where(and(eq(deployments.deployment_slug, slug), ne(deployments.id, excludeDeploymentId)))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return { available: false, reason: 'slug_taken', message: 'This subdomain is already taken' };
+  }
+
+  return { available: true };
+}
+
+/**
  * Resolve GitHub source configuration - validates platform integration and generates token
  */
 async function resolveGitHubSource(
@@ -595,8 +676,9 @@ export async function createDeployment(params: {
   branch: string;
   createdByUserId: string;
   envVars?: PlaintextEnvVar[];
+  slug?: string;
 }): Promise<CreateDeploymentResult> {
-  const { owner, source, branch, createdByUserId, envVars } = params;
+  const { owner, source, branch, createdByUserId, envVars, slug: requestedSlug } = params;
 
   // Temporary: skip payment check for app builder sites
   if (source.type !== 'app-builder') {
@@ -612,9 +694,24 @@ export async function createDeployment(params: {
 
   const resolved = await resolveSource(owner, source);
 
-  // Generate deployment slug from repository name + random suffix
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
-  const deploymentSlug = `${resolved.repoName}-${randomSuffix}`.toLowerCase();
+  // Use requested slug or generate one
+  let deploymentSlug: string;
+  if (requestedSlug) {
+    // Validate custom slug
+    const slugCheck = await checkSlugAvailability(requestedSlug);
+    if (!slugCheck.available) {
+      return {
+        success: false,
+        error: slugCheck.reason,
+        message: slugCheck.message,
+      };
+    }
+    deploymentSlug = requestedSlug;
+  } else {
+    // Generate deployment slug from repository name + random suffix
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    deploymentSlug = `${resolved.repoName}-${randomSuffix}`.toLowerCase();
+  }
 
   // Encrypt user-provided env vars first
   const encryptedUserEnvVars = envVars && envVars.length > 0 ? encryptEnvVars(envVars) : [];
@@ -649,39 +746,150 @@ export async function createDeployment(params: {
 
   const deploymentUrl = `https://${deploymentSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
 
-  const deploymentId = await db.transaction(async tx => {
-    const [deployment] = await tx
-      .insert(deployments)
-      .values({
-        created_by_user_id: createdByUserId,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        deployment_slug: deploymentSlug,
-        repository_source: resolved.repositorySource,
-        branch: branch,
-        deployment_url: deploymentUrl,
-        platform_integration_id: resolved.platformIntegrationId,
-        source_type: resolved.sourceType,
-        git_auth_token: resolved.encryptedToken,
-        last_build_id: builderResponse.buildId,
-      })
-      .returning();
+  let deploymentId: string;
+  try {
+    deploymentId = await db.transaction(async tx => {
+      const [deployment] = await tx
+        .insert(deployments)
+        .values({
+          created_by_user_id: createdByUserId,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          deployment_slug: deploymentSlug,
+          repository_source: resolved.repositorySource,
+          branch: branch,
+          deployment_url: deploymentUrl,
+          platform_integration_id: resolved.platformIntegrationId,
+          source_type: resolved.sourceType,
+          git_auth_token: resolved.encryptedToken,
+          last_build_id: builderResponse.buildId,
+        })
+        .returning();
 
-    await tx.insert(deployment_builds).values({
-      id: builderResponse.buildId,
-      deployment_id: deployment.id,
-      status: builderResponse.status,
-    });
+      await tx.insert(deployment_builds).values({
+        id: builderResponse.buildId,
+        deployment_id: deployment.id,
+        status: builderResponse.status,
+      });
 
-    // Store env vars (already encrypted)
-    if (encryptedUserEnvVars.length > 0) {
-      for (const envVar of encryptedUserEnvVars) {
-        await envVarsService.setEnvVar(deployment, envVar, owner, tx);
+      // Store env vars (already encrypted)
+      if (encryptedUserEnvVars.length > 0) {
+        for (const envVar of encryptedUserEnvVars) {
+          await envVarsService.setEnvVar(deployment, envVar, owner, tx);
+        }
       }
-    }
 
-    return deployment.id;
-  });
+      return deployment.id;
+    });
+  } catch (error) {
+    // Handle unique constraint violation on deployment_slug (race condition)
+    if (isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')) {
+      return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
+    }
+    throw error;
+  }
 
   return { success: true, deploymentId, deploymentSlug, deploymentUrl };
+}
+
+/**
+ * Rename a deployment's slug.
+ * Updates the public-facing URL while keeping the internal worker name unchanged.
+ */
+export async function renameDeployment(
+  deploymentId: string,
+  newSlug: string,
+  owner: Owner
+): Promise<RenameDeploymentResult> {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(deployments.owned_by_user_id, owner.id)
+      : eq(deployments.owned_by_organization_id, owner.id);
+
+  // Get deployment and verify ownership
+  const [deployment] = await db
+    .select()
+    .from(deployments)
+    .where(and(eq(deployments.id, deploymentId), ownershipCondition))
+    .limit(1);
+
+  if (!deployment) {
+    return { success: false, error: 'not_found', message: 'Deployment not found' };
+  }
+
+  // Check if there's an active build
+  const [activeBuild] = await db
+    .select({ id: deployment_builds.id })
+    .from(deployment_builds)
+    .where(
+      and(
+        eq(deployment_builds.deployment_id, deploymentId),
+        inArray(deployment_builds.status, ['queued', 'building', 'deploying'])
+      )
+    )
+    .limit(1);
+
+  if (activeBuild) {
+    return {
+      success: false,
+      error: 'build_in_progress',
+      message: 'Cannot rename deployment while a build is in progress',
+    };
+  }
+
+  // Check if the new slug is the same as the current one
+  if (deployment.deployment_slug === newSlug) {
+    return {
+      success: true,
+      deploymentUrl: deployment.deployment_url,
+    };
+  }
+
+  // Validate new slug is available (excluding current deployment)
+  const slugCheck = await checkSlugAvailabilityExcluding(newSlug, deploymentId);
+  if (!slugCheck.available) {
+    return {
+      success: false,
+      error: slugCheck.reason,
+      message: slugCheck.message,
+    };
+  }
+
+  const oldSlug = deployment.deployment_slug;
+  // The internal worker name is either stored explicitly or is the original slug
+  const internalWorkerName = deployment.internal_worker_name ?? oldSlug;
+  const newUrl = `https://${newSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
+
+  // DB update first — the unique constraint is the authoritative guard against races.
+  // Use optimistic locking: only update if the slug hasn't changed since we read it.
+  const [updated] = await db
+    .update(deployments)
+    .set({
+      deployment_slug: newSlug,
+      deployment_url: newUrl,
+      internal_worker_name: internalWorkerName,
+    })
+    .where(and(eq(deployments.id, deploymentId), eq(deployments.deployment_slug, oldSlug)))
+    .returning({ id: deployments.id });
+
+  if (!updated) {
+    // Another rename happened concurrently
+    return {
+      success: false,
+      error: 'slug_taken',
+      message: 'This subdomain was taken concurrently',
+    };
+  }
+
+  // KV mapping: newSlug -> internalWorkerName
+  // If this fails, the dispatcher falls back to using slug as the worker name directly,
+  // which won't resolve. A retry of the rename (to the same slug) will fix it.
+  await slugMappingsClient.setSlugMapping(newSlug, internalWorkerName);
+
+  // Remove old slug from KV (only if it was a custom mapping, not the original worker name)
+  if (oldSlug !== internalWorkerName) {
+    await slugMappingsClient.deleteSlugMapping(oldSlug);
+  }
+
+  return { success: true, deploymentUrl: newUrl };
 }

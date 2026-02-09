@@ -176,7 +176,7 @@ export default function BulkCreditsPage() {
     setUnmatchedEmails([]);
     const reader = new FileReader();
     reader.onload = e => {
-      const text = e.target?.result as string;
+      const text = typeof e.target?.result === 'string' ? e.target.result : '';
       const { emails, skippedLines: skipped } = parseCsvEmails(text);
       setParsedEmails(emails);
       setSkippedLines(skipped);

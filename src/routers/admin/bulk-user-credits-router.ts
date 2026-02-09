@@ -3,7 +3,7 @@ import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@/db/schema';
 import type { User } from '@/db/schema';
 import * as z from 'zod';
-import { eq, inArray } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 
 const BulkUserCreditsInputSchema = z.object({

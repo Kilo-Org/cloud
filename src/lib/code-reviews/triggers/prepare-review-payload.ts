@@ -26,7 +26,10 @@ import {
   getMRDiffRefs,
   GitLabProjectAccessTokenPermissionError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
-import { getOrCreateProjectAccessToken } from '@/lib/integrations/gitlab-service';
+import {
+  getOrCreateProjectAccessToken,
+  type GitLabIntegrationMetadata,
+} from '@/lib/integrations/gitlab-service';
 import type {
   ExistingReviewState,
   PreviousReviewStatus,
@@ -41,13 +44,6 @@ import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import type { CodeReviewPlatform } from '../core/schemas';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-/**
- * GitLab integration metadata stored in platform_integrations.metadata
- */
-type GitLabIntegrationMetadata = {
-  instance_url?: string;
-  webhook_secret?: string;
-};
 
 export type PreparePayloadParams = {
   reviewId: string;
@@ -198,7 +194,7 @@ export async function prepareReviewPayload(
           // GitLab: Use Project Access Token (PrAT) for all operations
           // PrAT is required for the glab CLI and Kilocode to work correctly
           const metadata = integration.metadata as GitLabIntegrationMetadata | null;
-          gitlabInstanceUrl = metadata?.instance_url || 'https://gitlab.com';
+          gitlabInstanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
           const instanceUrl = gitlabInstanceUrl;
 
           logExceptInTest('[prepareReviewPayload] GitLab integration found', {

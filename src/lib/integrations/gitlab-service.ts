@@ -7,6 +7,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
+import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
   fetchGitLabProjects,
   fetchGitLabBranches,
@@ -28,12 +29,31 @@ import {
 import { randomBytes } from 'crypto';
 import { logExceptInTest } from '@/lib/utils.server';
 
+const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
+
 /**
  * GitLab Integration Service
  *
  * Provides business logic for GitLab OAuth integrations.
  * Handles token refresh, repository listing, and integration management.
  */
+
+/**
+ * Normalizes a GitLab instance URL for comparison.
+ * Strips trailing slashes, lowercases, and treats undefined/empty as gitlab.com.
+ */
+export function normalizeInstanceUrl(url?: string): string {
+  const effectiveUrl = url || DEFAULT_GITLAB_INSTANCE_URL;
+  return effectiveUrl.replace(/\/+$/, '').toLowerCase();
+}
+
+/**
+ * Returns true if the GitLab instance URL has changed between
+ * the existing integration and the new connection.
+ */
+function instanceUrlChanged(existingUrl?: string, newUrl?: string): boolean {
+  return normalizeInstanceUrl(existingUrl) !== normalizeInstanceUrl(newUrl);
+}
 
 /**
  * Get GitLab integration for an owner
@@ -831,20 +851,30 @@ export async function connectWithPAT(
   const existingIntegration = await getGitLabIntegration(owner);
 
   if (existingIntegration) {
-    // Update existing integration, preserving webhook_secret, configured_webhooks, and project_tokens
     const existingMetadata = (existingIntegration.metadata || {}) as GitLabIntegrationMetadata;
+
+    // Detect if the GitLab instance URL changed (e.g. gitlab.com → self-hosted)
+    const isInstanceChange = instanceUrlChanged(existingMetadata.gitlab_instance_url, instanceUrl);
+
+    if (isInstanceChange) {
+      logExceptInTest('[connectWithPAT] Instance URL changed — clearing stale config', {
+        integrationId: existingIntegration.id,
+        oldInstanceUrl: existingMetadata.gitlab_instance_url,
+        newInstanceUrl: instanceUrl,
+      });
+    }
 
     const updatedMetadata: GitLabIntegrationMetadata = {
       access_token: token,
-      // No refresh_token for PAT (PATs don't refresh)
       gitlab_instance_url: instanceUrl,
-      // Preserve existing webhook secret so configured webhooks continue to work
-      webhook_secret: existingMetadata.webhook_secret || randomBytes(32).toString('hex'),
       auth_type: 'pat',
-      // Preserve configured webhooks
-      configured_webhooks: existingMetadata.configured_webhooks,
-      // Preserve project access tokens
-      project_tokens: existingMetadata.project_tokens,
+      // If instance changed: generate fresh webhook secret, clear webhooks & tokens
+      // If same instance: preserve existing config for continuity
+      webhook_secret: isInstanceChange
+        ? randomBytes(32).toString('hex')
+        : existingMetadata.webhook_secret || randomBytes(32).toString('hex'),
+      configured_webhooks: isInstanceChange ? undefined : existingMetadata.configured_webhooks,
+      project_tokens: isInstanceChange ? undefined : existingMetadata.project_tokens,
     };
 
     await db
@@ -861,14 +891,23 @@ export async function connectWithPAT(
       })
       .where(eq(platform_integrations.id, existingIntegration.id));
 
-    logExceptInTest('[connectWithPAT] Integration updated (preserved webhook config)', {
+    // If instance changed, reset the code review agent config
+    // (selected repos and manually added repos belong to the old instance)
+    if (isInstanceChange) {
+      await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
+    }
+
+    logExceptInTest('[connectWithPAT] Integration updated', {
       integrationId: existingIntegration.id,
       userId: validation.user.id,
       username: validation.user.username,
       instanceUrl,
       authType: 'pat',
-      preservedWebhookSecret: !!existingMetadata.webhook_secret,
-      preservedWebhooks: Object.keys(existingMetadata.configured_webhooks || {}).length,
+      instanceChanged: isInstanceChange,
+      preservedWebhookSecret: !isInstanceChange && !!existingMetadata.webhook_secret,
+      preservedWebhooks: isInstanceChange
+        ? 0
+        : Object.keys(existingMetadata.configured_webhooks || {}).length,
     });
 
     // Fetch and cache repositories

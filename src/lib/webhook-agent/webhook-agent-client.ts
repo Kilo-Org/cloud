@@ -103,7 +103,7 @@ function buildNamespace(userId?: string, organizationId?: string): string {
 
 function buildTriggerPath(namespace: string, triggerId: string): string {
   if (namespace.startsWith('user/')) {
-    return `/api/triggers/user/${namespace.slice(5)}/${triggerId}`;
+    return `/api/triggers/user/${encodeWebhookUserIdSegment(namespace.slice(5))}/${triggerId}`;
   }
   if (namespace.startsWith('org/')) {
     return `/api/triggers/org/${namespace.slice(4)}/${triggerId}`;
@@ -308,7 +308,23 @@ export function buildInboundUrl(
     return `${WEBHOOK_AGENT_URL}/inbound/org/${organizationId}/${triggerId}`;
   }
   if (userId) {
-    return `${WEBHOOK_AGENT_URL}/inbound/user/${userId}/${triggerId}`;
+    return `${WEBHOOK_AGENT_URL}/inbound/user/${encodeWebhookUserIdSegment(userId)}/${triggerId}`;
   }
   throw new Error('Either userId or organizationId must be provided');
+}
+
+const OAUTH_ID_PREFIX = 'oauth/';
+const OAUTH_ENCODED_PREFIX = 'o-';
+
+function encodeWebhookUserIdSegment(userId: string): string {
+  if (!userId.startsWith(OAUTH_ID_PREFIX)) {
+    return userId;
+  }
+  return `${OAUTH_ENCODED_PREFIX}${base64UrlEncode(userId)}`;
+}
+
+function base64UrlEncode(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  const base64 = Buffer.from(bytes).toString('base64');
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }

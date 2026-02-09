@@ -12,6 +12,7 @@ import type { HonoContext } from '../index';
 import { logger } from '../util/logger';
 import { resError, resSuccess } from '../util/res';
 import { internalApiMiddleware } from '../util/auth';
+import { decodeWebhookUserIdSegment, encodeWebhookUserIdSegment } from '../util/webhook-user-id';
 import { withDORetry } from '../util/do-retry';
 import { clampRequestLimit } from '../util/constants';
 
@@ -29,7 +30,8 @@ api.use('*', internalApiMiddleware);
  */
 api.post('/triggers/user/:userId/:triggerId', async c => {
   const { userId, triggerId } = c.req.param();
-  const namespace = `user/${userId}`;
+  const decodedUserId = decodeWebhookUserIdSegment(userId);
+  const namespace = `user/${decodedUserId}`;
   const doKey = buildDOKey(namespace, triggerId);
 
   return handleCreateTrigger(c, namespace, triggerId, doKey);
@@ -40,7 +42,8 @@ api.post('/triggers/user/:userId/:triggerId', async c => {
  */
 api.get('/triggers/user/:userId/:triggerId/requests', async c => {
   const { userId, triggerId } = c.req.param();
-  const namespace = `user/${userId}`;
+  const decodedUserId = decodeWebhookUserIdSegment(userId);
+  const namespace = `user/${decodedUserId}`;
 
   return handleListRequests(c, namespace, triggerId);
 });
@@ -50,7 +53,8 @@ api.get('/triggers/user/:userId/:triggerId/requests', async c => {
  */
 api.get('/triggers/user/:userId/:triggerId/requests/:requestId', async c => {
   const { userId, triggerId, requestId } = c.req.param();
-  const namespace = `user/${userId}`;
+  const decodedUserId = decodeWebhookUserIdSegment(userId);
+  const namespace = `user/${decodedUserId}`;
 
   return handleGetRequest(c, namespace, triggerId, requestId);
 });
@@ -60,7 +64,8 @@ api.get('/triggers/user/:userId/:triggerId/requests/:requestId', async c => {
  */
 api.get('/triggers/user/:userId/:triggerId', async c => {
   const { userId, triggerId } = c.req.param();
-  const namespace = `user/${userId}`;
+  const decodedUserId = decodeWebhookUserIdSegment(userId);
+  const namespace = `user/${decodedUserId}`;
 
   return handleGetTrigger(c, namespace, triggerId);
 });
@@ -70,7 +75,8 @@ api.get('/triggers/user/:userId/:triggerId', async c => {
  */
 api.put('/triggers/user/:userId/:triggerId', async c => {
   const { userId, triggerId } = c.req.param();
-  const namespace = `user/${userId}`;
+  const decodedUserId = decodeWebhookUserIdSegment(userId);
+  const namespace = `user/${decodedUserId}`;
 
   return handleUpdateTrigger(c, namespace, triggerId);
 });
@@ -80,7 +86,8 @@ api.put('/triggers/user/:userId/:triggerId', async c => {
  */
 api.delete('/triggers/user/:userId/:triggerId', async c => {
   const { userId, triggerId } = c.req.param();
-  const namespace = `user/${userId}`;
+  const decodedUserId = decodeWebhookUserIdSegment(userId);
+  const namespace = `user/${decodedUserId}`;
 
   return handleDeleteTrigger(c, namespace, triggerId);
 });
@@ -226,7 +233,7 @@ async function handleCreateTrigger(
 
     // Generate inbound URL
     const inboundUrl = namespace.startsWith('user/')
-      ? `/inbound/user/${namespace.slice(5)}/${triggerId}`
+      ? `/inbound/user/${encodeWebhookUserIdSegment(namespace.slice(5))}/${triggerId}`
       : `/inbound/org/${namespace.slice(4)}/${triggerId}`;
 
     logger.info('Trigger created', {

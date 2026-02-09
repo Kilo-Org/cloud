@@ -244,4 +244,65 @@ describe('computeSessionMetrics', () => {
     const result = computeSessionMetrics(items, 'completed');
     expect(result.totalTurns).toBe(1);
   });
+
+  it('clamps negative session duration to 0', () => {
+    const items = [makeItem('session', { time: { created: 61000, updated: 1000 } })];
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.sessionDurationMs).toBe(0);
+  });
+
+  it('returns undefined timeToFirstResponseMs with only user messages', () => {
+    const items = [
+      makeItem('message', { role: 'user', time: { created: 1000 } }),
+      makeItem('message', { role: 'user', time: { created: 2000 } }),
+    ];
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.timeToFirstResponseMs).toBeUndefined();
+  });
+
+  it('returns undefined timeToFirstResponseMs with only assistant messages', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+      }),
+    ];
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.timeToFirstResponseMs).toBeUndefined();
+  });
+
+  it('uses last kilo_meta for platform and orgId', () => {
+    const items = [
+      makeItem('kilo_meta', { platform: 'vscode', orgId: 'org-1' }),
+      makeItem('kilo_meta', { platform: 'cli', orgId: 'org-2' }),
+    ];
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.platform).toBe('cli');
+    expect(result.organizationId).toBe('org-2');
+  });
+
+  it('uses last session item for duration timestamps', () => {
+    const items = [
+      makeItem('session', { time: { created: 1000, updated: 2000 } }),
+      makeItem('session', { time: { created: 5000, updated: 10000 } }),
+    ];
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.sessionDurationMs).toBe(5000);
+  });
+
+  it('clamps timeToFirstResponseMs to 0 when assistant precedes user', () => {
+    const items = [
+      makeItem('message', { role: 'user', time: { created: 5000 } }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+      }),
+    ];
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.timeToFirstResponseMs).toBe(0);
+  });
 });

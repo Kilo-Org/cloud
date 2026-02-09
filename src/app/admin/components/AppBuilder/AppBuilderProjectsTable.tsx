@@ -199,7 +199,7 @@ export function AppBuilderProjectsTable() {
         <form onSubmit={handleSearchSubmit} className="flex flex-1 gap-2">
           <div className="relative max-w-md flex-1">
             <Input
-              placeholder="Search by title, user ID, or org ID..."
+              placeholder="Search by app ID, title, user ID, or org ID..."
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               className="pr-8"

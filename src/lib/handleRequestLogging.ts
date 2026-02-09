@@ -6,14 +6,14 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { after } from 'next/server';
 
 export function handleRequestLogging(params: {
-  clonedReponse: Response;
+  clonedResponse: Response;
   user: User | null;
   organization_id: string | null;
   provider: string;
   model: string;
   request: OpenRouterChatCompletionRequest;
 }) {
-  const { clonedReponse, user, organization_id, provider, model, request } = params;
+  const { clonedResponse, user, organization_id, provider, model, request } = params;
   if (
     !user?.google_user_email.endsWith('@kilo.ai') &&
     !user?.google_user_email.endsWith('@kilocode.ai') &&
@@ -28,11 +28,11 @@ export function handleRequestLogging(params: {
         .values({
           kilo_user_id: user?.id,
           organization_id: organization_id,
-          status_code: clonedReponse.status,
+          status_code: clonedResponse.status,
           model,
           provider,
           request,
-          response: await clonedReponse.text(),
+          response: await clonedResponse.text(),
         })
         .returning({ id: api_request_log.id });
       logExceptInTest(

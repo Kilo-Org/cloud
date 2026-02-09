@@ -441,7 +441,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
   handleRequestLogging({
-    clonedReponse: response.clone(),
+    clonedResponse: response.clone(),
     user: maybeUser,
     organization_id: organizationId || null,
     provider: provider.id,

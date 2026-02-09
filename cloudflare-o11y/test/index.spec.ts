@@ -50,6 +50,7 @@ function makeValidApiMetricsBody(overrides?: Record<string, unknown>) {
 		userByok: false,
 		mode: 'build',
 		provider: 'openai',
+		inferenceProvider: 'openai',
 		requestedModel: 'kilo/auto',
 		resolvedModel: 'anthropic/claude-sonnet-4.5',
 		toolsAvailable: ['function:get_weather', 'function:searchDocs'],
@@ -114,7 +115,7 @@ describe('o11y worker', () => {
 
 		expect(aeSpy.writeDataPoint).toHaveBeenCalledOnce();
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
-		expect(call.blobs).toEqual(['openai', 'anthropic/claude-sonnet-4.5', 'kilo-gateway', '0']);
+		expect(call.blobs).toEqual(['openai', 'anthropic/claude-sonnet-4.5', 'kilo-gateway', '0', 'openai']);
 		expect(call.doubles).toEqual([45, 123, 200]);
 	});
 

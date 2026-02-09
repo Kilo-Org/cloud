@@ -98,7 +98,15 @@ export function AppSidebar({
   const pathname = usePathname();
 
   return (
-    <Sidebar {...props}>
+    <Sidebar
+      {...props}
+      style={
+        {
+          '--sidebar': 'oklch(0.205 0.015 85)',
+          '--sidebar-accent': 'oklch(0.269 0.015 85)',
+        } as React.CSSProperties
+      }
+    >
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

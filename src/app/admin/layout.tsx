@@ -13,7 +13,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div
+      className="flex min-h-screen"
+      style={{ '--background': 'oklch(0.145 0.015 25)' } as React.CSSProperties}
+    >
       <SidebarProvider>
         <AppSidebar variant="inset">
           {/* Need to pass BuildInfo as children from a server component to make it have access to the right variables */}

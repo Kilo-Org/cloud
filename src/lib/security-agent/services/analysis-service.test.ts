@@ -63,7 +63,7 @@ describe('analysis-service', () => {
   });
 
   it('passes organization id to cloud agent sandbox analysis', async () => {
-    const organizationId = 'org-123';
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const findingId = 'finding-123';
     const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
 

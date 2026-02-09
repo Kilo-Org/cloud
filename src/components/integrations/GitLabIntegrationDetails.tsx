@@ -426,25 +426,30 @@ export function GitLabIntegrationDetails({
 
               {/* Actions */}
               <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    // For PAT connections, link to Access Tokens page; for OAuth, link to Applications
-                    const targetUrl =
-                      authType === 'pat'
-                        ? `${gitlabInstanceUrl}/-/user_settings/personal_access_tokens`
-                        : `${gitlabInstanceUrl}/-/profile/applications`;
-                    window.open(targetUrl, '_blank');
-                  }}
-                >
-                  {authType === 'pat' ? (
-                    <Key className="mr-2 h-4 w-4" />
-                  ) : (
-                    <Settings className="mr-2 h-4 w-4" />
-                  )}
-                  {authType === 'pat' ? 'Manage Access Token' : 'Manage on GitLab'}
-                  <ExternalLink className="ml-2 h-3 w-3" />
-                </Button>
+                {/* Show "Manage Access Token" for PAT connections, or "Manage on GitLab" for self-hosted OAuth
+                    (where user created their own OAuth app). Don't show for gitlab.com OAuth since
+                    Kilo Code provides the global OAuth app and users can't manage it. */}
+                {(authType === 'pat' || isSelfHosted) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      // For PAT connections, link to Access Tokens page; for OAuth, link to Applications
+                      const targetUrl =
+                        authType === 'pat'
+                          ? `${gitlabInstanceUrl}/-/user_settings/personal_access_tokens`
+                          : `${gitlabInstanceUrl}/-/profile/applications`;
+                      window.open(targetUrl, '_blank');
+                    }}
+                  >
+                    {authType === 'pat' ? (
+                      <Key className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Settings className="mr-2 h-4 w-4" />
+                    )}
+                    {authType === 'pat' ? 'Manage Access Token' : 'Manage on GitLab'}
+                    <ExternalLink className="ml-2 h-3 w-3" />
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={handleRefresh}

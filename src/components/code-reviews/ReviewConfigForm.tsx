@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   Copy,
   Check,
-  ExternalLink,
   ChevronDown,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -186,8 +185,8 @@ export function ReviewConfigForm({
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
-  // Manually added repositories (for GitLab where pagination limits results)
-  const [manuallyAddedRepos, setManuallyAddedRepos] = useState<Repository[]>([]);
+  // Repositories added from search results (for GitLab where pagination limits initial results)
+  const [searchAddedRepos, setSearchAddedRepos] = useState<Repository[]>([]);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
   // Webhook sync result from last save
@@ -272,9 +271,9 @@ export function ReviewConfigForm({
       const repoMode = configData.repositorySelectionMode || 'all';
       setRepositorySelectionMode(isGitLab ? 'selected' : repoMode);
       setSelectedRepositoryIds(configData.selectedRepositoryIds || []);
-      // Load manually added repositories from config
+      // Load repositories that were added from search results
       if (configData.manuallyAddedRepositories) {
-        setManuallyAddedRepos(
+        setSearchAddedRepos(
           configData.manuallyAddedRepositories.map(repo => ({
             id: repo.id,
             name: repo.name,
@@ -399,8 +398,9 @@ export function ReviewConfigForm({
     // Clear previous webhook sync result
     setWebhookSyncResult(null);
 
-    // Convert manually added repos to the format expected by the API
-    const manuallyAddedRepositories = manuallyAddedRepos.map(repo => ({
+    // Convert search-added repos to the format expected by the API
+    // Note: The API field is still called manuallyAddedRepositories for backwards compatibility
+    const manuallyAddedRepositories = searchAddedRepos.map(repo => ({
       id: repo.id,
       name: repo.name,
       full_name: repo.full_name,
@@ -622,15 +622,14 @@ export function ReviewConfigForm({
                               full_name: repo.fullName,
                               private: repo.private,
                             })),
-                            ...manuallyAddedRepos,
+                            ...searchAddedRepos,
                           ] as Repository[]
                         }
                         selectedIds={selectedRepositoryIds}
                         onSelectionChange={setSelectedRepositoryIds}
-                        allowManualAdd={isGitLab}
-                        onManualAdd={repo => {
-                          // Add to manually added repos and auto-select it
-                          setManuallyAddedRepos(prev => [...prev, repo]);
+                        onAddFromSearch={(repo: Repository) => {
+                          // Add to search-added repos and auto-select it
+                          setSearchAddedRepos(prev => [...prev, repo]);
                           setSelectedRepositoryIds(prev => [...prev, repo.id]);
                         }}
                         onSearch={
@@ -698,9 +697,8 @@ export function ReviewConfigForm({
                         Automatically configure webhooks
                       </Label>
                       <p className="text-muted-foreground text-sm">
-                        Automatically create and manage webhooks for selected repositories. Webhooks
-                        will be created when repositories are added and removed when they are
-                        deselected.
+                        Webhooks will be created when repositories are added and removed when they
+                        are deselected.
                       </p>
                     </div>
                   </div>
@@ -887,16 +885,6 @@ export function ReviewConfigForm({
                             <li>Click "Add webhook"</li>
                           </ol>
                         </div>
-
-                        <a
-                          href={`${gitlabStatusData?.integration?.instanceUrl || 'https://gitlab.com'}/-/profile/applications`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
-                        >
-                          Open GitLab Settings
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
                       </div>
                     )}
                   </div>

@@ -22,7 +22,7 @@ export default async function UserGitLabIntegrationPage({
   return (
     <PageLayout
       title="GitLab Integration"
-      subtitle="Manage your personal GitLab OAuth integration"
+      subtitle="Manage your personal GitLab integration"
       headerActions={
         <Link href="/integrations">
           <Button variant="ghost" size="sm" className="gap-2">

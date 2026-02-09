@@ -34,6 +34,8 @@ export const SessionMetricsParamsSchema = z.object({
 	autoCompactionCount: z.number().int().nonnegative(),
 
 	terminationReason: z.enum(TerminationReasons),
+
+	ingestVersion: z.number().int().nonnegative().default(0),
 });
 
 export type SessionMetricsParams = z.infer<typeof SessionMetricsParamsSchema>;

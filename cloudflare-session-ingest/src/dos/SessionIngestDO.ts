@@ -18,14 +18,20 @@ import {
   type TerminationReason,
 } from './session-metrics';
 
+type IngestMetaKey =
+  | ExtractableMetaKey
+  | 'kiloUserId'
+  | 'sessionId'
+  | 'ingestVersion'
+  | 'closeReason'
+  | 'metricsEmitted';
+
+type ExtractableMetaKey = 'title' | 'parentId' | 'platform' | 'orgId';
+
 function writeIngestMetaIfChanged(
   sql: SqlStorage,
-  params: { key: string; incomingValue: string | null | undefined }
+  params: { key: IngestMetaKey; incomingValue: string | null }
 ): { changed: boolean; value: string | null } {
-  if (params.incomingValue === undefined) {
-    return { changed: false, value: null };
-  }
-
   const existing = sql
     .exec<{
       value: string | null;
@@ -50,10 +56,8 @@ function writeIngestMetaIfChanged(
   return { changed: true, value: params.incomingValue };
 }
 
-type IngestMetaKey = 'title' | 'parentId' | 'platform' | 'orgId';
-
 const INGEST_META_EXTRACTORS: Array<{
-  key: IngestMetaKey;
+  key: ExtractableMetaKey;
   extract: (item: IngestBatch[number]) => string | null | undefined;
 }> = [
   { key: 'title', extract: extractNormalizedTitleFromItem },
@@ -62,7 +66,7 @@ const INGEST_META_EXTRACTORS: Array<{
   { key: 'orgId', extract: extractNormalizedOrgIdFromItem },
 ];
 
-type Changes = Array<{ name: IngestMetaKey; value: string | null }>;
+type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
 
 export class SessionIngestDO extends DurableObject<Env> {
   private sql: SqlStorage;
@@ -111,11 +115,15 @@ export class SessionIngestDO extends DurableObject<Env> {
   }> {
     this.initSchema();
 
-    // Persist identity so alarm() can recover kiloUserId/sessionId after hibernation
+    // Persist identity and version so alarm() can recover after hibernation
     writeIngestMetaIfChanged(this.sql, { key: 'kiloUserId', incomingValue: kiloUserId });
     writeIngestMetaIfChanged(this.sql, { key: 'sessionId', incomingValue: sessionId });
+    writeIngestMetaIfChanged(this.sql, {
+      key: 'ingestVersion',
+      incomingValue: String(ingestVersion),
+    });
 
-    const incomingByKey: Record<IngestMetaKey, string | null | undefined> = {
+    const incomingByKey: Record<ExtractableMetaKey, string | null | undefined> = {
       title: undefined,
       parentId: undefined,
       platform: undefined,
@@ -159,10 +167,12 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const changes: Changes = [];
 
-    for (const key of Object.keys(incomingByKey) as IngestMetaKey[]) {
+    for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
+      const incoming = incomingByKey[key];
+      if (incoming === undefined) continue;
       const meta = writeIngestMetaIfChanged(this.sql, {
         key,
-        incomingValue: incomingByKey[key],
+        incomingValue: incoming,
       });
       if (meta.changed) {
         changes.push({ name: key, value: meta.value });
@@ -224,7 +234,8 @@ export class SessionIngestDO extends DurableObject<Env> {
   private async emitSessionMetrics(
     kiloUserId: string,
     sessionId: string,
-    closeReason: TerminationReason
+    closeReason: TerminationReason,
+    ingestVersion: number
   ): Promise<boolean> {
     this.initSchema();
 
@@ -252,7 +263,7 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const metrics = computeSessionMetrics(rows, closeReason);
 
-    await this.env.O11Y.ingestSessionMetrics({ kiloUserId, sessionId, ...metrics });
+    await this.env.O11Y.ingestSessionMetrics({ kiloUserId, sessionId, ingestVersion, ...metrics });
 
     // Mark metrics as emitted to prevent duplicates
     this.sql.exec(
@@ -278,7 +289,7 @@ export class SessionIngestDO extends DurableObject<Env> {
         key: string;
         value: string | null;
       }>(
-        `SELECT key, value FROM ingest_meta WHERE key IN ('kiloUserId', 'sessionId', 'closeReason')`
+        `SELECT key, value FROM ingest_meta WHERE key IN ('kiloUserId', 'sessionId', 'closeReason', 'ingestVersion')`
       )
       .toArray();
 
@@ -289,8 +300,9 @@ export class SessionIngestDO extends DurableObject<Env> {
     if (!kiloUserId || !sessionId) return;
 
     const closeReason = (meta['closeReason'] ?? 'abandoned') as TerminationReason;
+    const ingestVersion = Number(meta['ingestVersion'] ?? '0') || 0;
 
-    await this.emitSessionMetrics(kiloUserId, sessionId, closeReason);
+    await this.emitSessionMetrics(kiloUserId, sessionId, closeReason, ingestVersion);
   }
 
   async clear(): Promise<void> {

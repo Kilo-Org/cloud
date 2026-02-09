@@ -103,6 +103,9 @@ export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.
 export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBACK_WEBHOOK_URL');
+// Posts deploy threat alerts to a dedicated Slack channel.
+// Expected to be a Slack Incoming Webhook URL.
+export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THREAT_WEBHOOK_URL');
 export const ENABLE_MILVUS_DUAL_WRITE = true;
 
 // AI Attribution Service

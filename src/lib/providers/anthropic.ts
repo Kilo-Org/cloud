@@ -17,7 +17,7 @@ export const opus_46_free_slackbot_model = {
   slackbot_only: true,
 } as KiloFreeModel;
 
-const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;
+const ENABLE_ANTHROPIC_STRICT_TOOL_USE = true;
 
 export function isAnthropicModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/');

@@ -53,7 +53,7 @@ export const recommendedModels = [
   {
     public_id: 'anthropic/claude-opus-4.6',
     tool_choice_required: false,
-    random_vercel_routing: false, // not yet allowed pending strict tool use support
+    random_vercel_routing: true,
   },
   {
     public_id: 'anthropic/claude-sonnet-4.5',

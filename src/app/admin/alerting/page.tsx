@@ -36,7 +36,7 @@ export default function AdminAlertingPage() {
   });
   const { baselineByModel, baselineStatus, setLoading, setBaseline, setError } = useBaselineState();
   const {
-    data: addSearchResults,
+    models: addSearchResults,
     isLoading: addSearchLoading,
     error: addSearchError,
   } = useAddModelSearch(addSearchTerm);
@@ -151,7 +151,7 @@ export default function AdminAlertingPage() {
             onSearchChange={setAddSearchTerm}
             isLoading={addSearchLoading}
             error={addSearchError}
-            models={addSearchResults?.models ?? []}
+            models={addSearchResults}
             onAddModel={handleAddModel}
           />
         </div>

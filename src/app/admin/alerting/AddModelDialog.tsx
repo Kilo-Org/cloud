@@ -72,9 +72,7 @@ export function AddModelDialog({
                 </button>
               ))
             ) : (
-              <div className="text-muted-foreground p-3 text-sm">
-                No models found. Try syncing model stats in the admin models page.
-              </div>
+              <div className="text-muted-foreground p-3 text-sm">No models match that search.</div>
             )}
           </div>
         </div>

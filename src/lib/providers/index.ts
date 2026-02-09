@@ -154,6 +154,9 @@ function getPreferredProvider(requestedModel: string): OpenRouterInferenceProvid
   if (isMistralModel(requestedModel)) {
     return OpenRouterInferenceProviderIdSchema.enum.mistral;
   }
+  if (isMoonshotModel(requestedModel)) {
+    return OpenRouterInferenceProviderIdSchema.enum.moonshotai;
+  }
   return null;
 }
 

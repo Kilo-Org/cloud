@@ -208,7 +208,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const { provider, userByok } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
-    isAnonymousContext(user) ? null : user,
+    user,
     organizationId
   );
 

@@ -6,20 +6,6 @@ import {
   normalizeToolCallIds,
 } from '@/lib/tool-calling';
 
-export const devstral_small_2512_free_model = {
-  public_id: 'mistralai/devstral-small-2512:free',
-  display_name: 'Mistral: Devstral Small 2 2512 (free)',
-  description:
-    'Devstral Small 2 is a state-of-the-art open-source model by Mistral AI specializing in agentic coding. It is a 24B-parameter dense transformer model supporting a 256K context window.\n**Note:** prompts and completions may be logged by Mistral during the free period and used to improve the model.',
-  context_length: 262144,
-  max_completion_tokens: 262144,
-  is_enabled: false,
-  flags: [],
-  gateway: 'vercel',
-  internal_id: 'mistral/devstral-small-2',
-  inference_providers: ['mistral'],
-} as KiloFreeModel;
-
 export function isMistralModel(model: string) {
   return model.startsWith('mistralai/');
 }

@@ -1,4 +1,5 @@
 {
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "name": "db-proxy",
   "main": "src/index.ts",
   "compatibility_date": "2025-09-01",

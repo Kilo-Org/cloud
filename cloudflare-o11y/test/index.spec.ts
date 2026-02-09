@@ -203,6 +203,7 @@ describe('session metrics RPC', () => {
 			compactionCount: 1,
 			autoCompactionCount: 1,
 			terminationReason: 'completed' as const,
+			ingestVersion: 1,
 		};
 	}
 
@@ -219,7 +220,7 @@ describe('session metrics RPC', () => {
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
 		expect(call.indexes).toEqual(['cli']);
 		expect(call.blobs).toEqual(['completed', 'cli', 'org_456']);
-		expect(call.doubles).toEqual([60000, 1500, 5, 12, 2, 21000, 0.15, 1, 0, 1]);
+		expect(call.doubles).toEqual([60000, 1500, 5, 12, 2, 21000, 0.15, 1, 0, 1, 1]);
 	});
 
 	it('uses empty string for missing organizationId in AE', async () => {
@@ -248,6 +249,20 @@ describe('session metrics RPC', () => {
 
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
 		expect(call.doubles[1]).toBe(-1);
+	});
+
+	it('defaults ingestVersion to 0 when omitted', async () => {
+		const aeSpy = makeWriteDataPointSpy();
+		const env = makeTestEnv({ O11Y_SESSION_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+		const ctx = createExecutionContext();
+		const instance = new Worker(ctx, env);
+
+		const params = makeValidSessionMetrics();
+		delete (params as Record<string, unknown>).ingestVersion;
+		await instance.ingestSessionMetrics(params);
+
+		const call = aeSpy.writeDataPoint.mock.calls[0][0];
+		expect(call.doubles[10]).toBe(0);
 	});
 
 	it('rejects invalid session metrics', async () => {

@@ -12,6 +12,7 @@ import { devstral_2512_free_model, devstral_small_2512_free_model } from '@/lib/
 import { pony_alpha_free_model } from '@/lib/providers/openrouter-free-models';
 import { recommendedModels } from '@/lib/providers/recommended-models';
 import { kat_coder_pro_free_model } from '@/lib/providers/streamlake';
+import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { zai_glm47_free_model } from '@/lib/providers/zai';
 
 export const DEFAULT_MODEL_CHOICES = ['anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.6'];
@@ -42,6 +43,7 @@ export const kiloFreeModels = [
   minimax_m21_free_model,
   minimax_m21_free_slackbot_model,
   opus_46_free_slackbot_model,
+  grok_code_fast_1_optimized_free_model,
   pony_alpha_free_model,
   zai_glm47_free_model,
 ] as KiloFreeModel[];

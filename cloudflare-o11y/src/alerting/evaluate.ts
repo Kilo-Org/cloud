@@ -16,19 +16,19 @@ import { getRecommendedModels } from './recommended-models';
  * Compute the burn rate from an observed bad-event fraction and the SLO.
  * burn_rate = (bad_fraction) / (1 - SLO)
  */
-function computeBurnRate(badFraction: number, slo: number): number {
+export function computeBurnRate(badFraction: number, slo: number): number {
 	const errorBudget = 1 - slo;
 	if (errorBudget <= 0) return Infinity;
 	return badFraction / errorBudget;
 }
 
-type DimensionKey = `${string}:${string}:${string}`; // provider:model:clientName
+export type DimensionKey = `${string}:${string}:${string}`; // provider:model:clientName
 
-function dimensionKey(provider: string, model: string, clientName: string): DimensionKey {
+export function dimensionKey(provider: string, model: string, clientName: string): DimensionKey {
 	return `${provider}:${model}:${clientName}`;
 }
 
-function rowsToMap<T extends { provider: string; model: string; client_name: string }>(rows: T[]): Map<DimensionKey, T> {
+export function rowsToMap<T extends { provider: string; model: string; client_name: string }>(rows: T[]): Map<DimensionKey, T> {
 	const map = new Map<DimensionKey, T>();
 	for (const row of rows) {
 		map.set(dimensionKey(row.provider, row.model, row.client_name), row);
@@ -43,7 +43,12 @@ function rowsToMap<T extends { provider: string; model: string; client_name: str
  * Pages are only for recommended models on kilo-gateway.
  * Everything else is a ticket at most.
  */
-function effectiveSeverity(baseSeverity: AlertSeverity, clientName: string, model: string, recommendedModels: Set<string>): AlertSeverity {
+export function effectiveSeverity(
+	baseSeverity: AlertSeverity,
+	clientName: string,
+	model: string,
+	recommendedModels: Set<string>,
+): AlertSeverity {
 	if (baseSeverity === 'page') {
 		if (clientName === 'kilo-gateway' && recommendedModels.has(model)) {
 			return 'page';

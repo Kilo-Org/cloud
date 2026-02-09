@@ -107,6 +107,12 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     description: 'Kilo Pass bonus credits',
     is_idempotent: false,
   },
+  // Admin bulk credit grant
+  {
+    credit_category: 'admin-bulk-grant',
+    description: 'Admin bulk credit grant to personal accounts',
+    is_idempotent: false,
+  },
   // OSS Sponsorship Program credits
   {
     credit_category: 'oss-sponsorship',

@@ -580,11 +580,10 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
                 href={`https://github.com/${gitRepoFullName}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                title={gitRepoFullName}
               >
                 <Github className="mr-2 h-4 w-4" />
-                <span className="max-w-[150px] truncate">
-                  {gitRepoFullName.split('/')[1] ?? gitRepoFullName}
-                </span>
+                GitHub
                 <ExternalLink className="ml-1.5 h-3 w-3 opacity-50" />
               </a>
             </Button>

@@ -124,9 +124,10 @@ export const adminAppBuilderRouter = createTRPCRouter({
         eq(app_builder_projects.created_by_user_id, searchTerm),
       ];
 
-      // Only add org ID search if searchTerm looks like a valid UUID
+      // Only add UUID column searches if searchTerm looks like a valid UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidRegex.test(searchTerm)) {
+        searchConditions.push(eq(app_builder_projects.id, searchTerm));
         searchConditions.push(eq(app_builder_projects.owned_by_organization_id, searchTerm));
       }
 

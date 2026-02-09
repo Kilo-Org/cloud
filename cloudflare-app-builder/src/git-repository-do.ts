@@ -336,11 +336,10 @@ export class GitRepositoryDO extends DurableObject<Env> {
         await memFs.writeFile(obj.path, obj.data);
       }
 
-      // Get all branches to push
+      // Get all branches to push (uses isomorphic-git to handle nested refs like feature/foo)
       let branches: string[] = [];
       try {
-        const headsDir = await memFs.readdir('.git/refs/heads');
-        branches = headsDir.filter((name: string) => !name.startsWith('.'));
+        branches = await git.listBranches({ fs: memFs, dir: '/' });
       } catch {
         branches = ['main']; // Default to main if no branches found
       }

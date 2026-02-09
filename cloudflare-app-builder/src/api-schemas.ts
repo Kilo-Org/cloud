@@ -157,7 +157,7 @@ export const MigrateToGithubSuccessResponseSchema = z.object({
 
 export const MigrateToGithubErrorResponseSchema = z.object({
   success: z.literal(false),
-  error: z.enum(['invalid_request', 'internal_error']),
+  error: z.enum(['invalid_request', 'internal_error', 'push_failed']),
   message: z.string(),
 });
 

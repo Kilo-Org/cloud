@@ -166,6 +166,8 @@ export async function migrateProjectToGitHub(
 
   // 1. Atomically claim this project for migration (prevents concurrent migrations)
   // Sets migrated_at as a claim — only one concurrent caller can win.
+  // We also require git_repo_full_name IS NULL so that a crashed previous attempt
+  // (migrated_at set but git_repo_full_name never written) doesn't permanently block retries.
   const projectOwnerCondition =
     owner.type === 'org'
       ? eq(app_builder_projects.owned_by_organization_id, owner.id)
@@ -178,7 +180,7 @@ export async function migrateProjectToGitHub(
       and(
         eq(app_builder_projects.id, projectId),
         projectOwnerCondition,
-        isNull(app_builder_projects.migrated_at)
+        isNull(app_builder_projects.git_repo_full_name)
       )
     )
     .returning();

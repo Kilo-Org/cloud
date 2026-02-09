@@ -104,7 +104,7 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
             {/* Title */}
             <div className="md:col-span-2">
               <div className="text-muted-foreground text-sm font-medium">Title</div>
-              <div className="text-lg font-semibold">{project.title}</div>
+              <div className="text-lg font-semibold break-words">{project.title}</div>
             </div>
 
             {/* Model */}

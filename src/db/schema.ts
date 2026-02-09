@@ -21,6 +21,7 @@ import {
   serial,
   vector,
   type AnyPgColumn,
+  bigserial,
 } from 'drizzle-orm/pg-core';
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -612,6 +613,22 @@ export const microdollar_usage_metadata = pgTable(
     has_tools: boolean(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
+);
+
+export const api_request_log = pgTable(
+  'api_request_log',
+  {
+    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    kilo_user_id: text(),
+    organization_id: text(),
+    provider: text(),
+    model: text(),
+    status_code: integer(),
+    request: jsonb(),
+    response: text(),
+  },
+  table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
 export const http_user_agent = pgTable(

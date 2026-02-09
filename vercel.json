@@ -21,6 +21,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/cleanup-api-request-log",
+      "schedule": "0 12 * * *"
+    },
+    {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",
       "schedule": "0 * * * *"
     },

@@ -29,6 +29,13 @@
       "when": 1770309949809,
       "tag": "0003_bizarre_sabra",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770638464816,
+      "tag": "0004_volatile_exodus",
+      "breakpoints": true
     }
   ]
 }

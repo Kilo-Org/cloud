@@ -17,9 +17,10 @@ import {
   FileSearch,
   GitPullRequest,
   UserX,
+  Coins,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import type { Session } from 'next-auth';
+import { usePathname } from 'next/navigation';
 import { UserAvatar } from '@/components/UserAvatar';
 
 import {
@@ -38,108 +39,54 @@ import {
 import Link from 'next/link';
 
 type MenuItem = {
-  title: (session: Session | null) => string;
+  title: string;
   url: string;
-  icon: (session: Session | null) => React.ReactElement;
+  icon: React.ElementType;
 };
 
-const menuItems: MenuItem[] = [
+type MenuSection = {
+  label: string;
+  items: MenuItem[];
+};
+
+const menuSections: MenuSection[] = [
   {
-    title: session => session?.user?.name || 'Profile',
-    url: '/profile',
-    icon: session => (
-      <UserAvatar
-        image={session?.user?.image}
-        name={session?.user?.name}
-        size={24}
-        className="mx-[-4px]"
-      />
-    ),
+    label: 'User Management',
+    items: [
+      { title: 'Users', url: '/admin/users', icon: Users },
+      { title: 'Organizations', url: '/admin/organizations', icon: Building2 },
+      { title: 'Abuse', url: '/admin/abuse', icon: ShieldAlert },
+      { title: 'Bulk Block', url: '/admin/bulk-block', icon: Ban },
+      { title: 'Blacklisted Domains', url: '/admin/blacklisted-domains', icon: Shield },
+    ],
   },
   {
-    title: () => 'Users',
-    url: '/admin/users',
-    icon: () => <Users />,
+    label: 'Financial',
+    items: [
+      { title: 'Credit Categories', url: '/admin/credit-categories', icon: DollarSign },
+      { title: 'Bulk Credits', url: '/admin/bulk-credits', icon: Coins },
+      { title: 'Revenue KPI', url: '/admin/revenue', icon: DollarSign },
+    ],
   },
   {
-    title: () => 'Organizations',
-    url: '/admin/organizations',
-    icon: () => <Building2 />,
+    label: 'Product & Engineering',
+    items: [
+      { title: 'Community PRs', url: '/admin/community-prs', icon: GitPullRequest },
+      { title: 'Code Reviewer', url: '/admin/code-reviews', icon: GitPullRequest },
+      { title: 'Slack Bot', url: '/admin/slack-bot', icon: MessageSquare },
+      { title: 'Deployments', url: '/admin/deployments', icon: Rocket },
+      { title: 'App Builder', url: '/admin/app-builder', icon: Blocks },
+      { title: 'Managed Indexing', url: '/admin/code-indexing', icon: Database },
+    ],
   },
   {
-    title: () => 'Credit Categories',
-    url: '/admin/credit-categories',
-    icon: () => <DollarSign />,
-  },
-  {
-    title: () => 'Revenue KPI',
-    url: '/admin/revenue',
-    icon: () => <DollarSign />,
-  },
-  {
-    title: () => 'Code Reviewer',
-    url: '/admin/code-reviews',
-    icon: () => <GitPullRequest />,
-  },
-  {
-    title: () => 'Community PRs',
-    url: '/admin/community-prs',
-    icon: () => <GitPullRequest />,
-  },
-  {
-    title: () => 'Abuse',
-    url: '/admin/abuse',
-    icon: () => <ShieldAlert />,
-  },
-  {
-    title: () => 'Bulk Block',
-    url: '/admin/bulk-block',
-    icon: () => <Ban />,
-  },
-  {
-    title: () => 'Blacklisted Domains',
-    url: '/admin/blacklisted-domains',
-    icon: () => <Shield />,
-  },
-  {
-    title: () => 'Managed Indexing',
-    url: '/admin/code-indexing',
-    icon: () => <Database />,
-  },
-  {
-    title: () => 'Model Stats',
-    url: '/admin/model-stats',
-    icon: () => <BarChart />,
-  },
-  {
-    title: () => 'Deployments',
-    url: '/admin/deployments',
-    icon: () => <Rocket />,
-  },
-  {
-    title: () => 'App Builder',
-    url: '/admin/app-builder',
-    icon: () => <Blocks />,
-  },
-  {
-    title: () => 'Slack Bot',
-    url: '/admin/slack-bot',
-    icon: () => <MessageSquare />,
-  },
-  {
-    title: () => 'Feature Interest',
-    url: '/admin/feature-interest',
-    icon: () => <Sparkles />,
-  },
-  {
-    title: () => 'Session Traces',
-    url: '/admin/session-traces',
-    icon: () => <FileSearch />,
-  },
-  {
-    title: () => 'Free Model Usage',
-    url: '/admin/free-model-usage',
-    icon: () => <UserX />,
+    label: 'Analytics & Observability',
+    items: [
+      { title: 'Model Stats', url: '/admin/model-stats', icon: BarChart },
+      { title: 'Session Traces', url: '/admin/session-traces', icon: FileSearch },
+      { title: 'Feature Interest', url: '/admin/feature-interest', icon: Sparkles },
+      { title: 'Free Model Usage', url: '/admin/free-model-usage', icon: UserX },
+    ],
   },
 ];
 
@@ -148,6 +95,7 @@ export function AppSidebar({
   ...props
 }: { children: React.ReactNode } & React.ComponentProps<typeof Sidebar>) {
   const session = useSession();
+  const pathname = usePathname();
 
   return (
     <Sidebar {...props}>
@@ -171,22 +119,63 @@ export function AppSidebar({
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map(item => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      {item.icon(session.data)}
-                      <span>{item.title(session.data)}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link
+                    href="/profile"
+                    prefetch={false}
+                    className={
+                      pathname === '/profile'
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : ''
+                    }
+                  >
+                    <UserAvatar
+                      image={session.data?.user?.image}
+                      name={session.data?.user?.name}
+                      size={24}
+                      className="mx-[-4px]"
+                    />
+                    <span>{session.data?.user?.name || 'Profile'}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {menuSections.map(section => (
+          <SidebarGroup key={section.label}>
+            <SidebarGroupLabel className="text-muted-foreground font-medium">
+              {section.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {section.items.map(item => {
+                  const isActive = pathname === item.url || pathname.startsWith(item.url + '/');
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton asChild>
+                        <Link
+                          href={item.url}
+                          prefetch={false}
+                          className={
+                            isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''
+                          }
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter className="p-4">{children}</SidebarFooter>

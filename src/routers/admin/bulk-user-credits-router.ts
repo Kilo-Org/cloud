@@ -7,9 +7,19 @@ import { inArray } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 
 const BulkUserCreditsInputSchema = z.object({
-  emails: z.array(z.string().email()),
+  emails: z.array(z.string().email()).max(1000),
   amountUsd: z.number().positive(),
-  expirationDate: z.string().optional(),
+  expirationDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+    .refine(
+      dateStr => {
+        const date = new Date(dateStr);
+        return !isNaN(date.getTime());
+      },
+      { message: 'Invalid date' }
+    )
+    .optional(),
   description: z.string().optional(),
 });
 
@@ -41,7 +51,7 @@ export const bulkUserCreditsRouter = createTRPCRouter({
    * Returns matched users and unmatched emails.
    */
   matchUsers: adminProcedure
-    .input(z.object({ emails: z.array(z.string().email()) }))
+    .input(z.object({ emails: z.array(z.string().email()).max(1000) }))
     .mutation(async ({ input }): Promise<MatchUsersResult> => {
       const { emails } = input;
 
@@ -49,8 +59,8 @@ export const bulkUserCreditsRouter = createTRPCRouter({
         return { matched: [], unmatched: [] };
       }
 
-      // Normalize emails to lowercase for matching
-      const normalizedEmails = emails.map(e => e.toLowerCase());
+      // Normalize emails to lowercase and deduplicate
+      const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
       // Find all users with matching emails
       const users = await db
@@ -94,8 +104,8 @@ export const bulkUserCreditsRouter = createTRPCRouter({
       const { emails, amountUsd, expirationDate, description } = input;
       const results: BulkCreditResult[] = [];
 
-      // Normalize emails
-      const normalizedEmails = emails.map(e => e.toLowerCase());
+      // Normalize emails and deduplicate to prevent double-crediting
+      const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
       // Fetch all users at once
       const users = await db

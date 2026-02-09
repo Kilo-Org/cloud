@@ -28,6 +28,8 @@ import {
   Calendar,
   Users,
 } from 'lucide-react';
+import AdminPage from '@/app/admin/components/AdminPage';
+import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
 type MatchedUser = {
   email: string;
@@ -99,6 +101,14 @@ function downloadCsv(content: string, filename: string) {
 function generateEmailsCsv(emails: string[]): string {
   return 'email\n' + emails.join('\n');
 }
+
+const breadcrumbs = (
+  <>
+    <BreadcrumbItem>
+      <BreadcrumbPage>Bulk Credits</BreadcrumbPage>
+    </BreadcrumbItem>
+  </>
+);
 
 export default function BulkCreditsPage() {
   const trpc = useTRPC();
@@ -266,314 +276,318 @@ export default function BulkCreditsPage() {
   const isFormValid = matchedUsers.length > 0 && parseFloat(amountUsd) > 0;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Bulk User Credits</h1>
-        <p className="text-muted-foreground">
-          Import a CSV of email addresses to grant credits to multiple personal Kilo accounts at
-          once.
-        </p>
-      </div>
+    <AdminPage breadcrumbs={breadcrumbs}>
+      <div className="flex w-full flex-col gap-y-6">
+        <div>
+          <h2 className="text-2xl font-bold">Bulk User Credits</h2>
+          <p className="text-muted-foreground">
+            Import a CSV of email addresses to grant credits to multiple personal Kilo accounts at
+            once.
+          </p>
+        </div>
 
-      {/* CSV Upload Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            CSV Import
-          </CardTitle>
-          <CardDescription>
-            Upload a CSV file with email addresses. The file should have one email per line or a
-            column containing emails.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Drop zone */}
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            className={`relative flex min-h-[150px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
-              isDragging
-                ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-            }`}
-          >
-            <FileSpreadsheet className="text-muted-foreground mb-2 h-10 w-10" />
-            <p className="text-muted-foreground text-sm">Drop CSV file here or click to browse</p>
-            <Input
-              type="file"
-              accept=".csv,text/csv"
-              onChange={handleInputChange}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-          </div>
-
-          {/* Skipped lines warning */}
-          {skippedLines.length > 0 && (
-            <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
-              <p className="text-destructive mb-2 flex items-center gap-2 font-medium">
-                <AlertCircle className="h-4 w-4" />
-                Skipped lines ({skippedLines.length})
-              </p>
-              <ul className="text-muted-foreground list-disc pl-5 text-sm">
-                {skippedLines.slice(0, 5).map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-                {skippedLines.length > 5 && <li>...and {skippedLines.length - 5} more</li>}
-              </ul>
-            </div>
-          )}
-
-          {/* Parsed emails preview */}
-          {parsedEmails.length > 0 && !hasMatched && (
-            <div className="space-y-4">
-              <p className="text-sm font-medium">
-                Found {parsedEmails.length} email{parsedEmails.length !== 1 ? 's' : ''} in CSV
-              </p>
-              <div className="max-h-[200px] overflow-auto rounded-lg border p-4">
-                <ul className="text-muted-foreground space-y-1 text-sm">
-                  {parsedEmails.slice(0, 10).map((email, i) => (
-                    <li key={i} className="font-mono">
-                      {email}
-                    </li>
-                  ))}
-                  {parsedEmails.length > 10 && (
-                    <li className="text-muted-foreground/70">
-                      ...and {parsedEmails.length - 10} more
-                    </li>
-                  )}
-                </ul>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleMatchUsers} disabled={matchUsersMutation.isPending}>
-                  {matchUsersMutation.isPending
-                    ? 'Matching...'
-                    : `Match ${parsedEmails.length} Emails to Users`}
-                </Button>
-                <Button variant="outline" onClick={handleClear}>
-                  Clear
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Matched Users Section */}
-      {hasMatched && !creditResults && (
+        {/* CSV Upload Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Matched Users ({matchedUsers.length})
+              <Upload className="h-5 w-5" />
+              CSV Import
             </CardTitle>
             <CardDescription>
-              {unmatchedEmails.length > 0
-                ? `${unmatchedEmails.length} email${unmatchedEmails.length !== 1 ? 's' : ''} could not be matched to existing accounts.`
-                : 'All emails matched to existing Kilo accounts.'}
+              Upload a CSV file with email addresses. The file should have one email per line or a
+              column containing emails.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Unmatched emails warning */}
-            {unmatchedEmails.length > 0 && (
+            {/* Drop zone */}
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className={`relative flex min-h-[150px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
+                isDragging
+                  ? 'border-primary bg-primary/5'
+                  : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+              }`}
+            >
+              <FileSpreadsheet className="text-muted-foreground mb-2 h-10 w-10" />
+              <p className="text-muted-foreground text-sm">Drop CSV file here or click to browse</p>
+              <Input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleInputChange}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </div>
+
+            {/* Skipped lines warning */}
+            {skippedLines.length > 0 && (
               <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-destructive flex items-center gap-2 font-medium">
-                    <XCircle className="h-4 w-4" />
-                    Unmatched emails ({unmatchedEmails.length})
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadUnmatched}
-                    className="text-destructive border-destructive/50 hover:bg-destructive/10"
-                  >
-                    <Download className="mr-1 h-4 w-4" />
-                    Download Unmatched
-                  </Button>
-                </div>
+                <p className="text-destructive mb-2 flex items-center gap-2 font-medium">
+                  <AlertCircle className="h-4 w-4" />
+                  Skipped lines ({skippedLines.length})
+                </p>
                 <ul className="text-muted-foreground list-disc pl-5 text-sm">
-                  {unmatchedEmails.slice(0, 5).map((item, i) => (
-                    <li key={i} className="font-mono">
-                      {item.email}
-                    </li>
+                  {skippedLines.slice(0, 5).map((line, i) => (
+                    <li key={i}>{line}</li>
                   ))}
-                  {unmatchedEmails.length > 5 && <li>...and {unmatchedEmails.length - 5} more</li>}
+                  {skippedLines.length > 5 && <li>...and {skippedLines.length - 5} more</li>}
                 </ul>
               </div>
             )}
 
-            {/* Matched users table */}
-            {matchedUsers.length > 0 && (
-              <div className="max-h-[300px] overflow-auto rounded-lg border">
+            {/* Parsed emails preview */}
+            {parsedEmails.length > 0 && !hasMatched && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium">
+                  Found {parsedEmails.length} email{parsedEmails.length !== 1 ? 's' : ''} in CSV
+                </p>
+                <div className="max-h-[200px] overflow-auto rounded-lg border p-4">
+                  <ul className="text-muted-foreground space-y-1 text-sm">
+                    {parsedEmails.slice(0, 10).map((email, i) => (
+                      <li key={i} className="font-mono">
+                        {email}
+                      </li>
+                    ))}
+                    {parsedEmails.length > 10 && (
+                      <li className="text-muted-foreground/70">
+                        ...and {parsedEmails.length - 10} more
+                      </li>
+                    )}
+                  </ul>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleMatchUsers} disabled={matchUsersMutation.isPending}>
+                    {matchUsersMutation.isPending
+                      ? 'Matching...'
+                      : `Match ${parsedEmails.length} Emails to Users`}
+                  </Button>
+                  <Button variant="outline" onClick={handleClear}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Matched Users Section */}
+        {hasMatched && !creditResults && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Matched Users ({matchedUsers.length})
+              </CardTitle>
+              <CardDescription>
+                {unmatchedEmails.length > 0
+                  ? `${unmatchedEmails.length} email${unmatchedEmails.length !== 1 ? 's' : ''} could not be matched to existing accounts.`
+                  : 'All emails matched to existing Kilo accounts.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Unmatched emails warning */}
+              {unmatchedEmails.length > 0 && (
+                <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-destructive flex items-center gap-2 font-medium">
+                      <XCircle className="h-4 w-4" />
+                      Unmatched emails ({unmatchedEmails.length})
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadUnmatched}
+                      className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                    >
+                      <Download className="mr-1 h-4 w-4" />
+                      Download Unmatched
+                    </Button>
+                  </div>
+                  <ul className="text-muted-foreground list-disc pl-5 text-sm">
+                    {unmatchedEmails.slice(0, 5).map((item, i) => (
+                      <li key={i} className="font-mono">
+                        {item.email}
+                      </li>
+                    ))}
+                    {unmatchedEmails.length > 5 && (
+                      <li>...and {unmatchedEmails.length - 5} more</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              {/* Matched users table */}
+              {matchedUsers.length > 0 && (
+                <div className="max-h-[300px] overflow-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>User ID</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {matchedUsers.map((user, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-mono text-sm">{user.email}</TableCell>
+                          <TableCell>{user.userName || '—'}</TableCell>
+                          <TableCell>
+                            <Link
+                              href={`/admin/users/${user.userId}`}
+                              className="font-mono text-sm text-blue-400 hover:underline"
+                            >
+                              {user.userId.slice(0, 8)}...
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Credit allocation form */}
+              {matchedUsers.length > 0 && (
+                <div className="space-y-4 rounded-lg border p-4">
+                  <h3 className="flex items-center gap-2 font-medium">
+                    <DollarSign className="h-4 w-4" />
+                    Credit Allocation
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <Label htmlFor="amount">Amount (USD) *</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={amountUsd}
+                        onChange={e => setAmountUsd(e.target.value)}
+                        min="0.01"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="expiration" className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Expiration Date
+                      </Label>
+                      <Input
+                        id="expiration"
+                        type="date"
+                        value={expirationDate}
+                        onChange={e => setExpirationDate(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="description">Description</Label>
+                      <Input
+                        id="description"
+                        type="text"
+                        placeholder="Optional description"
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleGrantCredits}
+                      disabled={!isFormValid || grantCreditsMutation.isPending}
+                    >
+                      {grantCreditsMutation.isPending
+                        ? 'Sending Credits...'
+                        : `Send Credits to ${matchedUsers.length} Users`}
+                    </Button>
+                    <Button variant="outline" onClick={handleClear}>
+                      Clear & Start Over
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Results Section */}
+        {creditResults && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                Credit Results
+              </CardTitle>
+              <CardDescription>
+                Successfully added credits to {creditResults.filter(r => r.success).length} of{' '}
+                {creditResults.length} accounts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Export buttons */}
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleDownloadSuccessful}>
+                  <Download className="mr-1 h-4 w-4" />
+                  Export Successful ({creditResults.filter(r => r.success).length})
+                </Button>
+                {creditResults.some(r => !r.success) && (
+                  <Button variant="outline" onClick={handleDownloadFailed}>
+                    <Download className="mr-1 h-4 w-4" />
+                    Export Failed ({creditResults.filter(r => !r.success).length})
+                  </Button>
+                )}
+              </div>
+
+              {/* Results table */}
+              <div className="max-h-[400px] overflow-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Status</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Name</TableHead>
                       <TableHead>User ID</TableHead>
+                      <TableHead>Error</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {matchedUsers.map((user, i) => (
+                    {creditResults.map((result, i) => (
                       <TableRow key={i}>
-                        <TableCell className="font-mono text-sm">{user.email}</TableCell>
-                        <TableCell>{user.userName || '—'}</TableCell>
                         <TableCell>
-                          <Link
-                            href={`/admin/users/${user.userId}`}
-                            className="font-mono text-sm text-blue-400 hover:underline"
-                          >
-                            {user.userId.slice(0, 8)}...
-                          </Link>
+                          {result.success ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <XCircle className="text-destructive h-5 w-5" />
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{result.email}</TableCell>
+                        <TableCell>
+                          {result.userId ? (
+                            <Link
+                              href={`/admin/users/${result.userId}`}
+                              className="font-mono text-sm text-blue-400 hover:underline"
+                            >
+                              {result.userId.slice(0, 8)}...
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-destructive text-sm">
+                          {result.error || ''}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-            )}
 
-            {/* Credit allocation form */}
-            {matchedUsers.length > 0 && (
-              <div className="space-y-4 rounded-lg border p-4">
-                <h3 className="flex items-center gap-2 font-medium">
-                  <DollarSign className="h-4 w-4" />
-                  Credit Allocation
-                </h3>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <Label htmlFor="amount">Amount (USD) *</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      placeholder="Enter amount"
-                      value={amountUsd}
-                      onChange={e => setAmountUsd(e.target.value)}
-                      min="0.01"
-                      step="0.01"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="expiration" className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Expiration Date
-                    </Label>
-                    <Input
-                      id="expiration"
-                      type="date"
-                      value={expirationDate}
-                      onChange={e => setExpirationDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Input
-                      id="description"
-                      type="text"
-                      placeholder="Optional description"
-                      value={description}
-                      onChange={e => setDescription(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleGrantCredits}
-                    disabled={!isFormValid || grantCreditsMutation.isPending}
-                  >
-                    {grantCreditsMutation.isPending
-                      ? 'Sending Credits...'
-                      : `Send Credits to ${matchedUsers.length} Users`}
-                  </Button>
-                  <Button variant="outline" onClick={handleClear}>
-                    Clear & Start Over
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Results Section */}
-      {creditResults && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Credit Results
-            </CardTitle>
-            <CardDescription>
-              Successfully added credits to {creditResults.filter(r => r.success).length} of{' '}
-              {creditResults.length} accounts.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Export buttons */}
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleDownloadSuccessful}>
-                <Download className="mr-1 h-4 w-4" />
-                Export Successful ({creditResults.filter(r => r.success).length})
+              <Button variant="outline" onClick={handleClear}>
+                Clear & Upload New
               </Button>
-              {creditResults.some(r => !r.success) && (
-                <Button variant="outline" onClick={handleDownloadFailed}>
-                  <Download className="mr-1 h-4 w-4" />
-                  Export Failed ({creditResults.filter(r => !r.success).length})
-                </Button>
-              )}
-            </div>
-
-            {/* Results table */}
-            <div className="max-h-[400px] overflow-auto rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>User ID</TableHead>
-                    <TableHead>Error</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {creditResults.map((result, i) => (
-                    <TableRow key={i}>
-                      <TableCell>
-                        {result.success ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <XCircle className="text-destructive h-5 w-5" />
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{result.email}</TableCell>
-                      <TableCell>
-                        {result.userId ? (
-                          <Link
-                            href={`/admin/users/${result.userId}`}
-                            className="font-mono text-sm text-blue-400 hover:underline"
-                          >
-                            {result.userId.slice(0, 8)}...
-                          </Link>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-destructive text-sm">
-                        {result.error || ''}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <Button variant="outline" onClick={handleClear}>
-              Clear & Upload New
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </AdminPage>
   );
 }

@@ -15,9 +15,23 @@ import type {
   StreamError,
   StreamErrorCode,
 } from './types.js';
-import type { SessionId } from '../types/ids.js';
+import type { SessionId, EventId } from '../types/ids.js';
 import { parseStreamFilters, matchesFilters } from './filters.js';
 import type { EventQueries } from '../session/queries/index.js';
+
+/**
+ * Approximate byte budget per replay round.
+ *
+ * Each round lazily iterates the SQLite cursor, serializes events and sends
+ * them over the WebSocket. Once the cumulative size of the serialized
+ * messages in a round exceeds this threshold the round stops, the cursor
+ * is abandoned, and a fresh query starts from the last sent event ID.
+ *
+ * This caps peak memory to roughly one round's worth of serialized JSON
+ * regardless of how many events or how large each payload is.
+ * At least one event is always sent per round to guarantee forward progress.
+ */
+const REPLAY_BATCH_BYTES = 1_048_576; // 1 MiB
 
 // ---------------------------------------------------------------------------
 // Event Formatting
@@ -124,28 +138,45 @@ export function createStreamHandler(
     /**
      * Replay historical events to a newly connected client.
      *
-     * Queries events using the client's filters and sends them in order.
-     * Uses `fromId` for exclusive pagination (id > fromId).
+     * Events are read lazily from the SQLite cursor one row at a time
+     * via iterateByFilters(). Each round serializes and sends events
+     * until the cumulative JSON size exceeds REPLAY_BATCH_BYTES, then
+     * abandons the cursor and starts a fresh query from the last sent
+     * event ID. At least one event is always sent per round so replay
+     * always makes forward progress even when a single event exceeds
+     * the byte budget.
      *
      * @param ws - The WebSocket connection to send events to
      * @param filters - The client's filter preferences
      */
     async replayEvents(ws: WebSocket, filters: StreamFilters): Promise<void> {
       try {
-        // Build query filters from stream filters
-        const queryFilters = {
-          fromId: filters.fromId,
-          executionIds: filters.executionIds,
-          eventTypes: filters.eventTypes,
-          startTime: filters.startTime,
-          endTime: filters.endTime,
-        };
+        let cursor: EventId | undefined = filters.fromId;
 
-        const events = eventQueries.findByFilters(queryFilters);
+        for (;;) {
+          if (ws.readyState !== WebSocket.OPEN) break;
 
-        for (const event of events) {
-          const formatted = formatStreamEvent(event, sessionId);
-          ws.send(JSON.stringify(formatted));
+          let bytesSent = 0;
+          let eventsSent = 0;
+
+          for (const event of eventQueries.iterateByFilters({
+            fromId: cursor,
+            executionIds: filters.executionIds,
+            eventTypes: filters.eventTypes,
+            startTime: filters.startTime,
+            endTime: filters.endTime,
+          })) {
+            const message = JSON.stringify(formatStreamEvent(event, sessionId));
+            ws.send(message);
+            bytesSent += message.length;
+            cursor = event.id;
+            eventsSent++;
+
+            if (bytesSent >= REPLAY_BATCH_BYTES) break;
+          }
+
+          // No events yielded — replay is complete
+          if (eventsSent === 0) break;
         }
       } catch (error) {
         console.error('Error replaying events:', error);

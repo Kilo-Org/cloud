@@ -34,13 +34,6 @@ function formatAbsoluteTime(timestamp: string): string {
   return new Date(timestamp).toLocaleString();
 }
 
-const TITLE_MAX_LENGTH = 60;
-
-function truncateTitle(title: string): string {
-  if (title.length <= TITLE_MAX_LENGTH) return title;
-  return title.slice(0, TITLE_MAX_LENGTH) + '…';
-}
-
 type AppBuilderProjectDetailPageProps = {
   children: React.ReactNode;
   projectTitle: string | undefined;
@@ -54,9 +47,7 @@ function AppBuilderProjectDetailPage({ children, projectTitle }: AppBuilderProje
       </BreadcrumbItem>
       <BreadcrumbSeparator />
       <BreadcrumbItem>
-        <BreadcrumbPage title={projectTitle}>
-          {projectTitle ? truncateTitle(projectTitle) : 'Project Details'}
-        </BreadcrumbPage>
+        <BreadcrumbPage>{projectTitle ?? 'Project Details'}</BreadcrumbPage>
       </BreadcrumbItem>
     </>
   );

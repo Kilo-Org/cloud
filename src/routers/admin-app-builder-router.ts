@@ -23,6 +23,13 @@ const GetProjectSchema = z.object({
   id: z.string().uuid(),
 });
 
+const TITLE_MAX_LENGTH = 60;
+
+function truncateTitle(title: string): string {
+  if (title.length <= TITLE_MAX_LENGTH) return title;
+  return title.slice(0, TITLE_MAX_LENGTH) + '…';
+}
+
 export type AdminAppBuilderProject = {
   id: string;
   title: string;
@@ -88,7 +95,7 @@ export const adminAppBuilderRouter = createTRPCRouter({
 
     const projectDetail: AdminAppBuilderProjectDetail = {
       id: result.project.id,
-      title: result.project.title,
+      title: truncateTitle(result.project.title),
       model_id: result.project.model_id,
       template: result.project.template,
       session_id: result.project.session_id,
@@ -186,7 +193,7 @@ export const adminAppBuilderRouter = createTRPCRouter({
     // Transform results to API response format
     const projectsData: AdminAppBuilderProject[] = projectsResult.map(row => ({
       id: row.project.id,
-      title: row.project.title,
+      title: truncateTitle(row.project.title),
       model_id: row.project.model_id,
       template: row.project.template,
       session_id: row.project.session_id,

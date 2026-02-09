@@ -209,8 +209,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     originalModelIdLowerCased,
     requestBodyParsed,
     isAnonymousContext(user) ? null : user,
-    organizationId,
-    taskId
+    organizationId
   );
 
   console.debug(`Routing request to ${provider.id}`);

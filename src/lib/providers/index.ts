@@ -101,8 +101,7 @@ export async function getProvider(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest,
   user: User | null,
-  organizationId: string | undefined,
-  taskId: string | undefined
+  organizationId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult | null }> {
   if (user) {
     const modelProvider = inferUserByokProviderForModel(requestedModel);
@@ -116,7 +115,7 @@ export async function getProvider(
     }
   }
 
-  if (await shouldRouteToVercel(requestedModel, request, taskId)) {
+  if (await shouldRouteToVercel(requestedModel, request, user?.id)) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null };
   }
 

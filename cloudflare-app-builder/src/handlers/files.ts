@@ -8,6 +8,22 @@ import { verifyBearerToken } from '../utils/auth';
 import { logger } from '../utils/logger';
 import type { Env } from '../types';
 
+const notFoundPatterns = [
+  'Path not found',
+  'File not found',
+  'Path is not a directory',
+  'Path is a directory',
+  'Path is required for blob',
+  'Invalid path',
+  // isomorphic-git throws this when a ref can't be resolved
+  'Could not resolve',
+];
+
+function isNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return notFoundPatterns.some(pattern => error.message.includes(pattern));
+}
+
 /**
  * Handle GET /apps/{app_id}/tree/{ref} request
  *
@@ -51,21 +67,18 @@ export async function handleGetTree(
       }
     );
   } catch (error) {
-    logger.error('Failed to get tree', {
-      appId,
-      ref,
-      path,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return new Response(
-      JSON.stringify({
-        error: 'not_found',
-        message: error instanceof Error ? error.message : 'Path not found',
-      }),
-      {
+    const message = error instanceof Error ? error.message : String(error);
+    if (isNotFoundError(error)) {
+      logger.info('Tree not found', { appId, ref, path, error: message });
+      return new Response(JSON.stringify({ error: 'not_found', message }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
-      }
+      });
+    }
+    logger.error('Failed to get tree', { appId, ref, path, error: message });
+    return new Response(
+      JSON.stringify({ error: 'internal_error', message: 'Internal server error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }
@@ -113,21 +126,18 @@ export async function handleGetBlob(
       }
     );
   } catch (error) {
-    logger.error('Failed to get blob', {
-      appId,
-      ref,
-      path,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return new Response(
-      JSON.stringify({
-        error: 'not_found',
-        message: error instanceof Error ? error.message : 'File not found',
-      }),
-      {
+    const message = error instanceof Error ? error.message : String(error);
+    if (isNotFoundError(error)) {
+      logger.info('Blob not found', { appId, ref, path, error: message });
+      return new Response(JSON.stringify({ error: 'not_found', message }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
-      }
+      });
+    }
+    logger.error('Failed to get blob', { appId, ref, path, error: message });
+    return new Response(
+      JSON.stringify({ error: 'internal_error', message: 'Internal server error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }

@@ -7,6 +7,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import git from '@ashishkumar472/cf-git';
 import { SqliteFS } from './git/fs-adapter';
+import { GitVersionControl } from './git/git';
 import { logger, withLogTags, formatError } from './utils/logger';
 import type { Env, GitObject, RepositoryStats } from './types';
 
@@ -264,6 +265,10 @@ export class GitRepositoryDO extends DurableObject<Env> {
     });
   }
 
+  private createGitVersionControl(): GitVersionControl {
+    return new GitVersionControl(this.sql.bind(this));
+  }
+
   /**
    * Get directory tree contents at a specific path (RPC method)
    * @param ref - Branch name (e.g., "main", "HEAD") or commit SHA
@@ -286,40 +291,9 @@ export class GitRepositoryDO extends DurableObject<Env> {
         throw new Error('Repository not initialized');
       }
 
-      // Resolve the ref to a commit SHA
-      const commitSha = await git.resolveRef({ fs: this.fs, dir: '/', ref });
-
-      // Read the commit to get the tree SHA
-      const { commit } = await git.readCommit({ fs: this.fs, dir: '/', oid: commitSha });
-      let treeSha = commit.tree;
-
-      // If a path is specified, navigate to that subtree
-      if (path && path.length > 0) {
-        const pathParts = path.split('/').filter(p => p.length > 0);
-        for (const part of pathParts) {
-          const { tree } = await git.readTree({ fs: this.fs, dir: '/', oid: treeSha });
-          const entry = tree.find((e: { path: string }) => e.path === part);
-          if (!entry || entry.type !== 'tree') {
-            throw new Error(`Path not found: ${path}`);
-          }
-          treeSha = entry.oid;
-        }
-      }
-
-      // Read the tree
-      const { tree } = await git.readTree({ fs: this.fs, dir: '/', oid: treeSha });
-
-      const entries = tree.map(
-        (entry: { path: string; type: string; oid: string; mode: string }) => ({
-          name: entry.path,
-          type: entry.type as 'blob' | 'tree',
-          oid: entry.oid,
-          mode: entry.mode,
-        })
-      );
-
-      // Return commit SHA (not tree SHA) - more useful for consumers to know which commit was resolved
-      return { entries, commitSha };
+      const gitVc = this.createGitVersionControl();
+      const result = await gitVc.getTree(ref, path);
+      return { entries: result.entries, commitSha: result.sha };
     });
   }
 
@@ -347,58 +321,26 @@ export class GitRepositoryDO extends DurableObject<Env> {
         throw new Error('Repository not initialized');
       }
 
-      // Resolve the ref to a commit SHA
-      const commitSha = await git.resolveRef({ fs: this.fs, dir: '/', ref });
-
-      // Read the commit to get the tree SHA
-      const { commit } = await git.readCommit({ fs: this.fs, dir: '/', oid: commitSha });
-      let treeSha = commit.tree;
-
-      // Navigate to the file's parent directory
-      const pathParts = path.split('/').filter(p => p.length > 0);
-      const fileName = pathParts.pop();
-      if (!fileName) {
-        throw new Error('Invalid path: no filename specified');
-      }
-
-      for (const part of pathParts) {
-        const { tree } = await git.readTree({ fs: this.fs, dir: '/', oid: treeSha });
-        const entry = tree.find((e: { path: string }) => e.path === part);
-        if (!entry || entry.type !== 'tree') {
-          throw new Error(`Path not found: ${path}`);
-        }
-        treeSha = entry.oid;
-      }
-
-      // Find the file in the tree
-      const { tree } = await git.readTree({ fs: this.fs, dir: '/', oid: treeSha });
-      const fileEntry = tree.find((e: { path: string }) => e.path === fileName);
-      if (!fileEntry || fileEntry.type !== 'blob') {
-        throw new Error(`File not found: ${path}`);
-      }
-
-      // Read the blob
-      const { blob } = await git.readBlob({ fs: this.fs, dir: '/', oid: fileEntry.oid });
+      const gitVc = this.createGitVersionControl();
+      const result = await gitVc.getBlob(ref, path);
 
       // Detect binary content by checking for null bytes
-      const isBinary = blob.some((byte: number) => byte === 0);
+      const isBinary = result.content.some((byte: number) => byte === 0);
 
       if (isBinary) {
-        // Base64 encode binary content
         return {
-          content: Buffer.from(blob).toString('base64'),
+          content: Buffer.from(result.content).toString('base64'),
           encoding: 'base64',
-          size: blob.length,
-          sha: fileEntry.oid,
+          size: result.size,
+          sha: result.sha,
         };
       } else {
-        // UTF-8 decode text content
         const textDecoder = new TextDecoder('utf-8');
         return {
-          content: textDecoder.decode(blob),
+          content: textDecoder.decode(result.content),
           encoding: 'utf-8',
-          size: blob.length,
-          sha: fileEntry.oid,
+          size: result.size,
+          sha: result.sha,
         };
       }
     });

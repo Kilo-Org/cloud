@@ -18,6 +18,10 @@ jest.mock('@/lib/r2/cli-sessions', () => ({
   deleteBlobs: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
+  deleteUserAttachments: jest.fn().mockResolvedValue(0),
+}));
+
 // Mock Customer.io API
 global.fetch = jest.fn();
 
@@ -226,6 +230,29 @@ describe('external-services', () => {
 
       // Verify Stripe service was called
       expect(safeDeleteStripeCustomer).toHaveBeenCalledWith(testUser.stripe_customer_id);
+    });
+
+    it('should delete cloud agent attachments for the user', async () => {
+      const { deleteUserAttachments } = await import('@/lib/r2/cloud-agent-attachments');
+
+      await deleteUserFromExternalServices(testUser);
+
+      expect(deleteUserAttachments).toHaveBeenCalledWith(testUser.id);
+    });
+
+    it('should continue with other deletions if cloud agent attachments deletion fails', async () => {
+      const { deleteUserAttachments } = await import('@/lib/r2/cloud-agent-attachments');
+      const { safeDeleteStripeCustomer } = await import('./stripe-client');
+      const { captureException } = await import('@sentry/nextjs');
+
+      (deleteUserAttachments as jest.Mock).mockRejectedValueOnce(
+        new Error('R2 attachments deletion failed')
+      );
+
+      await expect(deleteUserFromExternalServices(testUser)).resolves.not.toThrow();
+
+      expect(captureException).toHaveBeenCalled();
+      expect(safeDeleteStripeCustomer).toHaveBeenCalled();
     });
   });
 });

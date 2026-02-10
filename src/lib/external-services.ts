@@ -8,6 +8,7 @@ import { db } from '@/lib/drizzle';
 import { cliSessions, sharedCliSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
+import { deleteUserAttachments } from '@/lib/r2/cloud-agent-attachments';
 import { errorExceptInTest, logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 /**
@@ -125,6 +126,25 @@ async function deleteCliSessionBlobs(userId: string): Promise<void> {
 }
 
 /**
+ * Delete cloud agent attachments (images) from R2 storage
+ */
+async function deleteCloudAgentAttachments(userId: string): Promise<void> {
+  try {
+    const deletedCount = await deleteUserAttachments(userId);
+    logExceptInTest(
+      `Successfully deleted ${deletedCount} cloud agent attachment(s) for user: ${userId}`
+    );
+  } catch (error) {
+    const message = `Failed to delete cloud agent attachments for user ${userId}: ${error instanceof Error ? error.message : String(error)}`;
+    errorExceptInTest(message);
+    captureException(error, {
+      tags: { source: 'cloud-agent-attachments-deletion' },
+      extra: { userId },
+    });
+  }
+}
+
+/**
  * Delete user from all external services (Stripe, Customer.io, R2 blob storage)
  * This function is designed to be resilient - if one service fails, it will continue with the others
  */
@@ -134,6 +154,7 @@ export async function deleteUserFromExternalServices(user: User): Promise<void> 
   await safeDeleteStripeCustomer(user.stripe_customer_id);
   await deleteUserFromCustomerIO(user.google_user_email);
   await deleteCliSessionBlobs(user.id);
+  await deleteCloudAgentAttachments(user.id);
 
   logExceptInTest(`Completed external service deletions for user: ${user.id}`);
 }

@@ -163,10 +163,16 @@ export default function AdminAlertingPage() {
 
   const filteredConfigs = useMemo(() => {
     const configs = configsData?.configs ?? [];
-    if (!searchTerm.trim()) return configs;
+    const sorted = [...configs].sort((a, b) => a.model.localeCompare(b.model));
+    if (!searchTerm.trim()) return sorted;
     const query = searchTerm.toLowerCase();
-    return configs.filter(config => config.model.toLowerCase().includes(query));
+    return sorted.filter(config => config.model.toLowerCase().includes(query));
   }, [configsData, searchTerm]);
+
+  const existingModels = useMemo(() => {
+    const configs = configsData?.configs ?? [];
+    return new Set(configs.map(c => c.model));
+  }, [configsData]);
 
   const breadcrumbs = (
     <BreadcrumbItem>
@@ -217,6 +223,7 @@ export default function AdminAlertingPage() {
             isLoading={addSearchLoading}
             error={addSearchError}
             models={addSearchResults}
+            existingModels={existingModels}
             onAddModel={handleAddModel}
           />
         </div>

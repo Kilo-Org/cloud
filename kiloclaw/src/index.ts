@@ -99,12 +99,14 @@ async function initSandbox(c: Context<AppEnv>, next: Next) {
 
 /** Debug routes bypass env validation and auth -- gated by DEBUG_ROUTES + secret. */
 function isDebugRoute(c: Context<AppEnv>): boolean {
-  return new URL(c.req.url).pathname.startsWith('/debug');
+  const path = new URL(c.req.url).pathname;
+  return path === '/debug' || path.startsWith('/debug/');
 }
 
 /** Platform routes use internalApiMiddleware instead of JWT auth. */
 function isPlatformRoute(c: Context<AppEnv>): boolean {
-  return new URL(c.req.url).pathname.startsWith('/api/platform');
+  const path = new URL(c.req.url).pathname;
+  return path === '/api/platform' || path.startsWith('/api/platform/');
 }
 
 /** Reject early if required secrets are missing (skip for debug routes and dev mode). */

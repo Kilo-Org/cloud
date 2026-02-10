@@ -42,6 +42,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     http_x_vercel_ip_latitude: 43,
     http_x_vercel_ip_longitude: -79,
     http_x_vercel_ja4_digest: 'normal_fingerprint',
+    machine_id: null,
     provider: 'openrouter',
     user_prompt_prefix: '<task>Implement a feature',
     system_prompt_prefix: 'You are Kilo Code, a highly skilled software engineer',

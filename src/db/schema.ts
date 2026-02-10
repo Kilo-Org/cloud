@@ -611,6 +611,7 @@ export const microdollar_usage_metadata = pgTable(
     cancelled: boolean(),
     editor_name_id: integer(),
     has_tools: boolean(),
+    machine_id: text(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );

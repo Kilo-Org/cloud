@@ -43,6 +43,10 @@ minimumReleaseAgeExclude:
   - '@storybook/react-docgen-typescript-plugin@9.1.17'
   - '@storybook/react-dom-shim@9.1.17'
   - storybook@9.1.17
+  # glob@13.0.1 + minimatch@10.1.2 + @isaacs/brace-expansion@5.0.1 fix GHSA-7h2j-956f-4vf2
+  - glob@13.0.1
+  - minimatch@10.1.2
+  - '@isaacs/brace-expansion@5.0.1'
 
 onlyBuiltDependencies:
   - '@swc/core'

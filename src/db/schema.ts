@@ -611,6 +611,7 @@ export const microdollar_usage_metadata = pgTable(
     cancelled: boolean(),
     editor_name_id: integer(),
     has_tools: boolean(),
+    machine_id: text(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
@@ -756,6 +757,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   cancelled: boolean(),
   editor_name: text(),
   has_tools: boolean(),
+  machine_id: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -799,7 +801,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.streamed,
     meta.cancelled,
     edit.editor_name,
-    meta.has_tools
+    meta.has_tools,
+    meta.machine_id
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id

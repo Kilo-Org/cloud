@@ -143,6 +143,7 @@ export async function POST(request: NextRequest) {
     project_id: projectId,
     status_code: null,
     editor_name: request.headers.get('x-kilocode-editorname') || null,
+    machine_id: request.headers.get('x-kilocode-machineid') || null,
     user_byok: !!userByok,
     has_tools: false,
   };

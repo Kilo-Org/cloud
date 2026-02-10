@@ -129,13 +129,9 @@ export function applyVercelSettings(
     requestToMutate.providerOptions = convertProviderOptions(requestToMutate.provider);
   }
 
-  if (
-    isAnthropicModel(requestedModel) &&
-    requestToMutate.providerOptions &&
-    requestToMutate.verbosity
-  ) {
+  if (isAnthropicModel(requestedModel) && requestToMutate.providerOptions) {
     requestToMutate.providerOptions.anthropic = {
-      effort: requestToMutate.verbosity,
+      effort: requestToMutate.verbosity ?? 'medium',
     };
   }
 

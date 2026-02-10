@@ -82,6 +82,12 @@ export function applyAnthropicModelSettings(
     applyAnthropicStrictToolUse(requestToMutate, extraHeaders);
   }
 
+  // Default reasoning effort to 'medium' for Anthropic models when not already set.
+  // Anthropic recommends medium effort as best practice for their models.
+  if (!requestToMutate.reasoning?.effort) {
+    requestToMutate.reasoning = { ...requestToMutate.reasoning, effort: 'medium' };
+  }
+
   // anthropic doesn't allow '.' in tool call ids
   normalizeToolCallIds(requestToMutate, undefined);
 }

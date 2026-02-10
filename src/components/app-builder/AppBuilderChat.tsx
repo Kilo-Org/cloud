@@ -33,6 +33,7 @@ import { useQuery } from '@tanstack/react-query';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { useOrganizationWithMembers, useOrganizationDefaults } from '@/app/api/organizations/hooks';
+import { FeedbackDialog } from './FeedbackDialog';
 
 type AppBuilderChatProps = {
   onNewProject: () => void;
@@ -398,10 +399,13 @@ export function AppBuilderChat({ onNewProject, organizationId }: AppBuilderChatP
       {/* Header */}
       <div className="flex h-12 items-center justify-between gap-4 border-b px-4">
         <h2 className="shrink-0 text-sm font-medium">Chat</h2>
-        <Button variant="ghost" size="sm" onClick={onNewProject} disabled={isStreaming}>
-          <RotateCcw className="mr-1 h-3 w-3" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-1">
+          <FeedbackDialog disabled={isStreaming} />
+          <Button variant="ghost" size="sm" onClick={onNewProject} disabled={isStreaming}>
+            <RotateCcw className="mr-1 h-3 w-3" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       {/* Blocked Banner - show when user cannot use App Builder at all */}

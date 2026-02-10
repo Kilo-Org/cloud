@@ -610,6 +610,7 @@ export const microdollar_usage_metadata = pgTable(
     streamed: boolean(),
     cancelled: boolean(),
     editor_name_id: integer(),
+    machine_id_id: integer(),
     has_tools: boolean(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
@@ -713,6 +714,15 @@ export const editor_name = pgTable(
   table => [uniqueIndex('UQ_editor_name').on(table.editor_name)]
 );
 
+export const machine_id = pgTable(
+  'machine_id',
+  {
+    machine_id_id: serial().notNull().primaryKey(),
+    machine_id: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_machine_id').on(table.machine_id)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -755,6 +765,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   streamed: boolean(),
   cancelled: boolean(),
   editor_name: text(),
+  machine_id: text(),
   has_tools: boolean(),
 }).as(sql`
   SELECT
@@ -799,6 +810,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.streamed,
     meta.cancelled,
     edit.editor_name,
+    mach.machine_id,
     meta.has_tools
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
@@ -810,6 +822,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${http_user_agent} ua ON meta.http_user_agent_id = ua.http_user_agent_id
   LEFT JOIN ${finish_reason} frfr ON meta.finish_reason_id = frfr.finish_reason_id
   LEFT JOIN ${editor_name} edit ON meta.editor_name_id = edit.editor_name_id
+  LEFT JOIN ${machine_id} mach ON meta.machine_id_id = mach.machine_id_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;

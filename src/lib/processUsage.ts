@@ -169,6 +169,7 @@ export type MicrodollarUsageContext = {
   project_id: string | null;
   status_code: number | null;
   editor_name: string | null;
+  machine_id: string | null;
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
   has_tools: boolean;
@@ -190,6 +191,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     requested_model: usageContext.requested_model,
     status_code: usageContext.status_code,
     editor_name: usageContext.editor_name,
+    machine_id: usageContext.machine_id,
     is_user_byok: usageContext.user_byok,
     has_tools: usageContext.has_tools,
   };
@@ -422,6 +424,7 @@ export type UsageMetaData = {
   streamed: boolean | null;
   cancelled: boolean | null;
   editor_name: string | null;
+  machine_id: string | null;
   has_tools: boolean | null;
 };
 
@@ -508,6 +511,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`system_prompt_prefix`, metadataFields.system_prompt_prefix)}
           , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
           , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
+          , ${createUpsertCTE(sql`machine_id`, metadataFields.machine_id)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -537,7 +541,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ja4_digest_id,
               system_prompt_prefix_id,
               finish_reason_id,
-              editor_name_id
+              editor_name_id,
+              machine_id_id
             )
             SELECT
               ${metadataFields.id},
@@ -567,7 +572,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT ja4_digest_id FROM ja4_digest_cte),
               (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
               (SELECT finish_reason_id FROM finish_reason_cte),
-              (SELECT editor_name_id FROM editor_name_cte)
+              (SELECT editor_name_id FROM editor_name_cte),
+              (SELECT machine_id_id FROM machine_id_cte)
           )
           UPDATE kilocode_users
           SET microdollars_used = microdollars_used + ${coreUsageFields.cost}

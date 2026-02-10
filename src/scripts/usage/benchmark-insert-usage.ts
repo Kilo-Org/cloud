@@ -184,6 +184,7 @@ function generateRandomRecord(
     streamed: maybeNull(Math.random() < 0.8, 10),
     cancelled: maybeNull(Math.random() < 0.05, 50),
     editor_name: maybeNull(pickRandom(['vscode', 'cursor', 'windsurf', 'vim'], Math.random()), 30),
+    machine_id: maybeNull(randomString(32, 32, 32), 30),
     has_tools: maybeNull(Math.random() < 0.3, 20),
   };
 

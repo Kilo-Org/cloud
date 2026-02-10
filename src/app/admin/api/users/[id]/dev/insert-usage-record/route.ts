@@ -87,6 +87,7 @@ export async function POST(
     streamed: false,
     cancelled: false,
     editor_name: null,
+    machine_id: null,
     has_tools: false,
   };
 

@@ -91,7 +91,7 @@ function BannerSettingsContent({
           )}
           <p className="text-sm text-gray-400">
             {isEnabled
-              ? 'The "Made with Kilo App Builder" badge is visible on your deployed site. Visitors can dismiss it for their session.'
+              ? 'The "Made with Kilo App Builder" badge is visible on your deployed site.'
               : 'The badge is hidden. Enable it to show a small "Made with Kilo App Builder" link on your deployed site.'}
           </p>
         </div>

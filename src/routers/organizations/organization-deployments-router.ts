@@ -307,6 +307,9 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       if (deployment.created_from !== 'app_builder') {
         return { success: true as const };
       }
-      return dispatcherClient.setBanner(deployment.internal_worker_name, input.enabled);
+      const workerName = deployment.internal_worker_name;
+      return input.enabled
+        ? dispatcherClient.enableBanner(workerName)
+        : dispatcherClient.disableBanner(workerName);
     }),
 });

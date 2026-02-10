@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { Env } from './types';
 import { getPasswordRecord } from './auth/password-store';
-import { getBannerRecord } from './banner/banner-store';
+import { isBannerEnabled } from './banner/banner-store';
 import { injectBanner } from './banner/inject-banner';
 import { validateAuthCookie } from './auth/jwt';
 import { api } from './routes/api';
@@ -109,11 +109,8 @@ subdomainApp.all('*', async c => {
 
     // Inject banner for HTML responses when enabled
     const contentType = response.headers.get('content-type') ?? '';
-    if (contentType.includes('text/html')) {
-      const bannerRecord = await getBannerRecord(c.env.DEPLOY_KV, workerName);
-      if (bannerRecord?.enabled) {
-        return injectBanner(response);
-      }
+    if (contentType.includes('text/html') && (await isBannerEnabled(c.env.DEPLOY_KV, workerName))) {
+      return injectBanner(response);
     }
 
     return response;

@@ -73,34 +73,16 @@ function addNonceToCSP(csp: string, nonce: string): string {
 function getBannerScript(nonce: string): string {
   return `<script nonce="${nonce}" data-kilo-banner>
 (function() {
-  if (sessionStorage.getItem('kilo-banner-dismissed')) return;
-
   var badge = document.createElement('a');
   badge.href = 'https://kilo.ai/features/app-builder';
   badge.target = '_blank';
   badge.rel = 'noopener noreferrer';
-  badge.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#18181b;color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:500;line-height:1;border-radius:8px;border:1px solid #27272a;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:opacity 0.2s;';
-
-  var close = document.createElement('button');
-  close.type = 'button';
-  close.setAttribute('aria-label', 'Dismiss badge');
-  close.textContent = '\\u00D7';
-  close.style.cssText = 'background:none;border:none;color:#71717a;cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 4px;';
+  badge.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;display:flex;align-items:center;padding:8px 12px;background:#18181b;color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:500;line-height:1;border-radius:8px;border:1px solid #27272a;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:opacity 0.2s;';
 
   badge.addEventListener('mouseenter', function() { badge.style.opacity = '0.9'; });
   badge.addEventListener('mouseleave', function() { badge.style.opacity = '1'; });
-  close.addEventListener('mouseenter', function() { close.style.color = '#fafafa'; });
-  close.addEventListener('mouseleave', function() { close.style.color = '#71717a'; });
 
-  close.addEventListener('click', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    sessionStorage.setItem('kilo-banner-dismissed', '1');
-    badge.remove();
-  });
-
-  badge.appendChild(document.createTextNode('Made with Kilo App Builder'));
-  badge.appendChild(close);
+  badge.textContent = 'Made with Kilo App Builder';
   document.body.appendChild(badge);
 })();
 </script>`;

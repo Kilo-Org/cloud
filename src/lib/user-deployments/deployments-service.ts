@@ -218,10 +218,10 @@ export async function deleteDeployment(deploymentId: string, owner: Owner) {
 
   // Clean up KV records (slug mapping, password protection, banner)
   const workerName = deployment[0].internal_worker_name;
-  await dispatcherClient.deleteSlugMapping(workerName);
   await Promise.allSettled([
+    dispatcherClient.deleteSlugMapping(workerName),
     dispatcherClient.removePassword(workerName),
-    dispatcherClient.removeBanner(workerName),
+    dispatcherClient.disableBanner(workerName),
   ]);
 
   // Delete worker deployment from Cloudflare FIRST
@@ -765,7 +765,7 @@ export async function createDeployment(params: {
   // Auto-enable banner for app-builder deployments
   if (createdFrom === 'app_builder') {
     try {
-      await dispatcherClient.setBanner(internalWorkerName, true);
+      await dispatcherClient.enableBanner(internalWorkerName);
     } catch (error) {
       // Non-fatal: deployment was created successfully, banner is secondary
       console.error('Failed to enable banner for app-builder deployment:', error);

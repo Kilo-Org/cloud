@@ -7,7 +7,8 @@ import {
 } from '@/lib/config.server';
 import { fetchWithTimeout } from '@/lib/user-deployments/fetch-utils';
 
-// Password protection schemas
+const successResponseSchema = z.object({ success: z.literal(true) });
+
 const getPasswordStatusResponseSchema = z.discriminatedUnion('protected', [
   z.object({ protected: z.literal(true), passwordSetAt: z.number() }),
   z.object({ protected: z.literal(false) }),
@@ -18,41 +19,13 @@ const setPasswordResponseSchema = z.object({
   passwordSetAt: z.number(),
 });
 
-const deletePasswordResponseSchema = z.object({
-  success: z.literal(true),
-});
-
-// Slug mapping schemas
-const setSlugMappingResponseSchema = z.object({
-  success: z.literal(true),
-});
-
-const deleteSlugMappingResponseSchema = z.object({
-  success: z.literal(true),
-});
-
-// Banner schemas
 const getBannerStatusResponseSchema = z.object({
   enabled: z.boolean(),
 });
 
-const setBannerResponseSchema = z.object({
-  success: z.literal(true),
-});
-
-const deleteBannerResponseSchema = z.object({
-  success: z.literal(true),
-});
-
-// Exported types inferred from schemas
 export type GetPasswordStatusResponse = z.infer<typeof getPasswordStatusResponseSchema>;
 export type SetPasswordResponse = z.infer<typeof setPasswordResponseSchema>;
-export type DeletePasswordResponse = z.infer<typeof deletePasswordResponseSchema>;
-export type SetSlugMappingResponse = z.infer<typeof setSlugMappingResponseSchema>;
-export type DeleteSlugMappingResponse = z.infer<typeof deleteSlugMappingResponseSchema>;
 export type GetBannerStatusResponse = z.infer<typeof getBannerStatusResponseSchema>;
-export type SetBannerResponse = z.infer<typeof setBannerResponseSchema>;
-export type DeleteBannerResponse = z.infer<typeof deleteBannerResponseSchema>;
 
 /**
  * Client for the deploy dispatcher worker API.
@@ -109,7 +82,7 @@ class DispatcherClient {
     return setPasswordResponseSchema.parse(await response.json());
   }
 
-  async removePassword(workerSlug: string): Promise<DeletePasswordResponse> {
+  async removePassword(workerSlug: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/password/${workerSlug}`,
       {
@@ -123,12 +96,12 @@ class DispatcherClient {
       throw new Error(`Failed to remove password: ${response.statusText}`);
     }
 
-    return deletePasswordResponseSchema.parse(await response.json());
+    return successResponseSchema.parse(await response.json());
   }
 
   // ---- Slug mappings ----
 
-  async setSlugMapping(workerName: string, slug: string): Promise<SetSlugMappingResponse> {
+  async setSlugMapping(workerName: string, slug: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/slug-mapping/${workerName}`,
       {
@@ -146,10 +119,10 @@ class DispatcherClient {
       throw new Error(`Failed to set slug mapping: ${errorText}`);
     }
 
-    return setSlugMappingResponseSchema.parse(await response.json());
+    return successResponseSchema.parse(await response.json());
   }
 
-  async deleteSlugMapping(workerName: string): Promise<DeleteSlugMappingResponse> {
+  async deleteSlugMapping(workerName: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/slug-mapping/${workerName}`,
       {
@@ -163,7 +136,7 @@ class DispatcherClient {
       throw new Error(`Failed to delete slug mapping: ${response.statusText}`);
     }
 
-    return deleteSlugMappingResponseSchema.parse(await response.json());
+    return successResponseSchema.parse(await response.json());
   }
 
   // ---- Banner ----
@@ -182,28 +155,25 @@ class DispatcherClient {
     return getBannerStatusResponseSchema.parse(await response.json());
   }
 
-  async setBanner(workerName: string, enabled: boolean): Promise<SetBannerResponse> {
+  async enableBanner(workerName: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/app-builder-banner/${workerName}`,
       {
         method: 'PUT',
-        headers: this.getHeaders({
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify({ enabled }),
+        headers: this.getHeaders(),
       },
       { maxRetries: 0 }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to set banner: ${errorText}`);
+      throw new Error(`Failed to enable banner: ${errorText}`);
     }
 
-    return setBannerResponseSchema.parse(await response.json());
+    return successResponseSchema.parse(await response.json());
   }
 
-  async removeBanner(workerName: string): Promise<DeleteBannerResponse> {
+  async disableBanner(workerName: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/app-builder-banner/${workerName}`,
       {
@@ -214,10 +184,10 @@ class DispatcherClient {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to remove banner: ${response.statusText}`);
+      throw new Error(`Failed to disable banner: ${response.statusText}`);
     }
 
-    return deleteBannerResponseSchema.parse(await response.json());
+    return successResponseSchema.parse(await response.json());
   }
 }
 

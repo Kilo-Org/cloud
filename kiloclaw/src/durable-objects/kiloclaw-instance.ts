@@ -21,11 +21,11 @@ import { buildEnvVars } from '../gateway/env';
 import { mountR2Storage } from '../gateway/r2';
 import { ensureOpenClawGateway, findExistingGatewayProcess } from '../gateway/process';
 import { syncToR2 } from '../gateway/sync';
-import type { InstanceConfig } from '../schemas/instance-config';
-
-// Extracted from InstanceConfig for cached state fields
-type EncryptedSecrets = NonNullable<InstanceConfig['encryptedSecrets']>;
-type EncryptedChannelTokens = NonNullable<InstanceConfig['channels']>;
+import {
+  PersistedStateSchema,
+  type InstanceConfig,
+  type PersistedState,
+} from '../schemas/instance-config';
 
 // StopParams from @cloudflare/containers -- not re-exported by @cloudflare/sandbox
 type StopParams = {
@@ -35,7 +35,7 @@ type StopParams = {
 
 type InstanceStatus = 'provisioned' | 'running' | 'stopped';
 
-// DO SQLite storage keys
+// DO KV storage keys (match PersistedStateSchema field names exactly)
 const KEY_USER_ID = 'userId';
 const KEY_SANDBOX_ID = 'sandboxId';
 const KEY_STATUS = 'status';
@@ -47,7 +47,24 @@ const KEY_LAST_STARTED_AT = 'lastStartedAt';
 const KEY_LAST_STOPPED_AT = 'lastStoppedAt';
 const KEY_LAST_SYNC_AT = 'lastSyncAt';
 const KEY_SYNC_IN_PROGRESS = 'syncInProgress';
+const KEY_SYNC_LOCKED_AT = 'syncLockedAt';
 const KEY_SYNC_FAIL_COUNT = 'syncFailCount';
+
+const STORAGE_KEYS = [
+  KEY_USER_ID,
+  KEY_SANDBOX_ID,
+  KEY_STATUS,
+  KEY_ENV_VARS,
+  KEY_ENCRYPTED_SECRETS,
+  KEY_CHANNELS,
+  KEY_PROVISIONED_AT,
+  KEY_LAST_STARTED_AT,
+  KEY_LAST_STOPPED_AT,
+  KEY_LAST_SYNC_AT,
+  KEY_SYNC_IN_PROGRESS,
+  KEY_SYNC_LOCKED_AT,
+  KEY_SYNC_FAIL_COUNT,
+];
 
 // Sync timing constants
 const FIRST_SYNC_DELAY_MS = 10 * 60 * 1000; // 10 minutes
@@ -62,60 +79,61 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private userId: string | null = null;
   private sandboxId: string | null = null;
   private status: InstanceStatus | null = null;
-  private envVars: Record<string, string> | null = null;
-  private encryptedSecrets: EncryptedSecrets | null = null;
-  private channels: EncryptedChannelTokens | null = null;
+  private envVars: PersistedState['envVars'] = null;
+  private encryptedSecrets: PersistedState['encryptedSecrets'] = null;
+  private channels: PersistedState['channels'] = null;
   private provisionedAt: number | null = null;
   private lastStartedAt: number | null = null;
   private lastStoppedAt: number | null = null;
   private lastSyncAt: number | null = null;
   private syncInProgress = false;
+  private syncLockedAt: number | null = null;
   private syncFailCount = 0;
 
   /**
-   * Load persisted state from DO SQLite storage.
+   * Load persisted state from DO KV storage.
    * Called lazily on first method invocation.
+   * Uses zod to validate the untyped storage entries at runtime.
    */
   private async loadState(): Promise<void> {
     if (this.loaded) return;
-    const storage = this.ctx.storage;
 
-    const entries = await storage.get<unknown>([
-      KEY_USER_ID,
-      KEY_SANDBOX_ID,
-      KEY_STATUS,
-      KEY_ENV_VARS,
-      KEY_ENCRYPTED_SECRETS,
-      KEY_CHANNELS,
-      KEY_PROVISIONED_AT,
-      KEY_LAST_STARTED_AT,
-      KEY_LAST_STOPPED_AT,
-      KEY_LAST_SYNC_AT,
-      KEY_SYNC_IN_PROGRESS,
-      KEY_SYNC_FAIL_COUNT,
-    ]);
+    const entries = await this.ctx.storage.get(STORAGE_KEYS);
+    const raw = Object.fromEntries(entries.entries());
+    const parsed = PersistedStateSchema.safeParse(raw);
 
-    this.userId = (entries.get(KEY_USER_ID) as string) ?? null;
-    this.sandboxId = (entries.get(KEY_SANDBOX_ID) as string) ?? null;
-    this.status = (entries.get(KEY_STATUS) as InstanceStatus) ?? null;
-    this.envVars = (entries.get(KEY_ENV_VARS) as Record<string, string>) ?? null;
-    this.encryptedSecrets = (entries.get(KEY_ENCRYPTED_SECRETS) as EncryptedSecrets) ?? null;
-    this.channels = (entries.get(KEY_CHANNELS) as EncryptedChannelTokens) ?? null;
-    this.provisionedAt = (entries.get(KEY_PROVISIONED_AT) as number) ?? null;
-    this.lastStartedAt = (entries.get(KEY_LAST_STARTED_AT) as number) ?? null;
-    this.lastStoppedAt = (entries.get(KEY_LAST_STOPPED_AT) as number) ?? null;
-    this.lastSyncAt = (entries.get(KEY_LAST_SYNC_AT) as number) ?? null;
-    this.syncInProgress = (entries.get(KEY_SYNC_IN_PROGRESS) as boolean) ?? false;
-    this.syncFailCount = (entries.get(KEY_SYNC_FAIL_COUNT) as number) ?? 0;
+    if (parsed.success) {
+      const s = parsed.data;
+      // Empty strings mean "no value persisted" (from .default(''))
+      this.userId = s.userId || null;
+      this.sandboxId = s.sandboxId || null;
+      this.status = s.userId ? s.status : null;
+      this.envVars = s.envVars;
+      this.encryptedSecrets = s.encryptedSecrets;
+      this.channels = s.channels;
+      this.provisionedAt = s.provisionedAt;
+      this.lastStartedAt = s.lastStartedAt;
+      this.lastStoppedAt = s.lastStoppedAt;
+      this.lastSyncAt = s.lastSyncAt;
+      this.syncInProgress = s.syncInProgress;
+      this.syncLockedAt = s.syncLockedAt;
+      this.syncFailCount = s.syncFailCount;
 
-    // Stale sync lock detection: if syncInProgress is true but lastSyncAt is
-    // older than STALE_SYNC_LOCK_MS, the previous alarm likely crashed mid-sync.
-    if (this.syncInProgress && this.lastSyncAt) {
-      const elapsed = Date.now() - this.lastSyncAt;
-      if (elapsed > STALE_SYNC_LOCK_MS) {
-        console.warn('[DO] Resetting stale syncInProgress lock');
-        this.syncInProgress = false;
-        await storage.put(KEY_SYNC_IN_PROGRESS, false);
+      // Stale sync lock detection: if syncInProgress is true but the lock was
+      // acquired longer ago than STALE_SYNC_LOCK_MS, the previous alarm likely
+      // crashed mid-sync. Using syncLockedAt (set when acquiring the lock) instead
+      // of lastSyncAt avoids a stuck lock on first-ever sync when lastSyncAt is null.
+      if (this.syncInProgress && this.syncLockedAt) {
+        const elapsed = Date.now() - this.syncLockedAt;
+        if (elapsed > STALE_SYNC_LOCK_MS) {
+          console.warn('[DO] Resetting stale syncInProgress lock');
+          this.syncInProgress = false;
+          this.syncLockedAt = null;
+          await this.ctx.storage.put({
+            [KEY_SYNC_IN_PROGRESS]: false,
+            [KEY_SYNC_LOCKED_AT]: null,
+          });
+        }
       }
     }
 
@@ -131,8 +149,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async provision(userId: string, config: InstanceConfig): Promise<{ sandboxId: string }> {
     await this.loadState();
 
-    // If already provisioned and active, reject
-    if (this.status && this.status !== 'stopped') {
+    // Reject if any instance state exists. A stopped instance should be
+    // destroyed before re-provisioning, not silently overwritten.
+    if (this.status) {
       throw new Error(`Instance already exists with status '${this.status}'`);
     }
 
@@ -159,6 +178,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       [KEY_LAST_STOPPED_AT]: null,
       [KEY_LAST_SYNC_AT]: null,
       [KEY_SYNC_IN_PROGRESS]: false,
+      [KEY_SYNC_LOCKED_AT]: null,
       [KEY_SYNC_FAIL_COUNT]: 0,
     });
 
@@ -174,6 +194,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.lastStoppedAt = null;
     this.lastSyncAt = null;
     this.syncInProgress = false;
+    this.syncLockedAt = null;
     this.syncFailCount = 0;
     this.loaded = true;
 
@@ -276,10 +297,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Instance not provisioned');
     }
 
-    // DB soft-delete FIRST -- must succeed
+    // DB soft-delete FIRST -- must succeed and affect a row
     const db = createDatabaseConnection(this.env.HYPERDRIVE.connectionString);
     const store = new InstanceStore(db);
-    await store.markDestroyed(this.userId);
+    const destroyed = await store.markDestroyed(this.userId);
+    if (!destroyed) {
+      throw new Error('No active instance found in DB for this user');
+    }
 
     // Teardown (best-effort after DB write)
     if (this.sandboxId) {
@@ -320,6 +344,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.lastStoppedAt = null;
     this.lastSyncAt = null;
     this.syncInProgress = false;
+    this.syncLockedAt = null;
     this.syncFailCount = 0;
     this.loaded = false;
   }
@@ -469,14 +494,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    */
   private async performSync(sandbox: Sandbox): Promise<void> {
     this.syncInProgress = true;
-    await this.ctx.storage.put(KEY_SYNC_IN_PROGRESS, true);
+    this.syncLockedAt = Date.now();
+    await this.ctx.storage.put({
+      [KEY_SYNC_IN_PROGRESS]: true,
+      [KEY_SYNC_LOCKED_AT]: this.syncLockedAt,
+    });
 
     try {
       const gatewayProcess = await findExistingGatewayProcess(sandbox);
       if (!gatewayProcess) {
         console.log(`[sync] Gateway not running for ${this.userId}, skipping`);
         this.syncInProgress = false;
-        await this.ctx.storage.put(KEY_SYNC_IN_PROGRESS, false);
+        this.syncLockedAt = null;
+        await this.ctx.storage.put({
+          [KEY_SYNC_IN_PROGRESS]: false,
+          [KEY_SYNC_LOCKED_AT]: null,
+        });
         await this.scheduleSync();
         return;
       }
@@ -501,7 +534,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     this.syncInProgress = false;
-    await this.ctx.storage.put(KEY_SYNC_IN_PROGRESS, false);
+    this.syncLockedAt = null;
+    await this.ctx.storage.put({
+      [KEY_SYNC_IN_PROGRESS]: false,
+      [KEY_SYNC_LOCKED_AT]: null,
+    });
 
     if (this.syncFailCount > 0) {
       await this.rescheduleWithBackoff();

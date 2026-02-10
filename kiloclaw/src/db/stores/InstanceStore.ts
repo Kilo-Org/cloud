@@ -28,19 +28,22 @@ export class InstanceStore extends SqlStore {
   }
 
   /**
-   * Soft-delete: mark the active instance as destroyed. Must succeed or destroy fails.
+   * Soft-delete: mark the active instance as destroyed.
+   * Returns true if a row was updated, false if no active instance was found.
    */
-  async markDestroyed(userId: string): Promise<void> {
-    await this.query(
+  async markDestroyed(userId: string): Promise<boolean> {
+    const rows = await this.query(
       /* sql */ `
       UPDATE ${kiloclaw_instances}
       SET ${kiloclaw_instances.columns.status} = 'destroyed',
           ${kiloclaw_instances.columns.destroyed_at} = now()
       WHERE ${kiloclaw_instances.user_id} = $1
         AND ${kiloclaw_instances.destroyed_at} IS NULL
+      RETURNING ${kiloclaw_instances.id}
       `,
       { 1: userId }
     );
+    return rows.length > 0;
   }
 
   /**

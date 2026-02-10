@@ -155,7 +155,7 @@ describe('o11y worker', () => {
 		expect(call.doubles[2]).toBe(500);
 	});
 
-	it('requires admin token for api-metrics ingest', async () => {
+	it('rejects when neither header nor clientSecret is valid', async () => {
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -164,6 +164,33 @@ describe('o11y worker', () => {
 
 		const response = await workerFetch(request, makeTestEnv(), createExecutionContext());
 		expect(response.status).toBe(401);
+	});
+
+	it('accepts valid clientSecret in body without header (backwards compat)', async () => {
+		const env = makeTestEnv();
+		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(makeValidApiMetricsBody()),
+		});
+
+		const response = await workerFetch(request, env, createExecutionContext());
+		expect(response.status).toBe(204);
+	});
+
+	it('accepts valid header with wrong clientSecret in body', async () => {
+		const env = makeTestEnv();
+		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
+			body: JSON.stringify(makeValidApiMetricsBody({ clientSecret: 'irrelevant-secret' })),
+		});
+
+		const response = await workerFetch(request, env, createExecutionContext());
+		expect(response.status).toBe(204);
 	});
 
 	it('rejects missing params in /ingest/api-metrics', async () => {

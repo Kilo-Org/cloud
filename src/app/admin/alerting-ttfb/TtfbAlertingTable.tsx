@@ -144,6 +144,8 @@ export function TtfbAlertingTable({
                   <TableCell>
                     {status === 'loading' ? (
                       <div className="text-muted-foreground text-sm">Loading…</div>
+                    ) : status === 'error' ? (
+                      <div className="text-destructive text-xs">Failed to load</div>
                     ) : baseline ? (
                       <div className="text-muted-foreground text-xs">
                         <div>p50: {formatMs(baseline.p50Ttfb3d)}</div>
@@ -153,8 +155,6 @@ export function TtfbAlertingTable({
                       </div>
                     ) : baseline === null ? (
                       <div className="text-muted-foreground text-xs">No data</div>
-                    ) : status === 'error' ? (
-                      <div className="text-destructive text-xs">Failed to load</div>
                     ) : (
                       <div className="text-muted-foreground text-xs">Not loaded</div>
                     )}

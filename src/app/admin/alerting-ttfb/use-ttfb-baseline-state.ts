@@ -27,6 +27,11 @@ export function useTtfbBaselineState() {
   };
 
   const setError = (modelId: string, message: string) => {
+    setBaselineByModel(prev => {
+      const next = { ...prev };
+      delete next[modelId];
+      return next;
+    });
     setBaselineStatus(prev => ({
       ...prev,
       [modelId]: { status: 'error', message },

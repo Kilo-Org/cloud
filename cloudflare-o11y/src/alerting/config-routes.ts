@@ -105,6 +105,10 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
 
 		const baseline = await queryTtfbBaseline(model, c.env);
 
+		if (baseline.weighted_total_3d === 0) {
+			return c.json({ success: true, baseline: null });
+		}
+
 		const response = {
 			model,
 			p50Ttfb3d: baseline.p50_ttfb_3d,

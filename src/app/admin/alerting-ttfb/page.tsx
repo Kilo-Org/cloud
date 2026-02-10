@@ -72,7 +72,7 @@ export default function AdminAlertingTtfbPage() {
         }
 
         const ttfbSlo = Number(draft.ttfbSlo);
-        if (ttfbSlo <= 0 || ttfbSlo >= 1) {
+        if (!Number.isFinite(ttfbSlo) || ttfbSlo <= 0 || ttfbSlo >= 1) {
           throw new Error(`Invalid SLO for ${modelId}`);
         }
 

@@ -120,6 +120,7 @@ describe('o11y worker', () => {
 
 		expect(aeSpy.writeDataPoint).toHaveBeenCalledOnce();
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
+		expect(call.indexes).toEqual(['anthropic/claude-sonnet-4.5']);
 		expect(call.blobs).toEqual(['openai', 'anthropic/claude-sonnet-4.5', 'kilo-gateway', '0', 'openai']);
 		expect(call.doubles).toEqual([45, 123, 200]);
 	});

@@ -3,6 +3,7 @@ import { getCookie } from 'hono/cookie';
 import type { AppEnv } from '../types';
 import { KILO_WORKER_AUTH_COOKIE } from '../config';
 import { validateKiloToken } from './jwt';
+import { createDatabaseConnection, UserStore } from '../db';
 
 /**
  * Auth middleware for user-facing routes.
@@ -10,12 +11,9 @@ import { validateKiloToken } from './jwt';
  * 1. Extract JWT from Authorization: Bearer header
  * 2. Fallback: extract from kilo-worker-auth cookie
  * 3. Verify HS256 with NEXTAUTH_SECRET; check version and env
- * 4. Set ctx.userId, ctx.authToken on context
- * 5. DEV_MODE bypass: synthetic userId 'dev@kilocode.ai'
- *
- * Note: pepper validation against DB via Hyperdrive is deferred to PR4
- * when the Hyperdrive binding is wired. For now, the pepper is extracted
- * from the token but not validated against the database.
+ * 4. Validate apiTokenPepper against DB via Hyperdrive
+ * 5. Set ctx.userId, ctx.authToken on context
+ * 6. DEV_MODE bypass: synthetic userId 'dev@kilocode.ai'
  */
 export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   // DEV_MODE bypass
@@ -49,6 +47,29 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   if (!result.success) {
     console.warn('[auth] Token validation failed:', result.error);
     return c.json({ error: result.error }, 401);
+  }
+
+  // Validate pepper against DB via Hyperdrive.
+  if (!c.env.HYPERDRIVE?.connectionString) {
+    console.error('[auth] HYPERDRIVE not configured -- cannot validate token pepper');
+    return c.json({ error: 'Server configuration error' }, 500);
+  }
+
+  try {
+    const db = createDatabaseConnection(c.env.HYPERDRIVE.connectionString);
+    const userStore = new UserStore(db);
+    const user = await userStore.findPepperByUserId(result.userId);
+    if (!user) {
+      console.warn('[auth] User not found in DB:', result.userId);
+      return c.json({ error: 'User not found' }, 401);
+    }
+    if (user.api_token_pepper !== result.pepper) {
+      console.warn('[auth] Pepper mismatch for user:', result.userId);
+      return c.json({ error: 'Token revoked' }, 401);
+    }
+  } catch (err) {
+    console.error('[auth] Pepper validation failed:', err);
+    return c.json({ error: 'Authentication service unavailable' }, 500);
   }
 
   c.set('userId', result.userId);

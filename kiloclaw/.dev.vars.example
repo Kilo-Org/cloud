@@ -29,6 +29,10 @@ ANTHROPIC_API_KEY=sk-ant-...
 # Encryption (for user secrets -- PR5+)
 # AGENT_ENV_VARS_PRIVATE_KEY=...
 
+# Hyperdrive (Postgres connection for pepper validation + instance registry)
+# In dev, set the direct Postgres connection string; Hyperdrive proxies it in production.
+# HYPERDRIVE_CONNECTION_STRING=
+
 # Development
 DEV_MODE=true
 DEBUG_ROUTES=true

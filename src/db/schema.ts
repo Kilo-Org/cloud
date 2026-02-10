@@ -2802,3 +2802,43 @@ export const agent_environment_profile_commands = pgTable(
 );
 
 export type AgentEnvironmentProfileCommand = typeof agent_environment_profile_commands.$inferSelect;
+
+// ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
+
+export const KILOCLAW_INSTANCE_STATUSES = [
+  'provisioned',
+  'running',
+  'stopped',
+  'destroyed',
+] as const;
+export type KiloClawInstanceStatus = (typeof KILOCLAW_INSTANCE_STATUSES)[number];
+
+export const kiloclaw_instances = pgTable(
+  'kiloclaw_instances',
+  {
+    id: text()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text().notNull(),
+    sandbox_id: text().notNull(),
+    status: text().notNull().default('provisioned'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
+    destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    // One active (non-destroyed) instance per user.
+    // Re-provisioning after destroy creates a new row; old row stays with status='destroyed'.
+    uniqueIndex('UQ_kiloclaw_instances_active_user')
+      .on(table.user_id)
+      .where(sql`${table.status} != 'destroyed'`),
+    // Lookup by sandbox_id for lifecycle hooks (onStop -> find userId by sandboxId).
+    index('IDX_kiloclaw_instances_sandbox_id')
+      .on(table.sandbox_id)
+      .where(sql`${table.status} != 'destroyed'`),
+  ]
+);
+
+export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;

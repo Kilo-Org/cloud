@@ -46,16 +46,22 @@ export function useAlertingModelDrafts({ configs }: UseAlertingModelDraftsParams
   };
 
   const addDraft = (modelId: string) => {
+    setDrafts(prev => ({
+      ...prev,
+      [modelId]: {
+        enabled: false,
+        errorRatePercent: DEFAULT_ERROR_RATE_PERCENT,
+        minRequestsPerWindow: DEFAULT_MIN_REQUESTS,
+      },
+    }));
+  };
+
+  const removeDraft = (modelId: string) => {
     setDrafts(prev => {
-      if (prev[modelId]) return prev;
-      return {
-        ...prev,
-        [modelId]: {
-          enabled: false,
-          errorRatePercent: DEFAULT_ERROR_RATE_PERCENT,
-          minRequestsPerWindow: DEFAULT_MIN_REQUESTS,
-        },
-      };
+      if (!prev[modelId]) return prev;
+      const next = { ...prev };
+      delete next[modelId];
+      return next;
     });
   };
 
@@ -63,5 +69,6 @@ export function useAlertingModelDrafts({ configs }: UseAlertingModelDraftsParams
     drafts,
     updateDraft,
     addDraft,
+    removeDraft,
   };
 }

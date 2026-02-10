@@ -23,6 +23,7 @@ import {
   DEFAULT_MIN_REQUESTS,
   toErrorRateSlo,
 } from '@/app/admin/alerting/utils';
+import { normalizeModelId } from '@/lib/model-utils';
 
 export default function AdminAlertingPage() {
   const [savingAll, setSavingAll] = useState(false);
@@ -35,7 +36,7 @@ export default function AdminAlertingPage() {
   const updateConfig = useUpdateAlertingConfig();
   const baselineMutation = useAlertingBaseline();
   const deleteConfig = useDeleteAlertingConfig();
-  const { drafts, updateDraft, addDraft } = useAlertingModelDrafts({
+  const { drafts, updateDraft, addDraft, removeDraft } = useAlertingModelDrafts({
     configs: configsData?.configs,
   });
   const { baselineByModel, baselineStatus, setLoading, setBaseline, setError } = useBaselineState();
@@ -128,11 +129,12 @@ export default function AdminAlertingPage() {
   };
 
   const handleAddModel = async (modelId: string) => {
-    addDraft(modelId);
+    const normalizedModelId = normalizeModelId(modelId);
+    addDraft(normalizedModelId);
 
     try {
       await updateConfig.mutateAsync({
-        model: modelId,
+        model: normalizedModelId,
         enabled: false,
         errorRateSlo: toErrorRateSlo(Number(DEFAULT_ERROR_RATE_PERCENT)),
         minRequestsPerWindow: Number(DEFAULT_MIN_REQUESTS),
@@ -141,6 +143,7 @@ export default function AdminAlertingPage() {
       setIsAddDialogOpen(false);
       setAddSearchTerm('');
     } catch (error) {
+      removeDraft(normalizedModelId);
       toast.error(error instanceof Error ? error.message : 'Failed to add model');
     }
   };
@@ -149,6 +152,7 @@ export default function AdminAlertingPage() {
     setDeletingModelId(modelId);
     try {
       await deleteConfig.mutateAsync({ model: modelId });
+      removeDraft(modelId);
       toast.success('Alerting rule deleted');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to delete alerting rule');

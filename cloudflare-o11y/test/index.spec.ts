@@ -1,4 +1,4 @@
-import { createExecutionContext, waitOnExecutionContext, SELF } from 'cloudflare:test';
+import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
 import Worker from '../src/index';
 
@@ -31,6 +31,7 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
 		O11Y_API_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_SESSION_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_ALERT_STATE: makeKvMock(),
+		O11Y_ALERT_CONFIG: makeKvMock(),
 		O11Y_CF_ACCOUNT_ID: 'test-account-id' as never,
 		O11Y_API_BASE_URL: 'https://api.kilo.ai',
 		O11Y_CF_AE_API_TOKEN: { get: async () => 'test-ae-token' } as SecretsStoreSecret,
@@ -76,24 +77,14 @@ async function workerFetch(request: Request, env: Env, ctx: ExecutionContext): P
 }
 
 describe('o11y worker', () => {
-	it('responds with Hello World! (unit style)', async () => {
-		const request = new IncomingRequest('http://example.com');
-		const ctx = createExecutionContext();
-		const response = await workerFetch(request, makeTestEnv(), ctx);
-		await waitOnExecutionContext(ctx);
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
-	});
-
-	it('responds with Hello World! (integration style)', async () => {
-		const response = await SELF.fetch('https://example.com');
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
-	});
-
 	it('accepts valid /ingest/api-metrics and returns 204', async () => {
 		const env = makeTestEnv();
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 429 })),
 		});
 
@@ -107,7 +98,10 @@ describe('o11y worker', () => {
 
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 200 })),
 		});
 
@@ -126,7 +120,10 @@ describe('o11y worker', () => {
 
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify(body),
 		});
 
@@ -144,7 +141,10 @@ describe('o11y worker', () => {
 
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 500 })),
 		});
 
@@ -155,7 +155,7 @@ describe('o11y worker', () => {
 		expect(call.doubles[2]).toBe(500);
 	});
 
-	it('rejects unknown clientSecret', async () => {
+	it('requires admin token for api-metrics ingest', async () => {
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -163,29 +163,16 @@ describe('o11y worker', () => {
 		});
 
 		const response = await workerFetch(request, makeTestEnv(), createExecutionContext());
-		expect(response.status).toBe(403);
-		const json = await response.json();
-		expect(json).toMatchObject({ error: 'Unknown clientSecret' });
-	});
-
-	it('does not write to AE when clientSecret is invalid', async () => {
-		const aeSpy = makeWriteDataPointSpy();
-		const env = makeTestEnv({ O11Y_API_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
-
-		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(makeValidApiMetricsBody({ clientSecret: 'wrong-secret' })),
-		});
-
-		await workerFetch(request, env, createExecutionContext());
-		expect(aeSpy.writeDataPoint).not.toHaveBeenCalled();
+		expect(response.status).toBe(401);
 	});
 
 	it('rejects missing params in /ingest/api-metrics', async () => {
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify({}),
 		});
 

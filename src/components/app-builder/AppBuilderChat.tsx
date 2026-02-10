@@ -400,7 +400,7 @@ export function AppBuilderChat({ onNewProject, organizationId }: AppBuilderChatP
       <div className="flex h-12 items-center justify-between gap-4 border-b px-4">
         <h2 className="shrink-0 text-sm font-medium">Chat</h2>
         <div className="flex items-center gap-1">
-          <FeedbackDialog disabled={isStreaming} />
+          <FeedbackDialog disabled={isStreaming} organizationId={organizationId} />
           <Button variant="ghost" size="sm" onClick={onNewProject} disabled={isStreaming}>
             <RotateCcw className="mr-1 h-3 w-3" />
             New Project

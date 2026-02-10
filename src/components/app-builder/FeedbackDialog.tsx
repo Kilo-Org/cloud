@@ -18,9 +18,10 @@ import { useProject } from './ProjectSession';
 
 type FeedbackDialogProps = {
   disabled?: boolean;
+  organizationId?: string;
 };
 
-export function FeedbackDialog({ disabled }: FeedbackDialogProps) {
+export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
@@ -68,6 +69,7 @@ export function FeedbackDialog({ disabled }: FeedbackDialogProps) {
 
     mutate({
       project_id: manager.projectId,
+      organization_id: organizationId,
       feedback_text: feedbackText.trim(),
       model: state.model || undefined,
       preview_status: state.previewStatus,

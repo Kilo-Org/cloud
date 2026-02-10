@@ -269,6 +269,10 @@ export function checkOrganizationModelRestrictions(params: {
   return modelNotAllowedResponse();
 }
 
+export function extractHeaderAndLimitLength(request: NextRequest, name: string) {
+  return request.headers.get(name)?.slice(0, 500) || null;
+}
+
 export function extractFraudAndProjectHeaders(request: NextRequest) {
   return {
     fraudHeaders: getFraudDetectionHeaders(request.headers),

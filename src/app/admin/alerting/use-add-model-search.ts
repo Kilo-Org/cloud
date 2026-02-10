@@ -14,7 +14,6 @@ type AddModelSearchResult = {
 };
 
 const OpenRouterModelSchema = OpenRouterModelsResponseSchema.shape.data.element;
-type OpenRouterModel = z.infer<typeof OpenRouterModelSchema>;
 
 const modelsSchema = z.union([
   OpenRouterModelsResponseSchema.transform(value => value.data),

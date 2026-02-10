@@ -178,7 +178,7 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
     for (const session of userV2Sessions) {
       try {
         const response = await fetch(
-          `${SESSION_INGEST_WORKER_URL}/api/session/${session.session_id}`,
+          `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(session.session_id)}`,
           {
             method: 'DELETE',
             headers: {

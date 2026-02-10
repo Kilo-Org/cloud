@@ -1,4 +1,4 @@
-import { kiloFreeModels, preferredModels } from '@/lib/models';
+import { isFreeModel, kiloFreeModels, preferredModels } from '@/lib/models';
 import { PROVIDERS } from '@/lib/providers';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
@@ -69,13 +69,12 @@ function enhancedModelList(models: OpenRouterModel[]) {
         model.id === KILO_AUTO_MODEL_ID ? -1 : preferredModels.indexOf(model.id);
       const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
       const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
-      const isFree = parseFloat(model.pricing.prompt) === 0;
       const nameEndsWithParen = model.name.endsWith(')');
       return {
         ...model,
         name: nameEndsWithParen
           ? model.name
-          : isFree
+          : isFreeModel(model.id)
             ? model.name + ' (free)'
             : isNew
               ? model.name + ' (new)'

@@ -8,7 +8,7 @@ import {
   platform_integrations,
   app_builder_projects,
 } from '@/db/schema';
-import { eq, and, desc, gt, inArray, ne, or } from 'drizzle-orm';
+import { eq, and, desc, gt, inArray, or } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { CreateDeploymentResponse } from '@/lib/user-deployments/deployment-builder-client';
 import { apiClient as deployApiClient } from '@/lib/user-deployments/deployment-builder-client';
@@ -481,43 +481,6 @@ export async function checkSlugAvailability(slug: string): Promise<CheckSlugAvai
 }
 
 /**
- * Check if a slug is available, excluding a specific deployment (for rename operations).
- */
-async function checkSlugAvailabilityExcluding(
-  slug: string,
-  excludeDeploymentId: string
-): Promise<CheckSlugAvailabilityResult> {
-  // Validate format using zod schema (includes reserved word check)
-  const parseResult = slugSchema.safeParse(slug);
-  if (!parseResult.success) {
-    return {
-      available: false,
-      reason: 'invalid_slug',
-      message: parseResult.error.issues[0]?.message ?? 'Invalid slug format',
-    };
-  }
-
-  // Check database uniqueness, excluding the current deployment.
-  // Also check internal_worker_name to prevent collisions with renamed deployments.
-  const existing = await db
-    .select({ id: deployments.id })
-    .from(deployments)
-    .where(
-      and(
-        or(eq(deployments.deployment_slug, slug), eq(deployments.internal_worker_name, slug)),
-        ne(deployments.id, excludeDeploymentId)
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return { available: false, reason: 'slug_taken', message: 'This subdomain is already taken' };
-  }
-
-  return { available: true };
-}
-
-/**
  * Resolve GitHub source configuration - validates platform integration and generates token
  */
 async function resolveGitHubSource(
@@ -838,16 +801,15 @@ export async function renameDeployment(
     };
   }
 
-  // Check if the new slug is the same as the current one
-  if (deployment.deployment_slug === newSlug) {
+  // No-op if the new slug matches the current slug or internal worker name
+  if (newSlug === deployment.deployment_slug || newSlug === deployment.internal_worker_name) {
     return {
       success: true,
       deploymentUrl: deployment.deployment_url,
     };
   }
 
-  // Validate new slug is available (excluding current deployment)
-  const slugCheck = await checkSlugAvailabilityExcluding(newSlug, deploymentId);
+  const slugCheck = await checkSlugAvailability(newSlug);
   if (!slugCheck.available) {
     return {
       success: false,

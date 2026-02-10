@@ -560,7 +560,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'Ue3s33ublSbs43E+QQEH/Q==:+0EqZhBIxzYL+i4JttQDCQ==:3vRW1yVE',
+    encrypted_credit_category: 'WYiw0GGnTc4IkH85VQlpOg==:OAcEL5bCRN7F5fbA50Mg6A==:+HldhiRr',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,

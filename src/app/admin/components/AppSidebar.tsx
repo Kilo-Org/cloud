@@ -18,6 +18,7 @@ import {
   GitPullRequest,
   UserX,
   Upload,
+  Bell,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -147,6 +148,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Free Model Usage',
     url: '/admin/free-model-usage',
     icon: () => <UserX />,
+  },
+  {
+    title: () => 'Alerting',
+    url: '/admin/alerting',
+    icon: () => <Bell />,
   },
 ];
 

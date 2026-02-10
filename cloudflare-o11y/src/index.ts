@@ -7,6 +7,8 @@ import { SessionMetricsParamsSchema } from './session-metrics-schema';
 import type { SessionMetricsParams } from './session-metrics-schema';
 import { writeSessionMetricsDataPoint } from './session-metrics-analytics';
 
+export { AlertConfigDO } from './alerting/AlertConfigDO';
+
 const app = new Hono<{ Bindings: Env }>();
 
 registerApiMetricsRoutes(app);

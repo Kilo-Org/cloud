@@ -30,7 +30,7 @@ const freeOpenRouterModels = [
 export function isFreeModel(model: string): boolean {
   return (
     kiloFreeModels.some(m => m.public_id === model && m.is_enabled) ||
-    model.endsWith(':free') ||
+    (model ?? '').endsWith(':free') ||
     freeOpenRouterModels.includes(model)
   );
 }

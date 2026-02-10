@@ -31,12 +31,27 @@
         "class_name": "KiloClawSandbox",
         "name": "Sandbox",
       },
+      {
+        "class_name": "KiloClawInstance",
+        "name": "KILOCLAW_INSTANCE",
+      },
     ],
   },
   "migrations": [
     {
       "new_sqlite_classes": ["KiloClawSandbox"],
       "tag": "v2",
+    },
+    {
+      "new_sqlite_classes": ["KiloClawInstance"],
+      "tag": "v3",
+    },
+  ],
+  // Hyperdrive binding for Postgres (pepper validation, instance registry)
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
     },
   ],
   // R2 bucket for persistent storage
@@ -47,5 +62,7 @@
     },
   ],
   // Secrets to configure via `wrangler secret put`:
-  // - R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+  // - NEXTAUTH_SECRET, INTERNAL_API_SECRET, GATEWAY_TOKEN_SECRET
+  // - ANTHROPIC_API_KEY (or other AI provider key)
+  // - R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, CF_ACCOUNT_ID
 }

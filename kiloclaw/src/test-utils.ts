@@ -12,6 +12,8 @@ export function createMockEnv(overrides: Partial<KiloClawEnv> = {}): KiloClawEnv
   return {
     Sandbox: {} as unknown as KiloClawEnv['Sandbox'],
     KILOCLAW_BUCKET: {} as unknown as KiloClawEnv['KILOCLAW_BUCKET'],
+    KILOCLAW_INSTANCE: {} as unknown as KiloClawEnv['KILOCLAW_INSTANCE'],
+    HYPERDRIVE: {} as unknown as KiloClawEnv['HYPERDRIVE'],
     ...overrides,
   };
 }

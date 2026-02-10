@@ -14,7 +14,12 @@ import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@/lib/debugUtils';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
+import type {
+  OrganizationSettings,
+  OrganizationPlan,
+} from '@/lib/organizations/organization-types';
+import type { OpenRouterProviderConfig } from '@/lib/providers/openrouter/types';
+import { extraRequiredProviders } from '@/lib/models';
 import { getFraudDetectionHeaders } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
@@ -239,34 +244,80 @@ export async function captureProxyError(params: {
 // Shared Helper Functions
 // ============================================================================
 
+export type OrganizationRestrictionResult = {
+  error: NextResponse | null;
+  providerConfig?: OpenRouterProviderConfig;
+};
+
+/**
+ * Checks organization-level restrictions for model and provider access.
+ *
+ * Model allow list restrictions only apply to Enterprise plans.
+ * Provider allow list and data collection settings apply to all plans.
+ *
+ * @param params.modelId - The model ID being requested
+ * @param params.settings - Organization settings (may be undefined for non-org users)
+ * @param params.organizationPlan - The organization's plan type (undefined for non-org users)
+ * @returns Object with error response (if blocked) and provider config to apply
+ */
 export function checkOrganizationModelRestrictions(params: {
   modelId: string;
   settings?: OrganizationSettings;
-}): NextResponse | null {
-  if (!params.settings) return null;
-
-  const modelAllowList = params.settings.model_allow_list || [];
-
-  // If no restrictions, allow everything
-  if (modelAllowList.length === 0) return null;
+  organizationPlan?: OrganizationPlan;
+}): OrganizationRestrictionResult {
+  if (!params.settings) return { error: null };
 
   const normalizedModelId = normalizeModelId(params.modelId);
 
-  // Check for exact model match
-  if (modelAllowList.includes(normalizedModelId)) {
-    return null;
+  // Model allow list restrictions only apply to Enterprise plans
+  // Teams plans should allow all models by default
+  if (params.organizationPlan === 'enterprise') {
+    const modelAllowList = params.settings.model_allow_list || [];
+
+    // If there are model restrictions, check them
+    if (modelAllowList.length > 0) {
+      // Check for exact model match
+      const isExactMatch = modelAllowList.includes(normalizedModelId);
+
+      // Check for wildcard match (e.g., "anthropic/*" matches "anthropic/claude-3-opus")
+      const providerSlug = normalizedModelId.split('/')[0];
+      const wildcardEntry = `${providerSlug}/*`;
+      const isWildcardMatch = modelAllowList.includes(wildcardEntry);
+
+      if (!isExactMatch && !isWildcardMatch) {
+        return { error: modelNotAllowedResponse() };
+      }
+    }
   }
 
-  // Check for wildcard match (e.g., "anthropic/*" matches "anthropic/claude-3-opus")
-  const providerSlug = normalizedModelId.split('/')[0];
-  const wildcardEntry = `${providerSlug}/*`;
+  const providerAllowList = params.settings.provider_allow_list || [];
+  const dataCollection = params.settings.data_collection;
 
-  if (modelAllowList.includes(wildcardEntry)) {
-    return null;
+  const providerConfig: OpenRouterProviderConfig = {};
+
+  if (params.organizationPlan === 'enterprise' && providerAllowList.length > 0) {
+    // Check if the model requires specific providers that aren't in the allow list
+    const requiredProviders = extraRequiredProviders(normalizedModelId);
+    if (requiredProviders && !requiredProviders.every(p => providerAllowList.includes(p))) {
+      console.error(
+        `This FREE model requires ALL of these providers to be allowed: ${requiredProviders.join(', ')}`
+      );
+      // This is overly strict, but checking for just one of them is not enough,
+      // because this list overrides the org allow list
+      return { error: modelNotAllowedResponse() };
+    }
+    providerConfig.only = providerAllowList;
   }
 
-  // Model not allowed
-  return modelNotAllowedResponse();
+  // Setting this only if it's set as an override on the organization settings
+  if (dataCollection) {
+    providerConfig.data_collection = dataCollection;
+  }
+
+  return {
+    error: null,
+    providerConfig: Object.keys(providerConfig).length > 0 ? providerConfig : undefined,
+  };
 }
 
 export function extractHeaderAndLimitLength(request: NextRequest, name: string) {

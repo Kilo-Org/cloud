@@ -267,7 +267,7 @@ export async function syncProviders() {
         console.log(
           `Found existing ${provider} provider from OpenRouter, adding extra model ${extraModel.model.slug}`
         );
-        providerData.models.push(extraModel.model);
+        providerData.models.splice(0, 0, extraModel.model);
       }
     }
   }

@@ -50,6 +50,7 @@ export default defineConfig([
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
     },
   },
   {

@@ -56,6 +56,7 @@ import {
 } from '@/lib/kilo-pass/enums';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
+import { KiloClawInstanceStatus } from '@/lib/kiloclaw/enums';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -92,6 +93,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
+  KiloClawInstanceStatus,
 } as const;
 
 export const credit_transactions = pgTable(
@@ -2840,3 +2842,43 @@ export const app_builder_feedback = pgTable(
 
 export type AppBuilderFeedback = typeof app_builder_feedback.$inferSelect;
 export type NewAppBuilderFeedback = typeof app_builder_feedback.$inferInsert;
+
+// ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
+
+export { KiloClawInstanceStatus } from '@/lib/kiloclaw/enums';
+
+export const kiloclaw_instances = pgTable(
+  'kiloclaw_instances',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    sandbox_id: text().notNull(),
+    status: text()
+      .$type<KiloClawInstanceStatus>()
+      .notNull()
+      .default(KiloClawInstanceStatus.Provisioned),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
+    destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    // One active (non-destroyed) instance per user.
+    // Re-provisioning after destroy creates a new row; old row stays with destroyed_at set.
+    uniqueIndex('UQ_kiloclaw_instances_active_user')
+      .on(table.user_id)
+      .where(isNull(table.destroyed_at)),
+    // Lookup by sandbox_id for lifecycle hooks (onStop -> find userId by sandboxId).
+    index('IDX_kiloclaw_instances_sandbox_id')
+      .on(table.sandbox_id)
+      .where(isNull(table.destroyed_at)),
+    enumCheck('kiloclaw_instances_status_check', table.status, KiloClawInstanceStatus),
+  ]
+);
+
+export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;

@@ -44,9 +44,14 @@ export async function findExistingGatewayProcess(sandbox: Sandbox): Promise<Proc
  *
  * @param sandbox - The sandbox instance
  * @param env - Worker environment bindings
+ * @param prebuiltEnvVars - Pre-built env vars (multi-tenant path). If omitted, builds from worker env.
  * @returns The running gateway process
  */
-export async function ensureOpenClawGateway(sandbox: Sandbox, env: KiloClawEnv): Promise<Process> {
+export async function ensureOpenClawGateway(
+  sandbox: Sandbox,
+  env: KiloClawEnv,
+  prebuiltEnvVars?: Record<string, string>
+): Promise<Process> {
   // Mount R2 storage for persistent data (non-blocking if not configured)
   // R2 is used as a backup - the startup script will restore from it on boot
   await mountR2Storage(sandbox, env);
@@ -85,7 +90,7 @@ export async function ensureOpenClawGateway(sandbox: Sandbox, env: KiloClawEnv):
 
   // Start a new OpenClaw gateway
   console.log('Starting new OpenClaw gateway...');
-  const envVars = buildEnvVars(env);
+  const envVars = prebuiltEnvVars ?? (await buildEnvVars(env));
   const command = '/usr/local/bin/start-openclaw.sh';
 
   console.log('Starting process with command:', command);

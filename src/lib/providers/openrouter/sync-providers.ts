@@ -280,7 +280,7 @@ export async function syncProviders() {
     // Deduplicate models within each provider by slug
     const uniqueModelsMap = new Map<string, OpenRouterModel>();
     data.models.forEach(model => {
-      uniqueModelsMap.set(model.slug, model);
+      uniqueModelsMap.set(normalizeModelId(model.slug), model);
     });
     const uniqueModels = Array.from(uniqueModelsMap.values());
 

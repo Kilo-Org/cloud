@@ -560,6 +560,16 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
+    encrypted_credit_category: 'Ue3s33ublSbs43E+QQEH/Q==:+0EqZhBIxzYL+i4JttQDCQ==:3vRW1yVE',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 10,
+    promotion_ends_at: new Date('2026-03-01'),
+    description: 'Creator promo code',
+    total_redemptions_allowed: 5000,
+    customer_requirement: has_Payment,
+  },
+  {
     encrypted_credit_category: 'C3wdUIGcWvHqGKkb+S1caw==:y0x+2EPqORv/Cj/0iJRAoQ==:8mc/1wDaNo0=',
     is_user_selfservicable: true,
     is_idempotent: true,

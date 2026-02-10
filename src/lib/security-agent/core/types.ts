@@ -284,6 +284,8 @@ export type SecurityFindingAnalysis = {
   modelUsed?: string;
   /** User ID who triggered the analysis (for audit tracking) */
   triggeredByUserId?: string;
+  /** Correlation ID for tracing across triage → sandbox → extraction → auto-dismiss */
+  correlationId?: string;
 };
 
 /**

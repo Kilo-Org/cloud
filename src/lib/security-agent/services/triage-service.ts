@@ -12,7 +12,13 @@ import type OpenAI from 'openai';
 import { sendProxiedChatCompletion } from '@/lib/llm-proxy-helpers';
 import type { SecurityFinding } from '@/db/schema';
 import type { SecurityFindingTriage } from '../core/types';
-import { captureException } from '@sentry/nextjs';
+import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
+import { sentryLogger } from '@/lib/utils.server';
+import { emitApiMetrics } from '@/lib/o11y/api-metrics.server';
+import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@/lib/config.server';
+
+const log = sentryLogger('security-agent:triage', 'info');
+const logError = sentryLogger('security-agent:triage', 'error');
 
 // Version string for API requests
 const TRIAGE_SERVICE_VERSION = '5.0.0';
@@ -131,24 +137,24 @@ function parseTriageResult(args: string): SecurityFindingTriage | null {
 
     // Validate required fields
     if (typeof parsed.needsSandboxAnalysis !== 'boolean') {
-      console.error('[Triage] Invalid needsSandboxAnalysis:', parsed.needsSandboxAnalysis);
+      logError('Invalid needsSandboxAnalysis', { value: parsed.needsSandboxAnalysis });
       return null;
     }
 
     if (typeof parsed.needsSandboxReasoning !== 'string') {
-      console.error('[Triage] Invalid needsSandboxReasoning:', parsed.needsSandboxReasoning);
+      logError('Invalid needsSandboxReasoning', { value: parsed.needsSandboxReasoning });
       return null;
     }
 
     const validActions = ['dismiss', 'analyze_codebase', 'manual_review'];
     if (!validActions.includes(parsed.suggestedAction)) {
-      console.error('[Triage] Invalid suggestedAction:', parsed.suggestedAction);
+      logError('Invalid suggestedAction', { value: parsed.suggestedAction });
       return null;
     }
 
     const validConfidences = ['high', 'medium', 'low'];
     if (!validConfidences.includes(parsed.confidence)) {
-      console.error('[Triage] Invalid confidence:', parsed.confidence);
+      logError('Invalid confidence', { value: parsed.confidence });
       return null;
     }
 
@@ -160,7 +166,7 @@ function parseTriageResult(args: string): SecurityFindingTriage | null {
       triageAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('[Triage] Failed to parse tool arguments:', error);
+    logError('Failed to parse tool arguments', { error });
     return null;
   }
 }
@@ -182,18 +188,30 @@ function createFallbackTriage(reason: string): SecurityFindingTriage {
  * Triage a security finding using direct LLM call with function calling.
  * Returns a triage result that can be stored in the analysis field.
  *
- * @param finding - The security finding to triage
- * @param authToken - Auth token for the LLM proxy
- * @param model - Model to use for triage (default: anthropic/claude-sonnet-4)
- * @param organizationId - Optional organization ID for usage tracking
+ * @param options.finding - The security finding to triage
+ * @param options.authToken - Auth token for the LLM proxy
+ * @param options.model - Model to use for triage (default: anthropic/claude-sonnet-4)
+ * @param options.correlationId - Correlation ID for tracing across the analysis pipeline
+ * @param options.userId - User ID for metrics tracking
+ * @param options.organizationId - Optional organization ID for usage tracking
  */
-export async function triageSecurityFinding(
-  finding: SecurityFinding,
-  authToken: string,
-  model: string = 'anthropic/claude-sonnet-4',
-  organizationId?: string
-): Promise<SecurityFindingTriage> {
-  console.log('[Triage] Starting triage for finding:', finding.id);
+export async function triageSecurityFinding(options: {
+  finding: SecurityFinding;
+  authToken: string;
+  model?: string;
+  correlationId?: string;
+  userId?: string;
+  organizationId?: string;
+}): Promise<SecurityFindingTriage> {
+  const {
+    finding,
+    authToken,
+    model = 'anthropic/claude-sonnet-4',
+    correlationId = '',
+    userId = '',
+    organizationId,
+  } = options;
+  log('Starting triage', { correlationId, findingId: finding.id });
 
   const messages: ChatMessage[] = [
     {
@@ -207,71 +225,166 @@ export async function triageSecurityFinding(
   ];
 
   try {
-    const result = await sendProxiedChatCompletion<ChatCompletionResponse>({
-      authToken,
-      version: TRIAGE_SERVICE_VERSION,
-      userAgent: TRIAGE_SERVICE_USER_AGENT,
-      body: {
-        model,
-        messages,
-        tools: [SUBMIT_TRIAGE_TOOL],
-        tool_choice: {
-          type: 'function',
-          function: { name: 'submit_triage_result' },
-        },
-      },
-      organizationId,
-    });
+    const triageResult = await startSpan(
+      { name: 'security-agent.triage', op: 'ai.inference' },
+      async span => {
+        span.setAttribute('security_agent.model', model);
+        span.setAttribute('security_agent.finding_id', finding.id);
+        span.setAttribute('security_agent.correlation_id', correlationId);
 
-    if (!result.ok) {
-      console.error('[Triage] API error:', result.status, result.error);
-      captureException(new Error(`Triage API error: ${result.status}`), {
-        tags: { operation: 'triageSecurityFinding' },
-        extra: { findingId: finding.id, status: result.status, error: result.error },
-      });
-      return createFallbackTriage(`API error: ${result.status}`);
-    }
+        const llmStart = performance.now();
 
-    const choice = result.data.choices?.[0];
-    if (!choice) {
-      console.error('[Triage] No choice in response');
-      return createFallbackTriage('No response from LLM');
-    }
+        const result = await sendProxiedChatCompletion<ChatCompletionResponse>({
+          authToken,
+          version: TRIAGE_SERVICE_VERSION,
+          userAgent: TRIAGE_SERVICE_USER_AGENT,
+          body: {
+            model,
+            messages,
+            tools: [SUBMIT_TRIAGE_TOOL],
+            tool_choice: {
+              type: 'function',
+              function: { name: 'submit_triage_result' },
+            },
+          },
+          organizationId,
+        });
 
-    const message = choice.message;
-    const toolCall = message.tool_calls?.[0];
+        const durationMs = Math.round(performance.now() - llmStart);
+        span.setAttribute('security_agent.duration_ms', durationMs);
 
-    if (!toolCall || toolCall.type !== 'function') {
-      console.error('[Triage] No tool call in response');
-      return createFallbackTriage('LLM did not call the triage tool');
-    }
+        if (!result.ok) {
+          logError('Triage API error', {
+            correlationId,
+            findingId: finding.id,
+            status: result.status,
+          });
+          captureException(new Error(`Triage API error: ${result.status}`), {
+            tags: { operation: 'triageSecurityFinding' },
+            extra: {
+              findingId: finding.id,
+              status: result.status,
+              error: result.error,
+              correlationId,
+            },
+          });
 
-    if (toolCall.function.name !== 'submit_triage_result') {
-      console.error('[Triage] Unexpected tool call:', toolCall.function.name);
-      return createFallbackTriage(`Unexpected tool: ${toolCall.function.name}`);
-    }
+          span.setAttribute('security_agent.status', 'error');
+          span.setAttribute('security_agent.is_fallback', true);
 
-    const triageResult = parseTriageResult(toolCall.function.arguments);
-    if (!triageResult) {
-      return createFallbackTriage('Failed to parse triage result');
-    }
+          addBreadcrumb({
+            category: 'security-agent.triage',
+            message: 'Triage fallback used',
+            level: 'warning',
+            data: { correlationId, findingId: finding.id, isFallback: true },
+          });
 
-    console.log('[Triage] Triage complete:', {
-      findingId: finding.id,
-      needsSandboxAnalysis: triageResult.needsSandboxAnalysis,
-      needsSandboxReasoning: triageResult.needsSandboxReasoning,
-      suggestedAction: triageResult.suggestedAction,
-      confidence: triageResult.confidence,
-    });
+          return createFallbackTriage(`API error: ${result.status}`);
+        }
+
+        // Set token usage on span
+        const usage = result.data.usage;
+        if (usage) {
+          span.setAttribute('security_agent.input_tokens', usage.prompt_tokens);
+          span.setAttribute('security_agent.output_tokens', usage.completion_tokens);
+        }
+
+        // Emit API metrics (only if o11y client secret is configured)
+        if (usage && userId && O11Y_KILO_GATEWAY_CLIENT_SECRET) {
+          const responseToolCalls = result.data.choices?.[0]?.message?.tool_calls ?? [];
+          const toolsUsed = responseToolCalls
+            .filter(tc => tc.type === 'function')
+            .map(tc => `function:${tc.function.name}`);
+
+          emitApiMetrics({
+            clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
+            kiloUserId: userId,
+            organizationId,
+            isAnonymous: false,
+            isStreaming: false,
+            userByok: false,
+            mode: 'security-agent-triage',
+            provider: 'anthropic',
+            requestedModel: model,
+            resolvedModel: model,
+            toolsAvailable: ['function:submit_triage_result'],
+            toolsUsed,
+            ttfbMs: durationMs,
+            completeRequestMs: durationMs,
+            statusCode: 200,
+            tokens: {
+              inputTokens: usage.prompt_tokens,
+              outputTokens: usage.completion_tokens,
+              totalTokens: usage.total_tokens,
+            },
+          });
+        }
+
+        const choice = result.data.choices?.[0];
+        if (!choice) {
+          logError('No choice in response', { correlationId, findingId: finding.id });
+          span.setAttribute('security_agent.is_fallback', true);
+          return createFallbackTriage('No response from LLM');
+        }
+
+        const message = choice.message;
+        const toolCall = message.tool_calls?.[0];
+
+        if (!toolCall || toolCall.type !== 'function') {
+          logError('No tool call in response', { correlationId, findingId: finding.id });
+          span.setAttribute('security_agent.is_fallback', true);
+          return createFallbackTriage('LLM did not call the triage tool');
+        }
+
+        if (toolCall.function.name !== 'submit_triage_result') {
+          logError('Unexpected tool call', {
+            correlationId,
+            findingId: finding.id,
+            tool: toolCall.function.name,
+          });
+          span.setAttribute('security_agent.is_fallback', true);
+          return createFallbackTriage(`Unexpected tool: ${toolCall.function.name}`);
+        }
+
+        const parsed = parseTriageResult(toolCall.function.arguments);
+        if (!parsed) {
+          span.setAttribute('security_agent.is_fallback', true);
+          return createFallbackTriage('Failed to parse triage result');
+        }
+
+        span.setAttribute('security_agent.status', 'success');
+        span.setAttribute('security_agent.suggested_action', parsed.suggestedAction);
+        span.setAttribute('security_agent.confidence', parsed.confidence);
+        span.setAttribute('security_agent.is_fallback', false);
+
+        log('Triage complete', {
+          correlationId,
+          findingId: finding.id,
+          suggestedAction: parsed.suggestedAction,
+          confidence: parsed.confidence,
+          needsSandboxAnalysis: parsed.needsSandboxAnalysis,
+        });
+
+        return parsed;
+      }
+    );
 
     return triageResult;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[Triage] Error during triage:', errorMessage);
+    logError('Error during triage', { correlationId, findingId: finding.id, error: errorMessage });
     captureException(error, {
       tags: { operation: 'triageSecurityFinding' },
-      extra: { findingId: finding.id },
+      extra: { findingId: finding.id, correlationId },
     });
+
+    addBreadcrumb({
+      category: 'security-agent.triage',
+      message: 'Triage fallback used',
+      level: 'warning',
+      data: { correlationId, findingId: finding.id, isFallback: true },
+    });
+
     return createFallbackTriage(errorMessage);
   }
 }

@@ -208,9 +208,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const { provider, userByok } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
-    isAnonymousContext(user) ? null : user,
-    organizationId,
-    taskId
+    user,
+    organizationId
   );
 
   console.debug(`Routing request to ${provider.id}`);

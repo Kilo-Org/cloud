@@ -103,6 +103,9 @@ export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.
 export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBACK_WEBHOOK_URL');
+// Posts deploy threat alerts to a dedicated Slack channel.
+// Expected to be a Slack Incoming Webhook URL.
+export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THREAT_WEBHOOK_URL');
 export const ENABLE_MILVUS_DUAL_WRITE = true;
 
 // AI Attribution Service
@@ -151,3 +154,11 @@ export const CREDIT_CATEGORIES_ENCRYPTION_KEY = getEnvVariable('CREDIT_CATEGORIE
 // Agent observability ingest service
 export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
 export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');
+
+// Security agent BetterStack heartbeat URLs
+export const SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL = getEnvVariable(
+  'SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL'
+);
+export const SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL = getEnvVariable(
+  'SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL'
+);

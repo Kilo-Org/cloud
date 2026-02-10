@@ -1,3 +1,6 @@
+// Load environment variables before any other imports
+import '../lib/load-env';
+
 // get all folders in the src/scripts directory excluding './lib'
 import { readdirSync } from 'fs';
 import { join } from 'path';

@@ -18,6 +18,7 @@ import {
   GitPullRequest,
   UserX,
   Bell,
+  Upload,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -71,6 +72,11 @@ const menuItems: MenuItem[] = [
     title: () => 'Credit Categories',
     url: '/admin/credit-categories',
     icon: () => <DollarSign />,
+  },
+  {
+    title: () => 'Bulk Credits',
+    url: '/admin/bulk-credits',
+    icon: () => <Upload />,
   },
   {
     title: () => 'Revenue KPI',

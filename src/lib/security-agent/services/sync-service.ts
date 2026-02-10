@@ -5,6 +5,7 @@
  */
 
 import { captureException } from '@sentry/nextjs';
+import { trackSecurityAgentFullSync } from '../posthog-tracking';
 import { db } from '@/lib/drizzle';
 import { platform_integrations, agent_configs } from '@/db/schema';
 import { eq, and, isNotNull } from 'drizzle-orm';
@@ -20,6 +21,10 @@ import {
   type SyncResult,
 } from '../core/types';
 import type { Owner } from '@/lib/code-reviews/core';
+import { sentryLogger } from '@/lib/utils.server';
+
+const log = sentryLogger('security-agent:sync', 'info');
+const logError = sentryLogger('security-agent:sync', 'error');
 
 /**
  * Convert SecurityReviewOwner to Owner type used by agent_configs
@@ -45,10 +50,9 @@ export async function syncDependabotAlertsForRepo(params: {
   repoFullName: string;
 }): Promise<SyncResult> {
   const { owner, platformIntegrationId, installationId, repoFullName } = params;
+  const repoStartTime = performance.now();
 
-  console.log(
-    `[sync-service] Starting sync for ${repoFullName} (installationId=${installationId})`
-  );
+  log(`Starting sync for ${repoFullName}`, { installationId });
 
   const result: SyncResult = {
     synced: 0,
@@ -65,13 +69,12 @@ export async function syncDependabotAlertsForRepo(params: {
     }
 
     // Fetch all alerts from Dependabot
-    console.log(`[sync-service] Fetching Dependabot alerts for ${repoFullName}...`);
     const alerts = await fetchAllDependabotAlerts(installationId, repoOwner, repoName);
-    console.log(`[sync-service] Fetched ${alerts.length} alerts from GitHub for ${repoFullName}`);
+    log(`Fetched ${alerts.length} alerts from GitHub for ${repoFullName}`);
 
     // Parse alerts to our internal format
     const findings = parseDependabotAlerts(alerts, repoFullName);
-    console.log(`[sync-service] Parsed ${findings.length} findings for ${repoFullName}`);
+    log(`Parsed ${findings.length} findings for ${repoFullName}`);
 
     // Get SLA config for this owner
     const config = await getSecurityAgentConfig(toAgentConfigOwner(owner));
@@ -93,7 +96,10 @@ export async function syncDependabotAlertsForRepo(params: {
         result.synced++;
       } catch (error) {
         result.errors++;
-        console.error(`[sync-service] Error upserting finding for ${repoFullName}:`, error);
+        logError(`Error upserting finding for ${repoFullName}`, {
+          error,
+          alertNumber: finding.source_id,
+        });
         captureException(error, {
           tags: { operation: 'syncDependabotAlertsForRepo', step: 'upsertFinding' },
           extra: { repoFullName, alertNumber: finding.source_id },
@@ -101,13 +107,18 @@ export async function syncDependabotAlertsForRepo(params: {
       }
     }
 
-    console.log(
-      `[sync-service] Synced ${result.synced} alerts for ${repoFullName} (${result.errors} errors)`
-    );
+    const repoDurationMs = Math.round(performance.now() - repoStartTime);
+    log(`Repo sync complete`, {
+      repo: repoFullName,
+      durationMs: repoDurationMs,
+      alertsSynced: result.synced,
+      errors: result.errors,
+    });
 
     return result;
   } catch (error) {
-    console.error(`[sync-service] Error syncing ${repoFullName}:`, error);
+    const repoDurationMs = Math.round(performance.now() - repoStartTime);
+    logError(`Error syncing ${repoFullName}`, { durationMs: repoDurationMs, error });
     captureException(error, {
       tags: { operation: 'syncDependabotAlertsForRepo' },
       extra: { repoFullName },
@@ -155,7 +166,7 @@ export async function syncAllReposForOwner(params: {
       successfulRepos++;
     } catch (error) {
       totalResult.errors++;
-      console.error(`[sync-service] Failed to sync ${repoFullName}:`, error);
+      logError(`Failed to sync ${repoFullName}`, { error });
       if (!firstError && error instanceof Error) {
         firstError = error;
       }
@@ -201,7 +212,7 @@ export async function getEnabledSecurityReviewConfigs(): Promise<
     const userId = config.owned_by_user_id;
 
     if (!orgId && !userId) {
-      console.log(`[sync-service] Config ${config.id} has no owner, skipping`);
+      log(`Config ${config.id} has no owner, skipping`);
       continue;
     }
 
@@ -223,15 +234,13 @@ export async function getEnabledSecurityReviewConfigs(): Promise<
       .limit(1);
 
     if (!integration || !integration.platform_installation_id) {
-      console.log(`[sync-service] No GitHub integration found for config ${config.id}, skipping`);
+      log(`No GitHub integration found for config ${config.id}, skipping`);
       continue;
     }
 
     // Check if integration has required permissions
     if (!hasSecurityReviewPermissions(integration)) {
-      console.log(
-        `[sync-service] Integration ${integration.id} missing vulnerability_alerts permission, skipping`
-      );
+      log(`Integration ${integration.id} missing vulnerability_alerts permission, skipping`);
       continue;
     }
 
@@ -242,9 +251,7 @@ export async function getEnabledSecurityReviewConfigs(): Promise<
     );
 
     if (allRepositories.length === 0) {
-      console.log(
-        `[sync-service] No repositories found for integration ${integration.id}, skipping`
-      );
+      log(`No repositories found for integration ${integration.id}, skipping`);
       continue;
     }
 
@@ -264,20 +271,13 @@ export async function getEnabledSecurityReviewConfigs(): Promise<
       // Only sync selected repositories
       const selectedIds = new Set(securityConfig.selected_repository_ids);
       selectedRepos = allRepositories.filter(r => selectedIds.has(r.id)).map(r => r.full_name);
-
-      console.log(
-        `[sync-service] Config ${config.id} has 'selected' mode with ${selectedRepos.length} repos (from ${allRepositories.length} total)`
-      );
     } else {
       // Sync all repositories
       selectedRepos = allRepositories.map(r => r.full_name);
-      console.log(
-        `[sync-service] Config ${config.id} has 'all' mode with ${selectedRepos.length} repos`
-      );
     }
 
     if (selectedRepos.length === 0) {
-      console.log(`[sync-service] No selected repositories for config ${config.id}, skipping`);
+      log(`No selected repositories for config ${config.id}, skipping`);
       continue;
     }
 
@@ -305,11 +305,11 @@ export async function runFullSync(): Promise<{
   totalErrors: number;
   configsProcessed: number;
 }> {
-  console.log('[sync-service] Starting full security alerts sync...');
-  const startTime = Date.now();
+  log('Starting full security alerts sync...');
+  const startTime = performance.now();
 
   const configs = await getEnabledSecurityReviewConfigs();
-  console.log(`[sync-service] Found ${configs.length} enabled configurations`);
+  log(`Found ${configs.length} enabled configurations`);
 
   let totalSynced = 0;
   let totalErrors = 0;
@@ -328,10 +328,18 @@ export async function runFullSync(): Promise<{
     }
   }
 
-  const duration = Date.now() - startTime;
-  console.log(
-    `[sync-service] Full sync completed in ${duration}ms: ${totalSynced} alerts synced, ${totalErrors} errors, ${configs.length} configs processed`
+  const duration = Math.round(performance.now() - startTime);
+  log(
+    `Full sync completed in ${duration}ms: ${totalSynced} alerts synced, ${totalErrors} errors, ${configs.length} configs processed`
   );
+
+  trackSecurityAgentFullSync({
+    distinctId: 'system-cron',
+    configsProcessed: configs.length,
+    totalSynced,
+    totalErrors,
+    durationMs: duration,
+  });
 
   return {
     totalSynced,

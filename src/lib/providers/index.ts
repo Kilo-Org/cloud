@@ -31,6 +31,8 @@ import { hasAttemptCompletionTool } from '@/lib/tool-calling';
 import { applyGoogleModelSettings, isGoogleModel } from '@/lib/providers/google';
 import { db } from '@/lib/drizzle';
 import { applyMoonshotProviderSettings, isMoonshotModel } from '@/lib/providers/moonshotai';
+import type { AnonymousUserContext } from '@/lib/anonymous';
+import { isAnonymousContext } from '@/lib/anonymous';
 
 export const PROVIDERS = {
   OPENROUTER: {
@@ -100,11 +102,10 @@ export const PROVIDERS = {
 export async function getProvider(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest,
-  user: User | null,
-  organizationId: string | undefined,
-  taskId: string | undefined
+  user: User | AnonymousUserContext,
+  organizationId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult | null }> {
-  if (user) {
+  if (!isAnonymousContext(user)) {
     const modelProvider = inferUserByokProviderForModel(requestedModel);
     const userByok = !modelProvider
       ? null
@@ -116,7 +117,7 @@ export async function getProvider(
     }
   }
 
-  if (await shouldRouteToVercel(requestedModel, request, taskId)) {
+  if (await shouldRouteToVercel(requestedModel, request, user.id)) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null };
   }
 

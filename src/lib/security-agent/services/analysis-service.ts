@@ -10,6 +10,7 @@
  */
 
 import 'server-only';
+import { randomUUID } from 'crypto';
 import { createCloudAgentClient } from '@/lib/cloud-agent/cloud-agent-client';
 import { generateApiToken } from '@/lib/tokens';
 import { getSecurityFindingById } from '../db/security-findings';
@@ -17,7 +18,11 @@ import { updateAnalysisStatus } from '../db/security-analysis';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
 import type { User, SecurityFinding } from '@/db/schema';
 import type { StreamEvent, SystemKilocodeEvent } from '@/components/cloud-agent/types';
-import { captureException } from '@sentry/nextjs';
+import {
+  trackSecurityAgentAnalysisStarted,
+  trackSecurityAgentAnalysisCompleted,
+} from '../posthog-tracking';
+import { addBreadcrumb, captureException, startSpan, withScope } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { cliSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -25,6 +30,11 @@ import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { triageSecurityFinding } from './triage-service';
 import { extractSandboxAnalysis } from './extraction-service';
 import { maybeAutoDismissAnalysis } from './auto-dismiss-service';
+import { sentryLogger } from '@/lib/utils.server';
+
+const log = sentryLogger('security-agent:analysis', 'info');
+const warn = sentryLogger('security-agent:analysis', 'warning');
+const logError = sentryLogger('security-agent:analysis', 'error');
 
 const ANALYSIS_PROMPT_TEMPLATE = `You are a security analyst reviewing a dependency vulnerability alert for a codebase.
 
@@ -130,7 +140,10 @@ function getCliMessageContent(msg: RawCliMessage): string | null {
  * Fetch the last assistant message from a CLI session's ui_messages blob.
  * This is the final analysis result that we want to store.
  */
-async function fetchLastAssistantMessage(cliSessionId: string): Promise<string | null> {
+async function fetchLastAssistantMessage(
+  cliSessionId: string,
+  correlationId: string
+): Promise<string | null> {
   try {
     // Get the session to find the ui_messages blob URL
     const [session] = await db
@@ -140,7 +153,7 @@ async function fetchLastAssistantMessage(cliSessionId: string): Promise<string |
       .limit(1);
 
     if (!session?.ui_messages_blob_url) {
-      console.log('[Security Analysis] No ui_messages blob URL found for session:', cliSessionId);
+      log('No ui_messages blob URL found for session', { correlationId, cliSessionId });
       return null;
     }
 
@@ -148,11 +161,12 @@ async function fetchLastAssistantMessage(cliSessionId: string): Promise<string |
     const messages = (await getBlobContent(session.ui_messages_blob_url)) as RawCliMessage[] | null;
 
     if (!messages || messages.length === 0) {
-      console.log('[Security Analysis] No messages found in session:', cliSessionId);
+      log('No messages found in session', { correlationId, cliSessionId });
       return null;
     }
 
-    console.log('[Security Analysis] Fetched messages from R2:', {
+    log('Fetched messages from R2', {
+      correlationId,
       cliSessionId,
       messageCount: messages.length,
       lastFewTypes: messages.slice(-5).map(m => ({ type: m.type, say: m.say, ask: m.ask })),
@@ -164,11 +178,11 @@ async function fetchLastAssistantMessage(cliSessionId: string): Promise<string |
       if (msg.type === 'say' && msg.say === 'completion_result') {
         const content = getCliMessageContent(msg);
         if (content) {
-          console.log('[Security Analysis] Found completion_result message:', {
+          log('Found completion_result message', {
+            correlationId,
             cliSessionId,
             messageIndex: i,
             contentLength: content.length,
-            contentPreview: content.substring(0, 200),
           });
           return content;
         }
@@ -181,11 +195,11 @@ async function fetchLastAssistantMessage(cliSessionId: string): Promise<string |
       if (msg.type === 'say' && msg.say === 'text') {
         const content = getCliMessageContent(msg);
         if (content) {
-          console.log('[Security Analysis] Found last text message:', {
+          log('Found last text message', {
+            correlationId,
             cliSessionId,
             messageIndex: i,
             contentLength: content.length,
-            contentPreview: content.substring(0, 200),
           });
           return content;
         }
@@ -198,25 +212,25 @@ async function fetchLastAssistantMessage(cliSessionId: string): Promise<string |
       if (msg.type === 'say' && msg.say !== 'user_feedback') {
         const content = getCliMessageContent(msg);
         if (content) {
-          console.log('[Security Analysis] Found fallback say message:', {
+          log('Found fallback say message', {
+            correlationId,
             cliSessionId,
             messageIndex: i,
             messageSay: msg.say,
             contentLength: content.length,
-            contentPreview: content.substring(0, 200),
           });
           return content;
         }
       }
     }
 
-    console.log('[Security Analysis] No suitable analysis message found in session:', cliSessionId);
+    log('No suitable analysis message found in session', { correlationId, cliSessionId });
     return null;
   } catch (error) {
-    console.error('[Security Analysis] Error fetching last assistant message:', error);
+    logError('Error fetching last assistant message', { correlationId, cliSessionId, error });
     captureException(error, {
       tags: { operation: 'fetchLastAssistantMessage' },
-      extra: { cliSessionId },
+      extra: { cliSessionId, correlationId },
     });
     return null;
   }
@@ -239,6 +253,7 @@ async function finalizeAnalysis(
   owner: SecurityReviewOwner,
   userId: string,
   authToken: string,
+  correlationId: string,
   organizationId?: string
 ): Promise<void> {
   if (!rawMarkdown.trim()) {
@@ -262,17 +277,20 @@ async function finalizeAnalysis(
   // =========================================================================
   // Tier 3: Extract structured fields from raw markdown
   // =========================================================================
-  console.log('[Security Analysis] Starting Tier 3 extraction:', { findingId });
+  log('Starting Tier 3 extraction', { correlationId, findingId });
 
-  const sandboxAnalysis = await extractSandboxAnalysis(
+  const sandboxAnalysis = await extractSandboxAnalysis({
     finding,
     rawMarkdown,
     authToken,
     model,
-    organizationId
-  );
+    correlationId,
+    userId,
+    organizationId,
+  });
 
-  console.log('[Security Analysis] Extraction complete:', {
+  log('Extraction complete', {
+    correlationId,
     findingId,
     isExploitable: sandboxAnalysis.isExploitable,
     usageLocationsCount: sandboxAnalysis.usageLocations.length,
@@ -284,19 +302,39 @@ async function finalizeAnalysis(
     analyzedAt: new Date().toISOString(),
     modelUsed: model,
     triggeredByUserId: existingAnalysis?.triggeredByUserId,
+    correlationId,
   };
 
   await updateAnalysisStatus(findingId, 'completed', { analysis });
 
+  const triggeredBy = existingAnalysis?.triggeredByUserId ?? userId;
+  trackSecurityAgentAnalysisCompleted({
+    distinctId: triggeredBy,
+    userId: triggeredBy,
+    organizationId,
+    findingId,
+    model,
+    triageOnly: false,
+    needsSandboxAnalysis: existingAnalysis?.triage?.needsSandboxAnalysis,
+    triageSuggestedAction: existingAnalysis?.triage?.suggestedAction,
+    triageConfidence: existingAnalysis?.triage?.confidence,
+    isExploitable: sandboxAnalysis.isExploitable,
+    durationMs: finding.analysis_started_at
+      ? Date.now() - new Date(finding.analysis_started_at).getTime()
+      : 0,
+  });
+
   // Attempt auto-dismiss after sandbox analysis if isExploitable === false
   if (sandboxAnalysis.isExploitable === false) {
-    void maybeAutoDismissAnalysis(findingId, analysis, owner, userId).catch((error: unknown) => {
-      console.error('[Security Analysis] Auto-dismiss after sandbox error:', error);
-      captureException(error, {
-        tags: { operation: 'maybeAutoDismissAnalysis' },
-        extra: { findingId },
-      });
-    });
+    void maybeAutoDismissAnalysis({ findingId, analysis, owner, userId, correlationId }).catch(
+      (error: unknown) => {
+        logError('Auto-dismiss after sandbox error', { correlationId, findingId, error });
+        captureException(error, {
+          tags: { operation: 'maybeAutoDismissAnalysis' },
+          extra: { findingId, correlationId },
+        });
+      }
+    );
   }
 }
 
@@ -318,80 +356,164 @@ async function processAnalysisStream(
   owner: SecurityReviewOwner,
   userId: string,
   authToken: string,
+  correlationId: string,
   organizationId?: string
 ): Promise<void> {
   let cloudAgentSessionId: string | null = null;
   let cliSessionId: string | null = null;
+  const streamStartTime = performance.now();
 
-  try {
-    for await (const event of streamGenerator) {
-      switch (event.streamEventType) {
-        case 'status':
-          if (event.sessionId) {
-            // Only persist sessionId / running transition when it first becomes available.
-            // Cloud-agent emits multiple status events; avoid unnecessary writes.
-            if (cloudAgentSessionId !== event.sessionId) {
-              cloudAgentSessionId = event.sessionId;
-              await updateAnalysisStatus(findingId, 'running', { sessionId: cloudAgentSessionId });
-            }
-          }
-          break;
+  // Wrap in withScope so Sentry tags apply to this background work.
+  // This is a fire-and-forget function — the parent request scope is already gone.
+  await withScope(async scope => {
+    scope.setTag('security_agent.correlation_id', correlationId);
+    scope.setTag('security_agent.finding_id', findingId);
 
-        case 'kilocode': {
-          // Check for session_created event to capture CLI session ID
-          if (isSessionCreatedEvent(event)) {
-            const payloadSessionId = event.payload.sessionId;
-            if (typeof payloadSessionId === 'string') {
-              cliSessionId = payloadSessionId;
-              console.log('[Security Analysis] Session created:', {
-                findingId,
-                cloudAgentSessionId,
-                cliSessionId,
-              });
-              // Update the finding with the CLI session ID for linking
-              await updateAnalysisStatus(findingId, 'running', {
-                sessionId: cloudAgentSessionId ?? undefined,
-                cliSessionId,
-              });
+    await startSpan({ name: 'security-agent.sandbox-analysis', op: 'ai.pipeline' }, async span => {
+      span.setAttribute('security_agent.finding_id', findingId);
+      span.setAttribute('security_agent.model', model);
+      span.setAttribute('security_agent.correlation_id', correlationId);
+
+      try {
+        for await (const event of streamGenerator) {
+          switch (event.streamEventType) {
+            case 'status':
+              if (event.sessionId) {
+                if (cloudAgentSessionId !== event.sessionId) {
+                  cloudAgentSessionId = event.sessionId;
+                  await updateAnalysisStatus(findingId, 'running', {
+                    sessionId: cloudAgentSessionId,
+                  });
+                }
+              }
+              break;
+
+            case 'kilocode': {
+              if (isSessionCreatedEvent(event)) {
+                const payloadSessionId = event.payload.sessionId;
+                if (typeof payloadSessionId === 'string') {
+                  cliSessionId = payloadSessionId;
+                  log('Session created', {
+                    correlationId,
+                    findingId,
+                    cloudAgentSessionId,
+                    cliSessionId,
+                  });
+                  await updateAnalysisStatus(findingId, 'running', {
+                    sessionId: cloudAgentSessionId ?? undefined,
+                    cliSessionId,
+                  });
+                }
+              }
+              break;
             }
+
+            case 'error':
+              span.setAttribute('security_agent.status', 'failed');
+              span.setAttribute(
+                'security_agent.duration_ms',
+                Math.round(performance.now() - streamStartTime)
+              );
+              await updateAnalysisStatus(findingId, 'failed', {
+                error: event.error || 'Unknown error during analysis',
+              });
+              return;
+
+            case 'complete': {
+              log('Stream complete, fetching last message', { correlationId, findingId });
+
+              if (!cliSessionId) {
+                span.setAttribute('security_agent.status', 'failed');
+                await updateAnalysisStatus(findingId, 'failed', {
+                  error: 'Analysis completed but no CLI session ID was captured',
+                });
+                return;
+              }
+
+              // Wait/retry for session ui_messages to be available in DB/R2.
+              const maxAttempts = 5;
+              let delayMs = 1500;
+              let lastMessage: string | null = null;
+              const retryStartTime = performance.now();
+
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                lastMessage = await fetchLastAssistantMessage(cliSessionId, correlationId);
+                if (lastMessage) {
+                  const retryDurationMs = Math.round(performance.now() - retryStartTime);
+                  log('R2 fetch succeeded', {
+                    correlationId,
+                    findingId,
+                    attempt,
+                    totalRetryDurationMs: retryDurationMs,
+                  });
+                  span.setAttribute('security_agent.r2_retry_attempt', attempt);
+                  span.setAttribute('security_agent.r2_retry_duration_ms', retryDurationMs);
+                  break;
+                }
+                delayMs = Math.min(delayMs * 2, 15_000);
+              }
+
+              if (!lastMessage) {
+                const retryDurationMs = Math.round(performance.now() - retryStartTime);
+                warn('R2 fetch failed after all attempts', {
+                  correlationId,
+                  findingId,
+                  attempts: maxAttempts,
+                  totalRetryDurationMs: retryDurationMs,
+                });
+                span.setAttribute('security_agent.r2_retry_attempt', maxAttempts);
+                span.setAttribute('security_agent.r2_retry_exhausted', true);
+              }
+
+              const streamDurationMs = Math.round(performance.now() - streamStartTime);
+              span.setAttribute('security_agent.duration_ms', streamDurationMs);
+
+              if (lastMessage) {
+                span.setAttribute('security_agent.status', 'completed');
+                await finalizeAnalysis(
+                  findingId,
+                  lastMessage,
+                  model,
+                  owner,
+                  userId,
+                  authToken,
+                  correlationId,
+                  organizationId
+                );
+              } else {
+                span.setAttribute('security_agent.status', 'failed');
+                await updateAnalysisStatus(findingId, 'failed', {
+                  error:
+                    'Analysis completed but result was not available (no completion_result found)',
+                });
+              }
+              return;
+            }
+
+            case 'interrupted':
+              span.setAttribute('security_agent.status', 'interrupted');
+              span.setAttribute(
+                'security_agent.duration_ms',
+                Math.round(performance.now() - streamStartTime)
+              );
+              await updateAnalysisStatus(findingId, 'failed', {
+                error: `Analysis interrupted: ${event.reason}`,
+              });
+              return;
           }
-          break;
         }
 
-        case 'error':
-          await updateAnalysisStatus(findingId, 'failed', {
-            error: event.error || 'Unknown error during analysis',
-          });
-          return;
+        // Stream ended without explicit completion event
+        const streamDurationMs = Math.round(performance.now() - streamStartTime);
+        span.setAttribute('security_agent.duration_ms', streamDurationMs);
+        warn('Stream ended without complete event', { correlationId, findingId });
 
-        case 'complete': {
-          // Stream completed - fetch the last message from the session
-          console.log('[Security Analysis] Stream complete, fetching last message:', {
-            findingId,
-            cliSessionId,
-          });
-
-          if (!cliSessionId) {
-            await updateAnalysisStatus(findingId, 'failed', {
-              error: 'Analysis completed but no CLI session ID was captured',
-            });
-            return;
-          }
-
-          // Wait/retry for session ui_messages to be available in DB/R2.
-          // R2 writes can lag behind the stream completion event.
-          const maxAttempts = 5;
-          let delayMs = 1500;
-          let lastMessage: string | null = null;
-
-          for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-            lastMessage = await fetchLastAssistantMessage(cliSessionId);
-            if (lastMessage) break;
-            delayMs = Math.min(delayMs * 2, 15_000);
-          }
-
+        if (cliSessionId) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const lastMessage = await fetchLastAssistantMessage(cliSessionId, correlationId);
           if (lastMessage) {
+            span.setAttribute('security_agent.status', 'completed');
             await finalizeAnalysis(
               findingId,
               lastMessage,
@@ -399,60 +521,39 @@ async function processAnalysisStream(
               owner,
               userId,
               authToken,
+              correlationId,
               organizationId
             );
-          } else {
-            await updateAnalysisStatus(findingId, 'failed', {
-              error: 'Analysis completed but result was not available (no completion_result found)',
-            });
+            return;
           }
-          return;
         }
 
-        case 'interrupted':
-          await updateAnalysisStatus(findingId, 'failed', {
-            error: `Analysis interrupted: ${event.reason}`,
-          });
-          return;
-      }
-    }
+        span.setAttribute('security_agent.status', 'failed');
+        await updateAnalysisStatus(findingId, 'failed', {
+          error: 'Analysis stream ended without completion',
+        });
+      } catch (error) {
+        // Catch inside startSpan so span attributes are still available (#7)
+        const streamDurationMs = Math.round(performance.now() - streamStartTime);
+        span.setAttribute('security_agent.status', 'error');
+        span.setAttribute('security_agent.duration_ms', streamDurationMs);
 
-    // Stream ended without explicit completion event
-    console.log('[Security Analysis] Stream ended without complete event:', {
-      findingId,
-      cliSessionId,
-    });
-
-    if (cliSessionId) {
-      // Try to fetch the last message anyway
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const lastMessage = await fetchLastAssistantMessage(cliSessionId);
-      if (lastMessage) {
-        await finalizeAnalysis(
+        logError('processAnalysisStream failed', {
+          correlationId,
           findingId,
-          lastMessage,
-          model,
-          owner,
-          userId,
-          authToken,
-          organizationId
-        );
-        return;
+          durationMs: streamDurationMs,
+          error,
+        });
+        await updateAnalysisStatus(findingId, 'failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        captureException(error, {
+          tags: { operation: 'processAnalysisStream' },
+          extra: { findingId, cloudAgentSessionId, cliSessionId, correlationId },
+        });
       }
-    }
-
-    await updateAnalysisStatus(findingId, 'failed', {
-      error: 'Analysis stream ended without completion',
     });
-  } catch (error) {
-    await updateAnalysisStatus(findingId, 'failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    captureException(error, {
-      tags: { operation: 'processAnalysisStream' },
-      extra: { findingId, cloudAgentSessionId, cliSessionId },
-    });
-  }
+  });
 }
 
 /**
@@ -461,14 +562,6 @@ async function processAnalysisStream(
  * Tier 1 (Quick Triage): Always runs first. Direct LLM call to analyze metadata.
  * Tier 2 (Sandbox Analysis): Only runs if triage says it's needed OR forceSandbox is true.
  * Tier 3 (Structured Extraction): Extracts structured fields from raw markdown output.
- *
- * @param params.findingId - The security finding to analyze
- * @param params.user - The user initiating the analysis
- * @param params.githubRepo - The GitHub repository (owner/repo format)
- * @param params.githubToken - Optional GitHub token for private repos
- * @param params.model - Model to use for analysis
- * @param params.forceSandbox - Skip triage decision and always run sandbox analysis
- * @param params.organizationId - Optional organization ID (for org-level analysis)
  */
 export async function startSecurityAnalysis(params: {
   findingId: string;
@@ -489,6 +582,8 @@ export async function startSecurityAnalysis(params: {
     organizationId,
   } = params;
 
+  const correlationId = randomUUID();
+
   // Get the finding
   const finding = await getSecurityFindingById(findingId);
   if (!finding) {
@@ -503,6 +598,8 @@ export async function startSecurityAnalysis(params: {
   // Mark as pending
   await updateAnalysisStatus(findingId, 'pending');
 
+  const analysisStartTime = Date.now();
+
   try {
     // Generate auth token for LLM calls
     const authToken = generateApiToken(user);
@@ -510,17 +607,49 @@ export async function startSecurityAnalysis(params: {
     // =========================================================================
     // Tier 1: Quick Triage (always runs)
     // =========================================================================
-    console.log('[Security Analysis] Starting Tier 1 triage:', { findingId, model });
+    log('Starting Tier 1 triage', { correlationId, findingId, model });
 
-    const triage = await triageSecurityFinding(finding, authToken, model, organizationId);
-
-    console.log('[Security Analysis] Triage complete:', {
+    trackSecurityAgentAnalysisStarted({
+      distinctId: user.id,
+      userId: user.id,
+      organizationId,
       findingId,
-      needsSandboxAnalysis: triage.needsSandboxAnalysis,
-      needsSandboxReasoning: triage.needsSandboxReasoning,
+      model,
+      forceSandbox,
+    });
+
+    const tier1Start = performance.now();
+    const triage = await triageSecurityFinding({
+      finding,
+      authToken,
+      model,
+      correlationId,
+      userId: user.id,
+      organizationId,
+    });
+    const tier1DurationMs = Math.round(performance.now() - tier1Start);
+
+    log('Triage complete', {
+      correlationId,
+      findingId,
+      durationMs: tier1DurationMs,
       suggestedAction: triage.suggestedAction,
       confidence: triage.confidence,
-      forceSandbox,
+      needsSandboxAnalysis: triage.needsSandboxAnalysis,
+    });
+
+    addBreadcrumb({
+      category: 'security-agent.triage',
+      message: `Triage outcome: ${triage.suggestedAction}`,
+      level: 'info',
+      data: {
+        correlationId,
+        findingId,
+        suggestedAction: triage.suggestedAction,
+        confidence: triage.confidence,
+        needsSandbox: triage.needsSandboxAnalysis,
+        durationMs: tier1DurationMs,
+      },
     });
 
     // Decide whether to run sandbox analysis
@@ -530,27 +659,47 @@ export async function startSecurityAnalysis(params: {
       // =========================================================================
       // Triage-only: Save result and potentially auto-dismiss
       // =========================================================================
-      console.log('[Security Analysis] Triage-only completion:', { findingId });
+      log('Triage-only completion', { correlationId, findingId });
 
       const analysis: SecurityFindingAnalysis = {
         triage,
-        // No sandboxAnalysis - triage determined sandbox not needed
         analyzedAt: new Date().toISOString(),
         modelUsed: model,
         triggeredByUserId: user.id,
+        correlationId,
       };
 
       await updateAnalysisStatus(findingId, 'completed', { analysis });
+
+      trackSecurityAgentAnalysisCompleted({
+        distinctId: user.id,
+        userId: user.id,
+        organizationId,
+        findingId,
+        model,
+        triageOnly: true,
+        needsSandboxAnalysis: triage.needsSandboxAnalysis,
+        triageSuggestedAction: triage.suggestedAction,
+        triageConfidence: triage.confidence,
+        durationMs: Date.now() - analysisStartTime,
+      });
 
       // Attempt auto-dismiss if configured (off by default)
       const owner: SecurityReviewOwner = organizationId ? { organizationId } : { userId: user.id };
 
       // Run auto-dismiss in background (don't block response)
-      void maybeAutoDismissAnalysis(findingId, analysis, owner, user.id).catch((error: unknown) => {
-        console.error('[Security Analysis] Auto-dismiss error:', error);
+      void maybeAutoDismissAnalysis({
+        findingId,
+        analysis,
+        owner,
+        userId: user.id,
+        correlationId,
+      }).catch((error: unknown) => {
+        logError('Auto-dismiss error', { correlationId, findingId, error });
+
         captureException(error, {
           tags: { operation: 'maybeAutoDismissAnalysis' },
-          extra: { findingId },
+          extra: { findingId, correlationId },
         });
       });
 
@@ -560,39 +709,32 @@ export async function startSecurityAnalysis(params: {
     // =========================================================================
     // Tier 2: Sandbox Analysis (cloud agent)
     // =========================================================================
-    console.log('[Security Analysis] Starting Tier 2 sandbox analysis:', { findingId });
+    log('Starting Tier 2 sandbox analysis', { correlationId, findingId });
 
-    // Save triage first, then start sandbox
     const partialAnalysis: SecurityFindingAnalysis = {
       triage,
       analyzedAt: new Date().toISOString(),
       modelUsed: model,
       triggeredByUserId: user.id,
+      correlationId,
     };
     await updateAnalysisStatus(findingId, 'pending', { analysis: partialAnalysis });
 
-    // Build the analysis prompt
     const prompt = buildAnalysisPrompt(finding);
-
-    // Create cloud agent client
     const client = createCloudAgentClient(authToken);
 
-    console.log('[Security Analysis] Starting cloud agent:', { findingId });
-
-    // Start the session stream (no MCP - Tier 3 extraction handles structured output)
     const streamGenerator = client.initiateSessionStream({
       githubRepo,
       githubToken,
+      kilocodeOrganizationId: organizationId,
       prompt,
-      mode: 'code', // Use code mode so agent can search files
+      mode: 'code',
       model,
     });
 
-    // Build owner for auto-dismiss context
     const owner: SecurityReviewOwner = organizationId ? { organizationId } : { userId: user.id };
 
-    // Process stream in background (don't await)
-    // Using void to explicitly ignore the promise
+    // Fire-and-forget: processAnalysisStream manages its own Sentry scope (#2)
     void processAnalysisStream(
       findingId,
       streamGenerator,
@@ -600,6 +742,7 @@ export async function startSecurityAnalysis(params: {
       owner,
       user.id,
       authToken,
+      correlationId,
       organizationId
     );
 
@@ -610,7 +753,7 @@ export async function startSecurityAnalysis(params: {
     });
     captureException(error, {
       tags: { operation: 'startSecurityAnalysis' },
-      extra: { findingId, githubRepo },
+      extra: { findingId, githubRepo, correlationId },
     });
     return { started: false, error: error instanceof Error ? error.message : String(error) };
   }

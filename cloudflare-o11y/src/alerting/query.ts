@@ -86,7 +86,7 @@ export async function queryErrorRateBaseline(model: string, env: AeQueryEnv): Pr
 			SUM(IF(timestamp > NOW() - INTERVAL '7' DAY, _sample_interval, 0)) AS weighted_total_7d,
 			SUM(IF(timestamp > NOW() - INTERVAL '7' DAY AND blob4 = '1', _sample_interval, 0)) AS weighted_errors_7d
 		FROM o11y_api_metrics
-		WHERE blob2 = '${modelValue}'
+		WHERE blob2 = '${modelValue}' AND timestamp > NOW() - INTERVAL '7' DAY
 		FORMAT JSON
 	`;
 

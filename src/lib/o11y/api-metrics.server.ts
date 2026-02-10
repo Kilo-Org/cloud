@@ -120,6 +120,7 @@ const apiMetricsUrl = (() => {
 
 async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {
   if (!apiMetricsUrl) return;
+  if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
 
   await fetch(apiMetricsUrl, {
     method: 'POST',

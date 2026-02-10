@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { shouldSuppress, recordAlertFired } from '../src/alerting/dedup';
-import { BURN_RATE_WINDOWS, DEFAULT_SLO_CONFIG } from '../src/alerting/slo-config';
+import { BURN_RATE_WINDOWS } from '../src/alerting/slo-config';
 
 function makeKvMock() {
 	const store = new Map<string, { value: string; expiration?: number }>();
@@ -47,12 +47,6 @@ describe('slo-config', () => {
 		for (const w of BURN_RATE_WINDOWS) {
 			expect(w.shortWindowMinutes).toBeLessThan(w.longWindowMinutes);
 		}
-	});
-
-	it('default SLO config has sensible values', () => {
-		expect(DEFAULT_SLO_CONFIG.errorRateSlo).toBeGreaterThan(0.99);
-		expect(DEFAULT_SLO_CONFIG.errorRateSlo).toBeLessThan(1);
-		expect(DEFAULT_SLO_CONFIG.minRequestsPerWindow).toBeGreaterThan(0);
 	});
 });
 

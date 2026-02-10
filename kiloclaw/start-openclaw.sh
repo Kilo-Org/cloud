@@ -165,6 +165,14 @@ if (process.env.OPENCLAW_DEV_MODE === 'true') {
     config.gateway.controlUi.allowInsecureAuth = true;
 }
 
+// Multi-tenant: auto-approve devices so users don't need to pair.
+// Worker-level JWT auth is the real access control -- each user's sandbox
+// is only reachable via their signed token.
+if (process.env.AUTO_APPROVE_DEVICES === 'true') {
+    config.gateway.controlUi = config.gateway.controlUi || {};
+    config.gateway.controlUi.allowInsecureAuth = true;
+}
+
 // Legacy AI Gateway base URL override:
 // ANTHROPIC_BASE_URL is picked up natively by the Anthropic SDK,
 // so we don't need to patch the provider config. Writing a provider

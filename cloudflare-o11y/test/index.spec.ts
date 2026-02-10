@@ -43,7 +43,6 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
 
 function makeValidApiMetricsBody(overrides?: Record<string, unknown>) {
 	return {
-		clientSecret: TEST_CLIENT_SECRET,
 		kiloUserId: 'user_123',
 		organizationId: 'org_456',
 		isAnonymous: false,
@@ -159,7 +158,7 @@ describe('o11y worker', () => {
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(makeValidApiMetricsBody({ clientSecret: 'wrong-secret' })),
+			body: JSON.stringify(makeValidApiMetricsBody()),
 		});
 
 		const response = await workerFetch(request, makeTestEnv(), createExecutionContext());

@@ -5,7 +5,6 @@ import { writeApiMetricsDataPoint } from './o11y-analytics';
 import { requireAdmin } from './admin-middleware';
 
 export const ApiMetricsParamsSchema = z.object({
-	clientSecret: z.string().min(1),
 	kiloUserId: z.string().min(1),
 	organizationId: z.string().min(1).optional(),
 	isAnonymous: z.boolean(),

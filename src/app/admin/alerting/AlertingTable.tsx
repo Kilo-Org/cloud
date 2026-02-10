@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { formatPercent } from '@/app/admin/alerting/utils';
 import type { AlertingDraft, AlertingBaseline, BaselineState } from '@/app/admin/alerting/types';
+import { Info } from 'lucide-react';
 
 type AlertingTableProps = {
   configs: Array<{ model: string }>;
@@ -25,6 +26,7 @@ type AlertingTableProps = {
   onErrorRateChange: (modelId: string, value: string) => void;
   onMinRequestsChange: (modelId: string, value: string) => void;
   onLoadBaseline: (modelId: string) => void;
+  onSuggestDefaults: (modelId: string) => void;
   onSave: (modelId: string) => void;
   onDelete: (modelId: string) => void;
 };
@@ -40,6 +42,7 @@ export function AlertingTable({
   onErrorRateChange,
   onMinRequestsChange,
   onLoadBaseline,
+  onSuggestDefaults,
   onSave,
   onDelete,
 }: AlertingTableProps) {
@@ -51,7 +54,14 @@ export function AlertingTable({
             <TableHead>Model</TableHead>
             <TableHead>Enabled</TableHead>
             <TableHead>Error Rate (%)</TableHead>
-            <TableHead>Min Requests</TableHead>
+            <TableHead>
+              <div className="flex items-center gap-1">
+                <span>Min Requests</span>
+                <span title="Minimum requests required in each short window">
+                  <Info className="text-muted-foreground h-4 w-4" />
+                </span>
+              </div>
+            </TableHead>
             <TableHead>Baselines</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -140,6 +150,14 @@ export function AlertingTable({
                         disabled={status === 'loading'}
                       >
                         {status === 'loading' ? 'Loading...' : 'Load baseline'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onSuggestDefaults(modelId)}
+                        disabled={status === 'loading'}
+                      >
+                        Suggest
                       </Button>
                       <Button
                         size="sm"

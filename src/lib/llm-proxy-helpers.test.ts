@@ -172,8 +172,8 @@ describe('checkOrganizationModelRestrictions', () => {
     });
   });
 
-  describe('provider allow list - applies to all plans', () => {
-    it('should return provider config with only field when provider_allow_list is set', () => {
+  describe('provider allow list - applies to enterprise plans', () => {
+    it('should return provider config without fields when only provider_allow_list is set for teams', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
@@ -183,7 +183,7 @@ describe('checkOrganizationModelRestrictions', () => {
       });
 
       expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ only: ['anthropic', 'openai'] });
+      expect(result.providerConfig).toBeUndefined();
     });
 
     it('should return provider config on enterprise plan too', () => {
@@ -252,7 +252,6 @@ describe('checkOrganizationModelRestrictions', () => {
 
       expect(result.error).toBeNull();
       expect(result.providerConfig).toEqual({
-        only: ['anthropic'],
         data_collection: 'deny',
       });
     });

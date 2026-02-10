@@ -290,13 +290,12 @@ export function checkOrganizationModelRestrictions(params: {
     }
   }
 
-  // Provider allow list and data collection apply to all plans
   const providerAllowList = params.settings.provider_allow_list || [];
   const dataCollection = params.settings.data_collection;
 
   const providerConfig: OpenRouterProviderConfig = {};
 
-  if (providerAllowList.length > 0) {
+  if (params.organizationPlan === 'enterprise' && providerAllowList.length > 0) {
     // Check if the model requires specific providers that aren't in the allow list
     const requiredProviders = extraRequiredProviders(normalizedModelId);
     if (requiredProviders && !requiredProviders.every(p => providerAllowList.includes(p))) {

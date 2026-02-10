@@ -42,6 +42,6 @@ export function writeApiMetricsDataPoint(
 				complete_request_ms: params.completeRequestMs,
 				status_code: params.statusCode,
 			},
-		]),
+		]).catch((err: unknown) => console.error('Pipeline send failed (api-metrics):', err)),
 	);
 }

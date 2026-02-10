@@ -40,8 +40,8 @@
 	],
 	/**
 	 * Pipelines — dual-write to R2 as Parquet for Snowflake export
-	 * Requires infra setup: see pipelines/ directory for stream schemas and
-	 * README instructions for creating streams, sinks, and pipelines via wrangler CLI.
+	 * Requires infra setup: see pipelines/ directory for stream schemas;
+	 * provision the corresponding streams, sinks, and pipelines via wrangler CLI.
 	 */
 	"pipelines": [
 		{ "pipeline": "o11y_api_metrics_pipeline", "binding": "PIPELINE_API_METRICS" },

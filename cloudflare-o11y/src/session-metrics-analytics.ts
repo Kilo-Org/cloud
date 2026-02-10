@@ -69,6 +69,6 @@ export function writeSessionMetricsDataPoint(params: SessionMetricsParams, env: 
 				auto_compaction_count: params.autoCompactionCount,
 				ingest_version: params.ingestVersion,
 			},
-		]),
+		]).catch((err: unknown) => console.error('Pipeline send failed (session-metrics):', err)),
 	);
 }

@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ModelOption } from '@/app/admin/alerting/types';
+import { normalizeModelId } from '@/lib/model-utils';
 
 type AddModelDialogProps = {
   isOpen: boolean;
@@ -19,6 +20,7 @@ type AddModelDialogProps = {
   isLoading: boolean;
   error?: unknown;
   models: ModelOption[];
+  existingModels: Set<string>;
   onAddModel: (modelId: string) => void;
 };
 
@@ -30,6 +32,7 @@ export function AddModelDialog({
   isLoading,
   error,
   models,
+  existingModels,
   onAddModel,
 }: AddModelDialogProps) {
   return (
@@ -55,22 +58,28 @@ export function AddModelDialog({
                 {error instanceof Error ? error.message : 'Failed to load models'}
               </div>
             ) : models.length > 0 ? (
-              models.map(model => (
-                <button
-                  key={model.openrouterId}
-                  type="button"
-                  className="hover:bg-muted flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-sm last:border-b-0"
-                  onClick={() => onAddModel(model.openrouterId)}
-                >
-                  <div>
-                    <div className="font-medium">{model.name}</div>
-                    <div className="text-muted-foreground font-mono text-xs">
-                      {model.openrouterId}
+              models.map(model => {
+                const alreadyAdded = existingModels.has(normalizeModelId(model.openrouterId));
+                return (
+                  <button
+                    key={model.openrouterId}
+                    type="button"
+                    className={`flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-sm last:border-b-0 ${alreadyAdded ? 'cursor-not-allowed opacity-50' : 'hover:bg-muted'}`}
+                    onClick={() => !alreadyAdded && onAddModel(model.openrouterId)}
+                    disabled={alreadyAdded}
+                  >
+                    <div>
+                      <div className="font-medium">{model.name}</div>
+                      <div className="text-muted-foreground font-mono text-xs">
+                        {model.openrouterId}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-muted-foreground text-xs">Add</div>
-                </button>
-              ))
+                    <div className="text-muted-foreground text-xs">
+                      {alreadyAdded ? 'Already added' : 'Add'}
+                    </div>
+                  </button>
+                );
+              })
             ) : (
               <div className="text-muted-foreground p-3 text-sm">No models match that search.</div>
             )}

@@ -53,6 +53,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     requested_model: 'anthropic/claude-3.7-sonnet',
     status_code: 200,
     editor_name: null,
+    machine_id: null,
     is_user_byok: false,
     has_tools: false,
   };
@@ -103,6 +104,7 @@ export function createMockUsageContext(
     project_id: null,
     status_code: 200,
     editor_name: null,
+    machine_id: null,
     user_byok: false,
     has_tools: false,
   };

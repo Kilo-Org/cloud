@@ -33,6 +33,7 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
+  extractHeaderAndLimitLength,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -265,7 +266,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
     project_id: projectId,
     status_code: null,
-    editor_name: request.headers.get('x-kilocode-editorname') || null,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
   };

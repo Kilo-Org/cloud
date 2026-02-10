@@ -109,7 +109,7 @@ export default function AdminAlertingPage() {
       return;
     }
 
-    const baselineErrorRate = baseline.errorRate3d || baseline.errorRate1d || 0;
+    const baselineErrorRate = baseline.errorRate3d;
     const baselineErrorRatePercent = baselineErrorRate * 100;
     const bufferPercent = Math.min(baselineErrorRatePercent * 0.2, 0.5);
     const suggestedErrorRate = Math.max(0.5, baselineErrorRatePercent + bufferPercent);

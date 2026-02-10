@@ -3,7 +3,7 @@ import { z } from 'zod';
 const CONFIG_PREFIX = 'o11y:alert-config:';
 
 const alertingConfigInputSchema = z.object({
-	model: z.string().min(1),
+	model: z.string().trim().min(1),
 	enabled: z.boolean(),
 	errorRateSlo: z.number().gt(0).lt(1),
 	minRequestsPerWindow: z.number().int().positive(),

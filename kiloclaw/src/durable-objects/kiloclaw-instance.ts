@@ -232,16 +232,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Mount R2 storage
     await mountR2Storage(sandbox, this.env);
 
-    // Build env vars with per-sandbox gateway token + AUTO_APPROVE_DEVICES
-    // Merge user-provided env vars first, then build system env vars on top.
-    // buildEnvVars sets reserved keys (OPENCLAW_GATEWAY_TOKEN, AUTO_APPROVE_DEVICES)
-    // last, so user config cannot override them.
-    // PR5 will move this merge into buildEnvVars alongside encrypted secret decryption.
-    const userEnv = this.envVars ? { ...this.envVars } : {};
-    const envVars = await buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET);
-    const mergedEnvVars = { ...userEnv, ...envVars };
+    // Build env vars: platform defaults + user env vars + decrypted secrets +
+    // decrypted channel tokens + reserved system vars (OPENCLAW_GATEWAY_TOKEN, etc.)
+    const envVars = await buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET, {
+      envVars: this.envVars ?? undefined,
+      encryptedSecrets: this.encryptedSecrets ?? undefined,
+      channels: this.channels ?? undefined,
+    });
 
-    await ensureOpenClawGateway(sandbox, this.env, mergedEnvVars);
+    await ensureOpenClawGateway(sandbox, this.env, envVars);
 
     // Update state
     this.status = 'running';

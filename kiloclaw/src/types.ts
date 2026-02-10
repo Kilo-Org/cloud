@@ -38,6 +38,8 @@ export type KiloClawEnv = {
   DISCORD_DM_POLICY?: string;
   SLACK_BOT_TOKEN?: string;
   SLACK_APP_TOKEN?: string;
+  // Encryption (for user secrets)
+  AGENT_ENV_VARS_PRIVATE_KEY?: string;
   // R2 credentials for bucket mounting (set via wrangler secret)
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;

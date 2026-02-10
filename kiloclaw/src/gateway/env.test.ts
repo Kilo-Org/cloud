@@ -1,7 +1,46 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { generateKeyPairSync, publicEncrypt, randomBytes, createCipheriv, constants } from 'crypto';
 import { buildEnvVars } from './env';
 import { createMockEnv } from '../test-utils';
 import { deriveGatewayToken } from '../auth/gateway-token';
+import type { EncryptedEnvelope, EncryptedChannelTokens } from '../schemas/instance-config';
+
+/**
+ * Encrypt a string using the same RSA+AES envelope scheme as the shared lib.
+ * Used to create test fixtures for decryption tests.
+ */
+function encryptForTest(value: string, publicKeyPem: string): EncryptedEnvelope {
+  const dek = randomBytes(32);
+  const iv = randomBytes(16);
+  const cipher = createCipheriv('aes-256-gcm', dek, iv);
+  let encrypted = cipher.update(value, 'utf8');
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  const encryptedDataBuffer = Buffer.concat([iv, encrypted, authTag]);
+  const encryptedDEKBuffer = publicEncrypt(
+    { key: publicKeyPem, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+    dek
+  );
+  return {
+    encryptedData: encryptedDataBuffer.toString('base64'),
+    encryptedDEK: encryptedDEKBuffer.toString('base64'),
+    algorithm: 'rsa-aes-256-gcm',
+    version: 1,
+  };
+}
+
+let testPublicKey: string;
+let testPrivateKey: string;
+
+beforeAll(() => {
+  const pair = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+  testPublicKey = pair.publicKey;
+  testPrivateKey = pair.privateKey;
+});
 
 describe('buildEnvVars', () => {
   // ─── Shared sandbox mode (no sandboxId) ─────────────────────────────
@@ -209,5 +248,129 @@ describe('buildEnvVars', () => {
     expect(result.AUTO_APPROVE_DEVICES).toBeUndefined();
     // Channel tokens still passed through (shared-sandbox behavior)
     expect(result.TELEGRAM_BOT_TOKEN).toBe('tg-token');
+  });
+
+  // ─── Multi-tenant mode with userConfig ──────────────────────────────
+
+  it('merges user plaintext env vars on top of platform defaults', async () => {
+    const env = createMockEnv({ ANTHROPIC_API_KEY: 'sk-platform' });
+    const result = await buildEnvVars(env, 'sandbox-id', 'secret', {
+      envVars: { CUSTOM_VAR: 'custom-value', NODE_ENV: 'production' },
+    });
+
+    expect(result.ANTHROPIC_API_KEY).toBe('sk-platform');
+    expect(result.CUSTOM_VAR).toBe('custom-value');
+    expect(result.NODE_ENV).toBe('production');
+  });
+
+  it('user env vars can override platform AI keys (BYOK)', async () => {
+    const env = createMockEnv({ ANTHROPIC_API_KEY: 'sk-platform' });
+    const result = await buildEnvVars(env, 'sandbox-id', 'secret', {
+      envVars: { ANTHROPIC_API_KEY: 'sk-user-own-key' },
+    });
+
+    expect(result.ANTHROPIC_API_KEY).toBe('sk-user-own-key');
+  });
+
+  it('decrypts and merges encrypted secrets', async () => {
+    const env = createMockEnv({
+      ANTHROPIC_API_KEY: 'sk-platform',
+      AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
+    });
+    const result = await buildEnvVars(env, 'sandbox-id', 'secret', {
+      encryptedSecrets: {
+        SECRET_API_KEY: encryptForTest('decrypted-secret', testPublicKey),
+      },
+    });
+
+    expect(result.SECRET_API_KEY).toBe('decrypted-secret');
+    expect(result.ANTHROPIC_API_KEY).toBe('sk-platform');
+  });
+
+  it('encrypted secrets override plaintext env vars on key conflict', async () => {
+    const env = createMockEnv({
+      AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
+    });
+    const result = await buildEnvVars(env, 'sandbox-id', 'secret', {
+      envVars: { MY_KEY: 'plaintext-value' },
+      encryptedSecrets: {
+        MY_KEY: encryptForTest('encrypted-value', testPublicKey),
+      },
+    });
+
+    expect(result.MY_KEY).toBe('encrypted-value');
+  });
+
+  it('decrypts channel tokens and maps to container env vars', async () => {
+    const env = createMockEnv({
+      AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
+    });
+    const channels: EncryptedChannelTokens = {
+      telegramBotToken: encryptForTest('tg-token-123', testPublicKey),
+      discordBotToken: encryptForTest('discord-token-456', testPublicKey),
+      slackBotToken: encryptForTest('slack-bot-789', testPublicKey),
+      slackAppToken: encryptForTest('slack-app-012', testPublicKey),
+    };
+    const result = await buildEnvVars(env, 'sandbox-id', 'secret', { channels });
+
+    expect(result.TELEGRAM_BOT_TOKEN).toBe('tg-token-123');
+    expect(result.DISCORD_BOT_TOKEN).toBe('discord-token-456');
+    expect(result.SLACK_BOT_TOKEN).toBe('slack-bot-789');
+    expect(result.SLACK_APP_TOKEN).toBe('slack-app-012');
+  });
+
+  it('reserved system vars cannot be overridden by user config', async () => {
+    const env = createMockEnv({
+      AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
+    });
+    const sandboxId = 'test-sandbox';
+    const secret = 'test-secret';
+    const expectedToken = await deriveGatewayToken(sandboxId, secret);
+
+    const result = await buildEnvVars(env, sandboxId, secret, {
+      envVars: {
+        OPENCLAW_GATEWAY_TOKEN: 'user-tried-to-override',
+        AUTO_APPROVE_DEVICES: 'false',
+      },
+    });
+
+    // Reserved vars set last -- user config cannot override
+    expect(result.OPENCLAW_GATEWAY_TOKEN).toBe(expectedToken);
+    expect(result.AUTO_APPROVE_DEVICES).toBe('true');
+  });
+
+  it('skips channel decryption when no private key configured', async () => {
+    const env = createMockEnv(); // no AGENT_ENV_VARS_PRIVATE_KEY
+    const channels: EncryptedChannelTokens = {
+      telegramBotToken: encryptForTest('tg-token', testPublicKey),
+    };
+    const result = await buildEnvVars(env, 'sandbox-id', 'secret', { channels });
+
+    // Channel tokens not decrypted without private key
+    expect(result.TELEGRAM_BOT_TOKEN).toBeUndefined();
+  });
+
+  it('works with userConfig containing only channels (no envVars/secrets)', async () => {
+    const env = createMockEnv({
+      ANTHROPIC_API_KEY: 'sk-platform',
+      AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
+    });
+    const result = await buildEnvVars(env, 'sandbox-id', 'secret', {
+      channels: {
+        telegramBotToken: encryptForTest('tg-only', testPublicKey),
+      },
+    });
+
+    expect(result.ANTHROPIC_API_KEY).toBe('sk-platform');
+    expect(result.TELEGRAM_BOT_TOKEN).toBe('tg-only');
+    expect(result.AUTO_APPROVE_DEVICES).toBe('true');
+  });
+
+  it('handles empty userConfig gracefully', async () => {
+    const env = createMockEnv({ ANTHROPIC_API_KEY: 'sk-key' });
+    const result = await buildEnvVars(env, 'sandbox-id', 'secret', {});
+
+    expect(result.ANTHROPIC_API_KEY).toBe('sk-key');
+    expect(result.AUTO_APPROVE_DEVICES).toBe('true');
   });
 });

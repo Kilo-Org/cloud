@@ -267,8 +267,9 @@ describe('external-services', () => {
         );
 
         expect(v2SessionCalls.length).toBe(2);
-        expect(v2SessionCalls[0][0]).toContain('ses_test1234567890123456789');
-        expect(v2SessionCalls[1][0]).toContain('ses_test2345678901234567890');
+        const v2SessionUrls = v2SessionCalls.map((call: [string, RequestInit]) => call[0]).sort();
+        expect(v2SessionUrls[0]).toContain('ses_test1234567890123456789');
+        expect(v2SessionUrls[1]).toContain('ses_test2345678901234567890');
       });
 
       it('should handle 404 responses gracefully for v2 sessions', async () => {

@@ -56,6 +56,7 @@ import {
 } from '@/lib/kilo-pass/enums';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
+import { KiloClawInstanceStatus } from '@/lib/kiloclaw/enums';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -92,6 +93,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
+  KiloClawInstanceStatus,
 } as const;
 
 export const credit_transactions = pgTable(
@@ -2805,13 +2807,7 @@ export type AgentEnvironmentProfileCommand = typeof agent_environment_profile_co
 
 // ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
 
-export const KILOCLAW_INSTANCE_STATUSES = [
-  'provisioned',
-  'running',
-  'stopped',
-  'destroyed',
-] as const;
-export type KiloClawInstanceStatus = (typeof KILOCLAW_INSTANCE_STATUSES)[number];
+export { KiloClawInstanceStatus } from '@/lib/kiloclaw/enums';
 
 export const kiloclaw_instances = pgTable(
   'kiloclaw_instances',
@@ -2830,14 +2826,15 @@ export const kiloclaw_instances = pgTable(
   },
   table => [
     // One active (non-destroyed) instance per user.
-    // Re-provisioning after destroy creates a new row; old row stays with status='destroyed'.
+    // Re-provisioning after destroy creates a new row; old row stays with destroyed_at set.
     uniqueIndex('UQ_kiloclaw_instances_active_user')
       .on(table.user_id)
-      .where(sql`${table.status} != 'destroyed'`),
+      .where(isNull(table.destroyed_at)),
     // Lookup by sandbox_id for lifecycle hooks (onStop -> find userId by sandboxId).
     index('IDX_kiloclaw_instances_sandbox_id')
       .on(table.sandbox_id)
-      .where(sql`${table.status} != 'destroyed'`),
+      .where(isNull(table.destroyed_at)),
+    enumCheck('kiloclaw_instances_status_check', table.status, KiloClawInstanceStatus),
   ]
 );
 

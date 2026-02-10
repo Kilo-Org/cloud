@@ -1,4 +1,5 @@
 import type { Sandbox } from '@cloudflare/sandbox';
+import type { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 
 /**
  * Environment bindings for the KiloClaw Worker
@@ -6,6 +7,8 @@ import type { Sandbox } from '@cloudflare/sandbox';
 export type KiloClawEnv = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   KILOCLAW_BUCKET: R2Bucket;
+  KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
+  HYPERDRIVE: Hyperdrive;
 
   // Auth secrets
   NEXTAUTH_SECRET?: string;

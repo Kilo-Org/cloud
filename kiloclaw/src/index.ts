@@ -12,20 +12,21 @@
 
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
-import { getSandbox, Sandbox, type SandboxOptions } from '@cloudflare/sandbox';
+import { getSandbox, type SandboxOptions } from '@cloudflare/sandbox';
 
 import type { AppEnv, KiloClawEnv } from './types';
 import { OPENCLAW_PORT } from './config';
 import { ensureOpenClawGateway, findExistingGatewayProcess, syncToR2 } from './gateway';
-import { publicRoutes, api, debug } from './routes';
+import { publicRoutes, api, debug, platform } from './routes';
 import { redactSensitiveParams } from './utils/logging';
-import { authMiddleware } from './auth';
+import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { debugRoutesGate } from './auth/debug-gate';
 
-// Re-export Sandbox as KiloClawSandbox to match wrangler.jsonc class_name.
-// PR4 will replace this with a custom subclass that adds lifecycle hooks.
-export { Sandbox as KiloClawSandbox };
+// Export the custom Sandbox subclass with lifecycle hooks (matches wrangler.jsonc class_name)
+export { KiloClawSandbox } from './sandbox';
+// Export the KiloClawInstance DO (matches wrangler.jsonc class_name)
+export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 
 // =============================================================================
 // Helpers
@@ -101,9 +102,14 @@ function isDebugRoute(c: Context<AppEnv>): boolean {
   return new URL(c.req.url).pathname.startsWith('/debug');
 }
 
-/** Reject early if required secrets are missing (skip for debug routes and dev mode). */
+/** Platform routes use internalApiMiddleware instead of JWT auth. */
+function isPlatformRoute(c: Context<AppEnv>): boolean {
+  return new URL(c.req.url).pathname.startsWith('/api/platform');
+}
+
+/** Reject early if required secrets are missing (skip for debug routes, platform routes, and dev mode). */
 async function requireEnvVars(c: Context<AppEnv>, next: Next) {
-  if (isDebugRoute(c) || c.env.DEV_MODE === 'true') {
+  if (isDebugRoute(c) || isPlatformRoute(c) || c.env.DEV_MODE === 'true') {
     return next();
   }
 
@@ -124,9 +130,9 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
   return next();
 }
 
-/** Authenticate user via JWT (Bearer header or cookie). */
+/** Authenticate user via JWT (Bearer header or cookie). Skip for debug and platform routes. */
 async function authGuard(c: Context<AppEnv>, next: Next) {
-  if (isDebugRoute(c)) {
+  if (isDebugRoute(c) || isPlatformRoute(c)) {
     return next();
   }
   return authMiddleware(c, next);
@@ -163,8 +169,12 @@ app.use('*', requireEnvVars);
 app.use('*', authGuard);
 app.use('*', deriveSandboxId);
 
-// API routes
+// API routes (user-facing, JWT auth)
 app.route('/api', api);
+
+// Platform routes (backend-to-backend, x-internal-api-key)
+app.use('/api/platform/*', internalApiMiddleware);
+app.route('/api/platform', platform);
 
 // Debug routes (gated by env flag)
 app.use('/debug/*', debugRoutesGate);

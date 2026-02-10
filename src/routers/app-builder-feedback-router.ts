@@ -58,25 +58,42 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
 
       // Best-effort Slack notification
       if (SLACK_USER_FEEDBACK_WEBHOOK_URL) {
-        const textLines = [
-          '*New App Builder feedback:* :hammer_and_wrench:',
-          `• user: \`${ctx.user.id}\``,
-          `• project: \`${input.project_id}\``,
-          sessionId ? `• session: \`${sessionId}\`` : null,
-          input.model ? `• model: \`${input.model}\`` : null,
-          input.preview_status ? `• preview: \`${input.preview_status}\`` : null,
-          input.message_count != null ? `• messages: \`${input.message_count}\`` : null,
-          '',
-          '• feedback:',
-          '```',
-          input.feedback_text.trim().slice(0, 500),
-          '```',
-        ].filter((line): line is string => line != null);
+        const adminLink = `https://app.kilo.ai/admin/app-builder/${input.project_id}`;
+        const trimmedFeedback = input.feedback_text.trim();
+        const wasTruncated = trimmedFeedback.length > 500;
+        const feedbackText = trimmedFeedback.slice(0, 500) + (wasTruncated ? '...' : '');
 
         fetch(SLACK_USER_FEEDBACK_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: textLines.join('\n') }),
+          body: JSON.stringify({
+            text: 'New App Builder feedback',
+            unfurl_links: false,
+            unfurl_media: false,
+            blocks: [
+              {
+                type: 'header',
+                text: {
+                  type: 'plain_text',
+                  text: 'New App Builder feedback :hammer_and_wrench:',
+                },
+              },
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `<${adminLink}|View project>`,
+                },
+              },
+              {
+                type: 'section',
+                text: {
+                  type: 'plain_text',
+                  text: feedbackText,
+                },
+              },
+            ],
+          }),
         }).catch(error => {
           console.error('[AppBuilderFeedback] Failed to post to Slack webhook', error);
         });

@@ -313,7 +313,7 @@ export async function deployProject(
     },
     branch: 'main',
     createdByUserId,
-    createdFrom: 'app_builder',
+    createdFrom: 'app-builder',
   });
 
   if (!result.success) {

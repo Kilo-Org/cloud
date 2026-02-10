@@ -285,7 +285,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
         type: 'org',
         id: input.organizationId,
       });
-      if (deployment.created_from !== 'app_builder') {
+      if (deployment.created_from !== 'app-builder') {
         return { enabled: false };
       }
       return dispatcherClient.getBannerStatus(deployment.internal_worker_name);
@@ -304,7 +304,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
         type: 'org',
         id: input.organizationId,
       });
-      if (deployment.created_from !== 'app_builder') {
+      if (deployment.created_from !== 'app-builder') {
         return { success: true as const };
       }
       const workerName = deployment.internal_worker_name;

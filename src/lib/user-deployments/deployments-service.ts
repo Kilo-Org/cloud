@@ -653,13 +653,13 @@ export async function createDeployment(params: {
   source: DeploymentSource;
   branch: string;
   createdByUserId: string;
-  createdFrom: 'deploy' | 'app_builder';
+  createdFrom: 'deploy' | 'app-builder';
   envVars?: PlaintextEnvVar[];
 }): Promise<CreateDeploymentResult> {
   const { owner, source, branch, createdByUserId, createdFrom, envVars } = params;
 
   // Temporary: skip payment check for app builder sites
-  if (source.type !== 'app-builder') {
+  if (createdFrom !== 'app-builder') {
     const paymentCheck = await checkOwnerHasEverPaid(owner);
     if (!paymentCheck.hasPaid) {
       return {
@@ -763,7 +763,7 @@ export async function createDeployment(params: {
   }
 
   // Auto-enable banner for app-builder deployments
-  if (createdFrom === 'app_builder') {
+  if (createdFrom === 'app-builder') {
     try {
       await dispatcherClient.enableBanner(internalWorkerName);
     } catch (error) {

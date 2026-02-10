@@ -29,8 +29,8 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
 
   // Check if password features are available (org-only)
   const hasPasswordFeature = !!mutations.setPassword;
-  // Check if banner features are available (app-builder deployments)
-  const hasBannerFeature = !!mutations.setBanner;
+  // Banner settings hidden for now; the toggle will be re-enabled later.
+  const hasBannerFeature = false;
 
   const redeployMutation = mutations.redeploy;
   const deleteDeploymentMutation = mutations.deleteDeployment;
@@ -139,10 +139,10 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
           >
             <TabsList
               className={`grid w-full ${
-                hasPasswordFeature && hasBannerFeature && deployment.created_from === 'app_builder'
+                hasPasswordFeature && hasBannerFeature && deployment.created_from === 'app-builder'
                   ? 'grid-cols-4'
                   : hasPasswordFeature ||
-                      (hasBannerFeature && deployment.created_from === 'app_builder')
+                      (hasBannerFeature && deployment.created_from === 'app-builder')
                     ? 'grid-cols-3'
                     : 'grid-cols-2'
               }`}
@@ -150,7 +150,7 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="environment">Environment</TabsTrigger>
               {hasPasswordFeature && <TabsTrigger value="password">Password</TabsTrigger>}
-              {hasBannerFeature && deployment.created_from === 'app_builder' && (
+              {hasBannerFeature && deployment.created_from === 'app-builder' && (
                 <TabsTrigger value="banner">Banner</TabsTrigger>
               )}
             </TabsList>
@@ -325,7 +325,7 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
               </TabsContent>
             )}
 
-            {hasBannerFeature && deployment.created_from === 'app_builder' && (
+            {hasBannerFeature && deployment.created_from === 'app-builder' && (
               <TabsContent value="banner" className="space-y-6">
                 <BannerSettings deploymentId={deploymentId} />
               </TabsContent>

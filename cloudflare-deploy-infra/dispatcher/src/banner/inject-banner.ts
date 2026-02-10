@@ -1,6 +1,6 @@
 /**
  * HTMLRewriter-based banner injection for deployed sites.
- * Injects a "Made with Kilo App Builder" badge in the bottom-right corner.
+ * Injects a "Made with Kilo" badge in the bottom-right corner.
  */
 
 /**
@@ -73,23 +73,27 @@ function addNonceToCSP(csp: string, nonce: string): string {
 function getBannerScript(nonce: string): string {
   return `<script nonce="${nonce}" data-kilo-banner>
 (function() {
-  var badge = document.createElement('a');
-  badge.href = 'https://kilo.ai/features/app-builder';
-  badge.target = '_blank';
-  badge.rel = 'noopener noreferrer';
-  badge.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;display:flex;align-items:center;padding:8px 12px;background:#18181b;color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:500;line-height:1;border-radius:8px;border:1px solid #27272a;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:opacity 0.2s;';
+  function inject() {
+    var badge = document.createElement('a');
+    badge.href = 'http://app.kilo.ai/app-builder';
+    badge.target = '_blank';
+    badge.rel = 'noopener noreferrer';
+    badge.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;background:rgba(24,24,27,0.85);color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:500;line-height:1;border-radius:10px;border:1px solid rgba(255,255,255,0.08);text-decoration:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:transform 0.2s,box-shadow 0.2s;';
+    badge.innerHTML = '<svg width="24" height="24" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:6px"><rect width="512" height="512" rx="80" fill="#18181b"/><path d="M322 377H377V421H307.857L278 391.143V322H322V377ZM421 307.857L391.143 278H322V322L377 322V377H421V307.857ZM234 278H190V322H234V278ZM91 391.143L120.857 421H234V377H135V278H91V391.143ZM371.172 189.999V120.856L341.315 90.9995H278V135H327.172V189.999H278V233.999H421V189.999H371.172ZM135 91H91V233.999H135V184.5H190V233.999H234V184.5L190 140.5H135V91ZM234 91H190V140.5H234V91Z" fill="#FAF74F"/></svg><span>Made with Kilo</span>';
 
-  badge.addEventListener('mouseenter', function() { badge.style.opacity = '0.9'; });
-  badge.addEventListener('mouseleave', function() { badge.style.opacity = '1'; });
+    badge.addEventListener('mouseenter', function() { badge.style.transform = 'translateY(-1px)'; badge.style.boxShadow = '0 6px 16px rgba(0,0,0,0.5)'; });
+    badge.addEventListener('mouseleave', function() { badge.style.transform = 'none'; badge.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)'; });
 
-  badge.textContent = 'Made with Kilo App Builder';
-  document.body.appendChild(badge);
+    document.body.appendChild(badge);
+  }
+  if (document.body) { inject(); }
+  else { document.addEventListener('DOMContentLoaded', inject); }
 })();
 </script>`;
 }
 
 /**
- * Injects the "Made with Kilo App Builder" banner into an HTML response
+ * Injects the "Made with Kilo" banner into an HTML response
  * using HTMLRewriter. Handles CSP nonce injection.
  */
 export function injectBanner(response: Response): Response {

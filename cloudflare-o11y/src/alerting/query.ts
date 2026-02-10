@@ -20,13 +20,17 @@ export type ErrorRateRow = {
 	weighted_total: number;
 };
 
-export type LatencyRow = {
-	provider: string;
-	model: string;
-	client_name: string;
-	weighted_slow: number;
-	weighted_total: number;
+export type ErrorRateBaselineRow = {
+	weighted_total_1d: number;
+	weighted_errors_1d: number;
+	weighted_total_3d: number;
+	weighted_errors_3d: number;
+	weighted_total_7d: number;
+	weighted_errors_7d: number;
 };
+
+// _sample_interval scales rows back to full volume when AE sampling is enabled.
+// https://developers.cloudflare.com/analytics/analytics-engine/sql-api/#sampling
 
 async function queryAnalyticsEngine<T>(sql: string, env: AeQueryEnv): Promise<T[]> {
 	const apiToken = await env.O11Y_CF_AE_API_TOKEN.get();
@@ -67,28 +71,25 @@ export function queryErrorRates(windowMinutes: number, minRequests: number, env:
 	return queryAnalyticsEngine<ErrorRateRow>(sql, env);
 }
 
-/**
- * Query the fraction of "slow" requests (completeRequestMs > threshold)
- * grouped by provider, model, and client for a given time window.
- */
-export function querySlowRequestRates(
-	windowMinutes: number,
-	thresholdMs: number,
-	minRequests: number,
-	env: AeQueryEnv,
-): Promise<LatencyRow[]> {
+function escapeSqlString(value: string): string {
+	return value.replaceAll("'", "''");
+}
+
+export async function queryErrorRateBaseline(model: string, env: AeQueryEnv): Promise<ErrorRateBaselineRow | null> {
+	const modelValue = escapeSqlString(model);
 	const sql = `
 		SELECT
-			blob1 AS provider,
-			blob2 AS model,
-			blob3 AS client_name,
-			SUM(_sample_interval * IF(double2 > ${thresholdMs}, 1, 0)) AS weighted_slow,
-			SUM(_sample_interval) AS weighted_total
+			SUM(IF(timestamp > NOW() - INTERVAL '1' DAY, _sample_interval, 0)) AS weighted_total_1d,
+			SUM(IF(timestamp > NOW() - INTERVAL '1' DAY AND blob4 = '1', _sample_interval, 0)) AS weighted_errors_1d,
+			SUM(IF(timestamp > NOW() - INTERVAL '3' DAY, _sample_interval, 0)) AS weighted_total_3d,
+			SUM(IF(timestamp > NOW() - INTERVAL '3' DAY AND blob4 = '1', _sample_interval, 0)) AS weighted_errors_3d,
+			SUM(IF(timestamp > NOW() - INTERVAL '7' DAY, _sample_interval, 0)) AS weighted_total_7d,
+			SUM(IF(timestamp > NOW() - INTERVAL '7' DAY AND blob4 = '1', _sample_interval, 0)) AS weighted_errors_7d
 		FROM o11y_api_metrics
-		WHERE timestamp > NOW() - INTERVAL '${windowMinutes}' MINUTE
-		GROUP BY provider, model, client_name
-		HAVING weighted_total >= ${minRequests}
+		WHERE blob2 = '${modelValue}'
 		FORMAT JSON
 	`;
-	return queryAnalyticsEngine<LatencyRow>(sql, env);
+
+	const rows = await queryAnalyticsEngine<ErrorRateBaselineRow>(sql, env);
+	return rows[0] ?? null;
 }

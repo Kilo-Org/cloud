@@ -1,5 +1,5 @@
 {
-  "id": "1bde767c-9516-405f-8e0e-d4c0b8dd24ff",
+  "id": "739ffff7-77ac-4000-a4d0-a59d4cb30b29",
   "prevId": "bed79658-f70a-4a95-81cb-fc38076bcc8e",
   "version": "7",
   "dialect": "postgresql",
@@ -6053,7 +6053,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"kiloclaw_instances\".\"status\" != 'destroyed'",
+          "where": "\"kiloclaw_instances\".\"destroyed_at\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -6069,7 +6069,7 @@
             }
           ],
           "isUnique": false,
-          "where": "\"kiloclaw_instances\".\"status\" != 'destroyed'",
+          "where": "\"kiloclaw_instances\".\"destroyed_at\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -6079,7 +6079,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "kiloclaw_instances_status_check": {
+          "name": "kiloclaw_instances_status_check",
+          "value": "\"kiloclaw_instances\".\"status\" IN ('provisioned', 'running', 'stopped', 'destroyed')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.kilocode_users": {

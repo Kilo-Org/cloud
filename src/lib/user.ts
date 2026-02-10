@@ -17,7 +17,10 @@ import {
   user_auth_provider,
   sharedCliSessions,
   cliSessions,
+  cli_sessions_v2,
   app_builder_projects,
+  enrichment_data,
+  source_embeddings,
 } from '@/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
@@ -342,7 +345,15 @@ export async function deleteUserDatabaseRecords(userId: string) {
     await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
     await tx.delete(sharedCliSessions).where(eq(sharedCliSessions.kilo_user_id, userId));
     await tx.delete(cliSessions).where(eq(cliSessions.kilo_user_id, userId));
+    // cli_sessions_v2 has a self-referential FK on parent_session_id, so nullify it first
+    await tx
+      .update(cli_sessions_v2)
+      .set({ parent_session_id: null })
+      .where(eq(cli_sessions_v2.kilo_user_id, userId));
+    await tx.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, userId));
     await tx.delete(app_builder_projects).where(eq(app_builder_projects.owned_by_user_id, userId));
+    await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
+    await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));
     await tx.delete(kilocode_users).where(eq(kilocode_users.id, userId));
     //TODO: OrbEvent deletion - not implementable yet?
   });

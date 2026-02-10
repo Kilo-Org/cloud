@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { ApiMetricsParamsSchema } from './index';
+import type { ApiMetricsParamsSchema } from './api-metrics-routes';
 
 type ApiMetricsParams = z.infer<typeof ApiMetricsParamsSchema>;
 

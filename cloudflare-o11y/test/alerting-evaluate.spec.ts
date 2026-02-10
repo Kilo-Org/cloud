@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeBurnRate, dimensionKey, effectiveSeverity, rowsToMap } from '../src/alerting/evaluate';
+import { computeBurnRate, dimensionKey, rowsToMap } from '../src/alerting/evaluate';
 
 describe('computeBurnRate', () => {
 	it('computes burn rate from bad fraction and SLO', () => {
@@ -63,34 +63,5 @@ describe('rowsToMap', () => {
 		const map = rowsToMap(rows);
 		expect(map.size).toBe(1);
 		expect(map.get('openai:gpt-4:cli')?.value).toBe(2);
-	});
-});
-
-describe('effectiveSeverity', () => {
-	const recommended = new Set(['gpt-4', 'claude-sonnet-4.5']);
-
-	it('keeps page for recommended model on kilo-gateway', () => {
-		expect(effectiveSeverity('page', 'kilo-gateway', 'gpt-4', recommended)).toBe('page');
-	});
-
-	it('downgrades page to ticket for non-recommended model on kilo-gateway', () => {
-		expect(effectiveSeverity('page', 'kilo-gateway', 'gpt-3.5-turbo', recommended)).toBe('ticket');
-	});
-
-	it('downgrades page to ticket for recommended model on non-gateway client', () => {
-		expect(effectiveSeverity('page', 'cli', 'gpt-4', recommended)).toBe('ticket');
-	});
-
-	it('downgrades page to ticket for non-recommended model on non-gateway client', () => {
-		expect(effectiveSeverity('page', 'cli', 'gpt-3.5-turbo', recommended)).toBe('ticket');
-	});
-
-	it('keeps ticket severity unchanged regardless of model/client', () => {
-		expect(effectiveSeverity('ticket', 'kilo-gateway', 'gpt-4', recommended)).toBe('ticket');
-		expect(effectiveSeverity('ticket', 'cli', 'gpt-3.5-turbo', recommended)).toBe('ticket');
-	});
-
-	it('handles empty recommended models set', () => {
-		expect(effectiveSeverity('page', 'kilo-gateway', 'gpt-4', new Set())).toBe('ticket');
 	});
 });

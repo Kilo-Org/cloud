@@ -22,10 +22,6 @@ import {
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/model-utils';
 
-export function isRateLimitedToDeathFree(model: string) {
-  return model.endsWith(':free') && !isFreeModel(model);
-}
-
 function buildAutoModel(): OpenRouterModel {
   return {
     id: KILO_AUTO_MODEL_ID,
@@ -60,7 +56,6 @@ function enhancedModelList(models: OpenRouterModel[]) {
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
-        !isRateLimitedToDeathFree(model.id) &&
         !kiloFreeModels.some(m => m.public_id === model.id && m.is_enabled)
     )
     .concat(
@@ -74,9 +69,16 @@ function enhancedModelList(models: OpenRouterModel[]) {
         model.id === KILO_AUTO_MODEL_ID ? -1 : preferredModels.indexOf(model.id);
       const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
       const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
+      const nameEndsWithParen = model.name.endsWith(')');
       return {
         ...model,
-        name: isNew ? model.name + ' (new)' : model.name,
+        name: nameEndsWithParen
+          ? model.name
+          : isFreeModel(model.id)
+            ? model.name + ' (free)'
+            : isNew
+              ? model.name + ' (new)'
+              : model.name,
         preferredIndex:
           preferredIndex >= 0 || model.id === KILO_AUTO_MODEL_ID ? preferredIndex : undefined,
         settings: getModelSettings(model.id),

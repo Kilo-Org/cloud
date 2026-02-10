@@ -62,7 +62,7 @@ export type RenameDeploymentResult =
   | { success: true; deploymentUrl: string }
   | {
       success: false;
-      error: 'not_found' | 'invalid_slug' | 'slug_taken' | 'build_in_progress';
+      error: 'not_found' | 'invalid_slug' | 'slug_taken';
       message: string;
     };
 
@@ -216,12 +216,12 @@ export async function deleteDeployment(deploymentId: string, owner: Owner) {
     });
   }
 
+  // Clean up KV slug mapping
+  await dispatcherClient.deleteSlugMapping(deployment[0].internal_worker_name);
+
   // Delete worker deployment from Cloudflare FIRST
   // If this fails, we don't proceed with database deletion to avoid orphan deployments
   await deployApiClient.deleteWorker(deployment[0].internal_worker_name);
-
-  // Clean up KV slug mapping
-  await dispatcherClient.deleteSlugMapping(deployment[0].internal_worker_name);
 
   // Unlink app builder projects that reference this deployment
   await db
@@ -688,6 +688,9 @@ export async function createDeployment(params: {
   // Call builder API — deploys the CF worker under the internal name
   let builderResponse: CreateDeploymentResponse;
   try {
+    // Set up KV slug mapping so the dispatcher can route the public slug to the internal worker
+    await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
+
     builderResponse = await deployApiClient.createDeployment(
       resolved.sourceType,
       resolved.repositorySource,
@@ -743,15 +746,14 @@ export async function createDeployment(params: {
       return deployment.id;
     });
   } catch (error) {
-    // Handle unique constraint violation on deployment_slug (race condition)
+    // Handle unique constraint violation on deployment_slug (race condition).
+    // The worker was already created above, so clean it up best-effort.
     if (isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')) {
+      await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
       return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
     }
     throw error;
   }
-
-  // Set up KV slug mapping so the dispatcher can route the public slug to the internal worker
-  await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
 
   return { success: true, deploymentId, deploymentSlug, deploymentUrl };
 }
@@ -779,26 +781,6 @@ export async function renameDeployment(
 
   if (!deployment) {
     return { success: false, error: 'not_found', message: 'Deployment not found' };
-  }
-
-  // Check if there's an active build
-  const [activeBuild] = await db
-    .select({ id: deployment_builds.id })
-    .from(deployment_builds)
-    .where(
-      and(
-        eq(deployment_builds.deployment_id, deploymentId),
-        inArray(deployment_builds.status, ['queued', 'building', 'deploying'])
-      )
-    )
-    .limit(1);
-
-  if (activeBuild) {
-    return {
-      success: false,
-      error: 'build_in_progress',
-      message: 'Cannot rename deployment while a build is in progress',
-    };
   }
 
   // No-op if the new slug matches the current slug or internal worker name
@@ -839,7 +821,7 @@ export async function renameDeployment(
     return {
       success: false,
       error: 'slug_taken',
-      message: 'This subdomain was taken concurrently',
+      message: 'This subdomain was taken',
     };
   }
 

@@ -46,7 +46,9 @@ export async function validateKiloToken(
 ): Promise<ValidateResult> {
   let payload: TokenPayload;
   try {
-    const result = await jwtVerify(token, new TextEncoder().encode(secret));
+    const result = await jwtVerify(token, new TextEncoder().encode(secret), {
+      algorithms: ['HS256'],
+    });
     const parsed = parseTokenPayload(result.payload);
     if (!parsed.ok) {
       return { success: false, error: parsed.error };

@@ -64,4 +64,10 @@ describe('sandboxIdFromUserId', () => {
     expect(sandboxId).not.toContain('/');
     expect(sandboxId).not.toContain('=');
   });
+
+  it('roundtrips a Unicode userId without throwing', () => {
+    const userId = 'ユーザー@例.jp';
+    const sandboxId = sandboxIdFromUserId(userId);
+    expect(userIdFromSandboxId(sandboxId)).toBe(userId);
+  });
 });

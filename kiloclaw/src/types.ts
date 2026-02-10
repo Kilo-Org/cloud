@@ -6,6 +6,13 @@ import type { Sandbox } from '@cloudflare/sandbox';
 export type KiloClawEnv = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   KILOCLAW_BUCKET: R2Bucket;
+
+  // Auth secrets
+  NEXTAUTH_SECRET?: string;
+  INTERNAL_API_SECRET?: string;
+  GATEWAY_TOKEN_SECRET?: string;
+  WORKER_ENV?: string; // e.g. 'production' or 'development' -- for JWT env validation
+
   // Cloudflare AI Gateway configuration (preferred)
   CF_AI_GATEWAY_ACCOUNT_ID?: string;
   CF_AI_GATEWAY_GATEWAY_ID?: string;
@@ -20,6 +27,7 @@ export type KiloClawEnv = {
   OPENAI_API_KEY?: string;
   DEV_MODE?: string;
   DEBUG_ROUTES?: string;
+  DEBUG_ROUTES_SECRET?: string;
   SANDBOX_SLEEP_AFTER?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_DM_POLICY?: string;
@@ -41,5 +49,8 @@ export type AppEnv = {
   Bindings: KiloClawEnv;
   Variables: {
     sandbox: Sandbox;
+    userId: string;
+    authToken: string;
+    sandboxId: string;
   };
 };

@@ -2816,7 +2816,7 @@ export type KiloClawInstanceStatus = (typeof KILOCLAW_INSTANCE_STATUSES)[number]
 export const kiloclaw_instances = pgTable(
   'kiloclaw_instances',
   {
-    id: text()
+    id: uuid()
       .default(sql`gen_random_uuid()`)
       .primaryKey()
       .notNull(),

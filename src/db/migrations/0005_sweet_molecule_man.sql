@@ -1,5 +1,5 @@
 CREATE TABLE "kiloclaw_instances" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" text NOT NULL,
 	"sandbox_id" text NOT NULL,
 	"status" text DEFAULT 'provisioned' NOT NULL,

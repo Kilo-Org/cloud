@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ModelOption } from '@/app/admin/alerting/types';
-import { normalizeModelId } from '@/lib/model-utils';
 
 type AddModelDialogProps = {
   isOpen: boolean;
@@ -59,7 +58,7 @@ export function AddModelDialog({
               </div>
             ) : models.length > 0 ? (
               models.map(model => {
-                const alreadyAdded = existingModels.has(normalizeModelId(model.openrouterId));
+                const alreadyAdded = existingModels.has(model.openrouterId);
                 return (
                   <button
                     key={model.openrouterId}

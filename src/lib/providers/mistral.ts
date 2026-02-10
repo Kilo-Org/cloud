@@ -1,4 +1,3 @@
-import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import {
   dropToolStrictProperties,

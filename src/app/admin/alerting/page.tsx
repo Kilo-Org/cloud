@@ -8,6 +8,7 @@ import { Search } from 'lucide-react';
 import {
   useAlertingBaseline,
   useAlertingConfigs,
+  useDeleteAlertingConfig,
   useUpdateAlertingConfig,
 } from '@/app/admin/api/alerting/hooks';
 import { toast } from 'sonner';
@@ -24,6 +25,7 @@ import {
 
 export default function AdminAlertingPage() {
   const [updatingModelId, setUpdatingModelId] = useState<string | null>(null);
+  const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [addSearchTerm, setAddSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -31,6 +33,7 @@ export default function AdminAlertingPage() {
   const { data: configsData } = useAlertingConfigs();
   const updateConfig = useUpdateAlertingConfig();
   const baselineMutation = useAlertingBaseline();
+  const deleteConfig = useDeleteAlertingConfig();
   const { drafts, updateDraft, addDraft } = useAlertingModelDrafts({
     configs: configsData?.configs,
   });
@@ -109,6 +112,18 @@ export default function AdminAlertingPage() {
     }
   };
 
+  const handleDeleteModel = async (modelId: string) => {
+    setDeletingModelId(modelId);
+    try {
+      await deleteConfig.mutateAsync({ model: modelId });
+      toast.success('Alerting rule deleted');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete alerting rule');
+    } finally {
+      setDeletingModelId(null);
+    }
+  };
+
   const filteredConfigs = useMemo(() => {
     const configs = configsData?.configs ?? [];
     if (!searchTerm.trim()) return configs;
@@ -132,6 +147,19 @@ export default function AdminAlertingPage() {
         <p className="text-muted-foreground">
           Configure per-model error rate alerting. Baselines load per model and show last 1d, 3d,
           and 7d error rates alongside request counts.
+        </p>
+        <p className="text-muted-foreground">
+          Alerts fire when both the short and long windows exceed the configured error-rate SLO.
+          Only enabled models are evaluated, and alerts are based on status code &gt;= 400. See{' '}
+          <a
+            href="https://kilo.ai/docs/contributing/architecture/agent-observability"
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            documentation
+          </a>{' '}
+          for details.
         </p>
 
         <div className="flex items-center gap-2">
@@ -164,6 +192,7 @@ export default function AdminAlertingPage() {
             baselineByModel={baselineByModel}
             baselineStatus={baselineStatus}
             updatingModelId={updatingModelId}
+            deletingModelId={deletingModelId}
             onToggleEnabled={(modelId, enabled) => updateDraft(modelId, { enabled })}
             onErrorRateChange={(modelId, value) =>
               updateDraft(modelId, { errorRatePercent: value })
@@ -173,6 +202,7 @@ export default function AdminAlertingPage() {
             }
             onLoadBaseline={loadBaseline}
             onSave={saveConfig}
+            onDelete={handleDeleteModel}
           />
         )}
       </div>

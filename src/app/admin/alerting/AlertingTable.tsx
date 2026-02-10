@@ -20,11 +20,13 @@ type AlertingTableProps = {
   baselineByModel: Record<string, AlertingBaseline | null>;
   baselineStatus: Record<string, BaselineState>;
   updatingModelId: string | null;
+  deletingModelId: string | null;
   onToggleEnabled: (modelId: string, enabled: boolean) => void;
   onErrorRateChange: (modelId: string, value: string) => void;
   onMinRequestsChange: (modelId: string, value: string) => void;
   onLoadBaseline: (modelId: string) => void;
   onSave: (modelId: string) => void;
+  onDelete: (modelId: string) => void;
 };
 
 export function AlertingTable({
@@ -33,11 +35,13 @@ export function AlertingTable({
   baselineByModel,
   baselineStatus,
   updatingModelId,
+  deletingModelId,
   onToggleEnabled,
   onErrorRateChange,
   onMinRequestsChange,
   onLoadBaseline,
   onSave,
+  onDelete,
 }: AlertingTableProps) {
   return (
     <div className="rounded-lg border">
@@ -66,6 +70,7 @@ export function AlertingTable({
               const baseline = baselineByModel[modelId];
               const status = baselineStatus[modelId]?.status ?? 'idle';
               const isUpdating = updatingModelId === modelId;
+              const isDeleting = deletingModelId === modelId;
 
               return (
                 <TableRow key={modelId} className={isUpdating ? 'opacity-60' : ''}>
@@ -142,6 +147,15 @@ export function AlertingTable({
                         disabled={isUpdating || !draft}
                       >
                         {isUpdating ? 'Saving...' : 'Save'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDelete(modelId)}
+                        disabled={isDeleting}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        {isDeleting ? 'Deleting...' : 'Delete'}
                       </Button>
                     </div>
                   </TableCell>

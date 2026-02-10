@@ -21,6 +21,10 @@ const AlertingConfigResponseSchema = z.object({
   config: AlertingConfigSchema.extend({ updatedAt: z.string().min(1) }),
 });
 
+const AlertingConfigDeleteResponseSchema = z.object({
+  success: z.boolean(),
+});
+
 const AlertingBaselineSchema = z.object({
   model: z.string(),
   errorRate1d: z.number(),
@@ -81,6 +85,31 @@ export const adminAlertingRouter = createTRPCRouter({
       });
     }
   }),
+  deleteConfig: adminProcedure
+    .input(z.object({ model: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      try {
+        return await fetchO11yJson({
+          path: '/alerting/config',
+          schema: AlertingConfigDeleteResponseSchema,
+          method: 'DELETE',
+          searchParams: new URLSearchParams({ model: input.model }),
+          errorMessage: 'Failed to delete alerting config',
+          parseErrorMessage: 'Invalid delete response',
+        });
+      } catch (error) {
+        if (error instanceof O11yRequestError) {
+          throw new TRPCError({
+            code: error.status === 401 ? 'UNAUTHORIZED' : 'INTERNAL_SERVER_ERROR',
+            message: error.message,
+          });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to delete alerting config',
+        });
+      }
+    }),
   getBaseline: adminProcedure
     .input(z.object({ model: z.string().min(1) }))
     .mutation(async ({ input }) => {

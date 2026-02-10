@@ -27,3 +27,18 @@ export function useAlertingBaseline() {
   const trpc = useTRPC();
   return useMutation(trpc.admin.alerting.getBaseline.mutationOptions());
 }
+
+export function useDeleteAlertingConfig() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.admin.alerting.deleteConfig.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.alerting.listConfigs.queryKey(),
+        });
+      },
+    })
+  );
+}

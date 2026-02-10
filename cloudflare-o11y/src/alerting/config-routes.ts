@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { zodJsonValidator } from '../util/validation';
 import { requireAdmin } from '../admin-middleware';
-import { AlertingConfigInputSchema, listAlertingConfigs, upsertAlertingConfig } from './config-store';
+import { AlertingConfigInputSchema, deleteAlertingConfig, listAlertingConfigs, upsertAlertingConfig } from './config-store';
 import { queryErrorRateBaseline } from './query';
 
 function errorRate(errors: number, total: number): number {
@@ -22,6 +22,16 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
 		await upsertAlertingConfig(c.env, config);
 
 		return c.json({ success: true, config });
+	});
+
+	app.delete('/alerting/config', requireAdmin, async (c) => {
+		const model = c.req.query('model');
+		if (!model || model.trim().length === 0) {
+			return c.json({ success: false, error: 'model is required' }, 400);
+		}
+
+		await deleteAlertingConfig(c.env, model);
+		return c.json({ success: true });
 	});
 
 	app.get('/alerting/baseline', requireAdmin, async (c) => {

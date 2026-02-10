@@ -59,3 +59,7 @@ export async function listAlertingConfigs(env: AlertingConfigEnv): Promise<Alert
 export async function upsertAlertingConfig(env: AlertingConfigEnv, config: AlertingConfig): Promise<void> {
 	await env.O11Y_ALERT_CONFIG.put(configKey(config.model), JSON.stringify(config));
 }
+
+export async function deleteAlertingConfig(env: AlertingConfigEnv, model: string): Promise<void> {
+	await env.O11Y_ALERT_CONFIG.delete(configKey(model));
+}

@@ -32,6 +32,34 @@ export const setSlugMappingRequestSchema = z.object({
   slug: slugParamSchema,
 });
 
+export const setBannerRequestSchema = z.object({
+  enabled: z.boolean(),
+});
+
+// --- Slug mapping response schemas ---
+
+export const setSlugMappingResponseSchema = z.object({
+  success: z.literal(true),
+});
+
+export const deleteSlugMappingResponseSchema = z.object({
+  success: z.literal(true),
+});
+
+// --- Banner response schemas ---
+
+export const getBannerResponseSchema = z.object({
+  enabled: z.boolean(),
+});
+
+export const setBannerResponseSchema = z.object({
+  success: z.literal(true),
+});
+
+export const deleteBannerResponseSchema = z.object({
+  success: z.literal(true),
+});
+
 export const setPasswordResponseSchema = z.object({
   success: z.literal(true),
   passwordSetAt: z.number(),
@@ -76,3 +104,9 @@ export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export type AuthFormData = z.infer<typeof authFormSchema>;
 
 export type SetSlugMappingRequest = z.infer<typeof setSlugMappingRequestSchema>;
+export type SetSlugMappingResponse = z.infer<typeof setSlugMappingResponseSchema>;
+export type DeleteSlugMappingResponse = z.infer<typeof deleteSlugMappingResponseSchema>;
+
+export type GetBannerResponse = z.infer<typeof getBannerResponseSchema>;
+export type SetBannerResponse = z.infer<typeof setBannerResponseSchema>;
+export type DeleteBannerResponse = z.infer<typeof deleteBannerResponseSchema>;

@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { Env } from './types';
 import { getPasswordRecord } from './auth/password-store';
+import { getBannerRecord } from './banner/banner-store';
+import { injectBanner } from './banner/inject-banner';
 import { validateAuthCookie } from './auth/jwt';
 import { api } from './routes/api';
 import { auth } from './routes/auth';
@@ -103,7 +105,18 @@ subdomainApp.all('*', async c => {
 
   // Forward request
   try {
-    return (await worker.fetch(c.req.raw)) as unknown as Response;
+    const response = (await worker.fetch(c.req.raw)) as unknown as Response;
+
+    // Inject banner for HTML responses when enabled
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.includes('text/html')) {
+      const bannerRecord = await getBannerRecord(c.env.DEPLOY_KV, workerName);
+      if (bannerRecord?.enabled) {
+        return injectBanner(response);
+      }
+    }
+
+    return response;
   } catch {
     return c.text('Error forwarding request', 500);
   }

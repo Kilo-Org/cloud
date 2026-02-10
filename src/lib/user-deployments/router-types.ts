@@ -4,7 +4,7 @@ import type { AnyRouter } from '@trpc/server';
 import type { Deployment, DeploymentBuild } from '@/db/schema';
 import type { Event, BuildStatus } from './types';
 import type { EnvVarResponse } from './env-vars-validation';
-import type { GetPasswordStatusResponse } from './dispatcher-client';
+import type { GetPasswordStatusResponse, GetBannerStatusResponse } from './dispatcher-client';
 
 /**
  * Result type for creating a deployment - discriminated union
@@ -115,6 +115,13 @@ export type DeploymentQueries = {
   getPasswordStatus?: (
     deploymentId: string
   ) => UseQueryResult<GetPasswordStatusResponse, DeploymentError>;
+
+  /**
+   * Get banner status for an app-builder deployment
+   */
+  getBannerStatus?: (
+    deploymentId: string
+  ) => UseQueryResult<GetBannerStatusResponse, DeploymentError>;
 };
 
 /**
@@ -185,4 +192,13 @@ export type DeploymentMutations = {
    * Remove password protection from a deployment (org-only)
    */
   removePassword?: UseMutationResult<{ success: true }, DeploymentError, { deploymentId: string }>;
+
+  /**
+   * Set banner enabled/disabled for an app-builder deployment
+   */
+  setBanner?: UseMutationResult<
+    { success: true },
+    DeploymentError,
+    { deploymentId: string; enabled: boolean }
+  >;
 };

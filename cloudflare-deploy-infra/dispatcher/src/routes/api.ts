@@ -9,10 +9,12 @@ import { z } from 'zod';
 import type { Env } from '../types';
 import { hashPassword } from '../auth/password';
 import { getPasswordRecord, setPasswordRecord, deletePasswordRecord } from '../auth/password-store';
+import { getBannerRecord, setBannerRecord, deleteBannerRecord } from '../banner/banner-store';
 import {
   workerNameSchema,
   setPasswordRequestSchema,
   setSlugMappingRequestSchema,
+  setBannerRequestSchema,
 } from '../schemas';
 
 export const api = new Hono<{ Bindings: Env }>();
@@ -46,6 +48,14 @@ const validateSetSlugMappingBody = validator('json', (value, c) => {
   const result = setSlugMappingRequestSchema.safeParse(value);
   if (!result.success) {
     return c.json({ error: 'Missing or invalid slug in body' }, 400);
+  }
+  return result.data;
+});
+
+const validateSetBannerBody = validator('json', (value, c) => {
+  const result = setBannerRequestSchema.safeParse(value);
+  if (!result.success) {
+    return c.json({ error: 'Missing or invalid "enabled" in body' }, 400);
   }
   return result.data;
 });
@@ -133,6 +143,45 @@ api.delete('/slug-mapping/:worker', validateWorkerParam, async c => {
     await c.env.DEPLOY_KV.delete(`slug2worker:${slug}`);
   }
   await c.env.DEPLOY_KV.delete(`worker2slug:${worker}`);
+
+  return c.json({ success: true });
+});
+
+// ============================================================================
+// Banner Routes
+// Manages the "Made with Kilo App Builder" badge for deployed sites
+// ============================================================================
+
+/**
+ * Get banner status.
+ */
+api.get('/app-builder-banner/:worker', validateWorkerParam, async c => {
+  const { worker } = c.req.valid('param');
+
+  const record = await getBannerRecord(c.env.DEPLOY_KV, worker);
+
+  return c.json({ enabled: record?.enabled ?? false });
+});
+
+/**
+ * Set banner enabled/disabled.
+ */
+api.put('/app-builder-banner/:worker', validateWorkerParam, validateSetBannerBody, async c => {
+  const { worker } = c.req.valid('param');
+  const { enabled } = c.req.valid('json');
+
+  await setBannerRecord(c.env.DEPLOY_KV, worker, { enabled });
+
+  return c.json({ success: true });
+});
+
+/**
+ * Remove banner record.
+ */
+api.delete('/app-builder-banner/:worker', validateWorkerParam, async c => {
+  const { worker } = c.req.valid('param');
+
+  await deleteBannerRecord(c.env.DEPLOY_KV, worker);
 
   return c.json({ success: true });
 });

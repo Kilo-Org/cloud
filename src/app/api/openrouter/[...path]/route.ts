@@ -281,7 +281,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // Model allow list only applies to Enterprise plans
     // Provider allow list and data collection apply to all plans
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
-      modelId: requestedAutoModel ? KILO_AUTO_MODEL_ID : originalModelIdLowerCased,
+      modelId: originalModelIdLowerCased,
       settings,
       organizationPlan: plan,
     });

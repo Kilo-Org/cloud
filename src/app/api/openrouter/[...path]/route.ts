@@ -40,7 +40,6 @@ import {
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
-import { isRateLimitedToDeathFree } from '@/lib/providers/openrouter';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
 import { redactedModelResponse } from '@/lib/redactedModelResponse';
 import {
@@ -239,10 +238,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Slackbot-only models are only available through Kilo for Slack (internalApiUse)
   if (isSlackbotOnlyModel(originalModelIdLowerCased) && !internalApiUse) {
-    return modelDoesNotExistResponse();
-  }
-
-  if (isRateLimitedToDeathFree(originalModelIdLowerCased)) {
     return modelDoesNotExistResponse();
   }
 

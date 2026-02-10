@@ -55,16 +55,20 @@ export async function fetchO11yJson<T>({
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const data = (await response.json()) as unknown;
   if (!response.ok) {
-    const message =
-      typeof data === 'object' && data !== null && 'error' in data
-        ? String((data as { error?: string }).error || errorMessage)
-        : errorMessage;
+    let message = errorMessage;
+    try {
+      const data: unknown = JSON.parse(await response.text());
+      if (typeof data === 'object' && data !== null && 'error' in data) {
+        message = String((data as { error?: string }).error || errorMessage);
+      }
+    } catch {
+      // non-JSON error body (e.g. HTML 5xx) — fall through with default message
+    }
     throw new O11yRequestError(message, response.status);
   }
 
-  const parsed = schema.safeParse(data);
+  const parsed = schema.safeParse(await response.json());
   if (!parsed.success) {
     throw new O11yRequestError(parseErrorMessage, 502);
   }

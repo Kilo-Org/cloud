@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import {
   useAlertingBaseline,
@@ -24,7 +25,7 @@ import {
 } from '@/app/admin/alerting/utils';
 
 export default function AdminAlertingPage() {
-  const [updatingModelId, setUpdatingModelId] = useState<string | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [addSearchTerm, setAddSearchTerm] = useState('');
@@ -48,38 +49,42 @@ export default function AdminAlertingPage() {
     setSearchTerm(value);
   }, []);
 
-  const saveConfig = async (modelId: string) => {
-    const draft = drafts[modelId];
-    if (!draft) return;
+  const saveAllConfigs = async () => {
+    const configs = filteredConfigs;
+    if (configs.length === 0) return;
 
-    const errorRatePercent = Number(draft.errorRatePercent);
-    const minRequests = Number(draft.minRequestsPerWindow);
-
-    if (Number.isNaN(errorRatePercent) || errorRatePercent < 0 || errorRatePercent >= 100) {
-      toast.error('Error rate must be a number between 0 and 100');
-      return;
-    }
-
-    if (!Number.isInteger(minRequests) || minRequests <= 0) {
-      toast.error('Min requests must be a positive integer');
-      return;
-    }
-
-    const errorRateSlo = toErrorRateSlo(errorRatePercent);
-
-    setUpdatingModelId(modelId);
+    setSavingAll(true);
     try {
-      await updateConfig.mutateAsync({
-        model: modelId,
-        enabled: draft.enabled,
-        errorRateSlo,
-        minRequestsPerWindow: minRequests,
-      });
-      toast.success('Alerting config updated');
+      for (const config of configs) {
+        const modelId = config.model;
+        const draft = drafts[modelId];
+        if (!draft) continue;
+
+        const errorRatePercent = Number(draft.errorRatePercent);
+        const minRequests = Number(draft.minRequestsPerWindow);
+
+        if (Number.isNaN(errorRatePercent) || errorRatePercent < 0 || errorRatePercent >= 100) {
+          throw new Error(`Invalid error rate for ${modelId}`);
+        }
+
+        if (!Number.isInteger(minRequests) || minRequests <= 0) {
+          throw new Error(`Invalid min requests for ${modelId}`);
+        }
+
+        const errorRateSlo = toErrorRateSlo(errorRatePercent);
+
+        await updateConfig.mutateAsync({
+          model: modelId,
+          enabled: draft.enabled,
+          errorRateSlo,
+          minRequestsPerWindow: minRequests,
+        });
+      }
+      toast.success('Alerting configs saved');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update alerting config');
+      toast.error(error instanceof Error ? error.message : 'Failed to save alerting configs');
     } finally {
-      setUpdatingModelId(null);
+      setSavingAll(false);
     }
   };
 
@@ -219,7 +224,7 @@ export default function AdminAlertingPage() {
             drafts={drafts}
             baselineByModel={baselineByModel}
             baselineStatus={baselineStatus}
-            updatingModelId={updatingModelId}
+            savingAll={savingAll}
             deletingModelId={deletingModelId}
             onToggleEnabled={(modelId, enabled) => updateDraft(modelId, { enabled })}
             onErrorRateChange={(modelId, value) =>
@@ -230,9 +235,15 @@ export default function AdminAlertingPage() {
             }
             onLoadBaseline={loadBaseline}
             onSuggestDefaults={applySuggestedDefaults}
-            onSave={saveConfig}
             onDelete={handleDeleteModel}
           />
+        )}
+        {configsData && filteredConfigs.length > 0 && (
+          <div className="flex justify-end">
+            <Button onClick={saveAllConfigs} disabled={savingAll}>
+              {savingAll ? 'Saving...' : 'Save all'}
+            </Button>
+          </div>
         )}
       </div>
     </AdminPage>

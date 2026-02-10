@@ -8,7 +8,6 @@ import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
-import { devstral_2512_free_model, devstral_small_2512_free_model } from '@/lib/providers/mistral';
 import { pony_alpha_free_model } from '@/lib/providers/openrouter-free-models';
 import { recommendedModels } from '@/lib/providers/recommended-models';
 import { kat_coder_pro_free_model } from '@/lib/providers/streamlake';

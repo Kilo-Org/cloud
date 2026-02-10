@@ -1,9 +1,10 @@
 import type { SessionMetricsParams } from './session-metrics-schema';
 
 /**
- * Write a session metrics data point to Analytics Engine.
+ * Write a session metrics data point to Analytics Engine,
+ * and dual-write a structured event to a Stream for R2/Snowflake export.
  *
- * Schema:
+ * AE Schema:
  *   index1  = platform (for per-platform querying)
  *   blob1   = terminationReason
  *   blob2   = platform
@@ -22,7 +23,7 @@ import type { SessionMetricsParams } from './session-metrics-schema';
  *   double10 = autoCompactionCount
  *   double11 = ingestVersion
  */
-export function writeSessionMetricsDataPoint(params: SessionMetricsParams, env: Env): void {
+export function writeSessionMetricsDataPoint(params: SessionMetricsParams, env: Env, waitUntil: (p: Promise<unknown>) => void): void {
 	const totalTokensSum =
 		params.totalTokens.input +
 		params.totalTokens.output +
@@ -47,4 +48,27 @@ export function writeSessionMetricsDataPoint(params: SessionMetricsParams, env: 
 			params.ingestVersion,
 		],
 	});
+
+	waitUntil(
+		env.SESSION_METRICS_STREAM.send([
+			{
+				platform: params.platform,
+				termination_reason: params.terminationReason,
+				organization_id: params.organizationId,
+				kilo_user_id: params.kiloUserId,
+				model: params.model,
+				session_duration_ms: params.sessionDurationMs,
+				time_to_first_response_ms: params.timeToFirstResponseMs ?? -1,
+				total_turns: params.totalTurns,
+				total_steps: params.totalSteps,
+				total_errors: params.totalErrors,
+				total_tokens: totalTokensSum,
+				total_cost: params.totalCost,
+				compaction_count: params.compactionCount,
+				stuck_tool_call_count: params.stuckToolCallCount,
+				auto_compaction_count: params.autoCompactionCount,
+				ingest_version: params.ingestVersion,
+			},
+		]),
+	);
 }

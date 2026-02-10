@@ -828,7 +828,6 @@ export async function renameDeployment(
     .set({
       deployment_slug: newSlug,
       deployment_url: newUrl,
-      internal_worker_name: internalWorkerName,
     })
     .where(and(eq(deployments.id, deploymentId), eq(deployments.deployment_slug, oldSlug)))
     .returning({ id: deployments.id });

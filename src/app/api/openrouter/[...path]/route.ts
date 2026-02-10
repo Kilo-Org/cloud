@@ -3,10 +3,7 @@ import { type NextRequest } from 'next/server';
 import { stripRequiredPrefix } from '@/lib/utils';
 import { generateProviderSpecificHash } from '@/lib/providerHash';
 import { extractPromptInfo, type MicrodollarUsageContext } from '@/lib/processUsage';
-import type {
-  OpenRouterChatCompletionRequest,
-  OpenRouterProviderConfig,
-} from '@/lib/providers/openrouter/types';
+import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import { applyProviderSpecificLogic, getProvider, openRouterRequest } from '@/lib/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -15,7 +12,6 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isFreeModel,
   isDataCollectionRequiredOnKiloCodeOnly,
-  extraRequiredProviders,
   isDeadFreeModel,
   isSlackbotOnlyModel,
   isStealthModelOnKiloCodeOnly,
@@ -32,14 +28,13 @@ import {
   invalidRequestResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
-  modelNotAllowedResponse,
+  extractHeaderAndLimitLength,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
-import { isRateLimitedToDeathFree } from '@/lib/providers/openrouter';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
 import { redactedModelResponse } from '@/lib/redactedModelResponse';
 import {
@@ -241,10 +236,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
-  if (isRateLimitedToDeathFree(originalModelIdLowerCased)) {
-    return modelDoesNotExistResponse();
-  }
-
   // Extract properties for usage context
   const tokenEstimates = estimateChatTokens(requestBodyParsed);
   const promptInfo = extractPromptInfo(requestBodyParsed);
@@ -265,7 +256,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
     project_id: projectId,
     status_code: null,
-    editor_name: request.headers.get('x-kilocode-editorname') || null,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
   };
@@ -274,41 +266,23 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings } = await getBalanceAndOrgSettings(organizationId, user);
+    const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
     if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 
-    // Organization model allow list check.
-    const modelRestrictionError = checkOrganizationModelRestrictions({
-      modelId: requestedAutoModel ? KILO_AUTO_MODEL_ID : originalModelIdLowerCased,
+    // Organization model/provider restrictions check
+    // Model allow list only applies to Enterprise plans
+    // Provider allow list applies to Enterprise plans; data collection applies to all plans
+    const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
+      modelId: originalModelIdLowerCased,
       settings,
+      organizationPlan: plan,
     });
     if (modelRestrictionError) return modelRestrictionError;
 
-    if (settings) {
-      // Set up provider object with both allow list and data collection
-      const providerAllowList = settings.provider_allow_list || [];
-      const dataCollection = settings.data_collection;
-
-      const providerConfig: OpenRouterProviderConfig = {};
-      if (providerAllowList.length > 0) {
-        const requiredProviders = extraRequiredProviders(originalModelIdLowerCased);
-        if (requiredProviders && !requiredProviders.every(p => providerAllowList.includes(p))) {
-          console.error(
-            `This FREE model requires ALL of these providers to be allowed: ${requiredProviders.join(', ')}`
-          );
-          // this is overly strict, but checking for just one of them is not enough, because this list overrides the org allow list
-          return modelNotAllowedResponse();
-        }
-        providerConfig.only = providerAllowList;
-      }
-      // setting this only if its set as an override on the organziation settings
-      if (dataCollection) {
-        providerConfig.data_collection = dataCollection;
-      }
-
+    if (providerConfig) {
       requestBodyParsed.provider = providerConfig;
     }
   }

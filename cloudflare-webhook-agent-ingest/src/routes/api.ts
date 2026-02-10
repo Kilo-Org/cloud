@@ -14,6 +14,7 @@ import { resError, resSuccess } from '../util/res';
 import { internalApiMiddleware } from '../util/auth';
 import { withDORetry } from '../util/do-retry';
 import { clampRequestLimit } from '../util/constants';
+import { decodeUserIdFromPath, encodeUserIdForPath } from '../util/user-id-encoding';
 
 const api = new Hono<HonoContext>();
 
@@ -28,7 +29,8 @@ api.use('*', internalApiMiddleware);
  * Create/configure a new personal trigger
  */
 api.post('/triggers/user/:userId/:triggerId', async c => {
-  const { userId, triggerId } = c.req.param();
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
   const namespace = `user/${userId}`;
   const doKey = buildDOKey(namespace, triggerId);
 
@@ -39,7 +41,8 @@ api.post('/triggers/user/:userId/:triggerId', async c => {
  * List captured requests for a personal trigger
  */
 api.get('/triggers/user/:userId/:triggerId/requests', async c => {
-  const { userId, triggerId } = c.req.param();
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
   const namespace = `user/${userId}`;
 
   return handleListRequests(c, namespace, triggerId);
@@ -49,7 +52,8 @@ api.get('/triggers/user/:userId/:triggerId/requests', async c => {
  * Get a single captured request from a personal trigger
  */
 api.get('/triggers/user/:userId/:triggerId/requests/:requestId', async c => {
-  const { userId, triggerId, requestId } = c.req.param();
+  const { triggerId, requestId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
   const namespace = `user/${userId}`;
 
   return handleGetRequest(c, namespace, triggerId, requestId);
@@ -59,7 +63,8 @@ api.get('/triggers/user/:userId/:triggerId/requests/:requestId', async c => {
  * Get a personal trigger's configuration
  */
 api.get('/triggers/user/:userId/:triggerId', async c => {
-  const { userId, triggerId } = c.req.param();
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
   const namespace = `user/${userId}`;
 
   return handleGetTrigger(c, namespace, triggerId);
@@ -69,7 +74,8 @@ api.get('/triggers/user/:userId/:triggerId', async c => {
  * Update a personal trigger's configuration
  */
 api.put('/triggers/user/:userId/:triggerId', async c => {
-  const { userId, triggerId } = c.req.param();
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
   const namespace = `user/${userId}`;
 
   return handleUpdateTrigger(c, namespace, triggerId);
@@ -79,7 +85,8 @@ api.put('/triggers/user/:userId/:triggerId', async c => {
  * Delete a personal trigger and all its data
  */
 api.delete('/triggers/user/:userId/:triggerId', async c => {
-  const { userId, triggerId } = c.req.param();
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
   const namespace = `user/${userId}`;
 
   return handleDeleteTrigger(c, namespace, triggerId);
@@ -224,9 +231,9 @@ async function handleCreateTrigger(
       return c.json(resError('Failed to configure trigger'), 500);
     }
 
-    // Generate inbound URL
+    // Generate inbound URL (encode userId for OAuth IDs that contain '/')
     const inboundUrl = namespace.startsWith('user/')
-      ? `/inbound/user/${namespace.slice(5)}/${triggerId}`
+      ? `/inbound/user/${encodeUserIdForPath(namespace.slice(5))}/${triggerId}`
       : `/inbound/org/${namespace.slice(4)}/${triggerId}`;
 
     logger.info('Trigger created', {

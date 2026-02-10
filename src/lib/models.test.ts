@@ -9,11 +9,11 @@ describe('isFreeModel', () => {
       expect(isFreeModel('openrouter/sonoma-sky-alpha')).toBe(false);
     });
 
-    test('should return false for models ending with :free', () => {
-      expect(isFreeModel('gpt-4:free')).toBe(false);
-      expect(isFreeModel('claude-3:free')).toBe(false);
-      expect(isFreeModel('some-model:free')).toBe(false);
-      expect(isFreeModel(':free')).toBe(false);
+    test('should return true for models ending with :free', () => {
+      expect(isFreeModel('gpt-4:free')).toBe(true);
+      expect(isFreeModel('claude-3:free')).toBe(true);
+      expect(isFreeModel('some-model:free')).toBe(true);
+      expect(isFreeModel(':free')).toBe(true);
     });
   });
 
@@ -60,7 +60,7 @@ describe('isFreeModel', () => {
       expect(isFreeModel('sonic ')).toBe(false);
       expect(isFreeModel(' sonic ')).toBe(false);
       expect(isFreeModel('model:free ')).toBe(false);
-      expect(isFreeModel(' model:free')).toBe(false);
+      expect(isFreeModel(' model:free')).toBe(true);
     });
   });
 });

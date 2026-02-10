@@ -87,6 +87,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       project_id: null,
       status_code: 200,
       editor_name: null,
+      machine_id: null,
       user_byok: false,
       has_tools: false,
     };

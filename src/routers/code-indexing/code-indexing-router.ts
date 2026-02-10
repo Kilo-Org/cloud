@@ -36,7 +36,7 @@ const errorLogger = sentryLogger('code-indexing', 'error');
 const storage = getIndexStorage();
 
 const CodebaseIndexingSearchRequestSchema = z.object({
-  organizationId: z.string().nullable().optional(),
+  organizationId: z.uuid().nullable().optional(),
   query: z.string().min(1),
   path: z.string().optional(),
   projectId: z.string(),
@@ -46,7 +46,7 @@ const CodebaseIndexingSearchRequestSchema = z.object({
 });
 
 const CodebaseIndexingStatsSchema = z.object({
-  organizationId: z.string().nullable().optional(),
+  organizationId: z.uuid().nullable().optional(),
   overrideUser: z.string().optional(),
 });
 
@@ -93,7 +93,7 @@ const CodebaseIndexingManifestResponseSchema = z.object({
 });
 
 const CodebaseIndexingProjectFilesRequestSchema = z.object({
-  organizationId: z.string().nullable().optional(),
+  organizationId: z.uuid().nullable().optional(),
   projectId: z.string(),
   gitBranch: z.string().optional(),
   fileSearch: z.string().optional(),

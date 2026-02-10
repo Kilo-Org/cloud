@@ -18,10 +18,11 @@ import {
   type StatusFilterValue,
   type DeleteTarget,
 } from '@/components/webhook-triggers';
+import { encodeUserIdForPath } from '@/lib/webhook-agent/user-id-encoding';
 
 /** Build the inbound webhook URL for a trigger */
 function buildWebhookUrl(userId: string, triggerId: string): string {
-  return `https://hooks.kilosessions.ai/inbound/user/${userId}/${triggerId}`;
+  return `https://hooks.kilosessions.ai/inbound/user/${encodeUserIdForPath(userId)}/${triggerId}`;
 }
 
 type WebhookTriggersListContentProps = {

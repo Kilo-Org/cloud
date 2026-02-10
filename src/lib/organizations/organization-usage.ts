@@ -1,4 +1,5 @@
 import type { MicrodollarUsage, Organization, OrganizationUserLimitType, User } from '@/db/schema';
+import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 import {
   organization_user_limits,
   organization_user_usage,
@@ -31,6 +32,7 @@ export async function getBalanceAndOrgSettings(
 ): Promise<{
   balance: number;
   settings?: OrganizationSettings;
+  plan?: OrganizationPlan;
 }> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
   const result = organizationId
@@ -49,7 +51,7 @@ export async function getBalanceForOrganizationUser(
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
   } = {}
-): Promise<{ balance: number; settings?: OrganizationSettings }> {
+): Promise<{ balance: number; settings?: OrganizationSettings; plan?: OrganizationPlan }> {
   const { limitType = 'daily', fromDb = db } = options;
   const startTime = performance.now();
   logExceptInTest(
@@ -115,6 +117,7 @@ export async function getBalanceForOrganizationUser(
     organization_balance,
     settings,
     require_seats,
+    plan,
     auto_top_up_enabled,
   } = result[0];
 
@@ -135,7 +138,7 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (require_seats: ignoring limits)`
     );
 
-    return { balance: fromMicrodollars(organization_balance), settings };
+    return { balance: fromMicrodollars(organization_balance), settings, plan };
   }
 
   // If user has no limits set, return organization's total balance
@@ -146,7 +149,7 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (no limits)`
     );
 
-    return { balance: fromMicrodollars(organization_balance), settings };
+    return { balance: fromMicrodollars(organization_balance), settings, plan };
   }
 
   // User has limits - calculate remaining allowance
@@ -164,7 +167,7 @@ export async function getBalanceForOrganizationUser(
     `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(cappedBalance)} (allowance: ${fromMicrodollars(remainingAllowance)}, org balance: ${fromMicrodollars(organization_balance)})`
   );
 
-  return { balance: fromMicrodollars(cappedBalance), settings };
+  return { balance: fromMicrodollars(cappedBalance), settings, plan };
 }
 
 export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {

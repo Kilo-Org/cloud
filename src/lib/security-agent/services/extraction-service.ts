@@ -384,7 +384,11 @@ export async function extractSandboxAnalysis(options: {
         }
 
         if (toolCall.function.name !== 'submit_analysis_extraction') {
-          logError('Unexpected tool call', { correlationId, findingId: finding.id, tool: toolCall.function.name });
+          logError('Unexpected tool call', {
+            correlationId,
+            findingId: finding.id,
+            tool: toolCall.function.name,
+          });
           span.setAttribute('security_agent.is_fallback', true);
           return createFallbackExtraction(
             rawMarkdown,

@@ -169,6 +169,7 @@ export type MicrodollarUsageContext = {
   project_id: string | null;
   status_code: number | null;
   editor_name: string | null;
+  machine_id: string | null;
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
   has_tools: boolean;
@@ -190,6 +191,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     requested_model: usageContext.requested_model,
     status_code: usageContext.status_code,
     editor_name: usageContext.editor_name,
+    machine_id: usageContext.machine_id,
     is_user_byok: usageContext.user_byok,
     has_tools: usageContext.has_tools,
   };
@@ -423,6 +425,7 @@ export type UsageMetaData = {
   cancelled: boolean | null;
   editor_name: string | null;
   has_tools: boolean | null;
+  machine_id: string | null;
 };
 
 export async function insertUsageRecord(
@@ -529,6 +532,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               streamed,
               cancelled,
               has_tools,
+              machine_id,
 
               http_user_agent_id,
               http_ip_id,
@@ -559,6 +563,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.streamed},
               ${metadataFields.cancelled},
               ${metadataFields.has_tools},
+              ${metadataFields.machine_id},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),

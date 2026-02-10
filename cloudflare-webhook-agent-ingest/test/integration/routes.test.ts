@@ -1,5 +1,6 @@
 import { SELF, env } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
+import { encodeUserIdForPath } from '../../src/util/user-id-encoding';
 
 describe('Hono Routes', () => {
   describe('Webhook Ingestion - Personal Triggers', () => {
@@ -143,6 +144,56 @@ describe('Hono Routes', () => {
       const body = await response.json();
       expect(body.success).toBe(false);
       expect(body.error).toBe('Too many in-flight requests');
+    });
+  });
+
+  describe('Webhook Ingestion - OAuth User ID (encoded)', () => {
+    const oauthUserId = 'oauth/google:101043560986948156510';
+    const encodedUserId = encodeUserIdForPath(oauthUserId);
+    const testTriggerId = 'oauth-trigger';
+    // The namespace uses the raw (decoded) userId internally
+    const namespace = `user/${oauthUserId}`;
+
+    it('should capture webhook for an OAuth user via encoded path', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      // Use the encoded userId in the URL path
+      const response = await SELF.fetch(
+        `http://localhost/inbound/user/${encodedUserId}/${testTriggerId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'oauth-test' }),
+        }
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.success).toBe(true);
+      expect(body.data.requestId).toBeDefined();
+    });
+
+    it('should return 404 for unconfigured OAuth user trigger', async () => {
+      const unknownEncoded = encodeUserIdForPath('oauth/google:999999999');
+      const response = await SELF.fetch(
+        `http://localhost/inbound/user/${unknownEncoded}/unknown-trigger`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ test: true }),
+        }
+      );
+
+      expect(response.status).toBe(404);
+      const body = await response.json();
+      expect(body.success).toBe(false);
     });
   });
 

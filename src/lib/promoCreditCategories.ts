@@ -107,6 +107,12 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     description: 'Kilo Pass bonus credits',
     is_idempotent: false,
   },
+  // Admin bulk credit grant
+  {
+    credit_category: 'admin-bulk-grant',
+    description: 'Admin bulk credit grant to personal accounts',
+    is_idempotent: false,
+  },
   // OSS Sponsorship Program credits
   {
     credit_category: 'oss-sponsorship',
@@ -550,6 +556,16 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     amount_usd: 10,
     promotion_ends_at: new Date('2026-03-01'),
     description: 'Creator: Daily AI Digest',
+    total_redemptions_allowed: 5000,
+    customer_requirement: has_Payment,
+  },
+  {
+    encrypted_credit_category: 'WYiw0GGnTc4IkH85VQlpOg==:OAcEL5bCRN7F5fbA50Mg6A==:+HldhiRr',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 10,
+    promotion_ends_at: new Date('2026-03-01'),
+    description: 'Emilie Valentine Experiment',
     total_redemptions_allowed: 5000,
     customer_requirement: has_Payment,
   },

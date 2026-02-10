@@ -1,5 +1,6 @@
 import 'server-only';
 import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@/lib/config.server';
+import { encodeUserIdForPath } from './user-id-encoding';
 
 /**
  * Response type for trigger config from the worker.
@@ -103,7 +104,7 @@ function buildNamespace(userId?: string, organizationId?: string): string {
 
 function buildTriggerPath(namespace: string, triggerId: string): string {
   if (namespace.startsWith('user/')) {
-    return `/api/triggers/user/${namespace.slice(5)}/${triggerId}`;
+    return `/api/triggers/user/${encodeUserIdForPath(namespace.slice(5))}/${triggerId}`;
   }
   if (namespace.startsWith('org/')) {
     return `/api/triggers/org/${namespace.slice(4)}/${triggerId}`;
@@ -308,7 +309,7 @@ export function buildInboundUrl(
     return `${WEBHOOK_AGENT_URL}/inbound/org/${organizationId}/${triggerId}`;
   }
   if (userId) {
-    return `${WEBHOOK_AGENT_URL}/inbound/user/${userId}/${triggerId}`;
+    return `${WEBHOOK_AGENT_URL}/inbound/user/${encodeUserIdForPath(userId)}/${triggerId}`;
   }
   throw new Error('Either userId or organizationId must be provided');
 }

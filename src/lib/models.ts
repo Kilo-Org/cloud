@@ -3,15 +3,11 @@
  */
 
 import { opus_46_free_slackbot_model } from '@/lib/providers/anthropic';
-import { arcee_trinity_large_preview_free_model } from '@/lib/providers/arcee';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
-import { devstral_2512_free_model, devstral_small_2512_free_model } from '@/lib/providers/mistral';
-import { pony_alpha_free_model } from '@/lib/providers/openrouter-free-models';
 import { recommendedModels } from '@/lib/providers/recommended-models';
-import { kat_coder_pro_free_model } from '@/lib/providers/streamlake';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { zai_glm47_free_model } from '@/lib/providers/zai';
 
@@ -25,26 +21,31 @@ export function getFirstFreeModel() {
 
 export const preferredModels = recommendedModels.map(m => m.public_id);
 
+const freeOpenRouterModels = [
+  'openrouter/aurora-alpha',
+  'openrouter/pony-alpha',
+  'openrouter/free',
+];
+
 export function isFreeModel(model: string): boolean {
-  return !!kiloFreeModels.find(m => m.public_id === model && m.is_enabled);
+  return (
+    kiloFreeModels.some(m => m.public_id === model && m.is_enabled) ||
+    (model ?? '').endsWith(':free') ||
+    freeOpenRouterModels.includes(model)
+  );
 }
 
 export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {
-  return isFreeModel(model);
+  return kiloFreeModels.some(m => m.public_id === model && m.is_enabled);
 }
 
 export const kiloFreeModels = [
-  arcee_trinity_large_preview_free_model,
   corethink_free_model,
-  devstral_2512_free_model,
-  devstral_small_2512_free_model,
   giga_potato_model,
-  kat_coder_pro_free_model,
   minimax_m21_free_model,
   minimax_m21_free_slackbot_model,
   opus_46_free_slackbot_model,
   grok_code_fast_1_optimized_free_model,
-  pony_alpha_free_model,
   zai_glm47_free_model,
 ] as KiloFreeModel[];
 

@@ -46,7 +46,7 @@ function getProjectGitUrl(projectId: string): string {
   return `${APP_BUILDER_URL}/apps/${projectId}.git`;
 }
 
-async function getProjectWithOwnershipCheck(
+export async function getProjectWithOwnershipCheck(
   projectId: string,
   owner: Owner
 ): Promise<AppBuilderProject> {

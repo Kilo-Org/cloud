@@ -4,10 +4,9 @@
  */
 
 /**
- * Normalize a model ID by removing the `:free` suffix if present.
+ * Normalize a model ID by removing the `:free`, `:exacto`, etc. suffixes if present.
  */
 export function normalizeModelId(modelId: string): string {
-  return modelId.endsWith(':free')
-    ? modelId.substring(0, modelId.length - ':free'.length)
-    : modelId;
+  const colonIndex = modelId.indexOf(':');
+  return colonIndex >= 0 ? modelId.substring(0, colonIndex) : modelId;
 }

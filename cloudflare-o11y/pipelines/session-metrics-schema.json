@@ -1,0 +1,20 @@
+{
+	"fields": [
+		{ "name": "platform", "type": "string", "required": true },
+		{ "name": "termination_reason", "type": "string", "required": true },
+		{ "name": "organization_id", "type": "string", "required": false },
+		{ "name": "kilo_user_id", "type": "string", "required": true },
+		{ "name": "model", "type": "string", "required": false },
+		{ "name": "session_duration_ms", "type": "int64", "required": true },
+		{ "name": "time_to_first_response_ms", "type": "int64", "required": true },
+		{ "name": "total_turns", "type": "int32", "required": true },
+		{ "name": "total_steps", "type": "int32", "required": true },
+		{ "name": "total_errors", "type": "int32", "required": true },
+		{ "name": "total_tokens", "type": "int64", "required": true },
+		{ "name": "total_cost", "type": "float64", "required": true },
+		{ "name": "compaction_count", "type": "int32", "required": true },
+		{ "name": "stuck_tool_call_count", "type": "int32", "required": true },
+		{ "name": "auto_compaction_count", "type": "int32", "required": true },
+		{ "name": "ingest_version", "type": "int32", "required": true }
+	]
+}

@@ -6,11 +6,12 @@
  * both the long and short windows (multiwindow approach).
  */
 
-import { BURN_RATE_WINDOWS, DEFAULT_SLO_CONFIG, type AlertSeverity, type BurnRateWindow } from './slo-config';
-import { queryErrorRates, querySlowRequestRates, type ErrorRateRow, type LatencyRow } from './query';
+import { BURN_RATE_WINDOWS, type BurnRateWindow } from './slo-config';
+import { queryErrorRates, queryTtfbExceedRates, type ErrorRateRow, type TtfbExceedRow } from './query';
 import { shouldSuppress, recordAlertFired } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
-import { getRecommendedModels } from './recommended-models';
+import { listAlertingConfigs, type AlertingConfig } from './config-store';
+import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-store';
 
 /**
  * Compute the burn rate from an observed bad-event fraction and the SLO.
@@ -36,63 +37,48 @@ export function rowsToMap<T extends { provider: string; model: string; client_na
 	return map;
 }
 
-/**
- * Determine the effective severity for an alert based on whether
- * the model is a recommended model on the Kilo Gateway.
- *
- * Pages are only for recommended models on kilo-gateway.
- * Everything else is a ticket at most.
- */
-export function effectiveSeverity(
-	baseSeverity: AlertSeverity,
-	clientName: string,
-	model: string,
-	recommendedModels: Set<string>,
-): AlertSeverity {
-	if (baseSeverity === 'page') {
-		if (clientName === 'kilo-gateway' && recommendedModels.has(model)) {
-			return 'page';
-		}
-		// Downgrade to ticket for non-recommended / non-gateway
-		return 'ticket';
-	}
-	return baseSeverity;
-}
+type ConfigByModel = Map<string, AlertingConfig>;
 
-async function evaluateErrorRateWindow(window: BurnRateWindow, recommendedModels: Set<string>, env: Env): Promise<void> {
-	const config = DEFAULT_SLO_CONFIG;
+async function evaluateErrorRateWindow(window: BurnRateWindow, configByModel: ConfigByModel, env: Env): Promise<void> {
+	if (configByModel.size === 0) return;
 
 	// Query the long window first
-	const longRows = await queryErrorRates(window.longWindowMinutes, config.minRequestsPerWindow, env);
+	const longRows = await queryErrorRates(window.longWindowMinutes, 1, env);
 	if (longRows.length === 0) return;
 
 	// For each dimension that trips the long window, check the short window
-	const trippedDimensions: ErrorRateRow[] = [];
+	const trippedDimensions: Array<{ row: ErrorRateRow; config: AlertingConfig }> = [];
 	for (const row of longRows) {
+		const config = configByModel.get(row.model);
+		if (!config || !config.enabled) continue;
+		if (row.weighted_total <= 0) continue;
+		if (row.weighted_total < config.minRequestsPerWindow) continue;
 		const errorRate = row.weighted_errors / row.weighted_total;
 		const burnRate = computeBurnRate(errorRate, config.errorRateSlo);
 		if (burnRate >= window.burnRate) {
-			trippedDimensions.push(row);
+			trippedDimensions.push({ row, config });
 		}
 	}
 
 	if (trippedDimensions.length === 0) return;
 
 	// Query the short window
-	const shortRows = await queryErrorRates(window.shortWindowMinutes, config.minRequestsPerWindow, env);
+	const shortRows = await queryErrorRates(window.shortWindowMinutes, 1, env);
 	const shortMap = rowsToMap(shortRows);
 
-	for (const longRow of trippedDimensions) {
+	for (const { row: longRow, config } of trippedDimensions) {
 		const key = dimensionKey(longRow.provider, longRow.model, longRow.client_name);
 		const shortRow = shortMap.get(key);
 		if (!shortRow) continue;
+		if (shortRow.weighted_total <= 0) continue;
+		if (shortRow.weighted_total < config.minRequestsPerWindow) continue;
 
 		const shortErrorRate = shortRow.weighted_errors / shortRow.weighted_total;
 		const shortBurnRate = computeBurnRate(shortErrorRate, config.errorRateSlo);
 		if (shortBurnRate < window.burnRate) continue;
 
 		// Both windows tripped — determine severity and fire
-		const severity = effectiveSeverity(window.severity, longRow.client_name, longRow.model, recommendedModels);
+		const severity = window.severity;
 
 		const suppressed = await shouldSuppress(
 			env.O11Y_ALERT_STATE,
@@ -126,75 +112,111 @@ async function evaluateErrorRateWindow(window: BurnRateWindow, recommendedModels
 	}
 }
 
-async function evaluateLatencyWindow(
-	window: BurnRateWindow,
-	thresholdMs: number,
-	alertType: 'latency_p50' | 'latency_p90',
-	recommendedModels: Set<string>,
-	env: Env,
-): Promise<void> {
-	const config = DEFAULT_SLO_CONFIG;
+type TtfbConfigByModel = Map<string, TtfbAlertingConfig>;
 
-	// Query the long window
-	const longRows = await querySlowRequestRates(window.longWindowMinutes, thresholdMs, config.minRequestsPerWindow, env);
-	if (longRows.length === 0) return;
+/**
+ * Group TTFB configs by their threshold value so we can batch AE queries.
+ * Returns a map of thresholdMs -> set of model IDs.
+ */
+export function groupByThreshold(configs: TtfbConfigByModel): Map<number, Set<string>> {
+	const groups = new Map<number, Set<string>>();
+	for (const [model, config] of configs) {
+		const existing = groups.get(config.ttfbThresholdMs);
+		if (existing) {
+			existing.add(model);
+		} else {
+			groups.set(config.ttfbThresholdMs, new Set([model]));
+		}
+	}
+	return groups;
+}
 
-	// Find dimensions that trip the long window
-	const trippedDimensions: LatencyRow[] = [];
-	for (const row of longRows) {
-		const slowFraction = row.weighted_slow / row.weighted_total;
-		const burnRate = computeBurnRate(slowFraction, config.latencySlo);
-		if (burnRate >= window.burnRate) {
-			trippedDimensions.push(row);
+async function evaluateTtfbWindow(window: BurnRateWindow, configByModel: TtfbConfigByModel, env: Env): Promise<void> {
+	if (configByModel.size === 0) return;
+
+	const thresholdGroups = groupByThreshold(configByModel);
+
+	// Collect tripped dimensions across all threshold groups from the long window
+	const trippedDimensions: Array<{ row: TtfbExceedRow; config: TtfbAlertingConfig; slowFraction: number }> = [];
+
+	for (const [thresholdMs, modelSet] of thresholdGroups) {
+		const longRows = await queryTtfbExceedRates(window.longWindowMinutes, 1, thresholdMs, env);
+		if (longRows.length === 0) continue;
+
+		for (const row of longRows) {
+			if (!modelSet.has(row.model)) continue;
+			const config = configByModel.get(row.model);
+			if (!config) continue;
+			if (row.weighted_total <= 0) continue;
+			if (row.weighted_total < config.minRequestsPerWindow) continue;
+
+			const slowFraction = row.weighted_slow / row.weighted_total;
+			const burnRate = computeBurnRate(slowFraction, config.ttfbSlo);
+			if (burnRate >= window.burnRate) {
+				trippedDimensions.push({ row, config, slowFraction });
+			}
 		}
 	}
 
 	if (trippedDimensions.length === 0) return;
 
-	// Query the short window
-	const shortRows = await querySlowRequestRates(window.shortWindowMinutes, thresholdMs, config.minRequestsPerWindow, env);
-	const shortMap = rowsToMap(shortRows);
+	// Re-group tripped dimensions by threshold for the short window queries
+	const trippedByThreshold = new Map<number, Array<{ row: TtfbExceedRow; config: TtfbAlertingConfig; slowFraction: number }>>();
+	for (const tripped of trippedDimensions) {
+		const threshold = tripped.config.ttfbThresholdMs;
+		const existing = trippedByThreshold.get(threshold);
+		if (existing) {
+			existing.push(tripped);
+		} else {
+			trippedByThreshold.set(threshold, [tripped]);
+		}
+	}
 
-	for (const longRow of trippedDimensions) {
-		const key = dimensionKey(longRow.provider, longRow.model, longRow.client_name);
-		const shortRow = shortMap.get(key);
-		if (!shortRow) continue;
+	for (const [thresholdMs, trippedGroup] of trippedByThreshold) {
+		const shortRows = await queryTtfbExceedRates(window.shortWindowMinutes, 1, thresholdMs, env);
+		const shortMap = rowsToMap(shortRows);
 
-		const shortSlowFraction = shortRow.weighted_slow / shortRow.weighted_total;
-		const shortBurnRate = computeBurnRate(shortSlowFraction, config.latencySlo);
-		if (shortBurnRate < window.burnRate) continue;
+		for (const { row: longRow, config, slowFraction: longSlowFraction } of trippedGroup) {
+			const key = dimensionKey(longRow.provider, longRow.model, longRow.client_name);
+			const shortRow = shortMap.get(key);
+			if (!shortRow) continue;
+			if (shortRow.weighted_total <= 0) continue;
+			if (shortRow.weighted_total < config.minRequestsPerWindow) continue;
 
-		const severity = effectiveSeverity(window.severity, longRow.client_name, longRow.model, recommendedModels);
+			const shortSlowFraction = shortRow.weighted_slow / shortRow.weighted_total;
+			const shortBurnRate = computeBurnRate(shortSlowFraction, config.ttfbSlo);
+			if (shortBurnRate < window.burnRate) continue;
 
-		const suppressed = await shouldSuppress(
-			env.O11Y_ALERT_STATE,
-			severity,
-			alertType,
-			longRow.provider,
-			longRow.model,
-			longRow.client_name,
-		);
-		if (suppressed) continue;
+			const suppressed = await shouldSuppress(
+				env.O11Y_ALERT_STATE,
+				window.severity,
+				'ttfb',
+				longRow.provider,
+				longRow.model,
+				longRow.client_name,
+			);
+			if (suppressed) continue;
 
-		const longSlowFraction = longRow.weighted_slow / longRow.weighted_total;
-		const actualBurnRate = computeBurnRate(longSlowFraction, config.latencySlo);
+			const actualBurnRate = computeBurnRate(longSlowFraction, config.ttfbSlo);
 
-		const alert: AlertPayload = {
-			severity,
-			alertType,
-			provider: longRow.provider,
-			model: longRow.model,
-			clientName: longRow.client_name,
-			burnRate: actualBurnRate,
-			burnRateThreshold: window.burnRate,
-			windowMinutes: window.longWindowMinutes,
-			thresholdMs,
-			totalRequests: longRow.weighted_total,
-			slo: config.latencySlo,
-		};
+			const alert: AlertPayload = {
+				severity: window.severity,
+				alertType: 'ttfb',
+				provider: longRow.provider,
+				model: longRow.model,
+				clientName: longRow.client_name,
+				burnRate: actualBurnRate,
+				burnRateThreshold: window.burnRate,
+				windowMinutes: window.longWindowMinutes,
+				totalRequests: longRow.weighted_total,
+				slo: config.ttfbSlo,
+				currentTtfbFraction: longSlowFraction,
+				ttfbThresholdMs: config.ttfbThresholdMs,
+			};
 
-		await sendAlertNotification(alert, env);
-		await recordAlertFired(env.O11Y_ALERT_STATE, severity, alertType, longRow.provider, longRow.model, longRow.client_name);
+			await sendAlertNotification(alert, env);
+			await recordAlertFired(env.O11Y_ALERT_STATE, window.severity, 'ttfb', longRow.provider, longRow.model, longRow.client_name);
+		}
 	}
 }
 
@@ -206,8 +228,13 @@ async function evaluateLatencyWindow(
  * can suppress lower-severity alerts for the same dimension.
  */
 export async function evaluateAlerts(env: Env): Promise<void> {
-	const recommendedModels = await getRecommendedModels(env);
-	const config = DEFAULT_SLO_CONFIG;
+	const configs = await listAlertingConfigs(env);
+	const enabledConfigs = configs.filter((config) => config.enabled);
+	const configByModel: ConfigByModel = new Map(enabledConfigs.map((config) => [config.model, config]));
+
+	const ttfbConfigs = await listTtfbAlertingConfigs(env);
+	const enabledTtfbConfigs = ttfbConfigs.filter((config) => config.enabled);
+	const ttfbConfigByModel: TtfbConfigByModel = new Map(enabledTtfbConfigs.map((config) => [config.model, config]));
 
 	// Sort windows by severity: pages first, then tickets.
 	// Within the same severity, higher burn rate first.
@@ -216,23 +243,23 @@ export async function evaluateAlerts(env: Env): Promise<void> {
 		return b.burnRate - a.burnRate;
 	});
 
+	const errors: unknown[] = [];
+
 	for (const window of sortedWindows) {
 		try {
-			await evaluateErrorRateWindow(window, recommendedModels, env);
+			await evaluateErrorRateWindow(window, configByModel, env);
 		} catch (err) {
-			console.error(`Error evaluating error rate window (${window.longWindowMinutes}m):`, err);
+			errors.push(new Error(`error_rate window (${window.longWindowMinutes}m)`, { cause: err }));
 		}
 
 		try {
-			await evaluateLatencyWindow(window, config.latencyP50ThresholdMs, 'latency_p50', recommendedModels, env);
+			await evaluateTtfbWindow(window, ttfbConfigByModel, env);
 		} catch (err) {
-			console.error(`Error evaluating latency p50 window (${window.longWindowMinutes}m):`, err);
+			errors.push(new Error(`ttfb window (${window.longWindowMinutes}m)`, { cause: err }));
 		}
+	}
 
-		try {
-			await evaluateLatencyWindow(window, config.latencyP90ThresholdMs, 'latency_p90', recommendedModels, env);
-		} catch (err) {
-			console.error(`Error evaluating latency p90 window (${window.longWindowMinutes}m):`, err);
-		}
+	if (errors.length > 0) {
+		throw new AggregateError(errors, `Alert evaluation failed with ${errors.length} error(s)`);
 	}
 }

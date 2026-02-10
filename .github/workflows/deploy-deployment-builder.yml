@@ -2,6 +2,7 @@ name: Deploy Builder Worker
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   deploy:
@@ -23,7 +24,7 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        working-directory: cloud-agent
+        working-directory: cloudflare-deploy-infra/builder
         run: pnpm install --frozen-lockfile
 
       - name: Deploy to Cloudflare Workers

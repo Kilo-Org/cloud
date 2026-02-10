@@ -154,12 +154,12 @@ jobs:
   check-cloud-agent-changes:
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.changes.outputs.cloud-agent }}
+      changed: ${{ steps.changes.outputs['cloud-agent'] }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Check for cloud-agent changes
         uses: dorny/paths-filter@v3
@@ -183,7 +183,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Check for session-ingest changes
         uses: dorny/paths-filter@v3
@@ -209,7 +209,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Check for o11y changes
         uses: dorny/paths-filter@v3
@@ -226,3 +226,99 @@ jobs:
     secrets: inherit
     with:
       environment: prod
+
+  check-git-token-service-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs['git-token-service'] }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for git-token-service changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            git-token-service:
+              - 'cloudflare-git-token-service/**'
+
+  deploy-git-token-service:
+    needs: [check-git-token-service-changes]
+    if: needs.check-git-token-service-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-git-token-service.yml
+    secrets: inherit
+
+  check-deployment-dispatcher-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs['deployment-dispatcher'] }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for deployment-dispatcher changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            deployment-dispatcher:
+              - 'cloudflare-deploy-infra/dispatcher/**'
+
+  deploy-deployment-dispatcher:
+    needs: [check-deployment-dispatcher-changes]
+    if: needs.check-deployment-dispatcher-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-deployment-dispatcher.yml
+    secrets: inherit
+
+  check-deployment-builder-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs['deployment-builder'] }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for deployment-builder changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            deployment-builder:
+              - 'cloudflare-deploy-infra/builder/**'
+
+  deploy-deployment-builder:
+    needs: [check-deployment-builder-changes]
+    if: needs.check-deployment-builder-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-deployment-builder.yml
+    secrets: inherit
+
+  check-app-builder-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs['app-builder'] }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for app-builder changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            app-builder:
+              - 'cloudflare-app-builder/**'
+
+  deploy-app-builder:
+    needs: [check-app-builder-changes]
+    if: needs.check-app-builder-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-app-builder.yml
+    secrets: inherit

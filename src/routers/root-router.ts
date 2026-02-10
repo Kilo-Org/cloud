@@ -28,6 +28,7 @@ import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { agentProfilesRouter } from '@/routers/agent-profiles-router';
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
+import { appBuilderFeedbackRouter } from '@/routers/app-builder-feedback-router';
 
 export const rootRouter = createTRPCRouter({
   test: testRouter,
@@ -58,6 +59,7 @@ export const rootRouter = createTRPCRouter({
   agentProfiles: agentProfilesRouter,
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,
+  appBuilderFeedback: appBuilderFeedbackRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

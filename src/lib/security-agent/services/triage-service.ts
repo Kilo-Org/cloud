@@ -337,7 +337,11 @@ export async function triageSecurityFinding(options: {
         }
 
         if (toolCall.function.name !== 'submit_triage_result') {
-          logError('Unexpected tool call', { correlationId, findingId: finding.id, tool: toolCall.function.name });
+          logError('Unexpected tool call', {
+            correlationId,
+            findingId: finding.id,
+            tool: toolCall.function.name,
+          });
           span.setAttribute('security_agent.is_fallback', true);
           return createFallbackTriage(`Unexpected tool: ${toolCall.function.name}`);
         }

@@ -1,0 +1,39 @@
+# Copy this to .dev.vars and fill in your values
+# .dev.vars is gitignored and used by wrangler dev
+
+# Auth
+NEXTAUTH_SECRET=dev-secret-change-me
+INTERNAL_API_SECRET=dev-internal-secret
+GATEWAY_TOKEN_SECRET=dev-gateway-secret
+WORKER_ENV=development
+
+# AI Provider (at least one required)
+ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=sk-...
+
+# Cloudflare AI Gateway (alternative to direct provider keys)
+# CLOUDFLARE_AI_GATEWAY_API_KEY=your-provider-api-key
+# CF_AI_GATEWAY_ACCOUNT_ID=your-account-id
+# CF_AI_GATEWAY_GATEWAY_ID=your-gateway-id
+# CF_AI_GATEWAY_MODEL=workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast
+
+# Legacy AI Gateway (still supported)
+# AI_GATEWAY_API_KEY=your-key
+# AI_GATEWAY_BASE_URL=https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic
+
+# R2 Storage
+# R2_ACCESS_KEY_ID=...
+# R2_SECRET_ACCESS_KEY=...
+# CF_ACCOUNT_ID=...
+
+# Encryption (for user secrets -- PR5+)
+# AGENT_ENV_VARS_PRIVATE_KEY=...
+
+# Hyperdrive (Postgres connection for pepper validation + instance registry)
+# In dev, set the direct Postgres connection string; Hyperdrive proxies it in production.
+# HYPERDRIVE_CONNECTION_STRING=
+
+# Development
+DEV_MODE=true
+DEBUG_ROUTES=true
+DEBUG_ROUTES_SECRET=dev-debug-secret

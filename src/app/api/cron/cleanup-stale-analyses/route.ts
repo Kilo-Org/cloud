@@ -59,7 +59,9 @@ export async function GET(request: Request) {
 
     // Send heartbeat to BetterStack on success
     if (SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL) {
-      await fetch(SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL, { signal: AbortSignal.timeout(5000) }).catch(() => {});
+      await fetch(SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL, {
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
     }
 
     return NextResponse.json({
@@ -74,7 +76,9 @@ export async function GET(request: Request) {
 
     // Send failure heartbeat to BetterStack
     if (SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL) {
-      await fetch(`${SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL}/fail`, { signal: AbortSignal.timeout(5000) }).catch(() => {});
+      await fetch(`${SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL}/fail`, {
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
     }
 
     return NextResponse.json(

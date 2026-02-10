@@ -36,13 +36,17 @@ export function useAlertingModelDrafts({ configs }: UseAlertingModelDraftsParams
   }, [configs]);
 
   const updateDraft = (modelId: string, partial: Partial<AlertingDraft>) => {
-    setDrafts(prev => ({
-      ...prev,
-      [modelId]: {
-        ...prev[modelId],
-        ...partial,
-      },
-    }));
+    setDrafts(prev => {
+      const existing = prev[modelId];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [modelId]: {
+          ...existing,
+          ...partial,
+        },
+      };
+    });
   };
 
   const addDraft = (modelId: string) => {

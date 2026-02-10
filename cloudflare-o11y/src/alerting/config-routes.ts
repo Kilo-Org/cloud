@@ -18,7 +18,7 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
 	app.put('/alerting/config', requireAdmin, zodJsonValidator(AlertingConfigInputSchema), async (c) => {
 		const input = c.req.valid('json');
 		const updatedAt = new Date().toISOString();
-		const config = { ...input, updatedAt };
+		const config = { ...input, model: input.model.trim(), updatedAt };
 		await upsertAlertingConfig(c.env, config);
 
 		return c.json({ success: true, config });

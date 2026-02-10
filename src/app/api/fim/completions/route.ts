@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
 
   // Use shared helper for organization model restrictions
   // Model allow list only applies to Enterprise plans
-  // Provider allow list and data collection apply to all plans (but FIM doesn't use provider config)
+  // Provider allow list applies to Enterprise plans; data collection applies to all plans (but FIM doesn't use provider config)
   const { error: modelRestrictionError } = checkOrganizationModelRestrictions({
     modelId: fimModel_withOpenRouterStyleProviderPrefix,
     settings,

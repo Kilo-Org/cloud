@@ -42,7 +42,7 @@ export class AlertConfigDO extends DurableObject<Env> {
 	}
 
 	list(): AlertingConfig[] {
-		const rows = this.ctx.storage.sql.exec<AlertConfigRow>('SELECT * FROM alert_config').toArray();
+		const rows = this.ctx.storage.sql.exec<AlertConfigRow>('SELECT * FROM alert_config ORDER BY model ASC').toArray();
 		return rows.map(rowToConfig);
 	}
 

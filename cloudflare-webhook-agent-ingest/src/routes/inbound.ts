@@ -6,13 +6,15 @@ import { logger } from '../util/logger';
 import { resError, resSuccess } from '../util/res';
 import { withDORetry } from '../util/do-retry';
 import { compareWebhookSecret, type StoredWebhookAuth } from '../util/webhook-auth';
+import { decodeUserIdFromPath } from '../util/user-id-encoding';
 
 type CaptureResult = { success: true; requestId: string } | { success: false; error: string };
 
 const inbound = new Hono<HonoContext>();
 
 inbound.all('/user/:userId/:triggerId', async c => {
-  const { userId, triggerId } = c.req.param();
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
   const namespace = `user/${userId}`;
   const doKey = buildDOKey(namespace, triggerId);
 

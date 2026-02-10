@@ -4,6 +4,8 @@
 
 import { Hono } from 'hono';
 import { bearerAuth } from 'hono/bearer-auth';
+import { validator } from 'hono/validator';
+import { z } from 'zod';
 import type { Env } from '../types';
 import { hashPassword } from '../auth/password';
 import { getPasswordRecord, setPasswordRecord, deletePasswordRecord } from '../auth/password-store';
@@ -25,35 +27,46 @@ api.use('*', async (c, next) => {
   return bearerAuth({ token })(c, next);
 });
 
-// Worker name validation middleware
-api.use('/password/:worker', async (c, next) => {
-  const worker = c.req.param('worker');
-  const result = workerNameSchema.safeParse(worker);
+const validateWorkerParam = validator('param', (value, c) => {
+  const result = z.object({ worker: workerNameSchema }).safeParse(value);
   if (!result.success) {
     return c.json({ error: 'Invalid worker name' }, 400);
   }
-  await next();
+  return result.data;
+});
+
+const validateSlugParam = validator('param', (value, c) => {
+  const result = z.object({ slug: slugParamSchema }).safeParse(value);
+  if (!result.success) {
+    return c.json({ error: 'Invalid slug' }, 400);
+  }
+  return result.data;
+});
+
+const validateSetPasswordBody = validator('json', (value, c) => {
+  const result = setPasswordRequestSchema.safeParse(value);
+  if (!result.success) {
+    return c.json({ error: 'Missing password in body' }, 400);
+  }
+  return result.data;
+});
+
+const validateSetSlugMappingBody = validator('json', (value, c) => {
+  const result = setSlugMappingRequestSchema.safeParse(value);
+  if (!result.success) {
+    return c.json({ error: 'Missing workerName in body' }, 400);
+  }
+  return result.data;
 });
 
 /**
  * Set password protection.
  */
-api.put('/password/:worker', async c => {
-  const worker = c.req.param('worker');
+api.put('/password/:worker', validateWorkerParam, validateSetPasswordBody, async c => {
+  const { worker } = c.req.valid('param');
+  const { password } = c.req.valid('json');
 
-  let rawBody: unknown;
-  try {
-    rawBody = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
-  }
-
-  const result = setPasswordRequestSchema.safeParse(rawBody);
-  if (!result.success) {
-    return c.json({ error: 'Missing password in body' }, 400);
-  }
-
-  const record = hashPassword(result.data.password);
+  const record = hashPassword(password);
   await setPasswordRecord(c.env.DEPLOY_KV, worker, record);
 
   return c.json({
@@ -65,8 +78,8 @@ api.put('/password/:worker', async c => {
 /**
  * Remove password protection.
  */
-api.delete('/password/:worker', async c => {
-  const worker = c.req.param('worker');
+api.delete('/password/:worker', validateWorkerParam, async c => {
+  const { worker } = c.req.valid('param');
 
   await deletePasswordRecord(c.env.DEPLOY_KV, worker);
 
@@ -76,8 +89,8 @@ api.delete('/password/:worker', async c => {
 /**
  * Check protection status.
  */
-api.get('/password/:worker', async c => {
-  const worker = c.req.param('worker');
+api.get('/password/:worker', validateWorkerParam, async c => {
+  const { worker } = c.req.valid('param');
 
   const record = await getPasswordRecord(c.env.DEPLOY_KV, worker);
 
@@ -96,36 +109,15 @@ api.get('/password/:worker', async c => {
 // Maps public slugs to internal worker names for custom subdomain support
 // ============================================================================
 
-// Slug param validation middleware
-api.use('/slug-mapping/:slug', async (c, next) => {
-  const slug = c.req.param('slug');
-  const result = slugParamSchema.safeParse(slug);
-  if (!result.success) {
-    return c.json({ error: 'Invalid slug' }, 400);
-  }
-  await next();
-});
-
 /**
  * Set a slug mapping.
  * Maps a public slug to an internal worker name.
  */
-api.put('/slug-mapping/:slug', async c => {
-  const slug = c.req.param('slug');
+api.put('/slug-mapping/:slug', validateSlugParam, validateSetSlugMappingBody, async c => {
+  const { slug } = c.req.valid('param');
+  const { workerName } = c.req.valid('json');
 
-  let rawBody: unknown;
-  try {
-    rawBody = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
-  }
-
-  const result = setSlugMappingRequestSchema.safeParse(rawBody);
-  if (!result.success) {
-    return c.json({ error: 'Missing workerName in body' }, 400);
-  }
-
-  await c.env.DEPLOY_KV.put(`slug:${slug}`, result.data.workerName);
+  await c.env.DEPLOY_KV.put(`slug:${slug}`, workerName);
 
   return c.json({ success: true });
 });
@@ -133,8 +125,8 @@ api.put('/slug-mapping/:slug', async c => {
 /**
  * Delete a slug mapping.
  */
-api.delete('/slug-mapping/:slug', async c => {
-  const slug = c.req.param('slug');
+api.delete('/slug-mapping/:slug', validateSlugParam, async c => {
+  const { slug } = c.req.valid('param');
 
   await c.env.DEPLOY_KV.delete(`slug:${slug}`);
 
@@ -144,8 +136,8 @@ api.delete('/slug-mapping/:slug', async c => {
 /**
  * Get a slug mapping.
  */
-api.get('/slug-mapping/:slug', async c => {
-  const slug = c.req.param('slug');
+api.get('/slug-mapping/:slug', validateSlugParam, async c => {
+  const { slug } = c.req.valid('param');
 
   const workerName = await c.env.DEPLOY_KV.get(`slug:${slug}`);
 

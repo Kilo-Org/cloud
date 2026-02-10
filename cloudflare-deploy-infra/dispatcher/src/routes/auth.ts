@@ -13,7 +13,6 @@ import { createLoginRateLimiter } from '../auth/rate-limit';
 import { returnPathSchema, authFormSchema } from '../schemas';
 
 // Auth router - will be mounted at /__auth
-// Uses publicSlug for password lookup (not internal workerName)
 export const auth = new Hono<{
   Bindings: Env;
   Variables: { publicSlug: string; workerName: string };
@@ -26,10 +25,10 @@ export const auth = new Hono<{
  */
 auth.get('/', async c => {
   const publicSlug = c.get('publicSlug');
+  const workerName = c.get('workerName');
   const returnPath = returnPathSchema.parse(c.req.query('return') ?? '/');
 
-  // Check if password is set for this deployment (keyed by public slug)
-  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_KV, publicSlug);
+  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_KV, workerName);
 
   if (!passwordRecord) {
     // No password set - redirect to target path since there's nothing to authenticate
@@ -51,6 +50,7 @@ auth.get('/', async c => {
  */
 auth.post('/', createLoginRateLimiter(), async c => {
   const publicSlug = c.get('publicSlug');
+  const workerName = c.get('workerName');
 
   // Parse form data
   let formData: FormData;
@@ -86,8 +86,7 @@ auth.post('/', createLoginRateLimiter(), async c => {
 
   const { password, return: returnPath } = formResult.data;
 
-  // Get password record from KV (keyed by public slug)
-  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_KV, publicSlug);
+  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_KV, workerName);
 
   if (!passwordRecord) {
     // No password set means worker shouldn't be protected
@@ -116,11 +115,10 @@ auth.post('/', createLoginRateLimiter(), async c => {
     );
   }
 
-  // Password is valid - sign JWT (using public slug as the worker identifier)
   const sessionDuration = c.env.SESSION_DURATION_SECONDS;
   const jwt = signJwt(
     {
-      worker: publicSlug,
+      worker: workerName,
       passwordSetAt: passwordRecord.createdAt,
     },
     c.env.JWT_SECRET,

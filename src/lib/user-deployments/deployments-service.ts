@@ -756,6 +756,7 @@ export async function createDeployment(params: {
           owned_by_organization_id: owner.type === 'org' ? owner.id : null,
           owned_by_user_id: owner.type === 'user' ? owner.id : null,
           deployment_slug: deploymentSlug,
+          internal_worker_name: deploymentSlug,
           repository_source: resolved.repositorySource,
           branch: branch,
           deployment_url: deploymentUrl,
@@ -856,8 +857,7 @@ export async function renameDeployment(
   }
 
   const oldSlug = deployment.deployment_slug;
-  // The internal worker name is either stored explicitly or is the original slug
-  const internalWorkerName = deployment.internal_worker_name ?? oldSlug;
+  const internalWorkerName = deployment.internal_worker_name;
   const newUrl = `https://${newSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
 
   // DB update first — the unique constraint is the authoritative guard against races.

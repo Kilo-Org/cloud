@@ -229,12 +229,13 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ input }) => {
-      // Get deployment to verify ownership and get slug
+      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
       });
-      return dispatcherClient.getPasswordStatus(deployment.deployment_slug);
+      // Password records are keyed by internal worker name in the dispatcher
+      return dispatcherClient.getPasswordStatus(deployment.internal_worker_name);
     }),
 
   setPassword: organizationMemberProcedure
@@ -246,12 +247,13 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // Get deployment to verify ownership and get slug
+      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
       });
-      return dispatcherClient.setPassword(deployment.deployment_slug, input.password);
+      // Password records are keyed by internal worker name in the dispatcher
+      return dispatcherClient.setPassword(deployment.internal_worker_name, input.password);
     }),
 
   removePassword: organizationMemberProcedure
@@ -262,11 +264,12 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // Get deployment to verify ownership and get slug
+      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
       });
-      return dispatcherClient.removePassword(deployment.deployment_slug);
+      // Password records are keyed by internal worker name in the dispatcher
+      return dispatcherClient.removePassword(deployment.internal_worker_name);
     }),
 });

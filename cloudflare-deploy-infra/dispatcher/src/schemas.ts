@@ -29,7 +29,7 @@ export const slugParamSchema = z
   .max(63);
 
 export const setSlugMappingRequestSchema = z.object({
-  workerName: z.string().min(1),
+  workerName: workerNameSchema,
 });
 
 export const setPasswordResponseSchema = z.object({

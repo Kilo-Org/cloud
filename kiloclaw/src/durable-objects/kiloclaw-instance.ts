@@ -228,7 +228,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       Object.assign(envVars, this.envVars);
     }
 
-    await ensureOpenClawGateway(sandbox, this.env);
+    await ensureOpenClawGateway(sandbox, this.env, envVars);
 
     // Update state
     this.status = 'running';

@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import type { TtfbAlertingDraft } from '@/app/admin/alerting-ttfb/types';
-import { DEFAULT_TTFB_THRESHOLD_MS, DEFAULT_MIN_REQUESTS } from '@/app/admin/alerting-ttfb/utils';
+import {
+  DEFAULT_TTFB_THRESHOLD_MS,
+  DEFAULT_MIN_REQUESTS,
+  DEFAULT_TTFB_SLO,
+} from '@/app/admin/alerting-ttfb/utils';
 
 type TtfbAlertingConfigItem = {
   model: string;
   enabled: boolean;
   ttfbThresholdMs: number;
+  ttfbSlo: number;
   minRequestsPerWindow: number;
 };
 
@@ -28,6 +33,7 @@ export function useTtfbAlertingModelDrafts({ configs }: UseTtfbAlertingModelDraf
         next[config.model] = {
           enabled: config.enabled,
           ttfbThresholdMs: String(config.ttfbThresholdMs),
+          ttfbSlo: String(config.ttfbSlo),
           minRequestsPerWindow: String(config.minRequestsPerWindow),
         };
       }
@@ -55,6 +61,7 @@ export function useTtfbAlertingModelDrafts({ configs }: UseTtfbAlertingModelDraf
       [modelId]: {
         enabled: false,
         ttfbThresholdMs: DEFAULT_TTFB_THRESHOLD_MS,
+        ttfbSlo: DEFAULT_TTFB_SLO,
         minRequestsPerWindow: DEFAULT_MIN_REQUESTS,
       },
     }));

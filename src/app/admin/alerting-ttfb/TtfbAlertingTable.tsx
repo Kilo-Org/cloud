@@ -11,7 +11,14 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { formatMs } from '@/app/admin/alerting-ttfb/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { formatMs, SLO_OPTIONS } from '@/app/admin/alerting-ttfb/utils';
 import type { TtfbAlertingDraft, TtfbBaseline } from '@/app/admin/alerting-ttfb/types';
 import type { BaselineState } from '@/app/admin/alerting/types';
 import { Info } from 'lucide-react';
@@ -25,6 +32,7 @@ type TtfbAlertingTableProps = {
   deletingModelId: string | null;
   onToggleEnabled: (modelId: string, enabled: boolean) => void;
   onThresholdChange: (modelId: string, value: string) => void;
+  onSloChange: (modelId: string, value: string) => void;
   onMinRequestsChange: (modelId: string, value: string) => void;
   onLoadBaseline: (modelId: string) => void;
   onSuggestDefaults: (modelId: string) => void;
@@ -40,6 +48,7 @@ export function TtfbAlertingTable({
   deletingModelId,
   onToggleEnabled,
   onThresholdChange,
+  onSloChange,
   onMinRequestsChange,
   onLoadBaseline,
   onSuggestDefaults,
@@ -53,6 +62,7 @@ export function TtfbAlertingTable({
             <TableHead>Model</TableHead>
             <TableHead>Enabled</TableHead>
             <TableHead>TTFB Threshold (ms)</TableHead>
+            <TableHead>SLO (p-value)</TableHead>
             <TableHead>
               <div className="flex items-center gap-1">
                 <span>Min Requests</span>
@@ -61,14 +71,14 @@ export function TtfbAlertingTable({
                 </span>
               </div>
             </TableHead>
-            <TableHead>Baselines (p95)</TableHead>
+            <TableHead>Baselines (3d)</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {configs.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center">
+              <TableCell colSpan={7} className="text-center">
                 No TTFB alerting models found
               </TableCell>
             </TableRow>
@@ -103,6 +113,24 @@ export function TtfbAlertingTable({
                     />
                   </TableCell>
                   <TableCell>
+                    <Select
+                      value={draft?.ttfbSlo ?? '0.95'}
+                      onValueChange={value => onSloChange(modelId, value)}
+                      disabled={isDisabled}
+                    >
+                      <SelectTrigger size="sm" className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SLO_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
                     <Input
                       type="number"
                       step="1"
@@ -118,18 +146,10 @@ export function TtfbAlertingTable({
                       <div className="text-muted-foreground text-sm">Loading…</div>
                     ) : baseline ? (
                       <div className="text-muted-foreground text-xs">
-                        <div>
-                          1d: {formatMs(baseline.p95Ttfb1d)} ({baseline.requests1d.toLocaleString()}
-                          )
-                        </div>
-                        <div>
-                          3d: {formatMs(baseline.p95Ttfb3d)} ({baseline.requests3d.toLocaleString()}
-                          )
-                        </div>
-                        <div>
-                          7d: {formatMs(baseline.p95Ttfb7d)} ({baseline.requests7d.toLocaleString()}
-                          )
-                        </div>
+                        <div>p50: {formatMs(baseline.p50Ttfb3d)}</div>
+                        <div>p95: {formatMs(baseline.p95Ttfb3d)}</div>
+                        <div>p99: {formatMs(baseline.p99Ttfb3d)}</div>
+                        <div className="mt-0.5">{baseline.requests3d.toLocaleString()} reqs</div>
                       </div>
                     ) : baseline === null ? (
                       <div className="text-muted-foreground text-xs">No data</div>

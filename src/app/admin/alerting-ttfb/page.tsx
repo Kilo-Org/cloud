@@ -21,7 +21,7 @@ import { useAddModelSearch } from '@/app/admin/alerting/use-add-model-search';
 import {
   DEFAULT_TTFB_THRESHOLD_MS,
   DEFAULT_MIN_REQUESTS,
-  TTFB_SLO,
+  DEFAULT_TTFB_SLO,
 } from '@/app/admin/alerting-ttfb/utils';
 export default function AdminAlertingTtfbPage() {
   const [savingAll, setSavingAll] = useState(false);
@@ -71,11 +71,16 @@ export default function AdminAlertingTtfbPage() {
           throw new Error(`Invalid min requests for ${modelId}`);
         }
 
+        const ttfbSlo = Number(draft.ttfbSlo);
+        if (ttfbSlo <= 0 || ttfbSlo >= 1) {
+          throw new Error(`Invalid SLO for ${modelId}`);
+        }
+
         await updateConfig.mutateAsync({
           model: modelId,
           enabled: draft.enabled,
           ttfbThresholdMs: thresholdMs,
-          ttfbSlo: TTFB_SLO,
+          ttfbSlo,
           minRequestsPerWindow: minRequests,
         });
       }
@@ -107,9 +112,9 @@ export default function AdminAlertingTtfbPage() {
       return;
     }
 
-    // Take 3d p95, add 30% buffer, round to nearest 100ms, clamp to min 500ms
+    // Take 3d p95, add 20% buffer, round to nearest 100ms, clamp to min 500ms
     const p95 = baseline.p95Ttfb3d;
-    const withBuffer = p95 * 1.3;
+    const withBuffer = p95 * 1.2;
     const rounded = Math.round(withBuffer / 100) * 100;
     const suggestedThreshold = Math.max(500, rounded);
 
@@ -121,6 +126,7 @@ export default function AdminAlertingTtfbPage() {
 
     updateDraft(modelId, {
       ttfbThresholdMs: String(suggestedThreshold),
+      ttfbSlo: '0.95',
       minRequestsPerWindow: String(suggestedMinRequests),
     });
     toast.success('Suggested defaults applied');
@@ -134,7 +140,7 @@ export default function AdminAlertingTtfbPage() {
         model: modelId,
         enabled: false,
         ttfbThresholdMs: Number(DEFAULT_TTFB_THRESHOLD_MS),
-        ttfbSlo: TTFB_SLO,
+        ttfbSlo: Number(DEFAULT_TTFB_SLO),
         minRequestsPerWindow: Number(DEFAULT_MIN_REQUESTS),
       });
       toast.success('TTFB alerting model added');
@@ -186,12 +192,14 @@ export default function AdminAlertingTtfbPage() {
         </div>
 
         <p className="text-muted-foreground">
-          Configure per-model TTFB latency alerting. Baselines load per model and show last 1d, 3d,
-          and 7d p95 TTFB values alongside request counts.
+          Configure per-model TTFB latency alerting. Baselines show 3d p50/p95/p99 TTFB values and
+          request counts. The SLO p-value controls what fraction of requests must stay under the
+          threshold.
         </p>
         <p className="text-muted-foreground">
-          Alerts fire when more than 5% of successful requests exceed the configured TTFB threshold
-          across both the short and long burn-rate windows. Only enabled models are evaluated.
+          Alerts fire when the configured percentile of successful requests exceeds the TTFB
+          threshold across both the short and long burn-rate windows. Only enabled models are
+          evaluated.
         </p>
 
         <div className="flex items-center gap-2">
@@ -228,6 +236,7 @@ export default function AdminAlertingTtfbPage() {
             deletingModelId={deletingModelId}
             onToggleEnabled={(modelId, enabled) => updateDraft(modelId, { enabled })}
             onThresholdChange={(modelId, value) => updateDraft(modelId, { ttfbThresholdMs: value })}
+            onSloChange={(modelId, value) => updateDraft(modelId, { ttfbSlo: value })}
             onMinRequestsChange={(modelId, value) =>
               updateDraft(modelId, { minRequestsPerWindow: value })
             }

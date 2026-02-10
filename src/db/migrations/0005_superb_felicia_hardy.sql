@@ -10,5 +10,6 @@ CREATE TABLE "kiloclaw_instances" (
 	CONSTRAINT "kiloclaw_instances_status_check" CHECK ("kiloclaw_instances"."status" IN ('provisioned', 'running', 'stopped', 'destroyed'))
 );
 --> statement-breakpoint
+ALTER TABLE "kiloclaw_instances" ADD CONSTRAINT "kiloclaw_instances_user_id_kilocode_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_kiloclaw_instances_active_user" ON "kiloclaw_instances" USING btree ("user_id") WHERE "kiloclaw_instances"."destroyed_at" is null;--> statement-breakpoint
 CREATE INDEX "IDX_kiloclaw_instances_sandbox_id" ON "kiloclaw_instances" USING btree ("sandbox_id") WHERE "kiloclaw_instances"."destroyed_at" is null;

@@ -2816,9 +2816,14 @@ export const kiloclaw_instances = pgTable(
       .default(sql`gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    user_id: text().notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
-    status: text().notNull().default('provisioned'),
+    status: text()
+      .$type<KiloClawInstanceStatus>()
+      .notNull()
+      .default(KiloClawInstanceStatus.Provisioned),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     last_started_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_stopped_at: timestamp({ withTimezone: true, mode: 'string' }),

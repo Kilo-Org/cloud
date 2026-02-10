@@ -1,5 +1,5 @@
 {
-  "id": "739ffff7-77ac-4000-a4d0-a59d4cb30b29",
+  "id": "b63882e0-1601-4b90-9429-e2742e8b1916",
   "prevId": "bed79658-f70a-4a95-81cb-fc38076bcc8e",
   "version": "7",
   "dialect": "postgresql",
@@ -6075,7 +6075,21 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "kiloclaw_instances_user_id_kilocode_users_id_fk": {
+          "name": "kiloclaw_instances_user_id_kilocode_users_id_fk",
+          "tableFrom": "kiloclaw_instances",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

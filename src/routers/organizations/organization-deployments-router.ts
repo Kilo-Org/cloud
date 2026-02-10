@@ -113,7 +113,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
         repositoryFullName: repoNameSchema,
         branch: branchSchema,
         envVars: z.array(plaintextEnvVarSchema).optional(),
-        slug: slugSchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -127,7 +126,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
         branch: input.branch,
         createdByUserId: ctx.user.id,
         envVars: input.envVars,
-        slug: input.slug,
       });
     }),
 

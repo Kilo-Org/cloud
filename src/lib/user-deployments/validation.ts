@@ -13,6 +13,9 @@ const BRANCH_NAME_REGEX = /^[a-zA-Z0-9/_.-]+$/;
 // Must start and end with alphanumeric, only lowercase letters, numbers, and single hyphens
 const SLUG_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
+// Matches the internal worker name format (dpl-<uuid>)
+const INTERNAL_WORKER_NAME_REGEX = /^dpl-/;
+
 // Repository name validation regex (owner/repo format)
 const REPO_NAME_REGEX = /^[^/]+\/[^/]+$/;
 
@@ -87,6 +90,9 @@ export const slugSchema = z
   })
   .refine(slug => !RESERVED_SLUGS.includes(slug as (typeof RESERVED_SLUGS)[number]), {
     message: 'This subdomain is reserved',
+  })
+  .refine(slug => !INTERNAL_WORKER_NAME_REGEX.test(slug), {
+    message: 'Subdomain cannot start with "dpl-"',
   });
 
 /**

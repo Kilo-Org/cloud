@@ -8,7 +8,7 @@ import {
   platform_integrations,
   app_builder_projects,
 } from '@/db/schema';
-import { eq, and, desc, gt, inArray, ne } from 'drizzle-orm';
+import { eq, and, desc, gt, inArray, ne, or } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { CreateDeploymentResponse } from '@/lib/user-deployments/deployment-builder-client';
 import { apiClient as deployApiClient } from '@/lib/user-deployments/deployment-builder-client';
@@ -218,7 +218,10 @@ export async function deleteDeployment(deploymentId: string, owner: Owner) {
 
   // Delete worker deployment from Cloudflare FIRST
   // If this fails, we don't proceed with database deletion to avoid orphan deployments
-  await deployApiClient.deleteWorker(deployment[0].deployment_slug);
+  await deployApiClient.deleteWorker(deployment[0].internal_worker_name);
+
+  // Clean up KV slug mapping
+  await dispatcherClient.deleteSlugMapping(deployment[0].internal_worker_name);
 
   // Unlink app builder projects that reference this deployment
   await db
@@ -420,7 +423,7 @@ export async function redeploy(deployment: Deployment) {
   const builderResponse = await deployApiClient.createDeployment(
     provider,
     deployment.repository_source,
-    deployment.deployment_slug,
+    deployment.internal_worker_name,
     deployment.branch,
     accessToken,
     cancelBuildIds.length > 0 ? cancelBuildIds : undefined,
@@ -462,11 +465,12 @@ export async function checkSlugAvailability(slug: string): Promise<CheckSlugAvai
     };
   }
 
-  // Check database uniqueness
+  // Check database uniqueness — also check internal_worker_name to prevent collisions
+  // with renamed deployments whose original worker name differs from their current slug
   const existing = await db
     .select({ id: deployments.id })
     .from(deployments)
-    .where(eq(deployments.deployment_slug, slug))
+    .where(or(eq(deployments.deployment_slug, slug), eq(deployments.internal_worker_name, slug)))
     .limit(1);
 
   if (existing.length > 0) {
@@ -493,11 +497,17 @@ async function checkSlugAvailabilityExcluding(
     };
   }
 
-  // Check database uniqueness, excluding the current deployment
+  // Check database uniqueness, excluding the current deployment.
+  // Also check internal_worker_name to prevent collisions with renamed deployments.
   const existing = await db
     .select({ id: deployments.id })
     .from(deployments)
-    .where(and(eq(deployments.deployment_slug, slug), ne(deployments.id, excludeDeploymentId)))
+    .where(
+      and(
+        or(eq(deployments.deployment_slug, slug), eq(deployments.internal_worker_name, slug)),
+        ne(deployments.id, excludeDeploymentId)
+      )
+    )
     .limit(1);
 
   if (existing.length > 0) {
@@ -676,9 +686,8 @@ export async function createDeployment(params: {
   branch: string;
   createdByUserId: string;
   envVars?: PlaintextEnvVar[];
-  slug?: string;
 }): Promise<CreateDeploymentResult> {
-  const { owner, source, branch, createdByUserId, envVars, slug: requestedSlug } = params;
+  const { owner, source, branch, createdByUserId, envVars } = params;
 
   // Temporary: skip payment check for app builder sites
   if (source.type !== 'app-builder') {
@@ -694,24 +703,9 @@ export async function createDeployment(params: {
 
   const resolved = await resolveSource(owner, source);
 
-  // Use requested slug or generate one
-  let deploymentSlug: string;
-  if (requestedSlug) {
-    // Validate custom slug
-    const slugCheck = await checkSlugAvailability(requestedSlug);
-    if (!slugCheck.available) {
-      return {
-        success: false,
-        error: slugCheck.reason,
-        message: slugCheck.message,
-      };
-    }
-    deploymentSlug = requestedSlug;
-  } else {
-    // Generate deployment slug from repository name + random suffix
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    deploymentSlug = `${resolved.repoName}-${randomSuffix}`.toLowerCase();
-  }
+  // Generate deployment slug from repository name + random suffix
+  const randomSuffix = Math.random().toString(36).substring(2, 8);
+  const deploymentSlug = `${resolved.repoName}-${randomSuffix}`.toLowerCase();
 
   // Encrypt user-provided env vars first
   const encryptedUserEnvVars = envVars && envVars.length > 0 ? encryptEnvVars(envVars) : [];
@@ -725,13 +719,16 @@ export async function createDeployment(params: {
 
   const allEncryptedEnvVars = [...encryptedUserEnvVars, ...encryptedDBEnvVars];
 
-  // Call builder API
+  // Internal worker name uses a stable dpl-<uuid> format that can never collide with user slugs
+  const internalWorkerName = `dpl-${crypto.randomUUID()}`;
+
+  // Call builder API — deploys the CF worker under the internal name
   let builderResponse: CreateDeploymentResponse;
   try {
     builderResponse = await deployApiClient.createDeployment(
       resolved.sourceType,
       resolved.repositorySource,
-      deploymentSlug,
+      internalWorkerName,
       branch,
       resolved.authToken,
       undefined,
@@ -756,7 +753,7 @@ export async function createDeployment(params: {
           owned_by_organization_id: owner.type === 'org' ? owner.id : null,
           owned_by_user_id: owner.type === 'user' ? owner.id : null,
           deployment_slug: deploymentSlug,
-          internal_worker_name: deploymentSlug,
+          internal_worker_name: internalWorkerName,
           repository_source: resolved.repositorySource,
           branch: branch,
           deployment_url: deploymentUrl,
@@ -789,6 +786,9 @@ export async function createDeployment(params: {
     }
     throw error;
   }
+
+  // Set up KV slug mapping so the dispatcher can route the public slug to the internal worker
+  await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
 
   return { success: true, deploymentId, deploymentSlug, deploymentUrl };
 }

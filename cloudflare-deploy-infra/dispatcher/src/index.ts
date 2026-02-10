@@ -58,7 +58,7 @@ subdomainApp.use('*', async (c, next) => {
   c.set('publicSlug', slug);
 
   // Check KV for slug mapping (custom slug -> internal worker name)
-  const mappedWorkerName = await c.env.DEPLOY_KV.get(`slug:${slug}`);
+  const mappedWorkerName = await c.env.DEPLOY_KV.get(`slug2worker:${slug}`);
 
   if (mappedWorkerName !== null && !validateWorkerName(mappedWorkerName)) {
     return c.text('Not Found', 404);
@@ -75,7 +75,6 @@ subdomainApp.route('/__auth', auth);
 
 // Handle all other paths on subdomain - check password protection and forward to worker
 subdomainApp.all('*', async c => {
-  const publicSlug = c.get('publicSlug');
   const workerName = c.get('workerName');
   const url = new URL(c.req.url);
 

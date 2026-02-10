@@ -110,13 +110,13 @@ api.put('/slug-mapping/:worker', validateWorkerParam, validateSetSlugMappingBody
   const { slug } = c.req.valid('json');
 
   // Remove the old forward mapping if the worker was previously mapped to a different slug
-  const oldSlug = await c.env.DEPLOY_KV.get(`worker-slug:${worker}`);
+  const oldSlug = await c.env.DEPLOY_KV.get(`worker2slug:${worker}`);
   if (oldSlug && oldSlug !== slug) {
-    await c.env.DEPLOY_KV.delete(`slug:${oldSlug}`);
+    await c.env.DEPLOY_KV.delete(`slug2worker:${oldSlug}`);
   }
 
-  await c.env.DEPLOY_KV.put(`slug:${slug}`, worker);
-  await c.env.DEPLOY_KV.put(`worker-slug:${worker}`, slug);
+  await c.env.DEPLOY_KV.put(`slug2worker:${slug}`, worker);
+  await c.env.DEPLOY_KV.put(`worker2slug:${worker}`, slug);
 
   return c.json({ success: true });
 });
@@ -128,11 +128,11 @@ api.put('/slug-mapping/:worker', validateWorkerParam, validateSetSlugMappingBody
 api.delete('/slug-mapping/:worker', validateWorkerParam, async c => {
   const { worker } = c.req.valid('param');
 
-  const slug = await c.env.DEPLOY_KV.get(`worker-slug:${worker}`);
+  const slug = await c.env.DEPLOY_KV.get(`worker2slug:${worker}`);
   if (slug) {
-    await c.env.DEPLOY_KV.delete(`slug:${slug}`);
+    await c.env.DEPLOY_KV.delete(`slug2worker:${slug}`);
   }
-  await c.env.DEPLOY_KV.delete(`worker-slug:${worker}`);
+  await c.env.DEPLOY_KV.delete(`worker2slug:${worker}`);
 
   return c.json({ success: true });
 });

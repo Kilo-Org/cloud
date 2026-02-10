@@ -11,7 +11,7 @@
   "compatibility_flags": ["nodejs_compat"],
   /**
    * Single KV namespace for all deployment data.
-   * Keys are prefixed: "password:<slug>" for auth, "slug:<slug>" for slug-to-worker mappings.
+   * Keys are prefixed: "password:<worker>" for auth, "slug2worker:<slug>" and "worker2slug:<worker>" for slug mappings.
    */
   "kv_namespaces": [
     {

@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { ModelOption } from '@/app/admin/alerting/types';
 import { OpenRouterModelsResponseSchema } from '@/lib/organizations/organization-types';
+import { normalizeModelId } from '@/lib/model-utils';
 import { z } from 'zod';
 
 type AddModelSearchResult = {
@@ -39,10 +40,14 @@ export function useAddModelSearch(search: string): AddModelSearchResult {
 
   const models = useMemo(() => {
     const list = modelsQuery.data ?? [];
-    const mapped: ModelOption[] = list.map((model: OpenRouterModel) => ({
-      openrouterId: model.id,
-      name: model.name || model.id,
-    }));
+    const seen = new Set<string>();
+    const mapped: ModelOption[] = [];
+    for (const model of list) {
+      const id = normalizeModelId(model.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      mapped.push({ openrouterId: id, name: model.name || id });
+    }
 
     if (!search.trim()) return mapped;
     const normalizedSearch = search.toLowerCase();

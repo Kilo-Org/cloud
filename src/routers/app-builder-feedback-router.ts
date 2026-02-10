@@ -45,7 +45,7 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
         .insert(app_builder_feedback)
         .values({
           kilo_user_id: ctx.user.id,
-          project_id: input.project_id,
+          project_id: project.id,
           feedback_text: input.feedback_text,
           session_id: sessionId,
           model: input.model,

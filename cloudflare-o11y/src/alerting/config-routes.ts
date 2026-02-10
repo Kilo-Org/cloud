@@ -2,7 +2,13 @@ import type { Hono } from 'hono';
 import { zodJsonValidator } from '../util/validation';
 import { requireAdmin } from '../admin-middleware';
 import { AlertingConfigInputSchema, deleteAlertingConfig, listAlertingConfigs, upsertAlertingConfig } from './config-store';
-import { queryErrorRateBaseline } from './query';
+import {
+	TtfbAlertingConfigInputSchema,
+	deleteTtfbAlertingConfig,
+	listTtfbAlertingConfigs,
+	upsertTtfbAlertingConfig,
+} from './ttfb-config-store';
+import { queryErrorRateBaseline, queryTtfbBaseline } from './query';
 
 function errorRate(errors: number, total: number): number {
 	if (total <= 0) return 0;
@@ -60,6 +66,56 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
 			requests1d: total1d,
 			requests3d: total3d,
 			requests7d: total7d,
+		};
+
+		return c.json({ success: true, baseline: response });
+	});
+
+	// --- TTFB alerting config routes ---
+
+	app.get('/alerting/ttfb-config', requireAdmin, async (c) => {
+		const configs = await listTtfbAlertingConfigs(c.env);
+		return c.json({ success: true, configs });
+	});
+
+	app.put('/alerting/ttfb-config', requireAdmin, zodJsonValidator(TtfbAlertingConfigInputSchema), async (c) => {
+		const input = c.req.valid('json');
+		const updatedAt = new Date().toISOString();
+		const config = { ...input, model: input.model.trim(), updatedAt };
+		await upsertTtfbAlertingConfig(c.env, config);
+
+		return c.json({ success: true, config });
+	});
+
+	app.delete('/alerting/ttfb-config', requireAdmin, async (c) => {
+		const model = c.req.query('model')?.trim();
+		if (!model || model.length === 0) {
+			return c.json({ success: false, error: 'model is required' }, 400);
+		}
+
+		await deleteTtfbAlertingConfig(c.env, model);
+		return c.json({ success: true });
+	});
+
+	app.get('/alerting/ttfb-baseline', requireAdmin, async (c) => {
+		const model = c.req.query('model')?.trim();
+		if (!model || model.length === 0) {
+			return c.json({ success: false, error: 'model is required' }, 400);
+		}
+
+		const baseline = await queryTtfbBaseline(model, c.env);
+		if (!baseline) {
+			return c.json({ success: true, baseline: null });
+		}
+
+		const response = {
+			model,
+			p95Ttfb1d: Number(baseline.p95_ttfb_1d ?? 0),
+			p95Ttfb3d: Number(baseline.p95_ttfb_3d ?? 0),
+			p95Ttfb7d: Number(baseline.p95_ttfb_7d ?? 0),
+			requests1d: Number(baseline.weighted_total_1d || 0),
+			requests3d: Number(baseline.weighted_total_3d || 0),
+			requests7d: Number(baseline.weighted_total_7d || 0),
 		};
 
 		return c.json({ success: true, baseline: response });

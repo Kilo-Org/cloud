@@ -9,26 +9,32 @@ type NotifyEnv = {
 	O11Y_SLACK_WEBHOOK_TICKET: SecretsStoreSecret;
 };
 
+export type AlertType = 'error_rate' | 'ttfb';
+
 export type AlertPayload = {
 	severity: AlertSeverity;
-	alertType: 'error_rate';
+	alertType: AlertType;
 	provider: string;
 	model: string;
 	clientName: string;
 	burnRate: number;
 	burnRateThreshold: number;
 	windowMinutes: number;
-	// For error rate alerts
-	currentRate?: number;
-	// Common
 	totalRequests: number;
 	slo: number;
+	// Error rate specific
+	currentRate?: number;
+	// TTFB specific
+	currentTtfbFraction?: number;
+	ttfbThresholdMs?: number;
 };
 
 function formatAlertType(alertType: AlertPayload['alertType']): string {
 	switch (alertType) {
 		case 'error_rate':
 			return 'Error Rate';
+		case 'ttfb':
+			return 'TTFB Latency';
 	}
 }
 
@@ -36,11 +42,18 @@ function formatPercent(value: number): string {
 	return `${(value * 100).toFixed(2)}%`;
 }
 
+function buildMetricLine(alert: AlertPayload): string {
+	if (alert.alertType === 'ttfb') {
+		const fraction = formatPercent(alert.currentTtfbFraction ?? 0);
+		const budget = formatPercent(1 - alert.slo);
+		return `${fraction} of requests exceeded ${alert.ttfbThresholdMs ?? 0}ms TTFB (budget: ${budget})`;
+	}
+	return `Error rate: ${formatPercent(alert.currentRate ?? 0)} (SLO: ${formatPercent(alert.slo)})`;
+}
+
 function buildSlackMessage(alert: AlertPayload): object {
 	const severityLabel = alert.severity === 'page' ? ':rotating_light: PAGE' : ':ticket: TICKET';
 	const typeLabel = formatAlertType(alert.alertType);
-
-	const metricLine = `Error rate: ${formatPercent(alert.currentRate ?? 0)} (SLO: ${formatPercent(alert.slo)})`;
 
 	return {
 		blocks: [
@@ -67,7 +80,7 @@ function buildSlackMessage(alert: AlertPayload): object {
 				type: 'section',
 				text: {
 					type: 'mrkdwn',
-					text: `${metricLine}\nRequests in window: ${alert.totalRequests.toLocaleString()}\nClient: ${alert.clientName}`,
+					text: `${buildMetricLine(alert)}\nRequests in window: ${alert.totalRequests.toLocaleString()}\nClient: ${alert.clientName}`,
 				},
 			},
 		],

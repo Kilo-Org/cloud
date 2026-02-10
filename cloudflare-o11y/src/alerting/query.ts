@@ -93,3 +93,75 @@ export async function queryErrorRateBaseline(model: string, env: AeQueryEnv): Pr
 	const rows = await queryAnalyticsEngine<ErrorRateBaselineRow>(sql, env);
 	return rows[0] ?? null;
 }
+
+// --- TTFB queries ---
+
+export type TtfbExceedRow = {
+	provider: string;
+	model: string;
+	client_name: string;
+	weighted_slow: number;
+	weighted_total: number;
+};
+
+/**
+ * Query the fraction of successful requests where TTFB exceeds a threshold,
+ * grouped by provider, model, and client for a given time window.
+ *
+ * Only considers successful requests (blob4 = '0') so errored requests
+ * with meaningless TTFB values don't pollute the latency signal.
+ */
+export function queryTtfbExceedRates(
+	windowMinutes: number,
+	minRequests: number,
+	thresholdMs: number,
+	env: AeQueryEnv,
+): Promise<TtfbExceedRow[]> {
+	const sql = `
+		SELECT
+			blob1 AS provider,
+			blob2 AS model,
+			blob3 AS client_name,
+			SUM(_sample_interval * IF(double1 > ${thresholdMs}, 1, 0)) AS weighted_slow,
+			SUM(_sample_interval) AS weighted_total
+		FROM o11y_api_metrics
+		WHERE timestamp > NOW() - INTERVAL '${windowMinutes}' MINUTE
+			AND blob4 = '0'
+		GROUP BY provider, model, client_name
+		HAVING weighted_total >= ${minRequests}
+		FORMAT JSON
+	`;
+	return queryAnalyticsEngine<TtfbExceedRow>(sql, env);
+}
+
+export type TtfbBaselineRow = {
+	p95_ttfb_1d: number | null;
+	weighted_total_1d: number;
+	p95_ttfb_3d: number | null;
+	weighted_total_3d: number;
+	p95_ttfb_7d: number | null;
+	weighted_total_7d: number;
+};
+
+/**
+ * Query 1d/3d/7d p95 TTFB baselines for a specific model.
+ * Only considers successful requests (blob4 = '0').
+ */
+export async function queryTtfbBaseline(model: string, env: AeQueryEnv): Promise<TtfbBaselineRow | null> {
+	const modelValue = escapeSqlString(model);
+	const sql = `
+		SELECT
+			QUANTILE(0.95)(IF(timestamp > NOW() - INTERVAL '1' DAY AND blob4 = '0', double1, NULL)) AS p95_ttfb_1d,
+			SUM(IF(timestamp > NOW() - INTERVAL '1' DAY AND blob4 = '0', _sample_interval, 0)) AS weighted_total_1d,
+			QUANTILE(0.95)(IF(timestamp > NOW() - INTERVAL '3' DAY AND blob4 = '0', double1, NULL)) AS p95_ttfb_3d,
+			SUM(IF(timestamp > NOW() - INTERVAL '3' DAY AND blob4 = '0', _sample_interval, 0)) AS weighted_total_3d,
+			QUANTILE(0.95)(IF(timestamp > NOW() - INTERVAL '7' DAY AND blob4 = '0', double1, NULL)) AS p95_ttfb_7d,
+			SUM(IF(timestamp > NOW() - INTERVAL '7' DAY AND blob4 = '0', _sample_interval, 0)) AS weighted_total_7d
+		FROM o11y_api_metrics
+		WHERE blob2 = '${modelValue}' AND blob4 = '0' AND timestamp > NOW() - INTERVAL '7' DAY
+		FORMAT JSON
+	`;
+
+	const rows = await queryAnalyticsEngine<TtfbBaselineRow>(sql, env);
+	return rows[0] ?? null;
+}

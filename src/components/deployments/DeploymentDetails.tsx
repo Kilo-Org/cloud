@@ -8,6 +8,7 @@ import { StatusBadge } from './StatusBadge';
 import { BuildLogViewer } from './BuildLogViewer';
 import { EnvironmentSettings } from './EnvironmentSettings';
 import { PasswordSettings } from './PasswordSettings';
+import { SlugEditor } from './SlugEditor';
 import { Button } from '@/components/Button';
 import { Loader2, AlertCircle, Trash2, RotateCw, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -141,10 +142,10 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
             <TabsContent value="overview" className="space-y-6">
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-400">Name</h3>
-                    <p className="mt-1 text-gray-100">{deployment.deployment_slug}</p>
-                  </div>
+                  <SlugEditor
+                    deploymentId={deploymentId}
+                    currentSlug={deployment.deployment_slug}
+                  />
                   <div>
                     <h3 className="text-sm font-medium text-gray-400">Status</h3>
                     <div className="mt-1">

@@ -5,6 +5,7 @@ import type { Deployment, DeploymentBuild } from '@/db/schema';
 import type { Event, BuildStatus } from './types';
 import type { EnvVarResponse } from './env-vars-validation';
 import type { GetPasswordStatusResponse } from './dispatcher-client';
+import type { RenameDeploymentResult, CheckSlugAvailabilityResult } from './deployments-service';
 
 /**
  * Result type for creating a deployment - discriminated union
@@ -115,6 +116,12 @@ export type DeploymentQueries = {
   getPasswordStatus?: (
     deploymentId: string
   ) => UseQueryResult<GetPasswordStatusResponse, DeploymentError>;
+
+  /**
+   * Check if a deployment slug is available.
+   * Used on-demand (not as a reactive query hook).
+   */
+  checkSlugAvailability: (slug: string) => Promise<CheckSlugAvailabilityResult>;
 };
 
 /**
@@ -185,4 +192,13 @@ export type DeploymentMutations = {
    * Remove password protection from a deployment (org-only)
    */
   removePassword?: UseMutationResult<{ success: true }, DeploymentError, { deploymentId: string }>;
+
+  /**
+   * Rename a deployment's slug (subdomain)
+   */
+  renameDeployment: UseMutationResult<
+    RenameDeploymentResult,
+    DeploymentError,
+    { deploymentId: string; newSlug: string }
+  >;
 };

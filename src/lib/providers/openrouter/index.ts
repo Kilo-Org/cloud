@@ -69,9 +69,17 @@ function enhancedModelList(models: OpenRouterModel[]) {
         model.id === KILO_AUTO_MODEL_ID ? -1 : preferredModels.indexOf(model.id);
       const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
       const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
+      const isFree = parseFloat(model.pricing.prompt) === 0;
+      const nameEndsWithParen = model.name.endsWith(')');
       return {
         ...model,
-        name: isNew ? model.name + ' (new)' : model.name,
+        name: nameEndsWithParen
+          ? model.name
+          : isFree
+            ? model.name + ' (free)'
+            : isNew
+              ? model.name + ' (new)'
+              : model.name,
         preferredIndex:
           preferredIndex >= 0 || model.id === KILO_AUTO_MODEL_ID ? preferredIndex : undefined,
         settings: getModelSettings(model.id),

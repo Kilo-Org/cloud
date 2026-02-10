@@ -28,7 +28,7 @@ function rowToConfig(row: AlertConfigRow): AlertingConfig {
 export class AlertConfigDO extends DurableObject<Env> {
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
-		ctx.blockConcurrencyWhile(async () => {
+		void ctx.blockConcurrencyWhile(async () => {
 			ctx.storage.sql.exec(`
 				CREATE TABLE IF NOT EXISTS alert_config (
 					model TEXT PRIMARY KEY,

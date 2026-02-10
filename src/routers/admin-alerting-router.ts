@@ -93,16 +93,7 @@ export const adminAlertingRouter = createTRPCRouter({
         parseErrorMessage: 'Invalid alerting config response',
       });
     } catch (error) {
-      if (error instanceof O11yRequestError) {
-        throw new TRPCError({
-          code: error.status === 401 ? 'UNAUTHORIZED' : 'INTERNAL_SERVER_ERROR',
-          message: error.message,
-        });
-      }
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to fetch alerting config',
-      });
+      wrapO11yError(error, 'Failed to fetch alerting config');
     }
   }),
   updateConfig: adminProcedure.input(AlertingConfigSchema).mutation(async ({ input }) => {
@@ -117,16 +108,7 @@ export const adminAlertingRouter = createTRPCRouter({
         parseErrorMessage: 'Invalid alerting config response',
       });
     } catch (error) {
-      if (error instanceof O11yRequestError) {
-        throw new TRPCError({
-          code: error.status === 401 ? 'UNAUTHORIZED' : 'INTERNAL_SERVER_ERROR',
-          message: error.message,
-        });
-      }
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to update alerting config',
-      });
+      wrapO11yError(error, 'Failed to update alerting config');
     }
   }),
   deleteConfig: adminProcedure
@@ -143,16 +125,7 @@ export const adminAlertingRouter = createTRPCRouter({
           parseErrorMessage: 'Invalid delete response',
         });
       } catch (error) {
-        if (error instanceof O11yRequestError) {
-          throw new TRPCError({
-            code: error.status === 401 ? 'UNAUTHORIZED' : 'INTERNAL_SERVER_ERROR',
-            message: error.message,
-          });
-        }
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to delete alerting config',
-        });
+        wrapO11yError(error, 'Failed to delete alerting config');
       }
     }),
   getBaseline: adminProcedure
@@ -167,13 +140,7 @@ export const adminAlertingRouter = createTRPCRouter({
           parseErrorMessage: 'Invalid baseline response',
         });
       } catch (error) {
-        if (error instanceof O11yRequestError) {
-          throw new TRPCError({
-            code: error.status === 401 ? 'UNAUTHORIZED' : 'INTERNAL_SERVER_ERROR',
-            message: error.message,
-          });
-        }
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch baseline' });
+        wrapO11yError(error, 'Failed to fetch baseline');
       }
     }),
 

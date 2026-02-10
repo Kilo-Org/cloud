@@ -33,6 +33,7 @@ export function getFraudDetectionHeaders(headers: Headers) {
     http_x_vercel_ip_longitude: parseFloatOrNull(headers.get('x-vercel-ip-longitude')),
     http_x_vercel_ja4_digest: headers.get('x-vercel-ja4-digest'),
     http_user_agent: headers.get('user-agent'),
+    machine_id: headers.get('x-kilocode-machineid'),
   };
 }
 

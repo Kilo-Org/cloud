@@ -148,6 +148,7 @@ describe('ensurePaymentMethodStored', () => {
       http_x_vercel_ip_longitude: -122.4194,
       http_x_vercel_ja4_digest: 'test_digest',
       http_user_agent: 'Mozilla/5.0 (test)',
+      machine_id: null,
     };
 
     const result = await ensurePaymentMethodStored(testUser.id, mockStripePaymentMethod, headers);
@@ -262,6 +263,7 @@ describe('ensurePaymentMethodStored', () => {
       http_x_vercel_ip_longitude: null,
       http_x_vercel_ja4_digest: null,
       http_user_agent: null,
+      machine_id: null,
     };
 
     const uniquePaymentMethod = sampleStripePaymentMethod();

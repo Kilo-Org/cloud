@@ -55,6 +55,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     editor_name: null,
     is_user_byok: false,
     has_tools: false,
+    machine_id: null,
   };
 }
 

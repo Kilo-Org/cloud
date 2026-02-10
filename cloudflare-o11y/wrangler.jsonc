@@ -44,8 +44,8 @@
 	 * README instructions for creating streams, sinks, and pipelines via wrangler CLI.
 	 */
 	"pipelines": [
-		{ "pipeline": "o11y-api-metrics-pipeline", "binding": "PIPELINE_API_METRICS" },
-		{ "pipeline": "o11y-session-metrics-pipeline", "binding": "PIPELINE_SESSION_METRICS" },
+		{ "pipeline": "7b8a59eeeb954bfbb6988a02b4f010de", "binding": "PIPELINE_API_METRICS" },
+		{ "pipeline": "898bb5b1a6b44634b34f1b1a3cdcb2c6", "binding": "PIPELINE_SESSION_METRICS" },
 	],
 	/**
 	 * KV Namespace — stores alert dedup state (TTL-based cooldowns)

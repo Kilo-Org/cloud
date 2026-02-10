@@ -36,13 +36,6 @@
       "when": 1770638464816,
       "tag": "0004_volatile_exodus",
       "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1770710631765,
-      "tag": "0005_strong_rachel_grey",
-      "breakpoints": true
     }
   ]
 }

@@ -25,12 +25,22 @@ export function getFirstFreeModel() {
 
 export const preferredModels = recommendedModels.map(m => m.public_id);
 
+const freeOpenRouterModels = [
+  'openrouter/aurora-alpha',
+  'openrouter/pony-alpha',
+  'openrouter/free',
+];
+
 export function isFreeModel(model: string): boolean {
-  return !!kiloFreeModels.find(m => m.public_id === model && m.is_enabled);
+  return (
+    kiloFreeModels.some(m => m.public_id === model && m.is_enabled) ||
+    model.endsWith(':free') ||
+    freeOpenRouterModels.includes(model)
+  );
 }
 
 export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {
-  return isFreeModel(model);
+  return kiloFreeModels.some(m => m.public_id === model && m.is_enabled);
 }
 
 export const kiloFreeModels = [

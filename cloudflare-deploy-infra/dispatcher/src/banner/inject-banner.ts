@@ -75,7 +75,7 @@ function getBannerScript(nonce: string): string {
 (function() {
   function inject() {
     var badge = document.createElement('a');
-    badge.href = 'http://app.kilo.ai/app-builder';
+    badge.href = 'https://app.kilo.ai/app-builder';
     badge.target = '_blank';
     badge.rel = 'noopener noreferrer';
     badge.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;background:rgba(24,24,27,0.85);color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:500;line-height:1;border-radius:10px;border:1px solid rgba(255,255,255,0.08);text-decoration:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:transform 0.2s,box-shadow 0.2s;';

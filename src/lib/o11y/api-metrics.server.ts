@@ -118,20 +118,26 @@ const apiMetricsUrl = (() => {
   }
 })();
 
+async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {
+  if (!apiMetricsUrl) return;
+
+  await fetch(apiMetricsUrl, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-O11Y-ADMIN-TOKEN': O11Y_KILO_GATEWAY_CLIENT_SECRET || '',
+    },
+    body: JSON.stringify(params),
+  }).catch(() => {
+    // Best-effort only; never fail the caller request.
+  });
+}
+
 export function emitApiMetrics(params: ApiMetricsParams) {
   if (!apiMetricsUrl) return;
 
   after(async () => {
-    await fetch(apiMetricsUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'X-O11Y-ADMIN-TOKEN': O11Y_KILO_GATEWAY_CLIENT_SECRET || '',
-      },
-      body: JSON.stringify(params),
-    }).catch(() => {
-      // Best-effort only; never fail the caller request.
-    });
+    await sendApiMetrics(params);
   });
 }
 
@@ -155,21 +161,12 @@ export function emitApiMetricsForResponse(
 
     const completeRequestMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
 
-    await fetch(apiMetricsUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'X-O11Y-ADMIN-TOKEN': O11Y_KILO_GATEWAY_CLIENT_SECRET,
-      },
-      body: JSON.stringify({
-        ...params,
-        inferenceProvider,
-        clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
-        completeRequestMs,
-      } satisfies ApiMetricsParams),
-    }).catch(() => {
-      // Best-effort only; never fail the caller request.
-    });
+    await sendApiMetrics({
+      ...params,
+      inferenceProvider,
+      clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
+      completeRequestMs,
+    } satisfies ApiMetricsParams);
   });
 }
 

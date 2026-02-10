@@ -182,6 +182,7 @@ export type UsagePayload = {
   is_byok?: boolean | null;
   is_user_byok?: boolean | null;
   editor_name?: string | null;
+  machine_id?: string | null;
 
   // Existing classification (if any)
   abuse_classification?: number | null;
@@ -364,6 +365,7 @@ export async function classifyAbuse(
     streamed: body.stream === true,
     is_user_byok: context?.isByok ?? null,
     editor_name: request.headers.get('x-kilocode-editorname') ?? null,
+    machine_id: request.headers.get('x-kilocode-machineid') ?? null,
   };
 
   return classifyRequest(payload);

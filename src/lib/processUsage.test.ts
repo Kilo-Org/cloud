@@ -333,6 +333,7 @@ describe('logMicrodollarUsage', () => {
       estimatedOutputTokens: 100,
       status_code: 200,
       editor_name: null,
+      machine_id: null,
       user_byok: false,
       has_tools: false,
     }) satisfies MicrodollarUsageContext;

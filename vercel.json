@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/oss-monthly-reset",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/sync-github-status",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {

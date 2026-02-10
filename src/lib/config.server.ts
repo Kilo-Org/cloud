@@ -155,6 +155,12 @@ export const CREDIT_CATEGORIES_ENCRYPTION_KEY = getEnvVariable('CREDIT_CATEGORIE
 export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
 export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');
 
+// BetterStack Status Page (GitHub outage sync)
+export const BETTERSTACK_API_TOKEN = getEnvVariable('BETTERSTACK_API_TOKEN');
+export const BETTERSTACK_STATUS_PAGE_ID = getEnvVariable('BETTERSTACK_STATUS_PAGE_ID');
+// Comma-separated list of Betterstack status page resource IDs for GitHub-dependent features
+export const BETTERSTACK_GITHUB_RESOURCE_IDS = getEnvVariable('BETTERSTACK_GITHUB_RESOURCE_IDS');
+
 // Security agent BetterStack heartbeat URLs
 export const SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL = getEnvVariable(
   'SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL'

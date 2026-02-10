@@ -51,7 +51,7 @@ export default function AdminAlertingPage() {
   }, []);
 
   const saveAllConfigs = async () => {
-    const configs = filteredConfigs;
+    const configs = configsData?.configs ?? [];
     if (configs.length === 0) return;
 
     setSavingAll(true);
@@ -64,7 +64,7 @@ export default function AdminAlertingPage() {
         const errorRatePercent = Number(draft.errorRatePercent);
         const minRequests = Number(draft.minRequestsPerWindow);
 
-        if (Number.isNaN(errorRatePercent) || errorRatePercent < 0 || errorRatePercent >= 100) {
+        if (Number.isNaN(errorRatePercent) || errorRatePercent <= 0 || errorRatePercent >= 100) {
           throw new Error(`Invalid error rate for ${modelId}`);
         }
 

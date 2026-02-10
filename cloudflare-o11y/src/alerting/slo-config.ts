@@ -24,18 +24,6 @@ export const BURN_RATE_WINDOWS: BurnRateWindow[] = [
 	{ severity: 'ticket', longWindowMinutes: 360, shortWindowMinutes: 30, burnRate: 1 },
 ];
 
-export type O11ySloConfig = {
-	// 0.999 means 99.9% of requests should succeed
-	errorRateSlo: number;
-	// Suppress alerts if the window has fewer than this many requests
-	minRequestsPerWindow: number;
-};
-
-export const DEFAULT_SLO_CONFIG: O11ySloConfig = {
-	errorRateSlo: 0.999,
-	minRequestsPerWindow: 10,
-};
-
 // Alert dedup cooldowns
 export const PAGE_COOLDOWN_SECONDS = 15 * 60; // 15 minutes
 export const TICKET_COOLDOWN_SECONDS = 4 * 60 * 60; // 4 hours

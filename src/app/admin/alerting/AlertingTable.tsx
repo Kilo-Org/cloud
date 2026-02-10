@@ -94,7 +94,7 @@ export function AlertingTable({
                     <Input
                       type="number"
                       step="0.01"
-                      min="0"
+                      min="0.01"
                       max="99.99"
                       value={draft?.errorRatePercent ?? ''}
                       onChange={e => onErrorRateChange(modelId, e.target.value)}

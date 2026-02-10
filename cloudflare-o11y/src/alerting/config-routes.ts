@@ -25,8 +25,8 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
 	});
 
 	app.delete('/alerting/config', requireAdmin, async (c) => {
-		const model = c.req.query('model');
-		if (!model || model.trim().length === 0) {
+		const model = c.req.query('model')?.trim();
+		if (!model || model.length === 0) {
 			return c.json({ success: false, error: 'model is required' }, 400);
 		}
 
@@ -35,8 +35,8 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
 	});
 
 	app.get('/alerting/baseline', requireAdmin, async (c) => {
-		const model = c.req.query('model');
-		if (!model || model.trim().length === 0) {
+		const model = c.req.query('model')?.trim();
+		if (!model || model.length === 0) {
 			return c.json({ success: false, error: 'model is required' }, 400);
 		}
 

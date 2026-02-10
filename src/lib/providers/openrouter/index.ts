@@ -1,4 +1,4 @@
-import { isFreeModel, kiloFreeModels, preferredModels } from '@/lib/models';
+import { kiloFreeModels, preferredModels } from '@/lib/models';
 import { PROVIDERS } from '@/lib/providers';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
@@ -21,10 +21,6 @@ import {
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/model-utils';
-
-export function isRateLimitedToDeathFree(model: string) {
-  return model.endsWith(':free') && !isFreeModel(model);
-}
 
 function buildAutoModel(): OpenRouterModel {
   return {
@@ -60,7 +56,6 @@ function enhancedModelList(models: OpenRouterModel[]) {
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
-        !isRateLimitedToDeathFree(model.id) &&
         !kiloFreeModels.some(m => m.public_id === model.id && m.is_enabled)
     )
     .concat(

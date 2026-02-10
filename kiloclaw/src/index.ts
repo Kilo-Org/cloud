@@ -4,16 +4,13 @@
  * This Worker runs OpenClaw personal AI assistant instances in Cloudflare Sandbox containers.
  * It proxies all requests to the OpenClaw Gateway's web UI and WebSocket endpoint.
  *
- * Features:
- * - Web UI (Control Dashboard + WebChat) at /
- * - WebSocket support for real-time communication
- * - API endpoints at /api/* for management
- * - Configuration via environment secrets
- *
- * Required secrets (set via `wrangler secret put`):
- * - ANTHROPIC_API_KEY: Your Anthropic API key
+ * Auth model:
+ * - User routes: JWT via authMiddleware (Bearer header or kilo-worker-auth cookie)
+ * - Platform routes: x-internal-api-key via internalApiMiddleware (PR4+)
+ * - Public routes: no auth (health check only)
  */
 
+import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { getSandbox, Sandbox, type SandboxOptions } from '@cloudflare/sandbox';
 
@@ -22,21 +19,24 @@ import { OPENCLAW_PORT } from './config';
 import { ensureOpenClawGateway, findExistingGatewayProcess, syncToR2 } from './gateway';
 import { publicRoutes, api, debug } from './routes';
 import { redactSensitiveParams } from './utils/logging';
-
-/**
- * Transform error messages from the gateway to be more user-friendly.
- */
-function transformErrorMessage(message: string, host: string): string {
-  if (message.includes('gateway token missing') || message.includes('gateway token mismatch')) {
-    return `Invalid or missing token. Visit https://${host}?token={REPLACE_WITH_YOUR_TOKEN}`;
-  }
-
-  return message;
-}
+import { authMiddleware } from './auth';
+import { sandboxIdFromUserId } from './auth/sandbox-id';
+import { debugRoutesGate } from './auth/debug-gate';
 
 // Re-export Sandbox as KiloClawSandbox to match wrangler.jsonc class_name.
 // PR4 will replace this with a custom subclass that adds lifecycle hooks.
 export { Sandbox as KiloClawSandbox };
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function transformErrorMessage(message: string, host: string): string {
+  if (message.includes('gateway token missing') || message.includes('gateway token mismatch')) {
+    return `Invalid or missing token. Visit https://${host}?token={REPLACE_WITH_YOUR_TOKEN}`;
+  }
+  return message;
+}
 
 /**
  * Validate required environment variables.
@@ -45,7 +45,13 @@ export { Sandbox as KiloClawSandbox };
 function validateRequiredEnv(env: KiloClawEnv): string[] {
   const missing: string[] = [];
 
-  // Check for AI provider configuration (at least one must be set)
+  if (!env.NEXTAUTH_SECRET) {
+    missing.push('NEXTAUTH_SECRET');
+  }
+  if (!env.GATEWAY_TOKEN_SECRET) {
+    missing.push('GATEWAY_TOKEN_SECRET');
+  }
+
   const hasCloudflareGateway = !!(
     env.CLOUDFLARE_AI_GATEWAY_API_KEY &&
     env.CF_AI_GATEWAY_ACCOUNT_ID &&
@@ -64,72 +70,40 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   return missing;
 }
 
-/**
- * Build sandbox options based on environment configuration.
- *
- * SANDBOX_SLEEP_AFTER controls how long the container stays alive after inactivity:
- * - 'never' (default): Container stays alive indefinitely (recommended due to long cold starts)
- * - Duration string: e.g., '10m', '1h', '30s' - container sleeps after this period of inactivity
- */
 function buildSandboxOptions(env: KiloClawEnv): SandboxOptions {
   const sleepAfter = env.SANDBOX_SLEEP_AFTER?.toLowerCase() || 'never';
-
-  // 'never' means keep the container alive indefinitely
   if (sleepAfter === 'never') {
     return { keepAlive: true };
   }
-
-  // Otherwise, use the specified duration
   return { sleepAfter };
 }
 
-// Main app
-const app = new Hono<AppEnv>();
-
 // =============================================================================
-// MIDDLEWARE: Applied to ALL routes
+// Named middleware functions
 // =============================================================================
 
-// Middleware: Log every request
-app.use('*', async (c, next) => {
+async function logRequest(c: Context<AppEnv>, next: Next) {
   const url = new URL(c.req.url);
   const redactedSearch = redactSensitiveParams(url);
   console.log(`[REQ] ${c.req.method} ${url.pathname}${redactedSearch}`);
-  console.log(`[REQ] Has ANTHROPIC_API_KEY: ${!!c.env.ANTHROPIC_API_KEY}`);
-  console.log(`[REQ] DEV_MODE: ${c.env.DEV_MODE}`);
-  console.log(`[REQ] DEBUG_ROUTES: ${c.env.DEBUG_ROUTES}`);
   await next();
-});
+}
 
-// Middleware: Initialize sandbox for all requests
-app.use('*', async (c, next) => {
+async function initSandbox(c: Context<AppEnv>, next: Next) {
   const options = buildSandboxOptions(c.env);
   const sandbox = getSandbox(c.env.Sandbox, 'kiloclaw', options);
   c.set('sandbox', sandbox);
   await next();
-});
+}
 
-// =============================================================================
-// PUBLIC ROUTES: No authentication required
-// =============================================================================
+/** Debug routes bypass env validation and auth -- gated by DEBUG_ROUTES + secret. */
+function isDebugRoute(c: Context<AppEnv>): boolean {
+  return new URL(c.req.url).pathname.startsWith('/debug');
+}
 
-app.route('/', publicRoutes);
-
-// =============================================================================
-// PROTECTED ROUTES
-// =============================================================================
-
-// Middleware: Validate required environment variables (skip in dev mode and for debug routes)
-app.use('*', async (c, next) => {
-  const url = new URL(c.req.url);
-
-  // Skip validation for debug routes (they have their own enable check)
-  if (url.pathname.startsWith('/debug')) {
-    return next();
-  }
-
-  // Skip validation in dev mode
-  if (c.env.DEV_MODE === 'true') {
+/** Reject early if required secrets are missing (skip for debug routes and dev mode). */
+async function requireEnvVars(c: Context<AppEnv>, next: Next) {
+  if (isDebugRoute(c) || c.env.DEV_MODE === 'true') {
     return next();
   }
 
@@ -148,18 +122,52 @@ app.use('*', async (c, next) => {
   }
 
   return next();
-});
+}
 
-// Mount API routes
-app.route('/api', api);
+/** Authenticate user via JWT (Bearer header or cookie). */
+async function authGuard(c: Context<AppEnv>, next: Next) {
+  if (isDebugRoute(c)) {
+    return next();
+  }
+  return authMiddleware(c, next);
+}
 
-// Mount debug routes (only when DEBUG_ROUTES is enabled)
-app.use('/debug/*', async (c, next) => {
-  if (c.env.DEBUG_ROUTES !== 'true') {
-    return c.json({ error: 'Debug routes are disabled' }, 404);
+/**
+ * Derive sandboxId from the authenticated userId.
+ * PR2: derives sandboxId only. Does NOT call getSandbox() -- that would create
+ * containers without a provisioned record. getSandbox() per-user is deferred to PR4.
+ */
+async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
+  const userId = c.get('userId');
+  if (userId) {
+    c.set('sandboxId', sandboxIdFromUserId(userId));
   }
   return next();
-});
+}
+
+// =============================================================================
+// App assembly
+// =============================================================================
+
+const app = new Hono<AppEnv>();
+
+// Global middleware (all routes)
+app.use('*', logRequest);
+app.use('*', initSandbox);
+
+// Public routes (no auth)
+app.route('/', publicRoutes);
+
+// Protected middleware chain
+app.use('*', requireEnvVars);
+app.use('*', authGuard);
+app.use('*', deriveSandboxId);
+
+// API routes
+app.route('/api', api);
+
+// Debug routes (gated by env flag)
+app.use('/debug/*', debugRoutesGate);
 app.route('/debug', debug);
 
 // =============================================================================
@@ -180,7 +188,6 @@ app.all('*', async c => {
   const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
   if (!isGatewayReady && !isWebSocketRequest) {
-    // Start the gateway and wait for it
     try {
       await ensureOpenClawGateway(sandbox, c.env);
     } catch (error) {
@@ -205,7 +212,6 @@ app.all('*', async c => {
     }
   }
 
-  // Ensure gateway is running (this will wait for startup if needed)
   if (!isGatewayReady) {
     try {
       await ensureOpenClawGateway(sandbox, c.env);
@@ -222,7 +228,7 @@ app.all('*', async c => {
     }
   }
 
-  // Proxy to OpenClaw with WebSocket message interception
+  // WebSocket proxy with message interception
   if (isWebSocketRequest) {
     const debugLogs = c.env.DEBUG_ROUTES === 'true';
     const redactedSearch = redactSensitiveParams(url);
@@ -232,11 +238,9 @@ app.all('*', async c => {
       console.log('[WS] URL:', url.pathname + redactedSearch);
     }
 
-    // Get WebSocket connection to the container
     const containerResponse = await sandbox.wsConnect(request, OPENCLAW_PORT);
     console.log('[WS] wsConnect response status:', containerResponse.status);
 
-    // Get the container-side WebSocket
     const containerWs = containerResponse.webSocket;
     if (!containerWs) {
       console.error('[WS] No WebSocket in container response - falling back to direct proxy');
@@ -247,10 +251,8 @@ app.all('*', async c => {
       console.log('[WS] Got container WebSocket, setting up interception');
     }
 
-    // Create a WebSocket pair for the client
     const [clientWs, serverWs] = Object.values(new WebSocketPair());
 
-    // Accept both WebSockets
     serverWs.accept();
     containerWs.accept();
 
@@ -260,7 +262,7 @@ app.all('*', async c => {
       console.log('[WS] serverWs.readyState:', serverWs.readyState);
     }
 
-    // Relay messages from client to container
+    // Client -> Container relay
     serverWs.addEventListener('message', event => {
       if (debugLogs) {
         console.log(
@@ -276,7 +278,7 @@ app.all('*', async c => {
       }
     });
 
-    // Relay messages from container to client, with error transformation
+    // Container -> Client relay with error transformation
     containerWs.addEventListener('message', event => {
       if (debugLogs) {
         console.log(
@@ -287,7 +289,6 @@ app.all('*', async c => {
       }
       let data = event.data;
 
-      // Try to intercept and transform error messages
       if (typeof data === 'string') {
         try {
           const parsed = JSON.parse(data);
@@ -318,7 +319,7 @@ app.all('*', async c => {
       }
     });
 
-    // Handle close events
+    // Close relay
     serverWs.addEventListener('close', event => {
       if (debugLogs) {
         console.log('[WS] Client closed:', event.code, event.reason);
@@ -330,7 +331,6 @@ app.all('*', async c => {
       if (debugLogs) {
         console.log('[WS] Container closed:', event.code, event.reason);
       }
-      // Transform the close reason (truncate to 123 bytes max for WebSocket spec)
       let reason = transformErrorMessage(event.reason, url.host);
       if (reason.length > 123) {
         reason = reason.slice(0, 120) + '...';
@@ -341,7 +341,7 @@ app.all('*', async c => {
       serverWs.close(event.code, reason);
     });
 
-    // Handle errors
+    // Error relay
     serverWs.addEventListener('error', event => {
       console.error('[WS] Client error:', event);
       containerWs.close(1011, 'Client error');
@@ -361,11 +361,11 @@ app.all('*', async c => {
     });
   }
 
+  // HTTP proxy
   console.log('[HTTP] Proxying:', url.pathname + url.search);
   const httpResponse = await sandbox.containerFetch(request, OPENCLAW_PORT);
   console.log('[HTTP] Response status:', httpResponse.status);
 
-  // Add debug header to verify worker handled the request
   const newHeaders = new Headers(httpResponse.headers);
   newHeaders.set('X-Worker-Debug', 'proxy-to-openclaw');
   newHeaders.set('X-Debug-Path', url.pathname);
@@ -377,10 +377,10 @@ app.all('*', async c => {
   });
 });
 
-/**
- * Scheduled handler for cron triggers.
- * Syncs OpenClaw config/state from container to R2 for persistence.
- */
+// =============================================================================
+// Scheduled handler (dead code -- cron trigger removed in PR1, handler removed in PR6)
+// =============================================================================
+
 async function scheduled(
   _event: ScheduledEvent,
   env: KiloClawEnv,

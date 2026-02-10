@@ -1,6 +1,12 @@
 # Copy this to .dev.vars and fill in your values
 # .dev.vars is gitignored and used by wrangler dev
 
+# Auth
+NEXTAUTH_SECRET=dev-secret-change-me
+INTERNAL_API_SECRET=dev-internal-secret
+GATEWAY_TOKEN_SECRET=dev-gateway-secret
+WORKER_ENV=development
+
 # AI Provider (at least one required)
 ANTHROPIC_API_KEY=sk-ant-...
 # OPENAI_API_KEY=sk-...
@@ -15,28 +21,15 @@ ANTHROPIC_API_KEY=sk-ant-...
 # AI_GATEWAY_API_KEY=your-key
 # AI_GATEWAY_BASE_URL=https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic
 
-# Local development mode - skips Cloudflare Access auth and bypasses device pairing
-# DEV_MODE=true
+# R2 Storage
+# R2_ACCESS_KEY_ID=...
+# R2_SECRET_ACCESS_KEY=...
+# CF_ACCOUNT_ID=...
 
-# E2E test mode - skips Cloudflare Access auth but keeps device pairing enabled
-# Use this for automated tests that need to test the real pairing flow
-# E2E_TEST_MODE=true
+# Encryption (for user secrets -- PR5+)
+# AGENT_ENV_VARS_PRIVATE_KEY=...
 
-# Enable debug routes at /debug/* (optional)
-# DEBUG_ROUTES=true
-
-# Optional - set a fixed token instead of auto-generated
-OPENCLAW_GATEWAY_TOKEN=dev-token-change-in-prod
-
-# Cloudflare Access configuration for /_admin and /api routes
-# Required for admin UI and device pairing API in production
-# CF_ACCESS_TEAM_DOMAIN=myteam.cloudflareaccess.com
-# CF_ACCESS_AUD=your-application-audience-tag
-
-# Optional chat channels
-# TELEGRAM_BOT_TOKEN=optional
-# DISCORD_BOT_TOKEN=optional
-
-# CDP (Chrome DevTools Protocol) configuration for browser automation
-# CDP_SECRET=shared-secret-for-cdp-auth
-# WORKER_URL=https://your-worker.example.com
+# Development
+DEV_MODE=true
+DEBUG_ROUTES=true
+DEBUG_ROUTES_SECRET=dev-debug-secret

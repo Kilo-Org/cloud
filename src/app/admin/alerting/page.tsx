@@ -89,9 +89,37 @@ export default function AdminAlertingPage() {
     try {
       const result = await baselineMutation.mutateAsync({ model: modelId });
       setBaseline(modelId, result.baseline);
+      return result.baseline;
     } catch (error) {
       setError(modelId, error instanceof Error ? error.message : 'Failed to load baseline');
+      return null;
     }
+  };
+
+  const applySuggestedDefaults = async (modelId: string) => {
+    const baseline = baselineByModel[modelId] ?? (await loadBaseline(modelId));
+    if (!baseline) {
+      toast.error('Baseline not available for suggestions');
+      return;
+    }
+
+    const baselineErrorRate = baseline.errorRate3d || baseline.errorRate1d || 0;
+    const baselineErrorRatePercent = baselineErrorRate * 100;
+    const bufferPercent = Math.min(baselineErrorRatePercent * 0.2, 0.5);
+    const suggestedErrorRate = Math.max(0.5, baselineErrorRatePercent + bufferPercent);
+    const clampedErrorRate = Math.min(suggestedErrorRate, 20);
+
+    const avgRequestsPerMinute = Math.floor((baseline.requests3d || 0) / (3 * 24 * 60));
+    const suggestedMinRequests = Math.max(
+      10,
+      Math.min(500, Math.round(avgRequestsPerMinute * 1.2))
+    );
+
+    updateDraft(modelId, {
+      errorRatePercent: clampedErrorRate.toFixed(2),
+      minRequestsPerWindow: String(suggestedMinRequests),
+    });
+    toast.success('Suggested defaults applied');
   };
 
   const handleAddModel = async (modelId: string) => {
@@ -201,6 +229,7 @@ export default function AdminAlertingPage() {
               updateDraft(modelId, { minRequestsPerWindow: value })
             }
             onLoadBaseline={loadBaseline}
+            onSuggestDefaults={applySuggestedDefaults}
             onSave={saveConfig}
             onDelete={handleDeleteModel}
           />

@@ -7,9 +7,7 @@ import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
-import { devstral_2512_free_model, devstral_small_2512_free_model } from '@/lib/providers/mistral';
 import { recommendedModels } from '@/lib/providers/recommended-models';
-import { kat_coder_pro_free_model } from '@/lib/providers/streamlake';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { zai_glm47_free_model } from '@/lib/providers/zai';
 
@@ -43,10 +41,7 @@ export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {
 
 export const kiloFreeModels = [
   corethink_free_model,
-  devstral_2512_free_model,
-  devstral_small_2512_free_model,
   giga_potato_model,
-  kat_coder_pro_free_model,
   minimax_m21_free_model,
   minimax_m21_free_slackbot_model,
   opus_46_free_slackbot_model,

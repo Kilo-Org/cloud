@@ -31,7 +31,6 @@ export type KiloClawEnv = {
   DEV_MODE?: string;
   DEBUG_ROUTES?: string;
   DEBUG_ROUTES_SECRET?: string;
-  SANDBOX_SLEEP_AFTER?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_DM_POLICY?: string;
   DISCORD_BOT_TOKEN?: string;
@@ -53,7 +52,6 @@ export type KiloClawEnv = {
 export type AppEnv = {
   Bindings: KiloClawEnv;
   Variables: {
-    sandbox: Sandbox;
     userId: string;
     authToken: string;
     sandboxId: string;

@@ -1,27 +1,33 @@
 /**
  * KiloClaw - Multi-tenant OpenClaw in Cloudflare Sandbox containers
  *
- * This Worker runs OpenClaw personal AI assistant instances in Cloudflare Sandbox containers.
- * It proxies all requests to the OpenClaw Gateway's web UI and WebSocket endpoint.
+ * Each authenticated user gets their own sandbox container, managed by the
+ * KiloClawInstance Durable Object. The catch-all proxy resolves the user's
+ * per-user sandbox from their sandboxId and forwards HTTP/WebSocket traffic.
  *
  * Auth model:
- * - User routes: JWT via authMiddleware (Bearer header or kilo-worker-auth cookie)
- * - Platform routes: x-internal-api-key via internalApiMiddleware (PR4+)
+ * - User routes + catch-all proxy: JWT via authMiddleware (Bearer header or cookie)
+ * - Platform routes: x-internal-api-key via internalApiMiddleware
+ * - Debug routes: internal API key or debug secret via debugRoutesGate
  * - Public routes: no auth (health check only)
  */
 
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
-import { getSandbox, type SandboxOptions } from '@cloudflare/sandbox';
+import { getSandbox } from '@cloudflare/sandbox';
 
 import type { AppEnv, KiloClawEnv } from './types';
 import { OPENCLAW_PORT } from './config';
-import { ensureOpenClawGateway, findExistingGatewayProcess } from './gateway';
 import { publicRoutes, api, kiloclaw, debug, platform } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { debugRoutesGate } from './auth/debug-gate';
+
+// If an instance stopped less than this long ago, treat the next proxy failure
+// as a crash and auto-restart. Covers the race where handleContainerStopped
+// fires before the next user request arrives.
+const CRASH_RECOVERY_WINDOW_MS = 60_000; // 60 seconds
 
 // Export the custom Sandbox subclass with lifecycle hooks (matches wrangler.jsonc class_name)
 export { KiloClawSandbox } from './sandbox';
@@ -41,42 +47,14 @@ function transformErrorMessage(message: string): string {
 
 /**
  * Validate required environment variables.
- * Returns an array of missing variable descriptions, or empty array if all are set.
+ * Only checks auth secrets -- AI provider keys are not required at the worker
+ * level since users can bring their own keys (BYOK) via encrypted secrets.
  */
 function validateRequiredEnv(env: KiloClawEnv): string[] {
   const missing: string[] = [];
-
-  if (!env.NEXTAUTH_SECRET) {
-    missing.push('NEXTAUTH_SECRET');
-  }
-  if (!env.GATEWAY_TOKEN_SECRET) {
-    missing.push('GATEWAY_TOKEN_SECRET');
-  }
-
-  const hasCloudflareGateway = !!(
-    env.CLOUDFLARE_AI_GATEWAY_API_KEY &&
-    env.CF_AI_GATEWAY_ACCOUNT_ID &&
-    env.CF_AI_GATEWAY_GATEWAY_ID
-  );
-  const hasLegacyGateway = !!(env.AI_GATEWAY_API_KEY && env.AI_GATEWAY_BASE_URL);
-  const hasAnthropicKey = !!env.ANTHROPIC_API_KEY;
-  const hasOpenAIKey = !!env.OPENAI_API_KEY;
-
-  if (!hasCloudflareGateway && !hasLegacyGateway && !hasAnthropicKey && !hasOpenAIKey) {
-    missing.push(
-      'ANTHROPIC_API_KEY, OPENAI_API_KEY, or CLOUDFLARE_AI_GATEWAY_API_KEY + CF_AI_GATEWAY_ACCOUNT_ID + CF_AI_GATEWAY_GATEWAY_ID'
-    );
-  }
-
+  if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
+  if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
   return missing;
-}
-
-function buildSandboxOptions(env: KiloClawEnv): SandboxOptions {
-  const sleepAfter = env.SANDBOX_SLEEP_AFTER?.toLowerCase() || 'never';
-  if (sleepAfter === 'never') {
-    return { keepAlive: true };
-  }
-  return { sleepAfter };
 }
 
 // =============================================================================
@@ -87,13 +65,6 @@ async function logRequest(c: Context<AppEnv>, next: Next) {
   const url = new URL(c.req.url);
   const redactedSearch = redactSensitiveParams(url);
   console.log(`[REQ] ${c.req.method} ${url.pathname}${redactedSearch}`);
-  await next();
-}
-
-async function initSandbox(c: Context<AppEnv>, next: Next) {
-  const options = buildSandboxOptions(c.env);
-  const sandbox = getSandbox(c.env.Sandbox, 'kiloclaw', options);
-  c.set('sandbox', sandbox);
   await next();
 }
 
@@ -155,8 +126,6 @@ async function authGuard(c: Context<AppEnv>, next: Next) {
 
 /**
  * Derive sandboxId from the authenticated userId.
- * PR2: derives sandboxId only. Does NOT call getSandbox() -- that would create
- * containers without a provisioned record. getSandbox() per-user is deferred to PR4.
  */
 async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
   const userId = c.get('userId');
@@ -174,7 +143,6 @@ const app = new Hono<AppEnv>();
 
 // Global middleware (all routes)
 app.use('*', logRequest);
-app.use('*', initSandbox);
 
 // Public routes (no auth)
 app.route('/', publicRoutes);
@@ -192,69 +160,76 @@ app.route('/api/kiloclaw', kiloclaw);
 app.use('/api/platform/*', internalApiMiddleware);
 app.route('/api/platform', platform);
 
-// Debug routes (gated by env flag)
+// Debug routes (gated by env flag + secret/internal key)
 app.use('/debug/*', debugRoutesGate);
 app.route('/debug', debug);
 
 // =============================================================================
-// CATCH-ALL: Proxy to OpenClaw gateway
+// CATCH-ALL: Proxy to per-user OpenClaw gateway
 // =============================================================================
 
+/**
+ * Attempt crash recovery: if the user's instance has status 'running' but
+ * the container/gateway is dead, call start() to restart it transparently.
+ *
+ * Only triggers when DO status is 'running' -- this covers the race where
+ * the container crashed but handleContainerStopped hasn't fired yet.
+ * start() verifies the gateway is actually alive before no-oping, so it
+ * correctly restarts in this case.
+ *
+ * If status is 'stopped' or 'provisioned', the user must explicitly start.
+ * This prevents auto-restarting instances the user intentionally stopped.
+ */
+async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
+  const userId = c.get('userId');
+  if (!userId) return false;
+
+  try {
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+    const status = await stub.getStatus();
+
+    if (status.status === 'running') {
+      // Gateway dead despite running status (race: crash before handleContainerStopped)
+      console.log('[PROXY] Instance status is running but container unreachable, restarting');
+      await stub.start();
+      return true;
+    }
+
+    if (status.status === 'stopped' && status.lastStoppedAt) {
+      const stoppedAgo = Date.now() - status.lastStoppedAt;
+      if (stoppedAgo < CRASH_RECOVERY_WINDOW_MS) {
+        // Recently crashed (handleContainerStopped already fired) -- restart
+        console.log('[PROXY] Instance stopped', stoppedAgo, 'ms ago, treating as crash recovery');
+        await stub.start();
+        return true;
+      }
+    }
+
+    return false;
+  } catch (err) {
+    console.error('[PROXY] Crash recovery failed:', err);
+  }
+  return false;
+}
+
 app.all('*', async c => {
-  const sandbox = c.get('sandbox');
+  const sandboxId = c.get('sandboxId');
+  if (!sandboxId) {
+    return c.json(
+      { error: 'Authentication required', hint: 'No active session. Please log in.' },
+      401
+    );
+  }
+
+  const sandbox = getSandbox(c.env.Sandbox, sandboxId, { keepAlive: true });
   const request = c.req.raw;
   const url = new URL(request.url);
 
-  console.log('[PROXY] Handling request:', url.pathname);
-
-  // Check if gateway is already running
-  const existingProcess = await findExistingGatewayProcess(sandbox);
-  const isGatewayReady = existingProcess !== null && existingProcess.status === 'running';
+  console.log('[PROXY] Handling request:', url.pathname, 'sandbox:', sandboxId);
 
   const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
-  if (!isGatewayReady && !isWebSocketRequest) {
-    try {
-      await ensureOpenClawGateway(sandbox, c.env);
-    } catch (error) {
-      console.error('[PROXY] Failed to start OpenClaw:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      let hint = 'Check worker logs with: wrangler tail';
-      if (!c.env.ANTHROPIC_API_KEY) {
-        hint = 'ANTHROPIC_API_KEY is not set. Run: wrangler secret put ANTHROPIC_API_KEY';
-      } else if (errorMessage.includes('heap out of memory') || errorMessage.includes('OOM')) {
-        hint = 'Gateway ran out of memory. Try again or check for memory leaks.';
-      }
-
-      return c.json(
-        {
-          error: 'OpenClaw gateway failed to start',
-          details: errorMessage,
-          hint,
-        },
-        503
-      );
-    }
-  }
-
-  if (!isGatewayReady) {
-    try {
-      await ensureOpenClawGateway(sandbox, c.env);
-    } catch (error) {
-      console.error('[PROXY] Failed to start OpenClaw:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return c.json(
-        {
-          error: 'OpenClaw gateway failed to start',
-          details: errorMessage,
-        },
-        503
-      );
-    }
-  }
-
-  // WebSocket proxy with message interception
+  // WebSocket proxy with gateway token injection and message interception
   if (isWebSocketRequest) {
     const debugLogs = c.env.DEBUG_ROUTES === 'true';
     const redactedSearch = redactSensitiveParams(url);
@@ -264,12 +239,36 @@ app.all('*', async c => {
       console.log('[WS] URL:', url.pathname + redactedSearch);
     }
 
-    // NOTE: The catch-all proxy routes to the shared sandbox, not the user's
-    // per-user sandbox. Gateway token injection is NOT done here because the
-    // shared sandbox's gateway was not started with a per-user token.
-    // Per-user WebSocket proxying will be added when the catch-all is replaced
-    // with per-user sandbox resolution.
-    const containerResponse = await sandbox.wsConnect(request, OPENCLAW_PORT);
+    // Gateway token auth: the browser sends the token in the WebSocket connect
+    // frame (params.auth.token), NOT as a URL query param. The token reaches the
+    // browser via the URL fragment set by the Next.js dashboard (B4.2).
+    // The worker just relays the WebSocket messages transparently.
+
+    let containerResponse: Response;
+    try {
+      containerResponse = await sandbox.wsConnect(request, OPENCLAW_PORT);
+    } catch (err) {
+      console.error('[WS] wsConnect failed:', err);
+
+      // Attempt crash recovery: restart if the instance was supposed to be running
+      const recovered = await attemptCrashRecovery(c);
+      if (recovered) {
+        try {
+          containerResponse = await sandbox.wsConnect(request, OPENCLAW_PORT);
+        } catch (retryErr) {
+          console.error('[WS] Retry after recovery failed:', retryErr);
+          return c.json({ error: 'Instance not reachable after restart attempt' }, 503);
+        }
+      } else {
+        return c.json(
+          {
+            error: 'Instance not reachable',
+            hint: 'Your instance may not be running. Start it from the dashboard.',
+          },
+          503
+        );
+      }
+    }
     console.log('[WS] wsConnect response status:', containerResponse.status);
 
     const containerWs = containerResponse.webSocket;
@@ -394,7 +393,31 @@ app.all('*', async c => {
 
   // HTTP proxy
   console.log('[HTTP] Proxying:', url.pathname + url.search);
-  const httpResponse = await sandbox.containerFetch(request, OPENCLAW_PORT);
+  let httpResponse: Response;
+  try {
+    httpResponse = await sandbox.containerFetch(request, OPENCLAW_PORT);
+  } catch (err) {
+    console.error('[HTTP] containerFetch failed:', err);
+
+    // Attempt crash recovery: restart if the instance was supposed to be running
+    const recovered = await attemptCrashRecovery(c);
+    if (recovered) {
+      try {
+        httpResponse = await sandbox.containerFetch(request, OPENCLAW_PORT);
+      } catch (retryErr) {
+        console.error('[HTTP] Retry after recovery failed:', retryErr);
+        return c.json({ error: 'Instance not reachable after restart attempt' }, 503);
+      }
+    } else {
+      return c.json(
+        {
+          error: 'Instance not reachable',
+          hint: 'Your instance may not be running. Start it from the dashboard.',
+        },
+        503
+      );
+    }
+  }
   console.log('[HTTP] Response status:', httpResponse.status);
 
   const newHeaders = new Headers(httpResponse.headers);

@@ -20,7 +20,7 @@ import { createDatabaseConnection, InstanceStore } from '../db';
 import { buildEnvVars } from '../gateway/env';
 import { mountR2Storage, userR2Prefix } from '../gateway/r2';
 import { ensureOpenClawGateway, findExistingGatewayProcess } from '../gateway/process';
-import { syncToR2 } from '../gateway/sync';
+import { syncToR2, type SyncResult } from '../gateway/sync';
 import {
   PersistedStateSchema,
   type InstanceConfig,
@@ -215,6 +215,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   /**
    * Start the sandbox container and gateway.
+   *
+   * Idempotent: if status is already 'running', verifies the gateway is
+   * actually alive. If it crashed (race with handleContainerStopped), falls
+   * through to a full restart. This allows the catch-all proxy to call
+   * start() for crash recovery without needing to know the precise state.
    */
   async start(): Promise<void> {
     await this.loadState();
@@ -222,24 +227,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.userId || !this.sandboxId) {
       throw new Error('Instance not provisioned');
     }
-    if (this.status === 'running') {
-      console.log('[DO] Instance already running, no-op');
-      return;
-    }
 
     const sandbox = this.resolveSandbox();
+
+    // If status is 'running', verify the gateway is actually alive.
+    // handleContainerStopped may not have fired yet after a crash.
+    if (this.status === 'running') {
+      const gateway = await findExistingGatewayProcess(sandbox);
+      if (gateway && (gateway.status === 'running' || gateway.status === 'starting')) {
+        console.log('[DO] Instance already running with live gateway, no-op');
+        return;
+      }
+      // Gateway is dead despite status=running. Fall through to full restart.
+      console.log('[DO] Status is running but gateway is dead, restarting');
+    }
 
     // Mount R2 storage with per-user prefix
     await mountR2Storage(sandbox, this.env, this.userId);
 
-    // Build env vars: platform defaults + user env vars + decrypted secrets +
-    // decrypted channel tokens + reserved system vars (OPENCLAW_GATEWAY_TOKEN, etc.)
-    const envVars = await buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET, {
-      envVars: this.envVars ?? undefined,
-      encryptedSecrets: this.encryptedSecrets ?? undefined,
-      channels: this.channels ?? undefined,
-    });
-
+    const envVars = await this.buildUserEnvVars();
     await ensureOpenClawGateway(sandbox, this.env, envVars);
 
     // Update state
@@ -437,6 +443,67 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
+  // ─── User-facing operations (called by admin API routes via DO RPC) ──
+
+  /**
+   * Trigger a manual sync to R2. Requires a running instance.
+   */
+  async triggerSync(): Promise<SyncResult> {
+    await this.loadState();
+
+    if (this.status !== 'running' || !this.sandboxId || !this.userId) {
+      return { success: false, error: 'Instance is not running' };
+    }
+
+    const sandbox = this.resolveSandbox();
+    return syncToR2(sandbox, this.env, this.userId);
+  }
+
+  /**
+   * Restart the gateway process (kill existing, start new).
+   * Rebuilds env vars from stored config. Requires a running instance.
+   */
+  async restartGateway(): Promise<{
+    success: boolean;
+    error?: string;
+    previousProcessId?: string;
+  }> {
+    await this.loadState();
+
+    if (this.status !== 'running' || !this.sandboxId) {
+      return { success: false, error: 'Instance is not running' };
+    }
+
+    const sandbox = this.resolveSandbox();
+
+    // Kill existing gateway
+    let previousProcessId: string | undefined;
+    const existingProcess = await findExistingGatewayProcess(sandbox);
+    if (existingProcess) {
+      previousProcessId = existingProcess.id;
+      console.log('[DO] Killing gateway process:', existingProcess.id);
+      try {
+        await existingProcess.kill();
+      } catch (err) {
+        console.error('[DO] Error killing gateway:', err);
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    // Rebuild env vars and start new gateway
+    try {
+      const envVars = await this.buildUserEnvVars();
+      await ensureOpenClawGateway(sandbox, this.env, envVars);
+      return {
+        success: true,
+        previousProcessId,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      return { success: false, error: errorMessage, previousProcessId };
+    }
+  }
+
   // ─── Alarm (sync loop) ───────────────────────────────────────────────
 
   override async alarm(): Promise<void> {
@@ -561,6 +628,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────
+
+  /**
+   * Build env vars from stored user config. Used by start() and restartGateway().
+   */
+  private async buildUserEnvVars(): Promise<Record<string, string>> {
+    return buildEnvVars(this.env, this.sandboxId ?? undefined, this.env.GATEWAY_TOKEN_SECRET, {
+      envVars: this.envVars ?? undefined,
+      encryptedSecrets: this.encryptedSecrets ?? undefined,
+      channels: this.channels ?? undefined,
+    });
+  }
 
   private resolveSandbox() {
     if (!this.sandboxId) {

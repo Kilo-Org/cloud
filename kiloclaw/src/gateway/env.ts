@@ -17,8 +17,8 @@ export type UserConfig = {
  * Build environment variables to pass to the OpenClaw container process.
  *
  * Two modes:
- * - **Shared sandbox** (no sandboxId): passes worker-level env vars including
- *   channel tokens. Used by the catch-all proxy's ensureOpenClawGateway().
+ * - **Fallback** (no sandboxId): passes worker-level env vars including
+ *   channel tokens. Used for dev/testing only.
  * - **Multi-tenant** (sandboxId + gatewayTokenSecret): derives a per-sandbox
  *   gateway token, merges user-provided env vars and decrypted secrets,
  *   decrypts and maps channel tokens, and sets AUTO_APPROVE_DEVICES.
@@ -42,9 +42,8 @@ export async function buildEnvVars(
   gatewayTokenSecret?: string,
   userConfig?: UserConfig
 ): Promise<Record<string, string>> {
-  // Per-user path (DO start): both sandboxId and secret are present.
-  // Legacy shared-sandbox path (catch-all proxy): neither is passed.
-  // Remove this flag when PR7 eliminates the shared-sandbox catch-all.
+  // Multi-tenant path: both sandboxId and gatewayTokenSecret are present.
+  // When false, falls back to worker-level channel tokens (dev/testing only).
   const isPerUserPath = Boolean(sandboxId && gatewayTokenSecret);
 
   // Layer 1: Worker-level shared AI keys (platform defaults)

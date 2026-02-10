@@ -2,7 +2,6 @@ import type { Sandbox, Process } from '@cloudflare/sandbox';
 import type { KiloClawEnv } from '../types';
 import { OPENCLAW_PORT, STARTUP_TIMEOUT_MS } from '../config';
 import { buildEnvVars } from './env';
-import { mountR2Storage } from './r2';
 
 /**
  * Find an existing OpenClaw gateway process
@@ -35,12 +34,13 @@ export async function findExistingGatewayProcess(sandbox: Sandbox): Promise<Proc
 }
 
 /**
- * Ensure the OpenClaw gateway is running
+ * Ensure the OpenClaw gateway is running.
+ *
+ * Caller is responsible for mounting R2 storage before calling this function.
  *
  * This will:
- * 1. Mount R2 storage if configured
- * 2. Check for an existing gateway process
- * 3. Wait for it to be ready, or start a new one
+ * 1. Check for an existing gateway process
+ * 2. Wait for it to be ready, or start a new one
  *
  * @param sandbox - The sandbox instance
  * @param env - Worker environment bindings
@@ -52,10 +52,6 @@ export async function ensureOpenClawGateway(
   env: KiloClawEnv,
   prebuiltEnvVars?: Record<string, string>
 ): Promise<Process> {
-  // Mount R2 storage for persistent data (non-blocking if not configured)
-  // R2 is used as a backup - the startup script will restore from it on boot
-  await mountR2Storage(sandbox, env);
-
   // Check if gateway is already running or starting
   const existingProcess = await findExistingGatewayProcess(sandbox);
   if (existingProcess) {

@@ -23,7 +23,6 @@ import {
   DEFAULT_MIN_REQUESTS,
   toErrorRateSlo,
 } from '@/app/admin/alerting/utils';
-import { normalizeModelId } from '@/lib/model-utils';
 
 export default function AdminAlertingPage() {
   const [savingAll, setSavingAll] = useState(false);
@@ -129,12 +128,11 @@ export default function AdminAlertingPage() {
   };
 
   const handleAddModel = async (modelId: string) => {
-    const normalizedModelId = normalizeModelId(modelId);
-    addDraft(normalizedModelId);
+    addDraft(modelId);
 
     try {
       await updateConfig.mutateAsync({
-        model: normalizedModelId,
+        model: modelId,
         enabled: false,
         errorRateSlo: toErrorRateSlo(Number(DEFAULT_ERROR_RATE_PERCENT)),
         minRequestsPerWindow: Number(DEFAULT_MIN_REQUESTS),
@@ -143,7 +141,7 @@ export default function AdminAlertingPage() {
       setIsAddDialogOpen(false);
       setAddSearchTerm('');
     } catch (error) {
-      removeDraft(normalizedModelId);
+      removeDraft(modelId);
       toast.error(error instanceof Error ? error.message : 'Failed to add model');
     }
   };
@@ -163,10 +161,16 @@ export default function AdminAlertingPage() {
 
   const filteredConfigs = useMemo(() => {
     const configs = configsData?.configs ?? [];
-    if (!searchTerm.trim()) return configs;
+    const sorted = [...configs].sort((a, b) => a.model.localeCompare(b.model));
+    if (!searchTerm.trim()) return sorted;
     const query = searchTerm.toLowerCase();
-    return configs.filter(config => config.model.toLowerCase().includes(query));
+    return sorted.filter(config => config.model.toLowerCase().includes(query));
   }, [configsData, searchTerm]);
+
+  const existingModels = useMemo(() => {
+    const configs = configsData?.configs ?? [];
+    return new Set(configs.map(c => c.model));
+  }, [configsData]);
 
   const breadcrumbs = (
     <BreadcrumbItem>
@@ -217,6 +221,7 @@ export default function AdminAlertingPage() {
             isLoading={addSearchLoading}
             error={addSearchError}
             models={addSearchResults}
+            existingModels={existingModels}
             onAddModel={handleAddModel}
           />
         </div>

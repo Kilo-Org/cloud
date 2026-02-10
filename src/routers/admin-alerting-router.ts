@@ -63,12 +63,13 @@ export const adminAlertingRouter = createTRPCRouter({
     }
   }),
   updateConfig: adminProcedure.input(AlertingConfigSchema).mutation(async ({ input }) => {
+    const normalized = { ...input, model: normalizeModelId(input.model) };
     try {
       return await fetchO11yJson({
         path: '/alerting/config',
         schema: AlertingConfigResponseSchema,
         method: 'PUT',
-        body: input,
+        body: normalized,
         errorMessage: 'Failed to update alerting config',
         parseErrorMessage: 'Invalid alerting config response',
       });
@@ -88,12 +89,13 @@ export const adminAlertingRouter = createTRPCRouter({
   deleteConfig: adminProcedure
     .input(z.object({ model: z.string().min(1) }))
     .mutation(async ({ input }) => {
+      const model = normalizeModelId(input.model);
       try {
         return await fetchO11yJson({
           path: '/alerting/config',
           schema: AlertingConfigDeleteResponseSchema,
           method: 'DELETE',
-          searchParams: new URLSearchParams({ model: input.model }),
+          searchParams: new URLSearchParams({ model }),
           errorMessage: 'Failed to delete alerting config',
           parseErrorMessage: 'Invalid delete response',
         });

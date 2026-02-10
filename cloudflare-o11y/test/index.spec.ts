@@ -23,6 +23,18 @@ function makeKvMock(): KVNamespace {
 	} as unknown as KVNamespace;
 }
 
+function makeAlertConfigDOMock(): Env['ALERT_CONFIG_DO'] {
+	return {
+		idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
+		get: vi.fn(() => ({
+			list: vi.fn(async () => []),
+			get: vi.fn(async () => null),
+			upsert: vi.fn(async () => {}),
+			remove: vi.fn(async () => {}),
+		})),
+	} as unknown as Env['ALERT_CONFIG_DO'];
+}
+
 function makeTestEnv(overrides?: Partial<Env>): Env {
 	return {
 		O11Y_KILO_GATEWAY_CLIENT_SECRET: {
@@ -31,7 +43,7 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
 		O11Y_API_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_SESSION_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_ALERT_STATE: makeKvMock(),
-		O11Y_ALERT_CONFIG: makeKvMock(),
+		ALERT_CONFIG_DO: makeAlertConfigDOMock(),
 		O11Y_CF_ACCOUNT_ID: 'test-account-id' as never,
 		O11Y_API_BASE_URL: 'https://api.kilo.ai',
 		O11Y_CF_AE_API_TOKEN: { get: async () => 'test-ae-token' } as SecretsStoreSecret,

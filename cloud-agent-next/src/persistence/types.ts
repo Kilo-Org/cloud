@@ -167,6 +167,8 @@ export type PersistenceEnv = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
+  /** Service binding for the session ingest worker */
+  SESSION_INGEST: Fetcher;
   /** Shared secret for JWT token validation */
   NEXTAUTH_SECRET: string;
   /** Comma-separated list of allowed Origins for /stream WebSocket connections */
@@ -194,6 +196,9 @@ export type PersistenceEnv = {
    * Required when using encryptedSecrets feature. PEM format.
    */
   AGENT_ENV_VARS_PRIVATE_KEY?: string;
+
+  /** URL for session ingest service, injected into sandbox session env vars */
+  KILO_SESSION_INGEST_URL?: string;
 
   R2_ENDPOINT?: string;
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;

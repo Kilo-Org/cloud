@@ -1,16 +1,25 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import { useState } from 'react';
-import { ModeCombobox, type ModeComboboxProps } from '@/components/shared/ModeCombobox';
+import {
+  ModeCombobox,
+  LEGACY_MODE_OPTIONS,
+  type ModeComboboxProps,
+} from '@/components/shared/ModeCombobox';
 import type { AgentMode } from '@/components/cloud-agent/types';
 
-type StoryProps = Omit<ModeComboboxProps, 'onValueChange'>;
+type StoryProps = Omit<ModeComboboxProps<AgentMode>, 'onValueChange' | 'options'>;
 
 function ModeComboboxStory({ value = 'code', ...props }: StoryProps) {
   const [selected, setSelected] = useState<AgentMode>(value);
 
   return (
     <div className="max-w-md space-y-3">
-      <ModeCombobox {...props} value={selected} onValueChange={setSelected} />
+      <ModeCombobox
+        {...props}
+        value={selected}
+        onValueChange={setSelected}
+        options={LEGACY_MODE_OPTIONS}
+      />
       {selected && (
         <p className="text-muted-foreground text-xs">
           Selected: <span className="font-mono">{selected}</span>
@@ -154,7 +163,12 @@ export const CompactAllModes: Story = {
         {modes.map(mode => (
           <div key={mode} className="flex items-center gap-4 rounded-lg bg-zinc-900 p-4">
             <span className="text-muted-foreground w-24 text-sm capitalize">{mode}:</span>
-            <ModeCombobox value={mode} variant="compact" onValueChange={() => {}} />
+            <ModeCombobox
+              value={mode}
+              variant="compact"
+              onValueChange={() => {}}
+              options={LEGACY_MODE_OPTIONS}
+            />
           </div>
         ))}
       </div>

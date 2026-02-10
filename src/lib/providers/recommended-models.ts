@@ -2,7 +2,9 @@ import type { ModelSettings, VersionedSettings } from '@/lib/organizations/organ
 import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import { minimax_m21_free_model } from '@/lib/providers/minimax';
+import { pony_alpha_free_model } from '@/lib/providers/openrouter-free-models';
 import { zai_glm47_free_model } from '@/lib/providers/zai';
+import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 
 export type RecommendedModel = {
   public_id: string;
@@ -34,6 +36,11 @@ export const recommendedModels = [
     random_vercel_routing: false,
   },
   {
+    public_id: pony_alpha_free_model.public_id,
+    tool_choice_required: false,
+    random_vercel_routing: false,
+  },
+  {
     public_id: giga_potato_model.public_id,
     tool_choice_required: false,
     random_vercel_routing: false,
@@ -44,7 +51,7 @@ export const recommendedModels = [
     random_vercel_routing: true,
   },
   {
-    public_id: 'anthropic/claude-opus-4.5',
+    public_id: 'anthropic/claude-opus-4.6',
     tool_choice_required: false,
     random_vercel_routing: false, // not yet allowed pending strict tool use support
   },
@@ -79,7 +86,9 @@ export const recommendedModels = [
     random_vercel_routing: true,
   },
   {
-    public_id: 'x-ai/grok-code-fast-1',
+    public_id: grok_code_fast_1_optimized_free_model.is_enabled
+      ? grok_code_fast_1_optimized_free_model.public_id
+      : 'x-ai/grok-code-fast-1',
     tool_choice_required: true, // https://kilo-code.slack.com/archives/C09922UFQHF/p1768002096163529?thread_ts=1767889912.400579&cid=C09922UFQHF
     random_vercel_routing: true,
   },

@@ -106,6 +106,9 @@ function createFakeEnv(overrides?: {
       idFromName: vi.fn(name => ({ name })),
       get: vi.fn(() => metadataDO),
     },
+    SESSION_INGEST: {
+      fetch: vi.fn(),
+    },
   } as unknown as PersistenceEnv;
 
   return { env, metadataDO };

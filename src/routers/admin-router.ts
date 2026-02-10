@@ -16,6 +16,8 @@ import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-rou
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
+import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
+import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
@@ -122,6 +124,7 @@ const GetUserInvoicesSchema = z.object({
 });
 
 export const adminRouter = createTRPCRouter({
+  webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {
       return getKilocodeRepoOpenPullRequestCounts({ ttlMs: 2 * 60_000 });
@@ -679,4 +682,5 @@ export const adminRouter = createTRPCRouter({
   appBuilder: adminAppBuilderRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
+  bulkUserCredits: bulkUserCreditsRouter,
 });

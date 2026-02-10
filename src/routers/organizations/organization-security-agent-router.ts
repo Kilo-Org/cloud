@@ -58,6 +58,12 @@ import {
   DeleteFindingsByRepoInputSchema,
 } from '@/lib/security-agent/core/schemas';
 import { DEFAULT_SECURITY_AGENT_MODEL } from '@/lib/security-agent/core/constants';
+import {
+  trackSecurityAgentEnabled,
+  trackSecurityAgentConfigSaved,
+  trackSecurityAgentSync,
+  trackSecurityAgentFindingDismissed,
+} from '@/lib/security-agent/posthog-tracking';
 
 const OrgSaveSecurityConfigInputSchema = OrganizationIdInputSchema.merge(
   SaveSecurityConfigInputSchema
@@ -172,6 +178,18 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         ctx.user.id
       );
 
+      trackSecurityAgentConfigSaved({
+        distinctId: ctx.user.id,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        autoSyncEnabled: input.autoSyncEnabled,
+        autoDismissEnabled: input.autoDismissEnabled,
+        autoDismissConfidenceThreshold: input.autoDismissConfidenceThreshold,
+        modelSlug: input.modelSlug,
+        repositorySelectionMode: input.repositorySelectionMode,
+        selectedRepoCount: input.selectedRepositoryIds?.length,
+      });
+
       return { success: true };
     }),
 
@@ -275,6 +293,17 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
               `[security-agent] Sync completed: synced=${syncResult.synced}, errors=${syncResult.errors}`
             );
 
+            trackSecurityAgentEnabled({
+              distinctId: ctx.user.id,
+              userId: ctx.user.id,
+              organizationId: input.organizationId,
+              isEnabled: input.isEnabled,
+              repositorySelectionMode: selectionMode,
+              selectedRepoCount: repositoriesToSync.length,
+              syncedCount: syncResult.synced,
+              syncErrors: syncResult.errors,
+            });
+
             return {
               success: true,
               syncResult: {
@@ -289,6 +318,20 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
           console.log(`[security-agent] No installation ID found`);
         }
       }
+
+      const effectiveRepoCount =
+        selectionMode === 'all'
+          ? (integration?.repositories || []).filter(r => !!r.full_name).length
+          : selectedIds.length;
+
+      trackSecurityAgentEnabled({
+        distinctId: ctx.user.id,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        isEnabled: input.isEnabled,
+        repositorySelectionMode: selectionMode,
+        selectedRepoCount: effectiveRepoCount,
+      });
 
       return { success: true };
     }),
@@ -451,6 +494,16 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
           repoFullName: input.repoFullName,
         });
 
+        trackSecurityAgentSync({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+          syncType: 'single_repo',
+          repoCount: 1,
+          synced: result.synced,
+          errors: result.errors,
+        });
+
         return {
           success: true,
           synced: result.synced,
@@ -487,6 +540,16 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         platformIntegrationId: integration.id,
         installationId,
         repositories: repositoriesToSync,
+      });
+
+      trackSecurityAgentSync({
+        distinctId: ctx.user.id,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        syncType: 'all_repos',
+        repoCount: repositoriesToSync.length,
+        synced: result.synced,
+        errors: result.errors,
       });
 
       return {
@@ -566,6 +629,16 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         ignoredBy: ctx.user.google_user_email,
       });
 
+      trackSecurityAgentFindingDismissed({
+        distinctId: ctx.user.id,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        findingId: input.findingId,
+        reason: input.reason,
+        source: finding.source,
+        severity: finding.severity,
+      });
+
       return { success: true };
     }),
 
@@ -638,7 +711,7 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         });
       }
 
-      return { success: true };
+      return { success: true, triageOnly: result.triageOnly };
     }),
 
   /**

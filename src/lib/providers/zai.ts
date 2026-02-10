@@ -8,8 +8,8 @@ export const zai_glm47_free_model = {
   context_length: 202752,
   max_completion_tokens: 65535,
   is_enabled: true,
-  flags: ['reasoning'],
+  flags: ['reasoning', 'prompt_cache'],
   gateway: 'openrouter',
   internal_id: 'z-ai/glm-4.7',
-  inference_providers: ['novita', 'deepinfra'],
+  inference_providers: ['novita'],
 } as KiloFreeModel;

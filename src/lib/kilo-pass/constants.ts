@@ -13,7 +13,7 @@ export const KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT = 0.5;
 // TODO: Remove KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_* constants and related logic after 2026-05-01 (cutoff + grace period).
 // First-time subscribers receive a 50% bonus for the first 2 months if they started
 // strictly before this cutoff.
-export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF = dayjs('2026-02-06T07:59:59Z').utc();
+export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF = dayjs('2026-02-14T07:59:59Z').utc();
 
 export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT = 0.5;
 

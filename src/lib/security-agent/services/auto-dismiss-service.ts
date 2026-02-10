@@ -14,10 +14,15 @@ import { db } from '@/lib/drizzle';
 import { security_findings } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import { trackSecurityAgentAutoDismiss } from '../posthog-tracking';
 import { updateSecurityFindingStatus } from '../db/security-findings';
 import { getSecurityAgentConfig } from '../db/security-config';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
+import { sentryLogger } from '@/lib/utils.server';
+
+const log = sentryLogger('security-agent:auto-dismiss', 'info');
+const logError = sentryLogger('security-agent:auto-dismiss', 'error');
 
 /**
  * Convert SecurityReviewOwner + userId to Owner format for config lookups.
@@ -60,21 +65,24 @@ type AutoDismissSource = 'triage' | 'sandbox';
  * Only runs if auto-dismiss is enabled in config.
  *
  * Priority:
- * 1. If sandboxAnalysis exists and isExploitable === false → dismiss (no confidence threshold)
- * 2. If triage.suggestedAction === 'dismiss' → dismiss (with confidence threshold)
+ * 1. If sandboxAnalysis exists and isExploitable === false -> dismiss (no confidence threshold)
+ * 2. If triage.suggestedAction === 'dismiss' -> dismiss (with confidence threshold)
  *
- * @param findingId - The ID of the finding to potentially dismiss
- * @param analysis - The full analysis result (triage + optional sandbox)
- * @param owner - The security review owner (org or user)
- * @param userId - The user performing the action (for audit/permissions)
+ * @param options.findingId - The ID of the finding to potentially dismiss
+ * @param options.analysis - The full analysis result (triage + optional sandbox)
+ * @param options.owner - The security review owner (org or user)
+ * @param options.userId - The user performing the action (for audit/permissions)
+ * @param options.correlationId - Correlation ID for tracing across the analysis pipeline
  * @returns Object with dismissed status and source
  */
-export async function maybeAutoDismissAnalysis(
-  findingId: string,
-  analysis: SecurityFindingAnalysis,
-  owner: SecurityReviewOwner,
-  userId: string
-): Promise<{ dismissed: boolean; source?: AutoDismissSource }> {
+export async function maybeAutoDismissAnalysis(options: {
+  findingId: string;
+  analysis: SecurityFindingAnalysis;
+  owner: SecurityReviewOwner;
+  userId: string;
+  correlationId?: string;
+}): Promise<{ dismissed: boolean; source?: AutoDismissSource }> {
+  const { findingId, analysis, owner, userId, correlationId = '' } = options;
   const ownerConverted = toOwner(owner, userId);
   const config = await getSecurityAgentConfig(ownerConverted);
 
@@ -91,10 +99,18 @@ export async function maybeAutoDismissAnalysis(
       dismissedBy: 'auto-sandbox',
     });
 
-    console.log('[AutoDismiss] Auto-dismissed finding (sandbox):', {
+    log('Auto-dismissed finding (sandbox)', {
+      correlationId,
       findingId,
-      isExploitable: analysis.sandboxAnalysis.isExploitable,
       reasoning: analysis.sandboxAnalysis.exploitabilityReasoning.slice(0, 100),
+    });
+
+    trackSecurityAgentAutoDismiss({
+      distinctId: userId,
+      userId,
+      organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+      findingId,
+      source: 'sandbox',
     });
 
     return { dismissed: true, source: 'sandbox' };
@@ -118,10 +134,20 @@ export async function maybeAutoDismissAnalysis(
         dismissedBy: 'auto-triage',
       });
 
-      console.log('[AutoDismiss] Auto-dismissed finding (triage):', {
+      log('Auto-dismissed finding (triage)', {
+        correlationId,
         findingId,
         confidence: triage.confidence,
         reasoning: triage.needsSandboxReasoning.slice(0, 100),
+      });
+
+      trackSecurityAgentAutoDismiss({
+        distinctId: userId,
+        userId,
+        organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+        findingId,
+        source: 'triage',
+        confidence: triage.confidence,
       });
 
       return { dismissed: true, source: 'triage' };
@@ -215,7 +241,7 @@ export async function autoDismissEligibleFindings(
       });
       dismissed++;
     } catch (error) {
-      console.error('[AutoDismiss] Error dismissing finding:', finding.id, error);
+      logError('Error dismissing finding', { findingId: finding.id, error });
       captureException(error, {
         tags: { operation: 'autoDismissEligibleFindings' },
         extra: { findingId: finding.id },
@@ -224,7 +250,17 @@ export async function autoDismissEligibleFindings(
     }
   }
 
-  console.log('[AutoDismiss] Bulk auto-dismiss complete:', { dismissed, skipped, errors });
+  log('Bulk auto-dismiss complete', { dismissed, skipped, errors });
+
+  trackSecurityAgentAutoDismiss({
+    distinctId: userId,
+    userId,
+    organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+    source: 'bulk',
+    dismissed,
+    skipped,
+    errors,
+  });
 
   return { dismissed, skipped, errors };
 }

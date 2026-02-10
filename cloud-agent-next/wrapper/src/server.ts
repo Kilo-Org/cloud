@@ -270,7 +270,6 @@ function createPromptHandler(deps: ServerDependencies) {
     try {
       await kiloClient.sendPromptAsync({
         sessionId: job.kiloSessionId,
-        messageId, // Pass our tracked messageId to kilo
         parts: body.parts,
         prompt: body.prompt,
         agent: body.agent,

@@ -1,12 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import {
-  app_builder_projects,
-  app_builder_messages,
-  kilocode_users,
-  organizations,
-  cliSessions,
-} from '@/db/schema';
+import { app_builder_projects, kilocode_users, organizations, cliSessions } from '@/db/schema';
 import * as z from 'zod';
 import { eq, and, or, ilike, desc, asc, count, isNotNull, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -29,6 +23,13 @@ const GetProjectSchema = z.object({
   id: z.string().uuid(),
 });
 
+const TITLE_MAX_LENGTH = 60;
+
+function truncateTitle(title: string): string {
+  if (title.length <= TITLE_MAX_LENGTH) return title;
+  return title.slice(0, TITLE_MAX_LENGTH) + '…';
+}
+
 export type AdminAppBuilderProject = {
   id: string;
   title: string;
@@ -44,7 +45,6 @@ export type AdminAppBuilderProject = {
   last_message_at: string | null;
   owner_email: string | null;
   owner_org_name: string | null;
-  message_count: number;
   is_deployed: boolean;
 };
 
@@ -82,12 +82,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
       });
     }
 
-    // Get message count
-    const [messageCountResult] = await db
-      .select({ count: count() })
-      .from(app_builder_messages)
-      .where(eq(app_builder_messages.project_id, projectId));
-
     // Look up the CLI session by cloud_agent_session_id
     let cliSessionId: string | null = null;
     if (result.project.session_id) {
@@ -101,7 +95,7 @@ export const adminAppBuilderRouter = createTRPCRouter({
 
     const projectDetail: AdminAppBuilderProjectDetail = {
       id: result.project.id,
-      title: result.project.title,
+      title: truncateTitle(result.project.title),
       model_id: result.project.model_id,
       template: result.project.template,
       session_id: result.project.session_id,
@@ -114,7 +108,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
       last_message_at: result.project.last_message_at,
       owner_email: result.owner_user?.email ?? null,
       owner_org_name: result.owner_org?.name ?? null,
-      message_count: messageCountResult?.count ?? 0,
       is_deployed: result.project.deployment_id !== null,
       cli_session_id: cliSessionId,
     };
@@ -138,9 +131,10 @@ export const adminAppBuilderRouter = createTRPCRouter({
         eq(app_builder_projects.created_by_user_id, searchTerm),
       ];
 
-      // Only add org ID search if searchTerm looks like a valid UUID
+      // Only add UUID column searches if searchTerm looks like a valid UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidRegex.test(searchTerm)) {
+        searchConditions.push(eq(app_builder_projects.id, searchTerm));
         searchConditions.push(eq(app_builder_projects.owned_by_organization_id, searchTerm));
       }
 
@@ -185,25 +179,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
       .limit(limit)
       .offset(offset);
 
-    // Get message counts for all projects in a single query
-    const projectIds = projectsResult.map(row => row.project.id);
-    const messageCounts =
-      projectIds.length > 0
-        ? await db
-            .select({
-              project_id: app_builder_messages.project_id,
-              count: count(),
-            })
-            .from(app_builder_messages)
-            .where(
-              or(...projectIds.map(id => eq(app_builder_messages.project_id, id))) ?? undefined
-            )
-            .groupBy(app_builder_messages.project_id)
-        : [];
-
-    // Create a map for quick lookup
-    const messageCountMap = new Map(messageCounts.map(mc => [mc.project_id, mc.count]));
-
     // Get total count for pagination
     const totalCountResult = await db
       .select({ count: count() })
@@ -218,7 +193,7 @@ export const adminAppBuilderRouter = createTRPCRouter({
     // Transform results to API response format
     const projectsData: AdminAppBuilderProject[] = projectsResult.map(row => ({
       id: row.project.id,
-      title: row.project.title,
+      title: truncateTitle(row.project.title),
       model_id: row.project.model_id,
       template: row.project.template,
       session_id: row.project.session_id,
@@ -231,7 +206,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
       last_message_at: row.project.last_message_at,
       owner_email: row.owner_user?.email || null,
       owner_org_name: row.owner_org?.name || null,
-      message_count: messageCountMap.get(row.project.id) || 0,
       is_deployed: row.project.deployment_id !== null,
     }));
 

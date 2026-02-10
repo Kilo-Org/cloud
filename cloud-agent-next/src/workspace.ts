@@ -331,6 +331,39 @@ export async function cloneGitRepo(
   }
 }
 
+export type RestoreWorkspaceOptions = {
+  githubRepo?: string;
+  githubToken?: string;
+  gitUrl?: string;
+  gitToken?: string;
+  gitAuthorEnv?: { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string };
+  lastSeenBranch?: string;
+};
+
+export async function restoreWorkspace(
+  session: ExecutionSession,
+  workspacePath: string,
+  branchName: string,
+  options: RestoreWorkspaceOptions
+): Promise<void> {
+  if (options.gitUrl) {
+    await cloneGitRepo(session, workspacePath, options.gitUrl, options.gitToken);
+  } else if (options.githubRepo) {
+    await cloneGitHubRepo(
+      session,
+      workspacePath,
+      options.githubRepo,
+      options.githubToken,
+      options.gitAuthorEnv
+    );
+  } else {
+    throw new Error('No repository source provided for workspace restore');
+  }
+
+  const targetBranchName = options.lastSeenBranch ?? branchName;
+  await manageBranch(session, workspacePath, targetBranchName, false);
+}
+
 /**
  * Update the git remote origin URL to include a new token.
  * This is needed when the git token changes and we need to push/pull.

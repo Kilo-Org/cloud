@@ -16,7 +16,6 @@ import {
   User,
   Building2,
   Calendar,
-  MessageSquare,
   Cpu,
   ExternalLink,
   Loader2,
@@ -105,7 +104,7 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
             {/* Title */}
             <div className="md:col-span-2">
               <div className="text-muted-foreground text-sm font-medium">Title</div>
-              <div className="text-lg font-semibold">{project.title}</div>
+              <div className="text-lg font-semibold break-words">{project.title}</div>
             </div>
 
             {/* Model */}
@@ -152,15 +151,6 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
                 ) : (
                   <span className="text-muted-foreground text-sm">Unknown</span>
                 )}
-              </div>
-            </div>
-
-            {/* Message Count */}
-            <div className="flex items-center gap-2">
-              <MessageSquare className="text-muted-foreground h-4 w-4" />
-              <div>
-                <div className="text-muted-foreground text-xs">Messages</div>
-                <div className="text-sm">{project.message_count}</div>
               </div>
             </div>
 

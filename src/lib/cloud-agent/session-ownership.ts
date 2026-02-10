@@ -1,4 +1,4 @@
-import { cliSessions, organization_memberships } from '@/db/schema';
+import { cliSessions, cli_sessions_v2, organization_memberships } from '@/db/schema';
 import type { db } from '@/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
 
@@ -63,40 +63,65 @@ export async function verifyUserOwnsSessionByCloudAgentId(
   return session ? { kiloSessionId: session.session_id } : null;
 }
 
+// ============================================================================
+// V2 helpers (cli_sessions_v2 table)
+// ============================================================================
+
 /**
- * Verifies that an organization owns a specific CLI session.
+ * Verifies that a user owns a V2 session by cloud_agent_session_id.
  *
- * Used for organization context session ownership verification
- * before signing stream tickets. The caller should verify that
- * the user is a member of the organization separately.
- *
- * @param fromDb - Database instance to query
- * @param organizationId - The organization's ID
- * @param sessionId - The CLI session ID to verify
- * @returns true if the organization owns the session, false otherwise
+ * @returns The kiloSessionId if user owns the session, null otherwise
  */
-export async function verifyOrgOwnsSession(
+export async function verifyUserOwnsSessionV2ByCloudAgentId(
+  fromDb: DrizzleDb,
+  userId: string,
+  cloudAgentSessionId: string
+): Promise<{ kiloSessionId: string } | null> {
+  const [session] = await fromDb
+    .select({ session_id: cli_sessions_v2.session_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId),
+        eq(cli_sessions_v2.kilo_user_id, userId)
+      )
+    )
+    .limit(1);
+
+  return session ? { kiloSessionId: session.session_id } : null;
+}
+
+/**
+ * Verifies that an organization owns a V2 session by cloud_agent_session_id
+ * and that the user is a member of that organization.
+ *
+ * @returns The kiloSessionId if organization owns the session, null otherwise
+ */
+export async function verifyOrgOwnsSessionV2ByCloudAgentId(
   fromDb: DrizzleDb,
   organizationId: string,
   userId: string,
-  sessionId: string
-): Promise<boolean> {
+  cloudAgentSessionId: string
+): Promise<{ kiloSessionId: string } | null> {
   const [session] = await fromDb
-    .select({ session_id: cliSessions.session_id })
-    .from(cliSessions)
+    .select({ session_id: cli_sessions_v2.session_id })
+    .from(cli_sessions_v2)
     .innerJoin(
       organization_memberships,
       and(
-        eq(organization_memberships.organization_id, cliSessions.organization_id),
+        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
         eq(organization_memberships.kilo_user_id, userId)
       )
     )
     .where(
-      and(eq(cliSessions.session_id, sessionId), eq(cliSessions.organization_id, organizationId))
+      and(
+        eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId),
+        eq(cli_sessions_v2.organization_id, organizationId)
+      )
     )
     .limit(1);
 
-  return session !== undefined;
+  return session ? { kiloSessionId: session.session_id } : null;
 }
 
 /**

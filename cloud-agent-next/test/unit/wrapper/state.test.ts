@@ -14,7 +14,7 @@ import type { IngestEvent } from '../../../src/shared/protocol.js';
 // ---------------------------------------------------------------------------
 
 const createJobContext = (overrides: Partial<JobContext> = {}): JobContext => ({
-  executionId: 'exec_test-123',
+  executionId: 'exc_test-123',
   sessionId: 'session_abc',
   userId: 'user_xyz',
   kiloSessionId: 'kilo_sess_456',
@@ -91,13 +91,13 @@ describe('WrapperState', () => {
       });
 
       it('resets message counter on start', () => {
-        state.startJob(createJobContext({ executionId: 'exec_first' }));
+        state.startJob(createJobContext({ executionId: 'exc_first' }));
         state.nextMessageId(); // counter = 1
         state.nextMessageId(); // counter = 2
 
         // Clear job and start new one
         state.clearJob();
-        state.startJob(createJobContext({ executionId: 'exec_second' }));
+        state.startJob(createJobContext({ executionId: 'exc_second' }));
 
         // Counter should be reset
         const messageId = state.nextMessageId();
@@ -105,7 +105,7 @@ describe('WrapperState', () => {
       });
 
       it('is idempotent for same executionId', () => {
-        const context = createJobContext({ executionId: 'exec_same' });
+        const context = createJobContext({ executionId: 'exc_same' });
         state.startJob(context);
         state.nextMessageId(); // counter = 1
 
@@ -118,32 +118,32 @@ describe('WrapperState', () => {
       });
 
       it('allows starting new job when idle (no inflight)', () => {
-        state.startJob(createJobContext({ executionId: 'exec_first' }));
+        state.startJob(createJobContext({ executionId: 'exc_first' }));
         state.clearJob();
 
         // Should be able to start a new job
         expect(() => {
-          state.startJob(createJobContext({ executionId: 'exec_second' }));
+          state.startJob(createJobContext({ executionId: 'exc_second' }));
         }).not.toThrow();
       });
 
       it('throws when starting different job with inflight > 0', () => {
-        state.startJob(createJobContext({ executionId: 'exec_first' }));
+        state.startJob(createJobContext({ executionId: 'exc_first' }));
         state.addInflight('msg_1', Date.now() + 60000);
 
         expect(() => {
-          state.startJob(createJobContext({ executionId: 'exec_second' }));
+          state.startJob(createJobContext({ executionId: 'exc_second' }));
         }).toThrow(/Cannot start new job while inflight > 0/);
       });
 
       it('allows replacing job when idle but same job active', () => {
-        state.startJob(createJobContext({ executionId: 'exec_first' }));
+        state.startJob(createJobContext({ executionId: 'exc_first' }));
         // No inflight, so we can replace
 
         state.clearJob();
-        state.startJob(createJobContext({ executionId: 'exec_second' }));
+        state.startJob(createJobContext({ executionId: 'exc_second' }));
 
-        expect(state.currentJob?.executionId).toBe('exec_second');
+        expect(state.currentJob?.executionId).toBe('exc_second');
       });
     });
 
@@ -167,12 +167,12 @@ describe('WrapperState', () => {
       });
 
       it('resets message counter', () => {
-        state.startJob(createJobContext({ executionId: 'exec_test' }));
+        state.startJob(createJobContext({ executionId: 'exc_test' }));
         state.nextMessageId();
         state.nextMessageId();
 
         state.clearJob();
-        state.startJob(createJobContext({ executionId: 'exec_new' }));
+        state.startJob(createJobContext({ executionId: 'exc_new' }));
 
         expect(state.nextMessageId()).toBe('msg_new_1');
       });
@@ -348,7 +348,7 @@ describe('WrapperState', () => {
     });
 
     it('generates sequential IDs', () => {
-      state.startJob(createJobContext({ executionId: 'exec_test' }));
+      state.startJob(createJobContext({ executionId: 'exc_test' }));
 
       expect(state.nextMessageId()).toBe('msg_test_1');
       expect(state.nextMessageId()).toBe('msg_test_2');
@@ -369,6 +369,12 @@ describe('WrapperState', () => {
 
     it('strips msg_ prefix', () => {
       state.startJob(createJobContext({ executionId: 'msg_ghi789' }));
+
+      expect(state.nextMessageId()).toBe('msg_ghi789_1');
+    });
+
+    it('strips exc_ prefix', () => {
+      state.startJob(createJobContext({ executionId: 'exc_ghi789' }));
 
       expect(state.nextMessageId()).toBe('msg_ghi789_1');
     });

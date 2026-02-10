@@ -5,15 +5,15 @@
  * for the various entity identifiers used in the cloud-agent system.
  */
 
+import { ulid } from 'ulid';
+
 /**
  * Unique identifier for an execution request.
- * Format: msg_<uuid>
+ * Format: exc_<ulid>
  *
- * The msg_ prefix is required by kilo server for message correlation.
- * executionId === messageId for simplified correlation between
- * client requests and SSE events.
+ * The exc_ prefix is required for execution correlation.
  */
-export type ExecutionId = `msg_${string}`;
+export type ExecutionId = `exc_${string}`;
 
 /**
  * Session identifier - supports both:
@@ -35,8 +35,8 @@ export type EventId = number;
 // ID Generators
 // ---------------------------------------------------------------------------
 
-/** Generate a new unique execution ID (msg_<uuid> format for kilo server compatibility) */
-export const createExecutionId = (): ExecutionId => `msg_${crypto.randomUUID()}`;
+/** Generate a new unique execution ID (exc_<ulid> format for execution tracking) */
+export const createExecutionId = (): ExecutionId => `exc_${ulid()}`;
 
 /** Generate a new unique lease ID */
 export const createLeaseId = (): LeaseId => `lease_${crypto.randomUUID()}`;
@@ -45,8 +45,8 @@ export const createLeaseId = (): LeaseId => `lease_${crypto.randomUUID()}`;
 // Type Guards
 // ---------------------------------------------------------------------------
 
-/** Check if a string is a valid ExecutionId (msg_<uuid> format) */
-export const isExecutionId = (s: string): s is ExecutionId => s.startsWith('msg_');
+/** Check if a string is a valid ExecutionId (exc_<ulid> format) */
+export const isExecutionId = (s: string): s is ExecutionId => s.startsWith('exc_');
 
 /** Check if a string is a valid SessionId (supports both sess_ and agent_ prefixes) */
 export const isSessionId = (s: string): s is SessionId =>

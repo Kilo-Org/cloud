@@ -10,6 +10,7 @@ import { OrganizationAdminCreditGrant } from './OrganizationAdminCreditGrant';
 import { OrganizationAdminCreditNullify } from './OrganizationAdminCreditNullify';
 import { OrganizationAdminCreatedBy } from './OrganizationAdminCreatedBy';
 import { OrganizationWorkOSCard } from './OrganizationWorkOSCard';
+import { OrganizationAdminWebhooks } from './OrganizationAdminWebhooks';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -69,6 +70,9 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
               <div className="space-y-8 lg:col-span-2">
                 <SeatUsageCard organizationId={organizationId} />
                 <OrganizationAdminMembers organizationId={organizationId} showAdminLinks />
+              </div>
+              <div className="lg:col-span-2">
+                <OrganizationAdminWebhooks organizationId={organizationId} />
               </div>
               <div className="lg:col-span-2">
                 <OrganizationAdminCreditTransactions organizationId={organizationId} />

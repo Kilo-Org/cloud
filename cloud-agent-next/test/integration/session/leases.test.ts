@@ -26,7 +26,7 @@ describe('Lease Acquisition', () => {
 
     // Use the DO's RPC method directly
     const result = await runInDurableObject(stub, async instance => {
-      return instance.acquireLease('exec_123' as ExecutionId, 'msg_1', 'lease_abc');
+      return instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
     });
 
     expect(result.ok).toBe(true);
@@ -42,10 +42,10 @@ describe('Lease Acquisition', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       // First acquisition succeeds
-      const first = instance.acquireLease('exec_123' as ExecutionId, 'msg_1', 'lease_abc');
+      const first = instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
 
       // Second acquisition should fail (lease still held)
-      const second = instance.acquireLease('exec_123' as ExecutionId, 'msg_2', 'lease_xyz');
+      const second = instance.acquireLease('exc_123' as ExecutionId, 'msg_2', 'lease_xyz');
 
       return { first, second };
     });
@@ -65,13 +65,13 @@ describe('Lease Acquisition', () => {
     // test that acquiring a lease works, then release it, and acquire again
     const result = await runInDurableObject(stub, async instance => {
       // First: acquire and release
-      const first = instance.acquireLease('exec_123' as ExecutionId, 'msg_1', 'lease_abc');
+      const first = instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
       if (first.ok) {
-        instance.releaseLease('exec_123' as ExecutionId, 'lease_abc');
+        instance.releaseLease('exc_123' as ExecutionId, 'lease_abc');
       }
 
       // Second: should succeed after release
-      const second = instance.acquireLease('exec_123' as ExecutionId, 'msg_2', 'lease_xyz');
+      const second = instance.acquireLease('exc_123' as ExecutionId, 'msg_2', 'lease_xyz');
 
       return { first, second };
     });
@@ -86,10 +86,10 @@ describe('Lease Acquisition', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       // Acquire lease
-      const acquire = instance.acquireLease('exec_123' as ExecutionId, 'msg_1', 'lease_abc');
+      const acquire = instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
 
       // Extend with correct leaseId (should succeed)
-      const extended = instance.extendLease('exec_123' as ExecutionId, 'lease_abc');
+      const extended = instance.extendLease('exc_123' as ExecutionId, 'lease_abc');
 
       return { acquire, extended };
     });
@@ -104,10 +104,10 @@ describe('Lease Acquisition', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       // Acquire lease
-      const acquire = instance.acquireLease('exec_123' as ExecutionId, 'msg_1', 'lease_abc');
+      const acquire = instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
 
       // Try to extend with wrong leaseId (should fail)
-      const extended = instance.extendLease('exec_123' as ExecutionId, 'wrong_lease_id');
+      const extended = instance.extendLease('exc_123' as ExecutionId, 'wrong_lease_id');
 
       return { acquire, extended };
     });
@@ -122,13 +122,13 @@ describe('Lease Acquisition', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       // Acquire lease
-      instance.acquireLease('exec_123' as ExecutionId, 'msg_1', 'lease_abc');
+      instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
 
       // Release the lease
-      const released = instance.releaseLease('exec_123' as ExecutionId, 'lease_abc');
+      const released = instance.releaseLease('exc_123' as ExecutionId, 'lease_abc');
 
       // Another consumer can now acquire
-      const newAcquire = instance.acquireLease('exec_123' as ExecutionId, 'msg_2', 'lease_xyz');
+      const newAcquire = instance.acquireLease('exc_123' as ExecutionId, 'msg_2', 'lease_xyz');
 
       return { released, newAcquire };
     });

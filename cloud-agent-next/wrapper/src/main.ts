@@ -80,6 +80,13 @@ async function main() {
   const kiloServerPort = getOptionalEnvInt('KILO_SERVER_PORT', 4000);
   const workspacePath = getRequiredEnv('WORKSPACE_PATH');
 
+  const args = process.argv.slice(2);
+  const agentSessionFlagIndex = args.indexOf('--agent-session');
+  const agentSessionId =
+    agentSessionFlagIndex >= 0 && args.length > agentSessionFlagIndex + 1
+      ? args[agentSessionFlagIndex + 1]
+      : undefined;
+
   const autoCommit = getOptionalEnvBool('AUTO_COMMIT', false);
   const condenseOnComplete = getOptionalEnvBool('CONDENSE_ON_COMPLETE', false);
   const upstreamBranch = getOptionalEnv('UPSTREAM_BRANCH', '');
@@ -96,6 +103,9 @@ async function main() {
   logToFile(
     `config: wrapperPort=${wrapperPort} kiloServerPort=${kiloServerPort} workspacePath=${workspacePath}`
   );
+  if (agentSessionId) {
+    logToFile(`config: agentSession=${agentSessionId}`);
+  }
   logToFile(
     `config: autoCommit=${autoCommit} condenseOnComplete=${condenseOnComplete} maxRuntimeMs=${maxRuntimeMs} idleTimeoutMs=${idleTimeoutMs}`
   );
@@ -119,13 +129,22 @@ async function main() {
     process.exit(1);
   }
 
+  const lifecycleManagerRef = {
+    current: null as ReturnType<typeof createLifecycleManager> | null,
+  };
+  const getLifecycleManager = (): ReturnType<typeof createLifecycleManager> => {
+    if (!lifecycleManagerRef.current) {
+      throw new Error('Lifecycle manager not initialized');
+    }
+    return lifecycleManagerRef.current;
+  };
   // Create connection manager
   const connectionManager = createConnectionManager(
     state,
     { kiloServerPort },
     {
       onMessageComplete: (messageId: string) => {
-        lifecycleManager.onMessageComplete(messageId);
+        getLifecycleManager().onMessageComplete(messageId);
       },
       onTerminalError: (reason: string) => {
         logToFile(`terminal error: ${reason}`);
@@ -140,9 +159,9 @@ async function main() {
           kiloClient.abortSession({ sessionId: job.kiloSessionId }).catch(() => {});
         }
         // Mark as aborted (don't send 'complete' since we sent fatal error), then close
-        lifecycleManager.setAborted();
+        getLifecycleManager().setAborted();
         state.clearAllInflight();
-        lifecycleManager.triggerDrainAndClose();
+        getLifecycleManager().triggerDrainAndClose();
       },
       onCommand: (cmd: WrapperCommand) => {
         logToFile(`command received: ${cmd.type}`);
@@ -159,9 +178,9 @@ async function main() {
             kiloClient.abortSession({ sessionId: job.kiloSessionId }).catch(() => {});
           }
           // Mark as aborted (don't send 'complete' since we sent interrupted), then close
-          lifecycleManager.setAborted();
+          getLifecycleManager().setAborted();
           state.clearAllInflight();
-          lifecycleManager.triggerDrainAndClose();
+          getLifecycleManager().triggerDrainAndClose();
         }
         if (cmd.type === 'ping') {
           state.sendToIngest({
@@ -184,13 +203,13 @@ async function main() {
       },
       onCompletionSignal: () => {
         // Signal completion to lifecycle manager for post-processing waiters
-        lifecycleManager.signalCompletion();
+        getLifecycleManager().signalCompletion();
       },
     }
   );
 
   // Create lifecycle manager
-  const lifecycleManager = createLifecycleManager(
+  lifecycleManagerRef.current = createLifecycleManager(
     {
       maxRuntimeMs,
       idleTimeoutMs,
@@ -219,14 +238,14 @@ async function main() {
       state,
       kiloClient,
       openConnection: () => connectionManager.open(),
-      getMaxRuntimeMs: () => lifecycleManager.getMaxRuntimeMs(),
-      setAborted: () => lifecycleManager.setAborted(),
+      getMaxRuntimeMs: () => getLifecycleManager().getMaxRuntimeMs(),
+      setAborted: () => getLifecycleManager().setAborted(),
     },
-    () => lifecycleManager.triggerDrainAndClose()
+    () => getLifecycleManager().triggerDrainAndClose()
   );
 
   // Start lifecycle timers
-  lifecycleManager.start();
+  getLifecycleManager().start();
 
   logToFile(`wrapper ready on port ${wrapperPort}`);
   console.log(`Wrapper listening on port ${wrapperPort}`);
@@ -249,7 +268,7 @@ async function main() {
     });
 
     // Stop lifecycle timers
-    lifecycleManager.stop();
+    getLifecycleManager().stop();
 
     // Abort kilo session if running
     const job = state.currentJob;

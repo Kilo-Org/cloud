@@ -43,6 +43,7 @@ import { organizationDeploymentsRouter } from '@/routers/organizations/organizat
 import PostHogClient from '@/lib/posthog';
 import { organizationReviewAgentRouter } from '@/routers/organizations/organization-code-reviews-router';
 import { organizationCloudAgentRouter } from '@/routers/organizations/organization-cloud-agent-router';
+import { organizationCloudAgentNextRouter } from '@/routers/organizations/organization-cloud-agent-next-router';
 import { organizationAppBuilderRouter } from '@/routers/organizations/organization-app-builder-router';
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSlackRouter } from '@/routers/organizations/organization-slack-router';
@@ -97,6 +98,7 @@ export const organizationsRouter = createTRPCRouter({
   deployments: organizationDeploymentsRouter,
   reviewAgent: organizationReviewAgentRouter,
   cloudAgent: organizationCloudAgentRouter,
+  cloudAgentNext: organizationCloudAgentNextRouter,
   appBuilder: organizationAppBuilderRouter,
   securityAgent: organizationSecurityAgentRouter,
   slack: organizationSlackRouter,

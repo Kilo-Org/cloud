@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 jobs:
@@ -17,6 +17,7 @@ jobs:
       cloud_agent: ${{ steps.filter.outputs.cloud_agent }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
       webhook_agent: ${{ steps.filter.outputs.webhook_agent }}
+      kiloclaw: ${{ steps.filter.outputs.kiloclaw }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +34,8 @@ jobs:
               - 'cloud-agent-next/**'
             webhook_agent:
               - 'cloudflare-webhook-agent-ingest/**'
+            kiloclaw:
+              - 'kiloclaw/**'
 
   test:
     runs-on: ubuntu-24.04-8core
@@ -61,8 +64,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -79,56 +80,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck (fail fast)
+      - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Fix Formatting, Lint, Run Tests, and Commit Changes
-        shell: bash
-        run: |
+      - name: Lint
+        run: pnpm run lint
 
-          echo building message in ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          # Prepare the commit message file from the start
-          echo "ci: auto-fix formatting, linting, and snapshot updates" > ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          echo "" >> ${{ runner.temp }}/TMP_CI_commit_msg.txt
+      - name: Dependency cycle check
+        run: pnpm run dependency-cycle-check
 
-          echo "--- Linter Output ---" >> ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          (pnpm run lint --fix 2>&1 || true) | tee -a ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          #...and we DO ignore errors, since we'll relint later on and we want to commit what we can
-
-          echo "" >> ${{ runner.temp }}/TMP_CI_commit_msg.txt # Add a separator
-
-          echo "--- Formatter Output ---" >> ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          pnpm run format 2>&1 | tee -a ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          #...but here, do NOT ignore errors, since mere reformats don't count as error
-
-          TEST_EXIT_CODE=0
-          pnpm run test || TEST_EXIT_CODE=$?
-
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add .
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit $TEST_EXIT_CODE
-          fi
-
-          if [ "$(git log -1 --pretty=format:'%ae')" = "action@github.com" ]; then
-            echo "::error::CI autofix produced changes on a CI-generated commit. Committing could cause an infinite loop."
-            exit 1
-          fi
-
-          echo "Changes detected, committing..."
-          git commit -n -F ${{ runner.temp }}/TMP_CI_commit_msg.txt
-          git push
-
-          exit $TEST_EXIT_CODE
-
-      - name: Lints after autofixes
-        run: |
-          pnpm run typecheck
-          pnpm run lint
-          pnpm run dependency-cycle-check
+      - name: Run tests
+        run: pnpm run test
 
   build:
     runs-on: ubuntu-24.04-8core
@@ -136,7 +98,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-          ref: ${{ github.head_ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -184,7 +145,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-          ref: ${{ github.head_ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -270,7 +230,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-          ref: ${{ github.head_ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -296,6 +255,39 @@ jobs:
       - name: Run webhook-agent-ingest tests
         run: pnpm --filter cloudflare-webhook-agent-ingest test
 
+  kiloclaw:
+    needs: changes
+    if: needs.changes.outputs.kiloclaw == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (kiloclaw)
+        run: pnpm --filter kiloclaw typecheck
+
+      - name: Lint (kiloclaw)
+        run: pnpm --filter kiloclaw lint
+
+      - name: Run kiloclaw tests
+        run: pnpm --filter kiloclaw test
+
   cloudflare:
     strategy:
       fail-fast: false
@@ -315,7 +307,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-          ref: ${{ github.head_ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2

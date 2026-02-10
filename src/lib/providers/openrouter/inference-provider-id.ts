@@ -2,6 +2,7 @@ import * as z from 'zod';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'amazon-bedrock',
+  'anthropic',
   'arcee-ai',
   'deepinfra',
   'fireworks',

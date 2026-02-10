@@ -1,5 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "name": "kilo-app-builder",
   "main": "src/index.ts",
   "compatibility_date": "2025-09-01",

@@ -33,6 +33,7 @@
     "hono": "^4.11.7",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.3",
+    "ulid": "3.0.1",
     "workers-tagged-logger": "^0.13.7",
     "zod": "^4.1.0"
   },

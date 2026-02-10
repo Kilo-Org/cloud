@@ -3,7 +3,7 @@
  *
  * Manages the lifecycle of wrapper instances within sandboxes.
  * Each cloud-agent session gets its own wrapper, identified by a
- * command marker (KILO_WRAPPER_SESSION={sessionId}) embedded in the process command.
+ * command marker (--agent-session {sessionId}) embedded in the process command.
  *
  * This is similar to server-manager.ts but for the wrapper process,
  * using the 5xxx port range instead of 4xxx.
@@ -21,8 +21,8 @@ const WRAPPER_START_PORT = 5000;
 /** Port range size for session-based port allocation */
 const WRAPPER_PORT_RANGE = 1000;
 
-/** Environment variable marker to identify which session owns a wrapper */
-const KILO_WRAPPER_SESSION_MARKER = 'KILO_WRAPPER_SESSION';
+/** Command-line marker to identify which session owns a wrapper */
+const KILO_WRAPPER_SESSION_FLAG = '--agent-session';
 
 /**
  * Information about a running wrapper.
@@ -53,30 +53,28 @@ export function extractWrapperPortFromCommand(command: string): number | null {
 
 /**
  * Extract session ID from a wrapper command string.
- * Parses "KILO_WRAPPER_SESSION=XXX" from the command.
+ * Parses "--agent-session XXX" from the command.
  *
  * @param command - The full command string
  * @returns The session ID, or null if not found
  */
 export function extractWrapperSessionIdFromCommand(command: string): string | null {
-  const marker = `${KILO_WRAPPER_SESSION_MARKER}=`;
-  const idx = command.indexOf(marker);
-  if (idx === -1) {
-    return null;
-  }
+  const flagIndex = command.indexOf(KILO_WRAPPER_SESSION_FLAG);
+  if (flagIndex === -1) return null;
 
-  // Extract everything after the marker until whitespace
-  const startIdx = idx + marker.length;
-  const endIdx = command.indexOf(' ', startIdx);
+  const afterFlag = command.slice(flagIndex + KILO_WRAPPER_SESSION_FLAG.length).trimStart();
+  if (!afterFlag) return null;
+
+  const endIdx = afterFlag.indexOf(' ');
   if (endIdx === -1) {
-    return command.slice(startIdx);
+    return afterFlag;
   }
-  return command.slice(startIdx, endIdx);
+  return afterFlag.slice(0, endIdx);
 }
 
 /**
  * Find an existing wrapper for the given session.
- * Scans listProcesses() for a command containing KILO_WRAPPER_SESSION={sessionId}.
+ * Scans listProcesses() for a command containing "--agent-session {sessionId}".
  *
  * @param sandbox - The sandbox instance to search in
  * @param sessionId - The cloud-agent session ID to find
@@ -87,7 +85,7 @@ export async function findWrapperForSession(
   sessionId: string
 ): Promise<WrapperInfo | null> {
   const processes = await sandbox.listProcesses();
-  const marker = `${KILO_WRAPPER_SESSION_MARKER}=${sessionId}`;
+  const marker = `${KILO_WRAPPER_SESSION_FLAG} ${sessionId}`;
 
   for (const proc of processes) {
     if (proc.command.includes(marker) && proc.command.includes('kilocode-wrapper')) {
@@ -195,5 +193,5 @@ export async function findAvailableWrapperPort(
  * Get the session marker environment variable for a wrapper command.
  */
 export function getWrapperSessionMarker(sessionId: string): string {
-  return `${KILO_WRAPPER_SESSION_MARKER}=${sessionId}`;
+  return `${KILO_WRAPPER_SESSION_FLAG} ${sessionId}`;
 }

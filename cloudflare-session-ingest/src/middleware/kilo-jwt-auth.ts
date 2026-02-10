@@ -37,7 +37,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     return c.json({ success: false, error: 'Missing token' }, 401);
   }
 
-  const secret = await c.env.NEXTAUTH_SECRET.get();
+  const secret = await c.env.NEXTAUTH_SECRET_PROD.get();
 
   try {
     const payload = jwt.verify(token, secret, { algorithms: ['HS256'] });

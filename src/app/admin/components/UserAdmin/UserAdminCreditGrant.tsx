@@ -45,6 +45,7 @@ export function UserAdminCreditGrant({
   const [customDescription, setCustomDescription] = useState<string>('');
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [expiryHours, setExpiryHours] = useState<string>('');
+  const [neverExpire, setNeverExpire] = useState(false);
 
   // API state
   const [isGrantingCredit, setIsGrantingCredit] = useState(false);
@@ -55,8 +56,18 @@ export function UserAdminCreditGrant({
   );
   const expectNegative = selectedCreditCategory?.expect_negative_amount ?? false;
 
+  // Check if expiration is provided (either via date, hours, or category default)
+  const hasExpirationFromCategory =
+    selectedCreditCategory?.expiry_hours != null ||
+    selectedCreditCategory?.credit_expiry_date != null;
+  const hasExpirationFromForm = expirationDate.trim() !== '' || Number(expiryHours) > 0;
+  const hasExpiration = hasExpirationFromCategory || hasExpirationFromForm || neverExpire;
+
   // Form validation - credit category required; description required for negative amount categories
-  const isFormValid = selectedCredit && (!expectNegative || customDescription.trim().length > 0);
+  // For non-negative amounts, expiration is required unless "Never expire" is checked
+  const isExpirationValid = expectNegative || hasExpiration;
+  const isFormValid =
+    selectedCredit && (!expectNegative || customDescription.trim().length > 0) && isExpirationValid;
 
   const handleCreditTypeChange = (value: string) => {
     setSelectedCredit(value);
@@ -65,6 +76,7 @@ export function UserAdminCreditGrant({
     setCustomDescription('');
     setExpirationDate('');
     setExpiryHours('');
+    setNeverExpire(false);
   };
 
   const handleGrantCredit = async () => {
@@ -109,6 +121,7 @@ export function UserAdminCreditGrant({
         setCustomDescription('');
         setExpirationDate('');
         setExpiryHours('');
+        setNeverExpire(false);
         await queryClient.invalidateQueries({ queryKey: ['admin-user-credit-transactions', id] });
       } else {
         setCreditMessage({
@@ -220,7 +233,7 @@ export function UserAdminCreditGrant({
             <>
               <div>
                 <Label className="text-sm font-medium" htmlFor="expiry-hours">
-                  Expiry Hours
+                  Expiry Hours{!hasExpirationFromCategory && !neverExpire ? ' *' : ''}
                 </Label>
                 <Input
                   type="number"
@@ -230,12 +243,12 @@ export function UserAdminCreditGrant({
                   min="0"
                   step="0.01"
                   id="expiry-hours"
-                  disabled={!selectedCredit}
+                  disabled={!selectedCredit || neverExpire}
                 />
               </div>
               <div>
                 <Label className="text-sm font-medium" htmlFor="date">
-                  Expiration Date
+                  Expiration Date{!hasExpirationFromCategory && !neverExpire ? ' *' : ''}
                 </Label>
                 <Input
                   type="date"
@@ -244,11 +257,36 @@ export function UserAdminCreditGrant({
                   }
                   onChange={e => setExpirationDate(e.target.value)}
                   id="date"
+                  disabled={!selectedCredit || neverExpire}
                 />
+              </div>
+              <div className="flex items-end">
+                <Label className="flex items-center gap-2 pb-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={neverExpire}
+                    onChange={e => {
+                      setNeverExpire(e.target.checked);
+                      if (e.target.checked) {
+                        setExpirationDate('');
+                        setExpiryHours('');
+                      }
+                    }}
+                    disabled={!selectedCredit}
+                  />
+                  Never expire
+                </Label>
               </div>
             </>
           )}
         </div>
+
+        {!expectNegative && selectedCredit && !isExpirationValid && (
+          <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+            Please specify an expiration date or expiry hours, or check &quot;Never expire&quot; to
+            grant credits without expiration.
+          </div>
+        )}
 
         <div className="flex flex-row flex-wrap gap-4">
           <div className="grow">

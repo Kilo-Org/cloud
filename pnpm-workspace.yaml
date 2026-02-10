@@ -14,6 +14,9 @@ packages:
   - 'cloudflare-db-proxy'
   - 'cloudflare-webhook-agent-ingest'
   - 'cloudflare-session-ingest'
+  - 'cloudflare-o11y'
+  - 'cloudflare-git-token-service'
+  - 'kiloclaw'
 
 ignoredBuiltDependencies:
   - '@sentry/cli'

@@ -131,7 +131,7 @@ describe('WrapperClient', () => {
     it('returns job status', async () => {
       const statusResponse: JobStatus = {
         state: 'active',
-        executionId: 'exec_123',
+        executionId: 'exc_123',
         kiloSessionId: 'kilo_456',
         inflight: ['msg_1', 'msg_2'],
         inflightCount: 2,
@@ -153,7 +153,7 @@ describe('WrapperClient', () => {
         inflightCount: 0,
         lastError: {
           code: 'INFLIGHT_TIMEOUT',
-          messageId: 'msg_123',
+          messageId: 'exc_123',
           message: 'Timeout after 600s',
           timestamp: Date.now(),
         },
@@ -175,7 +175,7 @@ describe('WrapperClient', () => {
 
   describe('startJob', () => {
     const startJobOptions: StartJobOptions = {
-      executionId: 'exec_123',
+      executionId: 'exc_123',
       ingestUrl: 'wss://ingest.example.com',
       ingestToken: 'token_secret',
       sessionId: 'session_abc',
@@ -548,6 +548,7 @@ describe('WrapperClient', () => {
       expect(startProcessCall[0]).toContain('kilocode-wrapper');
       expect(startProcessCall[0]).toContain('WRAPPER_PORT=5000');
       expect(startProcessCall[0]).toContain('KILO_SERVER_PORT=4600');
+      expect(startProcessCall[0]).toContain('--agent-session test-session');
     });
   });
 

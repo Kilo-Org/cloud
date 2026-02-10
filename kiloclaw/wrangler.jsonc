@@ -1,0 +1,51 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kiloclaw",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  // Allow importing HTML files as text modules
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.html"],
+      "fallthrough": false,
+    },
+  ],
+  // Container configuration for KiloClaw sandbox
+  "containers": [
+    {
+      "class_name": "KiloClawSandbox",
+      "image": "./Dockerfile",
+      "instance_type": "standard-2",
+      "max_instances": 500,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "KiloClawSandbox",
+        "name": "Sandbox",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["KiloClawSandbox"],
+      "tag": "v2",
+    },
+  ],
+  // R2 bucket for persistent storage
+  "r2_buckets": [
+    {
+      "binding": "KILOCLAW_BUCKET",
+      "bucket_name": "kiloclaw-data",
+    },
+  ],
+  // Secrets to configure via `wrangler secret put`:
+  // - R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+}

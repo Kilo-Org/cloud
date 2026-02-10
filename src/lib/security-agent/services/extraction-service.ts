@@ -13,7 +13,10 @@ import type OpenAI from 'openai';
 import { sendProxiedChatCompletion } from '@/lib/llm-proxy-helpers';
 import type { SecurityFinding } from '@/db/schema';
 import type { SecurityFindingSandboxAnalysis, SandboxSuggestedAction } from '../core/types';
-import { captureException } from '@sentry/nextjs';
+import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
+import { sentryLogger } from '@/lib/utils.server';
+import { emitApiMetrics } from '@/lib/o11y/api-metrics.server';
+import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@/lib/config.server';
 
 const VALID_SUGGESTED_ACTIONS: SandboxSuggestedAction[] = [
   'dismiss',
@@ -21,6 +24,9 @@ const VALID_SUGGESTED_ACTIONS: SandboxSuggestedAction[] = [
   'manual_review',
   'monitor',
 ];
+
+const log = sentryLogger('security-agent:extraction', 'info');
+const logError = sentryLogger('security-agent:extraction', 'error');
 
 // Version string for API requests - must be >= 4.69.1 to pass LLM proxy version check
 const EXTRACTION_SERVICE_VERSION = '5.0.0';
@@ -157,42 +163,33 @@ function parseExtractionResult(
   try {
     const parsed = JSON.parse(args);
 
-    // Validate isExploitable
     if (typeof parsed.isExploitable !== 'boolean' && parsed.isExploitable !== 'unknown') {
-      console.error('[Extraction] Invalid isExploitable:', parsed.isExploitable);
+      logError('Invalid isExploitable', { value: parsed.isExploitable });
       return null;
     }
 
-    // Validate exploitabilityReasoning
     if (typeof parsed.exploitabilityReasoning !== 'string') {
-      console.error(
-        '[Extraction] Invalid exploitabilityReasoning:',
-        parsed.exploitabilityReasoning
-      );
+      logError('Invalid exploitabilityReasoning', { value: parsed.exploitabilityReasoning });
       return null;
     }
 
-    // Validate usageLocations
     if (!Array.isArray(parsed.usageLocations)) {
-      console.error('[Extraction] Invalid usageLocations:', parsed.usageLocations);
+      logError('Invalid usageLocations', { value: parsed.usageLocations });
       return null;
     }
 
-    // Validate suggestedFix
     if (typeof parsed.suggestedFix !== 'string') {
-      console.error('[Extraction] Invalid suggestedFix:', parsed.suggestedFix);
+      logError('Invalid suggestedFix', { value: parsed.suggestedFix });
       return null;
     }
 
-    // Validate suggestedAction
     if (!VALID_SUGGESTED_ACTIONS.includes(parsed.suggestedAction)) {
-      console.error('[Extraction] Invalid suggestedAction:', parsed.suggestedAction);
+      logError('Invalid suggestedAction', { value: parsed.suggestedAction });
       return null;
     }
 
-    // Validate summary
     if (typeof parsed.summary !== 'string') {
-      console.error('[Extraction] Invalid summary:', parsed.summary);
+      logError('Invalid summary', { value: parsed.summary });
       return null;
     }
 
@@ -207,7 +204,7 @@ function parseExtractionResult(
       analysisAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('[Extraction] Failed to parse tool arguments:', error);
+    logError('Failed to parse tool arguments', { error });
     return null;
   }
 }
@@ -235,20 +232,33 @@ function createFallbackExtraction(
  * Extract structured analysis fields from raw markdown output.
  * Uses direct LLM call with function calling to parse the unstructured analysis.
  *
- * @param finding - The security finding being analyzed
- * @param rawMarkdown - Raw markdown output from sandbox analysis
- * @param authToken - Auth token for the LLM proxy
- * @param model - Model to use for extraction (default: anthropic/claude-sonnet-4)
- * @param organizationId - Optional organization ID for usage tracking
+ * @param options.finding - The security finding being analyzed
+ * @param options.rawMarkdown - Raw markdown output from sandbox analysis
+ * @param options.authToken - Auth token for the LLM proxy
+ * @param options.model - Model to use for extraction (default: anthropic/claude-sonnet-4)
+ * @param options.correlationId - Correlation ID for tracing across the analysis pipeline
+ * @param options.userId - User ID for metrics tracking
+ * @param options.organizationId - Optional organization ID for usage tracking
  */
-export async function extractSandboxAnalysis(
-  finding: SecurityFinding,
-  rawMarkdown: string,
-  authToken: string,
-  model: string = 'anthropic/claude-sonnet-4',
-  organizationId?: string
-): Promise<SecurityFindingSandboxAnalysis> {
-  console.log('[Extraction] Starting extraction for finding:', finding.id);
+export async function extractSandboxAnalysis(options: {
+  finding: SecurityFinding;
+  rawMarkdown: string;
+  authToken: string;
+  model?: string;
+  correlationId?: string;
+  userId?: string;
+  organizationId?: string;
+}): Promise<SecurityFindingSandboxAnalysis> {
+  const {
+    finding,
+    rawMarkdown,
+    authToken,
+    model = 'anthropic/claude-sonnet-4',
+    correlationId = '',
+    userId = '',
+    organizationId,
+  } = options;
+  log('Starting extraction', { correlationId, findingId: finding.id });
 
   const messages: ChatMessage[] = [
     {
@@ -262,70 +272,185 @@ export async function extractSandboxAnalysis(
   ];
 
   try {
-    const result = await sendProxiedChatCompletion<ChatCompletionResponse>({
-      authToken,
-      version: EXTRACTION_SERVICE_VERSION,
-      userAgent: EXTRACTION_SERVICE_USER_AGENT,
-      body: {
-        model,
-        messages,
-        tools: [SUBMIT_EXTRACTION_TOOL],
-        tool_choice: {
-          type: 'function',
-          function: { name: 'submit_analysis_extraction' },
-        },
-      },
-      organizationId,
-    });
+    const extractionResult = await startSpan(
+      { name: 'security-agent.extraction', op: 'ai.inference' },
+      async span => {
+        span.setAttribute('security_agent.model', model);
+        span.setAttribute('security_agent.finding_id', finding.id);
+        span.setAttribute('security_agent.correlation_id', correlationId);
 
-    if (!result.ok) {
-      console.error('[Extraction] API error:', result.status, result.error);
-      captureException(new Error(`Extraction API error: ${result.status}`), {
-        tags: { operation: 'extractSandboxAnalysis' },
-        extra: { findingId: finding.id, status: result.status, error: result.error },
-      });
-      return createFallbackExtraction(rawMarkdown, `API error: ${result.status}`);
-    }
+        const llmStart = performance.now();
 
-    const choice = result.data.choices?.[0];
-    if (!choice) {
-      console.error('[Extraction] No choice in response');
-      return createFallbackExtraction(rawMarkdown, 'No response from LLM');
-    }
+        const result = await sendProxiedChatCompletion<ChatCompletionResponse>({
+          authToken,
+          version: EXTRACTION_SERVICE_VERSION,
+          userAgent: EXTRACTION_SERVICE_USER_AGENT,
+          body: {
+            model,
+            messages,
+            tools: [SUBMIT_EXTRACTION_TOOL],
+            tool_choice: {
+              type: 'function',
+              function: { name: 'submit_analysis_extraction' },
+            },
+          },
+          organizationId,
+        });
 
-    const message = choice.message;
-    const toolCall = message.tool_calls?.[0];
+        const durationMs = Math.round(performance.now() - llmStart);
+        span.setAttribute('security_agent.duration_ms', durationMs);
 
-    if (!toolCall || toolCall.type !== 'function') {
-      console.error('[Extraction] No tool call in response');
-      return createFallbackExtraction(rawMarkdown, 'LLM did not call the extraction tool');
-    }
+        if (!result.ok) {
+          logError('Extraction API error', {
+            correlationId,
+            findingId: finding.id,
+            status: result.status,
+          });
+          captureException(new Error(`Extraction API error: ${result.status}`), {
+            tags: { operation: 'extractSandboxAnalysis' },
+            extra: {
+              findingId: finding.id,
+              status: result.status,
+              error: result.error,
+              correlationId,
+            },
+          });
 
-    if (toolCall.function.name !== 'submit_analysis_extraction') {
-      console.error('[Extraction] Unexpected tool call:', toolCall.function.name);
-      return createFallbackExtraction(rawMarkdown, `Unexpected tool: ${toolCall.function.name}`);
-    }
+          span.setAttribute('security_agent.status', 'error');
+          span.setAttribute('security_agent.is_fallback', true);
 
-    const extractionResult = parseExtractionResult(toolCall.function.arguments, rawMarkdown);
-    if (!extractionResult) {
-      return createFallbackExtraction(rawMarkdown, 'Failed to parse extraction result');
-    }
+          addBreadcrumb({
+            category: 'security-agent.extraction',
+            message: 'Extraction fallback used',
+            level: 'warning',
+            data: { correlationId, findingId: finding.id, isFallback: true },
+          });
 
-    console.log('[Extraction] Extraction complete:', {
-      findingId: finding.id,
-      isExploitable: extractionResult.isExploitable,
-      usageLocationsCount: extractionResult.usageLocations.length,
-      summaryLength: extractionResult.summary.length,
-    });
+          return createFallbackExtraction(rawMarkdown, `API error: ${result.status}`);
+        }
+
+        // Set token usage on span
+        const usage = result.data.usage;
+        if (usage) {
+          span.setAttribute('security_agent.input_tokens', usage.prompt_tokens);
+          span.setAttribute('security_agent.output_tokens', usage.completion_tokens);
+        }
+
+        // Emit API metrics (only if o11y client secret is configured)
+        if (usage && userId && O11Y_KILO_GATEWAY_CLIENT_SECRET) {
+          const responseToolCalls = result.data.choices?.[0]?.message?.tool_calls ?? [];
+          const toolsUsed = responseToolCalls
+            .filter(tc => tc.type === 'function')
+            .map(tc => `function:${tc.function.name}`);
+
+          emitApiMetrics({
+            clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
+            kiloUserId: userId,
+            organizationId,
+            isAnonymous: false,
+            isStreaming: false,
+            userByok: false,
+            mode: 'security-agent-extraction',
+            provider: 'anthropic',
+            requestedModel: model,
+            resolvedModel: model,
+            toolsAvailable: ['function:submit_analysis_extraction'],
+            toolsUsed,
+            ttfbMs: durationMs,
+            completeRequestMs: durationMs,
+            statusCode: 200,
+            tokens: {
+              inputTokens: usage.prompt_tokens,
+              outputTokens: usage.completion_tokens,
+              totalTokens: usage.total_tokens,
+            },
+          });
+        }
+
+        const choice = result.data.choices?.[0];
+        if (!choice) {
+          logError('No choice in response', { correlationId, findingId: finding.id });
+          span.setAttribute('security_agent.is_fallback', true);
+          return createFallbackExtraction(rawMarkdown, 'No response from LLM');
+        }
+
+        const message = choice.message;
+        const toolCall = message.tool_calls?.[0];
+
+        if (!toolCall || toolCall.type !== 'function') {
+          logError('No tool call in response', { correlationId, findingId: finding.id });
+          span.setAttribute('security_agent.is_fallback', true);
+          return createFallbackExtraction(rawMarkdown, 'LLM did not call the extraction tool');
+        }
+
+        if (toolCall.function.name !== 'submit_analysis_extraction') {
+          logError('Unexpected tool call', {
+            correlationId,
+            findingId: finding.id,
+            tool: toolCall.function.name,
+          });
+          span.setAttribute('security_agent.is_fallback', true);
+          return createFallbackExtraction(
+            rawMarkdown,
+            `Unexpected tool: ${toolCall.function.name}`
+          );
+        }
+
+        const parsed = parseExtractionResult(toolCall.function.arguments, rawMarkdown);
+        if (!parsed) {
+          span.setAttribute('security_agent.is_fallback', true);
+          return createFallbackExtraction(rawMarkdown, 'Failed to parse extraction result');
+        }
+
+        log('Extraction complete', {
+          correlationId,
+          findingId: finding.id,
+          isExploitable: parsed.isExploitable,
+          usageLocationsCount: parsed.usageLocations.length,
+        });
+
+        span.setAttribute('security_agent.status', 'success');
+        span.setAttribute('security_agent.is_exploitable', String(parsed.isExploitable));
+        span.setAttribute('security_agent.suggested_action', parsed.suggestedAction);
+        span.setAttribute('security_agent.is_fallback', false);
+
+        addBreadcrumb({
+          category: 'security-agent.extraction',
+          message: `Extraction outcome: isExploitable=${parsed.isExploitable}`,
+          level: 'info',
+          data: {
+            correlationId,
+            findingId: finding.id,
+            isExploitable: parsed.isExploitable,
+            suggestedAction: parsed.suggestedAction,
+            isFallback: false,
+          },
+        });
+
+        return parsed;
+      }
+    );
 
     return extractionResult;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[Extraction] Error during extraction:', errorMessage);
+    logError('Error during extraction', {
+      correlationId,
+      findingId: finding.id,
+      error: errorMessage,
+    });
     captureException(error, {
       tags: { operation: 'extractSandboxAnalysis' },
-      extra: { findingId: finding.id },
+      extra: { findingId: finding.id, correlationId },
     });
+
+    addBreadcrumb({
+      category: 'security-agent.extraction',
+      message: 'Extraction fallback used',
+      level: 'warning',
+      data: { correlationId, findingId: finding.id, isFallback: true },
+    });
+
     return createFallbackExtraction(rawMarkdown, errorMessage);
   }
 }

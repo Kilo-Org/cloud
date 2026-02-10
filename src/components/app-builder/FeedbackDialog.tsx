@@ -75,7 +75,7 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
       message_count: state.messages.length,
       recent_messages: recentMessages,
     });
-  }, [feedbackText, manager.projectId, state, mutate]);
+  }, [feedbackText, manager.projectId, organizationId, state, mutate]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>

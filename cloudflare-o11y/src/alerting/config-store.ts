@@ -1,6 +1,6 @@
 import { z } from 'zod';
-
-const CONFIG_PREFIX = 'o11y:alert-config:';
+import { getAlertConfigDO } from './AlertConfigDO';
+import type { AlertConfigDO } from './AlertConfigDO';
 
 const alertingConfigInputSchema = z.object({
 	model: z.string().trim().min(1),
@@ -17,49 +17,25 @@ export const AlertingConfigSchema = alertingConfigInputSchema.extend({
 export type AlertingConfig = z.infer<typeof AlertingConfigSchema>;
 
 type AlertingConfigEnv = {
-	O11Y_ALERT_CONFIG: KVNamespace;
+	ALERT_CONFIG_DO: DurableObjectNamespace<AlertConfigDO>;
 };
 
-function configKey(model: string): string {
-	return `${CONFIG_PREFIX}${encodeURIComponent(model)}`;
-}
-
-function parseConfig(raw: string): AlertingConfig | null {
-	try {
-		const parsed = AlertingConfigSchema.safeParse(JSON.parse(raw));
-		if (parsed.success) return parsed.data;
-	} catch {
-		return null;
-	}
-	return null;
-}
-
 export async function getAlertingConfig(env: AlertingConfigEnv, model: string): Promise<AlertingConfig | null> {
-	const raw = await env.O11Y_ALERT_CONFIG.get(configKey(model));
-	if (!raw) return null;
-	return parseConfig(raw);
+	const stub = getAlertConfigDO(env);
+	return stub.get(model);
 }
 
 export async function listAlertingConfigs(env: AlertingConfigEnv): Promise<AlertingConfig[]> {
-	const result = await env.O11Y_ALERT_CONFIG.list({ prefix: CONFIG_PREFIX });
-	if (result.keys.length === 0) return [];
-
-	const values = await Promise.all(result.keys.map(async (key) => env.O11Y_ALERT_CONFIG.get(key.name)));
-
-	const configs: AlertingConfig[] = [];
-	for (const raw of values) {
-		if (!raw) continue;
-		const config = parseConfig(raw);
-		if (config) configs.push(config);
-	}
-
-	return configs;
+	const stub = getAlertConfigDO(env);
+	return stub.list();
 }
 
 export async function upsertAlertingConfig(env: AlertingConfigEnv, config: AlertingConfig): Promise<void> {
-	await env.O11Y_ALERT_CONFIG.put(configKey(config.model), JSON.stringify(config));
+	const stub = getAlertConfigDO(env);
+	await stub.upsert(config);
 }
 
 export async function deleteAlertingConfig(env: AlertingConfigEnv, model: string): Promise<void> {
-	await env.O11Y_ALERT_CONFIG.delete(configKey(model));
+	const stub = getAlertConfigDO(env);
+	await stub.remove(model);
 }

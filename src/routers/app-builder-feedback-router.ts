@@ -4,6 +4,7 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { app_builder_feedback } from '@/db/schema';
 import { getProjectWithOwnershipCheck } from '@/lib/app-builder/app-builder-service';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import * as z from 'zod';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -29,6 +30,10 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
   create: baseProcedure
     .input(CreateAppBuilderFeedbackInputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.organization_id) {
+        await ensureOrganizationAccess(ctx, input.organization_id);
+      }
+
       const owner: Owner = input.organization_id
         ? { type: 'org', id: input.organization_id }
         : { type: 'user', id: ctx.user.id };

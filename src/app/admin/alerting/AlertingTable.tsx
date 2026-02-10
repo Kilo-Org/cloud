@@ -20,14 +20,13 @@ type AlertingTableProps = {
   drafts: Record<string, AlertingDraft>;
   baselineByModel: Record<string, AlertingBaseline | null>;
   baselineStatus: Record<string, BaselineState>;
-  updatingModelId: string | null;
+  savingAll: boolean;
   deletingModelId: string | null;
   onToggleEnabled: (modelId: string, enabled: boolean) => void;
   onErrorRateChange: (modelId: string, value: string) => void;
   onMinRequestsChange: (modelId: string, value: string) => void;
   onLoadBaseline: (modelId: string) => void;
   onSuggestDefaults: (modelId: string) => void;
-  onSave: (modelId: string) => void;
   onDelete: (modelId: string) => void;
 };
 
@@ -36,14 +35,13 @@ export function AlertingTable({
   drafts,
   baselineByModel,
   baselineStatus,
-  updatingModelId,
+  savingAll,
   deletingModelId,
   onToggleEnabled,
   onErrorRateChange,
   onMinRequestsChange,
   onLoadBaseline,
   onSuggestDefaults,
-  onSave,
   onDelete,
 }: AlertingTableProps) {
   return (
@@ -79,17 +77,17 @@ export function AlertingTable({
               const draft = drafts[modelId];
               const baseline = baselineByModel[modelId];
               const status = baselineStatus[modelId]?.status ?? 'idle';
-              const isUpdating = updatingModelId === modelId;
               const isDeleting = deletingModelId === modelId;
+              const isDisabled = savingAll || isDeleting;
 
               return (
-                <TableRow key={modelId} className={isUpdating ? 'opacity-60' : ''}>
+                <TableRow key={modelId} className={isDisabled ? 'opacity-60' : ''}>
                   <TableCell className="font-mono text-sm">{modelId}</TableCell>
                   <TableCell>
                     <Switch
                       checked={draft?.enabled ?? false}
                       onCheckedChange={checked => onToggleEnabled(modelId, checked)}
-                      disabled={isUpdating}
+                      disabled={isDisabled}
                     />
                   </TableCell>
                   <TableCell>
@@ -101,7 +99,7 @@ export function AlertingTable({
                       value={draft?.errorRatePercent ?? ''}
                       onChange={e => onErrorRateChange(modelId, e.target.value)}
                       className="w-28"
-                      disabled={isUpdating}
+                      disabled={isDisabled}
                     />
                   </TableCell>
                   <TableCell>
@@ -112,7 +110,7 @@ export function AlertingTable({
                       value={draft?.minRequestsPerWindow ?? ''}
                       onChange={e => onMinRequestsChange(modelId, e.target.value)}
                       className="w-24"
-                      disabled={isUpdating}
+                      disabled={isDisabled}
                     />
                   </TableCell>
                   <TableCell>
@@ -147,7 +145,7 @@ export function AlertingTable({
                         variant="outline"
                         size="sm"
                         onClick={() => onLoadBaseline(modelId)}
-                        disabled={status === 'loading'}
+                        disabled={status === 'loading' || isDisabled}
                       >
                         {status === 'loading' ? 'Loading...' : 'Load baseline'}
                       </Button>
@@ -155,22 +153,15 @@ export function AlertingTable({
                         variant="outline"
                         size="sm"
                         onClick={() => onSuggestDefaults(modelId)}
-                        disabled={status === 'loading'}
+                        disabled={status === 'loading' || isDisabled}
                       >
                         Suggest
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => onSave(modelId)}
-                        disabled={isUpdating || !draft}
-                      >
-                        {isUpdating ? 'Saving...' : 'Save'}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onDelete(modelId)}
-                        disabled={isDeleting}
+                        disabled={isDisabled}
                         className="text-destructive hover:text-destructive"
                       >
                         {isDeleting ? 'Deleting...' : 'Delete'}

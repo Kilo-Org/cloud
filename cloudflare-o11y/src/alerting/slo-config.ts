@@ -27,20 +27,12 @@ export const BURN_RATE_WINDOWS: BurnRateWindow[] = [
 export type O11ySloConfig = {
 	// 0.999 means 99.9% of requests should succeed
 	errorRateSlo: number;
-	// Latency: the threshold in ms below which a request is "good"
-	latencyP50ThresholdMs: number;
-	latencyP90ThresholdMs: number;
-	// 0.999 means 99.9% of requests should be under the threshold
-	latencySlo: number;
 	// Suppress alerts if the window has fewer than this many requests
 	minRequestsPerWindow: number;
 };
 
 export const DEFAULT_SLO_CONFIG: O11ySloConfig = {
 	errorRateSlo: 0.999,
-	latencyP50ThresholdMs: 5_000,
-	latencyP90ThresholdMs: 15_000,
-	latencySlo: 0.999,
 	minRequestsPerWindow: 10,
 };
 

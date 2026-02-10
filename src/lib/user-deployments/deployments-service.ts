@@ -881,15 +881,11 @@ export async function renameDeployment(
     };
   }
 
-  // KV mapping: newSlug -> internalWorkerName
+  // KV mapping: newSlug <-> internalWorkerName (bidirectional).
+  // The dispatcher's set endpoint cleans up any previous slug mapping for this worker.
   // If this fails, the dispatcher falls back to using slug as the worker name directly,
   // which won't resolve. A retry of the rename (to the same slug) will fix it.
-  await dispatcherClient.setSlugMapping(newSlug, internalWorkerName);
-
-  // Remove old slug from KV (only if it was a custom mapping, not the original worker name)
-  if (oldSlug !== internalWorkerName) {
-    await dispatcherClient.deleteSlugMapping(oldSlug);
-  }
+  await dispatcherClient.setSlugMapping(internalWorkerName, newSlug);
 
   return { success: true, deploymentUrl: newUrl };
 }

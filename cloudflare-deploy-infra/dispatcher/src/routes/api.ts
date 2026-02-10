@@ -12,7 +12,6 @@ import { getPasswordRecord, setPasswordRecord, deletePasswordRecord } from '../a
 import {
   workerNameSchema,
   setPasswordRequestSchema,
-  slugParamSchema,
   setSlugMappingRequestSchema,
 } from '../schemas';
 
@@ -35,14 +34,6 @@ const validateWorkerParam = validator('param', (value, c) => {
   return result.data;
 });
 
-const validateSlugParam = validator('param', (value, c) => {
-  const result = z.object({ slug: slugParamSchema }).safeParse(value);
-  if (!result.success) {
-    return c.json({ error: 'Invalid slug' }, 400);
-  }
-  return result.data;
-});
-
 const validateSetPasswordBody = validator('json', (value, c) => {
   const result = setPasswordRequestSchema.safeParse(value);
   if (!result.success) {
@@ -54,7 +45,7 @@ const validateSetPasswordBody = validator('json', (value, c) => {
 const validateSetSlugMappingBody = validator('json', (value, c) => {
   const result = setSlugMappingRequestSchema.safeParse(value);
   if (!result.success) {
-    return c.json({ error: 'Missing workerName in body' }, 400);
+    return c.json({ error: 'Missing or invalid slug in body' }, 400);
   }
   return result.data;
 });
@@ -111,39 +102,37 @@ api.get('/password/:worker', validateWorkerParam, async c => {
 
 /**
  * Set a slug mapping.
- * Maps a public slug to an internal worker name.
+ * Maps a public slug to an internal worker name (bidirectional).
+ * Cleans up any previous slug mapping for this worker.
  */
-api.put('/slug-mapping/:slug', validateSlugParam, validateSetSlugMappingBody, async c => {
-  const { slug } = c.req.valid('param');
-  const { workerName } = c.req.valid('json');
+api.put('/slug-mapping/:worker', validateWorkerParam, validateSetSlugMappingBody, async c => {
+  const { worker } = c.req.valid('param');
+  const { slug } = c.req.valid('json');
 
-  await c.env.DEPLOY_KV.put(`slug:${slug}`, workerName);
+  // Remove the old forward mapping if the worker was previously mapped to a different slug
+  const oldSlug = await c.env.DEPLOY_KV.get(`worker-slug:${worker}`);
+  if (oldSlug && oldSlug !== slug) {
+    await c.env.DEPLOY_KV.delete(`slug:${oldSlug}`);
+  }
+
+  await c.env.DEPLOY_KV.put(`slug:${slug}`, worker);
+  await c.env.DEPLOY_KV.put(`worker-slug:${worker}`, slug);
 
   return c.json({ success: true });
 });
 
 /**
  * Delete a slug mapping.
+ * Looks up the slug via the reverse mapping and removes both directions.
  */
-api.delete('/slug-mapping/:slug', validateSlugParam, async c => {
-  const { slug } = c.req.valid('param');
+api.delete('/slug-mapping/:worker', validateWorkerParam, async c => {
+  const { worker } = c.req.valid('param');
 
-  await c.env.DEPLOY_KV.delete(`slug:${slug}`);
+  const slug = await c.env.DEPLOY_KV.get(`worker-slug:${worker}`);
+  if (slug) {
+    await c.env.DEPLOY_KV.delete(`slug:${slug}`);
+  }
+  await c.env.DEPLOY_KV.delete(`worker-slug:${worker}`);
 
   return c.json({ success: true });
-});
-
-/**
- * Get a slug mapping.
- */
-api.get('/slug-mapping/:slug', validateSlugParam, async c => {
-  const { slug } = c.req.valid('param');
-
-  const workerName = await c.env.DEPLOY_KV.get(`slug:${slug}`);
-
-  if (workerName) {
-    return c.json({ exists: true, workerName });
-  }
-
-  return c.json({ exists: false });
 });

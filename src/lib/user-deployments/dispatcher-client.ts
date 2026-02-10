@@ -21,8 +21,6 @@ export type DeletePasswordResponse = {
 };
 
 // Slug mapping types
-export type GetSlugMappingResponse = { exists: true; workerName: string } | { exists: false };
-
 export type SetSlugMappingResponse = {
   success: true;
 };
@@ -105,29 +103,15 @@ class DispatcherClient {
 
   // ---- Slug mappings ----
 
-  async getSlugMapping(slug: string): Promise<GetSlugMappingResponse> {
+  async setSlugMapping(workerName: string, slug: string): Promise<SetSlugMappingResponse> {
     const response = await fetchWithTimeout(
-      `${this.baseUrl}/api/slug-mapping/${slug}`,
-      { headers: this.getHeaders() },
-      { maxRetries: 0 }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to get slug mapping: ${response.statusText}`);
-    }
-
-    return (await response.json()) as GetSlugMappingResponse;
-  }
-
-  async setSlugMapping(slug: string, workerName: string): Promise<SetSlugMappingResponse> {
-    const response = await fetchWithTimeout(
-      `${this.baseUrl}/api/slug-mapping/${slug}`,
+      `${this.baseUrl}/api/slug-mapping/${workerName}`,
       {
         method: 'PUT',
         headers: this.getHeaders({
           'Content-Type': 'application/json',
         }),
-        body: JSON.stringify({ workerName }),
+        body: JSON.stringify({ slug }),
       },
       { maxRetries: 0 }
     );
@@ -140,9 +124,9 @@ class DispatcherClient {
     return (await response.json()) as SetSlugMappingResponse;
   }
 
-  async deleteSlugMapping(slug: string): Promise<DeleteSlugMappingResponse> {
+  async deleteSlugMapping(workerName: string): Promise<DeleteSlugMappingResponse> {
     const response = await fetchWithTimeout(
-      `${this.baseUrl}/api/slug-mapping/${slug}`,
+      `${this.baseUrl}/api/slug-mapping/${workerName}`,
       {
         method: 'DELETE',
         headers: this.getHeaders(),

@@ -29,7 +29,7 @@ export const slugParamSchema = z
   .max(63);
 
 export const setSlugMappingRequestSchema = z.object({
-  workerName: workerNameSchema,
+  slug: slugParamSchema,
 });
 
 export const setPasswordResponseSchema = z.object({
@@ -75,5 +75,4 @@ export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 
 export type AuthFormData = z.infer<typeof authFormSchema>;
 
-export type SlugParam = z.infer<typeof slugParamSchema>;
 export type SetSlugMappingRequest = z.infer<typeof setSlugMappingRequestSchema>;

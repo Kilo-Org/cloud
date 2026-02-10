@@ -1,6 +1,7 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { z } from 'zod';
 import { fetchO11yJson, O11yRequestError } from '@/lib/o11y-client';
+import { normalizeModelId } from '@/lib/model-utils';
 import { TRPCError } from '@trpc/server';
 
 const AlertingConfigSchema = z.object({
@@ -86,7 +87,7 @@ export const adminAlertingRouter = createTRPCRouter({
       try {
         return await fetchO11yJson({
           path: '/alerting/baseline',
-          searchParams: new URLSearchParams({ model: input.model }),
+          searchParams: new URLSearchParams({ model: normalizeModelId(input.model) }),
           schema: AlertingBaselineResponseSchema,
           errorMessage: 'Failed to fetch baseline',
           parseErrorMessage: 'Invalid baseline response',

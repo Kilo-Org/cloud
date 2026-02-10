@@ -33,13 +33,13 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
+  extractHeaderAndLimitLength,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
-import { isRateLimitedToDeathFree } from '@/lib/providers/openrouter';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
 import { redactedModelResponse } from '@/lib/redactedModelResponse';
 import {
@@ -241,10 +241,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
-  if (isRateLimitedToDeathFree(originalModelIdLowerCased)) {
-    return modelDoesNotExistResponse();
-  }
-
   // Extract properties for usage context
   const tokenEstimates = estimateChatTokens(requestBodyParsed);
   const promptInfo = extractPromptInfo(requestBodyParsed);
@@ -265,7 +261,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
     project_id: projectId,
     status_code: null,
-    editor_name: request.headers.get('x-kilocode-editorname') || null,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
   };

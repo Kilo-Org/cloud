@@ -2,7 +2,6 @@ import type { ModelSettings, VersionedSettings } from '@/lib/organizations/organ
 import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import { minimax_m21_free_model } from '@/lib/providers/minimax';
-import { pony_alpha_free_model } from '@/lib/providers/openrouter-free-models';
 import { zai_glm47_free_model } from '@/lib/providers/zai';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 
@@ -36,7 +35,7 @@ export const recommendedModels = [
     random_vercel_routing: false,
   },
   {
-    public_id: pony_alpha_free_model.public_id,
+    public_id: 'openrouter/pony-alpha',
     tool_choice_required: false,
     random_vercel_routing: false,
   },

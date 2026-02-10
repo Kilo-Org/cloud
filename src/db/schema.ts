@@ -611,6 +611,7 @@ export const microdollar_usage_metadata = pgTable(
     cancelled: boolean(),
     editor_name_id: integer(),
     has_tools: boolean(),
+    machine_id: text(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
@@ -756,6 +757,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   cancelled: boolean(),
   editor_name: text(),
   has_tools: boolean(),
+  machine_id: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -799,7 +801,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.streamed,
     meta.cancelled,
     edit.editor_name,
-    meta.has_tools
+    meta.has_tools,
+    meta.machine_id
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -2802,3 +2805,38 @@ export const agent_environment_profile_commands = pgTable(
 );
 
 export type AgentEnvironmentProfileCommand = typeof agent_environment_profile_commands.$inferSelect;
+
+// ============ APP BUILDER FEEDBACK ============
+
+export const app_builder_feedback = pgTable(
+  'app_builder_feedback',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    project_id: uuid().references(() => app_builder_projects.id, {
+      onDelete: 'cascade',
+    }),
+    session_id: text(),
+    model: text(),
+    preview_status: text(),
+    is_streaming: boolean(),
+    message_count: integer(),
+    feedback_text: text().notNull(),
+    recent_messages: jsonb().$type<{ role: string; text: string; ts: number }[]>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_app_builder_feedback_created_at').on(table.created_at),
+    index('IDX_app_builder_feedback_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_app_builder_feedback_project_id').on(table.project_id),
+  ]
+);
+
+export type AppBuilderFeedback = typeof app_builder_feedback.$inferSelect;
+export type NewAppBuilderFeedback = typeof app_builder_feedback.$inferInsert;

@@ -1,6 +1,6 @@
 import pLimit from 'p-limit';
 import { kiloFreeModels } from '@/lib/models';
-import { isRateLimitedToDeathFree, normalizeModelId } from '@/lib/providers/openrouter';
+import { normalizeModelId } from '@/lib/providers/openrouter';
 import { convertFromKiloModel } from '@/lib/providers/kilo-free-model';
 import type {
   NormalizedOpenRouterResponse,
@@ -277,18 +277,10 @@ export async function syncProviders() {
 
   // Create simplified structure with providers containing their models directly
   const normalizedProviders: NormalizedProvider[] = filteredProviderModelData.map(data => {
-    // Deduplicate models within each provider by slug and filter out free models
+    // Deduplicate models within each provider by slug
     const uniqueModelsMap = new Map<string, OpenRouterModel>();
     data.models.forEach(model => {
-      // Skip the typically rate-limited-to-death free models
-      if (
-        !(
-          isRateLimitedToDeathFree(model.endpoint?.model_variant_slug.toLowerCase() ?? '') ||
-          isRateLimitedToDeathFree(model.slug.toLowerCase())
-        )
-      ) {
-        uniqueModelsMap.set(model.slug, model);
-      }
+      uniqueModelsMap.set(normalizeModelId(model.slug), model);
     });
     const uniqueModels = Array.from(uniqueModelsMap.values());
 

@@ -96,7 +96,10 @@ export async function syncDependabotAlertsForRepo(params: {
         result.synced++;
       } catch (error) {
         result.errors++;
-        logError(`Error upserting finding for ${repoFullName}`, { error, alertNumber: finding.source_id });
+        logError(`Error upserting finding for ${repoFullName}`, {
+          error,
+          alertNumber: finding.source_id,
+        });
         captureException(error, {
           tags: { operation: 'syncDependabotAlertsForRepo', step: 'upsertFinding' },
           extra: { repoFullName, alertNumber: finding.source_id },

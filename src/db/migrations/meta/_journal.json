@@ -36,6 +36,20 @@
       "when": 1770638464816,
       "tag": "0004_volatile_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770722243921,
+      "tag": "0005_married_brood",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770729494005,
+      "tag": "0006_closed_umar",
+      "breakpoints": true
     }
   ]
 }

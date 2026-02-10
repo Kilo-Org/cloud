@@ -18,6 +18,7 @@ import {
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
   captureProxyError,
+  extractHeaderAndLimitLength,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { readDb } from '@/lib/drizzle';
@@ -142,7 +143,8 @@ export async function POST(request: NextRequest) {
     posthog_distinct_id: user.google_user_email,
     project_id: projectId,
     status_code: null,
-    editor_name: request.headers.get('x-kilocode-editorname') || null,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
   };

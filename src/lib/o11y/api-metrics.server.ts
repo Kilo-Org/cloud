@@ -126,6 +126,7 @@ export function emitApiMetrics(params: ApiMetricsParams) {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'X-O11Y-ADMIN-TOKEN': O11Y_KILO_GATEWAY_CLIENT_SECRET || '',
       },
       body: JSON.stringify(params),
     }).catch(() => {
@@ -158,6 +159,7 @@ export function emitApiMetricsForResponse(
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'X-O11Y-ADMIN-TOKEN': O11Y_KILO_GATEWAY_CLIENT_SECRET,
       },
       body: JSON.stringify({
         ...params,

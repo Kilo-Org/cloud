@@ -48,12 +48,10 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
   const handleOpenChange = useCallback(
     (open: boolean) => {
       setIsOpen(open);
-      if (!open) {
-        // Reset state when dialog closes
-        setFeedbackText('');
-        setShowSuccess(false);
-        resetMutation();
-      }
+      // Reset state on both open and close so re-opening always starts fresh
+      setFeedbackText('');
+      setShowSuccess(false);
+      resetMutation();
     },
     [resetMutation]
   );
@@ -82,9 +80,14 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" disabled={disabled} title="Send feedback">
-          <MessageSquareWarning className="mr-1 h-3 w-3" />
-          Feedback
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          disabled={disabled}
+          title="Send feedback"
+        >
+          <MessageSquareWarning className="h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

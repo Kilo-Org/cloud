@@ -1,4 +1,4 @@
-import { createExecutionContext, waitOnExecutionContext, SELF } from 'cloudflare:test';
+import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
 import Worker from '../src/index';
 
@@ -8,6 +8,10 @@ const TEST_CLIENT_SECRET = 'test-client-secret-value';
 
 function makeWriteDataPointSpy() {
 	return { writeDataPoint: vi.fn() };
+}
+
+function makePipelineSpy() {
+	return { send: vi.fn(async () => {}) };
 }
 
 function makeKvMock(): KVNamespace {
@@ -23,6 +27,18 @@ function makeKvMock(): KVNamespace {
 	} as unknown as KVNamespace;
 }
 
+function makeAlertConfigDOMock(): Env['ALERT_CONFIG_DO'] {
+	return {
+		idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
+		get: vi.fn(() => ({
+			list: vi.fn(async () => []),
+			get: vi.fn(async () => null),
+			upsert: vi.fn(async () => {}),
+			remove: vi.fn(async () => {}),
+		})),
+	} as unknown as Env['ALERT_CONFIG_DO'];
+}
+
 function makeTestEnv(overrides?: Partial<Env>): Env {
 	return {
 		O11Y_KILO_GATEWAY_CLIENT_SECRET: {
@@ -30,7 +46,10 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
 		} as SecretsStoreSecret,
 		O11Y_API_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
 		O11Y_SESSION_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
+		API_METRICS_STREAM: makePipelineSpy() as unknown as Env['API_METRICS_STREAM'],
+		SESSION_METRICS_STREAM: makePipelineSpy() as unknown as Env['SESSION_METRICS_STREAM'],
 		O11Y_ALERT_STATE: makeKvMock(),
+		ALERT_CONFIG_DO: makeAlertConfigDOMock(),
 		O11Y_CF_ACCOUNT_ID: 'test-account-id' as never,
 		O11Y_API_BASE_URL: 'https://api.kilo.ai',
 		O11Y_CF_AE_API_TOKEN: { get: async () => 'test-ae-token' } as SecretsStoreSecret,
@@ -42,7 +61,6 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
 
 function makeValidApiMetricsBody(overrides?: Record<string, unknown>) {
 	return {
-		clientSecret: TEST_CLIENT_SECRET,
 		kiloUserId: 'user_123',
 		organizationId: 'org_456',
 		isAnonymous: false,
@@ -76,24 +94,14 @@ async function workerFetch(request: Request, env: Env, ctx: ExecutionContext): P
 }
 
 describe('o11y worker', () => {
-	it('responds with Hello World! (unit style)', async () => {
-		const request = new IncomingRequest('http://example.com');
-		const ctx = createExecutionContext();
-		const response = await workerFetch(request, makeTestEnv(), ctx);
-		await waitOnExecutionContext(ctx);
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
-	});
-
-	it('responds with Hello World! (integration style)', async () => {
-		const response = await SELF.fetch('https://example.com');
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
-	});
-
 	it('accepts valid /ingest/api-metrics and returns 204', async () => {
 		const env = makeTestEnv();
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 429 })),
 		});
 
@@ -101,22 +109,46 @@ describe('o11y worker', () => {
 		expect(response.status).toBe(204);
 	});
 
-	it('writes data point to Analytics Engine on successful ingest', async () => {
+	it('writes data point to Analytics Engine and Pipeline on successful ingest', async () => {
 		const aeSpy = makeWriteDataPointSpy();
-		const env = makeTestEnv({ O11Y_API_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+		const pipelineSpy = makePipelineSpy();
+		const env = makeTestEnv({
+			O11Y_API_METRICS: aeSpy as unknown as AnalyticsEngineDataset,
+			API_METRICS_STREAM: pipelineSpy as unknown as Env['API_METRICS_STREAM'],
+		});
 
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 200 })),
 		});
 
-		await workerFetch(request, env, createExecutionContext());
+		const ctx = createExecutionContext();
+		await workerFetch(request, env, ctx);
+		await waitOnExecutionContext(ctx);
 
 		expect(aeSpy.writeDataPoint).toHaveBeenCalledOnce();
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
+		expect(call.indexes).toEqual(['anthropic/claude-sonnet-4.5']);
 		expect(call.blobs).toEqual(['openai', 'anthropic/claude-sonnet-4.5', 'kilo-gateway', '0', 'openai']);
 		expect(call.doubles).toEqual([45, 123, 200]);
+
+		expect(pipelineSpy.send).toHaveBeenCalledOnce();
+		expect(pipelineSpy.send.mock.calls[0][0]).toEqual([
+			{
+				provider: 'openai',
+				resolved_model: 'anthropic/claude-sonnet-4.5',
+				client_name: 'kilo-gateway',
+				is_error: false,
+				inference_provider: 'openai',
+				ttfb_ms: 45,
+				complete_request_ms: 123,
+				status_code: 200,
+			},
+		]);
 	});
 
 	it('defaults inferenceProvider to empty string', async () => {
@@ -126,7 +158,10 @@ describe('o11y worker', () => {
 
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify(body),
 		});
 
@@ -144,7 +179,10 @@ describe('o11y worker', () => {
 
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify(makeValidApiMetricsBody({ statusCode: 500 })),
 		});
 
@@ -155,37 +193,24 @@ describe('o11y worker', () => {
 		expect(call.doubles[2]).toBe(500);
 	});
 
-	it('rejects unknown clientSecret', async () => {
+	it('requires admin token for api-metrics ingest', async () => {
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(makeValidApiMetricsBody({ clientSecret: 'wrong-secret' })),
+			body: JSON.stringify(makeValidApiMetricsBody()),
 		});
 
 		const response = await workerFetch(request, makeTestEnv(), createExecutionContext());
-		expect(response.status).toBe(403);
-		const json = await response.json();
-		expect(json).toMatchObject({ error: 'Unknown clientSecret' });
-	});
-
-	it('does not write to AE when clientSecret is invalid', async () => {
-		const aeSpy = makeWriteDataPointSpy();
-		const env = makeTestEnv({ O11Y_API_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
-
-		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(makeValidApiMetricsBody({ clientSecret: 'wrong-secret' })),
-		});
-
-		await workerFetch(request, env, createExecutionContext());
-		expect(aeSpy.writeDataPoint).not.toHaveBeenCalled();
+		expect(response.status).toBe(401);
 	});
 
 	it('rejects missing params in /ingest/api-metrics', async () => {
 		const request = new IncomingRequest('https://example.com/ingest/api-metrics', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: {
+				'content-type': 'application/json',
+				'X-O11Y-ADMIN-TOKEN': TEST_CLIENT_SECRET,
+			},
 			body: JSON.stringify({}),
 		});
 
@@ -228,9 +253,13 @@ describe('session metrics RPC', () => {
 		};
 	}
 
-	it('writes session metrics to Analytics Engine', async () => {
+	it('writes session metrics to Analytics Engine and Pipeline', async () => {
 		const aeSpy = makeWriteDataPointSpy();
-		const env = makeTestEnv({ O11Y_SESSION_METRICS: aeSpy as unknown as AnalyticsEngineDataset });
+		const pipelineSpy = makePipelineSpy();
+		const env = makeTestEnv({
+			O11Y_SESSION_METRICS: aeSpy as unknown as AnalyticsEngineDataset,
+			SESSION_METRICS_STREAM: pipelineSpy as unknown as Env['SESSION_METRICS_STREAM'],
+		});
 		const ctx = createExecutionContext();
 		const instance = new Worker(ctx, env);
 
@@ -242,6 +271,28 @@ describe('session metrics RPC', () => {
 		expect(call.indexes).toEqual(['cli']);
 		expect(call.blobs).toEqual(['completed', 'cli', 'org_456', 'user_123', 'anthropic/claude-sonnet-4']);
 		expect(call.doubles).toEqual([60000, 1500, 5, 12, 2, 21000, 0.15, 1, 0, 1, 1]);
+
+		expect(pipelineSpy.send).toHaveBeenCalledOnce();
+		expect(pipelineSpy.send.mock.calls[0][0]).toEqual([
+			{
+				platform: 'cli',
+				termination_reason: 'completed',
+				organization_id: 'org_456',
+				kilo_user_id: 'user_123',
+				model: 'anthropic/claude-sonnet-4',
+				session_duration_ms: 60000,
+				time_to_first_response_ms: 1500,
+				total_turns: 5,
+				total_steps: 12,
+				total_errors: 2,
+				total_tokens: 21000,
+				total_cost: 0.15,
+				compaction_count: 1,
+				stuck_tool_call_count: 0,
+				auto_compaction_count: 1,
+				ingest_version: 1,
+			},
+		]);
 	});
 
 	it('uses empty string for missing organizationId in AE', async () => {

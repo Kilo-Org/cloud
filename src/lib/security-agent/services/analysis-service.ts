@@ -158,9 +158,7 @@ async function fetchLastAssistantMessage(
     }
 
     // Fetch the messages from R2
-    const messages = (await getBlobContent(session.ui_messages_blob_url)) as
-      | RawCliMessage[]
-      | null;
+    const messages = (await getBlobContent(session.ui_messages_blob_url)) as RawCliMessage[] | null;
 
     if (!messages || messages.length === 0) {
       log('No messages found in session', { correlationId, cliSessionId });
@@ -371,193 +369,190 @@ async function processAnalysisStream(
     scope.setTag('security_agent.correlation_id', correlationId);
     scope.setTag('security_agent.finding_id', findingId);
 
-    await startSpan(
-      { name: 'security-agent.sandbox-analysis', op: 'ai.pipeline' },
-      async span => {
-        span.setAttribute('security_agent.finding_id', findingId);
-        span.setAttribute('security_agent.model', model);
-        span.setAttribute('security_agent.correlation_id', correlationId);
+    await startSpan({ name: 'security-agent.sandbox-analysis', op: 'ai.pipeline' }, async span => {
+      span.setAttribute('security_agent.finding_id', findingId);
+      span.setAttribute('security_agent.model', model);
+      span.setAttribute('security_agent.correlation_id', correlationId);
 
-        try {
-          for await (const event of streamGenerator) {
-            switch (event.streamEventType) {
-              case 'status':
-                if (event.sessionId) {
-                  if (cloudAgentSessionId !== event.sessionId) {
-                    cloudAgentSessionId = event.sessionId;
-                    await updateAnalysisStatus(findingId, 'running', {
-                      sessionId: cloudAgentSessionId,
-                    });
-                  }
-                }
-                break;
-
-              case 'kilocode': {
-                if (isSessionCreatedEvent(event)) {
-                  const payloadSessionId = event.payload.sessionId;
-                  if (typeof payloadSessionId === 'string') {
-                    cliSessionId = payloadSessionId;
-                    log('Session created', {
-                      correlationId,
-                      findingId,
-                      cloudAgentSessionId,
-                      cliSessionId,
-                    });
-                    await updateAnalysisStatus(findingId, 'running', {
-                      sessionId: cloudAgentSessionId ?? undefined,
-                      cliSessionId,
-                    });
-                  }
-                }
-                break;
-              }
-
-              case 'error':
-                span.setAttribute('security_agent.status', 'failed');
-                span.setAttribute(
-                  'security_agent.duration_ms',
-                  Math.round(performance.now() - streamStartTime)
-                );
-                await updateAnalysisStatus(findingId, 'failed', {
-                  error: event.error || 'Unknown error during analysis',
-                });
-                return;
-
-              case 'complete': {
-                log('Stream complete, fetching last message', { correlationId, findingId });
-
-                if (!cliSessionId) {
-                  span.setAttribute('security_agent.status', 'failed');
-                  await updateAnalysisStatus(findingId, 'failed', {
-                    error: 'Analysis completed but no CLI session ID was captured',
+      try {
+        for await (const event of streamGenerator) {
+          switch (event.streamEventType) {
+            case 'status':
+              if (event.sessionId) {
+                if (cloudAgentSessionId !== event.sessionId) {
+                  cloudAgentSessionId = event.sessionId;
+                  await updateAnalysisStatus(findingId, 'running', {
+                    sessionId: cloudAgentSessionId,
                   });
-                  return;
                 }
+              }
+              break;
 
-                // Wait/retry for session ui_messages to be available in DB/R2.
-                const maxAttempts = 5;
-                let delayMs = 1500;
-                let lastMessage: string | null = null;
-                const retryStartTime = performance.now();
-
-                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                  await new Promise(resolve => setTimeout(resolve, delayMs));
-                  lastMessage = await fetchLastAssistantMessage(cliSessionId, correlationId);
-                  if (lastMessage) {
-                    const retryDurationMs = Math.round(performance.now() - retryStartTime);
-                    log('R2 fetch succeeded', {
-                      correlationId,
-                      findingId,
-                      attempt,
-                      totalRetryDurationMs: retryDurationMs,
-                    });
-                    span.setAttribute('security_agent.r2_retry_attempt', attempt);
-                    span.setAttribute('security_agent.r2_retry_duration_ms', retryDurationMs);
-                    break;
-                  }
-                  delayMs = Math.min(delayMs * 2, 15_000);
-                }
-
-                if (!lastMessage) {
-                  const retryDurationMs = Math.round(performance.now() - retryStartTime);
-                  warn('R2 fetch failed after all attempts', {
+            case 'kilocode': {
+              if (isSessionCreatedEvent(event)) {
+                const payloadSessionId = event.payload.sessionId;
+                if (typeof payloadSessionId === 'string') {
+                  cliSessionId = payloadSessionId;
+                  log('Session created', {
                     correlationId,
                     findingId,
-                    attempts: maxAttempts,
+                    cloudAgentSessionId,
+                    cliSessionId,
+                  });
+                  await updateAnalysisStatus(findingId, 'running', {
+                    sessionId: cloudAgentSessionId ?? undefined,
+                    cliSessionId,
+                  });
+                }
+              }
+              break;
+            }
+
+            case 'error':
+              span.setAttribute('security_agent.status', 'failed');
+              span.setAttribute(
+                'security_agent.duration_ms',
+                Math.round(performance.now() - streamStartTime)
+              );
+              await updateAnalysisStatus(findingId, 'failed', {
+                error: event.error || 'Unknown error during analysis',
+              });
+              return;
+
+            case 'complete': {
+              log('Stream complete, fetching last message', { correlationId, findingId });
+
+              if (!cliSessionId) {
+                span.setAttribute('security_agent.status', 'failed');
+                await updateAnalysisStatus(findingId, 'failed', {
+                  error: 'Analysis completed but no CLI session ID was captured',
+                });
+                return;
+              }
+
+              // Wait/retry for session ui_messages to be available in DB/R2.
+              const maxAttempts = 5;
+              let delayMs = 1500;
+              let lastMessage: string | null = null;
+              const retryStartTime = performance.now();
+
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                lastMessage = await fetchLastAssistantMessage(cliSessionId, correlationId);
+                if (lastMessage) {
+                  const retryDurationMs = Math.round(performance.now() - retryStartTime);
+                  log('R2 fetch succeeded', {
+                    correlationId,
+                    findingId,
+                    attempt,
                     totalRetryDurationMs: retryDurationMs,
                   });
-                  span.setAttribute('security_agent.r2_retry_attempt', maxAttempts);
-                  span.setAttribute('security_agent.r2_retry_exhausted', true);
+                  span.setAttribute('security_agent.r2_retry_attempt', attempt);
+                  span.setAttribute('security_agent.r2_retry_duration_ms', retryDurationMs);
+                  break;
                 }
-
-                const streamDurationMs = Math.round(performance.now() - streamStartTime);
-                span.setAttribute('security_agent.duration_ms', streamDurationMs);
-
-                if (lastMessage) {
-                  span.setAttribute('security_agent.status', 'completed');
-                  await finalizeAnalysis(
-                    findingId,
-                    lastMessage,
-                    model,
-                    owner,
-                    userId,
-                    authToken,
-                    correlationId,
-                    organizationId
-                  );
-                } else {
-                  span.setAttribute('security_agent.status', 'failed');
-                  await updateAnalysisStatus(findingId, 'failed', {
-                    error:
-                      'Analysis completed but result was not available (no completion_result found)',
-                  });
-                }
-                return;
+                delayMs = Math.min(delayMs * 2, 15_000);
               }
 
-              case 'interrupted':
-                span.setAttribute('security_agent.status', 'interrupted');
-                span.setAttribute(
-                  'security_agent.duration_ms',
-                  Math.round(performance.now() - streamStartTime)
-                );
-                await updateAnalysisStatus(findingId, 'failed', {
-                  error: `Analysis interrupted: ${event.reason}`,
+              if (!lastMessage) {
+                const retryDurationMs = Math.round(performance.now() - retryStartTime);
+                warn('R2 fetch failed after all attempts', {
+                  correlationId,
+                  findingId,
+                  attempts: maxAttempts,
+                  totalRetryDurationMs: retryDurationMs,
                 });
-                return;
-            }
-          }
+                span.setAttribute('security_agent.r2_retry_attempt', maxAttempts);
+                span.setAttribute('security_agent.r2_retry_exhausted', true);
+              }
 
-          // Stream ended without explicit completion event
-          const streamDurationMs = Math.round(performance.now() - streamStartTime);
-          span.setAttribute('security_agent.duration_ms', streamDurationMs);
-          warn('Stream ended without complete event', { correlationId, findingId });
+              const streamDurationMs = Math.round(performance.now() - streamStartTime);
+              span.setAttribute('security_agent.duration_ms', streamDurationMs);
 
-          if (cliSessionId) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            const lastMessage = await fetchLastAssistantMessage(cliSessionId, correlationId);
-            if (lastMessage) {
-              span.setAttribute('security_agent.status', 'completed');
-              await finalizeAnalysis(
-                findingId,
-                lastMessage,
-                model,
-                owner,
-                userId,
-                authToken,
-                correlationId,
-                organizationId
-              );
+              if (lastMessage) {
+                span.setAttribute('security_agent.status', 'completed');
+                await finalizeAnalysis(
+                  findingId,
+                  lastMessage,
+                  model,
+                  owner,
+                  userId,
+                  authToken,
+                  correlationId,
+                  organizationId
+                );
+              } else {
+                span.setAttribute('security_agent.status', 'failed');
+                await updateAnalysisStatus(findingId, 'failed', {
+                  error:
+                    'Analysis completed but result was not available (no completion_result found)',
+                });
+              }
               return;
             }
+
+            case 'interrupted':
+              span.setAttribute('security_agent.status', 'interrupted');
+              span.setAttribute(
+                'security_agent.duration_ms',
+                Math.round(performance.now() - streamStartTime)
+              );
+              await updateAnalysisStatus(findingId, 'failed', {
+                error: `Analysis interrupted: ${event.reason}`,
+              });
+              return;
           }
-
-          span.setAttribute('security_agent.status', 'failed');
-          await updateAnalysisStatus(findingId, 'failed', {
-            error: 'Analysis stream ended without completion',
-          });
-        } catch (error) {
-          // Catch inside startSpan so span attributes are still available (#7)
-          const streamDurationMs = Math.round(performance.now() - streamStartTime);
-          span.setAttribute('security_agent.status', 'error');
-          span.setAttribute('security_agent.duration_ms', streamDurationMs);
-
-          logError('processAnalysisStream failed', {
-            correlationId,
-            findingId,
-            durationMs: streamDurationMs,
-            error,
-          });
-          await updateAnalysisStatus(findingId, 'failed', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-          captureException(error, {
-            tags: { operation: 'processAnalysisStream' },
-            extra: { findingId, cloudAgentSessionId, cliSessionId, correlationId },
-          });
         }
+
+        // Stream ended without explicit completion event
+        const streamDurationMs = Math.round(performance.now() - streamStartTime);
+        span.setAttribute('security_agent.duration_ms', streamDurationMs);
+        warn('Stream ended without complete event', { correlationId, findingId });
+
+        if (cliSessionId) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const lastMessage = await fetchLastAssistantMessage(cliSessionId, correlationId);
+          if (lastMessage) {
+            span.setAttribute('security_agent.status', 'completed');
+            await finalizeAnalysis(
+              findingId,
+              lastMessage,
+              model,
+              owner,
+              userId,
+              authToken,
+              correlationId,
+              organizationId
+            );
+            return;
+          }
+        }
+
+        span.setAttribute('security_agent.status', 'failed');
+        await updateAnalysisStatus(findingId, 'failed', {
+          error: 'Analysis stream ended without completion',
+        });
+      } catch (error) {
+        // Catch inside startSpan so span attributes are still available (#7)
+        const streamDurationMs = Math.round(performance.now() - streamStartTime);
+        span.setAttribute('security_agent.status', 'error');
+        span.setAttribute('security_agent.duration_ms', streamDurationMs);
+
+        logError('processAnalysisStream failed', {
+          correlationId,
+          findingId,
+          durationMs: streamDurationMs,
+          error,
+        });
+        await updateAnalysisStatus(findingId, 'failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        captureException(error, {
+          tags: { operation: 'processAnalysisStream' },
+          extra: { findingId, cloudAgentSessionId, cliSessionId, correlationId },
+        });
       }
-    );
+    });
   });
 }
 
@@ -690,9 +685,7 @@ export async function startSecurityAnalysis(params: {
       });
 
       // Attempt auto-dismiss if configured (off by default)
-      const owner: SecurityReviewOwner = organizationId
-        ? { organizationId }
-        : { userId: user.id };
+      const owner: SecurityReviewOwner = organizationId ? { organizationId } : { userId: user.id };
 
       // Run auto-dismiss in background (don't block response)
       void maybeAutoDismissAnalysis({
@@ -739,9 +732,7 @@ export async function startSecurityAnalysis(params: {
       model,
     });
 
-    const owner: SecurityReviewOwner = organizationId
-      ? { organizationId }
-      : { userId: user.id };
+    const owner: SecurityReviewOwner = organizationId ? { organizationId } : { userId: user.id };
 
     // Fire-and-forget: processAnalysisStream manages its own Sentry scope (#2)
     void processAnalysisStream(

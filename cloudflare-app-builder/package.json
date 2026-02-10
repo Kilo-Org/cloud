@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@ashishkumar472/cf-git": "1.0.5",
-    "diff": "^8.0.2",
+    "diff": "^8.0.3",
     "jsonwebtoken": "^9.0.3",
     "workers-tagged-logger": "^1.0.0",
     "zod": "^4.1.12"

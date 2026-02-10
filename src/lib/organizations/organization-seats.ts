@@ -110,16 +110,23 @@ async function handleSubscriptionEventInternal(
     `handling subscription event for ${subscription.id} for org ${meta.organizationId}`
   );
 
-  const firstLineItem = subscription.items.data?.[0];
+  const lineItems = subscription.items.data ?? [];
+  const firstLineItem = lineItems[0];
   if (!firstLineItem?.current_period_end) {
     throw new Error(`No period end found in invoice line items subscription ${subscription.id}`);
   }
 
-  const seatCount = firstLineItem.quantity || 0;
-  // stripe amounts are in cents
-  const amountUsd = firstLineItem.price?.unit_amount
-    ? (firstLineItem.price.unit_amount / 100) * seatCount
-    : 0;
+  // Sum quantities from ALL line items in the subscription.
+  // When a subscription has multiple prices for Kilo Teams (e.g., paid seats at one price
+  // and free seats at another), Stripe stores them as separate line items.
+  const seatCount = lineItems.reduce((total, item) => total + (item.quantity ?? 0), 0);
+
+  // Calculate total amount from all line items (stripe amounts are in cents)
+  const amountUsd = lineItems.reduce((total, item) => {
+    const itemQuantity = item.quantity ?? 0;
+    const unitAmount = item.price?.unit_amount ?? 0;
+    return total + (unitAmount / 100) * itemQuantity;
+  }, 0);
 
   // use the start & end date of the line item (which is in seconds, not millis)
   const startDate = new Date(firstLineItem.current_period_start * 1000);

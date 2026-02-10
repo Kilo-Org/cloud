@@ -86,5 +86,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 }
 
 export default {
-  // No fetch handler needed - this is RPC-only
+  // Cloudflare requires a fetch handler to deploy, even for RPC-only workers
+  fetch() {
+    return new Response(null, { status: 404 });
+  },
 };

@@ -14,11 +14,11 @@ export function handleRequestLogging(params: {
   request: OpenRouterChatCompletionRequest;
 }) {
   const { clonedResponse, user, organization_id, provider, model, request } = params;
-  if (
-    !user?.google_user_email.endsWith('@kilo.ai') &&
-    !user?.google_user_email.endsWith('@kilocode.ai') &&
-    organization_id !== KILO_ORGANIZATION_ID
-  ) {
+  const isKiloEmployee =
+    user?.google_user_email.endsWith('@kilo.ai') ||
+    user?.google_user_email.endsWith('@kilocode.ai') ||
+    organization_id === KILO_ORGANIZATION_ID;
+  if (!isKiloEmployee) {
     return;
   }
   after(async () => {

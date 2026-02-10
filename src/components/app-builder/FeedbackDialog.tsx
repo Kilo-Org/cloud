@@ -62,14 +62,13 @@ export function FeedbackDialog({ disabled }: FeedbackDialogProps) {
 
     const recentMessages = state.messages.slice(-5).map(msg => ({
       role: msg.type,
-      text: msg.text ?? msg.content ?? '',
+      text: (msg.text ?? msg.content ?? '').slice(0, 10_000),
       ts: msg.ts,
     }));
 
     mutate({
       project_id: manager.projectId,
       feedback_text: feedbackText.trim(),
-      session_id: undefined, // session_id is on the project row, not directly on ProjectManager
       model: state.model || undefined,
       preview_status: state.previewStatus,
       is_streaming: state.isStreaming,

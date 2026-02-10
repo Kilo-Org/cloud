@@ -2,8 +2,10 @@ import 'server-only';
 
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { app_builder_feedback } from '@/db/schema';
+import { app_builder_feedback, app_builder_projects } from '@/db/schema';
 import * as z from 'zod';
+import { eq, and } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
 
 const recentMessageSchema = z.object({
@@ -15,7 +17,6 @@ const recentMessageSchema = z.object({
 const CreateAppBuilderFeedbackInputSchema = z.object({
   project_id: z.string().uuid(),
   feedback_text: z.string().min(1).max(10_000),
-  session_id: z.string().max(255).optional(),
   model: z.string().max(255).optional(),
   preview_status: z.string().max(100).optional(),
   is_streaming: z.boolean().optional(),
@@ -27,13 +28,30 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
   create: baseProcedure
     .input(CreateAppBuilderFeedbackInputSchema)
     .mutation(async ({ ctx, input }) => {
+      // Verify the caller owns the project (user-owned or org-owned)
+      const [project] = await db
+        .select({ session_id: app_builder_projects.session_id })
+        .from(app_builder_projects)
+        .where(
+          and(
+            eq(app_builder_projects.id, input.project_id),
+            eq(app_builder_projects.owned_by_user_id, ctx.user.id)
+          )
+        );
+
+      if (!project) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Project not found' });
+      }
+
+      const sessionId = project.session_id ?? undefined;
+
       const [inserted] = await db
         .insert(app_builder_feedback)
         .values({
           kilo_user_id: ctx.user.id,
           project_id: input.project_id,
           feedback_text: input.feedback_text,
-          session_id: input.session_id,
+          session_id: sessionId,
           model: input.model,
           preview_status: input.preview_status,
           is_streaming: input.is_streaming,
@@ -48,7 +66,7 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
           '*New App Builder feedback:* :hammer_and_wrench:',
           `• user: \`${ctx.user.id}\``,
           `• project: \`${input.project_id}\``,
-          input.session_id ? `• session: \`${input.session_id}\`` : null,
+          sessionId ? `• session: \`${sessionId}\`` : null,
           input.model ? `• model: \`${input.model}\`` : null,
           input.preview_status ? `• preview: \`${input.preview_status}\`` : null,
           input.message_count != null ? `• messages: \`${input.message_count}\`` : null,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mountR2Storage } from './r2';
+import { mountR2Storage, userR2Prefix } from './r2';
 import {
   createMockEnv,
   createMockEnvWithR2,
@@ -7,6 +7,46 @@ import {
   createMockSandbox,
   suppressConsole,
 } from '../test-utils';
+
+describe('userR2Prefix', () => {
+  it('returns a deterministic prefix for the same userId', async () => {
+    const a = await userR2Prefix('user_abc123');
+    const b = await userR2Prefix('user_abc123');
+    expect(a).toBe(b);
+  });
+
+  it('returns different prefixes for different userIds', async () => {
+    const a = await userR2Prefix('user_abc123');
+    const b = await userR2Prefix('user_xyz789');
+    expect(a).not.toBe(b);
+  });
+
+  it('starts with /users/', async () => {
+    const prefix = await userR2Prefix('user_abc123');
+    expect(prefix).toMatch(/^\/users\//);
+  });
+
+  it('uses URL-safe base64 characters only in the hash portion', async () => {
+    const prefix = await userR2Prefix('oauth/google:118234567890');
+    // Extract the hash after "/users/"
+    const hash = prefix.replace('/users/', '');
+    // Hash should not contain standard base64 chars +, /, or =
+    expect(hash).not.toMatch(/[+/=]/);
+    // Hash should only contain alphanumeric, dash, underscore
+    expect(hash).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it('produces a consistent length (SHA-256 -> 43 chars base64url + prefix)', async () => {
+    const prefix = await userR2Prefix('any-user');
+    // "/users/" (7 chars) + base64url(32 bytes) = 7 + 43 = 50 chars
+    expect(prefix).toHaveLength(50);
+  });
+
+  it('handles special characters in userId', async () => {
+    const prefix = await userR2Prefix('user@example.com');
+    expect(prefix).toMatch(/^\/users\/[A-Za-z0-9_-]+$/);
+  });
+});
 
 describe('mountR2Storage', () => {
   beforeEach(() => {
@@ -64,7 +104,7 @@ describe('mountR2Storage', () => {
   });
 
   describe('mounting behavior', () => {
-    it('mounts R2 bucket when credentials provided and not already mounted', async () => {
+    it('mounts R2 bucket without prefix when no userId provided', async () => {
       const { sandbox, mountBucketMock } = createMockSandbox({ mounted: false });
       const env = createMockEnvWithR2({
         R2_ACCESS_KEY_ID: 'key123',
@@ -81,6 +121,29 @@ describe('mountR2Storage', () => {
           accessKeyId: 'key123',
           secretAccessKey: 'secret',
         },
+        prefix: undefined,
+      });
+    });
+
+    it('mounts R2 bucket with per-user prefix when userId provided', async () => {
+      const { sandbox, mountBucketMock } = createMockSandbox({ mounted: false });
+      const env = createMockEnvWithR2({
+        R2_ACCESS_KEY_ID: 'key123',
+        R2_SECRET_ACCESS_KEY: 'secret',
+        CF_ACCOUNT_ID: 'account123',
+      });
+
+      const result = await mountR2Storage(sandbox, env, 'user_abc123');
+
+      expect(result).toBe(true);
+      const expectedPrefix = await userR2Prefix('user_abc123');
+      expect(mountBucketMock).toHaveBeenCalledWith('kiloclaw-data', '/data/openclaw', {
+        endpoint: 'https://account123.r2.cloudflarestorage.com',
+        credentials: {
+          accessKeyId: 'key123',
+          secretAccessKey: 'secret',
+        },
+        prefix: expectedPrefix,
       });
     });
 

@@ -3,6 +3,26 @@ import type { KiloClawEnv } from '../types';
 import { R2_MOUNT_PATH, getR2BucketName } from '../config';
 
 /**
+ * Derive a deterministic, URL-safe R2 prefix from a userId.
+ *
+ * Uses SHA-256 hash (base64url, no padding) to avoid issues with special
+ * characters in userIds (e.g. @, /, :). The hash is non-reversible -- the
+ * KiloClawInstance DO stores the original userId for admin lookup.
+ *
+ * The prefix starts with '/' as required by the sandbox SDK's mountBucket.
+ *
+ * Example: "user_abc123" -> "/users/2Kf8a..." (44 chars)
+ */
+export async function userR2Prefix(userId: string): Promise<string> {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(userId));
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(hash)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  return `/users/${b64}`;
+}
+
+/**
  * Check if R2 is already mounted by looking at the mount table
  */
 async function isR2Mounted(sandbox: Sandbox): Promise<boolean> {
@@ -26,13 +46,22 @@ async function isR2Mounted(sandbox: Sandbox): Promise<boolean> {
 }
 
 /**
- * Mount R2 bucket for persistent storage
+ * Mount R2 bucket for persistent storage.
+ *
+ * When userId is provided (multi-tenant path), mounts under a per-user
+ * prefix so each user's data is isolated within the shared bucket.
+ * When userId is omitted (shared-sandbox path), mounts the bucket root.
  *
  * @param sandbox - The sandbox instance
  * @param env - Worker environment bindings
+ * @param userId - User ID for per-user prefix (omit for shared-sandbox mode)
  * @returns true if mounted successfully, false otherwise
  */
-export async function mountR2Storage(sandbox: Sandbox, env: KiloClawEnv): Promise<boolean> {
+export async function mountR2Storage(
+  sandbox: Sandbox,
+  env: KiloClawEnv,
+  userId?: string
+): Promise<boolean> {
   // Skip if R2 credentials are not configured
   if (!env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.CF_ACCOUNT_ID) {
     console.log(
@@ -48,8 +77,16 @@ export async function mountR2Storage(sandbox: Sandbox, env: KiloClawEnv): Promis
   }
 
   const bucketName = getR2BucketName(env);
+  const prefix = userId ? await userR2Prefix(userId) : undefined;
+
   try {
-    console.log('Mounting R2 bucket', bucketName, 'at', R2_MOUNT_PATH);
+    console.log(
+      'Mounting R2 bucket',
+      bucketName,
+      'at',
+      R2_MOUNT_PATH,
+      prefix ? `prefix: ${prefix}` : '(no prefix)'
+    );
     await sandbox.mountBucket(bucketName, R2_MOUNT_PATH, {
       endpoint: `https://${env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       // Pass credentials explicitly since we use R2_* naming instead of AWS_*
@@ -57,6 +94,7 @@ export async function mountR2Storage(sandbox: Sandbox, env: KiloClawEnv): Promis
         accessKeyId: env.R2_ACCESS_KEY_ID,
         secretAccessKey: env.R2_SECRET_ACCESS_KEY,
       },
+      prefix,
     });
     console.log('R2 bucket mounted successfully');
     return true;

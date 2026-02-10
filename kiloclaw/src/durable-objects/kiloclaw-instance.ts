@@ -18,7 +18,7 @@ import type { KiloClawEnv } from '../types';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { createDatabaseConnection, InstanceStore } from '../db';
 import { buildEnvVars } from '../gateway/env';
-import { mountR2Storage } from '../gateway/r2';
+import { mountR2Storage, userR2Prefix } from '../gateway/r2';
 import { ensureOpenClawGateway, findExistingGatewayProcess } from '../gateway/process';
 import { syncToR2 } from '../gateway/sync';
 import {
@@ -229,8 +229,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const sandbox = this.resolveSandbox();
 
-    // Mount R2 storage
-    await mountR2Storage(sandbox, this.env);
+    // Mount R2 storage with per-user prefix
+    await mountR2Storage(sandbox, this.env, this.userId);
 
     // Build env vars: platform defaults + user env vars + decrypted secrets +
     // decrypted channel tokens + reserved system vars (OPENCLAW_GATEWAY_TOKEN, etc.)
@@ -527,7 +527,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         return;
       }
 
-      const result = await syncToR2(sandbox, this.env);
+      const result = await syncToR2(sandbox, this.env, this.userId ?? undefined);
       if (result.success) {
         this.lastSyncAt = Date.now();
         this.syncFailCount = 0;
@@ -612,12 +612,43 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
-   * Delete R2 data for this user. Uses R2 list + delete via the binding.
+   * Delete R2 data for this user via R2 list + delete.
+   * The R2 prefix is derived from userId using the same hash as mountR2Storage.
+   * userR2Prefix returns "/users/{hash}" (leading slash for s3fs); R2 keys
+   * use no leading slash, so we strip it.
    */
   private async deleteR2Data(): Promise<void> {
-    // R2 prefix is a SHA-256 hash of the userId (see gateway/r2.ts A5.1).
-    // For now, we can't easily derive the prefix without the function from A5.1.
-    // Defer R2 prefix deletion to PR6 when per-user R2 is implemented.
-    console.log('[DO] R2 data deletion deferred to PR6 (per-user R2 prefixes)');
+    if (!this.userId) return;
+
+    const prefixWithSlash = await userR2Prefix(this.userId);
+    // Strip leading '/' -- R2 keys don't use leading slashes
+    const r2Prefix = prefixWithSlash.startsWith('/') ? prefixWithSlash.slice(1) : prefixWithSlash;
+
+    console.log('[DO] Deleting R2 data with prefix:', r2Prefix);
+
+    try {
+      let cursor: string | undefined;
+      let totalDeleted = 0;
+
+      do {
+        const listed = await this.env.KILOCLAW_BUCKET.list({
+          prefix: r2Prefix,
+          cursor,
+          limit: 1000,
+        });
+
+        if (listed.objects.length > 0) {
+          const keys = listed.objects.map(o => o.key);
+          await this.env.KILOCLAW_BUCKET.delete(keys);
+          totalDeleted += keys.length;
+        }
+
+        cursor = listed.truncated ? listed.cursor : undefined;
+      } while (cursor);
+
+      console.log(`[DO] Deleted ${totalDeleted} R2 objects for user ${this.userId}`);
+    } catch (err) {
+      console.error('[DO] R2 data deletion failed:', err);
+    }
   }
 }

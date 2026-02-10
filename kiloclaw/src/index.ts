@@ -16,7 +16,7 @@ import { getSandbox, type SandboxOptions } from '@cloudflare/sandbox';
 
 import type { AppEnv, KiloClawEnv } from './types';
 import { OPENCLAW_PORT } from './config';
-import { ensureOpenClawGateway, findExistingGatewayProcess, syncToR2 } from './gateway';
+import { ensureOpenClawGateway, findExistingGatewayProcess } from './gateway';
 import { publicRoutes, api, debug, platform } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
@@ -402,35 +402,6 @@ app.all('*', async c => {
   });
 });
 
-// =============================================================================
-// Scheduled handler (dead code -- cron trigger removed in PR1, handler removed in PR6)
-// =============================================================================
-
-async function scheduled(
-  _event: ScheduledEvent,
-  env: KiloClawEnv,
-  _ctx: ExecutionContext
-): Promise<void> {
-  const options = buildSandboxOptions(env);
-  const sandbox = getSandbox(env.Sandbox, 'kiloclaw', options);
-
-  const gatewayProcess = await findExistingGatewayProcess(sandbox);
-  if (!gatewayProcess) {
-    console.log('[cron] Gateway not running yet, skipping sync');
-    return;
-  }
-
-  console.log('[cron] Starting backup sync to R2...');
-  const result = await syncToR2(sandbox, env);
-
-  if (result.success) {
-    console.log('[cron] Backup sync completed successfully at', result.lastSync);
-  } else {
-    console.error('[cron] Backup sync failed:', result.error, result.details || '');
-  }
-}
-
 export default {
   fetch: app.fetch,
-  scheduled,
 };

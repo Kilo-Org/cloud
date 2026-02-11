@@ -28,9 +28,10 @@ export function applyXaiModelSettings(
 ) {
   if (provider === 'martian') {
     delete requestToMutate.provider;
-    if (hasAttemptCompletionTool(requestToMutate)) {
-      requestToMutate.tool_choice = 'required';
-    }
+  }
+
+  if (hasAttemptCompletionTool(requestToMutate)) {
+    requestToMutate.tool_choice = 'required';
   }
 
   // https://kilo-code.slack.com/archives/C09922UFQHF/p1767968746782459

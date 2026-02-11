@@ -1,8 +1,8 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { DeploymentProvider } from './DeploymentContext';
 import type {
   DeploymentQueries,
@@ -22,6 +22,7 @@ type OrgDeploymentProviderProps = {
  */
 export function OrgDeploymentProvider({ organizationId, children }: OrgDeploymentProviderProps) {
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
 
   const queries: DeploymentQueries = {
@@ -91,6 +92,15 @@ export function OrgDeploymentProvider({ organizationId, children }: OrgDeploymen
           deploymentId,
         })
       ),
+
+    checkSlugAvailability: useCallback(
+      (slug: string) =>
+        trpcClient.organizations.deployments.checkSlugAvailability.query({
+          organizationId,
+          slug,
+        }),
+      [trpcClient, organizationId]
+    ),
   };
 
   // Base mutations from TRPC
@@ -227,6 +237,23 @@ export function OrgDeploymentProvider({ organizationId, children }: OrgDeploymen
     })
   );
 
+  const renameDeploymentMutation = useMutation(
+    trpc.organizations.deployments.renameDeployment.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.deployments.getDeployment.queryKey({
+            organizationId,
+          }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.deployments.listDeployments.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+
   // Wrap mutations to match the DeploymentMutations interface
   const mutations: DeploymentMutations = {
     createDeployment: {
@@ -318,6 +345,16 @@ export function OrgDeploymentProvider({ organizationId, children }: OrgDeploymen
         return removePasswordMutation.mutateAsync({ ...input, organizationId }, options);
       },
     } as DeploymentMutations['removePassword'],
+
+    renameDeployment: {
+      ...renameDeploymentMutation,
+      mutate: (input, options) => {
+        renameDeploymentMutation.mutate({ ...input, organizationId }, options);
+      },
+      mutateAsync: async (input, options) => {
+        return renameDeploymentMutation.mutateAsync({ ...input, organizationId }, options);
+      },
+    } as DeploymentMutations['renameDeployment'],
   };
 
   return (

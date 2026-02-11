@@ -1,8 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { DeploymentProvider } from './DeploymentContext';
 import type {
   DeploymentQueries,
@@ -17,6 +18,7 @@ import { DEPLOYMENT_POLL_INTERVAL_MS } from '@/lib/user-deployments/constants';
  */
 export function UserDeploymentProvider({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
 
   const queries: DeploymentQueries = {
@@ -70,6 +72,11 @@ export function UserDeploymentProvider({ children }: { children: ReactNode }) {
 
     listEnvVars: (deploymentId: string) =>
       useQuery(trpc.deployments.listEnvVars.queryOptions({ deploymentId })),
+
+    checkSlugAvailability: useCallback(
+      (slug: string) => trpcClient.deployments.checkSlugAvailability.query({ slug }),
+      [trpcClient]
+    ),
   };
 
   const mutations: DeploymentMutations = {
@@ -156,6 +163,19 @@ export function UserDeploymentProvider({ children }: { children: ReactNode }) {
             queryKey: trpc.deployments.listEnvVars.queryKey({
               deploymentId: variables.deploymentId,
             }),
+          });
+        },
+      })
+    ),
+
+    renameDeployment: useMutation(
+      trpc.deployments.renameDeployment.mutationOptions({
+        onSuccess: () => {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.deployments.getDeployment.queryKey(),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: trpc.deployments.listDeployments.queryKey(),
           });
         },
       })

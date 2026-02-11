@@ -321,7 +321,7 @@ export function checkOrganizationModelRestrictions(params: {
 }
 
 export function extractHeaderAndLimitLength(request: NextRequest, name: string) {
-  return request.headers.get(name)?.slice(0, 500) || null;
+  return request.headers.get(name)?.slice(0, 500)?.trim() || null;
 }
 
 export function extractFraudAndProjectHeaders(request: NextRequest) {

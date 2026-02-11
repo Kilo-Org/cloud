@@ -31,6 +31,10 @@ export function isHaikuModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/claude-haiku');
 }
 
+export function isOpusModel(requestedModel: string) {
+  return requestedModel.startsWith('anthropic/claude-opus');
+}
+
 type ReadFileParametersSchema = {
   properties?: {
     files?: {
@@ -83,11 +87,16 @@ function applyAnthropicStrictToolUse(
 }
 
 export function applyAnthropicModelSettings(
+  requestedModel: string,
   requestToMutate: OpenRouterChatCompletionRequest,
   extraHeaders: Record<string, string>
 ) {
   if (ENABLE_ANTHROPIC_STRICT_TOOL_USE) {
     applyAnthropicStrictToolUse(requestToMutate, extraHeaders);
+  }
+
+  if (isOpusModel(requestedModel) && !requestToMutate.verbosity) {
+    requestToMutate.verbosity = 'medium';
   }
 
   // anthropic doesn't allow '.' in tool call ids

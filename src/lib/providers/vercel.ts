@@ -1,7 +1,7 @@
 import type { BYOKResult } from '@/lib/byok';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { isAnthropicModel } from '@/lib/providers/anthropic';
-import { minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
+import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
 import {
   AutocompleteUserByokProviderIdSchema,
   inferVercelFirstPartyInferenceProviderForModel,
@@ -14,10 +14,23 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/providers/openrouter/types';
-import { recommendedModels } from '@/lib/providers/recommended-models';
+import { zai_glm47_free_model } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
 
 const VERCEL_ROUTING_PERCENTAGE = 10;
+
+const VERCEL_ROUTING_ALLOW_LIST = [
+  'arcee-ai/trinity-large-preview:free',
+  'google/gemini-3-pro-preview',
+  'google/gemini-3-flash-preview',
+  minimax_m21_free_model.public_id,
+  'minimax/minimax-m2.1',
+  'openai/gpt-5.2',
+  'openai/gpt-5.2-codex',
+  'x-ai/grok-code-fast-1',
+  zai_glm47_free_model.public_id,
+  'z-ai/glm-4.7',
+];
 
 function getRandomNumberLessThan100(userId: string) {
   return crypto.createHash('sha256').update(userId).digest().readUInt32BE(0) % 100;
@@ -28,7 +41,7 @@ export async function shouldRouteToVercel(
   request: OpenRouterChatCompletionRequest,
   userId: string
 ) {
-  if (!recommendedModels.find(m => m.public_id === requestedModel && m.random_vercel_routing)) {
+  if (!VERCEL_ROUTING_ALLOW_LIST.includes(requestedModel)) {
     console.debug(`[shouldRouteToVercel] model not on the allow list for Vercel routing`);
     return false;
   }

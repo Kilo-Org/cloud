@@ -51,11 +51,15 @@ import {
   getToolsUsed,
 } from '@/lib/o11y/api-metrics.server';
 import { handleRequestLogging } from '@/lib/handleRequestLogging';
+import {
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_SONNET_CURRENT_MODEL_ID,
+} from '@/lib/providers/anthropic';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
-const OPUS = 'anthropic/claude-opus-4.6';
-const SONNET = 'anthropic/claude-sonnet-4.5';
+const OPUS = CLAUDE_OPUS_CURRENT_MODEL_ID;
+const SONNET = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 // Mode → model mappings for kilo/auto routing.
 // Add/remove/modify entries here to change routing behavior.

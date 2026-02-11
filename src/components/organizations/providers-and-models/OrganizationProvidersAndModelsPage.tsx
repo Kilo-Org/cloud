@@ -8,7 +8,6 @@ import {
 } from '@/app/api/organizations/hooks';
 import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
 import { normalizeModelId } from '@/lib/model-utils';
-import { recommendedModels } from '@/lib/providers/recommended-models';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
@@ -30,6 +29,7 @@ import {
   useProvidersAndModelsAllowListsState,
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
+import { preferredModels } from '@/lib/models';
 
 type Props = {
   organizationId: string;
@@ -111,8 +111,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
-    for (let i = 0; i < recommendedModels.length; i++) {
-      const modelId = normalizeModelId(recommendedModels[i].public_id);
+    for (let i = 0; i < preferredModels.length; i++) {
+      const modelId = normalizeModelId(preferredModels[i]);
       index.set(modelId, i);
     }
     return index;

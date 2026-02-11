@@ -3,6 +3,10 @@ import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter
 import { normalizeToolCallIds } from '@/lib/tool-calling';
 import type OpenAI from 'openai';
 
+export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.5';
+
+export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.6';
+
 export const opus_46_free_slackbot_model = {
   public_id: 'anthropic/claude-opus-4.6:slackbot',
   display_name: 'Claude Opus 4.6 (Free for Kilo for Slack)',
@@ -21,6 +25,10 @@ const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;
 
 export function isAnthropicModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/');
+}
+
+export function isHaikuModel(requestedModel: string) {
+  return requestedModel.startsWith('anthropic/claude-haiku');
 }
 
 type ReadFileParametersSchema = {

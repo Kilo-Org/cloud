@@ -2,12 +2,12 @@
  * Utility functions for working with AI models
  */
 
+import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import { opus_46_free_slackbot_model } from '@/lib/providers/anthropic';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
-import { recommendedModels } from '@/lib/providers/recommended-models';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { zai_glm47_free_model } from '@/lib/providers/zai';
 
@@ -15,11 +15,29 @@ export const DEFAULT_MODEL_CHOICES = ['anthropic/claude-sonnet-4.5', 'anthropic/
 
 export const PRIMARY_DEFAULT_MODEL = DEFAULT_MODEL_CHOICES[0];
 
-export function getFirstFreeModel() {
-  return recommendedModels.find(m => isFreeModel(m.public_id))?.public_id ?? PRIMARY_DEFAULT_MODEL;
-}
+export const preferredModels = [
+  KILO_AUTO_MODEL_ID,
+  minimax_m21_free_model.is_enabled ? minimax_m21_free_model.public_id : 'minimax/minimax-m2.1',
+  zai_glm47_free_model.is_enabled ? zai_glm47_free_model.public_id : 'z-ai/glm-4.7',
+  'openrouter/pony-alpha',
+  giga_potato_model.public_id,
+  'arcee-ai/trinity-large-preview:free',
+  'anthropic/claude-opus-4.6',
+  'anthropic/claude-sonnet-4.5',
+  'anthropic/claude-haiku-4.5',
+  'openai/gpt-5.2',
+  'openai/gpt-5.2-codex',
+  'google/gemini-3-pro-preview',
+  'google/gemini-3-flash-preview',
+  'moonshotai/kimi-k2.5',
+  grok_code_fast_1_optimized_free_model.is_enabled
+    ? grok_code_fast_1_optimized_free_model.public_id
+    : 'x-ai/grok-code-fast-1',
+];
 
-export const preferredModels = recommendedModels.map(m => m.public_id);
+export function getFirstFreeModel() {
+  return preferredModels.find(m => isFreeModel(m)) ?? PRIMARY_DEFAULT_MODEL;
+}
 
 const freeOpenRouterModels = [
   'openrouter/aurora-alpha',

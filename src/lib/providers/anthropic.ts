@@ -23,6 +23,10 @@ export function isAnthropicModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/');
 }
 
+export function isHaikuModel(requestedModel: string) {
+  return requestedModel.startsWith('anthropic/claude-haiku');
+}
+
 type ReadFileParametersSchema = {
   properties?: {
     files?: {

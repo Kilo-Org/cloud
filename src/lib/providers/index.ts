@@ -15,9 +15,11 @@ import { applyXaiModelSettings, isXaiModel } from '@/lib/providers/xai';
 import { applyVercelSettings, shouldRouteToVercel } from '@/lib/providers/vercel';
 import { kiloFreeModels } from '@/lib/models';
 import { applyMinimaxProviderSettings } from '@/lib/providers/minimax';
-import type { RecommendedModel } from '@/lib/providers/recommended-models';
-import { recommendedModels } from '@/lib/providers/recommended-models';
-import { applyAnthropicModelSettings, isAnthropicModel } from '@/lib/providers/anthropic';
+import {
+  applyAnthropicModelSettings,
+  isAnthropicModel,
+  isHaikuModel,
+} from '@/lib/providers/anthropic';
 import { applyGigaPotatoProviderSettings } from '@/lib/providers/gigapotato';
 import { getBYOKforOrganization, getBYOKforUser, type BYOKResult } from '@/lib/byok';
 import type { User } from '@/db/schema';
@@ -28,11 +30,12 @@ import {
 } from '@/lib/providers/openrouter/inference-provider-id';
 import { applyCoreThinkProviderSettings } from '@/lib/providers/corethink';
 import { hasAttemptCompletionTool } from '@/lib/tool-calling';
-import { applyGoogleModelSettings, isGoogleModel } from '@/lib/providers/google';
+import { applyGoogleModelSettings, isGeminiModel } from '@/lib/providers/google';
 import { db } from '@/lib/drizzle';
 import { applyMoonshotProviderSettings, isMoonshotModel } from '@/lib/providers/moonshotai';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
+import { isOpenAiModel } from '@/lib/providers/openai';
 
 export const PROVIDERS = {
   OPENROUTER: {
@@ -130,15 +133,22 @@ export async function getProvider(
 }
 
 function applyToolChoiceSetting(
-  model: RecommendedModel,
+  requestedModel: string,
   requestToMutate: OpenRouterChatCompletionRequest
 ) {
-  const isAnthropicReasoningEnabled =
-    isAnthropicModel(model.public_id) && (requestToMutate.reasoning?.max_tokens ?? 0) > 0;
+  if (!hasAttemptCompletionTool(requestToMutate)) {
+    return;
+  }
+  const isReasoningEnabled =
+    (requestToMutate.reasoning?.enabled ?? false) === true ||
+    (requestToMutate.reasoning?.effort ?? 'none') !== 'none' ||
+    (requestToMutate.reasoning?.max_tokens ?? 0) > 0;
   if (
-    model.tool_choice_required &&
-    hasAttemptCompletionTool(requestToMutate) &&
-    !isAnthropicReasoningEnabled
+    isXaiModel(requestedModel) ||
+    isOpenAiModel(requestedModel) ||
+    isGeminiModel(requestedModel) ||
+    (isMoonshotModel(requestedModel) && !isReasoningEnabled) ||
+    (isHaikuModel(requestedModel) && !isReasoningEnabled)
   ) {
     console.debug('[applyToolChoiceSetting] setting tool_choice required');
     requestToMutate.tool_choice = 'required';
@@ -196,10 +206,7 @@ export function applyProviderSpecificLogic(
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
-  const recommendedModel = recommendedModels.find(m => m.public_id === requestedModel);
-  if (recommendedModel) {
-    applyToolChoiceSetting(recommendedModel, requestToMutate);
-  }
+  applyToolChoiceSetting(requestedModel, requestToMutate);
 
   applyPreferredProvider(requestedModel, requestToMutate);
 
@@ -207,12 +214,12 @@ export function applyProviderSpecificLogic(
     applyXaiModelSettings(provider.id, requestToMutate, extraHeaders);
   }
 
-  if (isGoogleModel(requestedModel)) {
+  if (isGeminiModel(requestedModel)) {
     applyGoogleModelSettings(provider.id, requestToMutate);
   }
 
   if (isMoonshotModel(requestedModel)) {
-    applyMoonshotProviderSettings(provider.id, requestToMutate);
+    applyMoonshotProviderSettings(requestToMutate);
   }
 
   if (provider.id === 'gigapotato') {

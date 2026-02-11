@@ -704,68 +704,74 @@ export async function createDeployment(params: {
     });
   }
 
-  // Retry slug generation on collision. The 4-digit suffix gives 10k combinations
-  // per prefix, so collisions are possible for popular repo names.
-  const MAX_SLUG_RETRIES = 3;
-  for (let attempt = 0; attempt < MAX_SLUG_RETRIES; attempt++) {
-    const deploymentSlug = generateDeploymentSlug(slugInput);
-    const deploymentUrl = `https://${deploymentSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
-
-    // Point the public slug at the internal worker
-    await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
-
-    try {
-      const deploymentId = await db.transaction(async tx => {
-        const [deployment] = await tx
-          .insert(deployments)
-          .values({
-            created_by_user_id: createdByUserId,
-            owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-            owned_by_user_id: owner.type === 'user' ? owner.id : null,
-            deployment_slug: deploymentSlug,
-            internal_worker_name: internalWorkerName,
-            repository_source: resolved.repositorySource,
-            branch: branch,
-            deployment_url: deploymentUrl,
-            platform_integration_id: resolved.platformIntegrationId,
-            source_type: resolved.sourceType,
-            git_auth_token: resolved.encryptedToken,
-            last_build_id: builderResponse.buildId,
-          })
-          .returning();
-
-        await tx.insert(deployment_builds).values({
-          id: builderResponse.buildId,
-          deployment_id: deployment.id,
-          status: builderResponse.status,
-        });
-
-        // Store env vars (already encrypted)
-        if (encryptedUserEnvVars.length > 0) {
-          for (const envVar of encryptedUserEnvVars) {
-            await envVarsService.setEnvVar(deployment, envVar, owner, tx);
-          }
-        }
-
-        return deployment.id;
-      });
-
-      return { success: true, deploymentId, deploymentSlug, deploymentUrl };
-    } catch (error) {
-      if (isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')) {
-        // Slug collision — retry with a fresh slug (stale KV mapping is harmless;
-        // the next attempt will overwrite it for the same internalWorkerName).
-        continue;
-      }
-      // Non-collision error: clean up the worker and re-throw
-      await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
-      throw error;
+  // Generate a slug that isn't already taken. The 4-digit suffix gives 10k
+  // combinations per prefix, so collisions are possible for popular repo names.
+  const MAX_SLUG_ATTEMPTS = 3;
+  let deploymentSlug: string | undefined;
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+    const candidate = generateDeploymentSlug(slugInput);
+    const check = await checkSlugAvailability(candidate);
+    if (check.available) {
+      deploymentSlug = candidate;
+      break;
     }
   }
+  if (deploymentSlug === undefined) {
+    await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
+    return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
+  }
 
-  // All retries exhausted — clean up and report failure
-  await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
-  return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
+  const deploymentUrl = `https://${deploymentSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
+
+  // Point the public slug at the internal worker
+  await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
+
+  let deploymentId: string;
+  try {
+    deploymentId = await db.transaction(async tx => {
+      const [deployment] = await tx
+        .insert(deployments)
+        .values({
+          created_by_user_id: createdByUserId,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          deployment_slug: deploymentSlug,
+          internal_worker_name: internalWorkerName,
+          repository_source: resolved.repositorySource,
+          branch: branch,
+          deployment_url: deploymentUrl,
+          platform_integration_id: resolved.platformIntegrationId,
+          source_type: resolved.sourceType,
+          git_auth_token: resolved.encryptedToken,
+          last_build_id: builderResponse.buildId,
+        })
+        .returning();
+
+      await tx.insert(deployment_builds).values({
+        id: builderResponse.buildId,
+        deployment_id: deployment.id,
+        status: builderResponse.status,
+      });
+
+      // Store env vars (already encrypted)
+      if (encryptedUserEnvVars.length > 0) {
+        for (const envVar of encryptedUserEnvVars) {
+          await envVarsService.setEnvVar(deployment, envVar, owner, tx);
+        }
+      }
+
+      return deployment.id;
+    });
+  } catch (error) {
+    // Handle unique constraint violation on deployment_slug (rare race condition).
+    if (isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')) {
+      await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
+      return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
+    }
+    throw error;
+  }
+
+  return { success: true, deploymentId, deploymentSlug, deploymentUrl };
 }
 
 /**

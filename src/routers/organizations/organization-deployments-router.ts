@@ -125,6 +125,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
         },
         branch: input.branch,
         createdByUserId: ctx.user.id,
+        createdFrom: 'deploy',
         envVars: input.envVars,
       });
     }),
@@ -269,5 +270,46 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
       // Password records are keyed by internal worker name in the dispatcher
       return dispatcherClient.removePassword(deployment.internal_worker_name);
+    }),
+
+  // Banner endpoints (app-builder deployments only)
+  getBannerStatus: organizationMemberProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid(),
+        deploymentId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
+        type: 'org',
+        id: input.organizationId,
+      });
+      if (deployment.created_from !== 'app-builder') {
+        return { enabled: false };
+      }
+      return dispatcherClient.getBannerStatus(deployment.internal_worker_name);
+    }),
+
+  setBanner: organizationMemberProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid(),
+        deploymentId: z.string().uuid(),
+        enabled: z.boolean(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
+        type: 'org',
+        id: input.organizationId,
+      });
+      if (deployment.created_from !== 'app-builder') {
+        return { success: true as const };
+      }
+      const workerName = deployment.internal_worker_name;
+      return input.enabled
+        ? dispatcherClient.enableBanner(workerName)
+        : dispatcherClient.disableBanner(workerName);
     }),
 });

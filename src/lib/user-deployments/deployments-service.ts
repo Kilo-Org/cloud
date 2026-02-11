@@ -216,12 +216,17 @@ export async function deleteDeployment(deploymentId: string, owner: Owner) {
     });
   }
 
-  // Clean up KV slug mapping
-  await dispatcherClient.deleteSlugMapping(deployment[0].internal_worker_name);
+  // Clean up KV records (slug mapping, password protection, banner)
+  const workerName = deployment[0].internal_worker_name;
+  await Promise.allSettled([
+    dispatcherClient.deleteSlugMapping(workerName),
+    dispatcherClient.removePassword(workerName),
+    dispatcherClient.disableBanner(workerName),
+  ]);
 
   // Delete worker deployment from Cloudflare FIRST
   // If this fails, we don't proceed with database deletion to avoid orphan deployments
-  await deployApiClient.deleteWorker(deployment[0].internal_worker_name);
+  await deployApiClient.deleteWorker(workerName);
 
   // Unlink app builder projects that reference this deployment
   await db
@@ -648,12 +653,13 @@ export async function createDeployment(params: {
   source: DeploymentSource;
   branch: string;
   createdByUserId: string;
+  createdFrom: 'deploy' | 'app-builder';
   envVars?: PlaintextEnvVar[];
 }): Promise<CreateDeploymentResult> {
-  const { owner, source, branch, createdByUserId, envVars } = params;
+  const { owner, source, branch, createdByUserId, createdFrom, envVars } = params;
 
   // Temporary: skip payment check for app builder sites
-  if (source.type !== 'app-builder') {
+  if (createdFrom !== 'app-builder') {
     const paymentCheck = await checkOwnerHasEverPaid(owner);
     if (!paymentCheck.hasPaid) {
       return {
@@ -727,6 +733,7 @@ export async function createDeployment(params: {
           source_type: resolved.sourceType,
           git_auth_token: resolved.encryptedToken,
           last_build_id: builderResponse.buildId,
+          created_from: createdFrom,
         })
         .returning();
 
@@ -753,6 +760,16 @@ export async function createDeployment(params: {
       return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
     }
     throw error;
+  }
+
+  // Auto-enable banner for app-builder deployments
+  if (createdFrom === 'app-builder') {
+    try {
+      await dispatcherClient.enableBanner(internalWorkerName);
+    } catch (error) {
+      // Non-fatal: deployment was created successfully, banner is secondary
+      console.error('Failed to enable banner for app-builder deployment:', error);
+    }
   }
 
   return { success: true, deploymentId, deploymentSlug, deploymentUrl };

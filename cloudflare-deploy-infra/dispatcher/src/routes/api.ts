@@ -9,6 +9,7 @@ import { z } from 'zod';
 import type { Env } from '../types';
 import { hashPassword } from '../auth/password';
 import { getPasswordRecord, setPasswordRecord, deletePasswordRecord } from '../auth/password-store';
+import { isBannerEnabled, enableBanner, disableBanner } from '../banner/banner-store';
 import {
   workerNameSchema,
   setPasswordRequestSchema,
@@ -134,5 +135,37 @@ api.delete('/slug-mapping/:worker', validateWorkerParam, async c => {
   }
   await c.env.DEPLOY_KV.delete(`worker2slug:${worker}`);
 
+  return c.json({ success: true });
+});
+
+// ============================================================================
+// Banner Routes
+// Manages the "Made with Kilo App Builder" badge for deployed sites
+// ============================================================================
+
+/**
+ * Get banner status.
+ */
+api.get('/app-builder-banner/:worker', validateWorkerParam, async c => {
+  const { worker } = c.req.valid('param');
+  const enabled = await isBannerEnabled(c.env.DEPLOY_KV, worker);
+  return c.json({ enabled });
+});
+
+/**
+ * Enable banner.
+ */
+api.put('/app-builder-banner/:worker', validateWorkerParam, async c => {
+  const { worker } = c.req.valid('param');
+  await enableBanner(c.env.DEPLOY_KV, worker);
+  return c.json({ success: true });
+});
+
+/**
+ * Disable banner.
+ */
+api.delete('/app-builder-banner/:worker', validateWorkerParam, async c => {
+  const { worker } = c.req.valid('param');
+  await disableBanner(c.env.DEPLOY_KV, worker);
   return c.json({ success: true });
 });

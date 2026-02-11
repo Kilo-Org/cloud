@@ -16,6 +16,10 @@ export const returnPathSchema = z
   })
   .catch('/');
 
+export const successResponseSchema = z.object({
+  success: z.literal(true),
+});
+
 // --- API route schemas (api.ts) ---
 
 export const setPasswordRequestSchema = z.object({
@@ -32,13 +36,15 @@ export const setSlugMappingRequestSchema = z.object({
   slug: slugParamSchema,
 });
 
+// --- Banner response schemas ---
+
+export const getBannerResponseSchema = z.object({
+  enabled: z.boolean(),
+});
+
 export const setPasswordResponseSchema = z.object({
   success: z.literal(true),
   passwordSetAt: z.number(),
-});
-
-export const deletePasswordResponseSchema = z.object({
-  success: z.literal(true),
 });
 
 export const getPasswordResponseSchema = z.discriminatedUnion('protected', [
@@ -66,13 +72,15 @@ export const authFormSchema = z.object({
 
 export type WorkerName = z.infer<typeof workerNameSchema>;
 export type ReturnPath = z.infer<typeof returnPathSchema>;
+export type SuccessResponse = z.infer<typeof successResponseSchema>;
 
 export type SetPasswordRequest = z.infer<typeof setPasswordRequestSchema>;
 export type SetPasswordResponse = z.infer<typeof setPasswordResponseSchema>;
-export type DeletePasswordResponse = z.infer<typeof deletePasswordResponseSchema>;
 export type GetPasswordResponse = z.infer<typeof getPasswordResponseSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 
 export type AuthFormData = z.infer<typeof authFormSchema>;
 
 export type SetSlugMappingRequest = z.infer<typeof setSlugMappingRequestSchema>;
+
+export type GetBannerResponse = z.infer<typeof getBannerResponseSchema>;

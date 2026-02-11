@@ -13,7 +13,7 @@ import { giga_potato_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
-import { zai_glm47_free_model } from '@/lib/providers/zai';
+import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
 
 export const DEFAULT_MODEL_CHOICES = [CLAUDE_SONNET_CURRENT_MODEL_ID, CLAUDE_OPUS_CURRENT_MODEL_ID];
 
@@ -22,7 +22,7 @@ export const PRIMARY_DEFAULT_MODEL = DEFAULT_MODEL_CHOICES[0];
 export const preferredModels = [
   KILO_AUTO_MODEL_ID,
   minimax_m21_free_model.is_enabled ? minimax_m21_free_model.public_id : 'minimax/minimax-m2.1',
-  zai_glm47_free_model.is_enabled ? zai_glm47_free_model.public_id : 'z-ai/glm-4.7',
+  zai_glm5_free_model.is_enabled ? zai_glm5_free_model.public_id : 'z-ai/glm-5',
   giga_potato_model.public_id,
   'arcee-ai/trinity-large-preview:free',
   CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -68,6 +68,7 @@ export const kiloFreeModels = [
   opus_46_free_slackbot_model,
   grok_code_fast_1_optimized_free_model,
   zai_glm47_free_model,
+  zai_glm5_free_model,
 ] as KiloFreeModel[];
 
 export function isStealthModelOnKiloCodeOnly(model: string): boolean {

@@ -90,13 +90,13 @@
       }
     },
     {
-      "id": "z-ai/glm-4.7:free",
-      "canonical_slug": "z-ai/glm-4.7:free",
+      "id": "z-ai/glm-5:free",
+      "canonical_slug": "z-ai/glm-5:free",
       "hugging_face_id": "",
-      "name": "Z.AI: GLM 4.7 (free)",
+      "name": "Z.AI: GLM 5 (free)",
       "created": 1756238927,
-      "description": "GLM-4.7 is Z.AI's latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing complex agent tasks while delivering more natural conversational experiences and superior front-end aesthetics.",
-      "context_length": 202752,
+      "description": "GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading closed-source models. With advanced agentic planning, deep backend reasoning, and iterative self-correction, GLM-5 moves beyond code generation to full-system construction and autonomous execution.",
+      "context_length": 202800,
       "architecture": {
         "modality": "text->text",
         "input_modalities": [
@@ -118,8 +118,8 @@
         "input_cache_read": "0.00000000"
       },
       "top_provider": {
-        "context_length": 202752,
-        "max_completion_tokens": 65535,
+        "context_length": 202800,
+        "max_completion_tokens": 131072,
         "is_moderated": false
       },
       "per_request_limits": null,

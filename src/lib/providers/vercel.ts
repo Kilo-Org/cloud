@@ -14,7 +14,7 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/providers/openrouter/types';
-import { zai_glm47_free_model } from '@/lib/providers/zai';
+import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
 
 const VERCEL_ROUTING_PERCENTAGE = 10;
@@ -30,6 +30,8 @@ const VERCEL_ROUTING_ALLOW_LIST = [
   'x-ai/grok-code-fast-1',
   zai_glm47_free_model.public_id,
   'z-ai/glm-4.7',
+  zai_glm5_free_model.public_id,
+  'z-ai/glm-5',
 ];
 
 function getRandomNumberLessThan100(userId: string) {

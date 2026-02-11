@@ -66,17 +66,10 @@ export type CreateDeploymentResult =
   | { success: true; deploymentId: string; deploymentSlug: string; deploymentUrl: string }
   | { success: false; error: 'payment_required' | 'invalid_slug' | 'slug_taken'; message: string };
 
-export type RenameDeploymentResult =
-  | { success: true; deploymentUrl: string }
-  | {
-      success: false;
-      error: 'not_found' | 'invalid_slug' | 'slug_taken' | 'internal_error';
-      message: string;
-    };
-
-export type CheckSlugAvailabilityResult =
-  | { available: true }
-  | { available: false; reason: 'invalid_slug' | 'slug_taken'; message: string };
+import type {
+  RenameDeploymentResult,
+  CheckSlugAvailabilityResult,
+} from '@/lib/user-deployments/router-types';
 
 // Resolved source details ready for deployment
 type ResolvedSourceDetails = {

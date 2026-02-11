@@ -101,6 +101,11 @@ const usageContext: MicrodollarUsageContext = {
 
 **⚠️ Security Note**: Header is validated (max 255 chars, alphanumeric + underscore/hyphen only) to prevent DB bloat from malicious clients.
 
+**⚠️ PostHog Identity Note**: For authenticated users, PostHog's `distinct_id` IS the email (set via `posthog.identify(email)` in PostHogProvider.tsx:94). This means:
+- Anonymous: `posthog_distinct_id` = header value (e.g., `"vscode-abc123"`)
+- Authenticated: `posthog_distinct_id` = email (e.g., `"user@example.com"`)
+- PostHog links them via `alias()` call, so queries work across both states
+
 ### File 4: `src/lib/processUsage.ts` (VERIFY ONLY)
 Check that `posthog_distinct_id` is included in INSERT around line ~550-600. Likely already works.
 

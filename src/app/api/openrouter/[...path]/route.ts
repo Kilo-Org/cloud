@@ -85,7 +85,9 @@ function resolveAutoModel(modeHeader: string | null) {
 }
 
 function validatePath(url: URL) {
-  const path = stripRequiredPrefix(url.pathname, '/api/openrouter');
+  const path =
+    stripRequiredPrefix(url.pathname, '/api/gateway') ??
+    stripRequiredPrefix(url.pathname, '/api/openrouter');
 
   return path === '/chat/completions' ? { path } : { errorResponse: invalidPathResponse() };
 }

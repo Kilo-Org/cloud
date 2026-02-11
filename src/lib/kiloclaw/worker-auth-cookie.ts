@@ -14,7 +14,7 @@ export async function setWorkerAuthCookie(user: User): Promise<void> {
   const cookieStore = await cookies();
   const isDev = process.env.NODE_ENV === 'development';
   cookieStore.set(COOKIE_NAME, token, {
-    domain: isDev ? undefined : '.kilo.ai',
+    domain: isDev ? 'localhost' : '.kilo.ai',
     path: '/',
     httpOnly: true,
     secure: !isDev,
@@ -32,18 +32,25 @@ export async function clearWorkerAuthCookie(): Promise<void> {
   const cookieStore = await cookies();
   const isDev = process.env.NODE_ENV === 'development';
   cookieStore.set(COOKIE_NAME, '', {
-    domain: isDev ? undefined : '.kilo.ai',
+    domain: isDev ? 'localhost' : '.kilo.ai',
     path: '/',
     maxAge: 0,
   });
 }
 
-export async function isWorkerAuthCookieExpiring(): Promise<boolean> {
+/**
+ * Check if the cookie needs refreshing. Returns true if:
+ * - Cookie is missing
+ * - Cookie is expiring within REFRESH_THRESHOLD
+ * - Cookie's userId doesn't match the provided userId (stale after DB reset)
+ */
+export async function isWorkerAuthCookieStale(currentUserId: string): Promise<boolean> {
   const token = await getWorkerAuthCookie();
   if (!token) return true;
   try {
-    const decoded = jwt.decode(token) as { exp?: number } | null;
+    const decoded = jwt.decode(token) as { exp?: number; kiloUserId?: string } | null;
     if (!decoded?.exp) return true;
+    if (decoded.kiloUserId !== currentUserId) return true;
     return decoded.exp - Math.floor(Date.now() / 1000) < REFRESH_THRESHOLD;
   } catch {
     return true;

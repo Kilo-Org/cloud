@@ -13,7 +13,8 @@ These are non-negotiable. Do not reintroduce shared/fallback paths.
 - **R2 is always per-user.** `mountR2Storage` requires a `userId` and always mounts with a per-user prefix (`/users/{sha256(userId)}`). There is no unprefixed/root mount path.
 - **`buildEnvVars` requires `sandboxId` and `gatewayTokenSecret`.** Gateway token and `AUTO_APPROVE_DEVICES` are always set. No fallback to worker-level channel tokens.
 - **`ensureOpenClawGateway` requires pre-built env vars.** Callers build env vars via `buildEnvVars`, mount R2, then call `ensureOpenClawGateway`. The function does not build env vars itself.
-- **Postgres is a registry, not operational state.** The DB stores `(user_id, sandbox_id, created_at, destroyed_at)`. Status, timestamps, and config live in the DO. No `mirrorStatusToDb`.
+- **Next.js is the sole Postgres writer.** The worker only reads via Hyperdrive (pepper validation + DO restore). The DB stores registry data (`user_id`, `sandbox_id`, `created_at`, `destroyed_at`) plus config backup (`channels` JSONB, `vars` JSONB). Operational state (status, timestamps) lives in the DO only.
+- **DO restore from Postgres.** If DO SQLite is wiped, `start(userId)` reads the active instance row from Postgres and repopulates the DO state. This is the backup path for development mistakes that corrupt DO storage.
 
 ## Architecture Map
 

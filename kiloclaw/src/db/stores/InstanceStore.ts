@@ -2,44 +2,49 @@ import { SqlStore } from '../SqlStore';
 import type { Database, Transaction } from '../database';
 import { kiloclaw_instances } from '../tables/kiloclaw-instances.table';
 
+/**
+ * Read-only Postgres access for the KiloClaw worker.
+ * The Next.js backend is the sole writer to kiloclaw_instances.
+ *
+ * Used for DO restore: if DO SQLite was wiped, read config/channels/vars
+ * from Postgres to repopulate the DO state.
+ */
 export class InstanceStore extends SqlStore {
   constructor(db: Database | Transaction) {
     super(db);
   }
 
   /**
-   * Insert a new provisioned instance. Must succeed or provision fails.
-   * Partial unique index enforces one active instance per user.
+   * Read the active instance for a user.
+   * Returns null if no active instance exists.
    */
-  async insertProvisioned(userId: string, sandboxId: string): Promise<void> {
-    await this.query(
-      /* sql */ `
-      INSERT INTO ${kiloclaw_instances} (
-        ${kiloclaw_instances.columns.user_id},
-        ${kiloclaw_instances.columns.sandbox_id},
-        ${kiloclaw_instances.columns.status}
-      ) VALUES ($1, $2, 'provisioned')
-      `,
-      { 1: userId, 2: sandboxId }
-    );
-  }
-
-  /**
-   * Soft-delete: mark the active instance as destroyed.
-   * Returns true if a row was updated, false if no active instance was found.
-   */
-  async markDestroyed(userId: string): Promise<boolean> {
+  async getActiveInstance(userId: string): Promise<{
+    id: string;
+    sandboxId: string;
+    channels: string | null;
+    vars: string | null;
+  } | null> {
     const rows = await this.query(
       /* sql */ `
-      UPDATE ${kiloclaw_instances}
-      SET ${kiloclaw_instances.columns.status} = 'destroyed',
-          ${kiloclaw_instances.columns.destroyed_at} = now()
+      SELECT ${kiloclaw_instances.id},
+             ${kiloclaw_instances.sandbox_id},
+             ${kiloclaw_instances.channels},
+             ${kiloclaw_instances.vars}
+      FROM ${kiloclaw_instances}
       WHERE ${kiloclaw_instances.user_id} = $1
         AND ${kiloclaw_instances.destroyed_at} IS NULL
-      RETURNING ${kiloclaw_instances.id}
+      LIMIT 1
       `,
       { 1: userId }
     );
-    return rows.length > 0;
+
+    if (rows.length === 0) return null;
+    const row = rows[0] as Record<string, unknown>;
+    return {
+      id: row.id as string,
+      sandboxId: row.sandbox_id as string,
+      channels: row.channels as string | null,
+      vars: row.vars as string | null,
+    };
   }
 }

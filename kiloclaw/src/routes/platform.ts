@@ -84,7 +84,7 @@ platform.post('/start', async c => {
   try {
     await withDORetry(
       instanceStubFactory(c.env, result.data.userId),
-      stub => stub.start(),
+      stub => stub.start(result.data.userId),
       'start'
     );
     return c.json({ ok: true });

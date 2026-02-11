@@ -3,13 +3,13 @@
  *
  * Primary source of truth for instance configuration and operational state.
  * API routes are thin wrappers that call into this DO via Workers RPC.
- * The DB (kiloclaw_instances) is a registry for enumeration (create/destroy only).
  *
  * Keyed by userId: env.KILOCLAW_INSTANCE.idFromName(userId)
  *
  * Authority model:
- * - Create/destroy: DB write inside DO, must succeed or operation fails
- * - Operational state (start/stop): DO is authoritative, not mirrored to DB
+ * - Postgres is written by the Next.js backend (sole writer). The worker reads only.
+ * - Postgres is a registry + config backup. Operational state lives here in the DO.
+ * - If DO SQLite is wiped, start() restores config from Postgres via Hyperdrive.
  */
 
 import { DurableObject } from 'cloudflare:workers';
@@ -25,6 +25,7 @@ import {
   PersistedStateSchema,
   type InstanceConfig,
   type PersistedState,
+  type EncryptedEnvelope,
 } from '../schemas/instance-config';
 
 // StopParams from @cloudflare/containers -- not re-exported by @cloudflare/sandbox
@@ -155,59 +156,55 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // ─── Lifecycle methods (called by platform API routes via RPC) ──────────
 
   /**
-   * Provision a new instance for a user.
-   * Generates sandboxId, inserts into DB (must succeed), stores config in DO.
+   * Provision or update config for a user's instance.
+   * The Next.js backend has already written the Postgres row before calling this.
+   * This method stores config in DO SQLite. Allows re-provisioning (config update).
    */
   async provision(userId: string, config: InstanceConfig): Promise<{ sandboxId: string }> {
     await this.loadState();
 
-    // Reject if any instance state exists. A stopped instance should be
-    // destroyed before re-provisioning, not silently overwritten.
-    if (this.status) {
-      throw new Error(`Instance already exists with status '${this.status}'`);
-    }
-
     const sandboxId = sandboxIdFromUserId(userId);
-
-    // DB INSERT in transaction -- must succeed
-    const db = createDatabaseConnection(this.env.HYPERDRIVE.connectionString);
-    const store = new InstanceStore(db);
-    await store.begin(async tx => {
-      const txStore = new InstanceStore(tx);
-      await txStore.insertProvisioned(userId, sandboxId);
-    });
+    const isNew = !this.status;
 
     // Store config + identity in DO SQLite
-    await this.ctx.storage.put({
+    const storageUpdate: Record<string, unknown> = {
       [KEY_USER_ID]: userId,
       [KEY_SANDBOX_ID]: sandboxId,
-      [KEY_STATUS]: 'provisioned' satisfies InstanceStatus,
+      [KEY_STATUS]: (this.status ?? 'provisioned') satisfies InstanceStatus,
       [KEY_ENV_VARS]: config.envVars ?? null,
       [KEY_ENCRYPTED_SECRETS]: config.encryptedSecrets ?? null,
       [KEY_CHANNELS]: config.channels ?? null,
-      [KEY_PROVISIONED_AT]: Date.now(),
-      [KEY_LAST_STARTED_AT]: null,
-      [KEY_LAST_STOPPED_AT]: null,
-      [KEY_LAST_SYNC_AT]: null,
-      [KEY_SYNC_IN_PROGRESS]: false,
-      [KEY_SYNC_LOCKED_AT]: null,
-      [KEY_SYNC_FAIL_COUNT]: 0,
-    });
+    };
+
+    // Only set initial state on first provision, not on config updates
+    if (isNew) {
+      storageUpdate[KEY_PROVISIONED_AT] = Date.now();
+      storageUpdate[KEY_LAST_STARTED_AT] = null;
+      storageUpdate[KEY_LAST_STOPPED_AT] = null;
+      storageUpdate[KEY_LAST_SYNC_AT] = null;
+      storageUpdate[KEY_SYNC_IN_PROGRESS] = false;
+      storageUpdate[KEY_SYNC_LOCKED_AT] = null;
+      storageUpdate[KEY_SYNC_FAIL_COUNT] = 0;
+    }
+
+    await this.ctx.storage.put(storageUpdate);
 
     // Update cached state
     this.userId = userId;
     this.sandboxId = sandboxId;
-    this.status = 'provisioned';
+    this.status = this.status ?? 'provisioned';
     this.envVars = config.envVars ?? null;
     this.encryptedSecrets = config.encryptedSecrets ?? null;
     this.channels = config.channels ?? null;
-    this.provisionedAt = Date.now();
-    this.lastStartedAt = null;
-    this.lastStoppedAt = null;
-    this.lastSyncAt = null;
-    this.syncInProgress = false;
-    this.syncLockedAt = null;
-    this.syncFailCount = 0;
+    if (isNew) {
+      this.provisionedAt = Date.now();
+      this.lastStartedAt = null;
+      this.lastStoppedAt = null;
+      this.lastSyncAt = null;
+      this.syncInProgress = false;
+      this.syncLockedAt = null;
+      this.syncFailCount = 0;
+    }
     this.loaded = true;
 
     return { sandboxId };
@@ -220,9 +217,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * actually alive. If it crashed (race with handleContainerStopped), falls
    * through to a full restart. This allows the catch-all proxy to call
    * start() for crash recovery without needing to know the precise state.
+   *
+   * @param userId - Optional userId hint for restore-from-Postgres if DO SQLite was wiped.
    */
-  async start(): Promise<void> {
+  async start(userId?: string): Promise<void> {
     await this.loadState();
+
+    // If DO SQLite was wiped, attempt restore from Postgres backup
+    if (!this.userId || !this.sandboxId) {
+      const restoreUserId = userId ?? this.userId;
+      if (restoreUserId) {
+        await this.restoreFromPostgres(restoreUserId);
+      }
+    }
 
     if (!this.userId || !this.sandboxId) {
       throw new Error('Instance not provisioned');
@@ -278,15 +285,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const sandbox = this.resolveSandbox();
 
-    // Kill gateway process if running
-    const existingProcess = await findExistingGatewayProcess(sandbox);
-    if (existingProcess) {
-      try {
-        await existingProcess.kill();
-      } catch (err) {
-        console.error('[DO] Error killing gateway process:', err);
-      }
-    }
+    // Kill gateway process tree (pkill to catch child processes)
+    await this.killGatewayProcesses(sandbox);
 
     // Update state
     this.status = 'stopped';
@@ -301,7 +301,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
-   * Destroy the instance. DB soft-delete first (must succeed), then teardown.
+   * Destroy the instance. Tears down sandbox + clears DO state.
+   * The Next.js backend has already soft-deleted the Postgres row before calling this.
    */
   async destroy(deleteData?: boolean): Promise<void> {
     await this.loadState();
@@ -310,26 +311,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Instance not provisioned');
     }
 
-    // DB soft-delete FIRST -- must succeed and affect a row
-    const db = createDatabaseConnection(this.env.HYPERDRIVE.connectionString);
-    const store = new InstanceStore(db);
-    const destroyed = await store.markDestroyed(this.userId);
-    if (!destroyed) {
-      throw new Error('No active instance found in DB for this user');
-    }
-
-    // Teardown (best-effort after DB write)
+    // Teardown sandbox + gateway process
     if (this.sandboxId) {
       try {
         const sandbox = this.resolveSandbox();
-        const existingProcess = await findExistingGatewayProcess(sandbox);
-        if (existingProcess) {
-          try {
-            await existingProcess.kill();
-          } catch {
-            // best-effort
-          }
-        }
+        await this.killGatewayProcesses(sandbox);
         await sandbox.destroy();
       } catch (err) {
         console.error('[DO] Sandbox teardown error:', err);
@@ -467,19 +453,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const sandbox = this.resolveSandbox();
 
-    // Kill existing gateway
-    let previousProcessId: string | undefined;
+    // Kill existing gateway process tree
     const existingProcess = await findExistingGatewayProcess(sandbox);
-    if (existingProcess) {
-      previousProcessId = existingProcess.id;
-      console.log('[DO] Killing gateway process:', existingProcess.id);
-      try {
-        await existingProcess.kill();
-      } catch (err) {
-        console.error('[DO] Error killing gateway:', err);
-      }
-      await new Promise(r => setTimeout(r, 2000));
-    }
+    const previousProcessId = existingProcess?.id;
+    await this.killGatewayProcesses(sandbox);
+    // Brief wait for processes to fully terminate
+    await new Promise(r => setTimeout(r, 2000));
 
     // Rebuild env vars and start new gateway
     try {
@@ -620,6 +599,116 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────
+
+  /**
+   * Kill the gateway process and all its children.
+   * Uses pkill -f instead of Process.kill() because start-openclaw.sh
+   * spawns child processes (the actual openclaw gateway) that survive
+   * if only the parent shell PID is killed.
+   */
+  private async killGatewayProcesses(sandbox: Sandbox): Promise<void> {
+    try {
+      // Kill anything matching start-openclaw or openclaw gateway
+      const proc = await sandbox.startProcess("pkill -f 'start-openclaw|openclaw'");
+      // Wait briefly for pkill to complete
+      let attempts = 0;
+      while (proc.status === 'running' && attempts < 10) {
+        await new Promise(r => setTimeout(r, 200));
+        attempts++;
+      }
+      console.log('[DO] pkill completed, status:', proc.status, 'exitCode:', proc.exitCode);
+    } catch (err) {
+      console.error('[DO] pkill failed:', err);
+    }
+  }
+
+  /**
+   * Restore DO state from Postgres backup if SQLite was wiped.
+   * The Next.js backend is the sole writer to Postgres, so this data
+   * is the authoritative backup of the instance config.
+   */
+  private async restoreFromPostgres(userId: string): Promise<void> {
+    const connectionString = this.env.HYPERDRIVE?.connectionString;
+    if (!connectionString) {
+      console.warn('[DO] HYPERDRIVE not configured, cannot restore from Postgres');
+      return;
+    }
+
+    try {
+      const db = createDatabaseConnection(connectionString);
+      const store = new InstanceStore(db);
+      const instance = await store.getActiveInstance(userId);
+
+      if (!instance) {
+        console.warn('[DO] No active instance found in Postgres for', userId);
+        return;
+      }
+
+      console.log('[DO] Restoring state from Postgres backup for', userId);
+
+      // Parse vars JSONB: [{ key, value, is_secret }]
+      let envVars: Record<string, string> | null = null;
+      let encryptedSecrets: Record<string, EncryptedEnvelope> | null = null;
+      if (instance.vars) {
+        const vars = JSON.parse(instance.vars) as Array<{
+          key: string;
+          value: string;
+          is_secret: boolean;
+        }>;
+        const plainVars: Record<string, string> = {};
+        const secretVars: Record<string, EncryptedEnvelope> = {};
+        for (const v of vars) {
+          if (v.is_secret) {
+            secretVars[v.key] = JSON.parse(v.value) as EncryptedEnvelope;
+          } else {
+            plainVars[v.key] = v.value;
+          }
+        }
+        if (Object.keys(plainVars).length > 0) envVars = plainVars;
+        if (Object.keys(secretVars).length > 0) encryptedSecrets = secretVars;
+      }
+
+      // Parse channels JSONB
+      const channels = instance.channels ? JSON.parse(instance.channels) : null;
+
+      // Write restored state to DO SQLite
+      await this.ctx.storage.put({
+        [KEY_USER_ID]: userId,
+        [KEY_SANDBOX_ID]: instance.sandboxId,
+        [KEY_STATUS]: 'provisioned' satisfies InstanceStatus,
+        [KEY_ENV_VARS]: envVars,
+        [KEY_ENCRYPTED_SECRETS]: encryptedSecrets,
+        [KEY_CHANNELS]: channels,
+        [KEY_PROVISIONED_AT]: Date.now(),
+        [KEY_LAST_STARTED_AT]: null,
+        [KEY_LAST_STOPPED_AT]: null,
+        [KEY_LAST_SYNC_AT]: null,
+        [KEY_SYNC_IN_PROGRESS]: false,
+        [KEY_SYNC_LOCKED_AT]: null,
+        [KEY_SYNC_FAIL_COUNT]: 0,
+      });
+
+      // Update cached state
+      this.userId = userId;
+      this.sandboxId = instance.sandboxId;
+      this.status = 'provisioned';
+      this.envVars = envVars;
+      this.encryptedSecrets = encryptedSecrets;
+      this.channels = channels;
+      this.provisionedAt = Date.now();
+      this.lastStartedAt = null;
+      this.lastStoppedAt = null;
+      this.lastSyncAt = null;
+      this.syncInProgress = false;
+      this.syncLockedAt = null;
+      this.syncFailCount = 0;
+      this.loaded = true;
+
+      console.log('[DO] Restored from Postgres: sandboxId =', instance.sandboxId);
+    } catch (err) {
+      console.error('[DO] Postgres restore failed:', err);
+    }
+  }
 
   /**
    * Build env vars from stored user config. Used by start() and restartGateway().

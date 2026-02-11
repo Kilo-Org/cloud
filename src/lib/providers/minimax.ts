@@ -9,9 +9,23 @@ export const minimax_m21_free_model = {
   context_length: 204800,
   max_completion_tokens: 131072,
   is_enabled: true,
-  flags: ['reasoning'],
+  flags: ['reasoning', 'prompt_cache'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.1',
+  inference_providers: ['minimax'],
+} as KiloFreeModel;
+
+export const minimax_m25_free_model = {
+  public_id: 'minimax/minimax-m2.5:free',
+  display_name: 'MiniMax: MiniMax M2.5 (free)',
+  description:
+    'MiniMax-M2.5 is a lightweight, state-of-the-art large language model optimized for coding, agentic workflows, and modern application development. With only 10 billion activated parameters, it delivers a major jump in real-world capability while maintaining exceptional latency, scalability, and cost efficiency.',
+  context_length: 204800,
+  max_completion_tokens: 131072,
+  is_enabled: true,
+  flags: ['reasoning', 'prompt_cache'],
+  gateway: 'openrouter',
+  internal_id: 'minimax/minimax-m2.5',
   inference_providers: ['minimax'],
 } as KiloFreeModel;
 

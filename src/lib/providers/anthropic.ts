@@ -91,5 +91,5 @@ export function applyAnthropicModelSettings(
   }
 
   // anthropic doesn't allow '.' in tool call ids
-  normalizeToolCallIds(requestToMutate, undefined);
+  normalizeToolCallIds(requestToMutate, toolCallId => toolCallId.includes('.'), undefined);
 }

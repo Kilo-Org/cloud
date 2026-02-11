@@ -17,7 +17,7 @@ export function applyMistralModelSettings(requestToMutate: OpenRouterChatComplet
   }
 
   // mistral requires tool call ids to be of length 9
-  normalizeToolCallIds(requestToMutate, 9);
+  normalizeToolCallIds(requestToMutate, toolCallId => toolCallId.length !== 9, 9);
 
   // mistral doesn't support strict for our schema
   dropToolStrictProperties(requestToMutate);

@@ -667,10 +667,6 @@ export async function createDeployment(params: {
 
   const resolved = await resolveSource(owner, source);
 
-  const deploymentSlug = generateDeploymentSlug(
-    source.type === 'app-builder' ? null : resolved.repoName
-  );
-
   // Encrypt user-provided env vars first
   const encryptedUserEnvVars = envVars && envVars.length > 0 ? encryptEnvVars(envVars) : [];
 
@@ -686,12 +682,12 @@ export async function createDeployment(params: {
   // Internal worker name uses a stable dpl-<uuid> format that can never collide with user slugs
   const internalWorkerName = `dpl-${crypto.randomUUID()}`;
 
-  // Call builder API — deploys the CF worker under the internal name
+  const slugInput = source.type === 'app-builder' ? null : resolved.repoName;
+
+  // Call builder API — deploys the CF worker under the internal name.
+  // The worker is created once under internalWorkerName (UUID-based, always unique).
   let builderResponse: CreateDeploymentResponse;
   try {
-    // Set up KV slug mapping so the dispatcher can route the public slug to the internal worker
-    await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
-
     builderResponse = await deployApiClient.createDeployment(
       resolved.sourceType,
       resolved.repositorySource,
@@ -708,55 +704,68 @@ export async function createDeployment(params: {
     });
   }
 
-  const deploymentUrl = `https://${deploymentSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
+  // Retry slug generation on collision. The 4-digit suffix gives 10k combinations
+  // per prefix, so collisions are possible for popular repo names.
+  const MAX_SLUG_RETRIES = 3;
+  for (let attempt = 0; attempt < MAX_SLUG_RETRIES; attempt++) {
+    const deploymentSlug = generateDeploymentSlug(slugInput);
+    const deploymentUrl = `https://${deploymentSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
 
-  let deploymentId: string;
-  try {
-    deploymentId = await db.transaction(async tx => {
-      const [deployment] = await tx
-        .insert(deployments)
-        .values({
-          created_by_user_id: createdByUserId,
-          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-          owned_by_user_id: owner.type === 'user' ? owner.id : null,
-          deployment_slug: deploymentSlug,
-          internal_worker_name: internalWorkerName,
-          repository_source: resolved.repositorySource,
-          branch: branch,
-          deployment_url: deploymentUrl,
-          platform_integration_id: resolved.platformIntegrationId,
-          source_type: resolved.sourceType,
-          git_auth_token: resolved.encryptedToken,
-          last_build_id: builderResponse.buildId,
-        })
-        .returning();
+    // Point the public slug at the internal worker
+    await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
 
-      await tx.insert(deployment_builds).values({
-        id: builderResponse.buildId,
-        deployment_id: deployment.id,
-        status: builderResponse.status,
+    try {
+      const deploymentId = await db.transaction(async tx => {
+        const [deployment] = await tx
+          .insert(deployments)
+          .values({
+            created_by_user_id: createdByUserId,
+            owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+            owned_by_user_id: owner.type === 'user' ? owner.id : null,
+            deployment_slug: deploymentSlug,
+            internal_worker_name: internalWorkerName,
+            repository_source: resolved.repositorySource,
+            branch: branch,
+            deployment_url: deploymentUrl,
+            platform_integration_id: resolved.platformIntegrationId,
+            source_type: resolved.sourceType,
+            git_auth_token: resolved.encryptedToken,
+            last_build_id: builderResponse.buildId,
+          })
+          .returning();
+
+        await tx.insert(deployment_builds).values({
+          id: builderResponse.buildId,
+          deployment_id: deployment.id,
+          status: builderResponse.status,
+        });
+
+        // Store env vars (already encrypted)
+        if (encryptedUserEnvVars.length > 0) {
+          for (const envVar of encryptedUserEnvVars) {
+            await envVarsService.setEnvVar(deployment, envVar, owner, tx);
+          }
+        }
+
+        return deployment.id;
       });
 
-      // Store env vars (already encrypted)
-      if (encryptedUserEnvVars.length > 0) {
-        for (const envVar of encryptedUserEnvVars) {
-          await envVarsService.setEnvVar(deployment, envVar, owner, tx);
-        }
+      return { success: true, deploymentId, deploymentSlug, deploymentUrl };
+    } catch (error) {
+      if (isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')) {
+        // Slug collision — retry with a fresh slug (stale KV mapping is harmless;
+        // the next attempt will overwrite it for the same internalWorkerName).
+        continue;
       }
-
-      return deployment.id;
-    });
-  } catch (error) {
-    // Handle unique constraint violation on deployment_slug (race condition).
-    // The worker was already created above, so clean it up best-effort.
-    if (isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')) {
+      // Non-collision error: clean up the worker and re-throw
       await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
-      return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
+      throw error;
     }
-    throw error;
   }
 
-  return { success: true, deploymentId, deploymentSlug, deploymentUrl };
+  // All retries exhausted — clean up and report failure
+  await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
+  return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
 }
 
 /**

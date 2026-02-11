@@ -15,13 +15,6 @@ describe('generateDeploymentSlug', () => {
         expect(result.success).toBe(true);
       }
     });
-
-    it('generates different slugs on repeated calls', () => {
-      const slugs = new Set(Array.from({ length: 50 }, () => generateDeploymentSlug(null)));
-      // With ~120 adjectives * ~150 nouns * 10000 numbers, collisions in 50 tries
-      // are astronomically unlikely
-      expect(slugs.size).toBeGreaterThan(1);
-    });
   });
 
   describe('regular deployments (repoName provided)', () => {

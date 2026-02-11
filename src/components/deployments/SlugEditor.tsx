@@ -30,6 +30,8 @@ export function SlugEditor({ deploymentId, currentSlug, deploymentUrl }: SlugEdi
   const [availability, setAvailability] = useState<AvailabilityState>({ status: 'idle' });
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Tracks the most recent slug sent to the availability check so stale responses are discarded.
+  const latestCheckSlugRef = useRef<string>(currentSlug);
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -40,11 +42,17 @@ export function SlugEditor({ deploymentId, currentSlug, deploymentUrl }: SlugEdi
 
   // Reset state when currentSlug changes (e.g. after successful rename)
   useEffect(() => {
+    clearTimeout(debounceTimerRef.current);
     setSlug(currentSlug);
     setIsEditing(false);
     setLocalError(undefined);
     setAvailability({ status: 'idle' });
   }, [currentSlug]);
+
+  // Clear pending debounce timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(debounceTimerRef.current);
+  }, []);
 
   const handleEdit = () => {
     setSlug(currentSlug);
@@ -88,17 +96,21 @@ export function SlugEditor({ deploymentId, currentSlug, deploymentUrl }: SlugEdi
 
     setLocalError(undefined);
     setAvailability({ status: 'checking' });
+    latestCheckSlugRef.current = normalized;
 
     // Debounced server-side availability check
     debounceTimerRef.current = setTimeout(async () => {
+      const checkedSlug = normalized;
       try {
-        const result = await queries.checkSlugAvailability(normalized);
+        const result = await queries.checkSlugAvailability(checkedSlug);
+        if (latestCheckSlugRef.current !== checkedSlug) return;
         if (result.available) {
           setAvailability({ status: 'available' });
         } else {
           setAvailability({ status: 'unavailable', message: result.message });
         }
       } catch {
+        if (latestCheckSlugRef.current !== checkedSlug) return;
         setAvailability({ status: 'unavailable', message: 'Failed to check availability' });
       }
     }, 300);

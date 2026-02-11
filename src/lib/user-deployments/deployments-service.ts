@@ -851,6 +851,13 @@ export async function renameDeployment(
         message: 'Failed to update subdomain routing. Please try again.',
       };
     }
+    if (isUniqueConstraintError(err, 'UQ_deployments_deployment_slug')) {
+      return {
+        success: false,
+        error: 'slug_taken',
+        message: 'This subdomain is already taken',
+      };
+    }
     throw err;
   }
 

@@ -3,7 +3,7 @@ import 'server-only';
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -107,22 +107,30 @@ export const kiloclawRouter = createTRPCRouter({
 
   // User-facing (user client -- forwards user's JWT)
   getConfig: kiloclawProcedure.query(async ({ ctx }) => {
-    const client = new KiloClawUserClient(generateApiToken(ctx.user));
+    const client = new KiloClawUserClient(
+      generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+    );
     return client.getConfig();
   }),
 
   getStorageInfo: kiloclawProcedure.query(async ({ ctx }) => {
-    const client = new KiloClawUserClient(generateApiToken(ctx.user));
+    const client = new KiloClawUserClient(
+      generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+    );
     return client.getStorageInfo();
   }),
 
   restartGateway: kiloclawProcedure.mutation(async ({ ctx }) => {
-    const client = new KiloClawUserClient(generateApiToken(ctx.user));
+    const client = new KiloClawUserClient(
+      generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+    );
     return client.restartGateway();
   }),
 
   syncStorage: kiloclawProcedure.mutation(async ({ ctx }) => {
-    const client = new KiloClawUserClient(generateApiToken(ctx.user));
+    const client = new KiloClawUserClient(
+      generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+    );
     return client.syncStorage();
   }),
 });

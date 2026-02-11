@@ -8,14 +8,12 @@
   "observability": {
     "enabled": true,
   },
-  // Allow importing HTML files as text modules
-  "rules": [
-    {
-      "type": "Text",
-      "globs": ["**/*.html"],
-      "fallthrough": false,
-    },
-  ],
+  "dev": {
+    "port": 8795,
+  },
+  // Production: add a custom domain route for claw.kilo.ai
+  // "routes": [{ "pattern": "claw.kilo.ai", "custom_domain": true }],
+
   // Container configuration for KiloClaw sandbox
   "containers": [
     {
@@ -52,6 +50,7 @@
     {
       "binding": "HYPERDRIVE",
       "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
   // R2 bucket for persistent storage
@@ -61,8 +60,5 @@
       "bucket_name": "kiloclaw-data",
     },
   ],
-  // Secrets to configure via `wrangler secret put`:
-  // - NEXTAUTH_SECRET, INTERNAL_API_SECRET, GATEWAY_TOKEN_SECRET
-  // - ANTHROPIC_API_KEY (or other AI provider key)
-  // - R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, CF_ACCOUNT_ID
+  // Secrets: see DEVELOPMENT.md for the full list and setup instructions
 }

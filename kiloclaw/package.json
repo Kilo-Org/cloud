@@ -7,6 +7,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "start": "wrangler dev",
+    "dev": "wrangler dev",
     "types": "wrangler types",
     "typecheck": "tsgo --noEmit --incremental false",
     "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
@@ -24,7 +25,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@cloudflare/sandbox": "*",
+    "@cloudflare/sandbox": "^0.7.0",
     "@eslint/js": "^9.38.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.16.0",

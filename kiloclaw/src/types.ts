@@ -31,13 +31,14 @@ export type KiloClawEnv = {
   DEV_MODE?: string;
   DEBUG_ROUTES?: string;
   DEBUG_ROUTES_SECRET?: string;
-  SANDBOX_SLEEP_AFTER?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_DM_POLICY?: string;
   DISCORD_BOT_TOKEN?: string;
   DISCORD_DM_POLICY?: string;
   SLACK_BOT_TOKEN?: string;
   SLACK_APP_TOKEN?: string;
+  // Encryption (for user secrets)
+  AGENT_ENV_VARS_PRIVATE_KEY?: string;
   // R2 credentials for bucket mounting (set via wrangler secret)
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
@@ -51,7 +52,6 @@ export type KiloClawEnv = {
 export type AppEnv = {
   Bindings: KiloClawEnv;
   Variables: {
-    sandbox: Sandbox;
     userId: string;
     authToken: string;
     sandboxId: string;

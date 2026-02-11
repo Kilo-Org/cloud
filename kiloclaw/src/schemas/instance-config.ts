@@ -21,6 +21,8 @@ export const InstanceConfigSchema = z.object({
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
+export type EncryptedEnvelope = z.infer<typeof EncryptedEnvelopeSchema>;
+export type EncryptedChannelTokens = NonNullable<InstanceConfig['channels']>;
 
 export const ProvisionRequestSchema = z.object({
   userId: z.string().min(1),

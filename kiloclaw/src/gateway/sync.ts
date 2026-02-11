@@ -27,16 +27,21 @@ export type SyncResult = {
  *
  * @param sandbox - The sandbox instance
  * @param env - Worker environment bindings
+ * @param userId - User ID for per-user R2 prefix derivation
  * @returns SyncResult with success status and optional error details
  */
-export async function syncToR2(sandbox: Sandbox, env: KiloClawEnv): Promise<SyncResult> {
+export async function syncToR2(
+  sandbox: Sandbox,
+  env: KiloClawEnv,
+  userId: string
+): Promise<SyncResult> {
   // Check if R2 is configured
   if (!env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.CF_ACCOUNT_ID) {
     return { success: false, error: 'R2 storage is not configured' };
   }
 
   // Mount R2 if not already mounted
-  const mounted = await mountR2Storage(sandbox, env);
+  const mounted = await mountR2Storage(sandbox, env, userId);
   if (!mounted) {
     return { success: false, error: 'Failed to mount R2 storage' };
   }

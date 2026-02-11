@@ -3,13 +3,13 @@
  *
  * Primary source of truth for instance configuration and operational state.
  * API routes are thin wrappers that call into this DO via Workers RPC.
- * The DB (kiloclaw_instances) is a registry mirror for enumeration.
+ * The DB (kiloclaw_instances) is a registry for enumeration (create/destroy only).
  *
  * Keyed by userId: env.KILOCLAW_INSTANCE.idFromName(userId)
  *
  * Authority model:
  * - Create/destroy: DB write inside DO, must succeed or operation fails
- * - Operational state (start/stop): DO is authoritative, DB mirrored best-effort
+ * - Operational state (start/stop): DO is authoritative, not mirrored to DB
  */
 
 import { DurableObject } from 'cloudflare:workers';
@@ -18,9 +18,9 @@ import type { KiloClawEnv } from '../types';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { createDatabaseConnection, InstanceStore } from '../db';
 import { buildEnvVars } from '../gateway/env';
-import { mountR2Storage } from '../gateway/r2';
+import { mountR2Storage, userR2Prefix } from '../gateway/r2';
 import { ensureOpenClawGateway, findExistingGatewayProcess } from '../gateway/process';
-import { syncToR2 } from '../gateway/sync';
+import { syncToR2, type SyncResult } from '../gateway/sync';
 import {
   PersistedStateSchema,
   type InstanceConfig,
@@ -215,6 +215,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   /**
    * Start the sandbox container and gateway.
+   *
+   * Idempotent: if status is already 'running', verifies the gateway is
+   * actually alive. If it crashed (race with handleContainerStopped), falls
+   * through to a full restart. This allows the catch-all proxy to call
+   * start() for crash recovery without needing to know the precise state.
    */
   async start(): Promise<void> {
     await this.loadState();
@@ -222,26 +227,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.userId || !this.sandboxId) {
       throw new Error('Instance not provisioned');
     }
-    if (this.status === 'running') {
-      console.log('[DO] Instance already running, no-op');
-      return;
-    }
 
     const sandbox = this.resolveSandbox();
 
-    // Mount R2 storage
-    await mountR2Storage(sandbox, this.env);
+    // If status is 'running', verify the gateway is actually alive.
+    // handleContainerStopped may not have fired yet after a crash.
+    if (this.status === 'running') {
+      const gateway = await findExistingGatewayProcess(sandbox);
+      if (gateway && (gateway.status === 'running' || gateway.status === 'starting')) {
+        console.log('[DO] Instance already running with live gateway, no-op');
+        return;
+      }
+      // Gateway is dead despite status=running. Fall through to full restart.
+      console.log('[DO] Status is running but gateway is dead, restarting');
+    }
 
-    // Build env vars with per-sandbox gateway token + AUTO_APPROVE_DEVICES
-    // Merge user-provided env vars first, then build system env vars on top.
-    // buildEnvVars sets reserved keys (OPENCLAW_GATEWAY_TOKEN, AUTO_APPROVE_DEVICES)
-    // last, so user config cannot override them.
-    // PR5 will move this merge into buildEnvVars alongside encrypted secret decryption.
-    const userEnv = this.envVars ? { ...this.envVars } : {};
-    const envVars = await buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET);
-    const mergedEnvVars = { ...userEnv, ...envVars };
+    // Mount R2 storage with per-user prefix
+    await mountR2Storage(sandbox, this.env, this.userId);
 
-    await ensureOpenClawGateway(sandbox, this.env, mergedEnvVars);
+    const envVars = await this.buildUserEnvVars();
+    await ensureOpenClawGateway(sandbox, this.env, envVars);
 
     // Update state
     this.status = 'running';
@@ -255,9 +260,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // Schedule first sync alarm (+10 minutes -- setup may take a while)
     await this.ctx.storage.setAlarm(Date.now() + FIRST_SYNC_DELAY_MS);
-
-    // Mirror to DB (best-effort)
-    this.mirrorStatusToDb('running', 'last_started_at');
   }
 
   /**
@@ -296,9 +298,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // Clear sync alarm
     await this.ctx.storage.deleteAlarm();
-
-    // Mirror to DB (best-effort)
-    this.mirrorStatusToDb('stopped', 'last_stopped_at');
   }
 
   /**
@@ -391,9 +390,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // Clear sync alarm
     await this.ctx.storage.deleteAlarm();
-
-    // Mirror to DB (best-effort)
-    this.mirrorStatusToDb('stopped', 'last_stopped_at');
   }
 
   // ─── Read methods ─────────────────────────────────────────────────────
@@ -436,6 +432,67 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       encryptedSecrets: this.encryptedSecrets ?? undefined,
       channels: this.channels ?? undefined,
     };
+  }
+
+  // ─── User-facing operations (called by admin API routes via DO RPC) ──
+
+  /**
+   * Trigger a manual sync to R2. Requires a running instance.
+   */
+  async triggerSync(): Promise<SyncResult> {
+    await this.loadState();
+
+    if (this.status !== 'running' || !this.sandboxId || !this.userId) {
+      return { success: false, error: 'Instance is not running' };
+    }
+
+    const sandbox = this.resolveSandbox();
+    return syncToR2(sandbox, this.env, this.userId);
+  }
+
+  /**
+   * Restart the gateway process (kill existing, start new).
+   * Rebuilds env vars from stored config. Requires a running instance.
+   */
+  async restartGateway(): Promise<{
+    success: boolean;
+    error?: string;
+    previousProcessId?: string;
+  }> {
+    await this.loadState();
+
+    if (this.status !== 'running' || !this.sandboxId) {
+      return { success: false, error: 'Instance is not running' };
+    }
+
+    const sandbox = this.resolveSandbox();
+
+    // Kill existing gateway
+    let previousProcessId: string | undefined;
+    const existingProcess = await findExistingGatewayProcess(sandbox);
+    if (existingProcess) {
+      previousProcessId = existingProcess.id;
+      console.log('[DO] Killing gateway process:', existingProcess.id);
+      try {
+        await existingProcess.kill();
+      } catch (err) {
+        console.error('[DO] Error killing gateway:', err);
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    // Rebuild env vars and start new gateway
+    try {
+      const envVars = await this.buildUserEnvVars();
+      await ensureOpenClawGateway(sandbox, this.env, envVars);
+      return {
+        success: true,
+        previousProcessId,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      return { success: false, error: errorMessage, previousProcessId };
+    }
   }
 
   // ─── Alarm (sync loop) ───────────────────────────────────────────────
@@ -494,7 +551,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         [KEY_LAST_STOPPED_AT]: this.lastStoppedAt,
         [KEY_SYNC_FAIL_COUNT]: this.syncFailCount,
       });
-      this.mirrorStatusToDb('stopped', 'last_stopped_at');
       return 'self-healed';
     }
 
@@ -507,6 +563,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Manages the syncInProgress lock and reschedules the next alarm.
    */
   private async performSync(sandbox: Sandbox): Promise<void> {
+    if (!this.userId) return;
+
     this.syncInProgress = true;
     this.syncLockedAt = Date.now();
     await this.ctx.storage.put({
@@ -528,7 +586,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         return;
       }
 
-      const result = await syncToR2(sandbox, this.env);
+      const result = await syncToR2(sandbox, this.env, this.userId);
       if (result.success) {
         this.lastSyncAt = Date.now();
         this.syncFailCount = 0;
@@ -563,6 +621,20 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   // ─── Private helpers ──────────────────────────────────────────────────
 
+  /**
+   * Build env vars from stored user config. Used by start() and restartGateway().
+   */
+  private async buildUserEnvVars(): Promise<Record<string, string>> {
+    if (!this.sandboxId || !this.env.GATEWAY_TOKEN_SECRET) {
+      throw new Error('Cannot build env vars: sandboxId or GATEWAY_TOKEN_SECRET missing');
+    }
+    return buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET, {
+      envVars: this.envVars ?? undefined,
+      encryptedSecrets: this.encryptedSecrets ?? undefined,
+      channels: this.channels ?? undefined,
+    });
+  }
+
   private resolveSandbox() {
     if (!this.sandboxId) {
       throw new Error('No sandboxId -- instance not provisioned');
@@ -582,43 +654,43 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
-   * Mirror operational status to DB (best-effort).
-   * Logs on failure but never throws -- the DO is authoritative.
-   */
-  private mirrorStatusToDb(
-    status: 'running' | 'stopped',
-    timestampColumn?: 'last_started_at' | 'last_stopped_at'
-  ): void {
-    if (!this.userId) return;
-
-    const connectionString = this.env.HYPERDRIVE?.connectionString;
-    if (!connectionString) {
-      console.warn('[DO] HYPERDRIVE not configured, skipping DB mirror');
-      return;
-    }
-    const userId = this.userId;
-
-    // Fire and forget via waitUntil
-    this.ctx.waitUntil(
-      (async () => {
-        try {
-          const db = createDatabaseConnection(connectionString);
-          const store = new InstanceStore(db);
-          await store.mirrorStatus(userId, status, timestampColumn);
-        } catch (err) {
-          console.error('[DO] DB mirror failed:', err);
-        }
-      })()
-    );
-  }
-
-  /**
-   * Delete R2 data for this user. Uses R2 list + delete via the binding.
+   * Delete R2 data for this user via R2 list + delete.
+   * The R2 prefix is derived from userId using the same hash as mountR2Storage.
+   * userR2Prefix returns "/users/{hash}" (leading slash for s3fs); R2 keys
+   * use no leading slash, so we strip it.
    */
   private async deleteR2Data(): Promise<void> {
-    // R2 prefix is a SHA-256 hash of the userId (see gateway/r2.ts A5.1).
-    // For now, we can't easily derive the prefix without the function from A5.1.
-    // Defer R2 prefix deletion to PR6 when per-user R2 is implemented.
-    console.log('[DO] R2 data deletion deferred to PR6 (per-user R2 prefixes)');
+    if (!this.userId) return;
+
+    const prefixWithSlash = await userR2Prefix(this.userId);
+    // Strip leading '/' -- R2 keys don't use leading slashes
+    const r2Prefix = prefixWithSlash.startsWith('/') ? prefixWithSlash.slice(1) : prefixWithSlash;
+
+    console.log('[DO] Deleting R2 data with prefix:', r2Prefix);
+
+    try {
+      let cursor: string | undefined;
+      let totalDeleted = 0;
+
+      do {
+        const listed = await this.env.KILOCLAW_BUCKET.list({
+          prefix: r2Prefix,
+          cursor,
+          limit: 1000,
+        });
+
+        if (listed.objects.length > 0) {
+          const keys = listed.objects.map(o => o.key);
+          await this.env.KILOCLAW_BUCKET.delete(keys);
+          totalDeleted += keys.length;
+        }
+
+        cursor = listed.truncated ? listed.cursor : undefined;
+      } while (cursor);
+
+      console.log(`[DO] Deleted ${totalDeleted} R2 objects for user ${this.userId}`);
+    } catch (err) {
+      console.error('[DO] R2 data deletion failed:', err);
+    }
   }
 }

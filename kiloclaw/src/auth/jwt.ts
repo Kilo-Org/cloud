@@ -7,13 +7,13 @@ import { KILO_TOKEN_VERSION } from '../config';
  */
 export type TokenPayload = {
   kiloUserId: string;
-  apiTokenPepper: string;
+  apiTokenPepper: string | null;
   version: number;
   env?: string;
 };
 
 export type ValidateResult =
-  | { success: true; userId: string; token: string; pepper: string }
+  | { success: true; userId: string; token: string; pepper: string | null }
   | { success: false; error: string };
 
 function parseTokenPayload(
@@ -23,14 +23,19 @@ function parseTokenPayload(
   if (typeof kiloUserId !== 'string') {
     return { ok: false, error: 'Missing or invalid kiloUserId' };
   }
-  if (typeof apiTokenPepper !== 'string') {
-    return { ok: false, error: 'Missing or invalid apiTokenPepper' };
+  if (
+    apiTokenPepper !== null &&
+    apiTokenPepper !== undefined &&
+    typeof apiTokenPepper !== 'string'
+  ) {
+    return { ok: false, error: 'Invalid apiTokenPepper type' };
   }
   if (typeof version !== 'number') {
     return { ok: false, error: 'Missing or invalid version' };
   }
   const env = typeof raw.env === 'string' ? raw.env : undefined;
-  return { ok: true, payload: { kiloUserId, apiTokenPepper, version, env } };
+  const pepper = typeof apiTokenPepper === 'string' ? apiTokenPepper : null;
+  return { ok: true, payload: { kiloUserId, apiTokenPepper: pepper, version, env } };
 }
 
 /**

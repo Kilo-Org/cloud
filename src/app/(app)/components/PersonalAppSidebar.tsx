@@ -23,6 +23,7 @@ import {
   Key,
   Wrench,
   Webhook,
+  Shell,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -39,6 +40,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isAdmin = user?.is_admin || false;
+  const isKiloClawUser = user?.google_user_email?.endsWith('@kilocode.ai') || false;
 
   // Dashboard group
   const dashboardItems: Array<{
@@ -143,6 +145,15 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
             title: 'Managed Indexing',
             icon: Database,
             url: '/code-indexing',
+          },
+        ]
+      : []),
+    ...(isKiloClawUser
+      ? [
+          {
+            title: 'Claw',
+            icon: Shell,
+            url: '/claw',
           },
         ]
       : []),

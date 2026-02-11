@@ -50,6 +50,11 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   }
 
   // Validate pepper against DB via Hyperdrive.
+  // Both the JWT pepper and DB pepper must match:
+  // - JWT null + DB null: user never rotated, valid
+  // - JWT string + DB same string: pepper matches, valid
+  // - JWT null + DB string: pre-rotation token used after rotation, revoked
+  // - JWT string + DB different string: wrong pepper, revoked
   if (!c.env.HYPERDRIVE?.connectionString) {
     console.error('[auth] HYPERDRIVE not configured -- cannot validate token pepper');
     return c.json({ error: 'Server configuration error' }, 500);
@@ -63,7 +68,8 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
       console.warn('[auth] User not found in DB:', result.userId);
       return c.json({ error: 'User not found' }, 401);
     }
-    if (user.api_token_pepper !== result.pepper) {
+    const dbPepper = user.api_token_pepper ?? null;
+    if (dbPepper !== result.pepper) {
       console.warn('[auth] Pepper mismatch for user:', result.userId);
       return c.json({ error: 'Token revoked' }, 401);
     }

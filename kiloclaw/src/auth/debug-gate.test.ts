@@ -47,7 +47,7 @@ describe('debugRoutesGate', () => {
     expect(res.status).toBe(403);
   });
 
-  it('allows access when header matches secret', async () => {
+  it('allows access when debug header matches secret', async () => {
     const app = mountDebugApp();
     const res = await app.request('/debug/ping', { headers: { 'x-debug-api-key': 'my-secret' } }, {
       DEBUG_ROUTES: 'true',
@@ -56,5 +56,35 @@ describe('debugRoutesGate', () => {
     expect(res.status).toBe(200);
     const body = await jsonBody(res);
     expect(body.ok).toBe(true);
+  });
+
+  it('allows access via internal API key even without debug secret', async () => {
+    const app = mountDebugApp();
+    const res = await app.request(
+      '/debug/ping',
+      { headers: { 'x-internal-api-key': 'internal-secret' } },
+      {
+        DEBUG_ROUTES: 'true',
+        INTERNAL_API_SECRET: 'internal-secret',
+      } as never
+    );
+    expect(res.status).toBe(200);
+    const body = await jsonBody(res);
+    expect(body.ok).toBe(true);
+  });
+
+  it('rejects wrong internal API key', async () => {
+    const app = mountDebugApp();
+    const res = await app.request(
+      '/debug/ping',
+      { headers: { 'x-internal-api-key': 'wrong-key' } },
+      {
+        DEBUG_ROUTES: 'true',
+        INTERNAL_API_SECRET: 'internal-secret',
+        DEBUG_ROUTES_SECRET: 'my-secret',
+      } as never
+    );
+    // Falls through to debug secret check, which also fails (no x-debug-api-key header)
+    expect(res.status).toBe(403);
   });
 });

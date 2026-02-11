@@ -26,12 +26,13 @@ ANTHROPIC_API_KEY=sk-ant-...
 # R2_SECRET_ACCESS_KEY=...
 # CF_ACCOUNT_ID=...
 
-# Encryption (for user secrets -- PR5+)
+# Encryption (for user secrets)
 # AGENT_ENV_VARS_PRIVATE_KEY=...
 
-# Hyperdrive (Postgres connection for pepper validation + instance registry)
-# In dev, set the direct Postgres connection string; Hyperdrive proxies it in production.
-# HYPERDRIVE_CONNECTION_STRING=
+# Hyperdrive is configured in wrangler.jsonc, not here.
+# In wrangler dev, it connects to the remote Postgres via the Hyperdrive service.
+# To use a local Postgres instead, add "localConnectionString" to the hyperdrive
+# config in wrangler.jsonc (see https://developers.cloudflare.com/hyperdrive/configuration/local-development/).
 
 # Development
 DEV_MODE=true

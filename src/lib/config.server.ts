@@ -139,6 +139,10 @@ if (process.env.NODE_ENV === 'production') {
  */
 export const AGENT_ENV_VARS_PUBLIC_KEY = getEnvVariable('AGENT_ENV_VARS_PUBLIC_KEY') || '';
 
+// KiloClaw Worker
+export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
+export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
+
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';

@@ -1,15 +1,35 @@
 import { Hono } from 'hono';
+import { getSandbox } from '@cloudflare/sandbox';
 import type { AppEnv } from '../types';
 import { findExistingGatewayProcess } from '../gateway';
 
 /**
- * Debug routes for inspecting container state
+ * Debug routes for inspecting container state.
+ *
+ * All debug routes require a ?sandboxId= query parameter to target
+ * a specific per-user sandbox. Gated by debugRoutesGate (internal API
+ * key or debug secret).
  */
 const debug = new Hono<AppEnv>();
 
+/**
+ * Resolve a sandbox from the ?sandboxId= query param.
+ * Returns null with a 400 response if missing.
+ */
+function resolveSandboxFromQuery(c: {
+  req: { query: (key: string) => string | undefined };
+  env: AppEnv['Bindings'];
+}) {
+  const sandboxId = c.req.query('sandboxId');
+  if (!sandboxId) return null;
+  return getSandbox(c.env.Sandbox, sandboxId, { keepAlive: true });
+}
+
 // GET /debug/version - Returns version info from inside the container
 debug.get('/version', async c => {
-  const sandbox = c.get('sandbox');
+  const sandbox = resolveSandboxFromQuery(c);
+  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
+
   try {
     // Get OpenClaw version
     const versionProcess = await sandbox.startProcess('openclaw --version');
@@ -35,7 +55,9 @@ debug.get('/version', async c => {
 
 // GET /debug/processes - List all processes with optional logs
 debug.get('/processes', async c => {
-  const sandbox = c.get('sandbox');
+  const sandbox = resolveSandboxFromQuery(c);
+  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
+
   try {
     const processes = await sandbox.listProcesses();
     const includeLogs = c.req.query('logs') === 'true';
@@ -95,7 +117,9 @@ debug.get('/processes', async c => {
 
 // GET /debug/gateway-api - Probe the OpenClaw gateway HTTP API
 debug.get('/gateway-api', async c => {
-  const sandbox = c.get('sandbox');
+  const sandbox = resolveSandboxFromQuery(c);
+  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
+
   const path = c.req.query('path') || '/';
   const OPENCLAW_PORT = 18789;
 
@@ -125,7 +149,9 @@ debug.get('/gateway-api', async c => {
 
 // GET /debug/cli - Test OpenClaw CLI commands
 debug.get('/cli', async c => {
-  const sandbox = c.get('sandbox');
+  const sandbox = resolveSandboxFromQuery(c);
+  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
+
   const cmd = c.req.query('cmd') || 'openclaw --help';
 
   try {
@@ -156,7 +182,9 @@ debug.get('/cli', async c => {
 
 // GET /debug/logs - Returns container logs for debugging
 debug.get('/logs', async c => {
-  const sandbox = c.get('sandbox');
+  const sandbox = resolveSandboxFromQuery(c);
+  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
+
   try {
     const processId = c.req.query('id');
     let process = null;
@@ -358,7 +386,8 @@ debug.get('/env', async c => {
 
 // GET /debug/container-config - Read the OpenClaw config from inside the container
 debug.get('/container-config', async c => {
-  const sandbox = c.get('sandbox');
+  const sandbox = resolveSandboxFromQuery(c);
+  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
 
   try {
     const proc = await sandbox.startProcess('cat /root/.openclaw/openclaw.json');

@@ -144,6 +144,31 @@ async function parseModelsByProviderBackupData() {
   );
 }
 
+export function useModelSelectorList(organizationId: string | undefined) {
+  const query = useQuery({
+    queryKey: ['openrouter-models', organizationId],
+    queryFn: async (): Promise<OpenRouterModelsResponse> => {
+      const response = await fetch(
+        organizationId ? `/api/organizations/${organizationId}/models` : '/api/openrouter/models'
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      }
+      const parsedResponse = OpenRouterModelsResponseSchema.safeParse(await response.json());
+      if (!parsedResponse.success) {
+        throw new Error('Failed to parse response: ' + z.prettifyError(parsedResponse.error));
+      }
+      return parsedResponse.data;
+    },
+  });
+
+  return {
+    data: query.data,
+    isLoading: query.isLoading,
+    error: query.error,
+  };
+}
+
 export function useOpenRouterModelsAndProviders() {
   const query = useQuery({
     queryKey: ['openrouter-models-and-providers'],

@@ -26,6 +26,6 @@ export default class extends WorkerEntrypoint<Env> {
 	/** RPC method called by session-ingest via service binding. */
 	async ingestSessionMetrics(params: SessionMetricsParams): Promise<void> {
 		const parsed = SessionMetricsParamsSchema.parse(params);
-		writeSessionMetricsDataPoint(parsed, this.env, (p) => this.ctx.waitUntil(p));
+		await writeSessionMetricsDataPoint(parsed, this.env);
 	}
 }

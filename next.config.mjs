@@ -73,6 +73,12 @@ const nextConfig = {
   redirects: async () => {
     return [
       {
+        source: '/cli/install',
+        destination:
+          'https://raw.githubusercontent.com/Kilo-Org/kilo/refs/heads/dev/install',
+        permanent: false,
+      },
+      {
         source: '/users/sign_up',
         destination: '/get-started',
         permanent: true,

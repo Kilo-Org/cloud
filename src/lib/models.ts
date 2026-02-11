@@ -23,7 +23,6 @@ export const preferredModels = [
   KILO_AUTO_MODEL_ID,
   minimax_m21_free_model.is_enabled ? minimax_m21_free_model.public_id : 'minimax/minimax-m2.1',
   zai_glm47_free_model.is_enabled ? zai_glm47_free_model.public_id : 'z-ai/glm-4.7',
-  'openrouter/pony-alpha',
   giga_potato_model.public_id,
   'arcee-ai/trinity-large-preview:free',
   CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -45,7 +44,6 @@ export function getFirstFreeModel() {
 
 const freeOpenRouterModels = [
   'openrouter/aurora-alpha',
-  'openrouter/pony-alpha',
   'openrouter/free',
 ];
 

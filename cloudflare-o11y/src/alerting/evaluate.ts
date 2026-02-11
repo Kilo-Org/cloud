@@ -260,6 +260,13 @@ export async function evaluateAlerts(env: Env): Promise<void> {
 	}
 
 	if (errors.length > 0) {
-		throw new AggregateError(errors, `Alert evaluation failed with ${errors.length} error(s)`);
+		const details = errors
+			.map((e) => {
+				const msg = e instanceof Error ? e.message : String(e);
+				const cause = e instanceof Error && e.cause instanceof Error ? `: ${e.cause.message}` : '';
+				return `  - ${msg}${cause}`;
+			})
+			.join('\n');
+		throw new AggregateError(errors, `Alert evaluation failed with ${errors.length} error(s):\n${details}`);
 	}
 }

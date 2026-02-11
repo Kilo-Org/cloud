@@ -723,11 +723,11 @@ export async function createDeployment(params: {
 
   const deploymentUrl = `https://${deploymentSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
 
-  // Point the public slug at the internal worker
-  await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
-
   let deploymentId: string;
   try {
+    // Point the public slug at the internal worker
+    await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
+
     deploymentId = await db.transaction(async tx => {
       const [deployment] = await tx
         .insert(deployments)

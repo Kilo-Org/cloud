@@ -1,7 +1,6 @@
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import type { ProviderId } from '@/lib/providers/provider-id';
-import { hasAttemptCompletionTool } from '@/lib/tool-calling';
 
 export const grok_code_fast_1_optimized_free_model = {
   public_id: 'x-ai/grok-code-fast-1:optimized:free',
@@ -28,10 +27,6 @@ export function applyXaiModelSettings(
 ) {
   if (provider === 'martian') {
     delete requestToMutate.provider;
-  }
-
-  if (hasAttemptCompletionTool(requestToMutate)) {
-    requestToMutate.tool_choice = 'required';
   }
 
   // https://kilo-code.slack.com/archives/C09922UFQHF/p1767968746782459

@@ -17,7 +17,7 @@ import type {
 import { zai_glm47_free_model } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
 
-const VERCEL_ROUTING_PERCENTAGE = 10;
+const VERCEL_ROUTING_PERCENTAGE = 0; // https://kilo-code.slack.com/archives/C08UR25T02V/p1770826241908569
 
 const VERCEL_ROUTING_ALLOW_LIST = [
   'arcee-ai/trinity-large-preview:free',

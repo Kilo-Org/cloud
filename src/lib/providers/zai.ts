@@ -7,9 +7,23 @@ export const zai_glm47_free_model = {
     "GLM-4.7 is Z.AI's latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing complex agent tasks while delivering more natural conversational experiences and superior front-end aesthetics.",
   context_length: 202752,
   max_completion_tokens: 65535,
-  is_enabled: true,
+  is_enabled: false,
   flags: ['reasoning', 'prompt_cache'],
   gateway: 'openrouter',
   internal_id: 'z-ai/glm-4.7',
+  inference_providers: ['novita'],
+} as KiloFreeModel;
+
+export const zai_glm5_free_model = {
+  public_id: 'z-ai/glm-5:free',
+  display_name: 'Z.AI: GLM 5 (free)',
+  description:
+    'GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading closed-source models. With advanced agentic planning, deep backend reasoning, and iterative self-correction, GLM-5 moves beyond code generation to full-system construction and autonomous execution.',
+  context_length: 202800,
+  max_completion_tokens: 131072,
+  is_enabled: true,
+  flags: ['reasoning', 'prompt_cache'],
+  gateway: 'openrouter',
+  internal_id: 'z-ai/glm-5',
   inference_providers: ['novita'],
 } as KiloFreeModel;

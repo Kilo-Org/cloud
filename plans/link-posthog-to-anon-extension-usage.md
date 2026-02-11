@@ -84,10 +84,10 @@ const usageContext: MicrodollarUsageContext = {
 **After** (add line ~250, modify line ~265):
 ```typescript
 // NEW - line ~250
-// Validate and sanitize PostHog distinct_id from header
+// Validate PostHog distinct_id from header (length limit only to prevent bloat)
 const rawDistinctId = request.headers.get('x-posthog-distinct-id');
-const posthogDistinctIdFromHeader = rawDistinctId && rawDistinctId.length <= 255 && /^[a-zA-Z0-9_-]+$/.test(rawDistinctId)
-  ? rawDistinctId
+const posthogDistinctIdFromHeader = rawDistinctId && rawDistinctId.length <= 255
+  ? rawDistinctId.trim()
   : undefined;
 
 const usageContext: MicrodollarUsageContext = {
@@ -99,10 +99,10 @@ const usageContext: MicrodollarUsageContext = {
 };
 ```
 
-**⚠️ Security Note**: Header is validated (max 255 chars, alphanumeric + underscore/hyphen only) to prevent DB bloat from malicious clients.
+**⚠️ Security Note**: Header is validated for length only (max 255 chars) to prevent DB bloat. No character restrictions to support all PostHog distinct_id formats.
 
 **⚠️ PostHog Identity Note**: For authenticated users, PostHog's `distinct_id` IS the email (set via `posthog.identify(email)` in PostHogProvider.tsx:94). This means:
-- Anonymous: `posthog_distinct_id` = header value (e.g., `"vscode-abc123"`)
+- Anonymous: `posthog_distinct_id` = header value (e.g., `"vscode-abc123"` or `"01JFKX..."`)
 - Authenticated: `posthog_distinct_id` = email (e.g., `"user@example.com"`)
 - PostHog links them via `alias()` call, so queries work across both states
 
@@ -220,7 +220,8 @@ const apiHandler = new KilocodeOpenrouterHandler({
 ```sql
 -- Check coverage rate
 SELECT 
-  COUNT(*) FILTER (WHERE mum.posthog_distinct_id IS NOT NULL) * 100.0 / COUNT(*) as coverage_pct
+  COUNT(*) FILTER (WHERE mum.posthog_distinct_id IS NOT NULL) * 100.0 / NULLIF(COUNT(*), 0) as coverage_pct,
+  COUNT(*) as total_requests
 FROM microdollar_usage mu
 JOIN microdollar_usage_metadata mum ON mu.id = mum.id
 WHERE mu.kilo_user_id LIKE 'anon:%' AND mu.created_at > NOW() - INTERVAL '7 days';

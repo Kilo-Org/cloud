@@ -174,14 +174,14 @@ export function MigrateToGitHubDialog({
 
   const handleRefreshRepos = useCallback(() => {
     if (organizationId) {
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({
         queryKey: trpc.organizations.appBuilder.canMigrateToGitHub.queryKey({
           projectId,
           organizationId,
         }),
       });
     } else {
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({
         queryKey: trpc.appBuilder.canMigrateToGitHub.queryKey({ projectId }),
       });
     }

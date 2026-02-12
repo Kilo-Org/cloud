@@ -15,7 +15,7 @@ import {
   cliSessions,
 } from '@/db/schema';
 import { TRPCError } from '@trpc/server';
-import { eq, and, sql, desc, isNull } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type { CloudMessage } from '@/components/cloud-agent/types';
 import { APP_BUILDER_URL } from '@/lib/config.server';
 import { createDeployment, getDeployment } from '@/lib/user-deployments/deployments-service';

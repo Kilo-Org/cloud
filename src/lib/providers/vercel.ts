@@ -1,7 +1,11 @@
 import type { BYOKResult } from '@/lib/byok';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { isAnthropicModel, isOpusModel } from '@/lib/providers/anthropic';
-import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
+import {
+  minimax_m21_free_model,
+  minimax_m21_free_slackbot_model,
+  minimax_m25_free_model,
+} from '@/lib/providers/minimax';
 import {
   AutocompleteUserByokProviderIdSchema,
   inferVercelFirstPartyInferenceProviderForModel,
@@ -25,6 +29,8 @@ const VERCEL_ROUTING_ALLOW_LIST = [
   'google/gemini-3-flash-preview',
   minimax_m21_free_model.public_id,
   'minimax/minimax-m2.1',
+  minimax_m25_free_model.public_id,
+  'minimax/minimax-m2.5',
   'openai/gpt-5.2',
   'openai/gpt-5.2-codex',
   'x-ai/grok-code-fast-1',

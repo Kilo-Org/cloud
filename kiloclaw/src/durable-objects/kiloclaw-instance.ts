@@ -779,18 +779,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const content = JSON.stringify(this.kilocodeModels ?? []);
     const escaped = content.replace(/'/g, "'\\''");
     const command = `printf '%s' '${escaped}' > /root/.openclaw/kilocode-models.json`;
-    try {
-      const proc = await sandbox.startProcess(command);
-
-      let attempts = 0;
-      while (attempts < 10) {
-        await new Promise(r => setTimeout(r, 100));
-        if (proc.status !== 'running') break;
-        attempts++;
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.warn('[DO] Failed to write KiloCode models file:', message);
+    const result = await sandbox.exec(command, { timeout: 1000 });
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Failed to write KiloCode models file (exit ${result.exitCode}): ${result.stderr}`
+      );
     }
   }
 

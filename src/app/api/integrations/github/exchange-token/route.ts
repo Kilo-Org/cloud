@@ -29,7 +29,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (integration.platform_account_id && integration.platform_account_id !== repositoryOwnerId) {
+    if (
+      integration.platform_account_id &&
+      integration.platform_account_id !== String(repositoryOwnerId)
+    ) {
       Sentry.captureMessage('OIDC token owner ID mismatch', {
         level: 'warning',
         extra: {

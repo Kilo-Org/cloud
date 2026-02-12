@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
 import { deployment_events, deployment_builds, deployments } from '@/db/schema';
 import { USER_DEPLOYMENTS_API_AUTH_KEY } from '@/lib/config.server';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import * as z from 'zod';
 import { webhookPayloadSchema, type WebhookPayload } from '@/lib/user-deployments/types';
 import { sendDeploymentFailedEmail } from '@/lib/email';
@@ -71,7 +71,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           status: lastStatusChangeEvent.payload.status,
           ...(isCompleted && { completed_at: lastStatusChangeEvent.ts }),
         })
-        .where(eq(deployment_builds.id, payload.buildId))
+        .where(
+          and(
+            eq(deployment_builds.id, payload.buildId),
+            ne(deployment_builds.status, lastStatusChangeEvent.payload.status)
+          )
+        )
         .returning({ deployment_id: deployment_builds.deployment_id });
 
       // If deployed, update the parent deployment's last_deployed_at and queue for threat scan
@@ -116,7 +121,7 @@ async function resolveRecipientEmails(deployment: {
   // Fall back to org owners for org-owned deployments
   if (deployment.owned_by_organization_id) {
     const members = await getOrganizationMembers(deployment.owned_by_organization_id);
-    return members.filter(m => m.role === 'owner').map(m => m.email);
+    return members.filter(m => m.role === 'owner' && m.status === 'active').map(m => m.email);
   }
 
   return [];

@@ -107,10 +107,17 @@ subdomainApp.all('*', async c => {
   try {
     const response = (await worker.fetch(c.req.raw)) as unknown as Response;
 
-    // Inject banner for HTML responses when enabled
+    // Banner injection is best-effort: if KV or HTMLRewriter fails,
+    // return the original response rather than turning it into a 500.
     const contentType = response.headers.get('content-type') ?? '';
-    if (contentType.includes('text/html') && (await isBannerEnabled(c.env.DEPLOY_KV, workerName))) {
-      return injectBanner(response);
+    if (contentType.includes('text/html')) {
+      try {
+        if (await isBannerEnabled(c.env.DEPLOY_KV, workerName)) {
+          return injectBanner(response);
+        }
+      } catch (bannerError) {
+        console.error('Banner injection failed, serving original response:', bannerError);
+      }
     }
 
     return response;

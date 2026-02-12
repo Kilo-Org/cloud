@@ -74,26 +74,13 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateFirstDayWelcomeNotification,
     generateAutocompleteNotification,
     generateKiloPassNotification,
-    generateKimiK25FreeNotification,
   ];
 
   const resolvedConditionalNotifications = (
     await Promise.all(conditionalNotifications.map(f => f(user)))
   ).flat();
 
-  const extra =
-    Date.now() < Date.parse('2026-02-01T05:00:00Z')
-      ? [
-          {
-            id: 'review-jan-27',
-            title: 'NEW: Local Code Reviews',
-            message: 'Select "Review" from the mode selector below to review local changes',
-            showIn: ['extension' as const, 'cli' as const],
-          },
-        ]
-      : normalUnconditionalNotifications;
-
-  return [...resolvedConditionalNotifications, ...extra];
+  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications];
 }
 
 async function generateLowCreditNotification(user: User): Promise<KiloNotification[]> {
@@ -338,43 +325,6 @@ async function generateKiloPassNotification(user: User): Promise<KiloNotificatio
         actionText: 'Learn More',
         actionURL: 'https://blog.kilo.ai/p/introducing-kilo-pass',
       },
-      showIn: ['cli', 'extension'],
-    },
-  ];
-}
-
-async function generateKimiK25FreeNotification(user: User): Promise<KiloNotification[]> {
-  try {
-    // Check if user has used the free Kimi K2.5 model in the last 2 weeks
-    const kimiK25FreeModels = ['moonshotai/kimi-k2.5:free'];
-    const twoWeeksAgo = subDays(new Date(), 14);
-    const result = await readDb
-      .select({ kilo_user_id: microdollar_usage.kilo_user_id })
-      .from(microdollar_usage)
-      .where(
-        and(
-          eq(microdollar_usage.kilo_user_id, user.id),
-          inArray(microdollar_usage.model, kimiK25FreeModels),
-          gte(microdollar_usage.created_at, twoWeeksAgo.toISOString())
-        )
-      )
-      .limit(1);
-
-    if (result.length === 0) {
-      return [];
-    }
-  } catch (e) {
-    console.error('[generateKimiK25FreeNotification]', e);
-    return [];
-  }
-
-  return [
-    {
-      id: 'kimi-k25-free-ended-feb-2',
-      title: 'Kimi K2.5 promotion has ended',
-      message:
-        'Our Kimi K2.5 promotion has ended. Continue with the paid version or try a different model.',
-      suggestModelId: 'moonshotai/kimi-k2.5',
       showIn: ['cli', 'extension'],
     },
   ];

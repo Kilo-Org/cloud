@@ -301,7 +301,20 @@ const statusLabels: Record<BuildStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-function DeploymentControls({ state, onDeploy }: { state: DeploymentState; onDeploy: () => void }) {
+function deploymentPageUrl(organizationId: string | undefined, deploymentId: string) {
+  const base = organizationId ? `/organizations/${organizationId}/deploy` : '/deploy';
+  return `${base}/${deploymentId}`;
+}
+
+function DeploymentControls({
+  state,
+  onDeploy,
+  organizationId,
+}: {
+  state: DeploymentState;
+  onDeploy: () => void;
+  organizationId?: string;
+}) {
   switch (state.kind) {
     case 'creating':
       return (
@@ -313,7 +326,7 @@ function DeploymentControls({ state, onDeploy }: { state: DeploymentState; onDep
     case 'in-progress':
       return (
         <Button size="sm" variant="outline" asChild>
-          <Link href={`/deploy/`} target="_blank">
+          <Link href={deploymentPageUrl(organizationId, state.deploymentId)} target="_blank">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             {statusLabels[state.buildStatus]}...
           </Link>
@@ -331,7 +344,7 @@ function DeploymentControls({ state, onDeploy }: { state: DeploymentState; onDep
     case 'failed':
       return (
         <Button size="sm" variant="outline" className="text-red-400" asChild>
-          <Link href={`/deploy/`} target="_blank">
+          <Link href={deploymentPageUrl(organizationId, state.deploymentId)} target="_blank">
             <AlertCircle className="mr-2 h-4 w-4" />
             Failed - View Logs
           </Link>
@@ -562,7 +575,11 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
 
         <div className="flex items-center gap-2">
           {projectId && <CloneDialog projectId={projectId} organizationId={organizationId} />}
-          <DeploymentControls state={deploymentState} onDeploy={handleDeploy} />
+          <DeploymentControls
+            state={deploymentState}
+            onDeploy={handleDeploy}
+            organizationId={organizationId}
+          />
         </div>
       </div>
 

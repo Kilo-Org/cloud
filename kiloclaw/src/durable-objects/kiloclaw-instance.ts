@@ -37,44 +37,13 @@ type StopParams = {
 
 type InstanceStatus = 'provisioned' | 'running' | 'stopped';
 
-// DO KV storage keys (match PersistedStateSchema field names exactly)
-const KEY_USER_ID = 'userId';
-const KEY_SANDBOX_ID = 'sandboxId';
-const KEY_STATUS = 'status';
-const KEY_ENV_VARS = 'envVars';
-const KEY_ENCRYPTED_SECRETS = 'encryptedSecrets';
-const KEY_KILOCODE_API_KEY = 'kilocodeApiKey';
-const KEY_KILOCODE_API_KEY_EXPIRES_AT = 'kilocodeApiKeyExpiresAt';
-const KEY_KILOCODE_DEFAULT_MODEL = 'kilocodeDefaultModel';
-const KEY_KILOCODE_MODELS = 'kilocodeModels';
-const KEY_CHANNELS = 'channels';
-const KEY_PROVISIONED_AT = 'provisionedAt';
-const KEY_LAST_STARTED_AT = 'lastStartedAt';
-const KEY_LAST_STOPPED_AT = 'lastStoppedAt';
-const KEY_LAST_SYNC_AT = 'lastSyncAt';
-const KEY_SYNC_IN_PROGRESS = 'syncInProgress';
-const KEY_SYNC_LOCKED_AT = 'syncLockedAt';
-const KEY_SYNC_FAIL_COUNT = 'syncFailCount';
+// Derived from PersistedStateSchema — single source of truth for DO KV keys.
+const STORAGE_KEYS = Object.keys(PersistedStateSchema.shape);
 
-const STORAGE_KEYS = [
-  KEY_USER_ID,
-  KEY_SANDBOX_ID,
-  KEY_STATUS,
-  KEY_ENV_VARS,
-  KEY_ENCRYPTED_SECRETS,
-  KEY_KILOCODE_API_KEY,
-  KEY_KILOCODE_API_KEY_EXPIRES_AT,
-  KEY_KILOCODE_DEFAULT_MODEL,
-  KEY_KILOCODE_MODELS,
-  KEY_CHANNELS,
-  KEY_PROVISIONED_AT,
-  KEY_LAST_STARTED_AT,
-  KEY_LAST_STOPPED_AT,
-  KEY_LAST_SYNC_AT,
-  KEY_SYNC_IN_PROGRESS,
-  KEY_SYNC_LOCKED_AT,
-  KEY_SYNC_FAIL_COUNT,
-];
+/** Type-checked wrapper for ctx.storage.put() — catches key typos and wrong value types at compile time. */
+function storageUpdate(update: Partial<PersistedState>): Partial<PersistedState> {
+  return update;
+}
 
 // Sync timing constants
 const FIRST_SYNC_DELAY_MS = 10 * 60 * 1000; // 10 minutes
@@ -147,10 +116,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           console.warn('[DO] Resetting stale syncInProgress lock');
           this.syncInProgress = false;
           this.syncLockedAt = null;
-          await this.ctx.storage.put({
-            [KEY_SYNC_IN_PROGRESS]: false,
-            [KEY_SYNC_LOCKED_AT]: null,
-          });
+          await this.ctx.storage.put(
+            storageUpdate({
+              syncInProgress: false,
+              syncLockedAt: null,
+            })
+          );
         }
       }
     } else {
@@ -184,31 +155,34 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const isNew = !this.status;
 
     // Store config + identity in DO SQLite
-    const storageUpdate: Record<string, unknown> = {
-      [KEY_USER_ID]: userId,
-      [KEY_SANDBOX_ID]: sandboxId,
-      [KEY_STATUS]: (this.status ?? 'provisioned') satisfies InstanceStatus,
-      [KEY_ENV_VARS]: config.envVars ?? null,
-      [KEY_ENCRYPTED_SECRETS]: config.encryptedSecrets ?? null,
-      [KEY_KILOCODE_API_KEY]: config.kilocodeApiKey ?? null,
-      [KEY_KILOCODE_API_KEY_EXPIRES_AT]: config.kilocodeApiKeyExpiresAt ?? null,
-      [KEY_KILOCODE_DEFAULT_MODEL]: config.kilocodeDefaultModel ?? null,
-      [KEY_KILOCODE_MODELS]: config.kilocodeModels ?? null,
-      [KEY_CHANNELS]: config.channels ?? null,
-    };
+    const configFields = {
+      userId,
+      sandboxId,
+      status: (this.status ?? 'provisioned') satisfies InstanceStatus,
+      envVars: config.envVars ?? null,
+      encryptedSecrets: config.encryptedSecrets ?? null,
+      kilocodeApiKey: config.kilocodeApiKey ?? null,
+      kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
+      kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
+      kilocodeModels: config.kilocodeModels ?? null,
+      channels: config.channels ?? null,
+    } satisfies Partial<PersistedState>;
 
     // Only set initial state on first provision, not on config updates
-    if (isNew) {
-      storageUpdate[KEY_PROVISIONED_AT] = Date.now();
-      storageUpdate[KEY_LAST_STARTED_AT] = null;
-      storageUpdate[KEY_LAST_STOPPED_AT] = null;
-      storageUpdate[KEY_LAST_SYNC_AT] = null;
-      storageUpdate[KEY_SYNC_IN_PROGRESS] = false;
-      storageUpdate[KEY_SYNC_LOCKED_AT] = null;
-      storageUpdate[KEY_SYNC_FAIL_COUNT] = 0;
-    }
+    const update = isNew
+      ? storageUpdate({
+          ...configFields,
+          provisionedAt: Date.now(),
+          lastStartedAt: null,
+          lastStoppedAt: null,
+          lastSyncAt: null,
+          syncInProgress: false,
+          syncLockedAt: null,
+          syncFailCount: 0,
+        })
+      : storageUpdate(configFields);
 
-    await this.ctx.storage.put(storageUpdate);
+    await this.ctx.storage.put(update);
 
     // Update cached state
     this.userId = userId;
@@ -248,27 +222,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }> {
     await this.loadState();
 
-    const storageUpdate: Record<string, unknown> = {};
+    const pending: Partial<PersistedState> = {};
 
     if (patch.kilocodeApiKey !== undefined) {
       this.kilocodeApiKey = patch.kilocodeApiKey;
-      storageUpdate[KEY_KILOCODE_API_KEY] = this.kilocodeApiKey;
+      pending.kilocodeApiKey = this.kilocodeApiKey;
     }
     if (patch.kilocodeApiKeyExpiresAt !== undefined) {
       this.kilocodeApiKeyExpiresAt = patch.kilocodeApiKeyExpiresAt;
-      storageUpdate[KEY_KILOCODE_API_KEY_EXPIRES_AT] = this.kilocodeApiKeyExpiresAt;
+      pending.kilocodeApiKeyExpiresAt = this.kilocodeApiKeyExpiresAt;
     }
     if (patch.kilocodeDefaultModel !== undefined) {
       this.kilocodeDefaultModel = patch.kilocodeDefaultModel;
-      storageUpdate[KEY_KILOCODE_DEFAULT_MODEL] = this.kilocodeDefaultModel;
+      pending.kilocodeDefaultModel = this.kilocodeDefaultModel;
     }
     if (patch.kilocodeModels !== undefined) {
       this.kilocodeModels = patch.kilocodeModels;
-      storageUpdate[KEY_KILOCODE_MODELS] = this.kilocodeModels;
+      pending.kilocodeModels = this.kilocodeModels;
     }
 
-    if (Object.keys(storageUpdate).length > 0) {
-      await this.ctx.storage.put(storageUpdate);
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
     }
 
     return {
@@ -329,11 +303,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.status = 'running';
     this.lastStartedAt = Date.now();
     this.syncFailCount = 0;
-    await this.ctx.storage.put({
-      [KEY_STATUS]: 'running' satisfies InstanceStatus,
-      [KEY_LAST_STARTED_AT]: this.lastStartedAt,
-      [KEY_SYNC_FAIL_COUNT]: 0,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        status: 'running',
+        lastStartedAt: this.lastStartedAt,
+        syncFailCount: 0,
+      })
+    );
 
     // Schedule first sync alarm (+10 minutes -- setup may take a while)
     await this.ctx.storage.setAlarm(Date.now() + FIRST_SYNC_DELAY_MS);
@@ -361,10 +337,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Update state
     this.status = 'stopped';
     this.lastStoppedAt = Date.now();
-    await this.ctx.storage.put({
-      [KEY_STATUS]: 'stopped' satisfies InstanceStatus,
-      [KEY_LAST_STOPPED_AT]: this.lastStoppedAt,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        status: 'stopped',
+        lastStoppedAt: this.lastStoppedAt,
+      })
+    );
 
     // Clear sync alarm
     await this.ctx.storage.deleteAlarm();
@@ -439,10 +417,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Update state
     this.status = 'stopped';
     this.lastStoppedAt = Date.now();
-    await this.ctx.storage.put({
-      [KEY_STATUS]: 'stopped' satisfies InstanceStatus,
-      [KEY_LAST_STOPPED_AT]: this.lastStoppedAt,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        status: 'stopped',
+        lastStoppedAt: this.lastStoppedAt,
+      })
+    );
 
     // Clear sync alarm
     await this.ctx.storage.deleteAlarm();
@@ -592,7 +572,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // Not healthy (or getState threw)
     this.syncFailCount++;
-    await this.ctx.storage.put(KEY_SYNC_FAIL_COUNT, this.syncFailCount);
+    await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
 
     if (this.syncFailCount >= SELF_HEAL_THRESHOLD) {
       console.warn(
@@ -600,11 +580,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       );
       this.status = 'stopped';
       this.lastStoppedAt = Date.now();
-      await this.ctx.storage.put({
-        [KEY_STATUS]: 'stopped' satisfies InstanceStatus,
-        [KEY_LAST_STOPPED_AT]: this.lastStoppedAt,
-        [KEY_SYNC_FAIL_COUNT]: this.syncFailCount,
-      });
+      await this.ctx.storage.put(
+        storageUpdate({
+          status: 'stopped',
+          lastStoppedAt: this.lastStoppedAt,
+          syncFailCount: this.syncFailCount,
+        })
+      );
       return 'self-healed';
     }
 
@@ -621,10 +603,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     this.syncInProgress = true;
     this.syncLockedAt = Date.now();
-    await this.ctx.storage.put({
-      [KEY_SYNC_IN_PROGRESS]: true,
-      [KEY_SYNC_LOCKED_AT]: this.syncLockedAt,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        syncInProgress: true,
+        syncLockedAt: this.syncLockedAt,
+      })
+    );
 
     try {
       const gatewayProcess = await findExistingGatewayProcess(sandbox);
@@ -632,10 +616,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         console.log(`[sync] Gateway not running for ${this.userId}, skipping`);
         this.syncInProgress = false;
         this.syncLockedAt = null;
-        await this.ctx.storage.put({
-          [KEY_SYNC_IN_PROGRESS]: false,
-          [KEY_SYNC_LOCKED_AT]: null,
-        });
+        await this.ctx.storage.put(
+          storageUpdate({
+            syncInProgress: false,
+            syncLockedAt: null,
+          })
+        );
         await this.scheduleSync();
         return;
       }
@@ -644,27 +630,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (result.success) {
         this.lastSyncAt = Date.now();
         this.syncFailCount = 0;
-        await this.ctx.storage.put({
-          [KEY_LAST_SYNC_AT]: this.lastSyncAt,
-          [KEY_SYNC_FAIL_COUNT]: 0,
-        });
+        await this.ctx.storage.put(
+          storageUpdate({
+            lastSyncAt: this.lastSyncAt,
+            syncFailCount: 0,
+          })
+        );
       } else {
         console.error(`[sync] Failed for ${this.userId}:`, result.error);
         this.syncFailCount++;
-        await this.ctx.storage.put(KEY_SYNC_FAIL_COUNT, this.syncFailCount);
+        await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
       }
     } catch (err) {
       console.error(`[sync] Error for ${this.userId}:`, err);
       this.syncFailCount++;
-      await this.ctx.storage.put(KEY_SYNC_FAIL_COUNT, this.syncFailCount);
+      await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
     }
 
     this.syncInProgress = false;
     this.syncLockedAt = null;
-    await this.ctx.storage.put({
-      [KEY_SYNC_IN_PROGRESS]: false,
-      [KEY_SYNC_LOCKED_AT]: null,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        syncInProgress: false,
+        syncLockedAt: null,
+      })
+    );
 
     if (this.syncFailCount > 0) {
       await this.rescheduleWithBackoff();
@@ -727,21 +717,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const channels = null;
 
       // Write restored state to DO SQLite
-      await this.ctx.storage.put({
-        [KEY_USER_ID]: userId,
-        [KEY_SANDBOX_ID]: instance.sandboxId,
-        [KEY_STATUS]: 'provisioned' satisfies InstanceStatus,
-        [KEY_ENV_VARS]: envVars,
-        [KEY_ENCRYPTED_SECRETS]: encryptedSecrets,
-        [KEY_CHANNELS]: channels,
-        [KEY_PROVISIONED_AT]: Date.now(),
-        [KEY_LAST_STARTED_AT]: null,
-        [KEY_LAST_STOPPED_AT]: null,
-        [KEY_LAST_SYNC_AT]: null,
-        [KEY_SYNC_IN_PROGRESS]: false,
-        [KEY_SYNC_LOCKED_AT]: null,
-        [KEY_SYNC_FAIL_COUNT]: 0,
-      });
+      await this.ctx.storage.put(
+        storageUpdate({
+          userId,
+          sandboxId: instance.sandboxId,
+          status: 'provisioned',
+          envVars,
+          encryptedSecrets,
+          channels,
+          provisionedAt: Date.now(),
+          lastStartedAt: null,
+          lastStoppedAt: null,
+          lastSyncAt: null,
+          syncInProgress: false,
+          syncLockedAt: null,
+          syncFailCount: 0,
+        })
+      );
 
       // Update cached state
       this.userId = userId;

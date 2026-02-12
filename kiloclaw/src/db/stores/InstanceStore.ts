@@ -1,6 +1,12 @@
+import { z } from 'zod';
 import { SqlStore } from '../SqlStore';
 import type { Database, Transaction } from '../database';
 import { kiloclaw_instances } from '../tables/kiloclaw-instances.table';
+
+const ActiveInstanceRow = z.object({
+  id: z.string(),
+  sandbox_id: z.string(),
+});
 
 /**
  * Read-only Postgres access for the KiloClaw worker.
@@ -32,10 +38,7 @@ export class InstanceStore extends SqlStore {
     );
 
     if (rows.length === 0) return null;
-    const row = rows[0] as Record<string, unknown>;
-    return {
-      id: row.id as string,
-      sandboxId: row.sandbox_id as string,
-    };
+    const row = ActiveInstanceRow.parse(rows[0]);
+    return { id: row.id, sandboxId: row.sandbox_id };
   }
 }

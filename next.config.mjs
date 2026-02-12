@@ -46,6 +46,10 @@ const nextConfig = {
       beforeFiles: globalApiRewrites,
       afterFiles: [
         {
+          source: '/config.json',
+          destination: 'https://opencode.ai/config.json',
+        },
+        {
           source: '/ingest/static/:path*',
           destination: 'https://us-assets.i.posthog.com/static/:path*',
         },

@@ -2,48 +2,73 @@
  * Utility functions for working with AI models
  */
 
-import { opus_46_free_slackbot_model } from '@/lib/providers/anthropic';
-import { arcee_trinity_large_preview_free_model } from '@/lib/providers/arcee';
+import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
+import {
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_SONNET_CURRENT_MODEL_ID,
+  opus_46_free_slackbot_model,
+} from '@/lib/providers/anthropic';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
-import { devstral_2512_free_model, devstral_small_2512_free_model } from '@/lib/providers/mistral';
-import { pony_alpha_free_model } from '@/lib/providers/openrouter-free-models';
-import { recommendedModels } from '@/lib/providers/recommended-models';
-import { kat_coder_pro_free_model } from '@/lib/providers/streamlake';
-import { zai_glm47_free_model } from '@/lib/providers/zai';
+import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
+import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
 
-export const DEFAULT_MODEL_CHOICES = ['anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.6'];
+export const DEFAULT_MODEL_CHOICES = [CLAUDE_SONNET_CURRENT_MODEL_ID, CLAUDE_OPUS_CURRENT_MODEL_ID];
 
 export const PRIMARY_DEFAULT_MODEL = DEFAULT_MODEL_CHOICES[0];
 
+export const preferredModels = [
+  KILO_AUTO_MODEL_ID,
+  minimax_m21_free_model.is_enabled ? minimax_m21_free_model.public_id : 'minimax/minimax-m2.1',
+  zai_glm5_free_model.is_enabled ? zai_glm5_free_model.public_id : 'z-ai/glm-5',
+  giga_potato_model.public_id,
+  'arcee-ai/trinity-large-preview:free',
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_SONNET_CURRENT_MODEL_ID,
+  'anthropic/claude-haiku-4.5',
+  'openai/gpt-5.2',
+  'openai/gpt-5.2-codex',
+  'google/gemini-3-pro-preview',
+  'google/gemini-3-flash-preview',
+  'moonshotai/kimi-k2.5',
+  grok_code_fast_1_optimized_free_model.is_enabled
+    ? grok_code_fast_1_optimized_free_model.public_id
+    : 'x-ai/grok-code-fast-1',
+];
+
 export function getFirstFreeModel() {
-  return recommendedModels.find(m => isFreeModel(m.public_id))?.public_id ?? PRIMARY_DEFAULT_MODEL;
+  return preferredModels.find(m => isFreeModel(m)) ?? PRIMARY_DEFAULT_MODEL;
 }
 
-export const preferredModels = recommendedModels.map(m => m.public_id);
+const freeOpenRouterModels = [
+  'openrouter/aurora-alpha',
+  'openrouter/pony-alpha',
+  'openrouter/free',
+];
 
 export function isFreeModel(model: string): boolean {
-  return !!kiloFreeModels.find(m => m.public_id === model && m.is_enabled);
+  return (
+    kiloFreeModels.some(m => m.public_id === model && m.is_enabled) ||
+    (model ?? '').endsWith(':free') ||
+    freeOpenRouterModels.includes(model)
+  );
 }
 
 export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {
-  return isFreeModel(model);
+  return kiloFreeModels.some(m => m.public_id === model && m.is_enabled);
 }
 
 export const kiloFreeModels = [
-  arcee_trinity_large_preview_free_model,
   corethink_free_model,
-  devstral_2512_free_model,
-  devstral_small_2512_free_model,
   giga_potato_model,
-  kat_coder_pro_free_model,
   minimax_m21_free_model,
   minimax_m21_free_slackbot_model,
   opus_46_free_slackbot_model,
-  pony_alpha_free_model,
+  grok_code_fast_1_optimized_free_model,
   zai_glm47_free_model,
+  zai_glm5_free_model,
 ] as KiloFreeModel[];
 
 export function isStealthModelOnKiloCodeOnly(model: string): boolean {

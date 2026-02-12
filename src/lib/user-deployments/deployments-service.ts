@@ -8,7 +8,7 @@ import {
   platform_integrations,
   app_builder_projects,
 } from '@/db/schema';
-import { eq, and, desc, gt, inArray } from 'drizzle-orm';
+import { eq, and, desc, gt, inArray, or } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { CreateDeploymentResponse } from '@/lib/user-deployments/deployment-builder-client';
 import { apiClient as deployApiClient } from '@/lib/user-deployments/deployment-builder-client';
@@ -17,6 +17,7 @@ import { generateGitToken as generateAppBuilderGitToken } from '@/lib/app-builde
 import { getCredentials as getAppBuilderDbCredentials } from '@/lib/app-builder/app-builder-db-proxy-client';
 import * as z from 'zod';
 import { eventSchema } from '@/lib/user-deployments/types';
+import { generateDeploymentSlug } from '@/lib/user-deployments/slug-generator';
 import type {
   Provider,
   DeploymentSource,
@@ -33,8 +34,25 @@ import { encryptEnvVars } from '@/lib/user-deployments/env-vars-service';
 import { isHTTPsUrl, extractRepoNameFromUrl } from './git-url-utils';
 import { encryptAuthToken, decryptAuthToken } from './auth-token-encryption';
 import { hasUserEverPaid, hasOrganizationEverPaid } from '@/lib/creditTransactions';
+import { slugSchema } from './validation';
+import { dispatcherClient } from './dispatcher-client';
 
 type PaymentCheckResult = { hasPaid: true } | { hasPaid: false };
+
+/** Thrown when the dispatcher KV slug mapping update fails during a rename. */
+class SlugMappingError extends Error {
+  constructor(cause: unknown) {
+    super('Dispatcher slug mapping failed', { cause });
+    this.name = 'SlugMappingError';
+  }
+}
+
+/** Detect Postgres unique constraint violations (error code 23505) by constraint name. */
+function isUniqueConstraintError(error: unknown, constraintName: string): boolean {
+  if (error === null || typeof error !== 'object') return false;
+  const err = error as { code?: string; constraint?: string };
+  return err.code === '23505' && err.constraint === constraintName;
+}
 
 async function checkOwnerHasEverPaid(owner: Owner): Promise<PaymentCheckResult> {
   const hasPaid =
@@ -47,7 +65,12 @@ async function checkOwnerHasEverPaid(owner: Owner): Promise<PaymentCheckResult> 
 
 export type CreateDeploymentResult =
   | { success: true; deploymentId: string; deploymentSlug: string; deploymentUrl: string }
-  | { success: false; error: 'payment_required'; message: string };
+  | { success: false; error: 'payment_required' | 'invalid_slug' | 'slug_taken'; message: string };
+
+import type {
+  RenameDeploymentResult,
+  CheckSlugAvailabilityResult,
+} from '@/lib/user-deployments/router-types';
 
 // Resolved source details ready for deployment
 type ResolvedSourceDetails = {
@@ -195,9 +218,12 @@ export async function deleteDeployment(deploymentId: string, owner: Owner) {
     });
   }
 
+  // Clean up KV slug mapping
+  await dispatcherClient.deleteSlugMapping(deployment[0].internal_worker_name);
+
   // Delete worker deployment from Cloudflare FIRST
   // If this fails, we don't proceed with database deletion to avoid orphan deployments
-  await deployApiClient.deleteWorker(deployment[0].deployment_slug);
+  await deployApiClient.deleteWorker(deployment[0].internal_worker_name);
 
   // Unlink app builder projects that reference this deployment
   await db
@@ -399,7 +425,7 @@ export async function redeploy(deployment: Deployment) {
   const builderResponse = await deployApiClient.createDeployment(
     provider,
     deployment.repository_source,
-    deployment.deployment_slug,
+    deployment.internal_worker_name,
     deployment.branch,
     accessToken,
     cancelBuildIds.length > 0 ? cancelBuildIds : undefined,
@@ -425,6 +451,36 @@ export async function redeploy(deployment: Deployment) {
 }
 
 const DEFAULT_DEPLOYMENT_DOMAIN = 'd.kiloapps.io';
+
+/**
+ * Check if a slug is available for use.
+ * Validates format, reserved words, and database uniqueness.
+ */
+export async function checkSlugAvailability(slug: string): Promise<CheckSlugAvailabilityResult> {
+  // Validate format using zod schema (includes reserved word check)
+  const parseResult = slugSchema.safeParse(slug);
+  if (!parseResult.success) {
+    return {
+      available: false,
+      reason: 'invalid_slug',
+      message: parseResult.error.issues[0]?.message ?? 'Invalid slug format',
+    };
+  }
+
+  // Check database uniqueness — also check internal_worker_name to prevent collisions
+  // with renamed deployments whose original worker name differs from their current slug
+  const existing = await db
+    .select({ id: deployments.id })
+    .from(deployments)
+    .where(or(eq(deployments.deployment_slug, slug), eq(deployments.internal_worker_name, slug)))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return { available: false, reason: 'slug_taken', message: 'This subdomain is already taken' };
+  }
+
+  return { available: true };
+}
 
 /**
  * Resolve GitHub source configuration - validates platform integration and generates token
@@ -612,10 +668,6 @@ export async function createDeployment(params: {
 
   const resolved = await resolveSource(owner, source);
 
-  // Generate deployment slug from repository name + random suffix
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
-  const deploymentSlug = `${resolved.repoName}-${randomSuffix}`.toLowerCase();
-
   // Encrypt user-provided env vars first
   const encryptedUserEnvVars = envVars && envVars.length > 0 ? encryptEnvVars(envVars) : [];
 
@@ -628,13 +680,36 @@ export async function createDeployment(params: {
 
   const allEncryptedEnvVars = [...encryptedUserEnvVars, ...encryptedDBEnvVars];
 
-  // Call builder API
+  // Internal worker name uses a stable dpl-<uuid> format that can never collide with user slugs
+  const internalWorkerName = `dpl-${crypto.randomUUID()}`;
+
+  const slugInput = source.type === 'app-builder' ? null : resolved.repoName;
+
+  // Generate a slug that isn't already taken. The 4-digit suffix gives 10k
+  // combinations per prefix, so collisions are possible for popular repo names.
+  // Done before creating the worker so we don't need to clean it up on failure.
+  const MAX_SLUG_ATTEMPTS = 3;
+  let deploymentSlug: string | undefined;
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+    const candidate = generateDeploymentSlug(slugInput);
+    const check = await checkSlugAvailability(candidate);
+    if (check.available) {
+      deploymentSlug = candidate;
+      break;
+    }
+  }
+  if (deploymentSlug === undefined) {
+    return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
+  }
+
+  // Call builder API — deploys the CF worker under the internal name.
+  // The worker is created once under internalWorkerName (UUID-based, always unique).
   let builderResponse: CreateDeploymentResponse;
   try {
     builderResponse = await deployApiClient.createDeployment(
       resolved.sourceType,
       resolved.repositorySource,
-      deploymentSlug,
+      internalWorkerName,
       branch,
       resolved.authToken,
       undefined,
@@ -649,39 +724,163 @@ export async function createDeployment(params: {
 
   const deploymentUrl = `https://${deploymentSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
 
-  const deploymentId = await db.transaction(async tx => {
-    const [deployment] = await tx
-      .insert(deployments)
-      .values({
-        created_by_user_id: createdByUserId,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        deployment_slug: deploymentSlug,
-        repository_source: resolved.repositorySource,
-        branch: branch,
-        deployment_url: deploymentUrl,
-        platform_integration_id: resolved.platformIntegrationId,
-        source_type: resolved.sourceType,
-        git_auth_token: resolved.encryptedToken,
-        last_build_id: builderResponse.buildId,
-      })
-      .returning();
+  let deploymentId: string;
+  try {
+    // Point the public slug at the internal worker
+    await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
 
-    await tx.insert(deployment_builds).values({
-      id: builderResponse.buildId,
-      deployment_id: deployment.id,
-      status: builderResponse.status,
-    });
+    deploymentId = await db.transaction(async tx => {
+      const [deployment] = await tx
+        .insert(deployments)
+        .values({
+          created_by_user_id: createdByUserId,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          deployment_slug: deploymentSlug,
+          internal_worker_name: internalWorkerName,
+          repository_source: resolved.repositorySource,
+          branch: branch,
+          deployment_url: deploymentUrl,
+          platform_integration_id: resolved.platformIntegrationId,
+          source_type: resolved.sourceType,
+          git_auth_token: resolved.encryptedToken,
+          last_build_id: builderResponse.buildId,
+        })
+        .returning();
 
-    // Store env vars (already encrypted)
-    if (encryptedUserEnvVars.length > 0) {
-      for (const envVar of encryptedUserEnvVars) {
-        await envVarsService.setEnvVar(deployment, envVar, owner, tx);
+      await tx.insert(deployment_builds).values({
+        id: builderResponse.buildId,
+        deployment_id: deployment.id,
+        status: builderResponse.status,
+      });
+
+      // Store env vars (already encrypted)
+      if (encryptedUserEnvVars.length > 0) {
+        for (const envVar of encryptedUserEnvVars) {
+          await envVarsService.setEnvVar(deployment, envVar, owner, tx);
+        }
       }
-    }
 
-    return deployment.id;
-  });
+      return deployment.id;
+    });
+  } catch (error) {
+    // The slug mapping (line 727) and worker already exist at this point.
+    // Clean up both on failure to avoid orphaned resources.
+    await dispatcherClient.deleteSlugMapping(internalWorkerName).catch(() => {});
+    await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
+
+    // Handle unique constraint violation on deployment_slug (rare race condition).
+    // Everything has been torn down at this point, so ask the user to retry.
+    if (isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')) {
+      return { success: false, error: 'slug_taken', message: 'Please try again' };
+    }
+    throw error;
+  }
 
   return { success: true, deploymentId, deploymentSlug, deploymentUrl };
+}
+
+/**
+ * Rename a deployment's slug.
+ * Updates the public-facing URL while keeping the internal worker name unchanged.
+ */
+export async function renameDeployment(
+  deploymentId: string,
+  newSlug: string,
+  owner: Owner
+): Promise<RenameDeploymentResult> {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(deployments.owned_by_user_id, owner.id)
+      : eq(deployments.owned_by_organization_id, owner.id);
+
+  // Get deployment and verify ownership
+  const [deployment] = await db
+    .select()
+    .from(deployments)
+    .where(and(eq(deployments.id, deploymentId), ownershipCondition))
+    .limit(1);
+
+  if (!deployment) {
+    return { success: false, error: 'not_found', message: 'Deployment not found' };
+  }
+
+  // No-op if the new slug matches the current slug or internal worker name
+  if (newSlug === deployment.deployment_slug || newSlug === deployment.internal_worker_name) {
+    return {
+      success: true,
+      deploymentUrl: deployment.deployment_url,
+    };
+  }
+
+  const slugCheck = await checkSlugAvailability(newSlug);
+  if (!slugCheck.available) {
+    return {
+      success: false,
+      error: slugCheck.reason,
+      message: slugCheck.message,
+    };
+  }
+
+  const oldSlug = deployment.deployment_slug;
+  const internalWorkerName = deployment.internal_worker_name;
+  const newUrl = `https://${newSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
+
+  // Run DB update + dispatcher KV mapping inside a transaction so the DB change
+  // is automatically rolled back if the dispatcher call fails.
+  try {
+    const slugWasConcurrentlyTaken = await db.transaction(async tx => {
+      // The unique constraint is the authoritative guard against races.
+      // Optimistic locking: only update if the slug hasn't changed since we read it.
+      const [row] = await tx
+        .update(deployments)
+        .set({
+          deployment_slug: newSlug,
+          deployment_url: newUrl,
+        })
+        .where(and(eq(deployments.id, deploymentId), eq(deployments.deployment_slug, oldSlug)))
+        .returning({ id: deployments.id });
+
+      if (!row) {
+        return true;
+      }
+
+      // KV mapping: newSlug <-> internalWorkerName (bidirectional).
+      // The dispatcher's set endpoint cleans up any previous slug mapping for this worker.
+      // If this throws, the transaction rolls back and the old slug + KV mapping stay consistent.
+      try {
+        await dispatcherClient.setSlugMapping(internalWorkerName, newSlug);
+      } catch (cause) {
+        throw new SlugMappingError(cause);
+      }
+
+      return false;
+    });
+
+    if (slugWasConcurrentlyTaken) {
+      return {
+        success: false,
+        error: 'slug_taken',
+        message: 'This subdomain was taken',
+      };
+    }
+  } catch (err) {
+    if (err instanceof SlugMappingError) {
+      return {
+        success: false,
+        error: 'internal_error',
+        message: 'Failed to update subdomain routing. Please try again.',
+      };
+    }
+    if (isUniqueConstraintError(err, 'UQ_deployments_deployment_slug')) {
+      return {
+        success: false,
+        error: 'slug_taken',
+        message: 'This subdomain is already taken',
+      };
+    }
+    throw err;
+  }
+
+  return { success: true, deploymentUrl: newUrl };
 }

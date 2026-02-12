@@ -1,7 +1,7 @@
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
-import { branchSchema, repoNameSchema } from '@/lib/user-deployments/validation';
+import { branchSchema, repoNameSchema, slugSchema } from '@/lib/user-deployments/validation';
 import * as deploymentsService from '@/lib/user-deployments/deployments-service';
 import * as envVarsService from '@/lib/user-deployments/env-vars-service';
 import {
@@ -89,6 +89,26 @@ export const deploymentsRouter = createTRPCRouter({
         branch: input.branch,
         createdByUserId: ctx.user.id,
         envVars: input.envVars,
+      });
+    }),
+
+  checkSlugAvailability: baseProcedure
+    .input(z.object({ slug: slugSchema }))
+    .query(async ({ input }) => {
+      return deploymentsService.checkSlugAvailability(input.slug);
+    }),
+
+  renameDeployment: baseProcedure
+    .input(
+      z.object({
+        deploymentId: z.string().uuid(),
+        newSlug: slugSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return deploymentsService.renameDeployment(input.deploymentId, input.newSlug, {
+        type: 'user',
+        id: ctx.user.id,
       });
     }),
 

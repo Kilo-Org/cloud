@@ -74,7 +74,6 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateFirstDayWelcomeNotification,
     generateAutocompleteNotification,
     generateKiloPassNotification,
-    generateGrokCodeFast1Notification,
     generateKimiK25FreeNotification,
   ];
 
@@ -339,43 +338,6 @@ async function generateKiloPassNotification(user: User): Promise<KiloNotificatio
         actionText: 'Learn More',
         actionURL: 'https://blog.kilo.ai/p/introducing-kilo-pass',
       },
-      showIn: ['cli', 'extension'],
-    },
-  ];
-}
-
-async function generateGrokCodeFast1Notification(user: User): Promise<KiloNotification[]> {
-  try {
-    // Check if user has used the Grok Code Fast 1 free model in the last 2 weeks
-    const grokCodeFast1Models = ['x-ai/grok-code-fast-1'];
-    const twoWeeksAgo = subDays(new Date(), 14);
-    const result = await readDb
-      .select({ kilo_user_id: microdollar_usage.kilo_user_id })
-      .from(microdollar_usage)
-      .where(
-        and(
-          eq(microdollar_usage.kilo_user_id, user.id),
-          inArray(microdollar_usage.model, grokCodeFast1Models),
-          gte(microdollar_usage.created_at, twoWeeksAgo.toISOString())
-        )
-      )
-      .limit(1);
-
-    if (result.length === 0) {
-      return [];
-    }
-  } catch (e) {
-    console.error('[generateGrokCodeFast1Notification]', e);
-    return [];
-  }
-
-  return [
-    {
-      id: 'grok-code-fast-1-paid-jan-30',
-      title: 'Grok Code Fast 1 is becoming paid',
-      message:
-        'xAI is changing Grok Code Fast 1 to a paid model. You can keep using the paid version or try another free model like Giga Potato.',
-      suggestModelId: 'giga-potato',
       showIn: ['cli', 'extension'],
     },
   ];

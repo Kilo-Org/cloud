@@ -7,7 +7,8 @@
       "description": "Automatically routes your request to the best model for the task.",
       "architecture": {
         "input_modalities": [
-          "text"
+          "text",
+          "image"
         ],
         "output_modalities": [
           "text"
@@ -90,13 +91,13 @@
       }
     },
     {
-      "id": "z-ai/glm-4.7:free",
-      "canonical_slug": "z-ai/glm-4.7:free",
+      "id": "z-ai/glm-5:free",
+      "canonical_slug": "z-ai/glm-5:free",
       "hugging_face_id": "",
-      "name": "Z.AI: GLM 4.7 (free)",
+      "name": "Z.AI: GLM 5 (free)",
       "created": 1756238927,
-      "description": "GLM-4.7 is Z.AI's latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing complex agent tasks while delivering more natural conversational experiences and superior front-end aesthetics.",
-      "context_length": 202752,
+      "description": "GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading closed-source models. With advanced agentic planning, deep backend reasoning, and iterative self-correction, GLM-5 moves beyond code generation to full-system construction and autonomous execution.",
+      "context_length": 202800,
       "architecture": {
         "modality": "text->text",
         "input_modalities": [
@@ -114,11 +115,12 @@
         "request": "0",
         "image": "0",
         "web_search": "0",
-        "internal_reasoning": "0"
+        "internal_reasoning": "0",
+        "input_cache_read": "0.00000000"
       },
       "top_provider": {
-        "context_length": 202752,
-        "max_completion_tokens": 65535,
+        "context_length": 202800,
+        "max_completion_tokens": 131072,
         "is_moderated": false
       },
       "per_request_limits": null,
@@ -142,49 +144,6 @@
           ]
         }
       }
-    },
-    {
-      "id": "openrouter/pony-alpha",
-      "canonical_slug": "openrouter/pony-alpha",
-      "hugging_face_id": "",
-      "name": "Pony Alpha (free)",
-      "created": 1756238927,
-      "description": "Pony Alpha is a stealth model optimized for speed and enhanced reasoning capabilities. It is provided free of charge in Kilo Code for a limited time.\n**Note:** Prompts and completions are logged and may be used to improve the model.",
-      "context_length": 200000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 200000,
-        "max_completion_tokens": 32000,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "preferredIndex": 4
     },
     {
       "id": "giga-potato",
@@ -229,7 +188,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 5,
+      "preferredIndex": 3,
       "versioned_settings": {
         "4.146.0": {
           "included_tools": [
@@ -241,47 +200,6 @@
           ]
         }
       }
-    },
-    {
-      "id": "arcee-ai/trinity-large-preview:free",
-      "canonical_slug": "arcee-ai/trinity-large-preview:free",
-      "hugging_face_id": "",
-      "name": "Arcee AI: Trinity Large Preview (free)",
-      "created": 1756238927,
-      "description": "Trinity Large Preview is a state-of-the-art large language model from Arcee AI, optimized for coding and general-purpose assistance.",
-      "context_length": 128000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "top_provider": {
-        "context_length": 128000,
-        "max_completion_tokens": 16384,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools"
-      ],
-      "default_parameters": {},
-      "preferredIndex": 6
     },
     {
       "id": "anthropic/claude-sonnet-4",
@@ -516,6 +434,101 @@
         "max_tokens",
         "temperature",
         "tools"
+      ],
+      "default_parameters": {}
+    },
+    {
+      "id": "minimax/minimax-m2.1:slackbot",
+      "canonical_slug": "minimax/minimax-m2.1:slackbot",
+      "hugging_face_id": "",
+      "name": "MiniMax: MiniMax M2.1 (Free for Kilo for Slack)",
+      "created": 1756238927,
+      "description": "Free version of MiniMax M2.1 for use in Kilo for Slack only",
+      "context_length": 204800,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000000",
+        "completion": "0.0000000",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 204800,
+        "max_completion_tokens": 131072,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "default_parameters": {},
+      "settings": {
+        "included_tools": [
+          "search_and_replace"
+        ],
+        "excluded_tools": [
+          "apply_diff",
+          "edit_file"
+        ]
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-4.6:slackbot",
+      "canonical_slug": "anthropic/claude-opus-4.6:slackbot",
+      "hugging_face_id": "",
+      "name": "Anthropic: Claude Opus 4.6 (Free for Kilo for Slack)",
+      "created": 1756238927,
+      "description": "Free version of Claude Opus 4.6 for use in Kilo for Slack only",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000000",
+        "completion": "0.0000000",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0",
+        "input_cache_read": "0.00000000"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 32000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
       ],
       "default_parameters": {}
     }

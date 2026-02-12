@@ -17,10 +17,11 @@ import {
   FileSearch,
   GitPullRequest,
   UserX,
+  Upload,
+  Bell,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
-import { UserAvatar } from '@/components/UserAvatar';
 
 import {
   Sidebar,
@@ -43,19 +44,12 @@ type MenuItem = {
   icon: (session: Session | null) => React.ReactElement;
 };
 
-const menuItems: MenuItem[] = [
-  {
-    title: session => session?.user?.name || 'Profile',
-    url: '/profile',
-    icon: session => (
-      <UserAvatar
-        image={session?.user?.image}
-        name={session?.user?.name}
-        size={24}
-        className="mx-[-4px]"
-      />
-    ),
-  },
+type MenuSection = {
+  label: string;
+  items: MenuItem[];
+};
+
+const userManagementItems: MenuItem[] = [
   {
     title: () => 'Users',
     url: '/admin/users',
@@ -65,26 +59,6 @@ const menuItems: MenuItem[] = [
     title: () => 'Organizations',
     url: '/admin/organizations',
     icon: () => <Building2 />,
-  },
-  {
-    title: () => 'Credit Categories',
-    url: '/admin/credit-categories',
-    icon: () => <DollarSign />,
-  },
-  {
-    title: () => 'Revenue KPI',
-    url: '/admin/revenue',
-    icon: () => <DollarSign />,
-  },
-  {
-    title: () => 'Code Reviewer',
-    url: '/admin/code-reviews',
-    icon: () => <GitPullRequest />,
-  },
-  {
-    title: () => 'Community PRs',
-    url: '/admin/community-prs',
-    icon: () => <GitPullRequest />,
   },
   {
     title: () => 'Abuse',
@@ -101,15 +75,41 @@ const menuItems: MenuItem[] = [
     url: '/admin/blacklisted-domains',
     icon: () => <Shield />,
   },
+];
+
+const financialItems: MenuItem[] = [
   {
-    title: () => 'Managed Indexing',
-    url: '/admin/code-indexing',
-    icon: () => <Database />,
+    title: () => 'Credit Categories',
+    url: '/admin/credit-categories',
+    icon: () => <DollarSign />,
   },
   {
-    title: () => 'Model Stats',
-    url: '/admin/model-stats',
-    icon: () => <BarChart />,
+    title: () => 'Bulk Credits',
+    url: '/admin/bulk-credits',
+    icon: () => <Upload />,
+  },
+  {
+    title: () => 'Revenue KPI',
+    url: '/admin/revenue',
+    icon: () => <DollarSign />,
+  },
+];
+
+const productEngineeringItems: MenuItem[] = [
+  {
+    title: () => 'Community PRs',
+    url: '/admin/community-prs',
+    icon: () => <GitPullRequest />,
+  },
+  {
+    title: () => 'Code Reviewer',
+    url: '/admin/code-reviews',
+    icon: () => <GitPullRequest />,
+  },
+  {
+    title: () => 'Slack Bot',
+    url: '/admin/slack-bot',
+    icon: () => <MessageSquare />,
   },
   {
     title: () => 'Deployments',
@@ -122,14 +122,17 @@ const menuItems: MenuItem[] = [
     icon: () => <Blocks />,
   },
   {
-    title: () => 'Slack Bot',
-    url: '/admin/slack-bot',
-    icon: () => <MessageSquare />,
+    title: () => 'Managed Indexing',
+    url: '/admin/code-indexing',
+    icon: () => <Database />,
   },
+];
+
+const analyticsObservabilityItems: MenuItem[] = [
   {
-    title: () => 'Feature Interest',
-    url: '/admin/feature-interest',
-    icon: () => <Sparkles />,
+    title: () => 'Model Stats',
+    url: '/admin/model-stats',
+    icon: () => <BarChart />,
   },
   {
     title: () => 'Session Traces',
@@ -137,9 +140,43 @@ const menuItems: MenuItem[] = [
     icon: () => <FileSearch />,
   },
   {
+    title: () => 'Feature Interest',
+    url: '/admin/feature-interest',
+    icon: () => <Sparkles />,
+  },
+  {
     title: () => 'Free Model Usage',
     url: '/admin/free-model-usage',
     icon: () => <UserX />,
+  },
+  {
+    title: () => 'Alerting',
+    url: '/admin/alerting',
+    icon: () => <Bell />,
+  },
+  {
+    title: () => 'Alerting (TTFB)',
+    url: '/admin/alerting-ttfb',
+    icon: () => <Bell />,
+  },
+];
+
+const menuSections: MenuSection[] = [
+  {
+    label: 'User Management',
+    items: userManagementItems,
+  },
+  {
+    label: 'Financial',
+    items: financialItems,
+  },
+  {
+    label: 'Product & Engineering',
+    items: productEngineeringItems,
+  },
+  {
+    label: 'Analytics & Observability',
+    items: analyticsObservabilityItems,
   },
 ];
 
@@ -170,23 +207,25 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map(item => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      {item.icon(session.data)}
-                      <span>{item.title(session.data)}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {menuSections.map(section => (
+          <SidebarGroup key={section.label}>
+            <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {section.items.map(item => (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton asChild>
+                      <a href={item.url}>
+                        {item.icon(session.data)}
+                        <span>{item.title(session.data)}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter className="p-4">{children}</SidebarFooter>

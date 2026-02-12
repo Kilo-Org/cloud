@@ -346,6 +346,9 @@ describe('balance-validation', () => {
         idFromName: vi.fn(),
         get: vi.fn(),
       },
+      SESSION_INGEST: {
+        fetch: vi.fn(),
+      },
     } as unknown as PersistenceEnv;
 
     beforeEach(() => {

@@ -26,6 +26,7 @@
 # === WORKER SETTINGS ===
 @workerName = demo-app
 @password = TestPassword123
+@slug = super-awesome-app
 
 ###
 
@@ -52,6 +53,27 @@ Content-Type: application/json
 
 ### Remove password protection
 DELETE {{baseUrl}}/api/password/{{workerName}}
+Authorization: Bearer {{authToken}}
+
+###
+
+# =============================================================================
+# SLUG MAPPING API (apex domain: d.kiloapps.io/api)
+# =============================================================================
+
+### Set slug mapping (maps slug to worker)
+PUT {{baseUrl}}/api/slug-mapping/{{workerName}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "slug": "{{slug}}"
+}
+
+###
+
+### Delete slug mapping
+DELETE {{baseUrl}}/api/slug-mapping/{{workerName}}
 Authorization: Bearer {{authToken}}
 
 ###

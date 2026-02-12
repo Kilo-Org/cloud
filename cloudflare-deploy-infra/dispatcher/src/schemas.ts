@@ -22,6 +22,16 @@ export const setPasswordRequestSchema = z.object({
   password: z.string().min(1),
 });
 
+export const slugParamSchema = z
+  .string()
+  .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/)
+  .min(3)
+  .max(63);
+
+export const setSlugMappingRequestSchema = z.object({
+  slug: slugParamSchema,
+});
+
 export const setPasswordResponseSchema = z.object({
   success: z.literal(true),
   passwordSetAt: z.number(),
@@ -64,3 +74,5 @@ export type GetPasswordResponse = z.infer<typeof getPasswordResponseSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 
 export type AuthFormData = z.infer<typeof authFormSchema>;
+
+export type SetSlugMappingRequest = z.infer<typeof setSlugMappingRequestSchema>;

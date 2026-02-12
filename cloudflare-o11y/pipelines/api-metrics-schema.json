@@ -1,0 +1,12 @@
+{
+	"fields": [
+		{ "name": "provider", "type": "string", "required": true },
+		{ "name": "resolved_model", "type": "string", "required": true },
+		{ "name": "client_name", "type": "string", "required": true },
+		{ "name": "is_error", "type": "bool", "required": true },
+		{ "name": "inference_provider", "type": "string", "required": false },
+		{ "name": "ttfb_ms", "type": "int64", "required": true },
+		{ "name": "complete_request_ms", "type": "int64", "required": true },
+		{ "name": "status_code", "type": "int32", "required": true }
+	]
+}

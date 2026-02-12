@@ -92,7 +92,7 @@ function buildKiloAutoModel(): OpenRouterModel {
     description: KILO_AUTO_MODEL_DESCRIPTION,
     model_version_group_id: null,
     context_length: KILO_AUTO_MODEL_CONTEXT_LENGTH,
-    input_modalities: ['text'],
+    input_modalities: ['text', 'image'],
     output_modalities: ['text'],
     has_text_output: true,
     group: 'other',
@@ -142,6 +142,31 @@ async function parseModelsByProviderBackupData() {
   return NormalizedOpenRouterResponse.parse(
     (await import('@/data/openrouter-models-by-provider-backup.json')).default
   );
+}
+
+export function useModelSelectorList(organizationId: string | undefined) {
+  const query = useQuery({
+    queryKey: ['openrouter-models', organizationId],
+    queryFn: async (): Promise<OpenRouterModelsResponse> => {
+      const response = await fetch(
+        organizationId ? `/api/organizations/${organizationId}/models` : '/api/openrouter/models'
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      }
+      const parsedResponse = OpenRouterModelsResponseSchema.safeParse(await response.json());
+      if (!parsedResponse.success) {
+        throw new Error('Failed to parse response: ' + z.prettifyError(parsedResponse.error));
+      }
+      return parsedResponse.data;
+    },
+  });
+
+  return {
+    data: query.data,
+    isLoading: query.isLoading,
+    error: query.error,
+  };
 }
 
 export function useOpenRouterModelsAndProviders() {

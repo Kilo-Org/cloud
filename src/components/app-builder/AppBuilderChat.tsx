@@ -9,7 +9,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, memo, useCallback } from 'react';
-import { User, ArrowDown, RotateCcw } from 'lucide-react';
+import { User, ArrowDown } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import AssistantLogo from '@/components/AssistantLogo';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -33,9 +33,9 @@ import { useQuery } from '@tanstack/react-query';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { useOrganizationWithMembers, useOrganizationDefaults } from '@/app/api/organizations/hooks';
+import { FeedbackDialog } from './FeedbackDialog';
 
 type AppBuilderChatProps = {
-  onNewProject: () => void;
   organizationId?: string;
 };
 
@@ -181,7 +181,7 @@ function DynamicMessages({
 /**
  * Main chat component
  */
-export function AppBuilderChat({ onNewProject, organizationId }: AppBuilderChatProps) {
+export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
   const { messages, isStreaming, isInterrupting, model: projectModel } = state;
@@ -398,10 +398,7 @@ export function AppBuilderChat({ onNewProject, organizationId }: AppBuilderChatP
       {/* Header */}
       <div className="flex h-12 items-center justify-between gap-4 border-b px-4">
         <h2 className="shrink-0 text-sm font-medium">Chat</h2>
-        <Button variant="ghost" size="sm" onClick={onNewProject} disabled={isStreaming}>
-          <RotateCcw className="mr-1 h-3 w-3" />
-          New Project
-        </Button>
+        <FeedbackDialog disabled={isStreaming} organizationId={organizationId} />
       </div>
 
       {/* Blocked Banner - show when user cannot use App Builder at all */}

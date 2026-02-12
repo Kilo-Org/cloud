@@ -56,7 +56,7 @@ export type SendMessageInput = {
  */
 export type DeployProjectResult =
   | { success: true; deploymentId: string; deploymentUrl: string; alreadyDeployed: boolean }
-  | { success: false; error: 'payment_required'; message: string };
+  | { success: false; error: 'payment_required' | 'invalid_slug' | 'slug_taken'; message: string };
 
 /**
  * Project with all its messages and session state

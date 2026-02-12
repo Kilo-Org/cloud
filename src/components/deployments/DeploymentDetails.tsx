@@ -8,6 +8,7 @@ import { StatusBadge } from './StatusBadge';
 import { BuildLogViewer } from './BuildLogViewer';
 import { EnvironmentSettings } from './EnvironmentSettings';
 import { PasswordSettings } from './PasswordSettings';
+import { SlugEditor } from './SlugEditor';
 import { Button } from '@/components/Button';
 import { Loader2, AlertCircle, Trash2, RotateCw, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -139,46 +140,32 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-400">Name</h3>
-                    <p className="mt-1 text-gray-100">{deployment.deployment_slug}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-400">Status</h3>
-                    <div className="mt-1">
-                      <StatusBadge status={deploymentStatus} />
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-400">Preview URL</h3>
-                    <a
-                      href={deployment.deployment_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 block text-blue-400 hover:text-blue-300"
-                    >
-                      {deployment.deployment_slug}.d.kiloapps.io
-                    </a>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-400">Repository</h3>
-                    <p className="mt-1 truncate text-gray-100">{deployment.repository_source}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-400">Branch</h3>
-                    <p className="mt-1 text-gray-100">{deployment.branch}</p>
-                  </div>
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between gap-3">
+                  <SlugEditor
+                    deploymentId={deploymentId}
+                    currentSlug={deployment.deployment_slug}
+                    deploymentUrl={deployment.deployment_url}
+                  />
+                  <StatusBadge status={deploymentStatus} className="shrink-0" />
+                </div>
+
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                  <span className="text-gray-400">Repository</span>
+                  <span className="truncate text-gray-100" title={deployment.repository_source}>
+                    {deployment.repository_source}
+                  </span>
+                  <span className="text-gray-400">Branch</span>
+                  <span className="text-gray-100">{deployment.branch}</span>
                   {deployment.last_deployed_at && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-400">Last Deployed</h3>
-                      <p className="mt-1 text-gray-100">
+                    <>
+                      <span className="text-gray-400">Deployed</span>
+                      <span className="text-gray-100">
                         {formatDistanceToNow(new Date(deployment.last_deployed_at), {
                           addSuffix: true,
                         })}
-                      </p>
-                    </div>
+                      </span>
+                    </>
                   )}
                 </div>
               </div>

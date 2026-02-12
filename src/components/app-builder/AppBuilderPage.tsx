@@ -14,6 +14,7 @@
 
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+
 import { ProjectLoader } from './ProjectLoader';
 import { ProjectSession } from './ProjectSession';
 import { AppBuilderChat } from './AppBuilderChat';
@@ -30,21 +31,11 @@ type AppBuilderPageProps = {
  * Rendered inside ProjectSession, so it has access to useProject hooks.
  */
 function AppBuilderProjectView({ organizationId }: { organizationId?: string }) {
-  const router = useRouter();
-
-  // Navigate to landing page to start a new project
-  const navigateToLanding = useCallback(() => {
-    const landingPath = organizationId
-      ? `/organizations/${organizationId}/app-builder`
-      : `/app-builder`;
-    router.push(landingPath);
-  }, [organizationId, router]);
-
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden lg:flex-row">
       {/* Chat Pane - 1/3 width on desktop, full width on mobile */}
       <div className="flex h-1/2 w-full flex-col overflow-hidden border-b lg:h-full lg:w-1/3 lg:border-r lg:border-b-0">
-        <AppBuilderChat onNewProject={navigateToLanding} organizationId={organizationId} />
+        <AppBuilderChat organizationId={organizationId} />
       </div>
 
       {/* Preview Pane - 2/3 width on desktop, full width on mobile */}

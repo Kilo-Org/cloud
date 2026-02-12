@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { cliSessions, sharedCliSessions, kilocode_users } from '@/db/schema';
+import { cliSessions, sharedCliSessions, cli_sessions_v2, kilocode_users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { deleteUserFromExternalServices } from './external-services';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -17,6 +17,15 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@/lib/r2/cli-sessions', () => ({
   deleteBlobs: jest.fn().mockResolvedValue(undefined),
 }));
+
+// Mock config.server to provide SESSION_INGEST_WORKER_URL
+jest.mock('@/lib/config.server', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
+  return {
+    ...actual,
+    SESSION_INGEST_WORKER_URL: 'https://ingest.kilosessions.ai',
+  };
+});
 
 // Mock Customer.io API
 global.fetch = jest.fn();
@@ -41,6 +50,7 @@ describe('external-services', () => {
     // Clean up CLI sessions
     await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
     await db.delete(sharedCliSessions).where(eq(sharedCliSessions.kilo_user_id, testUser.id));
+    await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, testUser.id));
     // Clean up user
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
@@ -226,6 +236,103 @@ describe('external-services', () => {
 
       // Verify Stripe service was called
       expect(safeDeleteStripeCustomer).toHaveBeenCalledWith(testUser.stripe_customer_id);
+    });
+
+    describe('v2 session blob deletion', () => {
+      it('should delete v2 CLI session blobs via session ingest worker', async () => {
+        // Create v2 CLI sessions
+        await db.insert(cli_sessions_v2).values({
+          session_id: 'ses_test1234567890123456789',
+          kilo_user_id: testUser.id,
+        });
+
+        await db.insert(cli_sessions_v2).values({
+          session_id: 'ses_test2345678901234567890',
+          kilo_user_id: testUser.id,
+        });
+
+        // Mock successful deletion responses
+        (global.fetch as jest.Mock).mockResolvedValue({
+          ok: true,
+          status: 200,
+        });
+
+        await deleteUserFromExternalServices(testUser);
+
+        // Verify fetch was called for each v2 session (plus Customer.io call)
+        const fetchCalls = (global.fetch as jest.Mock).mock.calls;
+        const v2SessionCalls = fetchCalls.filter(
+          (call: [string, RequestInit]) =>
+            call[0].includes('ingest.kilosessions.ai') && call[1]?.method === 'DELETE'
+        );
+
+        expect(v2SessionCalls.length).toBe(2);
+        const v2SessionUrls = v2SessionCalls.map((call: [string, RequestInit]) => call[0]).sort();
+        expect(v2SessionUrls[0]).toContain('ses_test1234567890123456789');
+        expect(v2SessionUrls[1]).toContain('ses_test2345678901234567890');
+      });
+
+      it('should handle 404 responses gracefully for v2 sessions', async () => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: 'ses_notfound12345678901234',
+          kilo_user_id: testUser.id,
+        });
+
+        // Mock 404 response (session already deleted)
+        (global.fetch as jest.Mock).mockImplementation((url: string) => {
+          if (url.includes('ingest.kilosessions.ai')) {
+            return Promise.resolve({
+              ok: false,
+              status: 404,
+              text: () => Promise.resolve('Not found'),
+            });
+          }
+          return Promise.resolve({ ok: true, status: 200 });
+        });
+
+        // Should not throw
+        await expect(deleteUserFromExternalServices(testUser)).resolves.not.toThrow();
+      });
+
+      it('should continue with other deletions if v2 session deletion fails', async () => {
+        const { safeDeleteStripeCustomer } = await import('./stripe-client');
+
+        await db.insert(cli_sessions_v2).values({
+          session_id: 'ses_failtest123456789012',
+          kilo_user_id: testUser.id,
+        });
+
+        // Mock failed response
+        (global.fetch as jest.Mock).mockImplementation((url: string) => {
+          if (url.includes('ingest.kilosessions.ai')) {
+            return Promise.resolve({
+              ok: false,
+              status: 500,
+              text: () => Promise.resolve('Internal error'),
+            });
+          }
+          return Promise.resolve({ ok: true, status: 200 });
+        });
+
+        // Should not throw
+        await expect(deleteUserFromExternalServices(testUser)).resolves.not.toThrow();
+
+        // Other services should still be called
+        expect(safeDeleteStripeCustomer).toHaveBeenCalled();
+      });
+
+      it('should handle user with no v2 CLI sessions', async () => {
+        await deleteUserFromExternalServices(testUser);
+
+        // Verify no v2 session deletion calls were made
+        const fetchCalls = (global.fetch as jest.Mock).mock.calls;
+        const v2SessionCalls = fetchCalls.filter(
+          (call: [string, RequestInit]) =>
+            call[0].includes('ingest.kilosessions.ai') && call[1]?.method === 'DELETE'
+        );
+
+        expect(v2SessionCalls.length).toBe(0);
+      });
     });
   });
 });

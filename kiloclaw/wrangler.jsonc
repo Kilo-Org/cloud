@@ -1,0 +1,64 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kiloclaw",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  "dev": {
+    "port": 8795,
+  },
+  // Production: add a custom domain route for claw.kilo.ai
+  // "routes": [{ "pattern": "claw.kilo.ai", "custom_domain": true }],
+
+  // Container configuration for KiloClaw sandbox
+  "containers": [
+    {
+      "class_name": "KiloClawSandbox",
+      "image": "./Dockerfile",
+      "instance_type": "standard-2",
+      "max_instances": 500,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "KiloClawSandbox",
+        "name": "Sandbox",
+      },
+      {
+        "class_name": "KiloClawInstance",
+        "name": "KILOCLAW_INSTANCE",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["KiloClawSandbox"],
+      "tag": "v2",
+    },
+    {
+      "new_sqlite_classes": ["KiloClawInstance"],
+      "tag": "v3",
+    },
+  ],
+  // Hyperdrive binding for Postgres (pepper validation, instance registry)
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  // R2 bucket for persistent storage
+  "r2_buckets": [
+    {
+      "binding": "KILOCLAW_BUCKET",
+      "bucket_name": "kiloclaw-data",
+    },
+  ],
+  // Secrets: see DEVELOPMENT.md for the full list and setup instructions
+}

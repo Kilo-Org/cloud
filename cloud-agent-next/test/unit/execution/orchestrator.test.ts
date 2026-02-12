@@ -127,12 +127,12 @@ describe('ExecutionError', () => {
 
   describe('conflict error factory methods', () => {
     it('executionInProgress creates conflict error', () => {
-      const error = ExecutionError.executionInProgress('exec_active');
+      const error = ExecutionError.executionInProgress('exc_active');
 
       expect(error.code).toBe('EXECUTION_IN_PROGRESS');
       expect(error.retryable).toBe(false);
-      expect(error.activeExecutionId).toBe('exec_active');
-      expect(error.message).toContain('exec_active');
+      expect(error.activeExecutionId).toBe('exc_active');
+      expect(error.message).toContain('exc_active');
     });
   });
 
@@ -216,7 +216,7 @@ describe('ExecutionError', () => {
     });
 
     it('EXECUTION_IN_PROGRESS is not retryable', () => {
-      const error = ExecutionError.executionInProgress('exec_123');
+      const error = ExecutionError.executionInProgress('exc_123');
       expect(error.retryable).toBe(false);
     });
 
@@ -345,13 +345,11 @@ describe('WorkspacePlan types', () => {
 // ---------------------------------------------------------------------------
 
 describe('ExecutionResult types', () => {
-  it('contains messageId and kiloSessionId', () => {
+  it('contains kiloSessionId', () => {
     const result: ExecutionResult = {
-      messageId: 'msg_123',
       kiloSessionId: 'kilo_sess_456',
     };
 
-    expect(result.messageId).toBeDefined();
     expect(result.kiloSessionId).toBeDefined();
   });
 });

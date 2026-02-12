@@ -4,14 +4,25 @@ import type { AnyRouter } from '@trpc/server';
 import type { Deployment, DeploymentBuild } from '@/db/schema';
 import type { Event, BuildStatus } from './types';
 import type { EnvVarResponse } from './env-vars-validation';
-import type { GetPasswordStatusResponse } from './password-client';
-
+import type { GetPasswordStatusResponse } from './dispatcher-client';
 /**
  * Result type for creating a deployment - discriminated union
  */
 export type CreateDeploymentResult =
   | { success: true; deploymentId: string; deploymentSlug: string; deploymentUrl: string }
-  | { success: false; error: 'payment_required'; message: string };
+  | { success: false; error: 'payment_required' | 'invalid_slug' | 'slug_taken'; message: string };
+
+export type RenameDeploymentResult =
+  | { success: true; deploymentUrl: string }
+  | {
+      success: false;
+      error: 'not_found' | 'invalid_slug' | 'slug_taken' | 'internal_error';
+      message: string;
+    };
+
+export type CheckSlugAvailabilityResult =
+  | { available: true }
+  | { available: false; reason: 'invalid_slug' | 'slug_taken'; message: string };
 
 /**
  * Represents an owner that can be either a user or an organization
@@ -115,6 +126,12 @@ export type DeploymentQueries = {
   getPasswordStatus?: (
     deploymentId: string
   ) => UseQueryResult<GetPasswordStatusResponse, DeploymentError>;
+
+  /**
+   * Check if a deployment slug is available.
+   * Used on-demand (not as a reactive query hook).
+   */
+  checkSlugAvailability: (slug: string) => Promise<CheckSlugAvailabilityResult>;
 };
 
 /**
@@ -185,4 +202,13 @@ export type DeploymentMutations = {
    * Remove password protection from a deployment (org-only)
    */
   removePassword?: UseMutationResult<{ success: true }, DeploymentError, { deploymentId: string }>;
+
+  /**
+   * Rename a deployment's slug (subdomain)
+   */
+  renameDeployment: UseMutationResult<
+    RenameDeploymentResult,
+    DeploymentError,
+    { deploymentId: string; newSlug: string }
+  >;
 };

@@ -1,8 +1,8 @@
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import type { ProviderId } from '@/lib/providers/provider-id';
 
-export function isGoogleModel(model: string) {
-  return model.startsWith('google/');
+export function isGeminiModel(model: string) {
+  return model.startsWith('google/gemini');
 }
 
 type ReadFileParametersSchema = {

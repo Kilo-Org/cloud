@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET, SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL } from '@/lib/config.server';
 import { runFullSync } from '@/lib/security-agent/services/sync-service';
+import { sentryLogger } from '@/lib/utils.server';
 
-// TODO: Create BetterStack heartbeat for security alerts sync
-// const BETTERSTACK_HEARTBEAT_URL = 'https://uptime.betterstack.com/api/v1/heartbeat/...';
+const log = sentryLogger('security-agent:cron-sync', 'info');
+const cronWarn = sentryLogger('cron', 'warning');
+const logError = sentryLogger('security-agent:cron-sync', 'error');
 
 /**
  * Vercel Cron Job: Sync Security Alerts
@@ -19,10 +21,14 @@ export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+      cronWarn(
+        'SECURITY: Invalid CRON job authorization attempt: ' +
+          (authHeader ? 'Invalid authorization header' : 'Missing authorization header')
+      );
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('[sync-security-alerts] Starting security alerts sync...');
+    log('Starting security alerts sync...');
     const startTime = Date.now();
 
     const result = await runFullSync();
@@ -37,14 +43,18 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
-    console.log('[sync-security-alerts] Sync completed:', summary);
+    log('Sync completed', summary);
 
-    // TODO: Send heartbeat to BetterStack on success
-    // await fetch(BETTERSTACK_HEARTBEAT_URL);
+    // Send heartbeat to BetterStack on success
+    if (SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL) {
+      await fetch(SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL, {
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
+    }
 
     return NextResponse.json(summary);
   } catch (error) {
-    console.error('[sync-security-alerts] Error syncing security alerts:', error);
+    logError('Error syncing security alerts', { error });
     captureException(error, {
       tags: { endpoint: 'cron/sync-security-alerts' },
       extra: {
@@ -52,8 +62,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // TODO: Send failure heartbeat to BetterStack
-    // await fetch(`${BETTERSTACK_HEARTBEAT_URL}/fail`);
+    // Send failure heartbeat to BetterStack
+    if (SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL) {
+      await fetch(`${SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL}/fail`, {
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
+    }
 
     return NextResponse.json(
       {

@@ -32,6 +32,8 @@ type O11YSessionMetricsParams = {
   compactionCount: number;
   autoCompactionCount: number;
   terminationReason: 'completed' | 'error' | 'interrupted' | 'abandoned' | 'unknown';
+  model?: string;
+  ingestVersion: number;
 };
 
 type O11YBinding = Fetcher & {

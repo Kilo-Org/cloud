@@ -6,10 +6,9 @@
  */
 
 import { useMemo } from 'react';
-import { useOrganizationWithMembers, useOrganizationDefaults } from '@/app/api/organizations/hooks';
-import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
+import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { isModelAllowedProviderAwareClient } from '@/lib/model-allow.client';
 
 type UseOrganizationModelsReturn = {
   /** Models formatted for the ModelCombobox component */
@@ -29,35 +28,16 @@ type UseOrganizationModelsReturn = {
  * @param organizationId - Optional organization ID to filter models for
  */
 export function useOrganizationModels(organizationId?: string): UseOrganizationModelsReturn {
-  // Fetch organization configuration and models
-  const { data: organizationData } = useOrganizationWithMembers(organizationId || '', {
-    enabled: !!organizationId,
-  });
-  const {
-    models: openRouterModels,
-    providers: openRouterProviders,
-    isLoading: isLoadingOpenRouter,
-  } = useOpenRouterModelsAndProviders();
+  // Fetch models for the model selector
+  const { data: openRouterModels, isLoading: isLoadingOpenRouter } =
+    useModelSelectorList(organizationId);
+
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
-  // Get organization's allowed models
-  const savedModelAllowList = organizationData?.settings?.model_allow_list || [];
-  const allModels = openRouterModels;
-
-  // Filter models based on organization's allow list
-  const availableModels = useMemo(() => {
-    return savedModelAllowList.length === 0
-      ? allModels
-      : allModels.filter(model =>
-          isModelAllowedProviderAwareClient(model.slug, savedModelAllowList, openRouterProviders)
-        );
-  }, [allModels, openRouterProviders, savedModelAllowList]);
-
   // Format models for the combobox
-  const modelOptions = useMemo<ModelOption[]>(
-    () => availableModels.map(model => ({ id: model.slug, name: model.name })),
-    [availableModels]
-  );
+  const modelOptions = useMemo<ModelOption[]>(() => {
+    return openRouterModels?.data.map(model => ({ id: model.id, name: model.name })) ?? [];
+  }, [openRouterModels]);
 
   return {
     modelOptions,

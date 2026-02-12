@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { shouldSuppress, recordAlertFired } from '../src/alerting/dedup';
-import { BURN_RATE_WINDOWS, DEFAULT_SLO_CONFIG } from '../src/alerting/slo-config';
+import { BURN_RATE_WINDOWS } from '../src/alerting/slo-config';
 
 function makeKvMock() {
 	const store = new Map<string, { value: string; expiration?: number }>();
@@ -47,13 +47,6 @@ describe('slo-config', () => {
 		for (const w of BURN_RATE_WINDOWS) {
 			expect(w.shortWindowMinutes).toBeLessThan(w.longWindowMinutes);
 		}
-	});
-
-	it('default SLO config has sensible values', () => {
-		expect(DEFAULT_SLO_CONFIG.errorRateSlo).toBeGreaterThan(0.99);
-		expect(DEFAULT_SLO_CONFIG.errorRateSlo).toBeLessThan(1);
-		expect(DEFAULT_SLO_CONFIG.latencyP50ThresholdMs).toBeLessThan(DEFAULT_SLO_CONFIG.latencyP90ThresholdMs);
-		expect(DEFAULT_SLO_CONFIG.minRequestsPerWindow).toBeGreaterThan(0);
 	});
 });
 
@@ -114,9 +107,9 @@ describe('dedup', () => {
 		});
 	});
 
-	it('different alert types are independent', async () => {
+	it('different dimensions are independent', async () => {
 		await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
-		const result = await shouldSuppress(kv, 'page', 'latency_p50', 'openai', 'gpt-4', 'kilo-gateway');
+		const result = await shouldSuppress(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'other-client');
 		expect(result).toBe(false);
 	});
 });

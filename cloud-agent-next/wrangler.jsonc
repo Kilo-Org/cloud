@@ -42,6 +42,7 @@
     "PENDING_START_TIMEOUT_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai",
+    "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
   },
   "placement": { "mode": "smart" },
   /**
@@ -68,7 +69,12 @@
    * Service Bindings (communicate between multiple Workers)
    * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
    */
-  // "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
+  "services": [
+    {
+      "binding": "SESSION_INGEST",
+      "service": "session-ingest",
+    },
+  ],
   /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
@@ -111,10 +117,10 @@
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "v0.26.0",
+        "KILOCODE_CLI_VERSION": "1.0.16",
       },
-      "max_instances": 10,
-      "rollout_active_grace_period": 1800,
+      "max_instances": 20,
+      "rollout_active_grace_period": 120,
     },
   ],
   "durable_objects": {
@@ -216,7 +222,14 @@
         "PENDING_START_TIMEOUT_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://192.168.200.174:3000",
+        "KILO_SESSION_INGEST_URL": "http://localhost:8787",
       },
+      "services": [
+        {
+          "binding": "SESSION_INGEST",
+          "service": "session-ingest",
+        },
+      ],
       "r2_buckets": [
         {
           "binding": "R2_BUCKET",
@@ -229,7 +242,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "next",
+            "KILOCODE_CLI_VERSION": "latest",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,

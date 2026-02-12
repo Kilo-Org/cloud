@@ -14,7 +14,8 @@
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "jest": "^30.2.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "wrangler": "^4.61.0"
   },
   "dependencies": {
     "hono": "^4.11.4",

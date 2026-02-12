@@ -7,6 +7,11 @@
 import { Octokit } from '@octokit/rest';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import type { DependabotAlertRaw, DependabotAlertState } from '../core/types';
+import { sentryLogger } from '@/lib/utils.server';
+
+const log = sentryLogger('security-agent:dependabot-api', 'info');
+const warn = sentryLogger('security-agent:dependabot-api', 'warning');
+const logError = sentryLogger('security-agent:dependabot-api', 'error');
 
 /**
  * Dependabot alert from GitHub API
@@ -111,40 +116,61 @@ export async function fetchAllDependabotAlerts(
   owner: string,
   repo: string
 ): Promise<DependabotAlertRaw[]> {
-  console.log(
-    `[dependabot-api] Fetching alerts for ${owner}/${repo} (installationId=${installationId})`
-  );
+  log(`Fetching alerts for ${owner}/${repo}`, { installationId });
 
+  const apiStartTime = performance.now();
   const tokenData = await generateGitHubInstallationToken(installationId);
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
-    console.log(`[dependabot-api] Fetching all alerts for ${owner}/${repo} using pagination...`);
     // Use Octokit's paginate helper which handles cursor-based pagination automatically
     // The Dependabot API does not support the `page` parameter
-    const data = await octokit.paginate(octokit.rest.dependabot.listAlertsForRepo, {
-      owner,
-      repo,
-      per_page: 100,
-      // No state filter - get all alerts including fixed/dismissed
+    const data = await octokit.paginate(
+      octokit.rest.dependabot.listAlertsForRepo,
+      {
+        owner,
+        repo,
+        per_page: 100,
+        // No state filter - get all alerts including fixed/dismissed
+      },
+      response => {
+        // Track rate limit on each page response
+        const remaining = response.headers['x-ratelimit-remaining'];
+        const limit = response.headers['x-ratelimit-limit'];
+        if (remaining !== undefined && Number(remaining) < 100) {
+          warn(`GitHub API rate limit low: ${remaining}/${limit} remaining`, {
+            repo: `${owner}/${repo}`,
+          });
+        }
+        return response.data;
+      }
+    );
+
+    const apiDurationMs = Math.round(performance.now() - apiStartTime);
+    const alerts = data.map(alert => toInternalAlert(alert as unknown as GitHubDependabotAlert));
+
+    log(`Alerts fetched for ${owner}/${repo}`, {
+      alertCount: alerts.length,
+      durationMs: apiDurationMs,
     });
 
-    const alerts = data.map(alert => toInternalAlert(alert as unknown as GitHubDependabotAlert));
-    console.log(`[dependabot-api] Total alerts fetched for ${owner}/${repo}: ${alerts.length}`);
     return alerts;
   } catch (error) {
+    const apiDurationMs = Math.round(performance.now() - apiStartTime);
     const status = (error as { status?: number }).status;
     const message = (error as { message?: string }).message;
 
     // Handle case where Dependabot alerts are disabled for the repository
     if (status === 403 && message?.includes('Dependabot alerts are disabled')) {
-      console.log(`[dependabot-api] Dependabot alerts are disabled for ${owner}/${repo}, skipping`);
+      log(`Dependabot alerts are disabled for ${owner}/${repo}, skipping`);
       return [];
     }
 
-    console.error(
-      `[dependabot-api] Error fetching alerts for ${owner}/${repo}: status=${status}, message=${message}`
-    );
+    logError(`Error fetching alerts for ${owner}/${repo}`, {
+      status,
+      message,
+      durationMs: apiDurationMs,
+    });
     throw error;
   }
 }

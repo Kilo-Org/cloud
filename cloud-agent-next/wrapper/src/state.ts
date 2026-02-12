@@ -340,7 +340,7 @@ export class WrapperState {
     }
     this.messageCounter++;
     // Strip known prefixes if present
-    const base = this.job.executionId.replace(/^(exec_|execution_|msg_)/, '');
+    const base = this.job.executionId.replace(/^(exc_|exec_|execution_|msg_)/, '');
     return `msg_${base}_${this.messageCounter}`;
   }
 

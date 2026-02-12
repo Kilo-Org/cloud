@@ -1,6 +1,8 @@
 import { db } from '@/lib/drizzle';
 import { deployments, deployment_threat_detections } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { APP_URL } from '@/lib/constants';
+import { SLACK_DEPLOY_THREAT_WEBHOOK_URL } from '@/lib/config.server';
 import type { CheckUrlResult, ThreatType } from './web-risk-client';
 
 type Deployment = typeof deployments.$inferSelect;
@@ -41,20 +43,38 @@ type AlertAdminsParams = {
   threatTypes: ThreatType[];
 };
 
-/**
- * Alert admins about a detected threat.
- *
- * Currently logs to console. Future: integrate with Slack webhook.
- */
 async function alertAdmins(params: AlertAdminsParams): Promise<void> {
+  const { deployment, threatTypes } = params;
+  const timestamp = new Date().toISOString();
+
   console.warn('[THREAT DETECTED]', {
-    deploymentId: params.deployment.id,
-    deploymentUrl: params.deployment.deployment_url,
-    deploymentSlug: params.deployment.deployment_slug,
-    threatTypes: params.threatTypes,
-    buildId: params.deployment.last_build_id,
-    timestamp: new Date().toISOString(),
+    deploymentId: deployment.id,
+    deploymentUrl: deployment.deployment_url,
+    deploymentSlug: deployment.deployment_slug,
+    threatTypes,
+    buildId: deployment.last_build_id,
+    timestamp,
   });
 
-  // TODO: Integrate with Slack admin notification system when webhook is available
+  if (SLACK_DEPLOY_THREAT_WEBHOOK_URL) {
+    const adminUrl = `${APP_URL}/admin/deployments?search=${encodeURIComponent(deployment.deployment_slug ?? '')}`;
+    const textLines = [
+      ':rotating_light: *Deploy Threat Detected*',
+      deployment.deployment_slug ? `• Deployment: \`${deployment.deployment_slug}\`` : null,
+      deployment.deployment_url ? `• URL: ${deployment.deployment_url}` : null,
+      `• Threat types: \`${threatTypes.join(', ')}\``,
+      `• Deployment ID: \`${deployment.id}\``,
+      deployment.last_build_id ? `• Build ID: \`${deployment.last_build_id}\`` : null,
+      `• Detected at: \`${timestamp}\``,
+      `• <${adminUrl}|View in Admin>`,
+    ].filter((line): line is string => line !== null);
+
+    await fetch(SLACK_DEPLOY_THREAT_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: textLines.join('\n') }),
+    }).catch(error => {
+      console.error('[DeployThreat] Failed to post to Slack webhook', error);
+    });
+  }
 }

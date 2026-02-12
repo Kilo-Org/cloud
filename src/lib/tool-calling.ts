@@ -16,15 +16,18 @@ export function dropToolStrictProperties(requestToMutate: OpenRouterChatCompleti
 
 export function normalizeToolCallIds(
   requestToMutate: OpenRouterChatCompletionRequest,
+  filter: (toolCallId: string) => boolean,
   maxIdLength: number | undefined
 ) {
   for (const msg of requestToMutate.messages) {
     if (msg.role === 'assistant') {
       for (const toolCall of msg.tool_calls ?? []) {
-        toolCall.id = normalizeToolCallId(toolCall.id, maxIdLength);
+        if (filter(toolCall.id)) {
+          toolCall.id = normalizeToolCallId(toolCall.id, maxIdLength);
+        }
       }
     }
-    if (msg.role === 'tool') {
+    if (msg.role === 'tool' && filter(msg.tool_call_id)) {
       msg.tool_call_id = normalizeToolCallId(msg.tool_call_id, maxIdLength);
     }
   }

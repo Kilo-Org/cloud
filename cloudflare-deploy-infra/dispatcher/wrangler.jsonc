@@ -4,17 +4,18 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "name": "kilo-deploy-dispatcher",
   "main": "src/index.ts",
   "compatibility_date": "2025-10-11",
   "compatibility_flags": ["nodejs_compat"],
   /**
-   * KV namespace for password protection storage.
-   * Stores password hashes for deployed workers.
+   * Single KV namespace for all deployment data.
+   * Keys are prefixed: "password:<worker>" for auth, "slug2worker:<slug>" and "worker2slug:<worker>" for slug mappings.
    */
   "kv_namespaces": [
     {
-      "binding": "DEPLOY_AUTH_KV",
+      "binding": "DEPLOY_KV",
       "id": "c8d39d486e4246eb8784744bf24b9909",
     },
   ],
@@ -64,7 +65,7 @@
       "name": "kilo-deploy-dispatcher-staging",
       "kv_namespaces": [
         {
-          "binding": "DEPLOY_AUTH_KV",
+          "binding": "DEPLOY_KV",
           "id": "c8d39d486e4246eb8784744bf24b9909",
         },
       ],

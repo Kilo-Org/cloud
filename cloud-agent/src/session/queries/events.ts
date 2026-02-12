@@ -45,6 +45,31 @@ export type EventQueryFilters = {
 };
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Build the base SELECT query and args from filters (without LIMIT). */
+function buildEventFilterQuery(filters: Omit<EventQueryFilters, 'limit'>): {
+  query: string;
+  args: unknown[];
+} {
+  const conditions: string[] = [];
+  const args: unknown[] = [];
+
+  pushCondition(conditions, args, `${events.id}`, '>', filters.fromId);
+  pushInClause(conditions, args, `${events.execution_id}`, filters.executionIds);
+  pushInClause(conditions, args, `${events.stream_event_type}`, filters.eventTypes);
+  pushCondition(conditions, args, `${events.timestamp}`, '>=', filters.startTime);
+  pushCondition(conditions, args, `${events.timestamp}`, '<=', filters.endTime);
+
+  let query = `SELECT ${events.id}, ${events.execution_id}, ${events.session_id}, ${events.stream_event_type}, ${events.payload}, ${events.timestamp} FROM ${events}`;
+  query += buildWhereClause(conditions);
+  query += ` ORDER BY ${events.id} ASC`;
+
+  return { query, args };
+}
+
+// ---------------------------------------------------------------------------
 // Factory Function
 // ---------------------------------------------------------------------------
 
@@ -86,28 +111,34 @@ export function createEventQueries(sql: SqlStorage) {
      * @returns Array of stored events matching the filters
      */
     findByFilters(filters: EventQueryFilters): StoredEvent[] {
-      const conditions: string[] = [];
-      const args: unknown[] = [];
+      const { query, args } = buildEventFilterQuery(filters);
 
-      // Use qualified column names (events.column) for WHERE clause
-      pushCondition(conditions, args, `${events.id}`, '>', filters.fromId);
-      pushInClause(conditions, args, `${events.execution_id}`, filters.executionIds);
-      pushInClause(conditions, args, `${events.stream_event_type}`, filters.eventTypes);
-      pushCondition(conditions, args, `${events.timestamp}`, '>=', filters.startTime);
-      pushCondition(conditions, args, `${events.timestamp}`, '<=', filters.endTime);
-
-      let query = `SELECT ${events.id}, ${events.execution_id}, ${events.session_id}, ${events.stream_event_type}, ${events.payload}, ${events.timestamp} FROM ${events}`;
-      query += buildWhereClause(conditions);
-      query += ` ORDER BY ${events.id} ASC`;
-
+      let finalQuery = query;
       if (filters.limit !== undefined) {
-        query += ' LIMIT ?';
+        finalQuery += ' LIMIT ?';
         args.push(filters.limit);
       }
 
-      const result = sql.exec(query, ...args);
-
+      const result = sql.exec(finalQuery, ...args);
       return [...result].map(row => EventRecord.parse(row) as StoredEvent);
+    },
+
+    /**
+     * Lazily iterate events by filters, yielding one row at a time.
+     *
+     * Unlike findByFilters, this does not materialize all matching rows
+     * into an array. The underlying SqlStorageCursor is consumed lazily,
+     * so breaking out of iteration stops reading from SQLite.
+     * No LIMIT clause is applied -- the caller controls how far to iterate.
+     *
+     * @param filters - Query filters to apply (limit field is ignored)
+     */
+    *iterateByFilters(filters: Omit<EventQueryFilters, 'limit'>): Generator<StoredEvent> {
+      const { query, args } = buildEventFilterQuery(filters);
+      const cursor = sql.exec(query, ...args);
+      for (const row of cursor) {
+        yield EventRecord.parse(row) as StoredEvent;
+      }
     },
 
     /**

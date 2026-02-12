@@ -2,10 +2,10 @@ import 'server-only';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import { organizationMemberProcedure } from './utils';
-import { branchSchema, repoNameSchema } from '@/lib/user-deployments/validation';
+import { branchSchema, repoNameSchema, slugSchema } from '@/lib/user-deployments/validation';
 import * as deploymentsService from '@/lib/user-deployments/deployments-service';
 import * as envVarsService from '@/lib/user-deployments/env-vars-service';
-import { passwordClient } from '@/lib/user-deployments/password-client';
+import { dispatcherClient } from '@/lib/user-deployments/dispatcher-client';
 import {
   envVarKeySchema,
   plaintextEnvVarSchema,
@@ -129,6 +129,32 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
     }),
 
+  checkSlugAvailability: organizationMemberProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid(),
+        slug: slugSchema,
+      })
+    )
+    .query(async ({ input }) => {
+      return deploymentsService.checkSlugAvailability(input.slug);
+    }),
+
+  renameDeployment: organizationMemberProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid(),
+        deploymentId: z.string().uuid(),
+        newSlug: slugSchema,
+      })
+    )
+    .mutation(async ({ input }) => {
+      return deploymentsService.renameDeployment(input.deploymentId, input.newSlug, {
+        type: 'org',
+        id: input.organizationId,
+      });
+    }),
+
   setEnvVar: organizationMemberProcedure
     .input(
       baseEnvVarSchema.extend({
@@ -201,12 +227,13 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ input }) => {
-      // Get deployment to verify ownership and get slug
+      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
       });
-      return passwordClient.getPasswordStatus(deployment.deployment_slug);
+      // Password records are keyed by internal worker name in the dispatcher
+      return dispatcherClient.getPasswordStatus(deployment.internal_worker_name);
     }),
 
   setPassword: organizationMemberProcedure
@@ -218,12 +245,13 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // Get deployment to verify ownership and get slug
+      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
       });
-      return passwordClient.setPassword(deployment.deployment_slug, input.password);
+      // Password records are keyed by internal worker name in the dispatcher
+      return dispatcherClient.setPassword(deployment.internal_worker_name, input.password);
     }),
 
   removePassword: organizationMemberProcedure
@@ -234,11 +262,12 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // Get deployment to verify ownership and get slug
+      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
       });
-      return passwordClient.removePassword(deployment.deployment_slug);
+      // Password records are keyed by internal worker name in the dispatcher
+      return dispatcherClient.removePassword(deployment.internal_worker_name);
     }),
 });

@@ -18,6 +18,7 @@ import {
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
   captureProxyError,
+  extractHeaderAndLimitLength,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { readDb } from '@/lib/drizzle';
@@ -142,7 +143,8 @@ export async function POST(request: NextRequest) {
     posthog_distinct_id: user.google_user_email,
     project_id: projectId,
     status_code: null,
-    editor_name: request.headers.get('x-kilocode-editorname') || null,
+    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
   };
@@ -150,16 +152,19 @@ export async function POST(request: NextRequest) {
   setTag('ui.ai_model', fimModel_withOpenRouterStyleProviderPrefix);
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users
-  const { balance, settings } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (balance <= 0 && !isFreeModel(fimModel_withOpenRouterStyleProviderPrefix) && !userByok) {
     return await usageLimitExceededResponse(user, balance);
   }
 
-  // Use new shared helper for organization model restrictions
-  const modelRestrictionError = checkOrganizationModelRestrictions({
+  // Use shared helper for organization model restrictions
+  // Model allow list only applies to Enterprise plans
+  // Provider allow list applies to Enterprise plans; data collection applies to all plans (but FIM doesn't use provider config)
+  const { error: modelRestrictionError } = checkOrganizationModelRestrictions({
     modelId: fimModel_withOpenRouterStyleProviderPrefix,
     settings,
+    organizationPlan: plan,
   });
   if (modelRestrictionError) return modelRestrictionError;
 

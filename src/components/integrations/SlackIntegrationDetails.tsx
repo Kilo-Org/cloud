@@ -18,9 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSlackQueries } from './SlackContext';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
-import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { isModelAllowedProviderAwareClient } from '@/lib/model-allow.client';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 
 type SlackIntegrationDetailsProps = {
   organizationId?: string;
@@ -42,30 +40,12 @@ export function SlackIntegrationDetails({
   const { data: oauthUrlData } = queries.getOAuthUrl();
 
   // Fetch models for the model selector
-  const {
-    models: openRouterModels,
-    providers: openRouterProviders,
-    isLoading: isLoadingModels,
-  } = useOpenRouterModelsAndProviders();
-  const { data: organizationData } = useOrganizationWithMembers(organizationId || '', {
-    enabled: !!organizationId,
-  });
+  const { data: openRouterModels, isLoading: isLoadingModels } =
+    useModelSelectorList(organizationId);
 
-  // Get organization's allowed models
-  const savedModelAllowList = organizationData?.settings?.model_allow_list || [];
-  const allModels = openRouterModels;
-
-  // Filter models based on organization's allow list (supports wildcards like "anthropic/*")
   const modelOptions = useMemo<ModelOption[]>(() => {
-    const availableModels =
-      savedModelAllowList.length === 0
-        ? allModels
-        : allModels.filter(model =>
-            isModelAllowedProviderAwareClient(model.slug, savedModelAllowList, openRouterProviders)
-          );
-
-    return availableModels.map(model => ({ id: model.slug, name: model.name }));
-  }, [allModels, openRouterProviders, savedModelAllowList]);
+    return openRouterModels?.data.map(model => ({ id: model.id, name: model.name })) ?? [];
+  }, [openRouterModels]);
 
   // Track selected model
   const [selectedModel, setSelectedModel] = useState<string>('');

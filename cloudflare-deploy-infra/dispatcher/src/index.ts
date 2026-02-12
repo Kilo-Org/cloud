@@ -41,13 +41,32 @@ const apexApp = new Hono<{ Bindings: Env }>();
 apexApp.route('/api', api);
 apexApp.all('*', c => c.text('Not Found', 404));
 
-const subdomainApp = new Hono<{ Bindings: Env; Variables: { workerName: string } }>();
+// Variables stored in context:
+// - publicSlug: The slug from the URL (used for password protection, cookies)
+// - workerName: The actual Cloudflare worker name (may differ from publicSlug if renamed)
+const subdomainApp = new Hono<{
+  Bindings: Env;
+  Variables: { publicSlug: string; workerName: string };
+}>();
 
-// Middleware to extract workerName from hostname
+// Middleware to extract slug from hostname and resolve worker name via KV
 subdomainApp.use('*', async (c, next) => {
   const hostname = new URL(c.req.url).hostname;
-  const workerName = hostname.slice(0, -c.env.HOSTNAME_SUFFIX.length);
-  c.set('workerName', workerName);
+  const slug = hostname.slice(0, -c.env.HOSTNAME_SUFFIX.length);
+
+  // Store the public-facing slug (for password protection lookup, auth cookies)
+  c.set('publicSlug', slug);
+
+  // Check KV for slug mapping (custom slug -> internal worker name)
+  const mappedWorkerName = await c.env.DEPLOY_KV.get(`slug2worker:${slug}`);
+
+  if (mappedWorkerName !== null && !validateWorkerName(mappedWorkerName)) {
+    return c.text('Not Found', 404);
+  }
+
+  // Use mapped name if exists, otherwise use slug directly (backwards compat)
+  c.set('workerName', mappedWorkerName ?? slug);
+
   await next();
 });
 
@@ -59,8 +78,9 @@ subdomainApp.all('*', async c => {
   const workerName = c.get('workerName');
   const url = new URL(c.req.url);
 
-  // Check password protection
-  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_AUTH_KV, workerName);
+  // Check password protection (keyed by internal worker name so it applies
+  // regardless of which subdomain/slug is used to reach the worker)
+  const passwordRecord = await getPasswordRecord(c.env.DEPLOY_KV, workerName);
 
   if (passwordRecord) {
     const authCookie = getCookie(c, 'kilo_auth');
@@ -78,7 +98,7 @@ subdomainApp.all('*', async c => {
     }
   }
 
-  // Get the worker from dispatch namespace
+  // Get the worker from dispatch namespace using the internal worker name
   const worker = c.env.DISPATCH.get(workerName);
 
   // Forward request

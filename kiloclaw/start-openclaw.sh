@@ -106,8 +106,6 @@ if [ ! -f "$CONFIG_FILE" ]; then
             --cloudflare-ai-gateway-account-id $CF_AI_GATEWAY_ACCOUNT_ID \
             --cloudflare-ai-gateway-gateway-id $CF_AI_GATEWAY_GATEWAY_ID \
             --cloudflare-ai-gateway-api-key $CLOUDFLARE_AI_GATEWAY_API_KEY"
-    elif [ -n "$ANTHROPIC_API_KEY" ]; then
-        AUTH_ARGS="--auth-choice apiKey --anthropic-api-key $ANTHROPIC_API_KEY"
     elif [ -n "$OPENAI_API_KEY" ]; then
         AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $OPENAI_API_KEY"
     fi
@@ -154,6 +152,9 @@ config.channels = config.channels || {};
 config.gateway.port = 18789;
 config.gateway.mode = 'local';
 config.gateway.trustedProxies = ['10.1.0.0'];
+// Set bind to loopback so agent tools connect via 127.0.0.1 (auto-approved for pairing).
+// The actual server bind is controlled by --bind lan on the command line, not this config.
+config.gateway.bind = 'loopback';
 
 if (process.env.OPENCLAW_GATEWAY_TOKEN) {
     config.gateway.auth = config.gateway.auth || {};
@@ -173,54 +174,49 @@ if (process.env.AUTO_APPROVE_DEVICES === 'true') {
     config.gateway.controlUi.allowInsecureAuth = true;
 }
 
-// Legacy AI Gateway base URL override:
-// ANTHROPIC_BASE_URL is picked up natively by the Anthropic SDK,
-// so we don't need to patch the provider config. Writing a provider
-// entry without a models array breaks OpenClaw's config validation.
+// KiloCode AI Gateway provider override
+// Uses KILOCODE_API_KEY and sets a default model + catalog.
+if (process.env.KILOCODE_API_KEY) {
+    const providerName = 'kilocode';
+    const baseUrl = process.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/openrouter/';
+    const defaultModel =
+        process.env.KILOCODE_DEFAULT_MODEL || providerName + '/anthropic/claude-opus-4.5';
+    const modelsPath = '/root/.openclaw/kilocode-models.json';
+    const defaultModels = [
+        { id: 'anthropic/claude-opus-4.5', name: 'Anthropic: Claude Opus 4.5' },
+        { id: 'minimax/minimax-m2.1:free', name: 'Minimax: Minimax M2.1' },
+        { id: 'z-ai/glm-4.7:free', name: 'GLM-4.7 (Free - Exclusive to Kilo)' },
+    ];
+    let models = defaultModels;
 
-// AI Gateway model override (CF_AI_GATEWAY_MODEL=provider/model-id)
-// Adds a provider entry for any AI Gateway provider and sets it as default model.
-// Examples:
-//   workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast
-//   openai/gpt-4o
-//   anthropic/claude-sonnet-4-5
-if (process.env.CF_AI_GATEWAY_MODEL) {
-    const raw = process.env.CF_AI_GATEWAY_MODEL;
-    const slashIdx = raw.indexOf('/');
-    const gwProvider = raw.substring(0, slashIdx);
-    const modelId = raw.substring(slashIdx + 1);
-
-    const accountId = process.env.CF_AI_GATEWAY_ACCOUNT_ID;
-    const gatewayId = process.env.CF_AI_GATEWAY_GATEWAY_ID;
-    const apiKey = process.env.CLOUDFLARE_AI_GATEWAY_API_KEY;
-
-    let baseUrl;
-    if (accountId && gatewayId) {
-        baseUrl = 'https://gateway.ai.cloudflare.com/v1/' + accountId + '/' + gatewayId + '/' + gwProvider;
-        if (gwProvider === 'workers-ai') baseUrl += '/v1';
-    } else if (gwProvider === 'workers-ai' && process.env.CF_ACCOUNT_ID) {
-        baseUrl = 'https://api.cloudflare.com/client/v4/accounts/' + process.env.CF_ACCOUNT_ID + '/ai/v1';
+    if (fs.existsSync(modelsPath)) {
+        const rawModels = fs.readFileSync(modelsPath, 'utf8');
+        if (rawModels.trim().length === 0) {
+            models = [];
+        } else {
+            try {
+                const parsed = JSON.parse(rawModels);
+                models = Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                console.warn('Failed to parse KiloCode models file, using empty list:', error);
+                models = [];
+            }
+        }
     }
 
-    if (baseUrl && apiKey) {
-        const api = gwProvider === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
-        const providerName = 'cf-ai-gw-' + gwProvider;
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers[providerName] = {
+        baseUrl: baseUrl,
+        apiKey: process.env.KILOCODE_API_KEY,
+        api: 'openai-completions',
+        models: models,
+    };
 
-        config.models = config.models || {};
-        config.models.providers = config.models.providers || {};
-        config.models.providers[providerName] = {
-            baseUrl: baseUrl,
-            apiKey: apiKey,
-            api: api,
-            models: [{ id: modelId, name: modelId, contextWindow: 131072, maxTokens: 8192 }],
-        };
-        config.agents = config.agents || {};
-        config.agents.defaults = config.agents.defaults || {};
-        config.agents.defaults.model = { primary: providerName + '/' + modelId };
-        console.log('AI Gateway model override: provider=' + providerName + ' model=' + modelId + ' via ' + baseUrl);
-    } else {
-        console.warn('CF_AI_GATEWAY_MODEL set but missing required config (account ID, gateway ID, or API key)');
-    }
+    config.agents = config.agents || {};
+    config.agents.defaults = config.agents.defaults || {};
+    config.agents.defaults.model = { primary: defaultModel };
+    console.log('KiloCode provider configured with base URL ' + baseUrl);
 }
 
 // Telegram configuration

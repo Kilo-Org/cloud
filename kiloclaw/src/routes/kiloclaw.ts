@@ -20,6 +20,9 @@ kiloclaw.get('/config', async c => {
   return c.json({
     envVarKeys: config.envVars ? Object.keys(config.envVars) : [],
     secretCount: config.encryptedSecrets ? Object.keys(config.encryptedSecrets).length : 0,
+    kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
+    hasKiloCodeApiKey: !!config.kilocodeApiKey,
+    kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
     channels: {
       telegram: !!config.channels?.telegramBotToken,
       discord: !!config.channels?.discordBotToken,

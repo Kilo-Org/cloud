@@ -13,9 +13,30 @@ import {
   UserIdRequestSchema,
   DestroyRequestSchema,
 } from '../schemas/instance-config';
+import type { ModelEntry } from '../schemas/instance-config';
+import { z } from 'zod';
 import { withDORetry } from '../util/do-retry';
 import { deriveGatewayToken } from '../auth/gateway-token';
-import type { z } from 'zod';
+
+const modelEntrySchema: z.ZodType<ModelEntry> = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+const KiloCodeConfigPatchSchema = z.object({
+  userId: z.string().min(1),
+  kilocodeApiKey: z.string().nullable().optional(),
+  kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
+  kilocodeDefaultModel: z
+    .string()
+    .regex(
+      /^kilocode\/[^/]+\/.+$/,
+      'kilocodeDefaultModel must start with kilocode/ and include a provider'
+    )
+    .nullable()
+    .optional(),
+  kilocodeModels: z.array(modelEntrySchema).nullable().optional(),
+});
 
 const platform = new Hono<AppEnv>();
 
@@ -57,12 +78,30 @@ platform.post('/provision', async c => {
   const result = await parseBody(c, ProvisionRequestSchema);
   if ('error' in result) return result.error;
 
-  const { userId, envVars, encryptedSecrets, channels } = result.data;
+  const {
+    userId,
+    envVars,
+    encryptedSecrets,
+    channels,
+    kilocodeApiKey,
+    kilocodeApiKeyExpiresAt,
+    kilocodeDefaultModel,
+    kilocodeModels,
+  } = result.data;
 
   try {
     const provision = await withDORetry(
       instanceStubFactory(c.env, userId),
-      stub => stub.provision(userId, { envVars, encryptedSecrets, channels }),
+      stub =>
+        stub.provision(userId, {
+          envVars,
+          encryptedSecrets,
+          channels,
+          kilocodeApiKey,
+          kilocodeApiKeyExpiresAt,
+          kilocodeDefaultModel,
+          kilocodeModels,
+        }),
       'provision'
     );
     return c.json(provision, 201);
@@ -72,6 +111,34 @@ platform.post('/provision', async c => {
     if (message.includes('duplicate key') || message.includes('unique constraint')) {
       return c.json({ error: 'User already has an active instance' }, 409);
     }
+    return c.json({ error: message }, 500);
+  }
+});
+
+// PATCH /api/platform/kilocode-config
+platform.patch('/kilocode-config', async c => {
+  const result = await parseBody(c, KiloCodeConfigPatchSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, kilocodeApiKey, kilocodeApiKeyExpiresAt, kilocodeDefaultModel, kilocodeModels } =
+    result.data;
+
+  try {
+    const updated = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub =>
+        stub.updateKiloCodeConfig({
+          kilocodeApiKey,
+          kilocodeApiKeyExpiresAt,
+          kilocodeDefaultModel,
+          kilocodeModels,
+        }),
+      'updateKiloCodeConfig'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] kilocode-config patch failed:', message);
     return c.json({ error: message }, 500);
   }
 });

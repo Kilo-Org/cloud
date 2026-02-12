@@ -32,7 +32,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy startup script
-# Build cache bust: 2026-02-10-v30-openclaw-upgrade
+# Build cache bust: 2026-02-11-v37-loopback-bind-config
+RUN echo "6"
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 RUN chmod +x /usr/local/bin/start-openclaw.sh
 

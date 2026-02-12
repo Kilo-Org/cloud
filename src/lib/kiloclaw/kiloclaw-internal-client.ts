@@ -1,7 +1,12 @@
 import 'server-only';
 
 import { KILOCLAW_API_URL, KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
-import type { ProvisionInput, PlatformStatusResponse } from './types';
+import type {
+  ProvisionInput,
+  PlatformStatusResponse,
+  KiloCodeConfigPatchInput,
+  KiloCodeConfigResponse,
+} from './types';
 
 /**
  * KiloClaw worker client for platform (internal) routes.
@@ -74,5 +79,15 @@ export class KiloClawInternalClient {
 
   async getGatewayToken(userId: string): Promise<{ gatewayToken: string }> {
     return this.request(`/api/platform/gateway-token?userId=${encodeURIComponent(userId)}`);
+  }
+
+  async patchKiloCodeConfig(
+    userId: string,
+    patch: KiloCodeConfigPatchInput
+  ): Promise<KiloCodeConfigResponse> {
+    return this.request('/api/platform/kilocode-config', {
+      method: 'PATCH',
+      body: JSON.stringify({ userId, ...patch }),
+    });
   }
 }

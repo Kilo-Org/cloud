@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   useKiloClawStatus,
   useKiloClawConfig,
@@ -10,12 +10,13 @@ import {
 import { PageLayout } from '@/components/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExternalLink, Play, Square, RotateCw, RefreshCw, Trash2, Plus, Save } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -34,60 +35,6 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 // ─── Env Var Editor ───────────────────────────────────────────────────
-
-function EnvVarEditor({
-  vars,
-  onChange,
-  secretMode,
-}: {
-  vars: Record<string, string>;
-  onChange: (v: Record<string, string>) => void;
-  secretMode?: boolean;
-}) {
-  const entries = Object.entries(vars);
-  return (
-    <div className="space-y-2">
-      {entries.map(([key, value], i) => (
-        <div key={i} className="flex gap-2">
-          <Input
-            placeholder="KEY"
-            value={key}
-            onChange={e => {
-              const next: Record<string, string> = {};
-              for (const [k, v] of Object.entries(vars)) {
-                next[k === key ? e.target.value : k] = v;
-              }
-              onChange(next);
-            }}
-            className="font-mono text-sm"
-          />
-          <Input
-            type={secretMode ? 'password' : 'text'}
-            placeholder="value"
-            value={value}
-            onChange={e => onChange({ ...vars, [key]: e.target.value })}
-            className="font-mono text-sm"
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              const next = { ...vars };
-              delete next[key];
-              onChange(next);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ))}
-      <Button variant="outline" size="sm" onClick={() => onChange({ ...vars, '': '' })}>
-        <Plus className="mr-2 h-3 w-3" />
-        Add
-      </Button>
-    </div>
-  );
-}
 
 // ─── Tab: Overview ────────────────────────────────────────────────────
 
@@ -218,32 +165,41 @@ function OverviewTab() {
 function SettingsTab() {
   const { data: config } = useKiloClawConfig();
   const { updateConfig } = useKiloClawMutations();
+  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
 
-  const [envVars, setEnvVars] = useState<Record<string, string>>({});
-  const [secrets, setSecrets] = useState<Record<string, string>>({});
-  const [channels, setChannels] = useState({
-    telegramBotToken: '',
-    discordBotToken: '',
-    slackBotToken: '',
-    slackAppToken: '',
-  });
+  const [selectedModel, setSelectedModel] = useState('');
+  const [hasAppliedDefaults, setHasAppliedDefaults] = useState(false);
+  const modelOptions = useMemo<ModelOption[]>(
+    () => (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
+    [modelsData]
+  );
+  const defaultModel = config?.kilocodeDefaultModel?.startsWith('kilocode/')
+    ? config.kilocodeDefaultModel.replace(/^kilocode\//, '')
+    : '';
+
+  useEffect(() => {
+    if (hasAppliedDefaults) return;
+    if (!config || modelOptions.length === 0) return;
+
+    if (defaultModel && modelOptions.some(model => model.id === defaultModel)) {
+      setSelectedModel(defaultModel);
+    }
+    setHasAppliedDefaults(true);
+  }, [config, defaultModel, hasAppliedDefaults, modelOptions]);
+
+  const isSaving = updateConfig.isPending;
 
   function handleSave() {
-    const cleanEnvVars = Object.fromEntries(Object.entries(envVars).filter(([k]) => k.trim()));
-    const cleanSecrets = Object.fromEntries(Object.entries(secrets).filter(([k]) => k.trim()));
-    const cleanChannels = {
-      telegramBotToken: channels.telegramBotToken || undefined,
-      discordBotToken: channels.discordBotToken || undefined,
-      slackBotToken: channels.slackBotToken || undefined,
-      slackAppToken: channels.slackAppToken || undefined,
-    };
-    const hasChannels = Object.values(cleanChannels).some(Boolean);
+    if (isLoadingModels) {
+      toast.error('Models are still loading; try again in a moment.');
+      return;
+    }
 
+    const modelsPayload = modelOptions.map(({ id, name }) => ({ id, name }));
     updateConfig.mutate(
       {
-        envVars: Object.keys(cleanEnvVars).length > 0 ? cleanEnvVars : undefined,
-        secrets: Object.keys(cleanSecrets).length > 0 ? cleanSecrets : undefined,
-        channels: hasChannels ? cleanChannels : undefined,
+        kilocodeDefaultModel: selectedModel ? `kilocode/${selectedModel}` : null,
+        kilocodeModels: modelsPayload.length > 0 ? modelsPayload : null,
       },
       {
         onSuccess: () => toast.success('Configuration saved'),
@@ -259,92 +215,43 @@ function SettingsTab() {
           <CardHeader>
             <CardTitle>Current Config</CardTitle>
             <CardDescription>
-              {config.envVarKeys.length} env vars, {config.secretCount} secrets,{' '}
-              {[
-                config.channels.telegram && 'Telegram',
-                config.channels.discord && 'Discord',
-                (config.channels.slackBot || config.channels.slackApp) && 'Slack',
-              ]
-                .filter(Boolean)
-                .join(', ') || 'no channels'}
+              Default model: {config.kilocodeDefaultModel || 'not set'}
             </CardDescription>
           </CardHeader>
+          {config.kilocodeApiKeyExpiresAt && (
+            <CardContent>
+              <p className="text-muted-foreground text-sm">
+                API key expires: {new Date(config.kilocodeApiKeyExpiresAt).toLocaleString()}
+              </p>
+            </CardContent>
+          )}
         </Card>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Environment Variables</CardTitle>
-          <CardDescription>Plaintext variables passed to the container.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EnvVarEditor vars={envVars} onChange={setEnvVars} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Secrets</CardTitle>
-          <CardDescription>Encrypted at rest. Override env vars on conflict.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EnvVarEditor vars={secrets} onChange={setSecrets} secretMode />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Chat Channels</CardTitle>
-          <CardDescription>Bot tokens are encrypted at rest.</CardDescription>
+          <CardTitle>KiloCode</CardTitle>
+          <CardDescription>Default model and API key for KiloCode gateway access.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Telegram Bot Token</Label>
-            <Input
-              type="password"
-              placeholder="1234567890:ABCdefGHI..."
-              value={channels.telegramBotToken}
-              onChange={e => setChannels(c => ({ ...c, telegramBotToken: e.target.value }))}
-              className="font-mono text-sm"
-            />
+          <div className="text-muted-foreground text-sm">
+            API key is managed by the platform and refreshed every save.
           </div>
-          <div className="space-y-2">
-            <Label>Discord Bot Token</Label>
-            <Input
-              type="password"
-              placeholder="MTIz..."
-              value={channels.discordBotToken}
-              onChange={e => setChannels(c => ({ ...c, discordBotToken: e.target.value }))}
-              className="font-mono text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Slack Bot Token</Label>
-            <Input
-              type="password"
-              placeholder="xoxb-..."
-              value={channels.slackBotToken}
-              onChange={e => setChannels(c => ({ ...c, slackBotToken: e.target.value }))}
-              className="font-mono text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Slack App Token</Label>
-            <Input
-              type="password"
-              placeholder="xapp-..."
-              value={channels.slackAppToken}
-              onChange={e => setChannels(c => ({ ...c, slackAppToken: e.target.value }))}
-              className="font-mono text-sm"
-            />
-          </div>
+          <ModelCombobox
+            label=""
+            models={modelOptions}
+            value={selectedModel}
+            onValueChange={setSelectedModel}
+            isLoading={isLoadingModels}
+            disabled={isSaving || isLoadingModels}
+          />
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={updateConfig.isPending}>
+        <Button onClick={handleSave} disabled={isSaving}>
           <Save className="mr-2 h-4 w-4" />
-          {updateConfig.isPending ? 'Saving...' : 'Save & Provision'}
+          {isSaving ? 'Saving...' : 'Save & Provision'}
         </Button>
       </div>
     </div>
@@ -459,32 +366,24 @@ function ActionsTab() {
 
 function CreateInstanceForm() {
   const { updateConfig } = useKiloClawMutations();
-
-  const [envVars, setEnvVars] = useState<Record<string, string>>({});
-  const [secrets, setSecrets] = useState<Record<string, string>>({});
-  const [channels, setChannels] = useState({
-    telegramBotToken: '',
-    discordBotToken: '',
-    slackBotToken: '',
-    slackAppToken: '',
-  });
+  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
+  const [selectedModel, setSelectedModel] = useState('');
+  const modelOptions = useMemo<ModelOption[]>(
+    () => (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
+    [modelsData]
+  );
 
   function handleCreate() {
-    const cleanEnvVars = Object.fromEntries(Object.entries(envVars).filter(([k]) => k.trim()));
-    const cleanSecrets = Object.fromEntries(Object.entries(secrets).filter(([k]) => k.trim()));
-    const cleanChannels = {
-      telegramBotToken: channels.telegramBotToken || undefined,
-      discordBotToken: channels.discordBotToken || undefined,
-      slackBotToken: channels.slackBotToken || undefined,
-      slackAppToken: channels.slackAppToken || undefined,
-    };
-    const hasChannels = Object.values(cleanChannels).some(Boolean);
+    if (isLoadingModels) {
+      toast.error('Models are still loading; try again in a moment.');
+      return;
+    }
 
+    const modelsPayload = modelOptions.map(({ id, name }) => ({ id, name }));
     updateConfig.mutate(
       {
-        envVars: Object.keys(cleanEnvVars).length > 0 ? cleanEnvVars : undefined,
-        secrets: Object.keys(cleanSecrets).length > 0 ? cleanSecrets : undefined,
-        channels: hasChannels ? cleanChannels : undefined,
+        kilocodeDefaultModel: selectedModel ? `kilocode/${selectedModel}` : null,
+        kilocodeModels: modelsPayload.length > 0 ? modelsPayload : null,
       },
       {
         onSuccess: () => toast.success('Instance created'),
@@ -498,78 +397,23 @@ function CreateInstanceForm() {
       <Card>
         <CardHeader className="pb-6">
           <CardTitle>Create Instance</CardTitle>
-          <CardDescription>
-            Configure your KiloClaw instance. All fields are optional — you can update them later.
-          </CardDescription>
+          <CardDescription>Choose a default model for your KiloClaw instance.</CardDescription>
         </CardHeader>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Environment Variables</CardTitle>
-          <CardDescription>Plaintext variables passed to the container.</CardDescription>
+          <CardTitle>Default Model</CardTitle>
         </CardHeader>
         <CardContent>
-          <EnvVarEditor vars={envVars} onChange={setEnvVars} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Secrets</CardTitle>
-          <CardDescription>Encrypted at rest. Override env vars on conflict.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EnvVarEditor vars={secrets} onChange={setSecrets} secretMode />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Chat Channels</CardTitle>
-          <CardDescription>Bot tokens are encrypted at rest.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Telegram Bot Token</Label>
-            <Input
-              type="password"
-              placeholder="1234567890:ABCdefGHI..."
-              value={channels.telegramBotToken}
-              onChange={e => setChannels(c => ({ ...c, telegramBotToken: e.target.value }))}
-              className="font-mono text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Discord Bot Token</Label>
-            <Input
-              type="password"
-              placeholder="MTIz..."
-              value={channels.discordBotToken}
-              onChange={e => setChannels(c => ({ ...c, discordBotToken: e.target.value }))}
-              className="font-mono text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Slack Bot Token</Label>
-            <Input
-              type="password"
-              placeholder="xoxb-..."
-              value={channels.slackBotToken}
-              onChange={e => setChannels(c => ({ ...c, slackBotToken: e.target.value }))}
-              className="font-mono text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Slack App Token</Label>
-            <Input
-              type="password"
-              placeholder="xapp-..."
-              value={channels.slackAppToken}
-              onChange={e => setChannels(c => ({ ...c, slackAppToken: e.target.value }))}
-              className="font-mono text-sm"
-            />
-          </div>
+          <ModelCombobox
+            label=""
+            models={modelOptions}
+            value={selectedModel}
+            onValueChange={setSelectedModel}
+            isLoading={isLoadingModels}
+            disabled={updateConfig.isPending || isLoadingModels}
+          />
         </CardContent>
       </Card>
 

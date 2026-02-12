@@ -26,6 +26,7 @@ import {
   type InstanceConfig,
   type PersistedState,
   type EncryptedEnvelope,
+  type ModelEntry,
 } from '../schemas/instance-config';
 
 // StopParams from @cloudflare/containers -- not re-exported by @cloudflare/sandbox
@@ -42,6 +43,10 @@ const KEY_SANDBOX_ID = 'sandboxId';
 const KEY_STATUS = 'status';
 const KEY_ENV_VARS = 'envVars';
 const KEY_ENCRYPTED_SECRETS = 'encryptedSecrets';
+const KEY_KILOCODE_API_KEY = 'kilocodeApiKey';
+const KEY_KILOCODE_API_KEY_EXPIRES_AT = 'kilocodeApiKeyExpiresAt';
+const KEY_KILOCODE_DEFAULT_MODEL = 'kilocodeDefaultModel';
+const KEY_KILOCODE_MODELS = 'kilocodeModels';
 const KEY_CHANNELS = 'channels';
 const KEY_PROVISIONED_AT = 'provisionedAt';
 const KEY_LAST_STARTED_AT = 'lastStartedAt';
@@ -57,6 +62,10 @@ const STORAGE_KEYS = [
   KEY_STATUS,
   KEY_ENV_VARS,
   KEY_ENCRYPTED_SECRETS,
+  KEY_KILOCODE_API_KEY,
+  KEY_KILOCODE_API_KEY_EXPIRES_AT,
+  KEY_KILOCODE_DEFAULT_MODEL,
+  KEY_KILOCODE_MODELS,
   KEY_CHANNELS,
   KEY_PROVISIONED_AT,
   KEY_LAST_STARTED_AT,
@@ -82,6 +91,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private status: InstanceStatus | null = null;
   private envVars: PersistedState['envVars'] = null;
   private encryptedSecrets: PersistedState['encryptedSecrets'] = null;
+  private kilocodeApiKey: PersistedState['kilocodeApiKey'] = null;
+  private kilocodeApiKeyExpiresAt: PersistedState['kilocodeApiKeyExpiresAt'] = null;
+  private kilocodeDefaultModel: PersistedState['kilocodeDefaultModel'] = null;
+  private kilocodeModels: PersistedState['kilocodeModels'] = null;
   private channels: PersistedState['channels'] = null;
   private provisionedAt: number | null = null;
   private lastStartedAt: number | null = null;
@@ -111,6 +124,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.status = s.userId ? s.status : null;
       this.envVars = s.envVars;
       this.encryptedSecrets = s.encryptedSecrets;
+      this.kilocodeApiKey = s.kilocodeApiKey;
+      this.kilocodeApiKeyExpiresAt = s.kilocodeApiKeyExpiresAt;
+      this.kilocodeDefaultModel = s.kilocodeDefaultModel;
+      this.kilocodeModels = s.kilocodeModels;
       this.channels = s.channels;
       this.provisionedAt = s.provisionedAt;
       this.lastStartedAt = s.lastStartedAt;
@@ -173,6 +190,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       [KEY_STATUS]: (this.status ?? 'provisioned') satisfies InstanceStatus,
       [KEY_ENV_VARS]: config.envVars ?? null,
       [KEY_ENCRYPTED_SECRETS]: config.encryptedSecrets ?? null,
+      [KEY_KILOCODE_API_KEY]: config.kilocodeApiKey ?? null,
+      [KEY_KILOCODE_API_KEY_EXPIRES_AT]: config.kilocodeApiKeyExpiresAt ?? null,
+      [KEY_KILOCODE_DEFAULT_MODEL]: config.kilocodeDefaultModel ?? null,
+      [KEY_KILOCODE_MODELS]: config.kilocodeModels ?? null,
       [KEY_CHANNELS]: config.channels ?? null,
     };
 
@@ -195,6 +216,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.status = this.status ?? 'provisioned';
     this.envVars = config.envVars ?? null;
     this.encryptedSecrets = config.encryptedSecrets ?? null;
+    this.kilocodeApiKey = config.kilocodeApiKey ?? null;
+    this.kilocodeApiKeyExpiresAt = config.kilocodeApiKeyExpiresAt ?? null;
+    this.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
+    this.kilocodeModels = config.kilocodeModels ?? null;
     this.channels = config.channels ?? null;
     if (isNew) {
       this.provisionedAt = Date.now();
@@ -208,6 +233,50 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.loaded = true;
 
     return { sandboxId };
+  }
+
+  async updateKiloCodeConfig(patch: {
+    kilocodeApiKey?: string | null;
+    kilocodeApiKeyExpiresAt?: string | null;
+    kilocodeDefaultModel?: string | null;
+    kilocodeModels?: ModelEntry[] | null;
+  }): Promise<{
+    kilocodeApiKey: string | null;
+    kilocodeApiKeyExpiresAt: string | null;
+    kilocodeDefaultModel: string | null;
+    kilocodeModels: ModelEntry[] | null;
+  }> {
+    await this.loadState();
+
+    const storageUpdate: Record<string, unknown> = {};
+
+    if (patch.kilocodeApiKey !== undefined) {
+      this.kilocodeApiKey = patch.kilocodeApiKey;
+      storageUpdate[KEY_KILOCODE_API_KEY] = this.kilocodeApiKey;
+    }
+    if (patch.kilocodeApiKeyExpiresAt !== undefined) {
+      this.kilocodeApiKeyExpiresAt = patch.kilocodeApiKeyExpiresAt;
+      storageUpdate[KEY_KILOCODE_API_KEY_EXPIRES_AT] = this.kilocodeApiKeyExpiresAt;
+    }
+    if (patch.kilocodeDefaultModel !== undefined) {
+      this.kilocodeDefaultModel = patch.kilocodeDefaultModel;
+      storageUpdate[KEY_KILOCODE_DEFAULT_MODEL] = this.kilocodeDefaultModel;
+    }
+    if (patch.kilocodeModels !== undefined) {
+      this.kilocodeModels = patch.kilocodeModels;
+      storageUpdate[KEY_KILOCODE_MODELS] = this.kilocodeModels;
+    }
+
+    if (Object.keys(storageUpdate).length > 0) {
+      await this.ctx.storage.put(storageUpdate);
+    }
+
+    return {
+      kilocodeApiKey: this.kilocodeApiKey,
+      kilocodeApiKeyExpiresAt: this.kilocodeApiKeyExpiresAt,
+      kilocodeDefaultModel: this.kilocodeDefaultModel,
+      kilocodeModels: this.kilocodeModels,
+    };
   }
 
   /**
@@ -253,6 +322,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await mountR2Storage(sandbox, this.env, this.userId);
 
     const envVars = await this.buildUserEnvVars();
+    await this.writeKiloCodeModelsFile();
     await ensureOpenClawGateway(sandbox, this.env, envVars);
 
     // Update state
@@ -416,6 +486,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return {
       envVars: this.envVars ?? undefined,
       encryptedSecrets: this.encryptedSecrets ?? undefined,
+      kilocodeApiKey: this.kilocodeApiKey ?? undefined,
+      kilocodeApiKeyExpiresAt: this.kilocodeApiKeyExpiresAt ?? undefined,
+      kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
+      kilocodeModels: this.kilocodeModels ?? undefined,
       channels: this.channels ?? undefined,
     };
   }
@@ -463,6 +537,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Rebuild env vars and start new gateway
     try {
       const envVars = await this.buildUserEnvVars();
+      await this.writeKiloCodeModelsFile();
       await ensureOpenClawGateway(sandbox, this.env, envVars);
       return {
         success: true,
@@ -720,8 +795,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET, {
       envVars: this.envVars ?? undefined,
       encryptedSecrets: this.encryptedSecrets ?? undefined,
+      kilocodeApiKey: this.kilocodeApiKey ?? undefined,
+      kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
       channels: this.channels ?? undefined,
     });
+  }
+
+  private async writeKiloCodeModelsFile(): Promise<void> {
+    if (!this.sandboxId) return;
+    const sandbox = this.resolveSandbox();
+    const content = JSON.stringify(this.kilocodeModels ?? []);
+    const escaped = content.replace(/'/g, "'\\''");
+    const command = `printf '%s' '${escaped}' > /root/.openclaw/kilocode-models.json`;
+    try {
+      const proc = await sandbox.startProcess(command);
+
+      let attempts = 0;
+      while (attempts < 10) {
+        await new Promise(r => setTimeout(r, 100));
+        if (proc.status !== 'running') break;
+        attempts++;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.warn('[DO] Failed to write KiloCode models file:', message);
+    }
   }
 
   private resolveSandbox() {

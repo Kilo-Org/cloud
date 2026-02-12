@@ -25,6 +25,8 @@ const kiloclawProcedure = baseProcedure.use(async ({ ctx, next }) => {
   return next();
 });
 
+const modelEntrySchema = z.object({ id: z.string(), name: z.string() });
+
 const updateConfigSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
   secrets: z.record(z.string(), z.string()).optional(),
@@ -36,6 +38,27 @@ const updateConfigSchema = z.object({
       slackAppToken: z.string().optional(),
     })
     .optional(),
+  kilocodeDefaultModel: z
+    .string()
+    .regex(
+      /^kilocode\/[^/]+\/.+$/,
+      'kilocodeDefaultModel must start with kilocode/ and include a provider'
+    )
+    .nullable()
+    .optional(),
+  kilocodeModels: z.array(modelEntrySchema).nullable().optional(),
+});
+
+const updateKiloCodeConfigSchema = z.object({
+  kilocodeDefaultModel: z
+    .string()
+    .regex(
+      /^kilocode\/[^/]+\/.+$/,
+      'kilocodeDefaultModel must start with kilocode/ and include a provider'
+    )
+    .nullable()
+    .optional(),
+  kilocodeModels: z.array(modelEntrySchema).nullable().optional(),
 });
 
 /**
@@ -195,13 +218,40 @@ export const kiloclawRouter = createTRPCRouter({
         )
       : undefined;
 
+    const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+    const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
+      expiresIn: expiresInSeconds,
+    });
+    const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
     const client = new KiloClawInternalClient();
     return client.provision(userId, {
       envVars: input.envVars,
       encryptedSecrets,
       channels: buildWorkerChannels(input.channels),
+      kilocodeApiKey,
+      kilocodeApiKeyExpiresAt,
+      kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+      kilocodeModels: input.kilocodeModels ?? undefined,
     });
   }),
+
+  updateKiloCodeConfig: kiloclawProcedure
+    .input(updateKiloCodeConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
+        expiresIn: expiresInSeconds,
+      });
+      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+      return client.patchKiloCodeConfig(ctx.user.id, {
+        ...input,
+        kilocodeApiKey,
+        kilocodeApiKeyExpiresAt,
+      });
+    }),
 
   // User-facing (user client -- forwards user's short-lived JWT)
   getConfig: kiloclawProcedure.query(async ({ ctx }) => {

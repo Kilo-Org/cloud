@@ -21,13 +21,9 @@ export type KiloClawEnv = {
   CF_AI_GATEWAY_GATEWAY_ID?: string;
   CLOUDFLARE_AI_GATEWAY_API_KEY?: string;
   CF_AI_GATEWAY_MODEL?: string;
-  // Legacy AI Gateway configuration (still supported for backward compat)
-  AI_GATEWAY_API_KEY?: string;
-  AI_GATEWAY_BASE_URL?: string;
   // Direct provider configuration
-  ANTHROPIC_API_KEY?: string;
-  ANTHROPIC_BASE_URL?: string;
   OPENAI_API_KEY?: string;
+  KILOCODE_API_BASE_URL?: string;
   DEV_MODE?: string;
   DEBUG_ROUTES?: string;
   DEBUG_ROUTES_SECRET?: string;

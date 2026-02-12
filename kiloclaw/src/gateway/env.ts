@@ -10,6 +10,9 @@ import { mergeEnvVarsWithSecrets, decryptChannelTokens } from '../utils/encrypti
 export type UserConfig = {
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
+  kilocodeApiKey?: string | null;
+  kilocodeDefaultModel?: string | null;
+  kilocodeModels?: Array<{ id: string; name: string }> | null;
   channels?: EncryptedChannelTokens;
 };
 
@@ -50,19 +53,7 @@ export async function buildEnvVars(
   }
 
   // Direct provider keys
-  if (env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY;
   if (env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = env.OPENAI_API_KEY;
-
-  // Legacy AI Gateway support: AI_GATEWAY_BASE_URL + AI_GATEWAY_API_KEY
-  // When set, these override direct keys for backward compatibility
-  if (env.AI_GATEWAY_API_KEY && env.AI_GATEWAY_BASE_URL) {
-    const normalizedBaseUrl = env.AI_GATEWAY_BASE_URL.replace(/\/+$/, '');
-    envVars.AI_GATEWAY_BASE_URL = normalizedBaseUrl;
-    envVars.ANTHROPIC_BASE_URL = normalizedBaseUrl;
-    envVars.ANTHROPIC_API_KEY = env.AI_GATEWAY_API_KEY;
-  } else if (env.ANTHROPIC_BASE_URL) {
-    envVars.ANTHROPIC_BASE_URL = env.ANTHROPIC_BASE_URL;
-  }
 
   if (env.DEV_MODE) envVars.OPENCLAW_DEV_MODE = env.DEV_MODE;
   if (env.CF_AI_GATEWAY_MODEL) envVars.CF_AI_GATEWAY_MODEL = env.CF_AI_GATEWAY_MODEL;
@@ -76,6 +67,13 @@ export async function buildEnvVars(
       env.AGENT_ENV_VARS_PRIVATE_KEY
     );
     Object.assign(envVars, userEnv);
+
+    if (userConfig.kilocodeApiKey) {
+      envVars.KILOCODE_API_KEY = userConfig.kilocodeApiKey;
+    }
+    if (userConfig.kilocodeDefaultModel) {
+      envVars.KILOCODE_DEFAULT_MODEL = userConfig.kilocodeDefaultModel;
+    }
 
     // Layer 4: Decrypt channel tokens and map to container env var names
     if (userConfig.channels && env.AGENT_ENV_VARS_PRIVATE_KEY) {

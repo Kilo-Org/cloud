@@ -16,7 +16,7 @@ pnpm install
 # Copy the example env file
 cp .dev.vars.example .dev.vars
 
-# Edit .dev.vars -- at minimum set ANTHROPIC_API_KEY
+# Edit .dev.vars -- add any required secrets
 # See "Environment Variables" below for details
 
 # Run the dev server
@@ -64,13 +64,12 @@ For production, generate real secrets and keep `NEXTAUTH_SECRET` and
 
 ### AI Provider (at least one required)
 
-Users can bring their own keys (BYOK), but the worker should have at least one
-platform default so instances can start without user-provided keys.
+Users can bring their own keys (BYOK), or set a platform default for development.
 
-| Variable            | Description              |
-| ------------------- | ------------------------ |
-| `ANTHROPIC_API_KEY` | Direct Anthropic API key |
-| `OPENAI_API_KEY`    | Direct OpenAI API key    |
+| Variable           | Description                 |
+| ------------------ | --------------------------- |
+| `KILOCODE_API_KEY` | KiloCode API key (per user) |
+| `OPENAI_API_KEY`   | Direct OpenAI API key       |
 
 **Cloudflare AI Gateway** (alternative -- all three required together):
 
@@ -125,11 +124,11 @@ user-provided encrypted secrets and channel tokens are silently skipped.
 
 ### Optional
 
-| Variable             | Description                                        |
-| -------------------- | -------------------------------------------------- |
-| `ANTHROPIC_BASE_URL` | Custom Anthropic API base URL                      |
-| `CDP_SECRET`         | Shared secret for CDP browser automation endpoints |
-| `WORKER_URL`         | Public URL of the worker (required for CDP)        |
+| Variable                | Description                                        |
+| ----------------------- | -------------------------------------------------- |
+| `KILOCODE_API_BASE_URL` | Override KiloCode API base URL (dev only)          |
+| `CDP_SECRET`            | Shared secret for CDP browser automation endpoints |
+| `WORKER_URL`            | Public URL of the worker (required for CDP)        |
 
 ## Wrangler Bindings
 
@@ -150,8 +149,8 @@ echo "$(openssl rand -hex 32)" | npx wrangler secret put NEXTAUTH_SECRET
 echo "$(openssl rand -hex 32)" | npx wrangler secret put INTERNAL_API_SECRET
 echo "$(openssl rand -hex 32)" | npx wrangler secret put GATEWAY_TOKEN_SECRET
 
-# Set AI provider key
-npx wrangler secret put ANTHROPIC_API_KEY
+# Set AI provider key (optional if users bring their own)
+npx wrangler secret put KILOCODE_API_KEY
 
 # Set R2 credentials
 npx wrangler secret put R2_ACCESS_KEY_ID

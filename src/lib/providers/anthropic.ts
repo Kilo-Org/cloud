@@ -23,7 +23,7 @@ export const opus_46_free_slackbot_model = {
 
 const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;
 
-const ENABLE_ANTHROPIC_AUTOMATIC_CACHING = true;
+const ENABLE_ANTHROPIC_AUTOMATIC_CACHING = false;
 
 const ENABLE_ANTHROPIC_FINE_GRAINED_TOOL_STREAMING = true;
 

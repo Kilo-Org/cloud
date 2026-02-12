@@ -1,5 +1,4 @@
 import type { BYOKResult } from '@/lib/byok';
-import { getEnvVariable } from '@/lib/dotenvx';
 import { isAnthropicModel, isOpusModel } from '@/lib/providers/anthropic';
 import { minimax_m21_free_model } from '@/lib/providers/minimax';
 import {

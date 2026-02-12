@@ -31,8 +31,8 @@ import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
-import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
-import { useOrganizationWithMembers, useOrganizationDefaults } from '@/app/api/organizations/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { FeedbackDialog } from './FeedbackDialog';
 
 type AppBuilderChatProps = {
@@ -225,23 +225,14 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   const isBlocked = !isEligibilityLoading && accessLevel === 'blocked';
 
   // Fetch organization configuration and models for the model selector
-  const { data: organizationData } = useOrganizationWithMembers(organizationId || '', {
-    enabled: !!organizationId,
-  });
-  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
-  // Get organization's allowed models
-  const savedModelAllowList = organizationData?.settings?.model_allow_list || [];
   const allModels = modelsData?.data || [];
 
-  // Filter models based on organization's allow list
   // When user has limited access, only show free models
   const availableModels = useMemo(() => {
-    let models =
-      savedModelAllowList.length === 0
-        ? allModels
-        : allModels.filter(m => savedModelAllowList.includes(m.id));
+    let models = allModels;
 
     // If user has limited access, filter to only free models
     if (hasLimitedAccess) {
@@ -253,7 +244,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
 
     return models;
-  }, [allModels, savedModelAllowList, hasLimitedAccess]);
+  }, [allModels, hasLimitedAccess]);
 
   // Format models for the combobox (ModelOption format: id, name, supportsVision)
   const modelOptions = useMemo<ModelOption[]>(

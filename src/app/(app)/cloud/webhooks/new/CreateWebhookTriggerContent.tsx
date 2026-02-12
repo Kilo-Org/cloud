@@ -15,7 +15,7 @@ import { TriggerForm, type TriggerFormData } from '@/components/webhook-triggers
 import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { ArrowLeft, Webhook, AlertCircle } from 'lucide-react';
 
 type CreateWebhookTriggerContentProps = {
@@ -57,7 +57,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     !isLoadingRepos && githubRepoData?.integrationInstalled === false;
 
   // Fetch models
-  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
 
   // Transform repositories to RepositoryOption format
   const repositories = useMemo<RepositoryOption[]>(() => {

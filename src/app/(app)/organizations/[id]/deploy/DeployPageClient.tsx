@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { DeploymentsList } from '@/components/deployments/DeploymentsList';
 import { DeploymentDetails } from '@/components/deployments/DeploymentDetails';
 import { NewDeploymentDialog } from '@/components/deployments/NewDeploymentDialog';
@@ -9,21 +9,25 @@ import { OrgGitHubAppsProvider } from '@/components/integrations/OrgGitHubAppsPr
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 type DeployPageClientProps = {
   organizationId: string;
+  initialDeploymentId?: string;
 };
 
-export function DeployPageClient({ organizationId }: DeployPageClientProps) {
-  const [selectedDeploymentId, setSelectedDeploymentId] = useState<string | null>(null);
+export function DeployPageClient({ organizationId, initialDeploymentId }: DeployPageClientProps) {
+  const router = useRouter();
   const [isNewDeploymentOpen, setIsNewDeploymentOpen] = useState(false);
 
+  const basePath = `/organizations/${organizationId}/deploy`;
+
   const handleViewDetails = (deploymentId: string) => {
-    setSelectedDeploymentId(deploymentId);
+    router.push(`${basePath}/${deploymentId}`);
   };
 
   const handleCloseDetails = () => {
-    setSelectedDeploymentId(null);
+    router.push(basePath);
   };
 
   const handleNewDeployment = () => {
@@ -64,10 +68,10 @@ export function DeployPageClient({ organizationId }: DeployPageClientProps) {
 
         <DeploymentsList onViewDetails={handleViewDetails} />
 
-        {selectedDeploymentId && (
+        {initialDeploymentId && (
           <DeploymentDetails
-            deploymentId={selectedDeploymentId}
-            isOpen={selectedDeploymentId !== null}
+            deploymentId={initialDeploymentId}
+            isOpen={true}
             onClose={handleCloseDetails}
           />
         )}

@@ -33,8 +33,17 @@ export function useKiloClawMutations() {
     start: useMutation(trpc.kiloclaw.start.mutationOptions({ onSuccess: invalidateStatus })),
     stop: useMutation(trpc.kiloclaw.stop.mutationOptions({ onSuccess: invalidateStatus })),
     destroy: useMutation(trpc.kiloclaw.destroy.mutationOptions({ onSuccess: invalidateStatus })),
+    provision: useMutation(
+      trpc.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    patchConfig: useMutation(
+      trpc.kiloclaw.patchConfig.mutationOptions({ onSuccess: invalidateStatus })
+    ),
     updateConfig: useMutation(
       trpc.kiloclaw.updateConfig.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    updateKiloCodeConfig: useMutation(
+      trpc.kiloclaw.updateKiloCodeConfig.mutationOptions({ onSuccess: invalidateStatus })
     ),
     restartGateway: useMutation(
       trpc.kiloclaw.restartGateway.mutationOptions({ onSuccess: invalidateStatus })

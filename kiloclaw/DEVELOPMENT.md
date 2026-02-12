@@ -16,7 +16,7 @@ pnpm install
 # Copy the example env file
 cp .dev.vars.example .dev.vars
 
-# Edit .dev.vars -- at minimum set ANTHROPIC_API_KEY
+# Edit .dev.vars -- add any required secrets
 # See "Environment Variables" below for details
 
 # Run the dev server
@@ -62,27 +62,13 @@ For local dev, any placeholder values work (the example file has defaults).
 For production, generate real secrets and keep `NEXTAUTH_SECRET` and
 `INTERNAL_API_SECRET` in sync with the Next.js deployment.
 
-### AI Provider (at least one required)
+### AI Provider (required)
 
-Users can bring their own keys (BYOK), but the worker should have at least one
-platform default so instances can start without user-provided keys.
+KiloClaw uses the KiloCode provider only.
 
-| Variable            | Description              |
-| ------------------- | ------------------------ |
-| `ANTHROPIC_API_KEY` | Direct Anthropic API key |
-| `OPENAI_API_KEY`    | Direct OpenAI API key    |
-
-**Cloudflare AI Gateway** (alternative -- all three required together):
-
-| Variable                        | Description                                         |
-| ------------------------------- | --------------------------------------------------- |
-| `CLOUDFLARE_AI_GATEWAY_API_KEY` | Your provider's API key, routed through the gateway |
-| `CF_AI_GATEWAY_ACCOUNT_ID`      | Your Cloudflare account ID                          |
-| `CF_AI_GATEWAY_GATEWAY_ID`      | Your AI Gateway ID                                  |
-| `CF_AI_GATEWAY_MODEL`           | Optional model override: `provider/model-id`        |
-
-Legacy AI Gateway (`AI_GATEWAY_API_KEY` + `AI_GATEWAY_BASE_URL`) is still
-supported but deprecated.
+| Variable           | Description                                                                |
+| ------------------ | -------------------------------------------------------------------------- |
+| `KILOCODE_API_KEY` | Per-instance KiloCode API key (injected by Next.js during provision/patch) |
 
 ### R2 Persistence
 
@@ -125,11 +111,11 @@ user-provided encrypted secrets and channel tokens are silently skipped.
 
 ### Optional
 
-| Variable             | Description                                        |
-| -------------------- | -------------------------------------------------- |
-| `ANTHROPIC_BASE_URL` | Custom Anthropic API base URL                      |
-| `CDP_SECRET`         | Shared secret for CDP browser automation endpoints |
-| `WORKER_URL`         | Public URL of the worker (required for CDP)        |
+| Variable                | Description                                        |
+| ----------------------- | -------------------------------------------------- |
+| `KILOCODE_API_BASE_URL` | Override KiloCode API base URL (dev only)          |
+| `CDP_SECRET`            | Shared secret for CDP browser automation endpoints |
+| `WORKER_URL`            | Public URL of the worker (required for CDP)        |
 
 ## Wrangler Bindings
 
@@ -150,8 +136,8 @@ echo "$(openssl rand -hex 32)" | npx wrangler secret put NEXTAUTH_SECRET
 echo "$(openssl rand -hex 32)" | npx wrangler secret put INTERNAL_API_SECRET
 echo "$(openssl rand -hex 32)" | npx wrangler secret put GATEWAY_TOKEN_SECRET
 
-# Set AI provider key
-npx wrangler secret put ANTHROPIC_API_KEY
+# Set AI provider key (optional if users bring their own)
+npx wrangler secret put KILOCODE_API_KEY
 
 # Set R2 credentials
 npx wrangler secret put R2_ACCESS_KEY_ID

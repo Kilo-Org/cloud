@@ -59,75 +59,18 @@ describe('buildEnvVars', () => {
     expect(result.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
-  it('includes ANTHROPIC_API_KEY when set directly', async () => {
-    const env = createMockEnv({ ANTHROPIC_API_KEY: 'sk-test-key' });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.ANTHROPIC_API_KEY).toBe('sk-test-key');
-  });
-
-  it('includes OPENAI_API_KEY when set directly', async () => {
-    const env = createMockEnv({ OPENAI_API_KEY: 'sk-openai-key' });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.OPENAI_API_KEY).toBe('sk-openai-key');
-  });
-
-  it('passes Cloudflare AI Gateway env vars', async () => {
-    const env = createMockEnv({
-      CLOUDFLARE_AI_GATEWAY_API_KEY: 'cf-gw-key',
-      CF_AI_GATEWAY_ACCOUNT_ID: 'my-account-id',
-      CF_AI_GATEWAY_GATEWAY_ID: 'my-gateway-id',
-    });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.CLOUDFLARE_AI_GATEWAY_API_KEY).toBe('cf-gw-key');
-    expect(result.CF_AI_GATEWAY_ACCOUNT_ID).toBe('my-account-id');
-    expect(result.CF_AI_GATEWAY_GATEWAY_ID).toBe('my-gateway-id');
-  });
-
-  it('maps legacy AI_GATEWAY_API_KEY to ANTHROPIC_API_KEY with base URL', async () => {
-    const env = createMockEnv({
-      AI_GATEWAY_API_KEY: 'sk-gateway-key',
-      AI_GATEWAY_BASE_URL: 'https://gateway.ai.cloudflare.com/v1/123/my-gw/anthropic',
-    });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.ANTHROPIC_API_KEY).toBe('sk-gateway-key');
-    expect(result.ANTHROPIC_BASE_URL).toBe(
-      'https://gateway.ai.cloudflare.com/v1/123/my-gw/anthropic'
-    );
-  });
-
-  it('strips trailing slashes from legacy AI_GATEWAY_BASE_URL', async () => {
-    const env = createMockEnv({
-      AI_GATEWAY_API_KEY: 'sk-gateway-key',
-      AI_GATEWAY_BASE_URL: 'https://gateway.ai.cloudflare.com/v1/123/my-gw/anthropic///',
-    });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.AI_GATEWAY_BASE_URL).toBe(
-      'https://gateway.ai.cloudflare.com/v1/123/my-gw/anthropic'
-    );
-  });
-
-  it('falls back to ANTHROPIC_BASE_URL when no AI_GATEWAY_BASE_URL', async () => {
-    const env = createMockEnv({
-      ANTHROPIC_API_KEY: 'direct-key',
-      ANTHROPIC_BASE_URL: 'https://api.anthropic.com',
-    });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.ANTHROPIC_API_KEY).toBe('direct-key');
-    expect(result.ANTHROPIC_BASE_URL).toBe('https://api.anthropic.com');
-  });
-
   it('maps DEV_MODE to OPENCLAW_DEV_MODE for container', async () => {
     const env = createMockEnv({ DEV_MODE: 'true' });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
     expect(result.OPENCLAW_DEV_MODE).toBe('true');
   });
 
-  it('passes CF_AI_GATEWAY_MODEL to container', async () => {
+  it('passes KILOCODE_API_BASE_URL override to container', async () => {
     const env = createMockEnv({
-      CF_AI_GATEWAY_MODEL: 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      KILOCODE_API_BASE_URL: 'https://example.internal/openrouter/',
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.CF_AI_GATEWAY_MODEL).toBe('workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+    expect(result.KILOCODE_API_BASE_URL).toBe('https://example.internal/openrouter/');
   });
 
   it('does not pass worker-level channel tokens (user config only)', async () => {
@@ -148,28 +91,30 @@ describe('buildEnvVars', () => {
   // ─── User config merging (Layers 2-4) ────────────────────────────────
 
   it('merges user plaintext env vars on top of platform defaults', async () => {
-    const env = createMockEnv({ ANTHROPIC_API_KEY: 'sk-platform' });
+    const env = createMockEnv({ DEV_MODE: 'true' });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
       envVars: { CUSTOM_VAR: 'custom-value', NODE_ENV: 'production' },
     });
 
-    expect(result.ANTHROPIC_API_KEY).toBe('sk-platform');
+    expect(result.OPENCLAW_DEV_MODE).toBe('true');
     expect(result.CUSTOM_VAR).toBe('custom-value');
     expect(result.NODE_ENV).toBe('production');
   });
 
-  it('user env vars can override platform AI keys (BYOK)', async () => {
-    const env = createMockEnv({ ANTHROPIC_API_KEY: 'sk-platform' });
+  it('passes KiloCode overrides from user config', async () => {
+    const env = createMockEnv({ AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
-      envVars: { ANTHROPIC_API_KEY: 'sk-user-own-key' },
+      kilocodeApiKey: 'kc-user-key',
+      kilocodeDefaultModel: 'kilocode/anthropic/claude-opus-4.5',
+      kilocodeModels: [{ id: 'anthropic/claude-opus-4.5', name: 'Anthropic: Claude Opus 4.5' }],
     });
 
-    expect(result.ANTHROPIC_API_KEY).toBe('sk-user-own-key');
+    expect(result.KILOCODE_API_KEY).toBe('kc-user-key');
+    expect(result.KILOCODE_DEFAULT_MODEL).toBe('kilocode/anthropic/claude-opus-4.5');
   });
 
   it('decrypts and merges encrypted secrets', async () => {
     const env = createMockEnv({
-      ANTHROPIC_API_KEY: 'sk-platform',
       AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
@@ -179,7 +124,6 @@ describe('buildEnvVars', () => {
     });
 
     expect(result.SECRET_API_KEY).toBe('decrypted-secret');
-    expect(result.ANTHROPIC_API_KEY).toBe('sk-platform');
   });
 
   it('encrypted secrets override plaintext env vars on key conflict', async () => {
@@ -245,7 +189,6 @@ describe('buildEnvVars', () => {
 
   it('works with userConfig containing only channels (no envVars/secrets)', async () => {
     const env = createMockEnv({
-      ANTHROPIC_API_KEY: 'sk-platform',
       AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
@@ -254,16 +197,14 @@ describe('buildEnvVars', () => {
       },
     });
 
-    expect(result.ANTHROPIC_API_KEY).toBe('sk-platform');
     expect(result.TELEGRAM_BOT_TOKEN).toBe('tg-only');
     expect(result.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
   it('handles empty userConfig gracefully', async () => {
-    const env = createMockEnv({ ANTHROPIC_API_KEY: 'sk-key' });
+    const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {});
 
-    expect(result.ANTHROPIC_API_KEY).toBe('sk-key');
     expect(result.AUTO_APPROVE_DEVICES).toBe('true');
   });
 });

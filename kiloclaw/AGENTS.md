@@ -13,7 +13,8 @@ These are non-negotiable. Do not reintroduce shared/fallback paths.
 - **R2 is always per-user.** `mountR2Storage` requires a `userId` and always mounts with a per-user prefix (`/users/{sha256(userId)}`). There is no unprefixed/root mount path.
 - **`buildEnvVars` requires `sandboxId` and `gatewayTokenSecret`.** Gateway token and `AUTO_APPROVE_DEVICES` are always set. No fallback to worker-level channel tokens.
 - **`ensureOpenClawGateway` requires pre-built env vars.** Callers build env vars via `buildEnvVars`, mount R2, then call `ensureOpenClawGateway`. The function does not build env vars itself.
-- **Postgres is a registry, not operational state.** The DB stores `(user_id, sandbox_id, created_at, destroyed_at)`. Status, timestamps, and config live in the DO. No `mirrorStatusToDb`.
+- **Next.js is the sole Postgres writer.** The worker only reads via Hyperdrive (pepper validation + DO restore). The DB stores registry data (`user_id`, `sandbox_id`, `created_at`, `destroyed_at`) plus config backup (`channels` JSONB, `vars` JSONB). Operational state (status, timestamps) lives in the DO only.
+- **DO restore from Postgres.** If DO SQLite is wiped, `start(userId)` reads the active instance row from Postgres and repopulates the DO state. This is the backup path for development mistakes that corrupt DO storage.
 
 ## Architecture Map
 
@@ -110,14 +111,13 @@ OpenClaw configuration is built at container startup by `start-openclaw.sh`:
 3. The startup script patches the config for channels, gateway auth, and trusted proxies
 4. Gateway starts with `openclaw gateway --allow-unconfigured --bind lan`
 
-### AI Provider Priority
+### AI Provider Selection
 
-The startup script selects the provider based on which env vars are set:
+KiloClaw is KiloCode-only:
 
-1. **Cloudflare AI Gateway** (native): `CLOUDFLARE_AI_GATEWAY_API_KEY` + `CF_AI_GATEWAY_ACCOUNT_ID` + `CF_AI_GATEWAY_GATEWAY_ID`
-2. **Direct Anthropic**: `ANTHROPIC_API_KEY` (optionally with `ANTHROPIC_BASE_URL`)
-3. **Direct OpenAI**: `OPENAI_API_KEY`
-4. **Legacy AI Gateway**: `AI_GATEWAY_API_KEY` + `AI_GATEWAY_BASE_URL`
+1. `KILOCODE_API_KEY` is required at startup.
+2. `start-openclaw.sh` patches `config.models.providers.kilocode`.
+3. `agents.defaults.model.primary` is set from `KILOCODE_DEFAULT_MODEL` (or fallback default).
 
 ## OpenClaw Config Schema
 

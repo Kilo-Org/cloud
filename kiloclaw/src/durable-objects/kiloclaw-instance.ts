@@ -3,13 +3,13 @@
  *
  * Primary source of truth for instance configuration and operational state.
  * API routes are thin wrappers that call into this DO via Workers RPC.
- * The DB (kiloclaw_instances) is a registry for enumeration (create/destroy only).
  *
  * Keyed by userId: env.KILOCLAW_INSTANCE.idFromName(userId)
  *
  * Authority model:
- * - Create/destroy: DB write inside DO, must succeed or operation fails
- * - Operational state (start/stop): DO is authoritative, not mirrored to DB
+ * - Postgres is written by the Next.js backend (sole writer). The worker reads only.
+ * - Postgres is a registry + config backup. Operational state lives here in the DO.
+ * - If DO SQLite is wiped, start() restores config from Postgres via Hyperdrive.
  */
 
 import { DurableObject } from 'cloudflare:workers';
@@ -25,6 +25,8 @@ import {
   PersistedStateSchema,
   type InstanceConfig,
   type PersistedState,
+  type EncryptedEnvelope,
+  type ModelEntry,
 } from '../schemas/instance-config';
 
 // StopParams from @cloudflare/containers -- not re-exported by @cloudflare/sandbox
@@ -35,36 +37,13 @@ type StopParams = {
 
 type InstanceStatus = 'provisioned' | 'running' | 'stopped';
 
-// DO KV storage keys (match PersistedStateSchema field names exactly)
-const KEY_USER_ID = 'userId';
-const KEY_SANDBOX_ID = 'sandboxId';
-const KEY_STATUS = 'status';
-const KEY_ENV_VARS = 'envVars';
-const KEY_ENCRYPTED_SECRETS = 'encryptedSecrets';
-const KEY_CHANNELS = 'channels';
-const KEY_PROVISIONED_AT = 'provisionedAt';
-const KEY_LAST_STARTED_AT = 'lastStartedAt';
-const KEY_LAST_STOPPED_AT = 'lastStoppedAt';
-const KEY_LAST_SYNC_AT = 'lastSyncAt';
-const KEY_SYNC_IN_PROGRESS = 'syncInProgress';
-const KEY_SYNC_LOCKED_AT = 'syncLockedAt';
-const KEY_SYNC_FAIL_COUNT = 'syncFailCount';
+// Derived from PersistedStateSchema — single source of truth for DO KV keys.
+const STORAGE_KEYS = Object.keys(PersistedStateSchema.shape);
 
-const STORAGE_KEYS = [
-  KEY_USER_ID,
-  KEY_SANDBOX_ID,
-  KEY_STATUS,
-  KEY_ENV_VARS,
-  KEY_ENCRYPTED_SECRETS,
-  KEY_CHANNELS,
-  KEY_PROVISIONED_AT,
-  KEY_LAST_STARTED_AT,
-  KEY_LAST_STOPPED_AT,
-  KEY_LAST_SYNC_AT,
-  KEY_SYNC_IN_PROGRESS,
-  KEY_SYNC_LOCKED_AT,
-  KEY_SYNC_FAIL_COUNT,
-];
+/** Type-checked wrapper for ctx.storage.put() — catches key typos and wrong value types at compile time. */
+function storageUpdate(update: Partial<PersistedState>): Partial<PersistedState> {
+  return update;
+}
 
 // Sync timing constants
 const FIRST_SYNC_DELAY_MS = 10 * 60 * 1000; // 10 minutes
@@ -81,6 +60,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private status: InstanceStatus | null = null;
   private envVars: PersistedState['envVars'] = null;
   private encryptedSecrets: PersistedState['encryptedSecrets'] = null;
+  private kilocodeApiKey: PersistedState['kilocodeApiKey'] = null;
+  private kilocodeApiKeyExpiresAt: PersistedState['kilocodeApiKeyExpiresAt'] = null;
+  private kilocodeDefaultModel: PersistedState['kilocodeDefaultModel'] = null;
+  private kilocodeModels: PersistedState['kilocodeModels'] = null;
   private channels: PersistedState['channels'] = null;
   private provisionedAt: number | null = null;
   private lastStartedAt: number | null = null;
@@ -110,6 +93,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.status = s.userId ? s.status : null;
       this.envVars = s.envVars;
       this.encryptedSecrets = s.encryptedSecrets;
+      this.kilocodeApiKey = s.kilocodeApiKey;
+      this.kilocodeApiKeyExpiresAt = s.kilocodeApiKeyExpiresAt;
+      this.kilocodeDefaultModel = s.kilocodeDefaultModel;
+      this.kilocodeModels = s.kilocodeModels;
       this.channels = s.channels;
       this.provisionedAt = s.provisionedAt;
       this.lastStartedAt = s.lastStartedAt;
@@ -129,10 +116,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           console.warn('[DO] Resetting stale syncInProgress lock');
           this.syncInProgress = false;
           this.syncLockedAt = null;
-          await this.ctx.storage.put({
-            [KEY_SYNC_IN_PROGRESS]: false,
-            [KEY_SYNC_LOCKED_AT]: null,
-          });
+          await this.ctx.storage.put(
+            storageUpdate({
+              syncInProgress: false,
+              syncLockedAt: null,
+            })
+          );
         }
       }
     } else {
@@ -155,62 +144,113 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // ─── Lifecycle methods (called by platform API routes via RPC) ──────────
 
   /**
-   * Provision a new instance for a user.
-   * Generates sandboxId, inserts into DB (must succeed), stores config in DO.
+   * Provision or update config for a user's instance.
+   * The Next.js backend has already written the Postgres row before calling this.
+   * This method stores config in DO SQLite. Allows re-provisioning (config update).
    */
   async provision(userId: string, config: InstanceConfig): Promise<{ sandboxId: string }> {
     await this.loadState();
 
-    // Reject if any instance state exists. A stopped instance should be
-    // destroyed before re-provisioning, not silently overwritten.
-    if (this.status) {
-      throw new Error(`Instance already exists with status '${this.status}'`);
-    }
-
     const sandboxId = sandboxIdFromUserId(userId);
-
-    // DB INSERT in transaction -- must succeed
-    const db = createDatabaseConnection(this.env.HYPERDRIVE.connectionString);
-    const store = new InstanceStore(db);
-    await store.begin(async tx => {
-      const txStore = new InstanceStore(tx);
-      await txStore.insertProvisioned(userId, sandboxId);
-    });
+    const isNew = !this.status;
 
     // Store config + identity in DO SQLite
-    await this.ctx.storage.put({
-      [KEY_USER_ID]: userId,
-      [KEY_SANDBOX_ID]: sandboxId,
-      [KEY_STATUS]: 'provisioned' satisfies InstanceStatus,
-      [KEY_ENV_VARS]: config.envVars ?? null,
-      [KEY_ENCRYPTED_SECRETS]: config.encryptedSecrets ?? null,
-      [KEY_CHANNELS]: config.channels ?? null,
-      [KEY_PROVISIONED_AT]: Date.now(),
-      [KEY_LAST_STARTED_AT]: null,
-      [KEY_LAST_STOPPED_AT]: null,
-      [KEY_LAST_SYNC_AT]: null,
-      [KEY_SYNC_IN_PROGRESS]: false,
-      [KEY_SYNC_LOCKED_AT]: null,
-      [KEY_SYNC_FAIL_COUNT]: 0,
-    });
+    const configFields = {
+      userId,
+      sandboxId,
+      status: (this.status ?? 'provisioned') satisfies InstanceStatus,
+      envVars: config.envVars ?? null,
+      encryptedSecrets: config.encryptedSecrets ?? null,
+      kilocodeApiKey: config.kilocodeApiKey ?? null,
+      kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
+      kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
+      kilocodeModels: config.kilocodeModels ?? null,
+      channels: config.channels ?? null,
+    } satisfies Partial<PersistedState>;
+
+    // Only set initial state on first provision, not on config updates
+    const update = isNew
+      ? storageUpdate({
+          ...configFields,
+          provisionedAt: Date.now(),
+          lastStartedAt: null,
+          lastStoppedAt: null,
+          lastSyncAt: null,
+          syncInProgress: false,
+          syncLockedAt: null,
+          syncFailCount: 0,
+        })
+      : storageUpdate(configFields);
+
+    await this.ctx.storage.put(update);
 
     // Update cached state
     this.userId = userId;
     this.sandboxId = sandboxId;
-    this.status = 'provisioned';
+    this.status = this.status ?? 'provisioned';
     this.envVars = config.envVars ?? null;
     this.encryptedSecrets = config.encryptedSecrets ?? null;
+    this.kilocodeApiKey = config.kilocodeApiKey ?? null;
+    this.kilocodeApiKeyExpiresAt = config.kilocodeApiKeyExpiresAt ?? null;
+    this.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
+    this.kilocodeModels = config.kilocodeModels ?? null;
     this.channels = config.channels ?? null;
-    this.provisionedAt = Date.now();
-    this.lastStartedAt = null;
-    this.lastStoppedAt = null;
-    this.lastSyncAt = null;
-    this.syncInProgress = false;
-    this.syncLockedAt = null;
-    this.syncFailCount = 0;
+    if (isNew) {
+      this.provisionedAt = Date.now();
+      this.lastStartedAt = null;
+      this.lastStoppedAt = null;
+      this.lastSyncAt = null;
+      this.syncInProgress = false;
+      this.syncLockedAt = null;
+      this.syncFailCount = 0;
+    }
     this.loaded = true;
 
     return { sandboxId };
+  }
+
+  async updateKiloCodeConfig(patch: {
+    kilocodeApiKey?: string | null;
+    kilocodeApiKeyExpiresAt?: string | null;
+    kilocodeDefaultModel?: string | null;
+    kilocodeModels?: ModelEntry[] | null;
+  }): Promise<{
+    kilocodeApiKey: string | null;
+    kilocodeApiKeyExpiresAt: string | null;
+    kilocodeDefaultModel: string | null;
+    kilocodeModels: ModelEntry[] | null;
+  }> {
+    await this.loadState();
+
+    const pending: Partial<PersistedState> = {};
+
+    if (patch.kilocodeApiKey !== undefined) {
+      this.kilocodeApiKey = patch.kilocodeApiKey;
+      pending.kilocodeApiKey = this.kilocodeApiKey;
+    }
+    if (patch.kilocodeApiKeyExpiresAt !== undefined) {
+      this.kilocodeApiKeyExpiresAt = patch.kilocodeApiKeyExpiresAt;
+      pending.kilocodeApiKeyExpiresAt = this.kilocodeApiKeyExpiresAt;
+    }
+    if (patch.kilocodeDefaultModel !== undefined) {
+      this.kilocodeDefaultModel = patch.kilocodeDefaultModel;
+      pending.kilocodeDefaultModel = this.kilocodeDefaultModel;
+    }
+    if (patch.kilocodeModels !== undefined) {
+      this.kilocodeModels = patch.kilocodeModels;
+      pending.kilocodeModels = this.kilocodeModels;
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
+    }
+
+    return {
+      kilocodeApiKey: this.kilocodeApiKey,
+      kilocodeApiKeyExpiresAt: this.kilocodeApiKeyExpiresAt,
+      kilocodeDefaultModel: this.kilocodeDefaultModel,
+      kilocodeModels: this.kilocodeModels,
+    };
   }
 
   /**
@@ -220,9 +260,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * actually alive. If it crashed (race with handleContainerStopped), falls
    * through to a full restart. This allows the catch-all proxy to call
    * start() for crash recovery without needing to know the precise state.
+   *
+   * @param userId - Optional userId hint for restore-from-Postgres if DO SQLite was wiped.
    */
-  async start(): Promise<void> {
+  async start(userId?: string): Promise<void> {
     await this.loadState();
+
+    // If DO SQLite was wiped, attempt restore from Postgres backup
+    if (!this.userId || !this.sandboxId) {
+      const restoreUserId = userId ?? this.userId;
+      if (restoreUserId) {
+        await this.restoreFromPostgres(restoreUserId);
+      }
+    }
 
     if (!this.userId || !this.sandboxId) {
       throw new Error('Instance not provisioned');
@@ -246,17 +296,20 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await mountR2Storage(sandbox, this.env, this.userId);
 
     const envVars = await this.buildUserEnvVars();
+    await this.writeKiloCodeModelsFile();
     await ensureOpenClawGateway(sandbox, this.env, envVars);
 
     // Update state
     this.status = 'running';
     this.lastStartedAt = Date.now();
     this.syncFailCount = 0;
-    await this.ctx.storage.put({
-      [KEY_STATUS]: 'running' satisfies InstanceStatus,
-      [KEY_LAST_STARTED_AT]: this.lastStartedAt,
-      [KEY_SYNC_FAIL_COUNT]: 0,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        status: 'running',
+        lastStartedAt: this.lastStartedAt,
+        syncFailCount: 0,
+      })
+    );
 
     // Schedule first sync alarm (+10 minutes -- setup may take a while)
     await this.ctx.storage.setAlarm(Date.now() + FIRST_SYNC_DELAY_MS);
@@ -278,30 +331,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const sandbox = this.resolveSandbox();
 
-    // Kill gateway process if running
-    const existingProcess = await findExistingGatewayProcess(sandbox);
-    if (existingProcess) {
-      try {
-        await existingProcess.kill();
-      } catch (err) {
-        console.error('[DO] Error killing gateway process:', err);
-      }
-    }
+    // Kill gateway process tree (pkill to catch child processes)
+    await this.killGatewayProcesses(sandbox);
 
     // Update state
     this.status = 'stopped';
     this.lastStoppedAt = Date.now();
-    await this.ctx.storage.put({
-      [KEY_STATUS]: 'stopped' satisfies InstanceStatus,
-      [KEY_LAST_STOPPED_AT]: this.lastStoppedAt,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        status: 'stopped',
+        lastStoppedAt: this.lastStoppedAt,
+      })
+    );
 
     // Clear sync alarm
     await this.ctx.storage.deleteAlarm();
   }
 
   /**
-   * Destroy the instance. DB soft-delete first (must succeed), then teardown.
+   * Destroy the instance. Tears down sandbox + clears DO state.
+   * The Next.js backend has already soft-deleted the Postgres row before calling this.
    */
   async destroy(deleteData?: boolean): Promise<void> {
     await this.loadState();
@@ -310,26 +359,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Instance not provisioned');
     }
 
-    // DB soft-delete FIRST -- must succeed and affect a row
-    const db = createDatabaseConnection(this.env.HYPERDRIVE.connectionString);
-    const store = new InstanceStore(db);
-    const destroyed = await store.markDestroyed(this.userId);
-    if (!destroyed) {
-      throw new Error('No active instance found in DB for this user');
-    }
-
-    // Teardown (best-effort after DB write)
+    // Teardown sandbox + gateway process
     if (this.sandboxId) {
       try {
         const sandbox = this.resolveSandbox();
-        const existingProcess = await findExistingGatewayProcess(sandbox);
-        if (existingProcess) {
-          try {
-            await existingProcess.kill();
-          } catch {
-            // best-effort
-          }
-        }
+        await this.killGatewayProcesses(sandbox);
         await sandbox.destroy();
       } catch (err) {
         console.error('[DO] Sandbox teardown error:', err);
@@ -383,10 +417,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Update state
     this.status = 'stopped';
     this.lastStoppedAt = Date.now();
-    await this.ctx.storage.put({
-      [KEY_STATUS]: 'stopped' satisfies InstanceStatus,
-      [KEY_LAST_STOPPED_AT]: this.lastStoppedAt,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        status: 'stopped',
+        lastStoppedAt: this.lastStoppedAt,
+      })
+    );
 
     // Clear sync alarm
     await this.ctx.storage.deleteAlarm();
@@ -430,6 +466,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return {
       envVars: this.envVars ?? undefined,
       encryptedSecrets: this.encryptedSecrets ?? undefined,
+      kilocodeApiKey: this.kilocodeApiKey ?? undefined,
+      kilocodeApiKeyExpiresAt: this.kilocodeApiKeyExpiresAt ?? undefined,
+      kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
+      kilocodeModels: this.kilocodeModels ?? undefined,
       channels: this.channels ?? undefined,
     };
   }
@@ -467,23 +507,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const sandbox = this.resolveSandbox();
 
-    // Kill existing gateway
-    let previousProcessId: string | undefined;
+    // Kill existing gateway process tree
     const existingProcess = await findExistingGatewayProcess(sandbox);
-    if (existingProcess) {
-      previousProcessId = existingProcess.id;
-      console.log('[DO] Killing gateway process:', existingProcess.id);
-      try {
-        await existingProcess.kill();
-      } catch (err) {
-        console.error('[DO] Error killing gateway:', err);
-      }
-      await new Promise(r => setTimeout(r, 2000));
-    }
+    const previousProcessId = existingProcess?.id;
+    await this.killGatewayProcesses(sandbox);
+    // Brief wait for processes to fully terminate
+    await new Promise(r => setTimeout(r, 2000));
 
     // Rebuild env vars and start new gateway
     try {
       const envVars = await this.buildUserEnvVars();
+      await this.writeKiloCodeModelsFile();
       await ensureOpenClawGateway(sandbox, this.env, envVars);
       return {
         success: true,
@@ -538,7 +572,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // Not healthy (or getState threw)
     this.syncFailCount++;
-    await this.ctx.storage.put(KEY_SYNC_FAIL_COUNT, this.syncFailCount);
+    await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
 
     if (this.syncFailCount >= SELF_HEAL_THRESHOLD) {
       console.warn(
@@ -546,11 +580,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       );
       this.status = 'stopped';
       this.lastStoppedAt = Date.now();
-      await this.ctx.storage.put({
-        [KEY_STATUS]: 'stopped' satisfies InstanceStatus,
-        [KEY_LAST_STOPPED_AT]: this.lastStoppedAt,
-        [KEY_SYNC_FAIL_COUNT]: this.syncFailCount,
-      });
+      await this.ctx.storage.put(
+        storageUpdate({
+          status: 'stopped',
+          lastStoppedAt: this.lastStoppedAt,
+          syncFailCount: this.syncFailCount,
+        })
+      );
       return 'self-healed';
     }
 
@@ -567,10 +603,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     this.syncInProgress = true;
     this.syncLockedAt = Date.now();
-    await this.ctx.storage.put({
-      [KEY_SYNC_IN_PROGRESS]: true,
-      [KEY_SYNC_LOCKED_AT]: this.syncLockedAt,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        syncInProgress: true,
+        syncLockedAt: this.syncLockedAt,
+      })
+    );
 
     try {
       const gatewayProcess = await findExistingGatewayProcess(sandbox);
@@ -578,10 +616,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         console.log(`[sync] Gateway not running for ${this.userId}, skipping`);
         this.syncInProgress = false;
         this.syncLockedAt = null;
-        await this.ctx.storage.put({
-          [KEY_SYNC_IN_PROGRESS]: false,
-          [KEY_SYNC_LOCKED_AT]: null,
-        });
+        await this.ctx.storage.put(
+          storageUpdate({
+            syncInProgress: false,
+            syncLockedAt: null,
+          })
+        );
         await this.scheduleSync();
         return;
       }
@@ -590,27 +630,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (result.success) {
         this.lastSyncAt = Date.now();
         this.syncFailCount = 0;
-        await this.ctx.storage.put({
-          [KEY_LAST_SYNC_AT]: this.lastSyncAt,
-          [KEY_SYNC_FAIL_COUNT]: 0,
-        });
+        await this.ctx.storage.put(
+          storageUpdate({
+            lastSyncAt: this.lastSyncAt,
+            syncFailCount: 0,
+          })
+        );
       } else {
         console.error(`[sync] Failed for ${this.userId}:`, result.error);
         this.syncFailCount++;
-        await this.ctx.storage.put(KEY_SYNC_FAIL_COUNT, this.syncFailCount);
+        await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
       }
     } catch (err) {
       console.error(`[sync] Error for ${this.userId}:`, err);
       this.syncFailCount++;
-      await this.ctx.storage.put(KEY_SYNC_FAIL_COUNT, this.syncFailCount);
+      await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
     }
 
     this.syncInProgress = false;
     this.syncLockedAt = null;
-    await this.ctx.storage.put({
-      [KEY_SYNC_IN_PROGRESS]: false,
-      [KEY_SYNC_LOCKED_AT]: null,
-    });
+    await this.ctx.storage.put(
+      storageUpdate({
+        syncInProgress: false,
+        syncLockedAt: null,
+      })
+    );
 
     if (this.syncFailCount > 0) {
       await this.rescheduleWithBackoff();
@@ -622,6 +666,98 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // ─── Private helpers ──────────────────────────────────────────────────
 
   /**
+   * Kill the gateway process and all its children.
+   * Uses pkill -f instead of Process.kill() because start-openclaw.sh
+   * spawns child processes (the actual openclaw gateway) that survive
+   * if only the parent shell PID is killed.
+   */
+  private async killGatewayProcesses(sandbox: Sandbox): Promise<void> {
+    try {
+      // Kill anything matching start-openclaw or openclaw gateway
+      const proc = await sandbox.startProcess("pkill -f 'start-openclaw|openclaw'");
+      // Wait briefly for pkill to complete
+      let attempts = 0;
+      while (proc.status === 'running' && attempts < 10) {
+        await new Promise(r => setTimeout(r, 200));
+        attempts++;
+      }
+      console.log('[DO] pkill completed, status:', proc.status, 'exitCode:', proc.exitCode);
+    } catch (err) {
+      console.error('[DO] pkill failed:', err);
+    }
+  }
+
+  /**
+   * Restore DO state from Postgres backup if SQLite was wiped.
+   * The Next.js backend is the sole writer to Postgres, so this data
+   * is the authoritative backup of the instance config.
+   */
+  private async restoreFromPostgres(userId: string): Promise<void> {
+    const connectionString = this.env.HYPERDRIVE?.connectionString;
+    if (!connectionString) {
+      console.warn('[DO] HYPERDRIVE not configured, cannot restore from Postgres');
+      return;
+    }
+
+    try {
+      const db = createDatabaseConnection(connectionString);
+      const store = new InstanceStore(db);
+      const instance = await store.getActiveInstance(userId);
+
+      if (!instance) {
+        console.warn('[DO] No active instance found in Postgres for', userId);
+        return;
+      }
+
+      console.log('[DO] Restoring state from Postgres backup for', userId);
+
+      // Config values are not persisted in Postgres.
+      const envVars: Record<string, string> | null = null;
+      const encryptedSecrets: Record<string, EncryptedEnvelope> | null = null;
+      const channels = null;
+
+      // Write restored state to DO SQLite
+      await this.ctx.storage.put(
+        storageUpdate({
+          userId,
+          sandboxId: instance.sandboxId,
+          status: 'provisioned',
+          envVars,
+          encryptedSecrets,
+          channels,
+          provisionedAt: Date.now(),
+          lastStartedAt: null,
+          lastStoppedAt: null,
+          lastSyncAt: null,
+          syncInProgress: false,
+          syncLockedAt: null,
+          syncFailCount: 0,
+        })
+      );
+
+      // Update cached state
+      this.userId = userId;
+      this.sandboxId = instance.sandboxId;
+      this.status = 'provisioned';
+      this.envVars = envVars;
+      this.encryptedSecrets = encryptedSecrets;
+      this.channels = channels;
+      this.provisionedAt = Date.now();
+      this.lastStartedAt = null;
+      this.lastStoppedAt = null;
+      this.lastSyncAt = null;
+      this.syncInProgress = false;
+      this.syncLockedAt = null;
+      this.syncFailCount = 0;
+      this.loaded = true;
+
+      console.log('[DO] Restored from Postgres: sandboxId =', instance.sandboxId);
+    } catch (err) {
+      console.error('[DO] Postgres restore failed:', err);
+    }
+  }
+
+  /**
    * Build env vars from stored user config. Used by start() and restartGateway().
    */
   private async buildUserEnvVars(): Promise<Record<string, string>> {
@@ -631,8 +767,24 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET, {
       envVars: this.envVars ?? undefined,
       encryptedSecrets: this.encryptedSecrets ?? undefined,
+      kilocodeApiKey: this.kilocodeApiKey ?? undefined,
+      kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
       channels: this.channels ?? undefined,
     });
+  }
+
+  private async writeKiloCodeModelsFile(): Promise<void> {
+    if (!this.sandboxId) return;
+    const sandbox = this.resolveSandbox();
+    const content = JSON.stringify(this.kilocodeModels ?? []);
+    const escaped = content.replace(/'/g, "'\\''");
+    const command = `printf '%s' '${escaped}' > /root/.openclaw/kilocode-models.json`;
+    const result = await sandbox.exec(command, { timeout: 1000 });
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Failed to write KiloCode models file (exit ${result.exitCode}): ${result.stderr}`
+      );
+    }
   }
 
   private resolveSandbox() {

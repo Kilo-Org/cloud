@@ -10,6 +10,8 @@ export type GitHubOIDCTokenPayload = {
   repository: string;
   repository_owner: string;
   repository_owner_id: string;
+  repository_id: string;
+  repository_visibility: string;
   run_id: string;
   run_number: string;
   run_attempt: string;

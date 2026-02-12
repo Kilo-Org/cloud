@@ -27,13 +27,19 @@ export async function POST(request: NextRequest) {
 
     const octokit = new Octokit({ auth: pat });
 
+    let repoData;
     try {
-      await octokit.rest.repos.get({ owner, repo });
+      const response = await octokit.rest.repos.get({ owner, repo });
+      repoData = response.data;
     } catch (error) {
       console.error('PAT validation failed:', error);
+      return NextResponse.json({ error: 'Invalid PAT or no access to repository' }, { status: 401 });
+    }
+
+    if (!repoData.permissions?.push && !repoData.permissions?.admin) {
       return NextResponse.json(
-        { error: 'Invalid PAT or no access to repository' },
-        { status: 401 }
+        { error: 'PAT owner does not have write access to repository' },
+        { status: 403 }
       );
     }
 
@@ -46,9 +52,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('PAT token exchange', {
+      owner,
+      repo,
+      installationId: integration.platform_installation_id,
+    });
+
     const { token } = await generateGitHubInstallationToken(
       integration.platform_installation_id,
-      integration.github_app_type || 'standard'
+      integration.github_app_type || 'standard',
+      [`${owner}/${repo}`]
     );
 
     return NextResponse.json({ token });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyGitHubOIDCToken } from '@/lib/integrations/platforms/github/oidc';
 import { findGitHubIntegrationByAccountLogin } from '@/lib/integrations/db/platform-integrations';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
+import type { PlatformRepository } from '@/lib/integrations/core/types';
 import * as Sentry from '@sentry/nextjs';
 
 export async function POST(request: NextRequest) {
@@ -16,6 +17,8 @@ export async function POST(request: NextRequest) {
     const payload = await verifyGitHubOIDCToken(oidcToken, 'kilo-github-action');
 
     const repositoryOwner = payload.repository_owner;
+    const repositoryOwnerId = payload.repository_owner_id;
+    const repository = payload.repository;
 
     const integration = await findGitHubIntegrationByAccountLogin(repositoryOwner);
 
@@ -26,9 +29,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (integration.platform_account_id && integration.platform_account_id !== repositoryOwnerId) {
+      Sentry.captureMessage('OIDC token owner ID mismatch', {
+        level: 'warning',
+        extra: {
+          repositoryOwner,
+          repositoryOwnerId,
+          integrationAccountId: integration.platform_account_id,
+        },
+      });
+      return NextResponse.json({ error: 'Installation owner mismatch' }, { status: 403 });
+    }
+
+    if (
+      integration.repository_access === 'selected' &&
+      integration.repositories &&
+      Array.isArray(integration.repositories)
+    ) {
+      const repos = integration.repositories as PlatformRepository[];
+      const hasAccess = repos.some((r) => r.full_name === repository);
+      if (!hasAccess) {
+        return NextResponse.json(
+          { error: 'Repository not in installation scope' },
+          { status: 403 }
+        );
+      }
+    }
+
+    console.log('OIDC token exchange', {
+      repository,
+      repositoryOwner,
+      repositoryOwnerId,
+      installationId: integration.platform_installation_id,
+    });
+
     const { token } = await generateGitHubInstallationToken(
       integration.platform_installation_id,
-      integration.github_app_type || 'standard'
+      integration.github_app_type || 'standard',
+      [repository]
     );
 
     return NextResponse.json({ token });

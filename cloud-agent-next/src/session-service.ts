@@ -397,6 +397,7 @@ export class SessionService {
     gitToken?: string;
     upstreamBranch?: string;
     botId?: string;
+    platform?: 'github' | 'gitlab';
   }): SessionContext {
     const sessionHome = options.sessionHome ?? getSessionHomePath(options.sessionId);
     const workspacePath =
@@ -417,6 +418,9 @@ export class SessionService {
       botId: options.botId,
       githubRepo: options.githubRepo,
       githubToken: options.githubToken,
+      gitUrl: options.gitUrl,
+      gitToken: options.gitToken,
+      platform: options.platform,
     };
   }
 
@@ -432,7 +436,10 @@ export class SessionService {
     githubRepo?: string,
     encryptedSecrets?: EncryptedSecrets,
     createdOnPlatform?: string,
-    appendSystemPrompt?: string
+    appendSystemPrompt?: string,
+    gitUrl?: string,
+    gitToken?: string,
+    platform?: 'github' | 'gitlab'
   ): Record<string, string> {
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
@@ -512,6 +519,33 @@ export class SessionService {
       envVars.GH_TOKEN = githubToken;
     }
 
+    // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
+    const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
+
+    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
+    if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
+      envVars.GITLAB_TOKEN = gitToken;
+      if (!baseEnvVars.GITLAB_HOST) {
+        if (gitUrl) {
+          try {
+            const url = new URL(gitUrl);
+            envVars.GITLAB_HOST = url.host;
+          } catch {
+            envVars.GITLAB_HOST = 'gitlab.com';
+          }
+        } else {
+          envVars.GITLAB_HOST = 'gitlab.com';
+        }
+      }
+      logger
+        .withFields({
+          gitUrl,
+          gitlabHost: envVars.GITLAB_HOST,
+          gitTokenLength: gitToken.length,
+        })
+        .info('[GITLAB] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
+    }
+
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)
     if (kilocodeOrganizationId) {
       envVars.KILOCODE_ORGANIZATION_ID = kilocodeOrganizationId;
@@ -560,7 +594,10 @@ export class SessionService {
       context.githubRepo,
       encryptedSecrets,
       createdOnPlatform,
-      appendSystemPrompt
+      appendSystemPrompt,
+      context.gitUrl,
+      context.gitToken,
+      context.platform
     );
 
     const session = await sandbox.createSession({
@@ -644,6 +681,7 @@ export class SessionService {
       gitToken,
       upstreamBranch,
       botId,
+      platform: options.platform,
     });
 
     // Inject env vars into context for session creation
@@ -951,6 +989,7 @@ export class SessionService {
       // For legacy CLI resumes, let the CLI manage its own branch state (undefined)
       upstreamBranch: isPreparedSession ? existingMetadata?.upstreamBranch : undefined,
       botId,
+      platform: existingMetadata?.platform,
     });
 
     if (envVars) {
@@ -1160,6 +1199,7 @@ export class SessionService {
       githubToken: metadata?.githubToken,
       gitUrl: metadata?.gitUrl,
       gitToken: metadata?.gitToken,
+      platform: metadata?.platform,
     });
 
     // Inject env vars from metadata into context (before creating session)
@@ -1527,7 +1567,7 @@ export class SessionService {
     },
     existing?: CloudAgentSessionState
   ): Promise<void> {
-    const { orgId, userId, sessionId, botId } = context;
+    const { orgId, userId, sessionId, botId, platform } = context;
     const doKey = `${userId}:${sessionId}`;
 
     // Build metadata, preserving prepared session fields from existing if provided
@@ -1540,6 +1580,7 @@ export class SessionService {
       orgId,
       userId,
       botId,
+      platform,
       timestamp: Date.now(),
       // Apply the new data (may override some existing fields, which is intentional)
       githubRepo: data.githubRepo,
@@ -1832,6 +1873,8 @@ export interface InitiateOptions {
    * Useful for fire-and-forget scenarios like code reviews where full history isn't needed.
    */
   shallow?: boolean;
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
 }
 
 export interface ResumeOptions {

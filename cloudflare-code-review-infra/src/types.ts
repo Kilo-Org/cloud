@@ -20,13 +20,19 @@ export interface MCPServerConfig {
 }
 
 export interface SessionInput {
-  githubRepo: string;
+  /** GitHub repo in format "owner/repo" (for GitHub platform) */
+  githubRepo?: string;
+  /** Full git URL for cloning (for GitLab and other platforms) */
+  gitUrl?: string;
   kilocodeOrganizationId?: string;
   prompt: string;
   mode: 'code';
   model: string;
   upstreamBranch: string;
+  /** GitHub installation token (for GitHub platform) */
   githubToken?: string;
+  /** Generic git token for authentication (for GitLab and other platforms) */
+  gitToken?: string;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, MCPServerConfig>;
 }

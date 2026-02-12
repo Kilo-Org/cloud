@@ -97,31 +97,49 @@ describe('extractRepoFromGitUrl', () => {
 });
 
 describe('buildPrepareSessionRepoParams', () => {
-  it('uses gitlabProject when gitUrl is GitLab', () => {
+  it('uses gitlabProject when platform is gitlab', () => {
     expect(
       buildPrepareSessionRepoParams({
         repo: 'group/project',
-        gitUrl: 'https://gitlab.com/group/project.git',
+        platform: 'gitlab',
       })
     ).toEqual({ gitlabProject: 'group/project' });
   });
 
-  it('uses githubRepo when gitUrl is GitHub', () => {
+  it('uses githubRepo when platform is github', () => {
     expect(
       buildPrepareSessionRepoParams({
         repo: 'owner/repo',
-        gitUrl: 'https://github.com/owner/repo.git',
+        platform: 'github',
       })
     ).toEqual({ githubRepo: 'owner/repo' });
   });
 
-  it('defaults to githubRepo when gitUrl is missing', () => {
-    expect(buildPrepareSessionRepoParams({ repo: 'owner/repo' })).toEqual({
-      githubRepo: 'owner/repo',
-    });
+  it('returns null when repo is empty', () => {
+    expect(buildPrepareSessionRepoParams({ repo: '  ', platform: 'github' })).toBeNull();
   });
 
-  it('returns null when repo is empty', () => {
-    expect(buildPrepareSessionRepoParams({ repo: '  ' })).toBeNull();
+  it('returns null when repo is null', () => {
+    expect(buildPrepareSessionRepoParams({ repo: null, platform: 'github' })).toBeNull();
+  });
+
+  it('handles self-hosted GitLab via explicit platform (no gitlab in URL needed)', () => {
+    // This is the key fix: self-hosted GitLab instances with custom domains
+    // (e.g. git.company.com) are correctly handled via explicit platform
+    expect(
+      buildPrepareSessionRepoParams({
+        repo: 'team/project',
+        platform: 'gitlab',
+      })
+    ).toEqual({ gitlabProject: 'team/project' });
+  });
+
+  it('handles nested GitLab group/subgroup via explicit platform', () => {
+    expect(
+      buildPrepareSessionRepoParams({
+        repo: 'group/subgroup/project',
+        platform: 'gitlab',
+      })
+    ).toEqual({ gitlabProject: 'group/subgroup/project' });
   });
 });

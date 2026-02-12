@@ -15,7 +15,7 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
 	&& apt install gh -y
 
 # Install GitLab CLI (glab) - download official .deb from GitLab releases
-RUN GLAB_VERSION="1.80.4" \
+RUN GLAB_VERSION="1.82.0" \
 	&& wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb

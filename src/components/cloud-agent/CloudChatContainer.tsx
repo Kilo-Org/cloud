@@ -745,7 +745,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         if (needsLegacyPrepare && effectiveSessionId && currentDbSessionId) {
           const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
-          const repoParams = buildPrepareSessionRepoParams({ repo: resumeRepo, gitUrl });
+          const repoParams = buildPrepareSessionRepoParams({
+            repo: resumeRepo,
+            platform: gitUrl ? 'gitlab' : 'github',
+          });
           if (!repoParams) {
             setError('Cannot prepare session without a repository.');
             toast.error('Cannot prepare session without a repository.');
@@ -793,7 +796,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         if (!effectiveSessionId) {
           const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
-          const repoParams = buildPrepareSessionRepoParams({ repo: resumeRepo, gitUrl });
+          const repoParams = buildPrepareSessionRepoParams({
+            repo: resumeRepo,
+            platform: gitUrl ? 'gitlab' : 'github',
+          });
           if (!repoParams) {
             setError('Cannot prepare session without a repository.');
             toast.error('Cannot prepare session without a repository.');

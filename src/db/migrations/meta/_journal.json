@@ -71,6 +71,13 @@
       "when": 1770891948221,
       "tag": "0009_minor_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1770923605629,
+      "tag": "0010_yellow_eternals",
+      "breakpoints": true
     }
   ]
 }

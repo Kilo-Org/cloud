@@ -35,6 +35,7 @@ import {
 import { db } from '@/lib/drizzle';
 import { cli_sessions_v2 } from '@/db/schema';
 import * as z from 'zod';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 // Extend base schemas with organizationId for organization context
 const PrepareSessionInput = basePrepareSessionNextSchema.and(
@@ -118,6 +119,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           githubRepo?: string;
           gitUrl?: string;
           gitToken?: string;
+          platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
@@ -131,10 +133,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           }
           const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken };
+          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
         } else {
           // GitHub flow: use githubRepo (token will be fetched in cloud-agent-next)
-          gitParams = { githubRepo };
+          gitParams = { githubRepo, platform: PLATFORM.GITHUB };
         }
 
         const result = await client.prepareSession({

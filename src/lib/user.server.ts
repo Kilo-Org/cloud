@@ -23,6 +23,7 @@ import LinkedInProvider from 'next-auth/providers/linkedin';
 import WorkOSProvider from 'next-auth/providers/workos';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
 import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
@@ -126,7 +127,7 @@ function createGitlabAccountInfo(
   account: Account,
   user: NextUser | AdapterUser
 ): CreateOrUpdateUserArgs | null {
-  if (account.provider !== 'gitlab') return null;
+  if (account.provider !== PLATFORM.GITLAB) return null;
   assert(user.email, 'User email is required for GitLab auth');
   assert(user.name, 'User name is required for GitLab auth');
 

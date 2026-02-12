@@ -62,11 +62,13 @@ export const codeReviewRouter = createTRPCRouter({
             offset,
             status: fullInput.status,
             repoFullName: fullInput.repoFullName,
+            platform: fullInput.platform,
           }),
           countCodeReviews({
             owner,
             status: fullInput.status,
             repoFullName: fullInput.repoFullName,
+            platform: fullInput.platform,
           }),
         ]);
 
@@ -107,11 +109,13 @@ export const codeReviewRouter = createTRPCRouter({
             offset,
             status: input.status,
             repoFullName: input.repoFullName,
+            platform: input.platform,
           }),
           countCodeReviews({
             owner,
             status: input.status,
             repoFullName: input.repoFullName,
+            platform: input.platform,
           }),
         ]);
 

@@ -142,6 +142,7 @@ export const MetadataSchema = z.object({
   githubAppType: z.enum(['standard', 'lite']).optional(),
   gitUrl: z.string().optional(),
   gitToken: z.string().optional(),
+  platform: z.enum(['github', 'gitlab']).optional(),
   envVars: z
     .record(z.string().max(256), z.string().max(256))
     .refine(obj => Object.keys(obj).length <= 50, {

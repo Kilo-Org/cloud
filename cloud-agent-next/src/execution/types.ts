@@ -88,6 +88,8 @@ export type InitializeContext = {
   isPreparedSession?: boolean;
   /** GitHub App type for selecting correct credentials and slug */
   githubAppType?: 'standard' | 'lite';
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
 };
 
 // ---------------------------------------------------------------------------
@@ -123,6 +125,8 @@ type InitiateExecutionRequest = BaseExecutionRequest & {
   condenseOnComplete?: boolean;
   upstreamBranch?: string;
   orgId?: string;
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
 };
 
 /**
@@ -241,6 +245,8 @@ export type InitContext = {
   botId?: string;
   /** GitHub app type for determining which app to use */
   githubAppType?: 'lite' | 'standard';
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
 };
 
 /**

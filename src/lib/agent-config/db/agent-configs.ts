@@ -4,7 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import type { Owner } from '@/lib/code-reviews/core';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
-import { warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 
 /**
@@ -238,4 +238,48 @@ export async function setAgentEnabledForOwner(
       updated_at: new Date().toISOString(),
     })
     .where(and(...conditions));
+}
+
+/**
+ * Resets code review agent config for an owner.
+ * Called when the GitLab instance URL changes on reconnection,
+ * to clear stale repository selections from the previous instance.
+ */
+export async function resetCodeReviewConfigForOwner(
+  owner: Pick<Owner, 'type' | 'id'>,
+  platform: string
+): Promise<boolean> {
+  const ownerForQuery = {
+    ...owner,
+    userId: owner.type === 'user' ? owner.id : 'system',
+  };
+
+  const config = await getAgentConfigForOwner(ownerForQuery, 'code_review', platform);
+  if (!config) {
+    return false;
+  }
+
+  const existingConfig = config.config as CodeReviewAgentConfig;
+
+  await upsertAgentConfigForOwner({
+    owner: ownerForQuery,
+    agentType: 'code_review',
+    platform,
+    config: {
+      ...existingConfig,
+      selected_repository_ids: [],
+      manually_added_repositories: [],
+      repository_selection_mode: 'all',
+    },
+    isEnabled: false,
+    createdBy: 'system',
+  });
+
+  logExceptInTest('[resetCodeReviewConfigForOwner] Reset config due to instance URL change', {
+    ownerType: owner.type,
+    ownerId: owner.id,
+    platform,
+  });
+
+  return true;
 }

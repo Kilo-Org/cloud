@@ -40,6 +40,7 @@ import { db } from '@/lib/drizzle';
 import { cliSessions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 /** Minimum balance required to use Cloud Agent (in dollars) */
 const MIN_BALANCE_DOLLARS = 1;
@@ -213,6 +214,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
           githubToken?: string;
           gitUrl?: string;
           gitToken?: string;
+          platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
@@ -226,11 +228,11 @@ export const organizationCloudAgentRouter = createTRPCRouter({
           }
           const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken };
+          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
         } else {
           // GitHub flow: use githubRepo + githubToken
           const githubToken = await getGitHubTokenForOrganization(organizationId);
-          gitParams = { githubRepo, githubToken };
+          gitParams = { githubRepo, githubToken, platform: PLATFORM.GITHUB };
         }
 
         return await client.prepareSession({
@@ -285,6 +287,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
           githubToken?: string;
           gitUrl?: string;
           gitToken?: string;
+          platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
@@ -297,10 +300,10 @@ export const organizationCloudAgentRouter = createTRPCRouter({
           }
           const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken };
+          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
         } else {
           const githubToken = await getGitHubTokenForOrganization(organizationId);
-          gitParams = { githubRepo, githubToken };
+          gitParams = { githubRepo, githubToken, platform: PLATFORM.GITHUB };
         }
 
         return await client.prepareLegacySession({

@@ -325,6 +325,7 @@ export async function deployProject(
     source,
     branch: 'main',
     createdByUserId,
+    createdFrom: 'app-builder',
   });
 
   if (!result.success) {

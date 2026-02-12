@@ -11,10 +11,11 @@ export const revalidate = 60;
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
 export async function GET(
-  _request: NextRequest
+  request: NextRequest
 ): Promise<NextResponse<{ error: string; message: string } | OpenRouterModelsResponse>> {
   try {
-    const data = await getEnhancedOpenRouterModels();
+    const includeSlackbotOnly = request.nextUrl.searchParams.get('includeSlackbotOnly') === 'true';
+    const data = await getEnhancedOpenRouterModels({ includeSlackbotOnly });
     return NextResponse.json(data);
   } catch (error) {
     captureException(error, {

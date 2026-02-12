@@ -106,12 +106,18 @@ async function parseModelsByProviderBackupData() {
   );
 }
 
-export function useModelSelectorList(organizationId: string | undefined) {
+export function useModelSelectorList(
+  organizationId: string | undefined,
+  { includeSlackbotOnly = false }: { includeSlackbotOnly?: boolean } = {}
+) {
   const query = useQuery({
-    queryKey: ['openrouter-models', organizationId],
+    queryKey: ['openrouter-models', organizationId, { includeSlackbotOnly }],
     queryFn: async (): Promise<OpenRouterModelsResponse> => {
+      const modelsUrl = includeSlackbotOnly
+        ? '/api/openrouter/models?includeSlackbotOnly=true'
+        : '/api/openrouter/models';
       const response = await fetch(
-        organizationId ? `/api/organizations/${organizationId}/models` : '/api/openrouter/models'
+        organizationId ? `/api/organizations/${organizationId}/models` : modelsUrl
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);

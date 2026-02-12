@@ -51,14 +51,20 @@ function buildAutoModel(): OpenRouterModel {
   };
 }
 
-function enhancedModelList(models: OpenRouterModel[]) {
+function enhancedModelList(
+  models: OpenRouterModel[],
+  { includeSlackbotOnly = false }: { includeSlackbotOnly?: boolean } = {}
+) {
   const autoModel = buildAutoModel();
+  const freeModelsToInclude = kiloFreeModels.filter(
+    m => m.is_enabled && (includeSlackbotOnly || !m.slackbot_only)
+  );
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
         !kiloFreeModels.some(m => m.public_id === model.id && m.is_enabled)
     )
-    .concat(kiloFreeModels.filter(m => m.is_enabled).map(model => convertFromKiloModel(model)))
+    .concat(freeModelsToInclude.map(model => convertFromKiloModel(model)))
     .concat([autoModel])
     .map((model: OpenRouterModel) => {
       const preferredIndex =
@@ -149,7 +155,9 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
  * Fetch enhanced models from OpenRouter API with filtering and UI enhancements
  * Use this for user-facing model selection where you want filtered, sorted models
  */
-export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsResponse> {
+export async function getEnhancedOpenRouterModels(
+  options: { includeSlackbotOnly?: boolean } = {}
+): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels();
 
   // If data is not in expected format (e.g., validation failed), return as-is
@@ -157,5 +165,5 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
     return rawResponse;
   }
 
-  return { data: enhancedModelList(rawResponse.data) };
+  return { data: enhancedModelList(rawResponse.data, options) };
 }

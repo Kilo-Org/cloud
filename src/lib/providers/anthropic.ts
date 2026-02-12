@@ -1,6 +1,7 @@
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import { normalizeToolCallIds } from '@/lib/tool-calling';
+import { logExceptInTest } from '@/lib/utils.server';
 import type OpenAI from 'openai';
 
 export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.5';
@@ -119,25 +120,25 @@ function setCacheControl(message: OpenAI.ChatCompletionMessageParam) {
 export function addCacheBreakpoints(messages: OpenAI.Chat.ChatCompletionMessageParam[]) {
   const systemPrompt = messages.find(msg => msg.role === 'system');
   if (!systemPrompt) {
-    console.debug(
+    logExceptInTest(
       "[addCacheBreakpoints] no system prompt, assuming this is a simple request that doesn't benefit from caching"
     );
     return;
   }
 
   if (hasCacheControl(systemPrompt)) {
-    console.debug(
+    logExceptInTest(
       '[addCacheBreakpoints] system prompt has cache breakpoint, assuming no work is necessary'
     );
     return;
   }
 
-  console.debug('[addCacheBreakpoints] setting cache breakpoint on system prompt');
+  logExceptInTest('[addCacheBreakpoints] setting cache breakpoint on system prompt');
   setCacheControl(systemPrompt);
 
   const lastUserMessage = messages.findLast(msg => msg.role === 'user' || msg.role === 'tool');
   if (lastUserMessage) {
-    console.debug(
+    logExceptInTest(
       `[addCacheBreakpoints] setting cache breakpoint on last ${lastUserMessage.role} message`
     );
     setCacheControl(lastUserMessage);
@@ -149,7 +150,7 @@ export function addCacheBreakpoints(messages: OpenAI.Chat.ChatCompletionMessageP
       .slice(0, lastAssistantIndex)
       .findLast(msg => msg.role === 'user' || msg.role === 'tool');
     if (previousUserMessage) {
-      console.debug(
+      logExceptInTest(
         `[addCacheBreakpoints] setting cache breakpoint on second-to-last ${previousUserMessage.role} message`
       );
       setCacheControl(previousUserMessage);

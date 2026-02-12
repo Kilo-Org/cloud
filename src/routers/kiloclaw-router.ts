@@ -8,7 +8,7 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
-import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
   ensureActiveInstance,
   markActiveInstanceDestroyed,
@@ -83,6 +83,21 @@ function buildWorkerChannels(channels: z.infer<typeof updateConfigSchema>['chann
   };
 }
 
+type KiloCodeConfigPublicResponse = Pick<
+  KiloCodeConfigResponse,
+  'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel' | 'kilocodeModels'
+>;
+
+function sanitizeKiloCodeConfigResponse(
+  response: KiloCodeConfigResponse
+): KiloCodeConfigPublicResponse {
+  return {
+    kilocodeApiKeyExpiresAt: response.kilocodeApiKeyExpiresAt,
+    kilocodeDefaultModel: response.kilocodeDefaultModel,
+    kilocodeModels: response.kilocodeModels,
+  };
+}
+
 async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateConfigSchema>
@@ -116,7 +131,7 @@ async function provisionInstance(
 async function patchConfig(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateKiloCodeConfigSchema>
-) {
+): Promise<KiloCodeConfigPublicResponse> {
   const client = new KiloClawInternalClient();
   const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
   const kilocodeApiKey = generateApiToken(user, undefined, {
@@ -124,11 +139,13 @@ async function patchConfig(
   });
   const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
-  return client.patchKiloCodeConfig(user.id, {
+  const response = await client.patchKiloCodeConfig(user.id, {
     ...input,
     kilocodeApiKey,
     kilocodeApiKeyExpiresAt,
   });
+
+  return sanitizeKiloCodeConfigResponse(response);
 }
 
 export const kiloclawRouter = createTRPCRouter({

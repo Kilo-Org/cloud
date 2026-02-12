@@ -64,29 +64,8 @@ function getProjectGitUrl(projectId: string): string {
   return `${APP_BUILDER_URL}/apps/${projectId}.git`;
 }
 
-export async function getProjectWithOwnershipCheck(
-  projectId: string,
-  owner: Owner
-): Promise<AppBuilderProject> {
-  const ownerCondition =
-    owner.type === 'org'
-      ? eq(app_builder_projects.owned_by_organization_id, owner.id)
-      : eq(app_builder_projects.owned_by_user_id, owner.id);
-
-  const [project] = await db
-    .select()
-    .from(app_builder_projects)
-    .where(and(eq(app_builder_projects.id, projectId), ownerCondition));
-
-  if (!project) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Project not found',
-    });
-  }
-
-  return project;
-}
+export { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
+import { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
 
 // ============================================================================
 // Exported Functions

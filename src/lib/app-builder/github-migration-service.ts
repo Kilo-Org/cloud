@@ -12,7 +12,7 @@ import {
 } from '@/lib/integrations/platforms/github/adapter';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
-import { getProjectWithOwnershipCheck } from '@/lib/app-builder/app-builder-service';
+import { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
 import type {
   MigrateToGitHubInput,
   MigrateToGitHubResult,

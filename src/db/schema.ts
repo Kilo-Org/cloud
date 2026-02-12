@@ -2199,9 +2199,6 @@ export const app_builder_project_sessions = pgTable(
   },
   table => [
     index('IDX_app_builder_project_sessions_project_id').on(table.project_id),
-    index('IDX_app_builder_project_sessions_cloud_agent_session_id').on(
-      table.cloud_agent_session_id
-    ),
     unique('UQ_app_builder_project_sessions_cloud_agent_session_id').on(
       table.cloud_agent_session_id
     ),

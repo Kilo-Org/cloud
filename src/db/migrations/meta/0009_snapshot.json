@@ -1,5 +1,5 @@
 {
-  "id": "bae9afc1-2bd1-4c57-a5e7-6e3a5476576a",
+  "id": "315cad01-0dfb-4325-bd84-418cb6ad845d",
   "prevId": "460a4eaf-98a5-44ad-b320-4620c0696a92",
   "version": "7",
   "dialect": "postgresql",
@@ -871,21 +871,6 @@
           "columns": [
             {
               "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_app_builder_project_sessions_cloud_agent_session_id": {
-          "name": "IDX_app_builder_project_sessions_cloud_agent_session_id",
-          "columns": [
-            {
-              "expression": "cloud_agent_session_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

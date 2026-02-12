@@ -1,6 +1,6 @@
 import type { BYOKResult } from '@/lib/byok';
 import { getEnvVariable } from '@/lib/dotenvx';
-import { isAnthropicModel } from '@/lib/providers/anthropic';
+import { isAnthropicModel, isOpusModel } from '@/lib/providers/anthropic';
 import { minimax_m21_free_model, minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
 import {
   AutocompleteUserByokProviderIdSchema,
@@ -144,11 +144,7 @@ export function applyVercelSettings(
     requestToMutate.providerOptions = convertProviderOptions(requestToMutate.provider);
   }
 
-  if (
-    isAnthropicModel(requestedModel) &&
-    requestToMutate.providerOptions &&
-    requestToMutate.verbosity
-  ) {
+  if (isOpusModel(requestedModel) && requestToMutate.providerOptions && requestToMutate.verbosity) {
     requestToMutate.providerOptions.anthropic = {
       effort: requestToMutate.verbosity,
     };

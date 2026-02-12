@@ -1,5 +1,5 @@
 {
-  "id": "4fd99cc8-18d6-4d09-badc-05dbdfd0aaf2",
+  "id": "315cad01-0dfb-4325-bd84-418cb6ad845d",
   "prevId": "460a4eaf-98a5-44ad-b320-4620c0696a92",
   "version": "7",
   "dialect": "postgresql",
@@ -822,6 +822,95 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.app_builder_project_sessions": {
+      "name": "app_builder_project_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "IDX_app_builder_project_sessions_project_id": {
+          "name": "IDX_app_builder_project_sessions_project_id",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "app_builder_project_sessions_project_id_app_builder_projects_id_fk": {
+          "name": "app_builder_project_sessions_project_id_app_builder_projects_id_fk",
+          "tableFrom": "app_builder_project_sessions",
+          "tableTo": "app_builder_projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_app_builder_project_sessions_cloud_agent_session_id": {
+          "name": "UQ_app_builder_project_sessions_cloud_agent_session_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "cloud_agent_session_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.app_builder_projects": {
       "name": "app_builder_projects",
       "schema": "",
@@ -883,6 +972,24 @@
         },
         "last_message_at": {
           "name": "last_message_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "git_repo_full_name": {
+          "name": "git_repo_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "git_platform_integration_id": {
+          "name": "git_platform_integration_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "migrated_at": {
+          "name": "migrated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -1012,6 +1119,19 @@
           "tableTo": "deployments",
           "columnsFrom": [
             "deployment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "app_builder_projects_git_platform_integration_id_platform_integrations_id_fk": {
+          "name": "app_builder_projects_git_platform_integration_id_platform_integrations_id_fk",
+          "tableFrom": "app_builder_projects",
+          "tableTo": "platform_integrations",
+          "columnsFrom": [
+            "git_platform_integration_id"
           ],
           "columnsTo": [
             "id"
@@ -6168,12 +6288,31 @@
           "primaryKey": false,
           "notNull": true
         },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'provisioned'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "last_started_at": {
+          "name": "last_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_stopped_at": {
+          "name": "last_stopped_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "destroyed_at": {
           "name": "destroyed_at",
@@ -6183,15 +6322,25 @@
         }
       },
       "indexes": {
-        "UQ_kiloclaw_instances_active": {
-          "name": "UQ_kiloclaw_instances_active",
+        "UQ_kiloclaw_instances_active_user": {
+          "name": "UQ_kiloclaw_instances_active_user",
           "columns": [
             {
               "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
-            },
+            }
+          ],
+          "isUnique": true,
+          "where": "\"kiloclaw_instances\".\"destroyed_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_instances_sandbox_id": {
+          "name": "IDX_kiloclaw_instances_sandbox_id",
+          "columns": [
             {
               "expression": "sandbox_id",
               "isExpression": false,
@@ -6199,7 +6348,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "where": "\"kiloclaw_instances\".\"destroyed_at\" is null",
           "concurrently": false,
           "method": "btree",
@@ -6224,7 +6373,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "kiloclaw_instances_status_check": {
+          "name": "kiloclaw_instances_status_check",
+          "value": "\"kiloclaw_instances\".\"status\" IN ('provisioned', 'running', 'stopped', 'destroyed')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.kilocode_users": {

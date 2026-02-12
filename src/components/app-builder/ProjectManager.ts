@@ -43,6 +43,8 @@ export type ProjectState = {
   model: string;
   /** Current URL the user is viewing in the preview iframe (tracked via postMessage) */
   currentIframeUrl: string | null;
+  /** GitHub repo name if migrated (e.g., "owner/repo"), null if not migrated */
+  gitRepoFullName: string | null;
 };
 
 export type ProjectManagerConfig = {
@@ -88,7 +90,8 @@ export class ProjectManager {
     const initialState = createInitialState(
       project.messages,
       project.deployment_id ?? null,
-      project.model_id ?? null
+      project.model_id ?? null,
+      project.git_repo_full_name ?? null
     );
     this.store = createProjectStore(initialState);
 
@@ -188,6 +191,11 @@ export class ProjectManager {
   /** Interrupt the current streaming response. */
   interrupt(): void {
     this.streamingCoordinator.interrupt();
+  }
+
+  /** Update the GitHub repo full name after migration (e.g., "owner/repo"). */
+  setGitRepoFullName(repoFullName: string): void {
+    this.store.setState({ gitRepoFullName: repoFullName });
   }
 
   /**

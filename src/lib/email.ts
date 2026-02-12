@@ -52,6 +52,7 @@ const teamplates = {
   ossInviteNewUser: '18',
   ossInviteExistingUser: '19',
   ossExistingOrgProvisioned: '20',
+  deployFailed: '21',
 } as const;
 
 type Template = (typeof teamplates)[keyof typeof teamplates];
@@ -163,6 +164,29 @@ export async function sendAutoTopUpFailedEmail(to: string, props: { reason: stri
     },
     identifiers: {
       email: to,
+    },
+    reply_to: 'hi@kilocode.ai',
+  });
+}
+
+type SendDeploymentFailedEmailProps = {
+  to: string;
+  deployment_name: string;
+  deployment_url: string;
+  repository: string;
+};
+
+export async function sendDeploymentFailedEmail(props: SendDeploymentFailedEmailProps) {
+  return send({
+    transactional_message_id: teamplates.deployFailed,
+    to: props.to,
+    message_data: {
+      deployment_name: props.deployment_name,
+      deployment_url: props.deployment_url,
+      repository: props.repository,
+    },
+    identifiers: {
+      email: props.to,
     },
     reply_to: 'hi@kilocode.ai',
   });

@@ -12,15 +12,24 @@ import {
   InitSuccessResponseSchema,
   GetPreviewResponseSchema,
   TokenSuccessResponseSchema,
+  MigrateToGithubResponseSchema,
   type InitSuccessResponse,
   type InitRequest,
   type GetPreviewResponse,
   type PreviewState,
   type TokenRequest,
+  type MigrateToGithubRequest,
+  type MigrateToGithubResponse,
 } from '../../../cloudflare-app-builder/src/api-schemas';
 
 // Re-export types for consumers
-export type { InitSuccessResponse, GetPreviewResponse, PreviewState };
+export type {
+  InitSuccessResponse,
+  GetPreviewResponse,
+  PreviewState,
+  MigrateToGithubRequest,
+  MigrateToGithubResponse,
+};
 
 // Error type for API errors
 class AppBuilderError extends Error {
@@ -256,4 +265,44 @@ export async function deleteProject(projectId: string): Promise<void> {
       endpoint
     );
   }
+}
+
+/**
+ * Migrate a project to GitHub.
+ *
+ * Pushes the internal git repository to GitHub, then configures the preview
+ * to clone from GitHub and schedules deletion of the internal git repository.
+ *
+ * @param projectId - The unique identifier for the project
+ * @param config - Remote push credentials, GitHub repo, and user context
+ * @returns Object indicating success/failure
+ * @throws AppBuilderError if the request fails
+ */
+export async function migrateToGithub(
+  projectId: string,
+  config: MigrateToGithubRequest
+): Promise<MigrateToGithubResponse> {
+  const baseUrl = getBaseUrl();
+  const endpoint = `${baseUrl}/apps/${encodeURIComponent(projectId)}/migrate-to-github`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(APP_BUILDER_AUTH_TOKEN && { Authorization: `Bearer ${APP_BUILDER_AUTH_TOKEN}` }),
+    },
+    body: JSON.stringify(config),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error');
+    throw new AppBuilderError(
+      `Failed to migrate project ${projectId} to GitHub: ${response.status} ${response.statusText} - ${errorText}`,
+      response.status,
+      endpoint
+    );
+  }
+
+  const data = await response.json();
+  return MigrateToGithubResponseSchema.parse(data);
 }

@@ -8,6 +8,7 @@ import {
   sendMessageBaseSchema,
   getImageUploadUrlSchema,
   prepareLegacySessionBaseSchema,
+  migrateToGitHubSchema,
 } from '@/routers/app-builder/schemas';
 import { getBalanceForUser } from '@/lib/user.balance';
 import { MIN_BALANCE_FOR_APP_BUILDER } from '@/lib/app-builder/constants';
@@ -229,4 +230,30 @@ export const appBuilderRouter = createTRPCRouter({
 
       return { cloudAgentSessionId: result.cloudAgentSessionId };
     }),
+
+  // ============================================================================
+  // GitHub Migration
+  // ============================================================================
+
+  /**
+   * Pre-flight check for GitHub migration.
+   */
+  canMigrateToGitHub: baseProcedure.input(projectIdBaseSchema).query(async ({ ctx, input }) => {
+    const owner = { type: 'user' as const, id: ctx.user.id };
+    return appBuilderService.canMigrateToGitHub(input.projectId, owner);
+  }),
+
+  /**
+   * Migrate an App Builder project to GitHub.
+   */
+  migrateToGitHub: baseProcedure.input(migrateToGitHubSchema).mutation(async ({ ctx, input }) => {
+    const owner = { type: 'user' as const, id: ctx.user.id };
+
+    return appBuilderService.migrateProjectToGitHub({
+      projectId: input.projectId,
+      owner,
+      userId: ctx.user.id,
+      repoFullName: input.repoFullName,
+    });
+  }),
 });

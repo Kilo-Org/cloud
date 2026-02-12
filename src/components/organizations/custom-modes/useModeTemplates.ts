@@ -40,9 +40,9 @@ export type ModeTemplate = {
 };
 
 async function fetchModeTemplates(): Promise<ModeTemplate[]> {
-  const response = await fetch('/modes.yaml');
+  const response = await fetch('/api/marketplace/modes');
   if (!response.ok) {
-    throw new Error(`Failed to fetch modes.yaml: ${response.statusText}`);
+    throw new Error(`Failed to fetch mode templates: ${response.statusText}`);
   }
 
   const yamlText = await response.text();

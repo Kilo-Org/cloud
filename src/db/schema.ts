@@ -2144,6 +2144,12 @@ export const app_builder_projects = pgTable(
     template: text(), // nullable - null means default template (nextjs-starter)
     deployment_id: uuid().references(() => deployments.id, { onDelete: 'set null' }),
     last_message_at: timestamp({ withTimezone: true, mode: 'string' }),
+    // Git platform migration fields (GitHub, GitLab, etc.)
+    git_repo_full_name: text(), // "owner/repo" after migration
+    git_platform_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'set null',
+    }), // platform_integrations.platform tells us which platform (github, gitlab, etc.)
+    migrated_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -2167,6 +2173,35 @@ export const app_builder_projects = pgTable(
 );
 
 export type AppBuilderProject = typeof app_builder_projects.$inferSelect;
+
+// App Builder Project Sessions - tracks all Cloud Agent sessions per project
+export const AppBuilderSessionReason = {
+  Initial: 'initial', // First session created with project
+  GitHubMigration: 'github_migration', // New session after migrating to GitHub
+} satisfies Record<string, string>;
+
+export const app_builder_project_sessions = pgTable(
+  'app_builder_project_sessions',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    project_id: uuid()
+      .references(() => app_builder_projects.id, { onDelete: 'cascade' })
+      .notNull(),
+    cloud_agent_session_id: text().notNull(), // "agent_xxx"
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    ended_at: timestamp({ withTimezone: true, mode: 'string' }), // null = current/active session
+    reason: text().notNull(), // 'initial', 'github_migration', etc.
+  },
+  table => [
+    index('IDX_app_builder_project_sessions_project_id').on(table.project_id),
+    unique('UQ_app_builder_project_sessions_cloud_agent_session_id').on(
+      table.cloud_agent_session_id
+    ),
+  ]
+);
 
 export const app_reported_messages = pgTable('app_reported_messages', {
   report_id: uuid()

@@ -20,7 +20,6 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
 
   // not real OpenRouter providers
   'corethink',
-  'martian',
 ]);
 
 export const VercelUserByokInferenceProviderIdSchema = z.enum([

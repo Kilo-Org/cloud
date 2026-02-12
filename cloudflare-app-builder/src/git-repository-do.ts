@@ -6,7 +6,10 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import git from '@ashishkumar472/cf-git';
+import http from '@ashishkumar472/cf-git/http/web';
+import { sanitizeGitUrl } from './utils/git-url';
 import { SqliteFS } from './git/fs-adapter';
+import { MemFS } from './git/memfs';
 import { logger, withLogTags, formatError } from './utils/logger';
 import type { Env, GitObject, RepositoryStats } from './types';
 
@@ -262,5 +265,137 @@ export class GitRepositoryDO extends DurableObject<Env> {
 
       logger.info('Repository deleted successfully');
     });
+  }
+
+  /**
+   * Schedule self-deletion after a delay.
+   * Used after GitHub migration to clean up the internal git repo
+   * while keeping a grace period for rollback.
+   */
+  async scheduleDelete(delayMs: number): Promise<void> {
+    return withLogTags({ source: 'GitRepositoryDO' }, async () => {
+      const deleteAt = Date.now() + delayMs;
+      await this.ctx.storage.setAlarm(deleteAt);
+      logger.info('Scheduled self-deletion', {
+        deleteAt: new Date(deleteAt).toISOString(),
+      });
+    });
+  }
+
+  /**
+   * Alarm handler: self-deletes all repository data.
+   */
+  async alarm(): Promise<void> {
+    return withLogTags({ source: 'GitRepositoryDO' }, async () => {
+      logger.info('Alarm fired: deleting repository data');
+      await this.ctx.storage.deleteAll();
+      this._initialized = false;
+      this.fs = null;
+      logger.info('Repository self-deleted');
+    });
+  }
+
+  /**
+   * Push repository to a remote URL (RPC method)
+   * Used for GitHub migration - pushes all branches to the remote
+   *
+   * @param remoteUrl - The HTTPS URL of the remote repository (e.g., https://github.com/owner/repo.git)
+   * @param authToken - GitHub installation token for authentication
+   * @returns Object indicating success/failure
+   */
+  async pushToRemote(
+    remoteUrl: string,
+    authToken: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.fs) {
+      await this.initializeFS();
+    }
+
+    if (!this._initialized || !this.fs) {
+      return { success: false, error: 'Repository not initialized' };
+    }
+
+    logger.info('Pushing repository to remote', {
+      id: this.ctx.id.toString(),
+      remoteUrl: sanitizeGitUrl(remoteUrl),
+    });
+
+    try {
+      // Export git objects from SQLite storage
+      const gitObjects = this.fs.exportGitObjects();
+
+      if (gitObjects.length === 0) {
+        return { success: false, error: 'No git objects to push' };
+      }
+
+      // Build in-memory FS for isomorphic-git push operation
+      const memFs = new MemFS();
+      await git.init({ fs: memFs, dir: '/', defaultBranch: 'main' });
+
+      // Import all git objects into the in-memory FS
+      for (const obj of gitObjects) {
+        await memFs.writeFile(obj.path, obj.data);
+      }
+
+      // Get all branches to push (uses isomorphic-git to handle nested refs like feature/foo)
+      let branches: string[] = [];
+      try {
+        branches = await git.listBranches({ fs: memFs, dir: '/' });
+      } catch {
+        branches = ['main']; // Default to main if no branches found
+      }
+
+      logger.info('Pushing branches to remote', { branches });
+
+      // Track push results
+      let mainPushed = false;
+      const failedBranches: string[] = [];
+
+      // Push each branch to the remote
+      for (const branch of branches) {
+        try {
+          await git.push({
+            fs: memFs,
+            http,
+            dir: '/',
+            url: remoteUrl,
+            ref: branch,
+            remoteRef: branch,
+            onAuth: () => ({ username: 'x-access-token', password: authToken }),
+            force: false, // Don't force push
+          });
+
+          logger.info('Successfully pushed branch', { branch });
+          if (branch === 'main') {
+            mainPushed = true;
+          }
+        } catch (branchError) {
+          // Log but continue with other branches
+          logger.warn('Failed to push branch', {
+            branch,
+            error: branchError instanceof Error ? branchError.message : String(branchError),
+          });
+          failedBranches.push(branch);
+        }
+      }
+
+      // Main branch must be pushed successfully
+      if (!mainPushed) {
+        const errorMessage = failedBranches.includes('main')
+          ? 'Failed to push main branch'
+          : 'Main branch not found in repository';
+        logger.error('Push failed: main branch not pushed', { failedBranches });
+        return { success: false, error: errorMessage };
+      }
+
+      logger.info('Repository push completed successfully', {
+        failedBranches: failedBranches.length > 0 ? failedBranches : undefined,
+      });
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to push repository to remote', { error: errorMessage });
+      return { success: false, error: errorMessage };
+    }
   }
 }

@@ -19,6 +19,7 @@ function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, 
     deploymentId: null,
     model: 'anthropic/claude-sonnet-4',
     currentIframeUrl: null,
+    gitRepoFullName: null,
   };
 
   return {

@@ -323,25 +323,6 @@ export async function syncProviders() {
       models: mappedExtraModels.filter(m => m.providers.includes('stealth')).map(m => m.model),
     });
   }
-  if (!allProviders.some(provider => provider.name.toLowerCase() === 'martian')) {
-    allProviders.push({
-      name: 'Martian',
-      displayName: 'Martian',
-      slug: 'martian',
-      dataPolicy: {
-        training: true,
-        retainsPrompts: true,
-        canPublish: false,
-      },
-      headquarters: 'Unknown',
-      datacenters: ['Global'],
-      icon: {
-        url: 'https://placehold.co/100?text=Ma&font=roboto',
-        className: 'rounded-sm',
-      },
-      models: mappedExtraModels.filter(m => m.providers.includes('martian')).map(m => m.model),
-    });
-  }
   if (!allProviders.some(provider => provider.name.toLowerCase() === 'corethink')) {
     allProviders.push({
       name: 'CoreThink',

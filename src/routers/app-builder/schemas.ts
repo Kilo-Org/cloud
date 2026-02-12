@@ -48,3 +48,14 @@ export const prepareLegacySessionBaseSchema = z.object({
   model: z.string().min(1),
   prompt: z.string().min(1),
 });
+
+// Schema for migrateToGitHub
+// User-created repository approach: users provide full repo name (owner/repo)
+export const migrateToGitHubSchema = z.object({
+  projectId: z.uuid(),
+  repoFullName: z
+    .string()
+    .min(3)
+    .max(200)
+    .regex(/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/, 'Must be in format owner/repo'),
+});

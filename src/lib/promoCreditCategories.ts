@@ -638,6 +638,17 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     description: 'Promo code for Solveo candidates/team expansion',
     total_redemptions_allowed: 20,
   },
+  {
+    encrypted_credit_category:
+      'AGBh1ht9Ae9xm358inZC4A==:82DdufHKhw6kMS2KTtlJpw==:TiBmyJMaGtk2K/A9ELFQ0I7MIrG8kog=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 20,
+    expiry_hours: 30 * 24,
+    promotion_ends_at: new Date('2026-02-15'),
+    description: 'Builders event promotional credit',
+    total_redemptions_allowed: 200,
+  },
 ];
 
 const selfServicePromos: readonly SelfServicePromoCreditCategoryConfig[] =

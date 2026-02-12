@@ -9,6 +9,7 @@ import type {
   PlatformRepository,
 } from '../core/types';
 import { INTEGRATION_STATUS, PLATFORM, PENDING_APPROVAL_STATUS } from '../core/constants';
+import type { IntegrationStatus } from '../core/constants';
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 
@@ -425,18 +426,28 @@ export async function autoCompleteInstallation({
  */
 
 /**
- * Gets platform integration for an owner (user or organization)
+ * Gets platform integration for an owner (user or organization).
+ * Optionally filters by integration status (e.g. 'active').
  */
-export async function getIntegrationForOwner(owner: Owner, platform: string) {
+export async function getIntegrationForOwner(
+  owner: Owner,
+  platform: string,
+  status?: IntegrationStatus
+) {
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)
       : eq(platform_integrations.owned_by_organization_id, owner.id);
 
+  const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
+  if (status) {
+    conditions.push(eq(platform_integrations.integration_status, status));
+  }
+
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(and(ownershipCondition, eq(platform_integrations.platform, platform)))
+    .where(and(...conditions))
     .limit(1);
 
   return integration || null;

@@ -21,7 +21,7 @@ describe('createInitialState', () => {
   it('creates state with provided messages', () => {
     const messages: CloudMessage[] = [{ ts: 1000, type: 'user', text: 'Hello', partial: false }];
 
-    const state = createInitialState(messages, null, null);
+    const state = createInitialState(messages, null, null, null);
 
     expect(state.messages).toEqual(messages);
     expect(state.isStreaming).toBe(false);
@@ -29,18 +29,25 @@ describe('createInitialState', () => {
     expect(state.previewStatus).toBe('idle');
     expect(state.deploymentId).toBeNull();
     expect(state.model).toBe('anthropic/claude-sonnet-4');
+    expect(state.gitRepoFullName).toBeNull();
   });
 
   it('uses provided deployment ID', () => {
-    const state = createInitialState([], 'deploy-123', null);
+    const state = createInitialState([], 'deploy-123', null, null);
 
     expect(state.deploymentId).toBe('deploy-123');
   });
 
   it('uses provided model ID', () => {
-    const state = createInitialState([], null, 'openai/gpt-4o');
+    const state = createInitialState([], null, 'openai/gpt-4o', null);
 
     expect(state.model).toBe('openai/gpt-4o');
+  });
+
+  it('uses provided git repo full name', () => {
+    const state = createInitialState([], null, null, 'owner/my-repo');
+
+    expect(state.gitRepoFullName).toBe('owner/my-repo');
   });
 });
 
@@ -54,6 +61,7 @@ describe('createProjectStore', () => {
     deploymentId: null,
     model: 'anthropic/claude-sonnet-4',
     currentIframeUrl: null,
+    gitRepoFullName: null,
   };
 
   describe('getState', () => {

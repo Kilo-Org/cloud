@@ -35,13 +35,14 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
-    id: 'skills-md-support-jan-6',
-    title: 'Agent skills now supported!',
-    message: 'Define reusable skills and workflows for your AI agent.',
+    id: 'feb-12-free-glm-5',
+    title: 'GLM-5 is free (for a limited time)',
+    message: 'Get Opus-level performance, for free.',
     action: {
       actionText: 'Learn More',
-      actionURL: 'https://kilo.ai/docs/features/skills',
+      actionURL: 'https://blog.kilo.ai/p/glm-5-free-limited-time',
     },
+    suggestModelId: 'z-ai/glm-5:free',
     showIn: ['extension', 'cli'],
   },
   {
@@ -74,27 +75,13 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateFirstDayWelcomeNotification,
     generateAutocompleteNotification,
     generateKiloPassNotification,
-    generateGrokCodeFast1Notification,
-    generateKimiK25FreeNotification,
   ];
 
   const resolvedConditionalNotifications = (
     await Promise.all(conditionalNotifications.map(f => f(user)))
   ).flat();
 
-  const extra =
-    Date.now() < Date.parse('2026-02-01T05:00:00Z')
-      ? [
-          {
-            id: 'review-jan-27',
-            title: 'NEW: Local Code Reviews',
-            message: 'Select "Review" from the mode selector below to review local changes',
-            showIn: ['extension' as const, 'cli' as const],
-          },
-        ]
-      : normalUnconditionalNotifications;
-
-  return [...resolvedConditionalNotifications, ...extra];
+  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications];
 }
 
 async function generateLowCreditNotification(user: User): Promise<KiloNotification[]> {
@@ -339,80 +326,6 @@ async function generateKiloPassNotification(user: User): Promise<KiloNotificatio
         actionText: 'Learn More',
         actionURL: 'https://blog.kilo.ai/p/introducing-kilo-pass',
       },
-      showIn: ['cli', 'extension'],
-    },
-  ];
-}
-
-async function generateGrokCodeFast1Notification(user: User): Promise<KiloNotification[]> {
-  try {
-    // Check if user has used the Grok Code Fast 1 free model in the last 2 weeks
-    const grokCodeFast1Models = ['x-ai/grok-code-fast-1'];
-    const twoWeeksAgo = subDays(new Date(), 14);
-    const result = await readDb
-      .select({ kilo_user_id: microdollar_usage.kilo_user_id })
-      .from(microdollar_usage)
-      .where(
-        and(
-          eq(microdollar_usage.kilo_user_id, user.id),
-          inArray(microdollar_usage.model, grokCodeFast1Models),
-          gte(microdollar_usage.created_at, twoWeeksAgo.toISOString())
-        )
-      )
-      .limit(1);
-
-    if (result.length === 0) {
-      return [];
-    }
-  } catch (e) {
-    console.error('[generateGrokCodeFast1Notification]', e);
-    return [];
-  }
-
-  return [
-    {
-      id: 'grok-code-fast-1-paid-jan-30',
-      title: 'Grok Code Fast 1 is becoming paid',
-      message:
-        'xAI is changing Grok Code Fast 1 to a paid model. You can keep using the paid version or try another free model like Giga Potato.',
-      suggestModelId: 'giga-potato',
-      showIn: ['cli', 'extension'],
-    },
-  ];
-}
-
-async function generateKimiK25FreeNotification(user: User): Promise<KiloNotification[]> {
-  try {
-    // Check if user has used the free Kimi K2.5 model in the last 2 weeks
-    const kimiK25FreeModels = ['moonshotai/kimi-k2.5:free'];
-    const twoWeeksAgo = subDays(new Date(), 14);
-    const result = await readDb
-      .select({ kilo_user_id: microdollar_usage.kilo_user_id })
-      .from(microdollar_usage)
-      .where(
-        and(
-          eq(microdollar_usage.kilo_user_id, user.id),
-          inArray(microdollar_usage.model, kimiK25FreeModels),
-          gte(microdollar_usage.created_at, twoWeeksAgo.toISOString())
-        )
-      )
-      .limit(1);
-
-    if (result.length === 0) {
-      return [];
-    }
-  } catch (e) {
-    console.error('[generateKimiK25FreeNotification]', e);
-    return [];
-  }
-
-  return [
-    {
-      id: 'kimi-k25-free-ended-feb-2',
-      title: 'Kimi K2.5 promotion has ended',
-      message:
-        'Our Kimi K2.5 promotion has ended. Continue with the paid version or try a different model.',
-      suggestModelId: 'moonshotai/kimi-k2.5',
       showIn: ['cli', 'extension'],
     },
   ];

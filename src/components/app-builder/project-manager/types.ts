@@ -31,6 +31,8 @@ export type ProjectState = {
   model: string;
   /** Current URL the user is viewing in the preview iframe (tracked via postMessage) */
   currentIframeUrl: string | null;
+  /** GitHub repo name if migrated (e.g., "owner/repo"), null if not migrated */
+  gitRepoFullName: string | null;
 };
 
 // =============================================================================

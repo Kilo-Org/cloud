@@ -110,6 +110,17 @@ async function stealthModelError(response: Response) {
   return NextResponse.json({ error, message: error }, { status: response.status });
 }
 
+const byokErrorMessages: Record<number, string> = {
+  401: '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
+  402: '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
+  403: '[BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.',
+  429: '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
+};
+
+function byokErrorMessage(status: number): string | undefined {
+  return byokErrorMessages[status];
+}
+
 function estimateTokenCount(request: OpenRouterChatCompletionRequest) {
   return Math.round(
     JSON.stringify(request).length / 4 + (request.max_completion_tokens ?? request.max_tokens ?? 0)
@@ -120,13 +131,26 @@ export async function makeErrorReadable({
   requestedModel,
   request,
   response,
+  isUserByok,
 }: {
   requestedModel: string;
   request: OpenRouterChatCompletionRequest;
   response: Response;
+  isUserByok: boolean;
 }) {
   if (response.status < 400) {
     return undefined;
+  }
+
+  if (isUserByok) {
+    const byokMessage = byokErrorMessage(response.status);
+    if (byokMessage) {
+      warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      return NextResponse.json(
+        { error: byokMessage, message: byokMessage },
+        { status: response.status }
+      );
+    }
   }
 
   // Sometimes we get generic or nonsensical errors when the context length is exceeded

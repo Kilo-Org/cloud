@@ -21,6 +21,7 @@ import {
   Home,
   Copy,
   Check,
+  Github,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DEPLOYMENT_POLL_INTERVAL_MS } from '@/lib/user-deployments/constants';
 import { isDeploymentInProgress, type BuildStatus } from '@/lib/user-deployments/types';
 import { CloneDialog } from './CloneDialog';
+import { MigrateToGitHubDialog } from './MigrateToGitHubDialog';
 import { useProject } from './ProjectSession';
 import { toast } from 'sonner';
 
@@ -301,7 +303,20 @@ const statusLabels: Record<BuildStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-function DeploymentControls({ state, onDeploy }: { state: DeploymentState; onDeploy: () => void }) {
+function deploymentPageUrl(organizationId: string | undefined, deploymentId: string) {
+  const base = organizationId ? `/organizations/${organizationId}/deploy` : '/deploy';
+  return `${base}/${deploymentId}`;
+}
+
+function DeploymentControls({
+  state,
+  onDeploy,
+  organizationId,
+}: {
+  state: DeploymentState;
+  onDeploy: () => void;
+  organizationId?: string;
+}) {
   switch (state.kind) {
     case 'creating':
       return (
@@ -313,7 +328,7 @@ function DeploymentControls({ state, onDeploy }: { state: DeploymentState; onDep
     case 'in-progress':
       return (
         <Button size="sm" variant="outline" asChild>
-          <Link href={`/deploy/`} target="_blank">
+          <Link href={deploymentPageUrl(organizationId, state.deploymentId)} target="_blank">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             {statusLabels[state.buildStatus]}...
           </Link>
@@ -331,7 +346,7 @@ function DeploymentControls({ state, onDeploy }: { state: DeploymentState; onDep
     case 'failed':
       return (
         <Button size="sm" variant="outline" className="text-red-400" asChild>
-          <Link href={`/deploy/`} target="_blank">
+          <Link href={deploymentPageUrl(organizationId, state.deploymentId)} target="_blank">
             <AlertCircle className="mr-2 h-4 w-4" />
             Failed - View Logs
           </Link>
@@ -371,8 +386,9 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
 }: AppBuilderPreviewProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
-  const { previewUrl, previewStatus, deploymentId, currentIframeUrl } = state;
+  const { previewUrl, previewStatus, deploymentId, currentIframeUrl, gitRepoFullName } = state;
   const projectId = manager.projectId;
+  const isMigrated = Boolean(gitRepoFullName);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
@@ -561,8 +577,35 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
         <h2 className="shrink-0 text-sm font-medium">Preview</h2>
 
         <div className="flex items-center gap-2">
-          {projectId && <CloneDialog projectId={projectId} organizationId={organizationId} />}
-          <DeploymentControls state={deploymentState} onDeploy={handleDeploy} />
+          {projectId && !isMigrated && (
+            <>
+              <MigrateToGitHubDialog
+                projectId={projectId}
+                organizationId={organizationId}
+                onMigrationComplete={repoFullName => manager.setGitRepoFullName(repoFullName)}
+              />
+              <CloneDialog projectId={projectId} organizationId={organizationId} />
+            </>
+          )}
+          {isMigrated && gitRepoFullName && (
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href={`https://github.com/${gitRepoFullName}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={gitRepoFullName}
+              >
+                <Github className="mr-2 h-4 w-4" />
+                GitHub
+                <ExternalLink className="ml-1.5 h-3 w-3 opacity-50" />
+              </a>
+            </Button>
+          )}
+          <DeploymentControls
+            state={deploymentState}
+            onDeploy={handleDeploy}
+            organizationId={organizationId}
+          />
         </div>
       </div>
 

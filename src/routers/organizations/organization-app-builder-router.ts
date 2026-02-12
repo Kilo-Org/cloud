@@ -10,6 +10,7 @@ import {
   organizationIdSchema,
   getImageUploadUrlSchema,
   prepareLegacySessionBaseSchema,
+  migrateToGitHubSchema,
 } from '@/routers/app-builder/schemas';
 import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
 import { MIN_BALANCE_FOR_APP_BUILDER } from '@/lib/app-builder/constants';
@@ -22,6 +23,7 @@ const sendMessageSchema = sendMessageBaseSchema.merge(organizationIdSchema);
 const deployProjectSchema = projectIdBaseSchema.merge(organizationIdSchema);
 const imageUploadUrlWithOrgIdSchema = getImageUploadUrlSchema.merge(organizationIdSchema);
 const prepareLegacySessionSchema = prepareLegacySessionBaseSchema.merge(organizationIdSchema);
+const migrateToGitHubWithOrgIdSchema = migrateToGitHubSchema.merge(organizationIdSchema);
 
 export const organizationAppBuilderRouter = createTRPCRouter({
   /**
@@ -265,5 +267,35 @@ export const organizationAppBuilderRouter = createTRPCRouter({
       );
 
       return { cloudAgentSessionId: result.cloudAgentSessionId };
+    }),
+
+  // ============================================================================
+  // GitHub Migration
+  // ============================================================================
+
+  /**
+   * Pre-flight check for GitHub migration.
+   */
+  canMigrateToGitHub: organizationMemberProcedure
+    .input(projectWithOrgIdSchema)
+    .query(async ({ input }) => {
+      const owner = { type: 'org' as const, id: input.organizationId };
+      return appBuilderService.canMigrateToGitHub(input.projectId, owner);
+    }),
+
+  /**
+   * Migrate an App Builder project to GitHub.
+   */
+  migrateToGitHub: organizationMemberProcedure
+    .input(migrateToGitHubWithOrgIdSchema)
+    .mutation(async ({ ctx, input }) => {
+      const owner = { type: 'org' as const, id: input.organizationId };
+
+      return appBuilderService.migrateProjectToGitHub({
+        projectId: input.projectId,
+        owner,
+        userId: ctx.user.id,
+        repoFullName: input.repoFullName,
+      });
     }),
 });

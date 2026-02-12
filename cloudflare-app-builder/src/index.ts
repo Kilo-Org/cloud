@@ -7,6 +7,7 @@ import { handleInit } from './handlers/init';
 import { handleGenerateToken } from './handlers/token';
 import { handleDelete } from './handlers/delete';
 import { handleGetCommit } from './handlers/commit';
+import { handleMigrateToGithub } from './handlers/migrate-to-github';
 import {
   handleGetPreviewStatus,
   handlePreviewProxy,
@@ -27,6 +28,7 @@ const COMMIT_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/commit$`);
 const PREVIEW_STATUS_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/preview$`);
 const BUILD_TRIGGER_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/build$`);
 const BUILD_LOGS_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/build/logs$`);
+const MIGRATE_TO_GITHUB_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/migrate-to-github$`);
 const DELETE_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})$`);
 
 // Dev Mode
@@ -126,6 +128,12 @@ export default {
       const buildLogsMatch = pathname.match(BUILD_LOGS_PATTERN);
       if (buildLogsMatch && request.method === 'GET') {
         return handleStreamBuildLogs(request, env, buildLogsMatch[1]);
+      }
+
+      // Handle migrate to GitHub requests (POST /apps/{app_id}/migrate-to-github)
+      const migrateToGithubMatch = pathname.match(MIGRATE_TO_GITHUB_PATTERN);
+      if (migrateToGithubMatch && request.method === 'POST') {
+        return handleMigrateToGithub(request, env, migrateToGithubMatch[1]);
       }
 
       // Handle delete requests (DELETE /apps/{app_id})

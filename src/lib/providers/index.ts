@@ -203,7 +203,7 @@ export function applyProviderSpecificLogic(
   }
 
   if (isAnthropicModel(requestedModel)) {
-    applyAnthropicModelSettings(requestToMutate, extraHeaders);
+    applyAnthropicModelSettings(requestedModel, requestToMutate, extraHeaders);
   }
 
   applyToolChoiceSetting(requestedModel, requestToMutate);

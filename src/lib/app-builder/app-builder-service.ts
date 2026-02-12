@@ -8,13 +8,20 @@ import {
 import * as appBuilderClient from '@/lib/app-builder/app-builder-client';
 import { APP_BUILDER_APPEND_SYSTEM_PROMPT } from '@/lib/app-builder/constants';
 import { db } from '@/lib/drizzle';
-import { app_builder_projects, cliSessions } from '@/db/schema';
+import {
+  app_builder_projects,
+  app_builder_project_sessions,
+  AppBuilderSessionReason,
+  cliSessions,
+} from '@/db/schema';
 import { TRPCError } from '@trpc/server';
 import { eq, and, sql } from 'drizzle-orm';
 import type { CloudMessage } from '@/components/cloud-agent/types';
 import { APP_BUILDER_URL } from '@/lib/config.server';
 import { createDeployment, getDeployment } from '@/lib/user-deployments/deployments-service';
+import type { DeploymentSource } from '@/lib/user-deployments/types';
 import { getHistoricalMessages } from '@/lib/app-builder/historical-messages';
+
 import type {
   AppBuilderProject,
   CreateProjectInput,
@@ -35,6 +42,17 @@ export type {
   ProjectWithMessages,
 };
 
+export {
+  canMigrateToGitHub,
+  migrateProjectToGitHub,
+} from '@/lib/app-builder/github-migration-service';
+
+export type {
+  MigrateToGitHubInput,
+  MigrateToGitHubResult,
+  CanMigrateToGitHubResult,
+} from '@/lib/app-builder/types';
+
 // ============================================================================
 // Private Helper Functions
 // ============================================================================
@@ -46,29 +64,8 @@ function getProjectGitUrl(projectId: string): string {
   return `${APP_BUILDER_URL}/apps/${projectId}.git`;
 }
 
-export async function getProjectWithOwnershipCheck(
-  projectId: string,
-  owner: Owner
-): Promise<AppBuilderProject> {
-  const ownerCondition =
-    owner.type === 'org'
-      ? eq(app_builder_projects.owned_by_organization_id, owner.id)
-      : eq(app_builder_projects.owned_by_user_id, owner.id);
-
-  const [project] = await db
-    .select()
-    .from(app_builder_projects)
-    .where(and(eq(app_builder_projects.id, projectId), ownerCondition));
-
-  if (!project) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Project not found',
-    });
-  }
-
-  return project;
-}
+export { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
+import { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
 
 // ============================================================================
 // Exported Functions
@@ -123,11 +120,19 @@ export async function createProject(input: CreateProjectInput): Promise<CreatePr
       appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
     });
 
-    // Save the session ID to the project
-    await db
-      .update(app_builder_projects)
-      .set({ session_id: cloudAgentSessionId })
-      .where(eq(app_builder_projects.id, projectId));
+    // Save session ID and track it atomically
+    await db.transaction(async tx => {
+      await tx
+        .update(app_builder_projects)
+        .set({ session_id: cloudAgentSessionId })
+        .where(eq(app_builder_projects.id, projectId));
+
+      await tx.insert(app_builder_project_sessions).values({
+        project_id: projectId,
+        cloud_agent_session_id: cloudAgentSessionId,
+        reason: AppBuilderSessionReason.Initial,
+      });
+    });
 
     return { projectId };
   } catch (error) {
@@ -301,16 +306,23 @@ export async function deployProject(
     };
   }
 
-  const gitUrl = getProjectGitUrl(projectId);
+  // If project was migrated to GitHub, deploy from GitHub; otherwise use internal git repo
+  const { git_repo_full_name, git_platform_integration_id } = project;
+  const source: DeploymentSource =
+    git_repo_full_name && git_platform_integration_id
+      ? {
+          type: 'github',
+          repositoryFullName: git_repo_full_name,
+          platformIntegrationId: git_platform_integration_id,
+        }
+      : {
+          type: 'app-builder',
+          gitUrl: getProjectGitUrl(projectId),
+        };
 
-  // Use createDeployment with app-builder source type
-  // Tokens and DB credentials are generated on-the-fly by the deployment service
   const result = await createDeployment({
     owner,
-    source: {
-      type: 'app-builder',
-      gitUrl,
-    },
+    source,
     branch: 'main',
     createdByUserId,
   });
@@ -446,6 +458,10 @@ export async function startSessionForProject(
 /**
  * Send a message to an existing App Builder session using the WebSocket-based API.
  * Returns immediately with session info - client connects to WebSocket separately for events.
+ *
+ * If the project was migrated to GitHub but the session still uses the internal git URL,
+ * a new session is created with the GitHub repo. The frontend will receive a different
+ * cloudAgentSessionId and should reconnect to the new session's WebSocket.
  */
 export async function sendMessage(input: SendMessageInput): Promise<InitiateSessionV2Output> {
   const { projectId, owner, message, authToken, images, model } = input;
@@ -458,6 +474,8 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
       message: 'Project not found',
     });
   }
+
+  const currentSessionId = project.session_id;
 
   // Determine which model to use - prefer override, fallback to project's stored model
   const effectiveModel = model ?? project.model_id;
@@ -473,8 +491,67 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
   // Create Cloud Agent client - App Builder handles its own billing, skip balance check
   const client = createAppBuilderCloudAgentClient(authToken);
 
-  // Generate a fresh token with full permissions for the cloud agent
-  const { token: gitToken } = await appBuilderClient.generateGitToken(projectId, 'full');
+  // If project was migrated to GitHub, check if the session still uses the internal
+  // git repo and create a new session pointing at GitHub.
+  if (project.git_repo_full_name) {
+    const session = await client.getSession(project.session_id);
+
+    // Session was prepared with internal gitUrl, but project is now on GitHub —
+    // create a new session with the GitHub repo
+    if (session.gitUrl && !session.githubRepo) {
+      const { cloudAgentSessionId: newSessionId } = await client.prepareSession({
+        githubRepo: project.git_repo_full_name,
+        prompt: message,
+        mode: 'code',
+        model: effectiveModel,
+        upstreamBranch: 'main',
+        autoCommit: true,
+        setupCommands: ['bun install'],
+        kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
+        images,
+        appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
+      });
+
+      const result = await client.initiateFromKilocodeSessionV2({
+        cloudAgentSessionId: newSessionId,
+      });
+
+      // Atomically end old session, update project, and record new session
+      await db.transaction(async tx => {
+        await tx
+          .update(app_builder_project_sessions)
+          .set({ ended_at: sql`now()` })
+          .where(eq(app_builder_project_sessions.cloud_agent_session_id, currentSessionId));
+
+        await tx
+          .update(app_builder_projects)
+          .set({ session_id: newSessionId })
+          .where(eq(app_builder_projects.id, projectId));
+
+        await tx.insert(app_builder_project_sessions).values({
+          project_id: projectId,
+          cloud_agent_session_id: newSessionId,
+          reason: AppBuilderSessionReason.GitHubMigration,
+        });
+      });
+
+      return {
+        cloudAgentSessionId: newSessionId,
+        executionId: result.executionId,
+        status: result.status,
+        streamUrl: result.streamUrl,
+      };
+    }
+  }
+
+  // Non-migrated project OR session already has githubRepo - use existing flow
+  // For non-migrated projects, generate a fresh internal git token
+  // For migrated projects (session has githubRepo), Cloud Agent handles GitHub token refresh
+  let gitToken: string | undefined;
+  if (!project.git_repo_full_name) {
+    const tokenResult = await appBuilderClient.generateGitToken(projectId, 'full');
+    gitToken = tokenResult.token;
+  }
 
   // Send message to existing session using V2 mutation (returns immediately)
   const result = await client.sendMessageV2({
@@ -483,7 +560,7 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
     mode: 'code',
     model: effectiveModel,
     autoCommit: true,
-    gitToken,
+    gitToken, // undefined for migrated projects - Cloud Agent handles GitHub tokens
     images,
     condenseOnComplete: true,
   });

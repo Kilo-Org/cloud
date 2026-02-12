@@ -366,7 +366,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   usageContext.status_code = response.status;
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.
-  if (response.status === 402) {
+  // Skip this conversion when user BYOK is used - the 402 is about their account, not ours.
+  if (response.status === 402 && !userByok) {
     await captureProxyError({
       user,
       request: requestBodyParsed,
@@ -433,6 +434,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestedModel: originalModelIdLowerCased,
       request: requestBodyParsed,
       response,
+      isUserByok: !!userByok,
     });
     if (errorResponse) {
       return errorResponse;

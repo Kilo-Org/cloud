@@ -7,6 +7,8 @@ import {
   type Env,
   type PreviewState,
   type PreviewPersistedState,
+  type GitHubSourceConfig,
+  type GetTokenForRepoResult,
   DEFAULT_SANDBOX_PORT,
 } from './types';
 import { logger, withLogTags, formatError } from './utils/logger';
@@ -29,6 +31,7 @@ export class PreviewDO extends DurableObject<Env> {
       appId: null,
       lastError: null,
       dbCredentials: null,
+      githubSource: null,
     };
 
     // Restore persisted state from storage if available
@@ -187,10 +190,37 @@ export class PreviewDO extends DurableObject<Env> {
   }
 
   /**
-   * Construct the git repository URL for cloning
-   * Generates a short-lived JWT token with read-only access for the clone operation
+   * Construct the git repository URL for cloning.
+   *
+   * For migrated projects (githubSource is set), fetches a fresh GitHub token
+   * from git-token-service and returns a GitHub URL.
+   *
+   * For non-migrated projects, generates a short-lived JWT token with read-only
+   * access for the internal App Builder git server.
    */
-  private getRepoUrl(repoId: string): string {
+  private async getRepoUrl(repoId: string): Promise<string> {
+    // Check if project is migrated to GitHub
+    if (this.persistedState.githubSource) {
+      const { githubRepo, userId, orgId } = this.persistedState.githubSource;
+
+      // Get fresh token from git-token-service
+      const result: GetTokenForRepoResult = await this.env.GIT_TOKEN_SERVICE.getTokenForRepo({
+        githubRepo,
+        userId,
+        orgId,
+      });
+
+      if (!result.success) {
+        throw new Error(`Failed to get GitHub token: ${result.reason}`);
+      }
+
+      const url = new URL(`https://github.com/${githubRepo}.git`);
+      url.username = 'x-access-token';
+      url.password = result.token;
+      return url.toString();
+    }
+
+    // Internal App Builder repository (not migrated)
     const authToken = signGitToken(repoId, 'ro', this.env.GIT_JWT_SECRET);
     const hostname = this.env.BUILDER_HOSTNAME;
     const baseUrl = `https://x-access-token:${authToken}@${hostname}`;
@@ -258,6 +288,38 @@ export class PreviewDO extends DurableObject<Env> {
     );
   }
 
+  /**
+   * Set GitHub source configuration for migrated projects.
+   *
+   * After calling this, the preview will clone from GitHub instead of the
+   * internal App Builder git server. A fresh GitHub token is fetched on
+   * every clone/fetch operation via git-token-service.
+   *
+   * This also destroys the existing sandbox to ensure a clean state when
+   * switching from internal repo to GitHub. The next build will clone
+   * fresh from GitHub.
+   *
+   * @param config - GitHub repository and user context for token lookup
+   */
+  async setGitHubSource(config: GitHubSourceConfig): Promise<void> {
+    return withLogTags(
+      { source: 'PreviewDO', tags: { appId: this.persistedState.appId ?? undefined } },
+      async () => {
+        logger.info('Setting GitHub source', {
+          githubRepo: config.githubRepo,
+          hasOrgId: !!config.orgId,
+        });
+        this.persistedState.githubSource = config;
+        await this.savePersistedState();
+
+        // Destroy the sandbox to ensure a clean state when switching sources.
+        // The next build will clone fresh from GitHub.
+        await this.destroy();
+        logger.info('Sandbox destroyed after setting GitHub source');
+      }
+    );
+  }
+
   async getStatus(): Promise<{ state: PreviewState; error: string | null }> {
     return withLogTags(
       { source: 'PreviewDO', tags: { appId: this.persistedState.appId ?? undefined } },
@@ -318,6 +380,13 @@ export class PreviewDO extends DurableObject<Env> {
 
           if (repoExists) {
             logger.debug('Repository exists, pulling latest changes');
+
+            // The origin URL contains an ephemeral GitHub token from the previous clone/fetch; refresh it
+            if (this.persistedState.githubSource) {
+              const repoUrl = await this.getRepoUrl(appId);
+              await sandbox.exec(`cd /workspace && git remote set-url origin '${repoUrl}'`);
+            }
+
             const pullResult = await sandbox.exec(
               'cd /workspace && git fetch origin && git reset --hard origin/HEAD'
             );
@@ -326,7 +395,7 @@ export class PreviewDO extends DurableObject<Env> {
             }
             logger.debug('Successfully pulled latest changes');
           } else {
-            const repoUrl = this.getRepoUrl(appId);
+            const repoUrl = await this.getRepoUrl(appId);
             logger.debug('Cloning repository for the first time');
             const checkoutResult = await sandbox.gitCheckout(repoUrl, {
               targetDir: '/workspace',
@@ -488,6 +557,7 @@ export class PreviewDO extends DurableObject<Env> {
           appId: null,
           lastError: null,
           dbCredentials: null,
+          githubSource: null,
         };
 
         logger.info('Preview deleted successfully');

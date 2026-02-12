@@ -27,8 +27,8 @@ import {
   effectiveSetupCommandsAtom,
   resetSessionFormAtom,
 } from '@/components/cloud-agent/store/session-form-atoms';
-import { useOrganizationWithMembers, useOrganizationDefaults } from '@/app/api/organizations/hooks';
-import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
+import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import {
   RepositoryCombobox,
   type RepositoryOption,
@@ -78,27 +78,15 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
     !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
 
   // Fetch organization configuration and models
-  const { data: organizationData } = useOrganizationWithMembers(organizationId || '', {
-    enabled: !!organizationId,
-  });
-  const { data: modelsData } = useOpenRouterModels();
+  const { data: modelsData } = useModelSelectorList(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
-  // Get organization's allowed models
-  const savedModelAllowList = organizationData?.settings?.model_allow_list || [];
   const allModels = modelsData?.data || [];
-
-  // Filter models based on organization's allow list (memoized to avoid prompt re-render churn)
-  const availableModels = useMemo(() => {
-    return savedModelAllowList.length === 0
-      ? allModels
-      : allModels.filter(model => savedModelAllowList.includes(model.id));
-  }, [allModels, savedModelAllowList]);
 
   // Format models for the combobox (ModelOption format: id, name)
   const modelOptions = useMemo<ModelOption[]>(
-    () => availableModels.map(model => ({ id: model.id, name: model.name })),
-    [availableModels]
+    () => allModels.map(model => ({ id: model.id, name: model.name })),
+    [allModels]
   );
 
   // Form state

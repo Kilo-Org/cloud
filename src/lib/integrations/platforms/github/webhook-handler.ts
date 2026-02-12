@@ -367,7 +367,7 @@ export async function handleGitHubWebhook(
       if (!parseResult.data.deleted) {
         // Process async
         after(async () => {
-          await handlePushEvent(parseResult.data);
+          await handlePushEvent(parseResult.data, integration);
         });
       }
       return NextResponse.json({ message: 'Event received' }, { status: 200 });

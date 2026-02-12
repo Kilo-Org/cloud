@@ -59,6 +59,11 @@
       "service": "db-proxy",
       "entrypoint": "AdminRPCEntrypoint",
     },
+    {
+      "binding": "GIT_TOKEN_SERVICE",
+      "service": "git-token-service",
+      "entrypoint": "GitTokenRPCEntrypoint",
+    },
   ],
   "r2_buckets": [
     {

@@ -1,18 +1,30 @@
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
-import { deployments, platform_integrations } from '@/db/schema';
+import {
+  deployments,
+  platform_integrations,
+  app_builder_projects,
+  type PlatformIntegration,
+} from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { redeploy } from '@/lib/user-deployments/deployments-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { PushEventPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { extractBranchNameFromRef } from '@/lib/integrations/platforms/github/utils';
+import { triggerBuild } from '@/lib/app-builder/app-builder-client';
 
-export async function handlePushEvent(event: PushEventPayload) {
+export async function handlePushEvent(event: PushEventPayload, integration: PlatformIntegration) {
   const branchName = extractBranchNameFromRef(event.ref);
   const repositoryFullName = event.repository.full_name;
 
-  // Query database for GitHub deployments matching this repository and branch
+  await Promise.allSettled([
+    redeployMatchingDeployments(repositoryFullName, branchName),
+    rebuildMatchingAppBuilderPreviews(repositoryFullName, branchName, integration),
+  ]);
+}
+
+async function redeployMatchingDeployments(repositoryFullName: string, branchName: string) {
   const githubDeployments = await db
     .select({
       deployment: deployments,
@@ -54,6 +66,50 @@ export async function handlePushEvent(event: PushEventPayload) {
             source: 'github_webhook_handler',
             event: 'push',
             deploymentId: deployment.id,
+          },
+          extra: {
+            repository: repositoryFullName,
+            branch: branchName,
+          },
+        });
+      }
+    })
+  );
+}
+
+async function rebuildMatchingAppBuilderPreviews(
+  repositoryFullName: string,
+  branchName: string,
+  integration: PlatformIntegration
+) {
+  if (branchName !== 'main') return;
+
+  const projects = await db
+    .select({ id: app_builder_projects.id })
+    .from(app_builder_projects)
+    .where(
+      and(
+        eq(app_builder_projects.git_repo_full_name, repositoryFullName),
+        eq(app_builder_projects.git_platform_integration_id, integration.id)
+      )
+    );
+
+  if (projects.length === 0) return;
+
+  await Promise.allSettled(
+    projects.map(async ({ id }) => {
+      try {
+        await triggerBuild(id);
+      } catch (error) {
+        logExceptInTest('Failed to trigger app builder preview rebuild', {
+          projectId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        captureException(error, {
+          tags: {
+            source: 'github_webhook_handler',
+            event: 'push',
+            projectId: id,
           },
           extra: {
             repository: repositoryFullName,

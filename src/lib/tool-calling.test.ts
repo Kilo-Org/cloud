@@ -286,6 +286,16 @@ describe('repairTools', () => {
   });
 
   describe('edge cases', () => {
+    it('should handle undefined messages without throwing', () => {
+      const request = createRequest({
+        messages: undefined as unknown as OpenRouterChatCompletionRequest['messages'],
+      });
+
+      repairTools(request);
+
+      expect(request.messages).toBeUndefined();
+    });
+
     it('should handle empty messages array', () => {
       const request = createRequest({ messages: [] });
 

@@ -18,7 +18,8 @@ import type { ProjectState, ProjectStore, StateListener } from './types';
 export function createInitialState(
   messages: CloudMessage[],
   deploymentId: string | null,
-  modelId: string | null
+  modelId: string | null,
+  gitRepoFullName: string | null
 ): ProjectState {
   return {
     messages,
@@ -29,6 +30,7 @@ export function createInitialState(
     deploymentId,
     model: modelId ?? 'anthropic/claude-sonnet-4',
     currentIframeUrl: null,
+    gitRepoFullName,
   };
 }
 

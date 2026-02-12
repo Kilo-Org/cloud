@@ -91,6 +91,7 @@ type GitHubRepository = {
   name: string;
   full_name: string;
   private: boolean;
+  created_at: string;
 };
 
 type GitHubBranch = {
@@ -129,6 +130,7 @@ export async function fetchGitHubRepositories(
           name: repo.name,
           full_name: repo.full_name,
           private: repo.private,
+          created_at: repo.created_at ?? new Date().toISOString(),
         }))
     );
 
@@ -479,6 +481,125 @@ function isHttpError(error: unknown): error is { status: number; message: string
     'status' in error &&
     typeof (error as { status: unknown }).status === 'number'
   );
+}
+
+/**
+ * Get repository details including whether it's empty.
+ * Used to validate target repo before migration.
+ *
+ * @param installationId - The GitHub App installation ID
+ * @param repoFullName - The full name of the repository (owner/repo)
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ * @returns Repository details or null if not found/not accessible
+ */
+export async function getRepositoryDetails(
+  installationId: string,
+  repoFullName: string,
+  appType: GitHubAppType = 'standard'
+): Promise<{
+  fullName: string;
+  cloneUrl: string;
+  htmlUrl: string;
+  isEmpty: boolean;
+  isPrivate: boolean;
+} | null> {
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  const [owner, repo] = repoFullName.split('/');
+  if (!owner || !repo) {
+    return null;
+  }
+
+  try {
+    const { data: repoData } = await octokit.repos.get({
+      owner,
+      repo,
+    });
+
+    // Check if repo is empty by trying to get commits
+    // An empty repo has no commits
+    let isEmpty = false;
+    try {
+      const { data: commits } = await octokit.repos.listCommits({
+        owner,
+        repo,
+        per_page: 1,
+      });
+      isEmpty = commits.length === 0;
+    } catch (error) {
+      // 409 Conflict means "Git Repository is empty" - this is expected for empty repos
+      if (isHttpError(error) && error.status === 409) {
+        isEmpty = true;
+      } else {
+        throw error;
+      }
+    }
+
+    logExceptInTest('[getRepositoryDetails] Got repository details', {
+      fullName: repoData.full_name,
+      isEmpty,
+      private: repoData.private,
+    });
+
+    return {
+      fullName: repoData.full_name,
+      cloneUrl: repoData.clone_url,
+      htmlUrl: repoData.html_url,
+      isEmpty,
+      isPrivate: repoData.private,
+    };
+  } catch (error) {
+    // 404 means repo doesn't exist or not accessible
+    if (isHttpError(error) && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get the URL to the GitHub App installation settings page.
+ * Users may need to grant access to newly created repos here.
+ *
+ * @param installationId - The GitHub App installation ID
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ * @returns The URL to the installation settings page
+ */
+export async function getInstallationSettingsUrl(
+  installationId: string,
+  appType: GitHubAppType = 'standard'
+): Promise<string> {
+  const credentials = getGitHubAppCredentials(appType);
+
+  if (!credentials.appId || !credentials.privateKey) {
+    throw new Error(`GitHub ${appType} App credentials not configured`);
+  }
+
+  // Create app-level authentication to get installation details
+  const auth = createAppAuth({
+    appId: credentials.appId,
+    privateKey: credentials.privateKey,
+  });
+
+  const { token } = await auth({ type: 'app' });
+  const octokit = new Octokit({ auth: token });
+
+  const { data } = await octokit.apps.getInstallation({
+    installation_id: parseInt(installationId),
+  });
+
+  // The account type determines the URL format
+  const accountLogin = (data.account as { login?: string })?.login ?? '';
+  const accountType = (data.account as { type?: string })?.type ?? 'User';
+
+  // GitHub App installation settings URL format
+  // For orgs: https://github.com/organizations/{org}/settings/installations/{id}
+  // For users: https://github.com/settings/installations/{id}
+  if (accountType === 'Organization') {
+    return `https://github.com/organizations/${accountLogin}/settings/installations/${installationId}`;
+  }
+  return `https://github.com/settings/installations/${installationId}`;
 }
 
 /**

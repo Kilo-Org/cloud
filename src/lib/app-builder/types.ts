@@ -81,3 +81,63 @@ export type ProjectWithMessages = AppBuilderProject & {
    */
   sessionPrepared: boolean | null;
 };
+
+/**
+ * Input for migrating a project to GitHub
+ * User-created repository approach: users create empty repos themselves, we push to them
+ */
+export type MigrateToGitHubInput = {
+  projectId: string;
+  owner: Owner;
+  /** Kilo user ID - needed by preview DO to resolve GitHub tokens */
+  userId: string;
+  repoFullName: string; // e.g., "org/my-repo" - user-created repo
+};
+
+/**
+ * Result of migrating a project to GitHub
+ */
+export type MigrateToGitHubResult =
+  | { success: true; githubRepoUrl: string; newSessionId: string }
+  | { success: false; error: MigrateToGitHubErrorCode };
+
+export type MigrateToGitHubErrorCode =
+  | 'github_app_not_installed'
+  | 'already_migrated'
+  | 'repo_not_found' // Specified repo doesn't exist or not accessible
+  | 'repo_not_empty' // Repo has commits, must be empty
+  | 'push_failed'
+  | 'project_not_found'
+  | 'internal_error';
+
+/**
+ * Repository info returned by canMigrateToGitHub
+ */
+export type AvailableRepo = {
+  fullName: string;
+  createdAt: string;
+  isPrivate: boolean;
+};
+
+/**
+ * Pre-flight check result for GitHub migration
+ * User-created repository approach: returns info needed to guide user through creating repo
+ */
+export type CanMigrateToGitHubResult = {
+  /** Whether the owner has a GitHub App installation */
+  hasGitHubIntegration: boolean;
+  /** The GitHub account login where the repo should be created */
+  targetAccountName: string | null;
+  /** Whether this project has already been migrated */
+  alreadyMigrated: boolean;
+  /** Suggested repository name based on project title */
+  suggestedRepoName: string;
+  /** URL to create new repo on GitHub (opens GitHub's new repo page) */
+  newRepoUrl: string;
+  /** URL to manage GitHub App repo access (for users with selective repo access) */
+  installationSettingsUrl: string;
+  /** List of repos accessible to the GitHub App installation */
+  availableRepos: AvailableRepo[];
+  /** Whether the GitHub App has access to all repos ('all') or only selected repos ('selected') */
+  repositorySelection: 'all' | 'selected';
+};

@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { LockableContainer } from '../LockableContainer';
 import {
   useUpdateDefaultModel,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
-import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -25,7 +25,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { isModelAllowedProviderAwareClient } from '@/lib/model-allow.client';
 import { toast } from 'sonner';
 import { Settings2 } from 'lucide-react';
 
@@ -47,28 +46,12 @@ export function DefaultModelDialog({
   const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState<string>('');
 
-  const {
-    models: openRouterModels,
-    providers: openRouterProviders,
-    isLoading: modelsLoading,
-  } = useOpenRouterModelsAndProviders();
+  const { data: openRouterModels, isLoading: modelsLoading } = useModelSelectorList(organizationId);
   const updateDefaultModelMutation = useUpdateDefaultModel();
   const updateSettingsMutation = useUpdateOrganizationSettings();
 
   const organizationDefaultModel = organizationSettings?.default_model;
-
-  // Get available models (filtered by organization's model_allow_list if it exists)
-  const availableModels = useMemo(() => {
-    return (
-      openRouterModels.filter(model => {
-        const allowList = organizationSettings?.model_allow_list;
-        if (!allowList || allowList.length === 0) {
-          return true; // No restrictions, all models available
-        }
-        return isModelAllowedProviderAwareClient(model.slug, allowList, openRouterProviders);
-      }) || []
-    );
-  }, [openRouterModels, openRouterProviders, organizationSettings?.model_allow_list]);
+  const availableModels = openRouterModels?.data ?? [];
 
   const handleUpdateDefaultModel = async () => {
     if (!selectedModel) return;
@@ -166,10 +149,10 @@ export function DefaultModelDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {availableModels.map(model => (
-                    <SelectItem key={model.slug} value={model.slug}>
+                    <SelectItem key={model.id} value={model.id}>
                       <div className="flex flex-col">
-                        <span className="font-mono text-sm">{model.slug}</span>
-                        {model.name !== model.slug && (
+                        <span className="font-mono text-sm">{model.id}</span>
+                        {model.name !== model.id && (
                           <span className="text-muted-foreground text-xs">{model.name}</span>
                         )}
                       </div>

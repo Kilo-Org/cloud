@@ -17,9 +17,52 @@ type AdminRPCService = {
   provision(appId: string): Promise<{ token: string; isNew: boolean }>;
 };
 
+/**
+ * Result type for getTokenForRepo RPC call.
+ */
+export type GetTokenForRepoResult =
+  | {
+      success: true;
+      token: string;
+      installationId: string;
+      accountLogin: string;
+      appType: 'standard' | 'lite';
+    }
+  | {
+      success: false;
+      reason:
+        | 'database_not_configured'
+        | 'invalid_repo_format'
+        | 'no_installation_found'
+        | 'invalid_org_id';
+    };
+
+/**
+ * Type for the GitTokenRPCEntrypoint service binding from cloudflare-git-token-service.
+ * Provides GitHub installation token generation via RPC.
+ */
+type GitTokenService = {
+  /**
+   * Get a GitHub token for a repository by looking up the installation.
+   * This validates user access and returns an installation access token.
+   */
+  getTokenForRepo(params: {
+    githubRepo: string;
+    userId: string;
+    orgId?: string;
+  }): Promise<GetTokenForRepoResult>;
+
+  /**
+   * Get a GitHub installation access token directly by installation ID.
+   * Use this when you already have the installation ID from a previous lookup.
+   */
+  getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+};
+
 export interface Env extends Omit<CloudflareEnv, 'SANDBOX' | 'DB_PROXY'> {
   SANDBOX: DurableObjectNamespace<Sandbox<unknown>>;
   DB_PROXY: AdminRPCService;
+  GIT_TOKEN_SERVICE: GitTokenService;
 }
 
 // ============================================
@@ -122,12 +165,24 @@ export type DbCredentials = {
 };
 
 /**
+ * GitHub source configuration for migrated projects.
+ * Set via setGitHubSource() after migration to enable cloning from GitHub.
+ */
+export type GitHubSourceConfig = {
+  githubRepo: string; // "owner/repo" format
+  userId: string; // Kilo user ID for token lookup
+  orgId?: string; // Kilo org ID (if org-owned project)
+};
+
+/**
  * Persisted state that survives DO destruction
  */
 export type PreviewPersistedState = {
   appId: string | null; // null = uninitialized
   lastError: string | null; // error message from last failed process
   dbCredentials: DbCredentials | null;
+  // GitHub migration state - when set, clone from GitHub instead of internal repo
+  githubSource: GitHubSourceConfig | null;
 };
 
 /**

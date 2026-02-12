@@ -131,18 +131,18 @@ export async function makeErrorReadable({
   requestedModel,
   request,
   response,
-  isByok,
+  isUserByok,
 }: {
   requestedModel: string;
   request: OpenRouterChatCompletionRequest;
   response: Response;
-  isByok?: boolean;
+  isUserByok: boolean;
 }) {
   if (response.status < 400) {
     return undefined;
   }
 
-  if (isByok) {
+  if (isUserByok) {
     const byokMessage = byokErrorMessage(response.status);
     if (byokMessage) {
       warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);

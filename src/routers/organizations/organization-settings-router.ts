@@ -144,10 +144,10 @@ const SettingsResponseSchema = z.object({
 
 export const organizationsSettingsRouter = createTRPCRouter({
   listAvailableModels: organizationMemberProcedure
-    .input(OrganizationIdInputSchema)
+    .input(OrganizationIdInputSchema.extend({ includeSlackbotOnly: z.boolean().optional() }))
     .output(z.custom<OpenRouterModelsResponse>())
     .query(async ({ input }) => {
-      const { organizationId } = input;
+      const { organizationId, includeSlackbotOnly } = input;
 
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
@@ -163,7 +163,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         allowedModels = organization.settings.model_allow_list;
       }
 
-      const responseData = await getEnhancedOpenRouterModels();
+      const responseData = await getEnhancedOpenRouterModels({ includeSlackbotOnly });
 
       let filteredModels = responseData.data;
       if (allowedModels) {

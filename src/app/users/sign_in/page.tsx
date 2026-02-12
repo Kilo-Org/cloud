@@ -19,11 +19,11 @@ export default async function SignInPage({
           error={error}
           isSignUp={false}
           allowFakeLogin={allow_fake_login}
-          title={ssoMode ? 'Enterprise SSO' : 'Sign in to Kilo Code'}
+          title={ssoMode ? 'Enterprise SSO' : 'Welcome to Kilo Code'}
           subtitle={
             ssoMode
               ? "Enter your work email address to sign in with your organization's Single Sign-On"
-              : undefined
+              : 'Sign in or create an account to get started'
           }
           ssoMode={ssoMode}
           emailOnly={ssoMode}

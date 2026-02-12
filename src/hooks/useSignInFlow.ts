@@ -60,6 +60,7 @@ export type SignInFlowReturn = {
   error: string;
   pendingSignIn: AuthProviderId | null;
   turnstileError: boolean;
+  termsAccepted: boolean;
 
   // Handlers
   handleEmailChange: (value: string) => void;
@@ -76,6 +77,7 @@ export type SignInFlowReturn = {
   handleSendMagicLink: () => Promise<void>;
   handleShowEmailInput: () => void;
   handleToggleOtherMethods: () => void;
+  handleTermsAcceptedChange: (accepted: boolean) => void;
 };
 
 export function useSignInFlow({
@@ -170,6 +172,8 @@ export function useSignInFlow({
   const [showOtherMethods, setShowOtherMethods] = useState(
     storybookInitialState?.showOtherMethods ?? false
   );
+
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Store pending SSO orgId in ref instead of window object
   const pendingSSOOrgIdRef = useRef<string | null>(null);
@@ -576,6 +580,10 @@ export function useSignInFlow({
     setShowOtherMethods(prev => !prev);
   }, []);
 
+  const handleTermsAcceptedChange = useCallback((accepted: boolean) => {
+    setTermsAccepted(accepted);
+  }, []);
+
   const handleClearHint = useCallback(() => {
     clearHint();
     setEmailState('');
@@ -614,6 +622,7 @@ export function useSignInFlow({
     error,
     pendingSignIn,
     turnstileError,
+    termsAccepted,
     handleEmailChange,
     handleEmailSubmit,
     handleOAuthClick,
@@ -628,5 +637,6 @@ export function useSignInFlow({
     handleSendMagicLink,
     handleShowEmailInput,
     handleToggleOtherMethods,
+    handleTermsAcceptedChange,
   };
 }

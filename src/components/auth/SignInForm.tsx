@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { Mail, SquareUserRound } from 'lucide-react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -128,7 +129,7 @@ export function SignInForm({
           </h1>
         )}
 
-        {subtitle && (
+        {subtitle && !flow?.hint && (
           <p className="text-muted-foreground mb-8 text-lg leading-relaxed">{subtitle}</p>
         )}
 
@@ -270,6 +271,7 @@ export function SignInForm({
                     onEmailChange={flow.handleEmailChange}
                     placeholder="you@example.com"
                     autoFocus={true}
+                    disabled={!flow.termsAccepted}
                   />
 
                   {ssoMode ? (
@@ -293,14 +295,38 @@ export function SignInForm({
               ) : (
                 // Provider buttons view (initial state)
                 <>
+                  <div className="mx-auto mb-6 max-w-md">
+                    <label className="text-muted-foreground flex items-start gap-3 text-sm">
+                      <Checkbox
+                        checked={flow.termsAccepted}
+                        onCheckedChange={flow.handleTermsAcceptedChange}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        By checking this box, I am agreeing to the{' '}
+                        <a
+                          href="https://kilo.ai/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          Terms & Conditions
+                        </a>
+                      </span>
+                    </label>
+                  </div>
                   <div className="mx-auto max-w-md space-y-4">
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
                       providers={OAuthProviderIds}
                       onProviderClick={flow.handleOAuthClick}
+                      disabled={!flow.termsAccepted}
                     />
 
-                    <SignInButton onClick={flow.handleShowEmailInput}>
+                    <SignInButton
+                      onClick={flow.handleShowEmailInput}
+                      disabled={!flow.termsAccepted}
+                    >
                       <Mail />
                       Continue with Email
                     </SignInButton>
@@ -337,9 +363,8 @@ export function SignInForm({
                   </p>
                 ) : (
                   <p className="text-muted-foreground text-sm">
-                    Don&rsquo;t have an account?{' '}
                     <Link href="/get-started" className="text-primary hover:underline">
-                      Sign up
+                      Get started with Kilo Code
                     </Link>
                   </p>
                 )}

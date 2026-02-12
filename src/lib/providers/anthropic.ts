@@ -23,6 +23,8 @@ export const opus_46_free_slackbot_model = {
 
 const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;
 
+const ENABLE_ANTHROPIC_FINE_GRAINED_TOOL_STREAMING = false;
+
 export function isAnthropicModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/');
 }
@@ -93,6 +95,18 @@ export function applyAnthropicModelSettings(
 ) {
   if (ENABLE_ANTHROPIC_STRICT_TOOL_USE) {
     applyAnthropicStrictToolUse(requestToMutate, extraHeaders);
+  }
+
+  if (ENABLE_ANTHROPIC_FINE_GRAINED_TOOL_STREAMING) {
+    console.debug(
+      '[applyAnthropicModelSettings] setting fine-grained-tool-streaming-2025-05-14 beta header'
+    );
+    extraHeaders['x-anthropic-beta'] = [
+      extraHeaders['x-anthropic-beta'],
+      'fine-grained-tool-streaming-2025-05-14',
+    ]
+      .filter(Boolean)
+      .join(',');
   }
 
   if (isOpusModel(requestedModel) && !requestToMutate.verbosity) {

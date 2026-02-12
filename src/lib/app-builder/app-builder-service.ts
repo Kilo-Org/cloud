@@ -88,53 +88,6 @@ export async function getProjectWithOwnershipCheck(
   return project;
 }
 
-/**
- * Lazily backfill session tracking for existing projects.
- * Uses ON CONFLICT DO NOTHING so it's safe to call repeatedly.
- */
-async function ensureSessionTracked(projectId: string, cloudAgentSessionId: string) {
-  await db
-    .insert(app_builder_project_sessions)
-    .values({
-      project_id: projectId,
-      cloud_agent_session_id: cloudAgentSessionId,
-      reason: AppBuilderSessionReason.Initial,
-    })
-    .onConflictDoNothing({ target: app_builder_project_sessions.cloud_agent_session_id });
-}
-
-// Get all sessions for a project (newest first)
-export async function getProjectSessions(projectId: string) {
-  return db
-    .select()
-    .from(app_builder_project_sessions)
-    .where(eq(app_builder_project_sessions.project_id, projectId))
-    .orderBy(desc(app_builder_project_sessions.created_at));
-}
-
-// Get current (active) session for a project
-export async function getCurrentSession(projectId: string) {
-  return db
-    .select()
-    .from(app_builder_project_sessions)
-    .where(
-      and(
-        eq(app_builder_project_sessions.project_id, projectId),
-        isNull(app_builder_project_sessions.ended_at)
-      )
-    )
-    .limit(1);
-}
-
-// Get session count for a project
-export async function getSessionCount(projectId: string) {
-  const result = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(app_builder_project_sessions)
-    .where(eq(app_builder_project_sessions.project_id, projectId));
-  return result[0]?.count ?? 0;
-}
-
 // ============================================================================
 // Exported Functions
 // ============================================================================
@@ -543,9 +496,6 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
   }
 
   const currentSessionId = project.session_id;
-
-  // Lazily backfill session tracking for pre-existing projects
-  await ensureSessionTracked(projectId, currentSessionId);
 
   // Determine which model to use - prefer override, fallback to project's stored model
   const effectiveModel = model ?? project.model_id;

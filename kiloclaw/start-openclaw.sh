@@ -97,22 +97,16 @@ fi
 # ============================================================
 # ONBOARD (only if no config exists yet)
 # ============================================================
+if [ -z "$KILOCODE_API_KEY" ]; then
+    echo "ERROR: KILOCODE_API_KEY is required"
+    exit 1
+fi
+
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "No existing config found, running openclaw onboard..."
 
-    AUTH_ARGS=""
-    if [ -n "$CLOUDFLARE_AI_GATEWAY_API_KEY" ] && [ -n "$CF_AI_GATEWAY_ACCOUNT_ID" ] && [ -n "$CF_AI_GATEWAY_GATEWAY_ID" ]; then
-        AUTH_ARGS="--auth-choice cloudflare-ai-gateway-api-key \
-            --cloudflare-ai-gateway-account-id $CF_AI_GATEWAY_ACCOUNT_ID \
-            --cloudflare-ai-gateway-gateway-id $CF_AI_GATEWAY_GATEWAY_ID \
-            --cloudflare-ai-gateway-api-key $CLOUDFLARE_AI_GATEWAY_API_KEY"
-    elif [ -n "$OPENAI_API_KEY" ]; then
-        AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $OPENAI_API_KEY"
-    fi
-
     openclaw onboard --non-interactive --accept-risk \
         --mode local \
-        $AUTH_ARGS \
         --gateway-port 18789 \
         --gateway-bind lan \
         --skip-channels \
@@ -131,7 +125,7 @@ fi
 # - Channel config (Telegram, Discord, Slack)
 # - Gateway token auth
 # - Trusted proxies for sandbox networking
-# - Base URL override for legacy AI Gateway path
+# - KiloCode provider + model config
 node << 'EOFPATCH'
 const fs = require('fs');
 
@@ -174,50 +168,47 @@ if (process.env.AUTO_APPROVE_DEVICES === 'true') {
     config.gateway.controlUi.allowInsecureAuth = true;
 }
 
-// KiloCode AI Gateway provider override
-// Uses KILOCODE_API_KEY and sets a default model + catalog.
-if (process.env.KILOCODE_API_KEY) {
-    const providerName = 'kilocode';
-    const baseUrl = process.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/openrouter/';
-    const defaultModel =
-        process.env.KILOCODE_DEFAULT_MODEL || providerName + '/anthropic/claude-opus-4.5';
-    const modelsPath = '/root/.openclaw/kilocode-models.json';
-    const defaultModels = [
-        { id: 'anthropic/claude-opus-4.5', name: 'Anthropic: Claude Opus 4.5' },
-        { id: 'minimax/minimax-m2.1:free', name: 'Minimax: Minimax M2.1' },
-        { id: 'z-ai/glm-4.7:free', name: 'GLM-4.7 (Free - Exclusive to Kilo)' },
-    ];
-    let models = defaultModels;
+// KiloCode provider configuration (required)
+const providerName = 'kilocode';
+const baseUrl = process.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/openrouter/';
+const defaultModel =
+    process.env.KILOCODE_DEFAULT_MODEL || providerName + '/anthropic/claude-opus-4.5';
+const modelsPath = '/root/.openclaw/kilocode-models.json';
+const defaultModels = [
+    { id: 'anthropic/claude-opus-4.5', name: 'Anthropic: Claude Opus 4.5' },
+    { id: 'minimax/minimax-m2.1:free', name: 'Minimax: Minimax M2.1' },
+    { id: 'z-ai/glm-4.7:free', name: 'GLM-4.7 (Free - Exclusive to Kilo)' },
+];
+let models = defaultModels;
 
-    if (fs.existsSync(modelsPath)) {
-        const rawModels = fs.readFileSync(modelsPath, 'utf8');
-        if (rawModels.trim().length === 0) {
+if (fs.existsSync(modelsPath)) {
+    const rawModels = fs.readFileSync(modelsPath, 'utf8');
+    if (rawModels.trim().length === 0) {
+        models = [];
+    } else {
+        try {
+            const parsed = JSON.parse(rawModels);
+            models = Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            console.warn('Failed to parse KiloCode models file, using empty list:', error);
             models = [];
-        } else {
-            try {
-                const parsed = JSON.parse(rawModels);
-                models = Array.isArray(parsed) ? parsed : [];
-            } catch (error) {
-                console.warn('Failed to parse KiloCode models file, using empty list:', error);
-                models = [];
-            }
         }
     }
-
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-    config.models.providers[providerName] = {
-        baseUrl: baseUrl,
-        apiKey: process.env.KILOCODE_API_KEY,
-        api: 'openai-completions',
-        models: models,
-    };
-
-    config.agents = config.agents || {};
-    config.agents.defaults = config.agents.defaults || {};
-    config.agents.defaults.model = { primary: defaultModel };
-    console.log('KiloCode provider configured with base URL ' + baseUrl);
 }
+
+config.models = config.models || {};
+config.models.providers = config.models.providers || {};
+config.models.providers[providerName] = {
+    baseUrl: baseUrl,
+    apiKey: process.env.KILOCODE_API_KEY,
+    api: 'openai-completions',
+    models: models,
+};
+
+config.agents = config.agents || {};
+config.agents.defaults = config.agents.defaults || {};
+config.agents.defaults.model = { primary: defaultModel };
+console.log('KiloCode provider configured with base URL ' + baseUrl);
 
 // Telegram configuration
 // Overwrite entire channel object to drop stale keys from old R2 backups

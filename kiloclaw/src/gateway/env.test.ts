@@ -59,36 +59,18 @@ describe('buildEnvVars', () => {
     expect(result.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
-  it('includes OPENAI_API_KEY when set directly', async () => {
-    const env = createMockEnv({ OPENAI_API_KEY: 'sk-openai-key' });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.OPENAI_API_KEY).toBe('sk-openai-key');
-  });
-
-  it('passes Cloudflare AI Gateway env vars', async () => {
-    const env = createMockEnv({
-      CLOUDFLARE_AI_GATEWAY_API_KEY: 'cf-gw-key',
-      CF_AI_GATEWAY_ACCOUNT_ID: 'my-account-id',
-      CF_AI_GATEWAY_GATEWAY_ID: 'my-gateway-id',
-    });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.CLOUDFLARE_AI_GATEWAY_API_KEY).toBe('cf-gw-key');
-    expect(result.CF_AI_GATEWAY_ACCOUNT_ID).toBe('my-account-id');
-    expect(result.CF_AI_GATEWAY_GATEWAY_ID).toBe('my-gateway-id');
-  });
-
   it('maps DEV_MODE to OPENCLAW_DEV_MODE for container', async () => {
     const env = createMockEnv({ DEV_MODE: 'true' });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
     expect(result.OPENCLAW_DEV_MODE).toBe('true');
   });
 
-  it('passes CF_AI_GATEWAY_MODEL to container', async () => {
+  it('passes KILOCODE_API_BASE_URL override to container', async () => {
     const env = createMockEnv({
-      CF_AI_GATEWAY_MODEL: 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      KILOCODE_API_BASE_URL: 'https://example.internal/openrouter/',
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.CF_AI_GATEWAY_MODEL).toBe('workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+    expect(result.KILOCODE_API_BASE_URL).toBe('https://example.internal/openrouter/');
   });
 
   it('does not pass worker-level channel tokens (user config only)', async () => {
@@ -109,23 +91,14 @@ describe('buildEnvVars', () => {
   // ─── User config merging (Layers 2-4) ────────────────────────────────
 
   it('merges user plaintext env vars on top of platform defaults', async () => {
-    const env = createMockEnv({ OPENAI_API_KEY: 'sk-platform-openai' });
+    const env = createMockEnv({ DEV_MODE: 'true' });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
       envVars: { CUSTOM_VAR: 'custom-value', NODE_ENV: 'production' },
     });
 
-    expect(result.OPENAI_API_KEY).toBe('sk-platform-openai');
+    expect(result.OPENCLAW_DEV_MODE).toBe('true');
     expect(result.CUSTOM_VAR).toBe('custom-value');
     expect(result.NODE_ENV).toBe('production');
-  });
-
-  it('user env vars can override platform AI keys (BYOK)', async () => {
-    const env = createMockEnv({ OPENAI_API_KEY: 'sk-platform-openai' });
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
-      envVars: { OPENAI_API_KEY: 'sk-user-openai' },
-    });
-
-    expect(result.OPENAI_API_KEY).toBe('sk-user-openai');
   });
 
   it('passes KiloCode overrides from user config', async () => {

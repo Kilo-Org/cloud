@@ -9,6 +9,11 @@ import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import {
+  ensureActiveInstance,
+  markActiveInstanceDestroyed,
+  restoreDestroyedInstance,
+} from '@/lib/kiloclaw/instance-registry';
 
 /**
  * Procedure middleware: restrict to @kilocode.ai users.
@@ -78,6 +83,54 @@ function buildWorkerChannels(channels: z.infer<typeof updateConfigSchema>['chann
   };
 }
 
+async function provisionInstance(
+  user: Parameters<typeof generateApiToken>[0],
+  input: z.infer<typeof updateConfigSchema>
+) {
+  await ensureActiveInstance(user.id);
+
+  const encryptedSecrets = input.secrets
+    ? Object.fromEntries(
+        Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
+      )
+    : undefined;
+
+  const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+  const kilocodeApiKey = generateApiToken(user, undefined, {
+    expiresIn: expiresInSeconds,
+  });
+  const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+  const client = new KiloClawInternalClient();
+  return client.provision(user.id, {
+    envVars: input.envVars,
+    encryptedSecrets,
+    channels: buildWorkerChannels(input.channels),
+    kilocodeApiKey,
+    kilocodeApiKeyExpiresAt,
+    kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+    kilocodeModels: input.kilocodeModels ?? undefined,
+  });
+}
+
+async function patchConfig(
+  user: Parameters<typeof generateApiToken>[0],
+  input: z.infer<typeof updateKiloCodeConfigSchema>
+) {
+  const client = new KiloClawInternalClient();
+  const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+  const kilocodeApiKey = generateApiToken(user, undefined, {
+    expiresIn: expiresInSeconds,
+  });
+  const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+  return client.patchKiloCodeConfig(user.id, {
+    ...input,
+    kilocodeApiKey,
+    kilocodeApiKeyExpiresAt,
+  });
+}
+
 export const kiloclawRouter = createTRPCRouter({
   // Status + gateway token (two internal client calls, merged for the dashboard)
   getStatus: kiloclawProcedure.query(async ({ ctx }) => {
@@ -114,51 +167,38 @@ export const kiloclawRouter = createTRPCRouter({
   destroy: kiloclawProcedure
     .input(z.object({ deleteData: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
+      const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.destroy(ctx.user.id, input.deleteData);
+      try {
+        return await client.destroy(ctx.user.id, input.deleteData);
+      } catch (error) {
+        if (destroyedRow) {
+          await restoreDestroyedInstance(destroyedRow.id);
+        }
+        throw error;
+      }
     }),
 
-  // Configuration: encrypt secrets server-side and call worker
+  // Explicit lifecycle APIs
+  provision: kiloclawProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
+    return provisionInstance(ctx.user, input);
+  }),
+
+  patchConfig: kiloclawProcedure
+    .input(updateKiloCodeConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      return patchConfig(ctx.user, input);
+    }),
+
+  // Backward-compatible aliases.
   updateConfig: kiloclawProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    const encryptedSecrets = input.secrets
-      ? Object.fromEntries(
-          Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
-        )
-      : undefined;
-
-    const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-    const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-      expiresIn: expiresInSeconds,
-    });
-    const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
-
-    const client = new KiloClawInternalClient();
-    return client.provision(ctx.user.id, {
-      envVars: input.envVars,
-      encryptedSecrets,
-      channels: buildWorkerChannels(input.channels),
-      kilocodeApiKey,
-      kilocodeApiKeyExpiresAt,
-      kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-      kilocodeModels: input.kilocodeModels ?? undefined,
-    });
+    return provisionInstance(ctx.user, input);
   }),
 
   updateKiloCodeConfig: kiloclawProcedure
     .input(updateKiloCodeConfigSchema)
     .mutation(async ({ ctx, input }) => {
-      const client = new KiloClawInternalClient();
-      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-        expiresIn: expiresInSeconds,
-      });
-      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
-
-      return client.patchKiloCodeConfig(ctx.user.id, {
-        ...input,
-        kilocodeApiKey,
-        kilocodeApiKeyExpiresAt,
-      });
+      return patchConfig(ctx.user, input);
     }),
 
   // User-facing (user client -- forwards user's short-lived JWT)

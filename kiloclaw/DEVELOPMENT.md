@@ -62,26 +62,13 @@ For local dev, any placeholder values work (the example file has defaults).
 For production, generate real secrets and keep `NEXTAUTH_SECRET` and
 `INTERNAL_API_SECRET` in sync with the Next.js deployment.
 
-### AI Provider (at least one required)
+### AI Provider (required)
 
-Users can bring their own keys (BYOK), or set a platform default for development.
+KiloClaw uses the KiloCode provider only.
 
-| Variable           | Description                 |
-| ------------------ | --------------------------- |
-| `KILOCODE_API_KEY` | KiloCode API key (per user) |
-| `OPENAI_API_KEY`   | Direct OpenAI API key       |
-
-**Cloudflare AI Gateway** (alternative -- all three required together):
-
-| Variable                        | Description                                         |
-| ------------------------------- | --------------------------------------------------- |
-| `CLOUDFLARE_AI_GATEWAY_API_KEY` | Your provider's API key, routed through the gateway |
-| `CF_AI_GATEWAY_ACCOUNT_ID`      | Your Cloudflare account ID                          |
-| `CF_AI_GATEWAY_GATEWAY_ID`      | Your AI Gateway ID                                  |
-| `CF_AI_GATEWAY_MODEL`           | Optional model override: `provider/model-id`        |
-
-Legacy AI Gateway (`AI_GATEWAY_API_KEY` + `AI_GATEWAY_BASE_URL`) is still
-supported but deprecated.
+| Variable           | Description                                                                |
+| ------------------ | -------------------------------------------------------------------------- |
+| `KILOCODE_API_KEY` | Per-instance KiloCode API key (injected by Next.js during provision/patch) |
 
 ### R2 Persistence
 

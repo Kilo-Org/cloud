@@ -20,7 +20,7 @@ export type UserConfig = {
  * Build environment variables to pass to the OpenClaw container process.
  *
  * Layering order:
- * 1. Worker-level shared AI keys (platform defaults)
+ * 1. Worker-level defaults
  * 2. User-provided plaintext env vars (override platform defaults)
  * 3. User-provided encrypted secrets (override env vars on conflict)
  * 4. Decrypted channel tokens (mapped to container env var names)
@@ -38,25 +38,11 @@ export async function buildEnvVars(
   gatewayTokenSecret: string,
   userConfig?: UserConfig
 ): Promise<Record<string, string>> {
-  // Layer 1: Worker-level shared AI keys (platform defaults)
+  // Layer 1: Worker-level defaults
   const envVars: Record<string, string> = {};
 
-  // Cloudflare AI Gateway configuration (new native provider)
-  if (env.CLOUDFLARE_AI_GATEWAY_API_KEY) {
-    envVars.CLOUDFLARE_AI_GATEWAY_API_KEY = env.CLOUDFLARE_AI_GATEWAY_API_KEY;
-  }
-  if (env.CF_AI_GATEWAY_ACCOUNT_ID) {
-    envVars.CF_AI_GATEWAY_ACCOUNT_ID = env.CF_AI_GATEWAY_ACCOUNT_ID;
-  }
-  if (env.CF_AI_GATEWAY_GATEWAY_ID) {
-    envVars.CF_AI_GATEWAY_GATEWAY_ID = env.CF_AI_GATEWAY_GATEWAY_ID;
-  }
-
-  // Direct provider keys
-  if (env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = env.OPENAI_API_KEY;
-
   if (env.DEV_MODE) envVars.OPENCLAW_DEV_MODE = env.DEV_MODE;
-  if (env.CF_AI_GATEWAY_MODEL) envVars.CF_AI_GATEWAY_MODEL = env.CF_AI_GATEWAY_MODEL;
+  if (env.KILOCODE_API_BASE_URL) envVars.KILOCODE_API_BASE_URL = env.KILOCODE_API_BASE_URL;
   if (env.CF_ACCOUNT_ID) envVars.CF_ACCOUNT_ID = env.CF_ACCOUNT_ID;
 
   // Layer 2 + 3: User env vars merged with decrypted secrets.

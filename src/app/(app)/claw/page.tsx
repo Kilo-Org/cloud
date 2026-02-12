@@ -10,7 +10,6 @@ import {
 import { PageLayout } from '@/components/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExternalLink, Play, Square, RotateCw, RefreshCw, Trash2, Plus, Save } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -164,7 +163,7 @@ function OverviewTab() {
 
 function SettingsTab() {
   const { data: config } = useKiloClawConfig();
-  const { updateConfig } = useKiloClawMutations();
+  const { patchConfig } = useKiloClawMutations();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
 
   const [selectedModel, setSelectedModel] = useState('');
@@ -187,7 +186,7 @@ function SettingsTab() {
     setHasAppliedDefaults(true);
   }, [config, defaultModel, hasAppliedDefaults, modelOptions]);
 
-  const isSaving = updateConfig.isPending;
+  const isSaving = patchConfig.isPending;
 
   function handleSave() {
     if (isLoadingModels) {
@@ -196,7 +195,7 @@ function SettingsTab() {
     }
 
     const modelsPayload = modelOptions.map(({ id, name }) => ({ id, name }));
-    updateConfig.mutate(
+    patchConfig.mutate(
       {
         kilocodeDefaultModel: selectedModel ? `kilocode/${selectedModel}` : null,
         kilocodeModels: modelsPayload.length > 0 ? modelsPayload : null,
@@ -365,7 +364,7 @@ function ActionsTab() {
 // ─── Create Instance (empty state with inline settings) ──────────────
 
 function CreateInstanceForm() {
-  const { updateConfig } = useKiloClawMutations();
+  const { provision } = useKiloClawMutations();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
   const [selectedModel, setSelectedModel] = useState('');
   const modelOptions = useMemo<ModelOption[]>(
@@ -380,7 +379,7 @@ function CreateInstanceForm() {
     }
 
     const modelsPayload = modelOptions.map(({ id, name }) => ({ id, name }));
-    updateConfig.mutate(
+    provision.mutate(
       {
         kilocodeDefaultModel: selectedModel ? `kilocode/${selectedModel}` : null,
         kilocodeModels: modelsPayload.length > 0 ? modelsPayload : null,
@@ -412,15 +411,15 @@ function CreateInstanceForm() {
             value={selectedModel}
             onValueChange={setSelectedModel}
             isLoading={isLoadingModels}
-            disabled={updateConfig.isPending || isLoadingModels}
+            disabled={provision.isPending || isLoadingModels}
           />
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleCreate} disabled={updateConfig.isPending}>
+        <Button onClick={handleCreate} disabled={provision.isPending}>
           <Plus className="mr-2 h-4 w-4" />
-          {updateConfig.isPending ? 'Creating...' : 'Create & Provision'}
+          {provision.isPending ? 'Creating...' : 'Create & Provision'}
         </Button>
       </div>
     </div>

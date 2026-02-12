@@ -16,13 +16,7 @@ export type KiloClawEnv = {
   GATEWAY_TOKEN_SECRET?: string;
   WORKER_ENV?: string; // e.g. 'production' or 'development' -- for JWT env validation
 
-  // Cloudflare AI Gateway configuration (preferred)
-  CF_AI_GATEWAY_ACCOUNT_ID?: string;
-  CF_AI_GATEWAY_GATEWAY_ID?: string;
-  CLOUDFLARE_AI_GATEWAY_API_KEY?: string;
-  CF_AI_GATEWAY_MODEL?: string;
-  // Direct provider configuration
-  OPENAI_API_KEY?: string;
+  // KiloCode provider configuration
   KILOCODE_API_BASE_URL?: string;
   DEV_MODE?: string;
   DEBUG_ROUTES?: string;

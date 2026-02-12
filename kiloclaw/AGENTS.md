@@ -111,13 +111,13 @@ OpenClaw configuration is built at container startup by `start-openclaw.sh`:
 3. The startup script patches the config for channels, gateway auth, and trusted proxies
 4. Gateway starts with `openclaw gateway --allow-unconfigured --bind lan`
 
-### AI Provider Priority
+### AI Provider Selection
 
-The startup script selects the provider based on which env vars are set:
+KiloClaw is KiloCode-only:
 
-1. **Cloudflare AI Gateway** (native): `CLOUDFLARE_AI_GATEWAY_API_KEY` + `CF_AI_GATEWAY_ACCOUNT_ID` + `CF_AI_GATEWAY_GATEWAY_ID`
-2. **Direct OpenAI**: `OPENAI_API_KEY`
-3. **Legacy AI Gateway**: `AI_GATEWAY_API_KEY` + `AI_GATEWAY_BASE_URL`
+1. `KILOCODE_API_KEY` is required at startup.
+2. `start-openclaw.sh` patches `config.models.providers.kilocode`.
+3. `agents.defaults.model.primary` is set from `KILOCODE_DEFAULT_MODEL` (or fallback default).
 
 ## OpenClaw Config Schema
 

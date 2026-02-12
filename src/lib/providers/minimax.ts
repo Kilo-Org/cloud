@@ -29,20 +29,6 @@ export const minimax_m25_free_model = {
   inference_providers: ['minimax'],
 } as KiloFreeModel;
 
-export const minimax_m21_free_slackbot_model = {
-  public_id: 'minimax/minimax-m2.1:slackbot',
-  display_name: 'MiniMax: MiniMax M2.1 (Free for Kilo for Slack)',
-  description: 'Free version of MiniMax M2.1 for use in Kilo for Slack only',
-  context_length: 204800,
-  max_completion_tokens: 131072,
-  is_enabled: true,
-  flags: ['reasoning'],
-  gateway: 'vercel',
-  internal_id: 'minimax/minimax-m2.1',
-  inference_providers: ['minimax'],
-  slackbot_only: true,
-} as KiloFreeModel;
-
 export function applyMinimaxProviderSettings(requestToMutate: OpenRouterChatCompletionRequest) {
   requestToMutate.reasoning_split = true;
 }

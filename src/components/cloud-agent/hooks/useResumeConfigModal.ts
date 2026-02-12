@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { type DbSessionDetails, type IndexedDbSessionData } from '../store/db-session-atoms';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 import type { ResumeConfig, StreamResumeConfig } from '../types';
-import { minimax_m21_free_slackbot_model } from '@/lib/providers/minimax';
 
 // Re-export StreamResumeConfig for backwards compatibility
 export type { StreamResumeConfig };
@@ -66,7 +65,7 @@ export function needsResumeConfigModal(params: {
   if (!loadedDbSession) return false;
 
   if (
-    loadedDbSession.last_model === minimax_m21_free_slackbot_model.public_id &&
+    loadedDbSession.last_model === 'minimax/minimax-m2.1:slackbot' &&
     !currentIndexedDbSession?.resumeConfig
   )
     return true;

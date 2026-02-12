@@ -290,10 +290,18 @@ export function ModeForm({
             <Select
               value={selectedTemplate}
               onValueChange={handleTemplateSelect}
-              disabled={templatesLoading || isSubmitting}
+              disabled={templatesLoading || isSubmitting || !templates?.length}
             >
               <SelectTrigger id="template-select" className="w-[280px]">
-                <SelectValue placeholder="Choose a template..." />
+                <SelectValue
+                  placeholder={
+                    templatesLoading
+                      ? 'Loading templates...'
+                      : templates?.length
+                        ? 'Choose a template...'
+                        : 'No templates available'
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {templates?.map(template => (

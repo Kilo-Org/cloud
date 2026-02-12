@@ -567,7 +567,6 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2026-03-01'),
     description: 'Emilie Valentine Experiment',
     total_redemptions_allowed: 5000,
-    customer_requirement: has_Payment,
   },
   {
     encrypted_credit_category: 'C3wdUIGcWvHqGKkb+S1caw==:y0x+2EPqORv/Cj/0iJRAoQ==:8mc/1wDaNo0=',

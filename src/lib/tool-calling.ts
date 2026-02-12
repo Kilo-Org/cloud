@@ -80,6 +80,9 @@ function deduplicateToolUses(assistantMessage: OpenAI.ChatCompletionAssistantMes
 }
 
 export function repairTools(requestToMutate: OpenRouterChatCompletionRequest) {
+  if (!Array.isArray(requestToMutate.messages)) {
+    return;
+  }
   const groups = groupByAssistantMessage(requestToMutate.messages);
 
   for (const group of groups) {

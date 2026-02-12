@@ -56,7 +56,6 @@ import {
 } from '@/lib/kilo-pass/enums';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
-import type { KiloClawInstanceChannels, KiloClawInstanceVar } from '@/lib/kiloclaw/enums';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -2856,8 +2855,6 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
-    channels: jsonb().$type<KiloClawInstanceChannels>(),
-    vars: jsonb().$type<KiloClawInstanceVar[]>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },

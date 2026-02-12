@@ -721,30 +721,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       console.log('[DO] Restoring state from Postgres backup for', userId);
 
-      // Parse vars JSONB: [{ key, value, is_secret }]
-      let envVars: Record<string, string> | null = null;
-      let encryptedSecrets: Record<string, EncryptedEnvelope> | null = null;
-      if (instance.vars) {
-        const vars = JSON.parse(instance.vars) as Array<{
-          key: string;
-          value: string;
-          is_secret: boolean;
-        }>;
-        const plainVars: Record<string, string> = {};
-        const secretVars: Record<string, EncryptedEnvelope> = {};
-        for (const v of vars) {
-          if (v.is_secret) {
-            secretVars[v.key] = JSON.parse(v.value) as EncryptedEnvelope;
-          } else {
-            plainVars[v.key] = v.value;
-          }
-        }
-        if (Object.keys(plainVars).length > 0) envVars = plainVars;
-        if (Object.keys(secretVars).length > 0) encryptedSecrets = secretVars;
-      }
-
-      // Parse channels JSONB
-      const channels = instance.channels ? JSON.parse(instance.channels) : null;
+      // Config values are not persisted in Postgres.
+      const envVars: Record<string, string> | null = null;
+      const encryptedSecrets: Record<string, EncryptedEnvelope> | null = null;
+      const channels = null;
 
       // Write restored state to DO SQLite
       await this.ctx.storage.put({

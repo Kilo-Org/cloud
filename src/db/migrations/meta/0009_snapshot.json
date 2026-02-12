@@ -1,5 +1,5 @@
 {
-  "id": "b9e74560-fe5f-4a13-a7c7-a1f096b85d33",
+  "id": "4fd99cc8-18d6-4d09-badc-05dbdfd0aaf2",
   "prevId": "460a4eaf-98a5-44ad-b320-4620c0696a92",
   "version": "7",
   "dialect": "postgresql",
@@ -6167,18 +6167,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "channels": {
-          "name": "channels",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "vars": {
-          "name": "vars",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",

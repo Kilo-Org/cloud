@@ -9,15 +9,15 @@ export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.6';
 
 export const opus_46_free_slackbot_model = {
   public_id: 'anthropic/claude-opus-4.6:slackbot',
-  display_name: 'Claude Opus 4.6 (Free for Kilo for Slack)',
+  display_name: 'Anthropic: Claude Opus 4.6 (Free for Kilo for Slack)',
   description: 'Free version of Claude Opus 4.6 for use in Kilo for Slack only',
-  context_length: 200000,
+  context_length: 1_000_000,
   max_completion_tokens: 32000,
   is_enabled: true,
-  flags: ['reasoning', 'vision'],
-  gateway: 'vercel',
+  flags: ['reasoning', 'prompt_cache', 'vision'],
+  gateway: 'openrouter',
   internal_id: 'anthropic/claude-opus-4.6',
-  inference_providers: ['anthropic'],
+  inference_providers: ['amazon-bedrock'],
   slackbot_only: true,
 } as KiloFreeModel;
 
@@ -29,6 +29,10 @@ export function isAnthropicModel(requestedModel: string) {
 
 export function isHaikuModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/claude-haiku');
+}
+
+export function isOpusModel(requestedModel: string) {
+  return requestedModel.startsWith('anthropic/claude-opus');
 }
 
 type ReadFileParametersSchema = {
@@ -83,11 +87,16 @@ function applyAnthropicStrictToolUse(
 }
 
 export function applyAnthropicModelSettings(
+  requestedModel: string,
   requestToMutate: OpenRouterChatCompletionRequest,
   extraHeaders: Record<string, string>
 ) {
   if (ENABLE_ANTHROPIC_STRICT_TOOL_USE) {
     applyAnthropicStrictToolUse(requestToMutate, extraHeaders);
+  }
+
+  if (isOpusModel(requestedModel) && !requestToMutate.verbosity) {
+    requestToMutate.verbosity = 'medium';
   }
 
   // anthropic doesn't allow '.' in tool call ids

@@ -492,10 +492,10 @@
       "id": "anthropic/claude-opus-4.6:slackbot",
       "canonical_slug": "anthropic/claude-opus-4.6:slackbot",
       "hugging_face_id": "",
-      "name": "Claude Opus 4.6 (Free for Kilo for Slack)",
+      "name": "Anthropic: Claude Opus 4.6 (Free for Kilo for Slack)",
       "created": 1756238927,
       "description": "Free version of Claude Opus 4.6 for use in Kilo for Slack only",
-      "context_length": 200000,
+      "context_length": 1000000,
       "architecture": {
         "modality": "text+image->text",
         "input_modalities": [
@@ -514,10 +514,11 @@
         "request": "0",
         "image": "0",
         "web_search": "0",
-        "internal_reasoning": "0"
+        "internal_reasoning": "0",
+        "input_cache_read": "0.00000000"
       },
       "top_provider": {
-        "context_length": 200000,
+        "context_length": 1000000,
         "max_completion_tokens": 32000,
         "is_moderated": false
       },

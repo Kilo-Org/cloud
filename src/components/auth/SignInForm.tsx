@@ -14,6 +14,7 @@ import { Mail, SquareUserRound } from 'lucide-react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -271,7 +272,6 @@ export function SignInForm({
                     onEmailChange={flow.handleEmailChange}
                     placeholder="you@example.com"
                     autoFocus={true}
-                    disabled={!flow.termsAccepted}
                   />
 
                   {ssoMode ? (
@@ -295,25 +295,23 @@ export function SignInForm({
               ) : (
                 // Provider buttons view (initial state)
                 <>
-                  <div className="mx-auto mb-6 max-w-md">
-                    <label className="text-muted-foreground flex items-start gap-3 text-sm">
-                      <Checkbox
-                        checked={flow.termsAccepted}
-                        onCheckedChange={flow.handleTermsAcceptedChange}
-                        className="mt-0.5"
-                      />
-                      <span>
-                        By checking this box, I am agreeing to the{' '}
-                        <a
-                          href="https://kilo.ai/terms"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          Terms & Conditions
-                        </a>
-                      </span>
-                    </label>
+                  <div className="mb-4 flex items-center space-x-2">
+                    <Checkbox
+                      id="termsAccepted"
+                      checked={flow.termsAccepted}
+                      onCheckedChange={flow.handleTermsAcceptedChange}
+                    />
+                    <Label htmlFor="termsAccepted" className="text-muted-foreground text-sm">
+                      By checking this box, I am agreeing to the{' '}
+                      <a
+                        href="https://kilo.ai/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                      >
+                        Terms & Conditions
+                      </a>
+                    </Label>
                   </div>
                   <div className="mx-auto max-w-md space-y-4">
                     {/* OAuth provider buttons - Google first */}

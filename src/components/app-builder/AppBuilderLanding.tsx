@@ -45,8 +45,8 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
-import { useOrganizationWithMembers, useOrganizationDefaults } from '@/app/api/organizations/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
@@ -597,23 +597,14 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     : personalProjectsQuery.isLoading;
 
   // Fetch organization configuration and models
-  const { data: organizationData } = useOrganizationWithMembers(organizationId || '', {
-    enabled: !!organizationId,
-  });
-  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
-  // Get organization's allowed models
-  const savedModelAllowList = organizationData?.settings?.model_allow_list || [];
   const allModels = modelsData?.data || [];
 
-  // Filter models based on organization's allow list (memoized to avoid prompt re-render churn)
   // When user has limited access, only show free models
   const availableModels = useMemo(() => {
-    let models =
-      savedModelAllowList.length === 0
-        ? allModels
-        : allModels.filter(m => savedModelAllowList.includes(m.id));
+    let models = allModels;
 
     // If user has limited access, filter to only free models
     if (hasLimitedAccess) {
@@ -625,7 +616,7 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     }
 
     return models;
-  }, [allModels, savedModelAllowList, hasLimitedAccess]);
+  }, [allModels, hasLimitedAccess]);
 
   // Check if the selected model supports images (vision)
   const selectedModelData = useMemo(

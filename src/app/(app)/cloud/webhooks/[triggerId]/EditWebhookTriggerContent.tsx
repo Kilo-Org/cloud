@@ -16,7 +16,7 @@ import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import type { AgentMode } from '@/components/cloud-agent/types';
-import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { ArrowLeft, Webhook, ExternalLink, RefreshCw } from 'lucide-react';
 
 type EditWebhookTriggerContentProps = {
@@ -66,7 +66,7 @@ export function EditWebhookTriggerContent({
   );
 
   // Fetch models
-  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
 
   // Transform repositories to RepositoryOption format
   const repositories = useMemo<RepositoryOption[]>(() => {

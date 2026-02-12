@@ -8,7 +8,6 @@ import { StatusBadge } from './StatusBadge';
 import { BuildLogViewer } from './BuildLogViewer';
 import { EnvironmentSettings } from './EnvironmentSettings';
 import { PasswordSettings } from './PasswordSettings';
-import { BannerSettings } from './BannerSettings';
 import { Button } from '@/components/Button';
 import { Loader2, AlertCircle, Trash2, RotateCw, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -22,15 +21,11 @@ type DeploymentDetailsProps = {
 };
 
 export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentDetailsProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'environment' | 'password' | 'banner'>(
-    'overview'
-  );
+  const [activeTab, setActiveTab] = useState<'overview' | 'environment' | 'password'>('overview');
   const { queries, mutations } = useDeploymentQueries();
 
   // Check if password features are available (org-only)
   const hasPasswordFeature = !!mutations.setPassword;
-  // Banner settings hidden for now; the toggle will be re-enabled later.
-  const hasBannerFeature = false;
 
   const redeployMutation = mutations.redeploy;
   const deleteDeploymentMutation = mutations.deleteDeployment;
@@ -133,26 +128,14 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
         ) : deployment ? (
           <Tabs
             value={activeTab}
-            onValueChange={value =>
-              setActiveTab(value as 'overview' | 'environment' | 'password' | 'banner')
-            }
+            onValueChange={value => setActiveTab(value as 'overview' | 'environment' | 'password')}
           >
             <TabsList
-              className={`grid w-full ${
-                hasPasswordFeature && hasBannerFeature && deployment.created_from === 'app-builder'
-                  ? 'grid-cols-4'
-                  : hasPasswordFeature ||
-                      (hasBannerFeature && deployment.created_from === 'app-builder')
-                    ? 'grid-cols-3'
-                    : 'grid-cols-2'
-              }`}
+              className={`grid w-full ${hasPasswordFeature ? 'grid-cols-3' : 'grid-cols-2'}`}
             >
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="environment">Environment</TabsTrigger>
               {hasPasswordFeature && <TabsTrigger value="password">Password</TabsTrigger>}
-              {hasBannerFeature && deployment.created_from === 'app-builder' && (
-                <TabsTrigger value="banner">Banner</TabsTrigger>
-              )}
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -322,12 +305,6 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
             {hasPasswordFeature && (
               <TabsContent value="password" className="space-y-6">
                 <PasswordSettings deploymentId={deploymentId} />
-              </TabsContent>
-            )}
-
-            {hasBannerFeature && deployment.created_from === 'app-builder' && (
-              <TabsContent value="banner" className="space-y-6">
-                <BannerSettings deploymentId={deploymentId} />
               </TabsContent>
             )}
           </Tabs>

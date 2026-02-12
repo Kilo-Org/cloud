@@ -19,13 +19,8 @@ const setPasswordResponseSchema = z.object({
   passwordSetAt: z.number(),
 });
 
-const getBannerStatusResponseSchema = z.object({
-  enabled: z.boolean(),
-});
-
 export type GetPasswordStatusResponse = z.infer<typeof getPasswordStatusResponseSchema>;
 export type SetPasswordResponse = z.infer<typeof setPasswordResponseSchema>;
-export type GetBannerStatusResponse = z.infer<typeof getBannerStatusResponseSchema>;
 
 /**
  * Client for the deploy dispatcher worker API.
@@ -140,20 +135,6 @@ class DispatcherClient {
   }
 
   // ---- Banner ----
-
-  async getBannerStatus(workerName: string): Promise<GetBannerStatusResponse> {
-    const response = await fetchWithTimeout(
-      `${this.baseUrl}/api/app-builder-banner/${workerName}`,
-      { headers: this.getHeaders() },
-      { maxRetries: 0 }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to get banner status: ${response.statusText}`);
-    }
-
-    return getBannerStatusResponseSchema.parse(await response.json());
-  }
 
   async enableBanner(workerName: string) {
     const response = await fetchWithTimeout(

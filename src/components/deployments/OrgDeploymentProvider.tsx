@@ -91,14 +91,6 @@ export function OrgDeploymentProvider({ organizationId, children }: OrgDeploymen
           deploymentId,
         })
       ),
-
-    getBannerStatus: (deploymentId: string) =>
-      useQuery(
-        trpc.organizations.deployments.getBannerStatus.queryOptions({
-          organizationId,
-          deploymentId,
-        })
-      ),
   };
 
   // Base mutations from TRPC
@@ -235,19 +227,6 @@ export function OrgDeploymentProvider({ organizationId, children }: OrgDeploymen
     })
   );
 
-  const setBannerMutation = useMutation(
-    trpc.organizations.deployments.setBanner.mutationOptions({
-      onSuccess: (_data, variables) => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.deployments.getBannerStatus.queryKey({
-            organizationId,
-            deploymentId: variables.deploymentId,
-          }),
-        });
-      },
-    })
-  );
-
   // Wrap mutations to match the DeploymentMutations interface
   const mutations: DeploymentMutations = {
     createDeployment: {
@@ -339,16 +318,6 @@ export function OrgDeploymentProvider({ organizationId, children }: OrgDeploymen
         return removePasswordMutation.mutateAsync({ ...input, organizationId }, options);
       },
     } as DeploymentMutations['removePassword'],
-
-    setBanner: {
-      ...setBannerMutation,
-      mutate: (input, options) => {
-        setBannerMutation.mutate({ ...input, organizationId }, options);
-      },
-      mutateAsync: async (input, options) => {
-        return setBannerMutation.mutateAsync({ ...input, organizationId }, options);
-      },
-    } as DeploymentMutations['setBanner'],
   };
 
   return (

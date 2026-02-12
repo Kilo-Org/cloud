@@ -4,7 +4,6 @@ import * as z from 'zod';
 import { branchSchema, repoNameSchema, slugSchema } from '@/lib/user-deployments/validation';
 import * as deploymentsService from '@/lib/user-deployments/deployments-service';
 import * as envVarsService from '@/lib/user-deployments/env-vars-service';
-import { dispatcherClient } from '@/lib/user-deployments/dispatcher-client';
 import {
   envVarKeySchema,
   plaintextEnvVarSchema,
@@ -168,44 +167,5 @@ export const deploymentsRouter = createTRPCRouter({
         type: 'user',
         id: ctx.user.id,
       });
-    }),
-
-  // Banner endpoints (app-builder deployments only)
-  getBannerStatus: baseProcedure
-    .input(
-      z.object({
-        deploymentId: z.string().uuid(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
-        type: 'user',
-        id: ctx.user.id,
-      });
-      if (deployment.created_from !== 'app-builder') {
-        return { enabled: false };
-      }
-      return dispatcherClient.getBannerStatus(deployment.internal_worker_name);
-    }),
-
-  setBanner: baseProcedure
-    .input(
-      z.object({
-        deploymentId: z.string().uuid(),
-        enabled: z.boolean(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
-        type: 'user',
-        id: ctx.user.id,
-      });
-      if (deployment.created_from !== 'app-builder') {
-        return { success: true as const };
-      }
-      const workerName = deployment.internal_worker_name;
-      return input.enabled
-        ? dispatcherClient.enableBanner(workerName)
-        : dispatcherClient.disableBanner(workerName);
     }),
 });

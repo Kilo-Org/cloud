@@ -70,9 +70,6 @@ export function UserDeploymentProvider({ children }: { children: ReactNode }) {
 
     listEnvVars: (deploymentId: string) =>
       useQuery(trpc.deployments.listEnvVars.queryOptions({ deploymentId })),
-
-    getBannerStatus: (deploymentId: string) =>
-      useQuery(trpc.deployments.getBannerStatus.queryOptions({ deploymentId })),
   };
 
   const mutations: DeploymentMutations = {
@@ -157,18 +154,6 @@ export function UserDeploymentProvider({ children }: { children: ReactNode }) {
         onSuccess: (_data, variables) => {
           void queryClient.invalidateQueries({
             queryKey: trpc.deployments.listEnvVars.queryKey({
-              deploymentId: variables.deploymentId,
-            }),
-          });
-        },
-      })
-    ),
-
-    setBanner: useMutation(
-      trpc.deployments.setBanner.mutationOptions({
-        onSuccess: (_data, variables) => {
-          void queryClient.invalidateQueries({
-            queryKey: trpc.deployments.getBannerStatus.queryKey({
               deploymentId: variables.deploymentId,
             }),
           });

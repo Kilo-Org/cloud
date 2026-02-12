@@ -1,1 +1,1 @@
-export { sanitizeGitUrl } from './git-url.js';
+export { sanitizeGitUrl } from './git-url';

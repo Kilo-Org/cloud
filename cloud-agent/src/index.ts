@@ -187,6 +187,35 @@ export default class KilocodeWorker extends WorkerEntrypoint<Env> {
         return stub.fetch(doRequest);
       }
 
+      const logsMatch = url.pathname.match(
+        /^\/sessions\/([^/]+)\/([^/]+)\/logs\/([^/]+)\/([^/]+)$/
+      );
+      if (logsMatch && request.method === 'PUT') {
+        const allowedFilenames = new Set(['cli.txt', 'wrapper.log']);
+        let userId: string, sessionId: string, executionId: string, filename: string;
+        try {
+          userId = decodeURIComponent(logsMatch[1]);
+          sessionId = decodeURIComponent(logsMatch[2]);
+          executionId = decodeURIComponent(logsMatch[3]);
+          filename = decodeURIComponent(logsMatch[4]);
+        } catch {
+          return new Response('Invalid URL encoding', { status: 400 });
+        }
+        if (!allowedFilenames.has(filename)) {
+          return new Response('Invalid filename', { status: 400 });
+        }
+        const authHeader = request.headers.get('Authorization');
+        const authResult = validateKiloToken(authHeader, this.env.NEXTAUTH_SECRET);
+        if (!authResult.success) {
+          return new Response(authResult.error, { status: 401 });
+        }
+        if (authResult.userId !== userId) {
+          return new Response('Token does not match session user', { status: 403 });
+        }
+        await this.env.R2_BUCKET.put(`logs/${sessionId}/${executionId}/${filename}`, request.body);
+        return new Response(null, { status: 204 });
+      }
+
       // Extract procedure name for pre-flight validation
       const procedureName = extractProcedureName(url.pathname);
 

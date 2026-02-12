@@ -14,7 +14,7 @@ const { values: args } = parseArgs({
     prompt: { type: 'string' },
     'auto-commit': { type: 'boolean', default: false },
     'condense-on-complete': { type: 'boolean', default: false },
-    'idle-timeout': { type: 'string', default: '120000' },
+    'idle-timeout': { type: 'string', default: '240000' },
     'append-system-prompt-file': { type: 'string' },
   },
   strict: true,
@@ -37,7 +37,7 @@ async function main() {
   const promptFile = args['prompt'];
   const autoCommit = args['auto-commit'] ?? false;
   const condenseOnComplete = args['condense-on-complete'] ?? false;
-  const idleTimeoutMs = parseInt(args['idle-timeout'] ?? '120000', 10);
+  const idleTimeoutMs = parseInt(args['idle-timeout'] ?? '240000', 10);
   const appendSystemPromptFile = args['append-system-prompt-file'];
 
   // Validate required args

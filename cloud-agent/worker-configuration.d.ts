@@ -10,7 +10,7 @@ declare namespace Cloudflare {
     GITHUB_TOKEN_CACHE: KVNamespace;
     GITHUB_APP_SLUG: 'kiloconnect' | 'kiloconnect-development';
     GITHUB_APP_BOT_USER_ID: '240665456' | '242397087';
-    WRAPPER_IDLE_TIMEOUT_MS: '120000';
+    WRAPPER_IDLE_TIMEOUT_MS: '240000';
     CLI_TIMEOUT_SECONDS: '700';
     REAPER_INTERVAL_MS: '300000';
     STALE_THRESHOLD_MS: '600000';

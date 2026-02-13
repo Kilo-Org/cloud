@@ -8,7 +8,7 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
   ensureActiveInstance,
@@ -18,7 +18,7 @@ import {
 
 const kiloclawProcedure = baseProcedure.use(async ({ ctx, next }) => {
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const isEnabled = await isFeatureFlagEnabled('kiloclaw', ctx.user.id);
+  const isEnabled = await isReleaseToggleEnabled('kiloclaw', ctx.user.id);
   if (!isEnabled && !isDevelopment) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'KiloClaw access restricted' });
   }

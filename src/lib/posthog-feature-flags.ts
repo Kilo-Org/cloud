@@ -73,3 +73,32 @@ export async function isFeatureFlagEnabled(
     return false;
   }
 }
+
+/**
+ * Strict boolean-only release toggle check.
+ * Intended for authorization decisions where multivariate feature flag variants must not grant access.
+ * @param flagName - The name of the PostHog feature flag to check
+ * @param distinctId - Optional distinct ID for the feature flag request (defaults to 'server-config-fetch')
+ * @returns true only when PostHog returns the boolean value true; false for all other values/errors
+ */
+export async function isReleaseToggleEnabled(
+  flagName: string,
+  distinctId: string = 'server-config-fetch'
+): Promise<boolean> {
+  try {
+    const flagValue = await startSpan(
+      { name: flagName, op: 'posthog-feature-flag-boolean' },
+      async () => {
+        return await posthogClient.getFeatureFlag(flagName, distinctId);
+      }
+    );
+    return flagValue === true;
+  } catch (error) {
+    console.error(`Error checking boolean feature flag '${flagName}':`, error);
+    captureException(error, {
+      tags: { source: 'posthog_feature_flag_boolean_enabled' },
+      extra: { flagName, distinctId },
+    });
+    return false;
+  }
+}

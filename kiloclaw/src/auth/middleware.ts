@@ -1,7 +1,7 @@
 import type { Context, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { AppEnv } from '../types';
-import { KILO_WORKER_AUTH_COOKIE } from '../config';
+import { KILOCLAW_AUTH_COOKIE } from '../config';
 import { validateKiloToken } from './jwt';
 import { createDatabaseConnection, UserStore } from '../db';
 
@@ -36,7 +36,7 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
     token = authHeader.substring(7);
   }
   if (!token) {
-    token = getCookie(c, KILO_WORKER_AUTH_COOKIE);
+    token = getCookie(c, KILOCLAW_AUTH_COOKIE);
   }
 
   if (!token) {

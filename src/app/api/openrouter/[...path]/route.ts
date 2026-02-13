@@ -36,6 +36,7 @@ import {
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
+import { normalizeModelId } from '@/lib/model-utils';
 import { redactedModelResponse } from '@/lib/redactedModelResponse';
 import {
   createAnonymousContext,
@@ -252,7 +253,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const usageContext: MicrodollarUsageContext = {
     kiloUserId: user.id,
     provider: provider.id,
-    requested_model: originalModelIdLowerCased,
+    requested_model: normalizeModelId(originalModelIdLowerCased),
     promptInfo,
     max_tokens: requestBodyParsed.max_tokens ?? null,
     has_middle_out_transform: requestBodyParsed.transforms?.includes('middle-out') ?? false,
@@ -357,7 +358,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
       provider: provider.id,
       requestedModel: requestedModelLowerCased,
-      resolvedModel: originalModelIdLowerCased,
+      resolvedModel: normalizeModelId(originalModelIdLowerCased),
       toolsAvailable,
       toolsUsed,
       ttfbMs,
@@ -428,7 +429,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user: maybeUser,
     organization_id: organizationId || null,
     provider: provider.id,
-    model: originalModelIdLowerCased,
+    model: normalizeModelId(originalModelIdLowerCased),
     request: requestBodyParsed,
   });
 

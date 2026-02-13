@@ -9,6 +9,9 @@ import { signKiloToken, validateKiloToken } from '../auth/jwt';
  * Access gateway routes — unauthenticated.
  * Serves an HTML form for entering a one-time access code, then validates
  * it via Hyperdrive, sets an auth cookie, and redirects to the OpenClaw UI.
+ *
+ * The gateway token (for OpenClaw websocket auth) is carried through the
+ * entire flow as a query param / hidden field / redirect hash fragment.
  */
 const accessGatewayRoutes = new Hono<AppEnv>();
 
@@ -29,8 +32,12 @@ const BASE_STYLES = /* css */ `
   .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 1.5rem; }
 `;
 
-function renderPage(params: { userId: string; error?: string }) {
-  const { userId, error } = params;
+function buildRedirectUrl(gatewayToken: string | undefined): string {
+  return gatewayToken ? `/#token=${gatewayToken}` : '/';
+}
+
+function renderPage(params: { userId: string; gatewayToken?: string; error?: string }) {
+  const { userId, gatewayToken, error } = params;
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,6 +75,7 @@ function renderPage(params: { userId: string; error?: string }) {
     ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
     <form method="POST" action="/kilo-access-gateway">
       <input type="hidden" name="userId" value="${escapeHtml(userId)}" />
+      ${gatewayToken ? `<input type="hidden" name="gatewayToken" value="${escapeHtml(gatewayToken)}" />` : ''}
       <label for="code">Access Code</label>
       <input type="text" id="code" name="code" placeholder="XXXXX-XXXXX"
              maxlength="11" autocomplete="off" autofocus required />
@@ -78,13 +86,14 @@ function renderPage(params: { userId: string; error?: string }) {
 </html>`;
 }
 
-function renderLoadingPage() {
+function renderLoadingPage(redirectUrl: string) {
+  const safeUrl = escapeHtml(redirectUrl);
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="refresh" content="2;url=/" />
+  <meta http-equiv="refresh" content="2;url=${safeUrl}" />
   <title>Loading KiloClaw...</title>
   <style>
     ${BASE_STYLES}
@@ -104,9 +113,9 @@ function renderLoadingPage() {
     <div class="spinner"></div>
     <h1>Access code accepted</h1>
     <p class="status">Loading KiloClaw Control UI...</p>
-    <noscript><a href="/">Click here to continue</a></noscript>
+    <noscript><a href="${safeUrl}">Click here to continue</a></noscript>
   </div>
-  <script>setTimeout(function() { window.location.href = '/'; }, 1000);</script>
+  <script>setTimeout(function() { window.location.href = '${redirectUrl}'; }, 1000);</script>
 </body>
 </html>`;
 }
@@ -116,15 +125,19 @@ function escapeHtml(s: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**
  * Check if the user already has a valid auth cookie.
- * Returns true if the cookie is present, the JWT is valid, and the userId matches.
+ * Returns true if the cookie JWT is valid and the userId matches.
+ *
+ * Note: this only checks the JWT signature/expiry/version — it does NOT
+ * validate the pepper against the DB. If the pepper was rotated, authMiddleware
+ * will catch it on the next real request and return 401.
  */
 async function hasValidCookie(
-  c: { req: { header: (name: string) => string | undefined } },
   cookieValue: string | undefined,
   userId: string,
   secret: string,
@@ -141,37 +154,45 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
     return c.text('Missing userId parameter', 400);
   }
 
+  const gatewayToken = c.req.query('token') || undefined;
+  const redirectUrl = buildRedirectUrl(gatewayToken);
+
   // If the user already has a valid cookie, skip straight to the UI
   const secret = c.env.NEXTAUTH_SECRET;
   if (secret) {
     const cookie = getCookie(c, KILOCLAW_AUTH_COOKIE);
-    if (await hasValidCookie(c, cookie, userId, secret, c.env.WORKER_ENV)) {
-      return c.redirect('/');
+    if (await hasValidCookie(cookie, userId, secret, c.env.WORKER_ENV)) {
+      return c.redirect(redirectUrl);
     }
   }
 
-  return c.html(renderPage({ userId }));
+  return c.html(renderPage({ userId, gatewayToken }));
 });
 
 accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   const body = await c.req.parseBody();
   const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
   const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
+  const gatewayToken =
+    typeof body.gatewayToken === 'string' && body.gatewayToken ? body.gatewayToken : undefined;
 
   if (!code || !userId) {
-    return c.html(renderPage({ userId, error: 'Access code and user ID are required.' }), 400);
+    return c.html(
+      renderPage({ userId, gatewayToken, error: 'Access code and user ID are required.' }),
+      400
+    );
   }
 
   const connectionString = c.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
     console.error('[access-gateway] HYPERDRIVE not configured');
-    return c.html(renderPage({ userId, error: 'Server configuration error.' }), 500);
+    return c.html(renderPage({ userId, gatewayToken, error: 'Server configuration error.' }), 500);
   }
 
   const secret = c.env.NEXTAUTH_SECRET;
   if (!secret) {
     console.error('[access-gateway] NEXTAUTH_SECRET not configured');
-    return c.html(renderPage({ userId, error: 'Server configuration error.' }), 500);
+    return c.html(renderPage({ userId, gatewayToken, error: 'Server configuration error.' }), 500);
   }
 
   const db = createDatabaseConnection(connectionString);
@@ -182,6 +203,7 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
     return c.html(
       renderPage({
         userId,
+        gatewayToken,
         error: 'Invalid or expired access code. Please generate a new one from your dashboard.',
       }),
       401
@@ -192,7 +214,7 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   const userStore = new UserStore(db);
   const user = await userStore.findPepperByUserId(redeemedUserId);
   if (!user) {
-    return c.html(renderPage({ userId, error: 'User not found.' }), 401);
+    return c.html(renderPage({ userId, gatewayToken, error: 'User not found.' }), 401);
   }
 
   const token = await signKiloToken({
@@ -205,12 +227,12 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   setCookie(c, KILOCLAW_AUTH_COOKIE, token, {
     path: '/',
     httpOnly: true,
-    secure: true,
+    secure: c.env.DEV_MODE !== 'true',
     sameSite: 'Lax',
     maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
   });
 
-  return c.html(renderLoadingPage());
+  return c.html(renderLoadingPage(buildRedirectUrl(gatewayToken)));
 });
 
 export { accessGatewayRoutes };

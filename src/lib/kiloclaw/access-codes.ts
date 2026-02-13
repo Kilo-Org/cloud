@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
 import { kiloclaw_access_codes } from '@/db/schema';
-import { eq, and, lt } from 'drizzle-orm';
+import { eq, and, lt, ne, or } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 
 const CODE_LENGTH = 10;
@@ -21,42 +21,51 @@ function generateCode(): string {
 
 /**
  * Generate a new access code for a user.
- * Expires all previous active codes for this user (only one valid code at a time).
+ * Atomically expires all previous active codes and inserts the new one,
+ * ensuring only one valid code exists per user at any time.
  */
 export async function generateAccessCode(
   userId: string
 ): Promise<{ code: string; expiresAt: Date }> {
-  // Expire all existing active codes for this user
-  await db
-    .update(kiloclaw_access_codes)
-    .set({ status: 'expired' })
-    .where(
-      and(
-        eq(kiloclaw_access_codes.kilo_user_id, userId),
-        eq(kiloclaw_access_codes.status, 'active')
-      )
-    );
-
   const code = generateCode();
   const expiresAt = new Date(Date.now() + CODE_EXPIRATION_MINUTES * 60 * 1000);
 
-  await db.insert(kiloclaw_access_codes).values({
-    code,
-    kilo_user_id: userId,
-    status: 'active',
-    expires_at: expiresAt.toISOString(),
+  await db.transaction(async tx => {
+    // Expire all existing active codes for this user
+    await tx
+      .update(kiloclaw_access_codes)
+      .set({ status: 'expired' })
+      .where(
+        and(
+          eq(kiloclaw_access_codes.kilo_user_id, userId),
+          eq(kiloclaw_access_codes.status, 'active')
+        )
+      );
+
+    await tx.insert(kiloclaw_access_codes).values({
+      code,
+      kilo_user_id: userId,
+      status: 'active',
+      expires_at: expiresAt.toISOString(),
+    });
   });
 
   return { code, expiresAt };
 }
 
 /**
- * Clean up expired access codes. Called by cron.
+ * Clean up access codes that are expired or already consumed.
+ * Called by cron — codes are validated at redemption time regardless.
  */
 export async function cleanupExpiredAccessCodes(): Promise<number> {
   const result = await db
     .delete(kiloclaw_access_codes)
-    .where(lt(kiloclaw_access_codes.expires_at, new Date().toISOString()))
+    .where(
+      or(
+        lt(kiloclaw_access_codes.expires_at, new Date().toISOString()),
+        ne(kiloclaw_access_codes.status, 'active')
+      )
+    )
     .returning({ id: kiloclaw_access_codes.id });
 
   return result.length;

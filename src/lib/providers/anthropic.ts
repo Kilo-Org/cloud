@@ -17,7 +17,7 @@ export const opus_46_free_slackbot_model = {
   flags: ['reasoning', 'prompt_cache', 'vision'],
   gateway: 'openrouter',
   internal_id: 'anthropic/claude-opus-4.6',
-  inference_providers: ['amazon-bedrock'],
+  inference_providers: [],
   slackbot_only: true,
 } as KiloFreeModel;
 

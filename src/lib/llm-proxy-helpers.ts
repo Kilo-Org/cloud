@@ -322,7 +322,10 @@ export function checkOrganizationModelRestrictions(params: {
   if (params.organizationPlan === 'enterprise' && providerAllowList.length > 0) {
     // Check if the model requires specific providers that aren't in the allow list
     const requiredProviders = extraRequiredProviders(normalizedModelId);
-    if (requiredProviders && !requiredProviders.every(p => providerAllowList.includes(p))) {
+    if (
+      requiredProviders.length > 0 &&
+      !requiredProviders.every(p => providerAllowList.includes(p))
+    ) {
       console.error(
         `This FREE model requires ALL of these providers to be allowed: ${requiredProviders.join(', ')}`
       );

@@ -6,7 +6,6 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
-// TODO: Replace with actual Typeform form ID
 const WELCOME_FORM_ID = 'xNTrQO4E';
 
 type WelcomeTypeformModalProps = {

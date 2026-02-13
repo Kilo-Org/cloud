@@ -55,6 +55,7 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
+import { normalizeModelId } from '@/lib/model-utils';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -357,7 +358,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
       provider: provider.id,
       requestedModel: requestedModelLowerCased,
-      resolvedModel: originalModelIdLowerCased,
+      resolvedModel: normalizeModelId(originalModelIdLowerCased),
       toolsAvailable,
       toolsUsed,
       ttfbMs,

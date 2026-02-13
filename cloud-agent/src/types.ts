@@ -133,6 +133,8 @@ export type Env = {
    * Used for looking up GitHub installation IDs from the database.
    */
   HYPERDRIVE?: { connectionString: string };
+  /** R2 bucket for object storage */
+  R2_BUCKET: R2Bucket;
 };
 
 /** tRPC context passed to all procedures */

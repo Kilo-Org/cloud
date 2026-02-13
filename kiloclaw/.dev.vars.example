@@ -10,11 +10,15 @@ WORKER_ENV=development
 # Optional: Override KiloCode base URL (dev)
 # KILOCODE_API_BASE_URL=https://api.kilo.ai/api/openrouter/
 
-
-# R2 Storage
-# R2_ACCESS_KEY_ID=...
-# R2_SECRET_ACCESS_KEY=...
-# CF_ACCOUNT_ID=...
+# Fly.io Machines API
+# Get your API token from: https://fly.io/docs/flyctl/tokens/
+FLY_API_TOKEN=fo1_...
+FLY_APP_NAME=kiloclaw-machines
+# Default region for new users. Comma-separated priority list of region codes or aliases.
+# Fly tries the first region, falls back to the next if unavailable.
+# Examples: "us,eu" (try US first, then Europe), "lhr,fra" (London first, then Frankfurt)
+# The platform API can override per-user at provision time.
+FLY_REGION=us,eu
 
 # Encryption (for user secrets)
 # AGENT_ENV_VARS_PRIVATE_KEY=...

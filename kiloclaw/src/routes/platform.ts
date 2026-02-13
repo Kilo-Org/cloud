@@ -87,6 +87,8 @@ platform.post('/provision', async c => {
     kilocodeApiKeyExpiresAt,
     kilocodeDefaultModel,
     kilocodeModels,
+    machineSize,
+    region,
   } = result.data;
 
   try {
@@ -101,6 +103,8 @@ platform.post('/provision', async c => {
           kilocodeApiKeyExpiresAt,
           kilocodeDefaultModel,
           kilocodeModels,
+          machineSize,
+          region,
         }),
       'provision'
     );
@@ -185,7 +189,7 @@ platform.post('/destroy', async c => {
   try {
     await withDORetry(
       instanceStubFactory(c.env, result.data.userId),
-      stub => stub.destroy(result.data.deleteData),
+      stub => stub.destroy(),
       'destroy'
     );
     return c.json({ ok: true });

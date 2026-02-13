@@ -181,20 +181,18 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   // Instance lifecycle
-  destroy: kiloclawProcedure
-    .input(z.object({ deleteData: z.boolean().optional() }))
-    .mutation(async ({ ctx, input }) => {
-      const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
-      const client = new KiloClawInternalClient();
-      try {
-        return await client.destroy(ctx.user.id, input.deleteData);
-      } catch (error) {
-        if (destroyedRow) {
-          await restoreDestroyedInstance(destroyedRow.id);
-        }
-        throw error;
+  destroy: kiloclawProcedure.mutation(async ({ ctx }) => {
+    const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
+    const client = new KiloClawInternalClient();
+    try {
+      return await client.destroy(ctx.user.id);
+    } catch (error) {
+      if (destroyedRow) {
+        await restoreDestroyedInstance(destroyedRow.id);
       }
-    }),
+      throw error;
+    }
+  }),
 
   // Explicit lifecycle APIs
   provision: kiloclawProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
@@ -226,24 +224,10 @@ export const kiloclawRouter = createTRPCRouter({
     return client.getConfig();
   }),
 
-  getStorageInfo: kiloclawProcedure.query(async ({ ctx }) => {
-    const client = new KiloClawUserClient(
-      generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
-    );
-    return client.getStorageInfo();
-  }),
-
   restartGateway: kiloclawProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
     return client.restartGateway();
-  }),
-
-  syncStorage: kiloclawProcedure.mutation(async ({ ctx }) => {
-    const client = new KiloClawUserClient(
-      generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
-    );
-    return client.syncStorage();
   }),
 });

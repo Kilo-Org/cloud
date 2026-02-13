@@ -103,14 +103,33 @@ describe('buildEnvVars', () => {
 
   it('passes KiloCode overrides from user config', async () => {
     const env = createMockEnv({ AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey });
+    const models = [
+      { id: 'anthropic/claude-opus-4.5', name: 'Anthropic: Claude Opus 4.5' },
+      { id: 'minimax/minimax-m2.1:free', name: 'Minimax M2.1' },
+    ];
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
       kilocodeApiKey: 'kc-user-key',
       kilocodeDefaultModel: 'kilocode/anthropic/claude-opus-4.5',
-      kilocodeModels: [{ id: 'anthropic/claude-opus-4.5', name: 'Anthropic: Claude Opus 4.5' }],
+      kilocodeModels: models,
     });
 
     expect(result.KILOCODE_API_KEY).toBe('kc-user-key');
     expect(result.KILOCODE_DEFAULT_MODEL).toBe('kilocode/anthropic/claude-opus-4.5');
+    expect(result.KILOCODE_MODELS_JSON).toBe(JSON.stringify(models));
+  });
+
+  it('does not set KILOCODE_MODELS_JSON when kilocodeModels is null or absent', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      kilocodeApiKey: 'kc-key',
+      kilocodeModels: null,
+    });
+    expect(result.KILOCODE_MODELS_JSON).toBeUndefined();
+
+    const result2 = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      kilocodeApiKey: 'kc-key',
+    });
+    expect(result2.KILOCODE_MODELS_JSON).toBeUndefined();
   });
 
   it('decrypts and merges encrypted secrets', async () => {
@@ -156,6 +175,27 @@ describe('buildEnvVars', () => {
     expect(result.DISCORD_BOT_TOKEN).toBe('discord-token-456');
     expect(result.SLACK_BOT_TOKEN).toBe('slack-bot-789');
     expect(result.SLACK_APP_TOKEN).toBe('slack-app-012');
+  });
+
+  // ─── Worker-level DM policy passthrough ─────────────────────────────
+
+  it('passes TELEGRAM_DM_POLICY and DISCORD_DM_POLICY from worker env', async () => {
+    const env = createMockEnv({
+      TELEGRAM_DM_POLICY: 'open',
+      DISCORD_DM_POLICY: 'pairing',
+    });
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+
+    expect(result.TELEGRAM_DM_POLICY).toBe('open');
+    expect(result.DISCORD_DM_POLICY).toBe('pairing');
+  });
+
+  it('does not set DM policy vars when not configured on worker', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+
+    expect(result.TELEGRAM_DM_POLICY).toBeUndefined();
+    expect(result.DISCORD_DM_POLICY).toBeUndefined();
   });
 
   // ─── Reserved system vars (Layer 5) ──────────────────────────────────

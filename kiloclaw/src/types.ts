@@ -1,12 +1,9 @@
-import type { Sandbox } from '@cloudflare/sandbox';
 import type { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 
 /**
  * Environment bindings for the KiloClaw Worker
  */
 export type KiloClawEnv = {
-  Sandbox: DurableObjectNamespace<Sandbox>;
-  KILOCLAW_BUCKET: R2Bucket;
   KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
   HYPERDRIVE: Hyperdrive;
 
@@ -29,11 +26,11 @@ export type KiloClawEnv = {
   SLACK_APP_TOKEN?: string;
   // Encryption (for user secrets)
   AGENT_ENV_VARS_PRIVATE_KEY?: string;
-  // R2 credentials for bucket mounting (set via wrangler secret)
-  R2_ACCESS_KEY_ID?: string;
-  R2_SECRET_ACCESS_KEY?: string;
-  R2_BUCKET_NAME?: string;
-  CF_ACCOUNT_ID?: string;
+
+  // Fly.io configuration
+  FLY_API_TOKEN?: string;
+  FLY_APP_NAME?: string;
+  FLY_REGION?: string;
 };
 
 /**

@@ -1,12 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  useKiloClawStatus,
-  useKiloClawConfig,
-  useKiloClawStorageInfo,
-  useKiloClawMutations,
-} from '@/hooks/useKiloClaw';
+import { useKiloClawStatus, useKiloClawConfig, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { PageLayout } from '@/components/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +11,6 @@ import {
   Play,
   Square,
   RotateCw,
-  RefreshCw,
   Trash2,
   Plus,
   Save,
@@ -52,14 +46,14 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
 
 function OverviewTab() {
   const { data: status } = useKiloClawStatus();
-  const { data: storage } = useKiloClawStorageInfo();
-  const { start, stop, restartGateway, syncStorage } = useKiloClawMutations();
+  const { start, stop, restartGateway } = useKiloClawMutations();
 
   if (!status?.status) return null;
 
   const isRunning = status.status === 'running';
   const isStopped = status.status === 'stopped';
   const isProvisioned = status.status === 'provisioned';
+  const isDestroying = status.status === 'destroying';
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -70,7 +64,7 @@ function OverviewTab() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           {(isStopped || isProvisioned) && (
-            <Button onClick={() => start.mutate()} disabled={start.isPending}>
+            <Button onClick={() => start.mutate()} disabled={start.isPending || isDestroying}>
               <Play className="mr-2 h-4 w-4" />
               {start.isPending ? 'Starting...' : 'Start'}
             </Button>
@@ -103,19 +97,6 @@ function OverviewTab() {
                 <RotateCw className="mr-2 h-4 w-4" />
                 {restartGateway.isPending ? 'Restarting...' : 'Restart Gateway'}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  syncStorage.mutate(undefined, {
-                    onSuccess: () => toast.success('Sync triggered'),
-                    onError: e => toast.error(e.message),
-                  })
-                }
-                disabled={syncStorage.isPending}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                {syncStorage.isPending ? 'Syncing...' : 'Force Sync'}
-              </Button>
             </>
           )}
         </CardContent>
@@ -126,7 +107,7 @@ function OverviewTab() {
           <CardTitle>Instance</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
-          <Stat label="Status" value={status.status} />
+          <Stat label="Status" value={isDestroying ? 'Destroying...' : status.status} />
           <Stat
             label="Sandbox ID"
             value={<span className="truncate font-mono text-xs">{status.sandboxId}</span>}
@@ -134,7 +115,9 @@ function OverviewTab() {
           <Stat label="Provisioned" value={formatTs(status.provisionedAt)} />
           <Stat label="Last started" value={formatTs(status.lastStartedAt)} />
           <Stat label="Last stopped" value={formatTs(status.lastStoppedAt)} />
-          <Stat label="Last sync" value={formatTs(status.lastSyncAt)} />
+          <Stat label="Machine ID" value={status.flyMachineId ?? 'None'} />
+          <Stat label="Volume ID" value={status.flyVolumeId ?? 'None'} />
+          <Stat label="Fly Region" value={status.flyRegion ?? 'None'} />
         </CardContent>
       </Card>
 
@@ -149,23 +132,14 @@ function OverviewTab() {
         </CardContent>
       </Card>
 
-      {storage && (
+      {isDestroying && (
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle>R2 Storage</CardTitle>
+            <CardTitle>Destroy In Progress</CardTitle>
             <CardDescription>
-              {storage.configured
-                ? 'Data persists across container restarts.'
-                : 'Not configured. Data is lost on container restart.'}
+              Cleanup is running in the background. Start/stop actions are temporarily unavailable.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Stat label="Configured" value={storage.configured ? 'Yes' : 'No'} />
-            <Stat label="Last sync" value={storage.lastSync ?? 'Never'} />
-            {storage.syncInProgress && (
-              <p className="col-span-2 text-sm text-yellow-600">Sync in progress...</p>
-            )}
-          </CardContent>
         </Card>
       )}
     </div>
@@ -274,10 +248,11 @@ function SettingsTab() {
 
 function ActionsTab() {
   const { data: status } = useKiloClawStatus();
-  const { restartGateway, syncStorage, stop, destroy } = useKiloClawMutations();
+  const { restartGateway, stop, destroy } = useKiloClawMutations();
   const [confirmDestroy, setConfirmDestroy] = useState(false);
 
   const isRunning = status?.status === 'running';
+  const isDestroying = status?.status === 'destroying';
 
   return (
     <div className="space-y-4">
@@ -303,19 +278,6 @@ function ActionsTab() {
             <Button
               variant="outline"
               onClick={() =>
-                syncStorage.mutate(undefined, {
-                  onSuccess: () => toast.success('Sync triggered'),
-                  onError: e => toast.error(e.message),
-                })
-              }
-              disabled={syncStorage.isPending}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Force Sync
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() =>
                 stop.mutate(undefined, {
                   onSuccess: () => toast.success('Instance stopped'),
                   onError: e => toast.error(e.message),
@@ -337,31 +299,32 @@ function ActionsTab() {
         </CardHeader>
         <CardContent>
           {!confirmDestroy ? (
-            <Button variant="destructive" onClick={() => setConfirmDestroy(true)}>
+            <Button
+              variant="destructive"
+              onClick={() => setConfirmDestroy(true)}
+              disabled={isDestroying}
+            >
               <Trash2 className="mr-2 h-4 w-4" />
-              Destroy Instance
+              {isDestroying ? 'Destroying...' : 'Destroy Instance'}
             </Button>
           ) : (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-red-600">Delete all data?</span>
+              <span className="text-sm text-red-600">Destroy instance and data?</span>
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={() =>
-                  destroy.mutate(
-                    { deleteData: true },
-                    {
-                      onSuccess: () => {
-                        toast.success('Instance destroyed');
-                        setConfirmDestroy(false);
-                      },
-                      onError: e => toast.error(e.message),
-                    }
-                  )
+                  destroy.mutate(undefined, {
+                    onSuccess: () => {
+                      toast.success('Instance destroyed');
+                      setConfirmDestroy(false);
+                    },
+                    onError: e => toast.error(e.message),
+                  })
                 }
-                disabled={destroy.isPending}
+                disabled={destroy.isPending || isDestroying}
               >
-                Yes, destroy
+                {isDestroying ? 'Destroying...' : 'Yes, destroy'}
               </Button>
               <Button variant="outline" size="sm" onClick={() => setConfirmDestroy(false)}>
                 Cancel
@@ -499,6 +462,7 @@ export default function ClawPage() {
   const isRunning = status?.status === 'running';
   const isStopped = status?.status === 'stopped';
   const isProvisioned = status?.status === 'provisioned';
+  const isDestroying = status?.status === 'destroying';
   const hasInstance = !!status?.status;
 
   const baseUrl = status?.workerUrl || 'https://claw.kilo.ai';
@@ -509,9 +473,14 @@ export default function ClawPage() {
   const headerActions = hasInstance ? (
     <div className="flex gap-2">
       {(isStopped || isProvisioned) && (
-        <Button onClick={() => start.mutate()} disabled={start.isPending}>
+        <Button onClick={() => start.mutate()} disabled={start.isPending || isDestroying}>
           <Play className="mr-2 h-4 w-4" />
           {start.isPending ? 'Starting...' : 'Start'}
+        </Button>
+      )}
+      {isDestroying && (
+        <Button variant="outline" disabled>
+          Destroying...
         </Button>
       )}
       {isRunning && (

@@ -43,7 +43,6 @@ export async function buildEnvVars(
 
   if (env.DEV_MODE) envVars.OPENCLAW_DEV_MODE = env.DEV_MODE;
   if (env.KILOCODE_API_BASE_URL) envVars.KILOCODE_API_BASE_URL = env.KILOCODE_API_BASE_URL;
-  if (env.CF_ACCOUNT_ID) envVars.CF_ACCOUNT_ID = env.CF_ACCOUNT_ID;
 
   // Layer 2 + 3: User env vars merged with decrypted secrets.
   if (userConfig) {
@@ -60,6 +59,9 @@ export async function buildEnvVars(
     if (userConfig.kilocodeDefaultModel) {
       envVars.KILOCODE_DEFAULT_MODEL = userConfig.kilocodeDefaultModel;
     }
+    if (userConfig.kilocodeModels) {
+      envVars.KILOCODE_MODELS_JSON = JSON.stringify(userConfig.kilocodeModels);
+    }
 
     // Layer 4: Decrypt channel tokens and map to container env var names
     if (userConfig.channels && env.AGENT_ENV_VARS_PRIVATE_KEY) {
@@ -67,6 +69,10 @@ export async function buildEnvVars(
       Object.assign(envVars, channelEnv);
     }
   }
+
+  // Worker-level channel DM policy passthrough
+  if (env.TELEGRAM_DM_POLICY) envVars.TELEGRAM_DM_POLICY = env.TELEGRAM_DM_POLICY;
+  if (env.DISCORD_DM_POLICY) envVars.DISCORD_DM_POLICY = env.DISCORD_DM_POLICY;
 
   // Layer 5: Reserved system vars (cannot be overridden by any user config)
   envVars.OPENCLAW_GATEWAY_TOKEN = await deriveGatewayToken(sandboxId, gatewayTokenSecret);

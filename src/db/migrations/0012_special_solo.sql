@@ -1,1 +1,0 @@
-ALTER TABLE "kilocode_users" ADD COLUMN "completed_welcome_form" boolean DEFAULT false NOT NULL;

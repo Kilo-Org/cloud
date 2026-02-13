@@ -22,6 +22,10 @@ export function WelcomeTypeformModal({ userEmail }: WelcomeTypeformModalProps) {
       onSuccess: () => {
         setIsOpen(false);
       },
+      onError: error => {
+        console.error('Failed to mark welcome form completed:', error);
+        setHasMarkedComplete(false);
+      },
     })
   );
 

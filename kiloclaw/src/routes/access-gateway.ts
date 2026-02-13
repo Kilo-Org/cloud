@@ -115,7 +115,7 @@ function renderLoadingPage(redirectUrl: string) {
     <p class="status">Loading KiloClaw Control UI...</p>
     <noscript><a href="${safeUrl}">Click here to continue</a></noscript>
   </div>
-  <script>setTimeout(function() { window.location.href = '${redirectUrl}'; }, 1000);</script>
+  <script>setTimeout(function() { window.location.href = ${JSON.stringify(redirectUrl)}; }, 1000);</script>
 </body>
 </html>`;
 }
@@ -227,7 +227,7 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   setCookie(c, KILOCLAW_AUTH_COOKIE, token, {
     path: '/',
     httpOnly: true,
-    secure: c.env.DEV_MODE !== 'true',
+    secure: new URL(c.req.url).protocol === 'https:',
     sameSite: 'Lax',
     maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
   });

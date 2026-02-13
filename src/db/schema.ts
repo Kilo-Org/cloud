@@ -2923,6 +2923,9 @@ export const kiloclaw_access_codes = pgTable(
   table => [
     uniqueIndex('UQ_kiloclaw_access_codes_code').on(table.code),
     index('IDX_kiloclaw_access_codes_user_status').on(table.kilo_user_id, table.status),
+    uniqueIndex('UQ_kiloclaw_access_codes_one_active_per_user')
+      .on(table.kilo_user_id)
+      .where(sql`status = 'active'`),
   ]
 );
 

@@ -19,10 +19,24 @@ function generateCode(): string {
   return `${code.slice(0, 5)}-${code.slice(5)}`;
 }
 
+/** Postgres unique violation error code */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    err !== null &&
+    typeof err === 'object' &&
+    'code' in err &&
+    (err as { code: string }).code === '23505'
+  );
+}
+
 /**
  * Generate a new access code for a user.
  * Atomically expires all previous active codes and inserts the new one,
  * ensuring only one valid code exists per user at any time.
+ *
+ * A partial unique index (UQ_kiloclaw_access_codes_one_active_per_user)
+ * enforces at most one active code per user. If a concurrent request
+ * wins the race, we return the existing active code instead.
  */
 export async function generateAccessCode(
   userId: string
@@ -30,27 +44,52 @@ export async function generateAccessCode(
   const code = generateCode();
   const expiresAt = new Date(Date.now() + CODE_EXPIRATION_MINUTES * 60 * 1000);
 
-  await db.transaction(async tx => {
-    // Expire all existing active codes for this user
-    await tx
-      .update(kiloclaw_access_codes)
-      .set({ status: 'expired' })
-      .where(
-        and(
-          eq(kiloclaw_access_codes.kilo_user_id, userId),
-          eq(kiloclaw_access_codes.status, 'active')
-        )
-      );
+  try {
+    await db.transaction(async tx => {
+      // Expire all existing active codes for this user
+      await tx
+        .update(kiloclaw_access_codes)
+        .set({ status: 'expired' })
+        .where(
+          and(
+            eq(kiloclaw_access_codes.kilo_user_id, userId),
+            eq(kiloclaw_access_codes.status, 'active')
+          )
+        );
 
-    await tx.insert(kiloclaw_access_codes).values({
-      code,
-      kilo_user_id: userId,
-      status: 'active',
-      expires_at: expiresAt.toISOString(),
+      await tx.insert(kiloclaw_access_codes).values({
+        code,
+        kilo_user_id: userId,
+        status: 'active',
+        expires_at: expiresAt.toISOString(),
+      });
     });
-  });
 
-  return { code, expiresAt };
+    return { code, expiresAt };
+  } catch (err) {
+    // A concurrent request won the race and inserted an active code first.
+    // Return that code instead of failing.
+    if (isUniqueViolation(err)) {
+      const [existing] = await db
+        .select({
+          code: kiloclaw_access_codes.code,
+          expires_at: kiloclaw_access_codes.expires_at,
+        })
+        .from(kiloclaw_access_codes)
+        .where(
+          and(
+            eq(kiloclaw_access_codes.kilo_user_id, userId),
+            eq(kiloclaw_access_codes.status, 'active')
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        return { code: existing.code, expiresAt: new Date(existing.expires_at) };
+      }
+    }
+    throw err;
+  }
 }
 
 /**

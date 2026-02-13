@@ -85,6 +85,13 @@
       "when": 1770942428243,
       "tag": "0011_fair_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1770978590644,
+      "tag": "0012_special_solo",
+      "breakpoints": true
     }
   ]
 }

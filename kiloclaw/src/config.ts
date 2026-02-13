@@ -5,8 +5,9 @@
 /** Port that the OpenClaw gateway listens on inside the Fly Machine */
 export const OPENCLAW_PORT = 18789;
 
-/** Maximum time to wait for the machine to reach 'started' state (3 minutes) */
-export const STARTUP_TIMEOUT_SECONDS = 180;
+/** Maximum time to wait for the machine to reach 'started' state.
+ *  Fly's /wait endpoint caps at 60s (spec.json:1538). */
+export const STARTUP_TIMEOUT_SECONDS = 60;
 
 /** Cookie name for worker auth token (set by worker after access code redemption) */
 export const KILOCLAW_AUTH_COOKIE = 'kiloclaw-auth';

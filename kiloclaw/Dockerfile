@@ -4,7 +4,7 @@ FROM debian:bookworm-slim
 ENV NODE_VERSION=22.13.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       ca-certificates curl xz-utils \
+       ca-certificates curl git xz-utils \
     && ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \
          amd64) NODE_ARCH="x64" ;; \
@@ -35,16 +35,17 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy startup script
-# Build cache bust: 2026-02-13-v40-models-env-var
-RUN echo "1"
+# Build cache bust: 2026-02-13-v42-allowed-origins
+RUN echo "4"
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 RUN chmod +x /usr/local/bin/start-openclaw.sh
+RUN ls -l /usr/local/bin/start-openclaw.sh \
+    && head -n 1 /usr/local/bin/start-openclaw.sh | cat -v \
+    && od -An -t x1 -N 4 /usr/local/bin/start-openclaw.sh \
+    && ls -l /bin/bash
 
 # Copy custom skills
 COPY skills/ /root/clawd/skills/
-
-# Set working directory
-WORKDIR /root/clawd
 
 # Expose the gateway port
 EXPOSE 18789

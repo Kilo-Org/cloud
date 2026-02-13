@@ -198,6 +198,22 @@ describe('buildEnvVars', () => {
     expect(result.DISCORD_DM_POLICY).toBeUndefined();
   });
 
+  it('passes OPENCLAW_ALLOWED_ORIGINS from worker env', async () => {
+    const env = createMockEnv({
+      OPENCLAW_ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:8795',
+    });
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+
+    expect(result.OPENCLAW_ALLOWED_ORIGINS).toBe('http://localhost:3000,http://localhost:8795');
+  });
+
+  it('does not set OPENCLAW_ALLOWED_ORIGINS when not configured', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+
+    expect(result.OPENCLAW_ALLOWED_ORIGINS).toBeUndefined();
+  });
+
   // ─── Reserved system vars (Layer 5) ──────────────────────────────────
 
   it('reserved system vars cannot be overridden by user config', async () => {

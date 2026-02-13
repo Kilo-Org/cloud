@@ -14,10 +14,13 @@ fi
 
 CONFIG_DIR="/root/.openclaw"
 CONFIG_FILE="$CONFIG_DIR/openclaw.json"
+WORKSPACE_DIR="/root/clawd"
 
 echo "Config directory: $CONFIG_DIR"
 
 mkdir -p "$CONFIG_DIR"
+mkdir -p "$WORKSPACE_DIR"
+cd "$WORKSPACE_DIR"
 
 # ============================================================
 # ONBOARD (only if no config exists yet)
@@ -89,6 +92,16 @@ if (process.env.OPENCLAW_DEV_MODE === 'true') {
 if (process.env.AUTO_APPROVE_DEVICES === 'true') {
     config.gateway.controlUi = config.gateway.controlUi || {};
     config.gateway.controlUi.allowInsecureAuth = true;
+}
+
+// Allowed origins for the Control UI WebSocket.
+// Without this, the gateway rejects connections from browser origins
+// that don't match the gateway's Host header (e.g., localhost:3000 vs fly.dev).
+if (process.env.OPENCLAW_ALLOWED_ORIGINS) {
+    config.gateway.controlUi = config.gateway.controlUi || {};
+    config.gateway.controlUi.allowedOrigins = process.env.OPENCLAW_ALLOWED_ORIGINS
+        .split(',')
+        .map(function(s) { return s.trim(); });
 }
 
 // KiloCode provider configuration (required)

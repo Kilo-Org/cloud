@@ -110,13 +110,14 @@ type MachineIdentity = { userId: string; sandboxId: string };
 
 function buildMachineConfig(
   appName: string,
+  imageTag: string,
   envVars: Record<string, string>,
   guest: FlyMachineConfig['guest'],
   flyVolumeId: string | null,
   identity: MachineIdentity
 ): FlyMachineConfig {
   return {
-    image: `registry.fly.io/${appName}:latest`,
+    image: `registry.fly.io/${appName}:${imageTag}`,
     env: envVars,
     guest,
     services: [
@@ -148,7 +149,10 @@ function guestFromSize(machineSize: MachineSize | null): FlyMachineConfig['guest
 // ============================================================================
 
 function volumeNameFromSandboxId(sandboxId: string): string {
-  return `kiloclaw-${sandboxId}`.slice(0, 30).replace(/[^a-z0-9_-]/gi, '_');
+  return `kiloclaw_${sandboxId}`
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_')
+    .slice(0, 30);
 }
 
 // ============================================================================
@@ -461,9 +465,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const guest = guestFromSize(this.machineSize);
+    const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
     const identity = { userId: this.userId, sandboxId: this.sandboxId };
     const machineConfig = buildMachineConfig(
       flyConfig.appName,
+      imageTag,
       envVars,
       guest,
       this.flyVolumeId,
@@ -648,9 +654,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       const envVars = await this.buildUserEnvVars();
       const guest = guestFromSize(this.machineSize);
+      const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
       const identity = { userId: this.userId ?? '', sandboxId: this.sandboxId ?? '' };
       const machineConfig = buildMachineConfig(
         flyConfig.appName,
+        imageTag,
         envVars,
         guest,
         this.flyVolumeId,

@@ -19,6 +19,14 @@ FLY_APP_NAME=kiloclaw-machines
 # Examples: "us,eu" (try US first, then Europe), "lhr,fra" (London first, then Frankfurt)
 # The platform API can override per-user at provision time.
 FLY_REGION=us,eu
+# Docker image tag on registry.fly.io/{FLY_APP_NAME}:{tag}.
+# In dev, use "latest" or run scripts/push-dev.sh which sets a timestamped tag.
+# In production, pin to a version (e.g., v40, sha-abc1234).
+FLY_IMAGE_TAG=latest
+
+# Allowed origins for the OpenClaw Control UI WebSocket (comma-separated).
+# Must include the origins that the browser connects from.
+OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795
 
 # Encryption (for user secrets)
 # AGENT_ENV_VARS_PRIVATE_KEY=...

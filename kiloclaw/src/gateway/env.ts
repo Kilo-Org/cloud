@@ -70,9 +70,10 @@ export async function buildEnvVars(
     }
   }
 
-  // Worker-level channel DM policy passthrough
+  // Worker-level passthrough
   if (env.TELEGRAM_DM_POLICY) envVars.TELEGRAM_DM_POLICY = env.TELEGRAM_DM_POLICY;
   if (env.DISCORD_DM_POLICY) envVars.DISCORD_DM_POLICY = env.DISCORD_DM_POLICY;
+  if (env.OPENCLAW_ALLOWED_ORIGINS) envVars.OPENCLAW_ALLOWED_ORIGINS = env.OPENCLAW_ALLOWED_ORIGINS;
 
   // Layer 5: Reserved system vars (cannot be overridden by any user config)
   envVars.OPENCLAW_GATEWAY_TOKEN = await deriveGatewayToken(sandboxId, gatewayTokenSecret);

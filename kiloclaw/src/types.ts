@@ -31,6 +31,10 @@ export type KiloClawEnv = {
   FLY_API_TOKEN?: string;
   FLY_APP_NAME?: string;
   FLY_REGION?: string;
+  FLY_IMAGE_TAG?: string;
+
+  // OpenClaw gateway configuration
+  OPENCLAW_ALLOWED_ORIGINS?: string;
 };
 
 /**

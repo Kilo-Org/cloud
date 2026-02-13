@@ -116,15 +116,16 @@ The alarm runs for ALL statuses (not just `running`). `destroying` short-circuit
 
 ### Optional
 
-| Variable                               | Purpose                                                                                                                              |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `FLY_REGION`                           | Default region for new volumes/machines. Comma-separated priority list: `us,eu` tries US first, falls back to EU. (default: `us,eu`) |
-| `KILOCODE_API_BASE_URL`                | Override KiloCode API URL                                                                                                            |
-| `AGENT_ENV_VARS_PRIVATE_KEY`           | RSA private key for decrypting user secrets                                                                                          |
-| `TELEGRAM_DM_POLICY`                   | Telegram DM policy (passed through to machine)                                                                                       |
-| `DISCORD_DM_POLICY`                    | Discord DM policy (passed through to machine)                                                                                        |
-| `DEV_MODE`                             | Enable dev mode features                                                                                                             |
-| `DEBUG_ROUTES` / `DEBUG_ROUTES_SECRET` | Enable debug endpoints                                                                                                               |
+| Variable                               | Purpose                                                                                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FLY_REGION`                           | Default region for new volumes/machines. Comma-separated priority list: `us,eu` tries US first, falls back to EU. (default: `us,eu`)                                    |
+| `KILOCODE_API_BASE_URL`                | Override KiloCode API URL                                                                                                                                               |
+| `AGENT_ENV_VARS_PRIVATE_KEY`           | RSA private key for decrypting user secrets                                                                                                                             |
+| `TELEGRAM_DM_POLICY`                   | Telegram DM policy (passed through to machine)                                                                                                                          |
+| `DISCORD_DM_POLICY`                    | Discord DM policy (passed through to machine)                                                                                                                           |
+| `OPENCLAW_ALLOWED_ORIGINS`             | Comma-separated origins for Control UI WebSocket (e.g., `http://localhost:3000,http://localhost:8795`). Production: `https://claw.kilo.ai,https://claw.kilosessions.ai` |
+| `DEV_MODE`                             | Enable dev mode features                                                                                                                                                |
+| `DEBUG_ROUTES` / `DEBUG_ROUTES_SECRET` | Enable debug endpoints                                                                                                                                                  |
 
 ### Fly.io Regions
 
@@ -184,21 +185,22 @@ Config and workspace persist across machine restarts via the Fly Volume at `/roo
 
 All user config is transported to the machine via environment variables set in the Fly machine config. The startup script reads these env vars and patches the openclaw config file.
 
-| Env var                  | Source                            | Purpose                     |
-| ------------------------ | --------------------------------- | --------------------------- |
-| `KILOCODE_API_KEY`       | User config (DO)                  | KiloCode API authentication |
-| `KILOCODE_DEFAULT_MODEL` | User config (DO)                  | Default model for agents    |
-| `KILOCODE_MODELS_JSON`   | User config (DO), JSON-serialized | Available model list        |
-| `KILOCODE_API_BASE_URL`  | Worker env                        | API base URL override       |
-| `OPENCLAW_GATEWAY_TOKEN` | Derived from sandboxId            | Per-user gateway auth       |
-| `AUTO_APPROVE_DEVICES`   | Hardcoded `true`                  | Skip device pairing         |
-| `OPENCLAW_DEV_MODE`      | Worker env (`DEV_MODE`)           | Dev mode features           |
-| `TELEGRAM_BOT_TOKEN`     | Decrypted channel token           | Telegram channel            |
-| `DISCORD_BOT_TOKEN`      | Decrypted channel token           | Discord channel             |
-| `SLACK_BOT_TOKEN`        | Decrypted channel token           | Slack channel               |
-| `SLACK_APP_TOKEN`        | Decrypted channel token           | Slack channel               |
-| `TELEGRAM_DM_POLICY`     | Worker env                        | Telegram DM policy          |
-| `DISCORD_DM_POLICY`      | Worker env                        | Discord DM policy           |
+| Env var                    | Source                            | Purpose                              |
+| -------------------------- | --------------------------------- | ------------------------------------ |
+| `KILOCODE_API_KEY`         | User config (DO)                  | KiloCode API authentication          |
+| `KILOCODE_DEFAULT_MODEL`   | User config (DO)                  | Default model for agents             |
+| `KILOCODE_MODELS_JSON`     | User config (DO), JSON-serialized | Available model list                 |
+| `KILOCODE_API_BASE_URL`    | Worker env                        | API base URL override                |
+| `OPENCLAW_GATEWAY_TOKEN`   | Derived from sandboxId            | Per-user gateway auth                |
+| `AUTO_APPROVE_DEVICES`     | Hardcoded `true`                  | Skip device pairing                  |
+| `OPENCLAW_DEV_MODE`        | Worker env (`DEV_MODE`)           | Dev mode features                    |
+| `TELEGRAM_BOT_TOKEN`       | Decrypted channel token           | Telegram channel                     |
+| `DISCORD_BOT_TOKEN`        | Decrypted channel token           | Discord channel                      |
+| `SLACK_BOT_TOKEN`          | Decrypted channel token           | Slack channel                        |
+| `SLACK_APP_TOKEN`          | Decrypted channel token           | Slack channel                        |
+| `TELEGRAM_DM_POLICY`       | Worker env                        | Telegram DM policy                   |
+| `DISCORD_DM_POLICY`        | Worker env                        | Discord DM policy                    |
+| `OPENCLAW_ALLOWED_ORIGINS` | Worker env                        | Control UI WebSocket allowed origins |
 
 ### AI Provider Selection
 

@@ -1,9 +1,9 @@
 /**
- * KiloClaw - Multi-tenant OpenClaw in Cloudflare Sandbox containers
+ * KiloClaw - Multi-tenant OpenClaw on Fly.io Machines
  *
- * Each authenticated user gets their own sandbox container, managed by the
+ * Each authenticated user gets their own Fly Machine, managed by the
  * KiloClawInstance Durable Object. The catch-all proxy resolves the user's
- * per-user sandbox from their sandboxId and forwards HTTP/WebSocket traffic.
+ * flyMachineId from the DO and forwards HTTP/WebSocket traffic via Fly Proxy.
  *
  * Auth model:
  * - User routes + catch-all proxy: JWT via authMiddleware (Bearer header or cookie)
@@ -14,18 +14,14 @@
 
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
-import { getSandbox } from '@cloudflare/sandbox';
 
 import type { AppEnv, KiloClawEnv } from './types';
-import { OPENCLAW_PORT } from './config';
 import { accessGatewayRoutes, publicRoutes, api, kiloclaw, debug, platform } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { debugRoutesGate } from './auth/debug-gate';
 
-// Export the custom Sandbox subclass with lifecycle hooks (matches wrangler.jsonc class_name)
-export { KiloClawSandbox } from './sandbox';
 // Export the KiloClawInstance DO (matches wrangler.jsonc class_name)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 
@@ -49,7 +45,16 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   const missing: string[] = [];
   if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
   if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
+  if (!env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
+  if (!env.FLY_APP_NAME) missing.push('FLY_APP_NAME');
   return missing;
+}
+
+/**
+ * Build the Fly Proxy URL for a given request path.
+ */
+function flyProxyUrl(appName: string, url: URL): string {
+  return `https://${appName}.fly.dev${url.pathname}${url.search}`;
 }
 
 // =============================================================================
@@ -87,6 +92,8 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
     if (!c.env.INTERNAL_API_SECRET) missing.push('INTERNAL_API_SECRET');
     if (!c.env.HYPERDRIVE?.connectionString) missing.push('HYPERDRIVE');
     if (!c.env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
+    if (!c.env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
+    if (!c.env.FLY_APP_NAME) missing.push('FLY_APP_NAME');
     if (missing.length > 0) {
       console.error('[CONFIG] Platform route missing bindings:', missing.join(', '));
       return c.json({ error: 'Configuration error', missing }, 503);
@@ -161,20 +168,12 @@ app.use('/debug/*', debugRoutesGate);
 app.route('/debug', debug);
 
 // =============================================================================
-// CATCH-ALL: Proxy to per-user OpenClaw gateway
+// CATCH-ALL: Proxy to per-user OpenClaw gateway via Fly Proxy
 // =============================================================================
 
 /**
  * Attempt crash recovery: if the user's instance has status 'running' but
- * the container/gateway is dead, call start() to restart it transparently.
- *
- * Only triggers when DO status is 'running' -- this covers the race where
- * the container crashed but handleContainerStopped hasn't fired yet.
- * start() verifies the gateway is actually alive before no-oping, so it
- * correctly restarts in this case.
- *
- * If status is 'stopped' or 'provisioned', the user must explicitly start.
- * This prevents auto-restarting instances the user intentionally stopped.
+ * the machine is dead, call start() to restart it transparently.
  */
 async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
   const userId = c.get('userId');
@@ -188,14 +187,33 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
       return false;
     }
 
-    // Gateway dead despite running status (race: crash before handleContainerStopped)
-    console.log('[PROXY] Instance status is running but container unreachable, restarting');
-    await stub.start();
+    // Machine dead despite running status -- restart
+    console.log('[PROXY] Instance status is running but machine unreachable, restarting');
+    await stub.start(userId);
     return true;
   } catch (err) {
     console.error('[PROXY] Crash recovery failed:', err);
   }
   return false;
+}
+
+/**
+ * Resolve the flyMachineId and status for the current user from their DO.
+ * Returns null machineId if the instance is destroying (blocks proxy during teardown).
+ */
+async function resolveInstance(c: Context<AppEnv>): Promise<{
+  machineId: string | null;
+  status: string | null;
+}> {
+  const userId = c.get('userId');
+  if (!userId) return { machineId: null, status: null };
+
+  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+  const s = await stub.getStatus();
+
+  if (s.status === 'destroying') return { machineId: null, status: 'destroying' };
+
+  return { machineId: s.flyMachineId, status: s.status };
 }
 
 app.all('*', async c => {
@@ -207,40 +225,73 @@ app.all('*', async c => {
     );
   }
 
-  const sandbox = getSandbox(c.env.Sandbox, sandboxId, { keepAlive: true });
+  const appName = c.env.FLY_APP_NAME;
+  if (!appName) {
+    return c.json({ error: 'FLY_APP_NAME not configured' }, 503);
+  }
+
+  const { machineId, status } = await resolveInstance(c);
+  if (status === 'destroying') {
+    return c.json(
+      { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
+      409
+    );
+  }
+  if (!machineId) {
+    return c.json(
+      {
+        error: 'Instance not provisioned',
+        hint: 'Your instance has not been created yet. Start it from the dashboard.',
+      },
+      404
+    );
+  }
+
   const request = c.req.raw;
   const url = new URL(request.url);
+  const targetUrl = flyProxyUrl(appName, url);
 
-  console.log('[PROXY] Handling request:', url.pathname, 'sandbox:', sandboxId);
+  console.log('[PROXY] Handling request:', url.pathname, 'machine:', machineId);
 
   const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
-  // WebSocket proxy with gateway token injection and message interception
+  // Build headers to forward, adding the fly-force-instance-id header
+  const forwardHeaders = new Headers(request.headers);
+  forwardHeaders.set('fly-force-instance-id', machineId);
+  // Remove hop-by-hop headers that shouldn't be forwarded
+  forwardHeaders.delete('host');
+
+  // WebSocket proxy
   if (isWebSocketRequest) {
     const debugLogs = c.env.DEBUG_ROUTES === 'true';
     const redactedSearch = redactSensitiveParams(url);
 
-    console.log('[WS] Proxying WebSocket connection to OpenClaw');
+    console.log('[WS] Proxying WebSocket connection to OpenClaw via Fly Proxy');
     if (debugLogs) {
       console.log('[WS] URL:', url.pathname + redactedSearch);
     }
 
-    // Gateway token auth: the browser sends the token in the WebSocket connect
-    // frame (params.auth.token), NOT as a URL query param. The token reaches the
-    // browser via the URL fragment set by the Next.js dashboard (B4.2).
-    // The worker just relays the WebSocket messages transparently.
-
     let containerResponse: Response;
     try {
-      containerResponse = await sandbox.wsConnect(request, OPENCLAW_PORT);
+      containerResponse = await fetch(targetUrl, {
+        headers: forwardHeaders,
+      });
     } catch (err) {
-      console.error('[WS] wsConnect failed:', err);
+      console.error('[WS] Fly Proxy fetch failed:', err);
 
-      // Attempt crash recovery: restart if the instance was supposed to be running
       const recovered = await attemptCrashRecovery(c);
       if (recovered) {
+        // Machine may have been recreated — refresh the instance routing header
+        const { machineId: newMachineId } = await resolveInstance(c);
+        if (!newMachineId) {
+          return c.json({ error: 'Instance not reachable after restart' }, 503);
+        }
+        forwardHeaders.set('fly-force-instance-id', newMachineId);
+
         try {
-          containerResponse = await sandbox.wsConnect(request, OPENCLAW_PORT);
+          containerResponse = await fetch(targetUrl, {
+            headers: forwardHeaders,
+          });
         } catch (retryErr) {
           console.error('[WS] Retry after recovery failed:', retryErr);
           return c.json({ error: 'Instance not reachable after restart attempt' }, 503);
@@ -255,28 +306,22 @@ app.all('*', async c => {
         );
       }
     }
-    console.log('[WS] wsConnect response status:', containerResponse.status);
+    console.log('[WS] Fly Proxy response status:', containerResponse.status);
 
     const containerWs = containerResponse.webSocket;
     if (!containerWs) {
-      console.error('[WS] No WebSocket in container response - falling back to direct proxy');
+      console.error('[WS] No WebSocket in response - returning direct response');
       return containerResponse;
     }
 
     if (debugLogs) {
-      console.log('[WS] Got container WebSocket, setting up interception');
+      console.log('[WS] Got container WebSocket, setting up relay');
     }
 
     const [clientWs, serverWs] = Object.values(new WebSocketPair());
 
     serverWs.accept();
     containerWs.accept();
-
-    if (debugLogs) {
-      console.log('[WS] Both WebSockets accepted');
-      console.log('[WS] containerWs.readyState:', containerWs.readyState);
-      console.log('[WS] serverWs.readyState:', serverWs.readyState);
-    }
 
     // Client -> Container relay
     serverWs.addEventListener('message', event => {
@@ -289,70 +334,39 @@ app.all('*', async c => {
       }
       if (containerWs.readyState === WebSocket.OPEN) {
         containerWs.send(event.data);
-      } else if (debugLogs) {
-        console.log('[WS] Container not open, readyState:', containerWs.readyState);
       }
     });
 
     // Container -> Client relay with error transformation
     containerWs.addEventListener('message', event => {
-      if (debugLogs) {
-        console.log(
-          '[WS] Container -> Client (raw):',
-          typeof event.data,
-          typeof event.data === 'string' ? event.data.slice(0, 500) : '(binary)'
-        );
-      }
       let data = event.data;
 
       if (typeof data === 'string') {
         try {
           const parsed = JSON.parse(data);
-          if (debugLogs) {
-            console.log('[WS] Parsed JSON, has error.message:', !!parsed.error?.message);
-          }
           if (parsed.error?.message) {
-            if (debugLogs) {
-              console.log('[WS] Original error.message:', parsed.error.message);
-            }
             parsed.error.message = transformErrorMessage(parsed.error.message);
-            if (debugLogs) {
-              console.log('[WS] Transformed error.message:', parsed.error.message);
-            }
             data = JSON.stringify(parsed);
           }
-        } catch (e) {
-          if (debugLogs) {
-            console.log('[WS] Not JSON or parse error:', e);
-          }
+        } catch {
+          // Not JSON -- pass through
         }
       }
 
       if (serverWs.readyState === WebSocket.OPEN) {
         serverWs.send(data);
-      } else if (debugLogs) {
-        console.log('[WS] Server not open, readyState:', serverWs.readyState);
       }
     });
 
     // Close relay
     serverWs.addEventListener('close', event => {
-      if (debugLogs) {
-        console.log('[WS] Client closed:', event.code, event.reason);
-      }
       containerWs.close(event.code, event.reason);
     });
 
     containerWs.addEventListener('close', event => {
-      if (debugLogs) {
-        console.log('[WS] Container closed:', event.code, event.reason);
-      }
       let reason = transformErrorMessage(event.reason);
       if (reason.length > 123) {
         reason = reason.slice(0, 120) + '...';
-      }
-      if (debugLogs) {
-        console.log('[WS] Transformed close reason:', reason);
       }
       serverWs.close(event.code, reason);
     });
@@ -368,9 +382,6 @@ app.all('*', async c => {
       serverWs.close(1011, 'Container error');
     });
 
-    if (debugLogs) {
-      console.log('[WS] Returning intercepted WebSocket response');
-    }
     return new Response(null, {
       status: 101,
       webSocket: clientWs,
@@ -378,18 +389,34 @@ app.all('*', async c => {
   }
 
   // HTTP proxy
+  // Buffer body upfront so it can be replayed on crash-recovery retry (streams are one-shot).
+  const requestBody = request.body ? await request.arrayBuffer() : null;
   console.log('[HTTP] Proxying:', url.pathname + url.search);
   let httpResponse: Response;
   try {
-    httpResponse = await sandbox.containerFetch(request, OPENCLAW_PORT);
+    httpResponse = await fetch(targetUrl, {
+      method: request.method,
+      headers: forwardHeaders,
+      body: requestBody,
+    });
   } catch (err) {
-    console.error('[HTTP] containerFetch failed:', err);
+    console.error('[HTTP] Fly Proxy fetch failed:', err);
 
-    // Attempt crash recovery: restart if the instance was supposed to be running
     const recovered = await attemptCrashRecovery(c);
     if (recovered) {
+      // Machine may have been recreated — refresh the instance routing header
+      const { machineId: newMachineId } = await resolveInstance(c);
+      if (!newMachineId) {
+        return c.json({ error: 'Instance not reachable after restart' }, 503);
+      }
+      forwardHeaders.set('fly-force-instance-id', newMachineId);
+
       try {
-        httpResponse = await sandbox.containerFetch(request, OPENCLAW_PORT);
+        httpResponse = await fetch(targetUrl, {
+          method: request.method,
+          headers: forwardHeaders,
+          body: requestBody,
+        });
       } catch (retryErr) {
         console.error('[HTTP] Retry after recovery failed:', retryErr);
         return c.json({ error: 'Instance not reachable after restart attempt' }, 503);

@@ -10,47 +10,209 @@
  * - Postgres is written by the Next.js backend (sole writer). The worker reads only.
  * - Postgres is a registry + config backup. Operational state lives here in the DO.
  * - If DO SQLite is wiped, start() restores config from Postgres via Hyperdrive.
+ *
+ * Compute backend: Fly.io Machines API.
+ * Each user gets a dedicated Fly Machine + Fly Volume for persistence.
+ *
+ * Reconciliation:
+ * - The alarm() loop calls reconcileWithFly() to fix drift between DO state and Fly reality.
+ * - Alarm runs for ALL live instances (provisioned, running, stopped, destroying).
+ * - Destroying instances only retry pending deletes; never recreate resources.
+ * - Two-phase destroy: IDs are persisted until Fly confirms deletion.
  */
 
 import { DurableObject } from 'cloudflare:workers';
-import { getSandbox, type Sandbox, type SandboxOptions } from '@cloudflare/sandbox';
 import type { KiloClawEnv } from '../types';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { createDatabaseConnection, InstanceStore } from '../db';
 import { buildEnvVars } from '../gateway/env';
-import { mountR2Storage, userR2Prefix } from '../gateway/r2';
-import { ensureOpenClawGateway, findExistingGatewayProcess } from '../gateway/process';
-import { syncToR2, type SyncResult } from '../gateway/sync';
 import {
   PersistedStateSchema,
   type InstanceConfig,
   type PersistedState,
   type EncryptedEnvelope,
   type ModelEntry,
+  type MachineSize,
 } from '../schemas/instance-config';
+import {
+  OPENCLAW_PORT,
+  STARTUP_TIMEOUT_SECONDS,
+  DEFAULT_MACHINE_GUEST,
+  DEFAULT_VOLUME_SIZE_GB,
+  ALARM_INTERVAL_RUNNING_MS,
+  ALARM_INTERVAL_DESTROYING_MS,
+  ALARM_INTERVAL_IDLE_MS,
+  ALARM_JITTER_MS,
+  SELF_HEAL_THRESHOLD,
+} from '../config';
+import type { FlyClientConfig } from '../fly/client';
+import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
+import * as fly from '../fly/client';
 
-// StopParams from @cloudflare/containers -- not re-exported by @cloudflare/sandbox
-type StopParams = {
-  exitCode: number;
-  reason: 'exit' | 'runtime_signal';
-};
+type InstanceStatus = PersistedState['status'];
 
-type InstanceStatus = 'provisioned' | 'running' | 'stopped';
-
-// Derived from PersistedStateSchema — single source of truth for DO KV keys.
+// Derived from PersistedStateSchema -- single source of truth for DO KV keys.
 const STORAGE_KEYS = Object.keys(PersistedStateSchema.shape);
 
-/** Type-checked wrapper for ctx.storage.put() — catches key typos and wrong value types at compile time. */
+/** Type-checked wrapper for ctx.storage.put(). */
 function storageUpdate(update: Partial<PersistedState>): Partial<PersistedState> {
   return update;
 }
 
-// Sync timing constants
-const FIRST_SYNC_DELAY_MS = 10 * 60 * 1000; // 10 minutes
-const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-const MAX_BACKOFF_MS = 30 * 60 * 1000; // 30 minutes
-const SELF_HEAL_THRESHOLD = 5; // consecutive non-healthy checks before marking stopped
-const STALE_SYNC_LOCK_MS = 10 * 60 * 1000; // 10 minutes: reset syncInProgress if stale
+// ============================================================================
+// Structured reconciliation logging
+// ============================================================================
+
+function reconcileLog(reason: string, action: string, details: Record<string, unknown> = {}): void {
+  console.log(
+    JSON.stringify({
+      tag: 'reconcile',
+      reason,
+      action,
+      ...details,
+    })
+  );
+}
+
+// ============================================================================
+// Alarm interval selection
+// ============================================================================
+
+function alarmIntervalForStatus(status: InstanceStatus): number {
+  switch (status) {
+    case 'running':
+      return ALARM_INTERVAL_RUNNING_MS;
+    case 'destroying':
+      return ALARM_INTERVAL_DESTROYING_MS;
+    case 'provisioned':
+    case 'stopped':
+      return ALARM_INTERVAL_IDLE_MS;
+  }
+}
+
+function nextAlarmTime(status: InstanceStatus): number {
+  return Date.now() + alarmIntervalForStatus(status) + Math.random() * ALARM_JITTER_MS;
+}
+
+// ============================================================================
+// Metadata keys set on every Fly Machine for recovery/orphan detection.
+// Avoid fly_* keys — those are reserved by Fly.
+// ============================================================================
+
+export const METADATA_KEY_USER_ID = 'kiloclaw_user_id';
+export const METADATA_KEY_SANDBOX_ID = 'kiloclaw_sandbox_id';
+
+// ============================================================================
+// Machine config builder
+// ============================================================================
+
+type MachineIdentity = { userId: string; sandboxId: string };
+
+function buildMachineConfig(
+  appName: string,
+  imageTag: string,
+  envVars: Record<string, string>,
+  guest: FlyMachineConfig['guest'],
+  flyVolumeId: string | null,
+  identity: MachineIdentity
+): FlyMachineConfig {
+  return {
+    image: `registry.fly.io/${appName}:${imageTag}`,
+    env: envVars,
+    guest,
+    services: [
+      {
+        ports: [{ port: 443, handlers: ['tls', 'http'] }],
+        internal_port: OPENCLAW_PORT,
+        protocol: 'tcp' as const,
+      },
+    ],
+    mounts: flyVolumeId ? [{ volume: flyVolumeId, path: '/root' }] : [],
+    metadata: {
+      [METADATA_KEY_USER_ID]: identity.userId,
+      [METADATA_KEY_SANDBOX_ID]: identity.sandboxId,
+    },
+  };
+}
+
+function guestFromSize(machineSize: MachineSize | null): FlyMachineConfig['guest'] {
+  if (!machineSize) return DEFAULT_MACHINE_GUEST;
+  return {
+    cpus: machineSize.cpus,
+    memory_mb: machineSize.memory_mb,
+    cpu_kind: machineSize.cpu_kind,
+  };
+}
+
+// ============================================================================
+// Volume name helper
+// ============================================================================
+
+function volumeNameFromSandboxId(sandboxId: string): string {
+  return `kiloclaw_${sandboxId}`
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_')
+    .slice(0, 30);
+}
+
+// ============================================================================
+// Machine recovery: deterministic selection from metadata query results
+// ============================================================================
+
+/** Cooldown between metadata recovery attempts (1 alarm cycle at idle cadence). */
+const METADATA_RECOVERY_COOLDOWN_MS = ALARM_INTERVAL_IDLE_MS;
+
+/** States that indicate the machine is dead and should be ignored for recovery. */
+const DEAD_STATES: ReadonlySet<FlyMachineState> = new Set(['destroyed', 'destroying']);
+
+/**
+ * Priority order for picking a machine to recover.
+ * Lower index = higher preference. `started` is best, then `starting`, etc.
+ */
+const STATE_PRIORITY: ReadonlyMap<FlyMachineState, number> = new Map([
+  ['started', 0],
+  ['starting', 1],
+  ['stopped', 2],
+  ['created', 3],
+  ['stopping', 4],
+  ['replacing', 5],
+]);
+
+/**
+ * Given a list of machines from Fly's metadata query, pick the best candidate
+ * for recovery. Returns null if no live machines found.
+ *
+ * Selection rules:
+ * 1. Ignore destroyed/destroying machines.
+ * 2. Prefer started > starting > stopped > created > others.
+ * 3. Tie-break by newest updated_at.
+ */
+export function selectRecoveryCandidate(machines: FlyMachine[]): FlyMachine | null {
+  const live = machines.filter(m => !DEAD_STATES.has(m.state));
+  if (live.length === 0) return null;
+
+  live.sort((a, b) => {
+    const pa = STATE_PRIORITY.get(a.state) ?? 99;
+    const pb = STATE_PRIORITY.get(b.state) ?? 99;
+    if (pa !== pb) return pa - pb;
+    // Tie-break: newest updated_at first
+    return b.updated_at.localeCompare(a.updated_at);
+  });
+
+  return live[0];
+}
+
+/**
+ * Extract the volume ID from a machine's mount config at /root, if present.
+ */
+function volumeIdFromMachine(machine: FlyMachine): string | null {
+  const rootMount = (machine.config?.mounts ?? []).find(m => m.path === '/root');
+  return rootMount?.volume ?? null;
+}
+
+// ============================================================================
+// KiloClawInstance DO
+// ============================================================================
 
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // Cached state (loaded from DO SQLite on first access)
@@ -68,16 +230,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private provisionedAt: number | null = null;
   private lastStartedAt: number | null = null;
   private lastStoppedAt: number | null = null;
-  private lastSyncAt: number | null = null;
-  private syncInProgress = false;
-  private syncLockedAt: number | null = null;
-  private syncFailCount = 0;
+  private flyMachineId: string | null = null;
+  private flyVolumeId: string | null = null;
+  private flyRegion: string | null = null;
+  private machineSize: MachineSize | null = null;
+  private healthCheckFailCount = 0;
+  private pendingDestroyMachineId: string | null = null;
+  private pendingDestroyVolumeId: string | null = null;
+  private lastMetadataRecoveryAt: number | null = null;
 
-  /**
-   * Load persisted state from DO KV storage.
-   * Called lazily on first method invocation.
-   * Uses zod to validate the untyped storage entries at runtime.
-   */
+  // ---- State loading ----
+
   private async loadState(): Promise<void> {
     if (this.loaded) return;
 
@@ -87,7 +250,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (parsed.success) {
       const s = parsed.data;
-      // Empty strings mean "no value persisted" (from .default(''))
       this.userId = s.userId || null;
       this.sandboxId = s.sandboxId || null;
       this.status = s.userId ? s.status : null;
@@ -101,34 +263,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.provisionedAt = s.provisionedAt;
       this.lastStartedAt = s.lastStartedAt;
       this.lastStoppedAt = s.lastStoppedAt;
-      this.lastSyncAt = s.lastSyncAt;
-      this.syncInProgress = s.syncInProgress;
-      this.syncLockedAt = s.syncLockedAt;
-      this.syncFailCount = s.syncFailCount;
-
-      // Stale sync lock detection: if syncInProgress is true but the lock was
-      // acquired longer ago than STALE_SYNC_LOCK_MS, the previous alarm likely
-      // crashed mid-sync. Using syncLockedAt (set when acquiring the lock) instead
-      // of lastSyncAt avoids a stuck lock on first-ever sync when lastSyncAt is null.
-      if (this.syncInProgress && this.syncLockedAt) {
-        const elapsed = Date.now() - this.syncLockedAt;
-        if (elapsed > STALE_SYNC_LOCK_MS) {
-          console.warn('[DO] Resetting stale syncInProgress lock');
-          this.syncInProgress = false;
-          this.syncLockedAt = null;
-          await this.ctx.storage.put(
-            storageUpdate({
-              syncInProgress: false,
-              syncLockedAt: null,
-            })
-          );
-        }
-      }
+      this.flyMachineId = s.flyMachineId;
+      this.flyVolumeId = s.flyVolumeId;
+      this.flyRegion = s.flyRegion;
+      this.machineSize = s.machineSize;
+      this.healthCheckFailCount = s.healthCheckFailCount;
+      this.pendingDestroyMachineId = s.pendingDestroyMachineId;
+      this.pendingDestroyVolumeId = s.pendingDestroyVolumeId;
+      this.lastMetadataRecoveryAt = s.lastMetadataRecoveryAt;
     } else {
-      // safeParse failed -- storage contains data in an unexpected shape.
-      // With .default() on every field this should only happen if storage
-      // contains truly malformed values (e.g. wrong types). Log the error
-      // and fall through to defaults (all fields null/false/0).
       const hasAnyData = entries.size > 0;
       if (hasAnyData) {
         console.warn(
@@ -141,20 +284,38 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.loaded = true;
   }
 
-  // ─── Lifecycle methods (called by platform API routes via RPC) ──────────
+  // ========================================================================
+  // Lifecycle methods (called by platform API routes via RPC)
+  // ========================================================================
 
   /**
    * Provision or update config for a user's instance.
-   * The Next.js backend has already written the Postgres row before calling this.
-   * This method stores config in DO SQLite. Allows re-provisioning (config update).
+   * Creates a Fly Volume on first provision. Allows re-provisioning (config update).
    */
   async provision(userId: string, config: InstanceConfig): Promise<{ sandboxId: string }> {
     await this.loadState();
 
+    if (this.status === 'destroying') {
+      throw new Error('Cannot provision: instance is being destroyed');
+    }
+
     const sandboxId = sandboxIdFromUserId(userId);
     const isNew = !this.status;
 
-    // Store config + identity in DO SQLite
+    // Create Fly Volume on first provision
+    if (isNew && !this.flyVolumeId) {
+      const flyConfig = this.getFlyConfig();
+      const region = config.region ?? this.env.FLY_REGION ?? 'us,eu';
+      const volume = await fly.createVolume(flyConfig, {
+        name: volumeNameFromSandboxId(sandboxId),
+        region,
+        size_gb: DEFAULT_VOLUME_SIZE_GB,
+      });
+      this.flyVolumeId = volume.id;
+      this.flyRegion = volume.region;
+      console.log('[DO] Created Fly Volume:', volume.id, 'region:', volume.region);
+    }
+
     const configFields = {
       userId,
       sandboxId,
@@ -166,19 +327,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
       kilocodeModels: config.kilocodeModels ?? null,
       channels: config.channels ?? null,
+      machineSize: config.machineSize ?? this.machineSize ?? null,
     } satisfies Partial<PersistedState>;
 
-    // Only set initial state on first provision, not on config updates
     const update = isNew
       ? storageUpdate({
           ...configFields,
           provisionedAt: Date.now(),
           lastStartedAt: null,
           lastStoppedAt: null,
-          lastSyncAt: null,
-          syncInProgress: false,
-          syncLockedAt: null,
-          syncFailCount: 0,
+          flyMachineId: this.flyMachineId,
+          flyVolumeId: this.flyVolumeId,
+          flyRegion: this.flyRegion,
+          healthCheckFailCount: 0,
+          pendingDestroyMachineId: null,
+          pendingDestroyVolumeId: null,
         })
       : storageUpdate(configFields);
 
@@ -195,16 +358,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
     this.kilocodeModels = config.kilocodeModels ?? null;
     this.channels = config.channels ?? null;
+    this.machineSize = config.machineSize ?? this.machineSize ?? null;
     if (isNew) {
       this.provisionedAt = Date.now();
       this.lastStartedAt = null;
       this.lastStoppedAt = null;
-      this.lastSyncAt = null;
-      this.syncInProgress = false;
-      this.syncLockedAt = null;
-      this.syncFailCount = 0;
+      this.healthCheckFailCount = 0;
+      this.pendingDestroyMachineId = null;
+      this.pendingDestroyVolumeId = null;
     }
     this.loaded = true;
+
+    // Schedule reconciliation alarm for new instances
+    if (isNew) {
+      await this.scheduleAlarm();
+    }
 
     return { sandboxId };
   }
@@ -254,17 +422,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
-   * Start the sandbox container and gateway.
-   *
-   * Idempotent: if status is already 'running', verifies the gateway is
-   * actually alive. If it crashed (race with handleContainerStopped), falls
-   * through to a full restart. This allows the catch-all proxy to call
-   * start() for crash recovery without needing to know the precise state.
-   *
-   * @param userId - Optional userId hint for restore-from-Postgres if DO SQLite was wiped.
+   * Start the Fly Machine.
    */
   async start(userId?: string): Promise<void> {
     await this.loadState();
+
+    if (this.status === 'destroying') {
+      throw new Error('Cannot start: instance is being destroyed');
+    }
 
     // If DO SQLite was wiped, attempt restore from Postgres backup
     if (!this.userId || !this.sandboxId) {
@@ -278,45 +443,63 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Instance not provisioned');
     }
 
-    const sandbox = this.resolveSandbox();
+    const flyConfig = this.getFlyConfig();
+    const envVars = await this.buildUserEnvVars();
 
-    // If status is 'running', verify the gateway is actually alive.
-    // handleContainerStopped may not have fired yet after a crash.
-    if (this.status === 'running') {
-      const gateway = await findExistingGatewayProcess(sandbox);
-      if (gateway && (gateway.status === 'running' || gateway.status === 'starting')) {
-        console.log('[DO] Instance already running with live gateway, no-op');
-        return;
+    // Ensure a volume exists
+    await this.ensureVolume(flyConfig, 'start');
+
+    // If status is 'running', verify the machine is actually alive.
+    if (this.status === 'running' && this.flyMachineId) {
+      try {
+        const machine = await fly.getMachine(flyConfig, this.flyMachineId);
+        if (machine.state === 'started') {
+          await this.reconcileMachineMount(flyConfig, machine, 'start');
+          console.log('[DO] Machine already running, mount verified');
+          return;
+        }
+        console.log('[DO] Status is running but machine state is:', machine.state, '-- restarting');
+      } catch (err) {
+        console.log('[DO] Failed to get machine state, will recreate:', err);
       }
-      // Gateway is dead despite status=running. Fall through to full restart.
-      console.log('[DO] Status is running but gateway is dead, restarting');
     }
 
-    // Mount R2 storage with per-user prefix
-    await mountR2Storage(sandbox, this.env, this.userId);
+    const guest = guestFromSize(this.machineSize);
+    const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
+    const identity = { userId: this.userId, sandboxId: this.sandboxId };
+    const machineConfig = buildMachineConfig(
+      flyConfig.appName,
+      imageTag,
+      envVars,
+      guest,
+      this.flyVolumeId,
+      identity
+    );
 
-    const envVars = await this.buildUserEnvVars();
-    await this.writeKiloCodeModelsFile();
-    await ensureOpenClawGateway(sandbox, this.env, envVars);
+    if (this.flyMachineId) {
+      await this.startExistingMachine(flyConfig, machineConfig);
+    } else {
+      await this.createNewMachine(flyConfig, machineConfig);
+    }
 
     // Update state
     this.status = 'running';
     this.lastStartedAt = Date.now();
-    this.syncFailCount = 0;
+    this.healthCheckFailCount = 0;
     await this.ctx.storage.put(
       storageUpdate({
         status: 'running',
         lastStartedAt: this.lastStartedAt,
-        syncFailCount: 0,
+        healthCheckFailCount: 0,
+        flyMachineId: this.flyMachineId,
       })
     );
 
-    // Schedule first sync alarm (+10 minutes -- setup may take a while)
-    await this.ctx.storage.setAlarm(Date.now() + FIRST_SYNC_DELAY_MS);
+    await this.scheduleAlarm();
   }
 
   /**
-   * Stop the sandbox container.
+   * Stop the Fly Machine.
    */
   async stop(): Promise<void> {
     await this.loadState();
@@ -324,17 +507,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.userId || !this.sandboxId) {
       throw new Error('Instance not provisioned');
     }
-    if (this.status === 'stopped' || this.status === 'provisioned') {
-      console.log('[DO] Instance not running, no-op');
+    if (
+      this.status === 'stopped' ||
+      this.status === 'provisioned' ||
+      this.status === 'destroying'
+    ) {
+      console.log('[DO] Instance not running (status:', this.status, '), no-op');
       return;
     }
 
-    const sandbox = this.resolveSandbox();
+    if (this.flyMachineId) {
+      const flyConfig = this.getFlyConfig();
+      try {
+        await fly.stopMachine(flyConfig, this.flyMachineId);
+        await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+      } catch (err) {
+        console.error('[DO] Failed to stop machine:', err);
+      }
+    }
 
-    // Kill gateway process tree (pkill to catch child processes)
-    await this.killGatewayProcesses(sandbox);
-
-    // Update state
     this.status = 'stopped';
     this.lastStoppedAt = Date.now();
     await this.ctx.storage.put(
@@ -344,104 +535,73 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       })
     );
 
-    // Clear sync alarm
-    await this.ctx.storage.deleteAlarm();
+    // Keep alarm running for idle reconciliation
+    await this.scheduleAlarm();
   }
 
   /**
-   * Destroy the instance. Tears down sandbox + clears DO state.
-   * The Next.js backend has already soft-deleted the Postgres row before calling this.
+   * Two-phase destroy.
+   *
+   * 1. Persist pendingDestroy IDs + status='destroying'
+   * 2. Attempt Fly deletions
+   * 3. Only deleteAll() when BOTH are confirmed deleted
+   * 4. If either fails, alarm retries cleanup
    */
-  async destroy(deleteData?: boolean): Promise<void> {
+  async destroy(): Promise<void> {
     await this.loadState();
 
     if (!this.userId) {
       throw new Error('Instance not provisioned');
     }
 
-    // Teardown sandbox + gateway process
-    if (this.sandboxId) {
-      try {
-        const sandbox = this.resolveSandbox();
-        await this.killGatewayProcesses(sandbox);
-        await sandbox.destroy();
-      } catch (err) {
-        console.error('[DO] Sandbox teardown error:', err);
-      }
-    }
+    // Phase 1: Persist intent before attempting any Fly operations
+    this.pendingDestroyMachineId = this.flyMachineId;
+    this.pendingDestroyVolumeId = this.flyVolumeId;
+    this.status = 'destroying';
 
-    // Optional: delete R2 data
-    if (deleteData && this.userId) {
-      await this.deleteR2Data();
-    }
-
-    // Clear all DO state + alarm
-    await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
-
-    // Reset cached state
-    this.userId = null;
-    this.sandboxId = null;
-    this.status = null;
-    this.envVars = null;
-    this.encryptedSecrets = null;
-    this.channels = null;
-    this.provisionedAt = null;
-    this.lastStartedAt = null;
-    this.lastStoppedAt = null;
-    this.lastSyncAt = null;
-    this.syncInProgress = false;
-    this.syncLockedAt = null;
-    this.syncFailCount = 0;
-    this.loaded = false;
-  }
-
-  // ─── Lifecycle hook handler ────────────────────────────────────────────
-
-  /**
-   * Called by KiloClawSandbox.onStop() lifecycle hook.
-   * Safety net for unexpected container deaths (crash, OOM, runtime signal).
-   */
-  async handleContainerStopped(params: StopParams): Promise<void> {
-    await this.loadState();
-
-    console.log(
-      '[DO] handleContainerStopped:',
-      this.userId,
-      'exitCode:',
-      params.exitCode,
-      'reason:',
-      params.reason
-    );
-
-    // Update state
-    this.status = 'stopped';
-    this.lastStoppedAt = Date.now();
     await this.ctx.storage.put(
       storageUpdate({
-        status: 'stopped',
-        lastStoppedAt: this.lastStoppedAt,
+        status: 'destroying',
+        pendingDestroyMachineId: this.pendingDestroyMachineId,
+        pendingDestroyVolumeId: this.pendingDestroyVolumeId,
       })
     );
 
-    // Clear sync alarm
-    await this.ctx.storage.deleteAlarm();
+    // Phase 2: Attempt Fly deletions
+    const flyConfig = this.getFlyConfig();
+    await this.tryDeleteMachine(flyConfig, 'destroy');
+    await this.tryDeleteVolume(flyConfig, 'destroy');
+
+    // Phase 3: Finalize if both cleared, otherwise alarm will retry
+    const finalized = await this.finalizeDestroyIfComplete();
+    if (!finalized) {
+      console.warn(
+        '[DO] Destroy incomplete, alarm will retry. pending machine:',
+        this.pendingDestroyMachineId,
+        'volume:',
+        this.pendingDestroyVolumeId
+      );
+      await this.scheduleAlarm();
+    }
   }
 
-  // ─── Read methods ─────────────────────────────────────────────────────
+  // ========================================================================
+  // Read methods
+  // ========================================================================
 
   async getStatus(): Promise<{
     userId: string | null;
     sandboxId: string | null;
     status: InstanceStatus | null;
-    lastSyncAt: number | null;
-    syncInProgress: boolean;
     provisionedAt: number | null;
     lastStartedAt: number | null;
     lastStoppedAt: number | null;
     envVarCount: number;
     secretCount: number;
     channelCount: number;
+    flyMachineId: string | null;
+    flyVolumeId: string | null;
+    flyRegion: string | null;
   }> {
     await this.loadState();
 
@@ -449,14 +609,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       userId: this.userId,
       sandboxId: this.sandboxId,
       status: this.status,
-      lastSyncAt: this.lastSyncAt,
-      syncInProgress: this.syncInProgress,
       provisionedAt: this.provisionedAt,
       lastStartedAt: this.lastStartedAt,
       lastStoppedAt: this.lastStoppedAt,
       envVarCount: this.envVars ? Object.keys(this.envVars).length : 0,
       secretCount: this.encryptedSecrets ? Object.keys(this.encryptedSecrets).length : 0,
       channelCount: this.channels ? Object.values(this.channels).filter(Boolean).length : 0,
+      flyMachineId: this.flyMachineId,
+      flyVolumeId: this.flyVolumeId,
+      flyRegion: this.flyRegion,
     };
   }
 
@@ -471,226 +632,562 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
       kilocodeModels: this.kilocodeModels ?? undefined,
       channels: this.channels ?? undefined,
+      machineSize: this.machineSize ?? undefined,
     };
   }
 
-  // ─── User-facing operations (called by admin API routes via DO RPC) ──
+  // ========================================================================
+  // User-facing operations
+  // ========================================================================
 
-  /**
-   * Trigger a manual sync to R2. Requires a running instance.
-   */
-  async triggerSync(): Promise<SyncResult> {
+  async restartGateway(): Promise<{ success: boolean; error?: string }> {
     await this.loadState();
 
-    if (this.status !== 'running' || !this.sandboxId || !this.userId) {
+    if (this.status !== 'running' || !this.flyMachineId) {
       return { success: false, error: 'Instance is not running' };
     }
 
-    const sandbox = this.resolveSandbox();
-    return syncToR2(sandbox, this.env, this.userId);
-  }
-
-  /**
-   * Restart the gateway process (kill existing, start new).
-   * Rebuilds env vars from stored config. Requires a running instance.
-   */
-  async restartGateway(): Promise<{
-    success: boolean;
-    error?: string;
-    previousProcessId?: string;
-  }> {
-    await this.loadState();
-
-    if (this.status !== 'running' || !this.sandboxId) {
-      return { success: false, error: 'Instance is not running' };
-    }
-
-    const sandbox = this.resolveSandbox();
-
-    // Kill existing gateway process tree
-    const existingProcess = await findExistingGatewayProcess(sandbox);
-    const previousProcessId = existingProcess?.id;
-    await this.killGatewayProcesses(sandbox);
-    // Brief wait for processes to fully terminate
-    await new Promise(r => setTimeout(r, 2000));
-
-    // Rebuild env vars and start new gateway
     try {
+      const flyConfig = this.getFlyConfig();
+      await fly.stopMachine(flyConfig, this.flyMachineId);
+      await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+
       const envVars = await this.buildUserEnvVars();
-      await this.writeKiloCodeModelsFile();
-      await ensureOpenClawGateway(sandbox, this.env, envVars);
-      return {
-        success: true,
-        previousProcessId,
-      };
+      const guest = guestFromSize(this.machineSize);
+      const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
+      const identity = { userId: this.userId ?? '', sandboxId: this.sandboxId ?? '' };
+      const machineConfig = buildMachineConfig(
+        flyConfig.appName,
+        imageTag,
+        envVars,
+        guest,
+        this.flyVolumeId,
+        identity
+      );
+
+      await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig);
+      await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
+
+      return { success: true };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      return { success: false, error: errorMessage, previousProcessId };
+      return { success: false, error: errorMessage };
     }
   }
 
-  // ─── Alarm (sync loop) ───────────────────────────────────────────────
+  // ========================================================================
+  // Alarm (reconciliation loop)
+  // ========================================================================
 
   override async alarm(): Promise<void> {
     await this.loadState();
 
-    if (this.status !== 'running' || !this.sandboxId) {
-      return;
-    }
+    // No instance provisioned — nothing to reconcile
+    if (!this.userId || !this.status) return;
 
-    const sandbox = this.resolveSandbox();
-
-    const health = await this.checkContainerHealth(sandbox);
-    if (health === 'self-healed' || health === 'unhealthy') {
-      return;
-    }
-
-    if (this.syncInProgress) {
-      await this.rescheduleWithBackoff();
-      return;
-    }
-
-    await this.performSync(sandbox);
-  }
-
-  /**
-   * Check container health via getState() (reads DO storage only -- no container wake).
-   * Increments syncFailCount on non-healthy checks and triggers self-heal after
-   * SELF_HEAL_THRESHOLD consecutive failures.
-   */
-  private async checkContainerHealth(
-    sandbox: Sandbox
-  ): Promise<'healthy' | 'unhealthy' | 'self-healed'> {
     try {
-      const containerState = await sandbox.getState();
-      if (containerState.status === 'healthy') {
-        return 'healthy';
-      }
+      await this.reconcileWithFly('alarm');
     } catch (err) {
-      console.error('[sync] getState() failed:', err);
+      console.error('[alarm] reconcileWithFly failed:', err);
     }
 
-    // Not healthy (or getState threw)
-    this.syncFailCount++;
-    await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
+    // Reschedule unless fully destroyed (status becomes null after deleteAll)
+    if (this.status) {
+      await this.scheduleAlarm();
+    }
+  }
 
-    if (this.syncFailCount >= SELF_HEAL_THRESHOLD) {
-      console.warn(
-        `[sync] Container not healthy after ${this.syncFailCount} checks, marking stopped`
-      );
-      this.status = 'stopped';
-      this.lastStoppedAt = Date.now();
-      await this.ctx.storage.put(
-        storageUpdate({
-          status: 'stopped',
-          lastStoppedAt: this.lastStoppedAt,
-          syncFailCount: this.syncFailCount,
-        })
-      );
-      return 'self-healed';
+  // ========================================================================
+  // Reconciliation
+  // ========================================================================
+
+  /**
+   * Check actual Fly state against DO state and fix drift.
+   * Destroying instances only retry pending deletes; never recreate resources.
+   */
+  private async reconcileWithFly(reason: string): Promise<void> {
+    const flyConfig = this.getFlyConfig();
+
+    // Destroying: only retry pending deletes, never recreate anything
+    if (this.status === 'destroying') {
+      await this.retryPendingDestroy(flyConfig, reason);
+      return;
     }
 
-    await this.rescheduleWithBackoff();
-    return 'unhealthy';
+    // Machine first: metadata recovery can recover both machine AND volume IDs.
+    // Volume second: only creates a new volume if still missing after machine recovery.
+    await this.reconcileMachine(flyConfig, reason);
+    await this.reconcileVolume(flyConfig, reason);
+  }
+
+  // ---- Volume reconciliation ----
+
+  private async reconcileVolume(flyConfig: FlyClientConfig, reason: string): Promise<void> {
+    if (!this.flyVolumeId) {
+      await this.ensureVolume(flyConfig, reason);
+      return;
+    }
+
+    // Verify volume still exists on Fly
+    try {
+      await fly.getVolume(flyConfig, this.flyVolumeId);
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        reconcileLog(reason, 'replace_lost_volume', {
+          data_loss: true,
+          old_volume_id: this.flyVolumeId,
+        });
+        this.flyVolumeId = null;
+        await this.ctx.storage.put(storageUpdate({ flyVolumeId: null }));
+        await this.ensureVolume(flyConfig, reason);
+      }
+      // Other errors: leave as-is, retry next alarm
+    }
+  }
+
+  // ---- Machine reconciliation ----
+
+  private async reconcileMachine(flyConfig: FlyClientConfig, reason: string): Promise<void> {
+    // If we don't have a machine ID, attempt metadata-based recovery
+    if (!this.flyMachineId) {
+      await this.attemptMetadataRecovery(flyConfig, reason);
+      return;
+    }
+
+    try {
+      const machine = await fly.getMachine(flyConfig, this.flyMachineId);
+      await this.syncStatusWithFly(machine.state, reason);
+      await this.reconcileMachineMount(flyConfig, machine, reason);
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        await this.handleMachineGone(reason);
+      }
+      // Other errors: log and retry next alarm
+    }
   }
 
   /**
-   * Run the sync operation: check gateway, rsync to R2, update timestamps.
-   * Manages the syncInProgress lock and reschedules the next alarm.
+   * Attempt to recover machine (and optionally volume) from Fly metadata.
+   * Only runs when flyMachineId is null. Respects a cooldown to avoid
+   * hammering listMachines when there's genuinely nothing to recover.
    */
-  private async performSync(sandbox: Sandbox): Promise<void> {
+  private async attemptMetadataRecovery(flyConfig: FlyClientConfig, reason: string): Promise<void> {
     if (!this.userId) return;
 
-    this.syncInProgress = true;
-    this.syncLockedAt = Date.now();
+    // Cooldown: skip if we tried recently
+    if (
+      this.lastMetadataRecoveryAt &&
+      Date.now() - this.lastMetadataRecoveryAt < METADATA_RECOVERY_COOLDOWN_MS
+    ) {
+      return;
+    }
+
+    // Record attempt time regardless of outcome
+    this.lastMetadataRecoveryAt = Date.now();
     await this.ctx.storage.put(
-      storageUpdate({
-        syncInProgress: true,
-        syncLockedAt: this.syncLockedAt,
-      })
+      storageUpdate({ lastMetadataRecoveryAt: this.lastMetadataRecoveryAt })
     );
 
     try {
-      const gatewayProcess = await findExistingGatewayProcess(sandbox);
-      if (!gatewayProcess) {
-        console.log(`[sync] Gateway not running for ${this.userId}, skipping`);
-        this.syncInProgress = false;
-        this.syncLockedAt = null;
-        await this.ctx.storage.put(
-          storageUpdate({
-            syncInProgress: false,
-            syncLockedAt: null,
-          })
-        );
-        await this.scheduleSync();
-        return;
+      const machines = await fly.listMachines(flyConfig, {
+        [METADATA_KEY_USER_ID]: this.userId,
+      });
+
+      if (machines.length > 1) {
+        reconcileLog(reason, 'multiple_machines_found', {
+          user_id: this.userId,
+          count: machines.length,
+          machine_ids: machines.map(m => m.id),
+        });
       }
 
-      const result = await syncToR2(sandbox, this.env, this.userId);
-      if (result.success) {
-        this.lastSyncAt = Date.now();
-        this.syncFailCount = 0;
-        await this.ctx.storage.put(
-          storageUpdate({
-            lastSyncAt: this.lastSyncAt,
-            syncFailCount: 0,
-          })
-        );
-      } else {
-        console.error(`[sync] Failed for ${this.userId}:`, result.error);
-        this.syncFailCount++;
-        await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
+      const candidate = selectRecoveryCandidate(machines);
+      if (!candidate) return;
+
+      reconcileLog(reason, 'recover_machine_from_metadata', {
+        machine_id: candidate.id,
+        state: candidate.state,
+        region: candidate.region,
+      });
+
+      // Recover machine ID
+      this.flyMachineId = candidate.id;
+      this.flyRegion = candidate.region;
+
+      const updates: Partial<PersistedState> = {
+        flyMachineId: candidate.id,
+        flyRegion: candidate.region,
+      };
+
+      // Sync DO status to Fly reality
+      if (candidate.state === 'started') {
+        this.status = 'running';
+        updates.status = 'running';
+      } else if (candidate.state === 'stopped' || candidate.state === 'created') {
+        this.status = 'stopped';
+        updates.status = 'stopped';
       }
+
+      // Recover volume ID from the machine's mount config
+      if (!this.flyVolumeId) {
+        const recoveredVolumeId = volumeIdFromMachine(candidate);
+        if (recoveredVolumeId) {
+          // Verify the volume actually exists before trusting it
+          try {
+            await fly.getVolume(flyConfig, recoveredVolumeId);
+            this.flyVolumeId = recoveredVolumeId;
+            updates.flyVolumeId = recoveredVolumeId;
+            reconcileLog(reason, 'recover_volume_from_mount', {
+              volume_id: recoveredVolumeId,
+              machine_id: candidate.id,
+            });
+          } catch (err) {
+            if (fly.isFlyNotFound(err)) {
+              reconcileLog(reason, 'recovered_volume_missing', {
+                volume_id: recoveredVolumeId,
+              });
+            }
+            // Volume gone or error — ensureVolume will handle on next cycle
+          }
+        }
+      }
+
+      await this.ctx.storage.put(storageUpdate(updates));
     } catch (err) {
-      console.error(`[sync] Error for ${this.userId}:`, err);
-      this.syncFailCount++;
-      await this.ctx.storage.put(storageUpdate({ syncFailCount: this.syncFailCount }));
-    }
-
-    this.syncInProgress = false;
-    this.syncLockedAt = null;
-    await this.ctx.storage.put(
-      storageUpdate({
-        syncInProgress: false,
-        syncLockedAt: null,
-      })
-    );
-
-    if (this.syncFailCount > 0) {
-      await this.rescheduleWithBackoff();
-    } else {
-      await this.scheduleSync();
+      console.error('[reconcile] metadata recovery failed:', err);
     }
   }
 
-  // ─── Private helpers ──────────────────────────────────────────────────
+  /**
+   * Sync DO status to match Fly machine state.
+   * Uses health-check fail counting for running → stopped transitions.
+   */
+  private async syncStatusWithFly(flyState: string, reason: string): Promise<void> {
+    if (flyState === 'started' && this.status !== 'running') {
+      reconcileLog(reason, 'sync_status', { old_state: this.status, new_state: 'running' });
+      this.status = 'running';
+      this.healthCheckFailCount = 0;
+      await this.ctx.storage.put(storageUpdate({ status: 'running', healthCheckFailCount: 0 }));
+      return;
+    }
+
+    if (flyState === 'started' && this.status === 'running') {
+      // Healthy — reset fail count if needed
+      if (this.healthCheckFailCount > 0) {
+        this.healthCheckFailCount = 0;
+        await this.ctx.storage.put(storageUpdate({ healthCheckFailCount: 0 }));
+      }
+      return;
+    }
+
+    if ((flyState === 'stopped' || flyState === 'created') && this.status === 'running') {
+      this.healthCheckFailCount++;
+      await this.ctx.storage.put(
+        storageUpdate({ healthCheckFailCount: this.healthCheckFailCount })
+      );
+
+      if (this.healthCheckFailCount >= SELF_HEAL_THRESHOLD) {
+        reconcileLog(reason, 'mark_stopped', {
+          old_state: 'running',
+          new_state: 'stopped',
+          fail_count: this.healthCheckFailCount,
+        });
+        this.status = 'stopped';
+        this.lastStoppedAt = Date.now();
+        this.healthCheckFailCount = 0;
+        await this.ctx.storage.put(
+          storageUpdate({
+            status: 'stopped',
+            lastStoppedAt: this.lastStoppedAt,
+            healthCheckFailCount: 0,
+          })
+        );
+      }
+    }
+  }
 
   /**
-   * Kill the gateway process and all its children.
-   * Uses pkill -f instead of Process.kill() because start-openclaw.sh
-   * spawns child processes (the actual openclaw gateway) that survive
-   * if only the parent shell PID is killed.
+   * Check that a running machine has the correct volume mount.
+   * If the mount is wrong/missing, repair via stop → update → start.
    */
-  private async killGatewayProcesses(sandbox: Sandbox): Promise<void> {
+  private async reconcileMachineMount(
+    flyConfig: FlyClientConfig,
+    machine: { state: string; config: FlyMachineConfig },
+    reason: string
+  ): Promise<void> {
+    if (machine.state !== 'started' || !this.flyVolumeId) return;
+
+    const mounts = machine.config?.mounts ?? [];
+    const hasCorrectMount = mounts.some(m => m.volume === this.flyVolumeId && m.path === '/root');
+
+    if (hasCorrectMount) return;
+
+    reconcileLog(reason, 'repair_mount', {
+      machine_id: this.flyMachineId,
+      volume_id: this.flyVolumeId,
+    });
+
+    if (!this.flyMachineId) return;
+
+    await fly.stopMachine(flyConfig, this.flyMachineId);
+    await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+    await fly.updateMachine(flyConfig, this.flyMachineId, {
+      ...machine.config,
+      mounts: [{ volume: this.flyVolumeId, path: '/root' }],
+    });
+    await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
+  }
+
+  /**
+   * Machine confirmed gone from Fly (404). Clear the ID and mark stopped.
+   */
+  private async handleMachineGone(reason: string): Promise<void> {
+    reconcileLog(reason, 'clear_stale_machine', {
+      old_state: this.status,
+      new_state: 'stopped',
+      machine_id: this.flyMachineId,
+    });
+    this.flyMachineId = null;
+    this.status = 'stopped';
+    this.lastStoppedAt = Date.now();
+    this.healthCheckFailCount = 0;
+    await this.ctx.storage.put(
+      storageUpdate({
+        flyMachineId: null,
+        status: 'stopped',
+        lastStoppedAt: this.lastStoppedAt,
+        healthCheckFailCount: 0,
+      })
+    );
+  }
+
+  // ========================================================================
+  // Two-phase destroy helpers
+  // ========================================================================
+
+  /**
+   * Retry deleting pending Fly resources. Called from alarm for destroying instances.
+   */
+  private async retryPendingDestroy(flyConfig: FlyClientConfig, reason: string): Promise<void> {
+    await this.tryDeleteMachine(flyConfig, reason);
+    await this.tryDeleteVolume(flyConfig, reason);
+    await this.finalizeDestroyIfComplete();
+  }
+
+  /**
+   * Attempt to delete the pending machine. Clears the ID on success or 404.
+   */
+  private async tryDeleteMachine(flyConfig: FlyClientConfig, reason: string): Promise<void> {
+    if (!this.pendingDestroyMachineId) return;
+
     try {
-      // Kill anything matching start-openclaw or openclaw gateway
-      const proc = await sandbox.startProcess("pkill -f 'start-openclaw|openclaw'");
-      // Wait briefly for pkill to complete
-      let attempts = 0;
-      while (proc.status === 'running' && attempts < 10) {
-        await new Promise(r => setTimeout(r, 200));
-        attempts++;
-      }
-      console.log('[DO] pkill completed, status:', proc.status, 'exitCode:', proc.exitCode);
+      await fly.destroyMachine(flyConfig, this.pendingDestroyMachineId);
+      reconcileLog(reason, 'destroy_machine_ok', {
+        machine_id: this.pendingDestroyMachineId,
+      });
     } catch (err) {
-      console.error('[DO] pkill failed:', err);
+      if (fly.isFlyNotFound(err)) {
+        reconcileLog(reason, 'destroy_machine_already_gone', {
+          machine_id: this.pendingDestroyMachineId,
+        });
+      } else {
+        reconcileLog(reason, 'destroy_machine_failed', {
+          machine_id: this.pendingDestroyMachineId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return; // Leave pending, retry next alarm
+      }
     }
+
+    // Success or 404: clear
+    this.pendingDestroyMachineId = null;
+    this.flyMachineId = null;
+    await this.ctx.storage.put(
+      storageUpdate({ pendingDestroyMachineId: null, flyMachineId: null })
+    );
+  }
+
+  /**
+   * Attempt to delete the pending volume. Clears the ID on success or 404.
+   */
+  private async tryDeleteVolume(flyConfig: FlyClientConfig, reason: string): Promise<void> {
+    if (!this.pendingDestroyVolumeId) return;
+
+    try {
+      await fly.deleteVolume(flyConfig, this.pendingDestroyVolumeId);
+      reconcileLog(reason, 'destroy_volume_ok', {
+        volume_id: this.pendingDestroyVolumeId,
+      });
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        reconcileLog(reason, 'destroy_volume_already_gone', {
+          volume_id: this.pendingDestroyVolumeId,
+        });
+      } else {
+        reconcileLog(reason, 'destroy_volume_failed', {
+          volume_id: this.pendingDestroyVolumeId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return; // Leave pending, retry next alarm
+      }
+    }
+
+    // Success or 404: clear
+    this.pendingDestroyVolumeId = null;
+    this.flyVolumeId = null;
+    await this.ctx.storage.put(storageUpdate({ pendingDestroyVolumeId: null, flyVolumeId: null }));
+  }
+
+  /**
+   * If both pending IDs are cleared, atomically wipe all DO state.
+   * Returns true if finalized, false if still pending.
+   */
+  private async finalizeDestroyIfComplete(): Promise<boolean> {
+    if (this.pendingDestroyMachineId || this.pendingDestroyVolumeId) {
+      return false;
+    }
+
+    reconcileLog('finalize', 'destroy_complete', {
+      user_id: this.userId,
+      sandbox_id: this.sandboxId,
+    });
+
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+
+    // Reset all cached state
+    this.userId = null;
+    this.sandboxId = null;
+    this.status = null;
+    this.envVars = null;
+    this.encryptedSecrets = null;
+    this.kilocodeApiKey = null;
+    this.kilocodeApiKeyExpiresAt = null;
+    this.kilocodeDefaultModel = null;
+    this.kilocodeModels = null;
+    this.channels = null;
+    this.provisionedAt = null;
+    this.lastStartedAt = null;
+    this.lastStoppedAt = null;
+    this.flyMachineId = null;
+    this.flyVolumeId = null;
+    this.flyRegion = null;
+    this.machineSize = null;
+    this.healthCheckFailCount = 0;
+    this.pendingDestroyMachineId = null;
+    this.pendingDestroyVolumeId = null;
+    this.lastMetadataRecoveryAt = null;
+    this.loaded = false;
+
+    return true;
+  }
+
+  // ========================================================================
+  // Infrastructure helpers
+  // ========================================================================
+
+  private getFlyConfig(): FlyClientConfig {
+    if (!this.env.FLY_API_TOKEN) {
+      throw new Error('FLY_API_TOKEN is not configured');
+    }
+    if (!this.env.FLY_APP_NAME) {
+      throw new Error('FLY_APP_NAME is not configured');
+    }
+    return {
+      apiToken: this.env.FLY_API_TOKEN,
+      appName: this.env.FLY_APP_NAME,
+    };
+  }
+
+  private async scheduleAlarm(): Promise<void> {
+    if (!this.status) return;
+    await this.ctx.storage.setAlarm(nextAlarmTime(this.status));
+  }
+
+  /**
+   * Ensure a Fly Volume exists. Creates one if flyVolumeId is null.
+   * Persists the new volume ID immediately.
+   */
+  private async ensureVolume(flyConfig: FlyClientConfig, reason: string): Promise<void> {
+    if (this.flyVolumeId) return;
+    if (!this.sandboxId) return;
+
+    const region = this.flyRegion ?? this.env.FLY_REGION ?? 'us,eu';
+    const volume = await fly.createVolume(flyConfig, {
+      name: volumeNameFromSandboxId(this.sandboxId),
+      region,
+      size_gb: DEFAULT_VOLUME_SIZE_GB,
+    });
+
+    this.flyVolumeId = volume.id;
+    this.flyRegion = volume.region;
+    await this.ctx.storage.put(storageUpdate({ flyVolumeId: volume.id, flyRegion: volume.region }));
+
+    reconcileLog(reason, 'create_volume', {
+      volume_id: volume.id,
+      region: volume.region,
+    });
+  }
+
+  /**
+   * Try to start an existing machine. Falls back to creating a new one if
+   * the existing machine is unusable (destroyed, corrupted).
+   */
+  private async startExistingMachine(
+    flyConfig: FlyClientConfig,
+    machineConfig: FlyMachineConfig
+  ): Promise<void> {
+    if (!this.flyMachineId) return;
+
+    try {
+      const machine = await fly.getMachine(flyConfig, this.flyMachineId);
+      if (machine.state === 'stopped' || machine.state === 'created') {
+        await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig);
+        await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
+        console.log('[DO] Machine updated and started:', this.flyMachineId);
+      } else if (machine.state === 'started') {
+        console.log('[DO] Machine already started');
+      } else {
+        await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
+      }
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        // Machine confirmed gone — safe to recreate
+        console.log('[DO] Machine gone (404), creating new one');
+        this.flyMachineId = null;
+        await this.ctx.storage.put(storageUpdate({ flyMachineId: null }));
+        await this.createNewMachine(flyConfig, machineConfig);
+      } else {
+        // Transient error (timeout, 500, network) — don't create a duplicate.
+        // Let the caller surface the error; reconciliation will repair later.
+        console.error('[DO] Transient error starting existing machine:', err);
+        throw err;
+      }
+    }
+  }
+
+  private async createNewMachine(
+    flyConfig: FlyClientConfig,
+    machineConfig: FlyMachineConfig
+  ): Promise<void> {
+    const machine = await fly.createMachine(flyConfig, machineConfig, {
+      name: this.sandboxId ?? undefined,
+      region: this.flyRegion ?? this.env.FLY_REGION ?? undefined,
+    });
+    this.flyMachineId = machine.id;
+
+    // Persist immediately so the ID survives even if waitForState fails.
+    // The reconciliation alarm will detect and repair a machine stuck in
+    // 'created'/'starting' state on the next cycle.
+    await this.ctx.storage.put(storageUpdate({ flyMachineId: machine.id }));
+    console.log('[DO] Created Fly Machine:', machine.id, 'region:', machine.region);
+
+    await fly.waitForState(flyConfig, machine.id, 'started', STARTUP_TIMEOUT_SECONDS);
+    console.log('[DO] Machine started');
   }
 
   /**
    * Restore DO state from Postgres backup if SQLite was wiped.
-   * The Next.js backend is the sole writer to Postgres, so this data
-   * is the authoritative backup of the instance config.
    */
   private async restoreFromPostgres(userId: string): Promise<void> {
     const connectionString = this.env.HYPERDRIVE?.connectionString;
@@ -711,12 +1208,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       console.log('[DO] Restoring state from Postgres backup for', userId);
 
-      // Config values are not persisted in Postgres.
       const envVars: Record<string, string> | null = null;
       const encryptedSecrets: Record<string, EncryptedEnvelope> | null = null;
       const channels = null;
 
-      // Write restored state to DO SQLite
       await this.ctx.storage.put(
         storageUpdate({
           userId,
@@ -728,14 +1223,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           provisionedAt: Date.now(),
           lastStartedAt: null,
           lastStoppedAt: null,
-          lastSyncAt: null,
-          syncInProgress: false,
-          syncLockedAt: null,
-          syncFailCount: 0,
+          flyMachineId: null,
+          flyVolumeId: null,
+          flyRegion: null,
+          machineSize: null,
+          healthCheckFailCount: 0,
+          pendingDestroyMachineId: null,
+          pendingDestroyVolumeId: null,
         })
       );
 
-      // Update cached state
       this.userId = userId;
       this.sandboxId = instance.sandboxId;
       this.status = 'provisioned';
@@ -745,21 +1242,32 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.provisionedAt = Date.now();
       this.lastStartedAt = null;
       this.lastStoppedAt = null;
-      this.lastSyncAt = null;
-      this.syncInProgress = false;
-      this.syncLockedAt = null;
-      this.syncFailCount = 0;
+      this.flyMachineId = null;
+      this.flyVolumeId = null;
+      this.flyRegion = null;
+      this.machineSize = null;
+      this.healthCheckFailCount = 0;
+      this.pendingDestroyMachineId = null;
+      this.pendingDestroyVolumeId = null;
+      this.lastMetadataRecoveryAt = null;
       this.loaded = true;
 
       console.log('[DO] Restored from Postgres: sandboxId =', instance.sandboxId);
+
+      // Attempt to recover machine/volume IDs via Fly metadata.
+      // The Postgres backup doesn't store Fly IDs, but if the machine
+      // was created with metadata tags, we can find it.
+      try {
+        const flyConfig = this.getFlyConfig();
+        await this.attemptMetadataRecovery(flyConfig, 'postgres_restore');
+      } catch (err) {
+        console.warn('[DO] Metadata recovery after Postgres restore failed:', err);
+      }
     } catch (err) {
       console.error('[DO] Postgres restore failed:', err);
     }
   }
 
-  /**
-   * Build env vars from stored user config. Used by start() and restartGateway().
-   */
   private async buildUserEnvVars(): Promise<Record<string, string>> {
     if (!this.sandboxId || !this.env.GATEWAY_TOKEN_SECRET) {
       throw new Error('Cannot build env vars: sandboxId or GATEWAY_TOKEN_SECRET missing');
@@ -771,78 +1279,5 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
       channels: this.channels ?? undefined,
     });
-  }
-
-  private async writeKiloCodeModelsFile(): Promise<void> {
-    if (!this.sandboxId) return;
-    const sandbox = this.resolveSandbox();
-    const content = JSON.stringify(this.kilocodeModels ?? []);
-    const escaped = content.replace(/'/g, "'\\''");
-    const command = `printf '%s' '${escaped}' > /root/.openclaw/kilocode-models.json`;
-    const result = await sandbox.exec(command, { timeout: 1000 });
-    if (result.exitCode !== 0) {
-      throw new Error(
-        `Failed to write KiloCode models file (exit ${result.exitCode}): ${result.stderr}`
-      );
-    }
-  }
-
-  private resolveSandbox() {
-    if (!this.sandboxId) {
-      throw new Error('No sandboxId -- instance not provisioned');
-    }
-    const options: SandboxOptions = { keepAlive: true };
-    return getSandbox(this.env.Sandbox, this.sandboxId, options);
-  }
-
-  private async scheduleSync(): Promise<void> {
-    await this.ctx.storage.setAlarm(Date.now() + SYNC_INTERVAL_MS);
-  }
-
-  private async rescheduleWithBackoff(): Promise<void> {
-    // Exponential backoff: min(5min * 2^failCount, 30min)
-    const delayMs = Math.min(SYNC_INTERVAL_MS * Math.pow(2, this.syncFailCount), MAX_BACKOFF_MS);
-    await this.ctx.storage.setAlarm(Date.now() + delayMs);
-  }
-
-  /**
-   * Delete R2 data for this user via R2 list + delete.
-   * The R2 prefix is derived from userId using the same hash as mountR2Storage.
-   * userR2Prefix returns "/users/{hash}" (leading slash for s3fs); R2 keys
-   * use no leading slash, so we strip it.
-   */
-  private async deleteR2Data(): Promise<void> {
-    if (!this.userId) return;
-
-    const prefixWithSlash = await userR2Prefix(this.userId);
-    // Strip leading '/' -- R2 keys don't use leading slashes
-    const r2Prefix = prefixWithSlash.startsWith('/') ? prefixWithSlash.slice(1) : prefixWithSlash;
-
-    console.log('[DO] Deleting R2 data with prefix:', r2Prefix);
-
-    try {
-      let cursor: string | undefined;
-      let totalDeleted = 0;
-
-      do {
-        const listed = await this.env.KILOCLAW_BUCKET.list({
-          prefix: r2Prefix,
-          cursor,
-          limit: 1000,
-        });
-
-        if (listed.objects.length > 0) {
-          const keys = listed.objects.map(o => o.key);
-          await this.env.KILOCLAW_BUCKET.delete(keys);
-          totalDeleted += keys.length;
-        }
-
-        cursor = listed.truncated ? listed.cursor : undefined;
-      } while (cursor);
-
-      console.log(`[DO] Deleted ${totalDeleted} R2 objects for user ${this.userId}`);
-    } catch (err) {
-      console.error('[DO] R2 data deletion failed:', err);
-    }
   }
 }

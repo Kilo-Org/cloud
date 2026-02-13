@@ -1,131 +1,55 @@
 import { Hono } from 'hono';
-import { getSandbox } from '@cloudflare/sandbox';
 import type { AppEnv } from '../types';
-import { findExistingGatewayProcess } from '../gateway';
+import * as fly from '../fly/client';
+import type { FlyClientConfig } from '../fly/client';
 
 /**
- * Debug routes for inspecting container state.
+ * Debug routes for inspecting Fly Machine state.
  *
- * All debug routes require a ?sandboxId= query parameter to target
- * a specific per-user sandbox. Gated by debugRoutesGate (internal API
- * key or debug secret).
+ * All debug routes require a ?sandboxId= or ?machineId= query parameter.
+ * Gated by debugRoutesGate (internal API key or debug secret).
  */
 const debug = new Hono<AppEnv>();
 
-/**
- * Resolve a sandbox from the ?sandboxId= query param.
- * Returns null with a 400 response if missing.
- */
-function resolveSandboxFromQuery(c: {
-  req: { query: (key: string) => string | undefined };
-  env: AppEnv['Bindings'];
-}) {
-  const sandboxId = c.req.query('sandboxId');
-  if (!sandboxId) return null;
-  return getSandbox(c.env.Sandbox, sandboxId, { keepAlive: true });
+function getFlyConfig(env: AppEnv['Bindings']): FlyClientConfig | null {
+  if (!env.FLY_API_TOKEN || !env.FLY_APP_NAME) return null;
+  return { apiToken: env.FLY_API_TOKEN, appName: env.FLY_APP_NAME };
 }
 
-// GET /debug/version - Returns version info from inside the container
-debug.get('/version', async c => {
-  const sandbox = resolveSandboxFromQuery(c);
-  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
+// GET /debug/machine - Get machine state from Fly API
+debug.get('/machine', async c => {
+  const machineId = c.req.query('machineId');
+  if (!machineId) return c.json({ error: 'machineId query parameter is required' }, 400);
+
+  const flyConfig = getFlyConfig(c.env);
+  if (!flyConfig) return c.json({ error: 'Fly API not configured' }, 503);
 
   try {
-    // Get OpenClaw version
-    const versionProcess = await sandbox.startProcess('openclaw --version');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const versionLogs = await versionProcess.getLogs();
-    const openclawVersion = (versionLogs.stdout || versionLogs.stderr || '').trim();
-
-    // Get node version
-    const nodeProcess = await sandbox.startProcess('node --version');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const nodeLogs = await nodeProcess.getLogs();
-    const nodeVersion = (nodeLogs.stdout || '').trim();
-
-    return c.json({
-      openclaw_version: openclawVersion,
-      node_version: nodeVersion,
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return c.json({ status: 'error', message: `Failed to get version info: ${errorMessage}` }, 500);
-  }
-});
-
-// GET /debug/processes - List all processes with optional logs
-debug.get('/processes', async c => {
-  const sandbox = resolveSandboxFromQuery(c);
-  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
-
-  try {
-    const processes = await sandbox.listProcesses();
-    const includeLogs = c.req.query('logs') === 'true';
-
-    const processData = await Promise.all(
-      processes.map(async p => {
-        const data: Record<string, unknown> = {
-          id: p.id,
-          command: p.command,
-          status: p.status,
-          startTime: p.startTime?.toISOString(),
-          endTime: p.endTime?.toISOString(),
-          exitCode: p.exitCode,
-        };
-
-        if (includeLogs) {
-          try {
-            const logs = await p.getLogs();
-            data.stdout = logs.stdout || '';
-            data.stderr = logs.stderr || '';
-          } catch {
-            data.logs_error = 'Failed to retrieve logs';
-          }
-        }
-
-        return data;
-      })
-    );
-
-    // Sort by status (running first, then starting, completed, failed)
-    // Within each status, sort by startTime descending (newest first)
-    const statusOrder: Record<string, number> = {
-      running: 0,
-      starting: 1,
-      completed: 2,
-      failed: 3,
-    };
-
-    processData.sort((a, b) => {
-      const statusA = statusOrder[a.status as string] ?? 99;
-      const statusB = statusOrder[b.status as string] ?? 99;
-      if (statusA !== statusB) {
-        return statusA - statusB;
-      }
-      // Within same status, sort by startTime descending
-      const timeA = (a.startTime as string) || '';
-      const timeB = (b.startTime as string) || '';
-      return timeB.localeCompare(timeA);
-    });
-
-    return c.json({ count: processes.length, processes: processData });
+    const machine = await fly.getMachine(flyConfig, machineId);
+    return c.json(machine);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return c.json({ error: errorMessage }, 500);
   }
 });
 
-// GET /debug/gateway-api - Probe the OpenClaw gateway HTTP API
+// GET /debug/gateway-api - Probe the OpenClaw gateway HTTP API via Fly Proxy
 debug.get('/gateway-api', async c => {
-  const sandbox = resolveSandboxFromQuery(c);
-  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
+  const machineId = c.req.query('machineId');
+  if (!machineId) return c.json({ error: 'machineId query parameter is required' }, 400);
+
+  const flyConfig = getFlyConfig(c.env);
+  if (!flyConfig) return c.json({ error: 'Fly API not configured' }, 503);
 
   const path = c.req.query('path') || '/';
-  const OPENCLAW_PORT = 18789;
 
   try {
-    const url = `http://localhost:${OPENCLAW_PORT}${path}`;
-    const response = await sandbox.containerFetch(new Request(url), OPENCLAW_PORT);
+    const url = `https://${flyConfig.appName}.fly.dev${path}`;
+    const response = await fetch(url, {
+      headers: {
+        'fly-force-instance-id': machineId,
+      },
+    });
     const contentType = response.headers.get('content-type') || '';
 
     let body: string | object;
@@ -135,105 +59,10 @@ debug.get('/gateway-api', async c => {
       body = await response.text();
     }
 
-    return c.json({
-      path,
-      status: response.status,
-      contentType,
-      body,
-    });
+    return c.json({ path, status: response.status, contentType, body });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return c.json({ error: errorMessage, path }, 500);
-  }
-});
-
-// GET /debug/cli - Test OpenClaw CLI commands
-debug.get('/cli', async c => {
-  const sandbox = resolveSandboxFromQuery(c);
-  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
-
-  const cmd = c.req.query('cmd') || 'openclaw --help';
-
-  try {
-    const proc = await sandbox.startProcess(cmd);
-
-    // Wait longer for command to complete
-    let attempts = 0;
-    while (attempts < 30) {
-      await new Promise(r => setTimeout(r, 500));
-      if (proc.status !== 'running') break;
-      attempts++;
-    }
-
-    const logs = await proc.getLogs();
-    return c.json({
-      command: cmd,
-      status: proc.status,
-      exitCode: proc.exitCode,
-      attempts,
-      stdout: logs.stdout || '',
-      stderr: logs.stderr || '',
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return c.json({ error: errorMessage, command: cmd }, 500);
-  }
-});
-
-// GET /debug/logs - Returns container logs for debugging
-debug.get('/logs', async c => {
-  const sandbox = resolveSandboxFromQuery(c);
-  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
-
-  try {
-    const processId = c.req.query('id');
-    let process = null;
-
-    if (processId) {
-      const processes = await sandbox.listProcesses();
-      process = processes.find(p => p.id === processId);
-      if (!process) {
-        return c.json(
-          {
-            status: 'not_found',
-            message: `Process ${processId} not found`,
-            stdout: '',
-            stderr: '',
-          },
-          404
-        );
-      }
-    } else {
-      process = await findExistingGatewayProcess(sandbox);
-      if (!process) {
-        return c.json({
-          status: 'no_process',
-          message: 'No OpenClaw process is currently running',
-          stdout: '',
-          stderr: '',
-        });
-      }
-    }
-
-    const logs = await process.getLogs();
-    return c.json({
-      status: 'ok',
-      process_id: process.id,
-      process_status: process.status,
-      stdout: logs.stdout || '',
-      stderr: logs.stderr || '',
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return c.json(
-      {
-        status: 'error',
-        message: `Failed to get logs: ${errorMessage}`,
-        stdout: '',
-        stderr: '',
-      },
-      500
-    );
   }
 });
 
@@ -269,9 +98,6 @@ debug.get('/ws-test', async c => {
     <input id="message" placeholder="JSON message to send..." />
     <button id="send" disabled>Send</button>
   </div>
-  <div style="margin: 10px 0;">
-    <button id="sendConnect" disabled>Send Connect Frame</button>
-  </div>
   <div id="log"></div>
   
   <script>
@@ -288,78 +114,29 @@ debug.get('/ws-test', async c => {
     document.getElementById('connect').onclick = () => {
       log('Connecting to ' + wsUrl + '...', 'info');
       ws = new WebSocket(wsUrl);
-      
       ws.onopen = () => {
         log('Connected!', 'info');
         document.getElementById('connect').disabled = true;
         document.getElementById('disconnect').disabled = false;
         document.getElementById('send').disabled = false;
-        document.getElementById('sendConnect').disabled = false;
       };
-      
-      ws.onmessage = (e) => {
-        log('RECV: ' + e.data, 'received');
-        try {
-          const parsed = JSON.parse(e.data);
-          log('  Parsed: ' + JSON.stringify(parsed, null, 2), 'received');
-        } catch {}
-      };
-      
-      ws.onerror = (e) => {
-        log('ERROR: ' + JSON.stringify(e), 'error');
-      };
-      
+      ws.onmessage = (e) => log('RECV: ' + e.data, 'received');
+      ws.onerror = (e) => log('ERROR: ' + JSON.stringify(e), 'error');
       ws.onclose = (e) => {
         log('Closed: code=' + e.code + ' reason=' + e.reason, 'info');
         document.getElementById('connect').disabled = false;
         document.getElementById('disconnect').disabled = true;
         document.getElementById('send').disabled = true;
-        document.getElementById('sendConnect').disabled = true;
         ws = null;
       };
     };
     
-    document.getElementById('disconnect').onclick = () => {
-      if (ws) ws.close();
-    };
-    
-    document.getElementById('clear').onclick = () => {
-      document.getElementById('log').innerHTML = '';
-    };
-    
+    document.getElementById('disconnect').onclick = () => { if (ws) ws.close(); };
+    document.getElementById('clear').onclick = () => { document.getElementById('log').innerHTML = ''; };
     document.getElementById('send').onclick = () => {
       const msg = document.getElementById('message').value;
-      if (ws && msg) {
-        log('SEND: ' + msg, 'sent');
-        ws.send(msg);
-      }
+      if (ws && msg) { log('SEND: ' + msg, 'sent'); ws.send(msg); }
     };
-    
-    document.getElementById('sendConnect').onclick = () => {
-      if (!ws) return;
-      const connectFrame = {
-        type: 'req',
-        id: 'debug-' + Date.now(),
-        method: 'connect',
-        params: {
-          minProtocol: 1,
-          maxProtocol: 1,
-          client: {
-            id: 'debug-tool',
-            displayName: 'Debug Tool',
-            version: '1.0.0',
-            mode: 'webchat',
-            platform: 'web'
-          },
-          role: 'operator',
-          scopes: []
-        }
-      };
-      const msg = JSON.stringify(connectFrame);
-      log('SEND Connect Frame: ' + msg, 'sent');
-      ws.send(msg);
-    };
-    
     document.getElementById('message').onkeypress = (e) => {
       if (e.key === 'Enter') document.getElementById('send').click();
     };
@@ -374,52 +151,12 @@ debug.get('/ws-test', async c => {
 debug.get('/env', async c => {
   return c.json({
     has_kilocode_base_url_override: !!c.env.KILOCODE_API_BASE_URL,
-    has_r2_access_key: !!c.env.R2_ACCESS_KEY_ID,
-    has_r2_secret_key: !!c.env.R2_SECRET_ACCESS_KEY,
-    has_cf_account_id: !!c.env.CF_ACCOUNT_ID,
+    has_fly_api_token: !!c.env.FLY_API_TOKEN,
+    fly_app_name: c.env.FLY_APP_NAME ?? null,
+    fly_region: c.env.FLY_REGION ?? null,
     dev_mode: c.env.DEV_MODE,
     debug_routes: c.env.DEBUG_ROUTES,
-    bind_mode: 'lan',
   });
-});
-
-// GET /debug/container-config - Read the OpenClaw config from inside the container
-debug.get('/container-config', async c => {
-  const sandbox = resolveSandboxFromQuery(c);
-  if (!sandbox) return c.json({ error: 'sandboxId query parameter is required' }, 400);
-
-  try {
-    const proc = await sandbox.startProcess('cat /root/.openclaw/openclaw.json');
-
-    let attempts = 0;
-    while (attempts < 10) {
-      await new Promise(r => setTimeout(r, 200));
-      if (proc.status !== 'running') break;
-      attempts++;
-    }
-
-    const logs = await proc.getLogs();
-    const stdout = logs.stdout || '';
-    const stderr = logs.stderr || '';
-
-    let config = null;
-    try {
-      config = JSON.parse(stdout);
-    } catch {
-      // Not valid JSON
-    }
-
-    return c.json({
-      status: proc.status,
-      exitCode: proc.exitCode,
-      config,
-      raw: config ? undefined : stdout,
-      stderr,
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return c.json({ error: errorMessage }, 500);
-  }
 });
 
 export { debug };

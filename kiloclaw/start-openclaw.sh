@@ -1,10 +1,9 @@
 #!/bin/bash
-# Startup script for OpenClaw in Cloudflare Sandbox
+# Startup script for OpenClaw on Fly.io Machines
 # This script:
-# 1. Restores config from R2 backup if available
-# 2. Runs openclaw onboard --non-interactive to configure from env vars
-# 3. Patches config for features onboard doesn't cover (channels, gateway auth)
-# 4. Starts the gateway
+# 1. Runs openclaw onboard --non-interactive to configure from env vars (first run only)
+# 2. Patches config for features onboard doesn't cover (channels, gateway auth)
+# 3. Starts the gateway
 
 set -e
 
@@ -15,84 +14,13 @@ fi
 
 CONFIG_DIR="/root/.openclaw"
 CONFIG_FILE="$CONFIG_DIR/openclaw.json"
-BACKUP_DIR="/data/openclaw"
+WORKSPACE_DIR="/root/clawd"
 
 echo "Config directory: $CONFIG_DIR"
-echo "Backup directory: $BACKUP_DIR"
 
 mkdir -p "$CONFIG_DIR"
-
-# ============================================================
-# RESTORE FROM R2 BACKUP
-# ============================================================
-
-should_restore_from_r2() {
-    local R2_SYNC_FILE="$BACKUP_DIR/.last-sync"
-    local LOCAL_SYNC_FILE="$CONFIG_DIR/.last-sync"
-
-    if [ ! -f "$R2_SYNC_FILE" ]; then
-        echo "No R2 sync timestamp found, skipping restore"
-        return 1
-    fi
-
-    if [ ! -f "$LOCAL_SYNC_FILE" ]; then
-        echo "No local sync timestamp, will restore from R2"
-        return 0
-    fi
-
-    R2_TIME=$(cat "$R2_SYNC_FILE" 2>/dev/null)
-    LOCAL_TIME=$(cat "$LOCAL_SYNC_FILE" 2>/dev/null)
-
-    echo "R2 last sync: $R2_TIME"
-    echo "Local last sync: $LOCAL_TIME"
-
-    R2_EPOCH=$(date -d "$R2_TIME" +%s 2>/dev/null || echo "0")
-    LOCAL_EPOCH=$(date -d "$LOCAL_TIME" +%s 2>/dev/null || echo "0")
-
-    if [ "$R2_EPOCH" -gt "$LOCAL_EPOCH" ]; then
-        echo "R2 backup is newer, will restore"
-        return 0
-    else
-        echo "Local data is newer or same, skipping restore"
-        return 1
-    fi
-}
-
-if [ -f "$BACKUP_DIR/openclaw/openclaw.json" ]; then
-    if should_restore_from_r2; then
-        echo "Restoring from R2 backup at $BACKUP_DIR/openclaw..."
-        cp -a "$BACKUP_DIR/openclaw/." "$CONFIG_DIR/"
-        cp -f "$BACKUP_DIR/.last-sync" "$CONFIG_DIR/.last-sync" 2>/dev/null || true
-        echo "Restored config from R2 backup"
-    fi
-elif [ -d "$BACKUP_DIR" ]; then
-    echo "R2 mounted at $BACKUP_DIR but no backup data found yet"
-else
-    echo "R2 not mounted, starting fresh"
-fi
-
-# Restore workspace from R2 backup if available (only if R2 is newer)
-# This includes IDENTITY.md, USER.md, MEMORY.md, memory/, and assets/
-WORKSPACE_DIR="/root/clawd"
-if [ -d "$BACKUP_DIR/workspace" ] && [ "$(ls -A $BACKUP_DIR/workspace 2>/dev/null)" ]; then
-    if should_restore_from_r2; then
-        echo "Restoring workspace from $BACKUP_DIR/workspace..."
-        mkdir -p "$WORKSPACE_DIR"
-        cp -a "$BACKUP_DIR/workspace/." "$WORKSPACE_DIR/"
-        echo "Restored workspace from R2 backup"
-    fi
-fi
-
-# Restore skills from R2 backup if available (only if R2 is newer)
-SKILLS_DIR="/root/clawd/skills"
-if [ -d "$BACKUP_DIR/skills" ] && [ "$(ls -A $BACKUP_DIR/skills 2>/dev/null)" ]; then
-    if should_restore_from_r2; then
-        echo "Restoring skills from $BACKUP_DIR/skills..."
-        mkdir -p "$SKILLS_DIR"
-        cp -a "$BACKUP_DIR/skills/." "$SKILLS_DIR/"
-        echo "Restored skills from R2 backup"
-    fi
-fi
+mkdir -p "$WORKSPACE_DIR"
+cd "$WORKSPACE_DIR"
 
 # ============================================================
 # ONBOARD (only if no config exists yet)
@@ -124,7 +52,6 @@ fi
 # openclaw onboard handles provider/model config, but we need to patch in:
 # - Channel config (Telegram, Discord, Slack)
 # - Gateway token auth
-# - Trusted proxies for sandbox networking
 # - KiloCode provider + model config
 node << 'EOFPATCH'
 const fs = require('fs');
@@ -145,7 +72,6 @@ config.channels = config.channels || {};
 // Gateway configuration
 config.gateway.port = 18789;
 config.gateway.mode = 'local';
-config.gateway.trustedProxies = ['10.1.0.0'];
 // Set bind to loopback so agent tools connect via 127.0.0.1 (auto-approved for pairing).
 // The actual server bind is controlled by --bind lan on the command line, not this config.
 config.gateway.bind = 'loopback';
@@ -161,11 +87,21 @@ if (process.env.OPENCLAW_DEV_MODE === 'true') {
 }
 
 // Multi-tenant: auto-approve devices so users don't need to pair.
-// Worker-level JWT auth is the real access control -- each user's sandbox
+// Worker-level JWT auth is the real access control -- each user's machine
 // is only reachable via their signed token.
 if (process.env.AUTO_APPROVE_DEVICES === 'true') {
     config.gateway.controlUi = config.gateway.controlUi || {};
     config.gateway.controlUi.allowInsecureAuth = true;
+}
+
+// Allowed origins for the Control UI WebSocket.
+// Without this, the gateway rejects connections from browser origins
+// that don't match the gateway's Host header (e.g., localhost:3000 vs fly.dev).
+if (process.env.OPENCLAW_ALLOWED_ORIGINS) {
+    config.gateway.controlUi = config.gateway.controlUi || {};
+    config.gateway.controlUi.allowedOrigins = process.env.OPENCLAW_ALLOWED_ORIGINS
+        .split(',')
+        .map(function(s) { return s.trim(); });
 }
 
 // KiloCode provider configuration (required)
@@ -181,7 +117,17 @@ const defaultModels = [
 ];
 let models = defaultModels;
 
-if (fs.existsSync(modelsPath)) {
+// Prefer KILOCODE_MODELS_JSON env var (set by buildEnvVars from DO config).
+// Falls back to file-based override for manual/debug use, then baked-in defaults.
+if (process.env.KILOCODE_MODELS_JSON) {
+    try {
+        const parsed = JSON.parse(process.env.KILOCODE_MODELS_JSON);
+        models = Array.isArray(parsed) ? parsed : defaultModels;
+        console.log('Using model list from KILOCODE_MODELS_JSON (' + models.length + ' models)');
+    } catch (error) {
+        console.warn('Failed to parse KILOCODE_MODELS_JSON, using defaults:', error);
+    }
+} else if (fs.existsSync(modelsPath)) {
     const rawModels = fs.readFileSync(modelsPath, 'utf8');
     if (rawModels.trim().length === 0) {
         models = [];
@@ -211,8 +157,6 @@ config.agents.defaults.model = { primary: defaultModel };
 console.log('KiloCode provider configured with base URL ' + baseUrl);
 
 // Telegram configuration
-// Overwrite entire channel object to drop stale keys from old R2 backups
-// that would fail OpenClaw's strict config validation (see #47)
 if (process.env.TELEGRAM_BOT_TOKEN) {
     const dmPolicy = process.env.TELEGRAM_DM_POLICY || 'pairing';
     config.channels.telegram = {
@@ -228,7 +172,6 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 }
 
 // Discord configuration
-// Discord uses a nested dm object: dm.policy, dm.allowFrom (per DiscordDmConfig)
 if (process.env.DISCORD_BOT_TOKEN) {
     const dmPolicy = process.env.DISCORD_DM_POLICY || 'pairing';
     const dm = { policy: dmPolicy };

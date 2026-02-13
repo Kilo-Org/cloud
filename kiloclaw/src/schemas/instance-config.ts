@@ -11,6 +11,14 @@ export type ModelEntry = { id: string; name: string };
 
 const ModelEntrySchema = z.object({ id: z.string(), name: z.string() });
 
+const MachineSizeSchema = z.object({
+  cpus: z.number(),
+  memory_mb: z.number(),
+  cpu_kind: z.enum(['shared', 'performance']).optional(),
+});
+
+export type MachineSize = z.infer<typeof MachineSizeSchema>;
+
 export const InstanceConfigSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
   encryptedSecrets: z.record(z.string(), EncryptedEnvelopeSchema).optional(),
@@ -26,6 +34,11 @@ export const InstanceConfigSchema = z.object({
       slackAppToken: EncryptedEnvelopeSchema.optional(),
     })
     .optional(),
+  machineSize: MachineSizeSchema.optional(),
+  // Region for Fly Volume/Machine. Comma-separated priority list of region codes or aliases.
+  // Examples: "us,eu" (try US first, then Europe), "lhr" (London only).
+  // If omitted, falls back to the FLY_REGION env var.
+  region: z.string().optional(),
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
@@ -45,7 +58,6 @@ export const UserIdRequestSchema = z.object({
 
 export const DestroyRequestSchema = z.object({
   userId: z.string().min(1),
-  deleteData: z.boolean().optional(),
 });
 
 /**
@@ -59,7 +71,7 @@ export const DestroyRequestSchema = z.object({
 export const PersistedStateSchema = z.object({
   userId: z.string().default(''),
   sandboxId: z.string().default(''),
-  status: z.enum(['provisioned', 'running', 'stopped']).default('stopped'),
+  status: z.enum(['provisioned', 'running', 'stopped', 'destroying']).default('stopped'),
   envVars: z.record(z.string(), z.string()).nullable().default(null),
   encryptedSecrets: z.record(z.string(), EncryptedEnvelopeSchema).nullable().default(null),
   kilocodeApiKey: z.string().nullable().default(null),
@@ -78,10 +90,19 @@ export const PersistedStateSchema = z.object({
   provisionedAt: z.number().nullable().default(null),
   lastStartedAt: z.number().nullable().default(null),
   lastStoppedAt: z.number().nullable().default(null),
-  lastSyncAt: z.number().nullable().default(null),
-  syncInProgress: z.boolean().default(false),
-  syncLockedAt: z.number().nullable().default(null),
-  syncFailCount: z.number().default(0),
+  // Fly.io machine/volume identifiers
+  flyMachineId: z.string().nullable().default(null),
+  flyVolumeId: z.string().nullable().default(null),
+  flyRegion: z.string().nullable().default(null),
+  machineSize: MachineSizeSchema.nullable().default(null),
+  // Health check tracking
+  healthCheckFailCount: z.number().default(0),
+  // Two-phase destroy: IDs pending deletion on Fly. Cleared once Fly confirms.
+  pendingDestroyMachineId: z.string().nullable().default(null),
+  pendingDestroyVolumeId: z.string().nullable().default(null),
+  // Cooldown: last time we attempted metadata-based machine recovery from Fly.
+  // Prevents hammering listMachines on every alarm when there's genuinely nothing.
+  lastMetadataRecoveryAt: z.number().nullable().default(null),
 });
 
 export type PersistedState = z.infer<typeof PersistedStateSchema>;

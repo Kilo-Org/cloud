@@ -15,6 +15,7 @@ import {
   isDeadFreeModel,
   isSlackbotOnlyModel,
   isKiloStealthModel,
+  isRateLimitedModel,
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
@@ -140,8 +141,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const originalModelIdLowerCased = requestBodyParsed.model.toLowerCase();
 
-  const isRequestedModelFree = isFreeModel(originalModelIdLowerCased);
-
   // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (!ipAddress) {
@@ -151,8 +150,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // For FREE models: check IP rate limit BEFORE auth, log at start
   // Slackbot-only models are exempt from free model rate limits since they're
   // already gated behind the Slack integration (internalApiUse auth).
-  const isSlackbotOnly = isSlackbotOnlyModel(originalModelIdLowerCased);
-  if (isRequestedModelFree && !isSlackbotOnly) {
+  if (isRateLimitedModel(originalModelIdLowerCased)) {
     const rateLimitResult = await checkFreeModelRateLimit(ipAddress);
     if (!rateLimitResult.allowed) {
       console.warn(
@@ -185,7 +183,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (authFailedResponse) {
     // No valid auth
-    if (!isRequestedModelFree) {
+    if (!isFreeModel(originalModelIdLowerCased)) {
       // Paid model requires authentication
       return authFailedResponse;
     }
@@ -198,7 +196,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRequestedModelFree && !isSlackbotOnly) {
+  if (isRateLimitedModel(originalModelIdLowerCased)) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,

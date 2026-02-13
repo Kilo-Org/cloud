@@ -40,7 +40,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isAdmin = user?.is_admin || false;
-  const isKiloClawUser = user?.google_user_email?.endsWith('@kilocode.ai') || false;
+  const isKiloClawEnabled = useFeatureFlagEnabled('kiloclaw');
 
   // Dashboard group
   const dashboardItems: Array<{
@@ -148,7 +148,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
-    ...(isKiloClawUser
+    ...(isKiloClawEnabled || isDevelopment
       ? [
           {
             title: 'Claw',

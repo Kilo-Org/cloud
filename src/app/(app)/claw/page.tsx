@@ -474,7 +474,7 @@ export default function ClawPage() {
 
   if (isLoading) {
     return (
-      <PageLayout title="Claw" subtitle="Manage your KiloClaw instance">
+      <PageLayout title="KiloClaw" subtitle="Manage your KiloClaw instance">
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">Loading...</p>
@@ -486,7 +486,7 @@ export default function ClawPage() {
 
   if (error) {
     return (
-      <PageLayout title="Claw" subtitle="Manage your KiloClaw instance">
+      <PageLayout title="KiloClaw" subtitle="Manage your KiloClaw instance">
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-red-600">Failed to load: {error.message}</p>

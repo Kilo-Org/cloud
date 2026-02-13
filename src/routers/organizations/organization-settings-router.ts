@@ -159,7 +159,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
 
       let allowedModels: string[] | undefined;
 
-      if (organization?.settings?.model_allow_list) {
+      if (organization.plan === 'enterprise' && organization?.settings?.model_allow_list) {
         allowedModels = organization.settings.model_allow_list;
       }
 

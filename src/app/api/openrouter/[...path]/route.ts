@@ -14,7 +14,7 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isSlackbotOnlyModel,
-  isStealthModelOnKiloCodeOnly,
+  isKiloStealthModel,
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
@@ -444,7 +444,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (isStealthModelOnKiloCodeOnly(originalModelIdLowerCased)) {
+  if (isKiloStealthModel(originalModelIdLowerCased)) {
     return redactedModelResponse(response, originalModelIdLowerCased);
   }
 

@@ -5,14 +5,20 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-05-06",
   "compatibility_flags": ["nodejs_compat"],
+  "preview_urls": false,
   "observability": {
     "enabled": true,
   },
   "dev": {
     "port": 8795,
   },
-  // Production: add a custom domain route for claw.kilo.ai
-  // "routes": [{ "pattern": "claw.kilo.ai", "custom_domain": true }],
+  "routes": [
+    {
+      "pattern": "claw.kilosessions.ai",
+      "zone_name": "kilosessions.ai",
+      "custom_domain": true,
+    },
+  ],
 
   "durable_objects": {
     "bindings": [
@@ -44,8 +50,14 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
+  "vars": {
+    "FLY_APP_NAME": "kiloclaw-machines",
+    "FLY_IMAGE_TAG": "latest",
+    "FLY_REGION": "us,eu",
+    "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
+  },
   // Secrets (set via wrangler secret put):
-  // FLY_API_TOKEN, FLY_APP_NAME, FLY_REGION,
+  // FLY_API_TOKEN,
   // NEXTAUTH_SECRET, INTERNAL_API_SECRET, GATEWAY_TOKEN_SECRET,
   // AGENT_ENV_VARS_PRIVATE_KEY
 }

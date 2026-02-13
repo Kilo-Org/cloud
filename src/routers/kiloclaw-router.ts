@@ -8,6 +8,7 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
   ensureActiveInstance,
@@ -15,11 +16,10 @@ import {
   restoreDestroyedInstance,
 } from '@/lib/kiloclaw/instance-registry';
 
-/**
- * Procedure middleware: restrict to @kilocode.ai users.
- */
 const kiloclawProcedure = baseProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.user.google_user_email?.endsWith('@kilocode.ai')) {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isEnabled = await isFeatureFlagEnabled('kiloclaw', ctx.user.id);
+  if (!isEnabled && !isDevelopment) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'KiloClaw access restricted' });
   }
   return next();

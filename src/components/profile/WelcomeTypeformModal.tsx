@@ -9,11 +9,10 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 const WELCOME_FORM_ID = 'xNTrQO4E';
 
 type WelcomeTypeformModalProps = {
-  userId: string;
   userEmail: string;
 };
 
-export function WelcomeTypeformModal({ userId, userEmail }: WelcomeTypeformModalProps) {
+export function WelcomeTypeformModal({ userEmail }: WelcomeTypeformModalProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [hasMarkedComplete, setHasMarkedComplete] = useState(false);
   const trpc = useTRPC();
@@ -57,7 +56,6 @@ export function WelcomeTypeformModal({ userId, userEmail }: WelcomeTypeformModal
           style={{ width: '100%', height: '100%', minHeight: '400px' }}
           className="my-form"
           hidden={{
-            user_id: userId,
             email: userEmail,
           }}
           onSubmit={handleComplete}

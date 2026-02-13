@@ -77,7 +77,7 @@ function isOpenRouterStealthModel(model: string): boolean {
 }
 
 export function extraRequiredProviders(model: string) {
-  return kiloFreeModels.find(m => m.public_id === model)?.inference_providers ?? null;
+  return kiloFreeModels.find(m => m.public_id === model)?.inference_providers ?? [];
 }
 
 export function isDeadFreeModel(model: string): boolean {

@@ -93,7 +93,8 @@ function applyAnthropicStrictToolUse(
 
 function hasCacheControl(message: OpenAI.ChatCompletionMessageParam) {
   return (
-    Array.isArray(message.content) && message.content.some(content => 'cache_control' in content)
+    'cache_control' in message ||
+    (Array.isArray(message.content) && message.content.some(content => 'cache_control' in content))
   );
 }
 

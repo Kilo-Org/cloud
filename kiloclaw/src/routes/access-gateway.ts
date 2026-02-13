@@ -4,14 +4,16 @@ import type { AppEnv } from '../types';
 import { KILOCLAW_AUTH_COOKIE, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
 import { createDatabaseConnection, AccessCodeStore, UserStore } from '../db';
 import { signKiloToken, validateKiloToken } from '../auth/jwt';
+import { deriveGatewayToken } from '../auth/gateway-token';
+import { sandboxIdFromUserId } from '../auth/sandbox-id';
 
 /**
  * Access gateway routes — unauthenticated.
  * Serves an HTML form for entering a one-time access code, then validates
  * it via Hyperdrive, sets an auth cookie, and redirects to the OpenClaw UI.
  *
- * The gateway token (for OpenClaw websocket auth) is carried through the
- * entire flow as a query param / hidden field / redirect hash fragment.
+ * The gateway token (for OpenClaw websocket auth) is derived server-side
+ * from the userId after authentication, never passed through the URL or form.
  */
 const accessGatewayRoutes = new Hono<AppEnv>();
 
@@ -32,12 +34,22 @@ const BASE_STYLES = /* css */ `
   .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 1.5rem; }
 `;
 
-function buildRedirectUrl(gatewayToken: string | undefined): string {
-  return gatewayToken ? `/#token=${gatewayToken}` : '/';
+/**
+ * Derive the redirect URL with the gateway token hash fragment.
+ * The token is computed server-side from the userId — never touches the client.
+ */
+async function buildRedirectUrl(
+  userId: string,
+  gatewayTokenSecret: string | undefined
+): Promise<string> {
+  if (!gatewayTokenSecret) return '/';
+  const sandboxId = sandboxIdFromUserId(userId);
+  const token = await deriveGatewayToken(sandboxId, gatewayTokenSecret);
+  return `/#token=${token}`;
 }
 
-function renderPage(params: { userId: string; gatewayToken?: string; error?: string }) {
-  const { userId, gatewayToken, error } = params;
+function renderPage(params: { userId: string; error?: string }) {
+  const { userId, error } = params;
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -75,7 +87,6 @@ function renderPage(params: { userId: string; gatewayToken?: string; error?: str
     ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
     <form method="POST" action="/kilo-access-gateway">
       <input type="hidden" name="userId" value="${escapeHtml(userId)}" />
-      ${gatewayToken ? `<input type="hidden" name="gatewayToken" value="${escapeHtml(gatewayToken)}" />` : ''}
       <label for="code">Access Code</label>
       <input type="text" id="code" name="code" placeholder="XXXXX-XXXXX"
              maxlength="11" autocomplete="off" autofocus required />
@@ -154,45 +165,38 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
     return c.text('Missing userId parameter', 400);
   }
 
-  const gatewayToken = c.req.query('token') || undefined;
-  const redirectUrl = buildRedirectUrl(gatewayToken);
-
-  // If the user already has a valid cookie, skip straight to the UI
+  // If the user already has a valid cookie, derive the gateway token and redirect
   const secret = c.env.NEXTAUTH_SECRET;
   if (secret) {
     const cookie = getCookie(c, KILOCLAW_AUTH_COOKIE);
     if (await hasValidCookie(cookie, userId, secret, c.env.WORKER_ENV)) {
+      const redirectUrl = await buildRedirectUrl(userId, c.env.GATEWAY_TOKEN_SECRET);
       return c.redirect(redirectUrl);
     }
   }
 
-  return c.html(renderPage({ userId, gatewayToken }));
+  return c.html(renderPage({ userId }));
 });
 
 accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   const body = await c.req.parseBody();
   const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
   const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
-  const gatewayToken =
-    typeof body.gatewayToken === 'string' && body.gatewayToken ? body.gatewayToken : undefined;
 
   if (!code || !userId) {
-    return c.html(
-      renderPage({ userId, gatewayToken, error: 'Access code and user ID are required.' }),
-      400
-    );
+    return c.html(renderPage({ userId, error: 'Access code and user ID are required.' }), 400);
   }
 
   const connectionString = c.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
     console.error('[access-gateway] HYPERDRIVE not configured');
-    return c.html(renderPage({ userId, gatewayToken, error: 'Server configuration error.' }), 500);
+    return c.html(renderPage({ userId, error: 'Server configuration error.' }), 500);
   }
 
   const secret = c.env.NEXTAUTH_SECRET;
   if (!secret) {
     console.error('[access-gateway] NEXTAUTH_SECRET not configured');
-    return c.html(renderPage({ userId, gatewayToken, error: 'Server configuration error.' }), 500);
+    return c.html(renderPage({ userId, error: 'Server configuration error.' }), 500);
   }
 
   const db = createDatabaseConnection(connectionString);
@@ -203,7 +207,6 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
     return c.html(
       renderPage({
         userId,
-        gatewayToken,
         error: 'Invalid or expired access code. Please generate a new one from your dashboard.',
       }),
       401
@@ -214,7 +217,7 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   const userStore = new UserStore(db);
   const user = await userStore.findPepperByUserId(redeemedUserId);
   if (!user) {
-    return c.html(renderPage({ userId, gatewayToken, error: 'User not found.' }), 401);
+    return c.html(renderPage({ userId, error: 'User not found.' }), 401);
   }
 
   const token = await signKiloToken({
@@ -232,7 +235,8 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
     maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
   });
 
-  return c.html(renderLoadingPage(buildRedirectUrl(gatewayToken)));
+  const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env.GATEWAY_TOKEN_SECRET);
+  return c.html(renderLoadingPage(redirectUrl));
 });
 
 export { accessGatewayRoutes };

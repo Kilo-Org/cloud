@@ -502,12 +502,9 @@ export default function ClawPage() {
   const hasInstance = !!status?.status;
 
   const baseUrl = status?.workerUrl || 'https://claw.kilo.ai';
-  const gatewayUrl = (() => {
-    if (!status?.userId) return baseUrl;
-    const params = new URLSearchParams({ userId: status.userId });
-    if (status.gatewayToken) params.set('token', status.gatewayToken);
-    return `${baseUrl}/kilo-access-gateway?${params.toString()}`;
-  })();
+  const gatewayUrl = status?.userId
+    ? `${baseUrl}/kilo-access-gateway?userId=${encodeURIComponent(status.userId)}`
+    : baseUrl;
 
   const headerActions = hasInstance ? (
     <div className="flex gap-2">

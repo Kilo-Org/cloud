@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX "UQ_kiloclaw_access_codes_one_active_per_user" ON "kiloclaw_access_codes" USING btree ("kilo_user_id") WHERE status = 'active';

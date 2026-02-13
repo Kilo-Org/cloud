@@ -1,5 +1,5 @@
 {
-  "id": "0ddbd01b-1202-49ee-801e-e557e7164797",
+  "id": "889eec28-9f2c-4358-b449-ebe085fed6ea",
   "prevId": "0177b32f-288e-434f-accb-970612f80adc",
   "version": "7",
   "dialect": "postgresql",
@@ -6348,6 +6348,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_kiloclaw_access_codes_one_active_per_user": {
+          "name": "UQ_kiloclaw_access_codes_one_active_per_user",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "status = 'active'",
           "concurrently": false,
           "method": "btree",
           "with": {}

@@ -63,6 +63,28 @@ function extractAppIdFromPath(pathname: string): string | null {
 }
 
 /**
+ * Return the origin if it's in the allow-list, otherwise null.
+ */
+function getAllowedOrigin(request: Request, env: Env): string | null {
+  const origin = request.headers.get('Origin');
+  if (!origin || !env.ALLOWED_ORIGINS) return null;
+  const allowed = env.ALLOWED_ORIGINS.split(',');
+  return allowed.includes(origin) ? origin : null;
+}
+
+/**
+ * Append CORS headers to an existing response for an allowed origin.
+ */
+function withCorsHeaders(response: Response, origin: string): Response {
+  const newResponse = new Response(response.body, response);
+  newResponse.headers.set('Access-Control-Allow-Origin', origin);
+  newResponse.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, OPTIONS');
+  newResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  newResponse.headers.set('Vary', 'Origin');
+  return newResponse;
+}
+
+/**
  * Main worker fetch handler
  */
 export default {
@@ -86,8 +108,16 @@ export default {
       });
 
       if (subdomainAppId) {
+        const allowedOrigin = getAllowedOrigin(request, env);
+
+        // Handle CORS preflight for cross-origin requests (e.g. keep-alive pings from app.kilo.ai)
+        if (allowedOrigin && request.method === 'OPTIONS') {
+          return withCorsHeaders(new Response(null, { status: 204 }), allowedOrigin);
+        }
+
         // All requests to app-id.* subdomain are proxied to the preview sandbox
-        return handlePreviewProxy(request, env, subdomainAppId);
+        const response = await handlePreviewProxy(request, env, subdomainAppId);
+        return allowedOrigin ? withCorsHeaders(response, allowedOrigin) : response;
       }
 
       // Handle init requests

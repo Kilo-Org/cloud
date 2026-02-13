@@ -357,7 +357,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
       provider: provider.id,
       requestedModel: requestedModelLowerCased,
-      resolvedModel: requestBodyParsed.model.toLowerCase(),
+      resolvedModel: originalModelIdLowerCased,
       toolsAvailable,
       toolsUsed,
       ttfbMs,

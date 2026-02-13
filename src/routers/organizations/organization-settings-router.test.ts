@@ -278,6 +278,39 @@ describe('organizations settings trpc router', () => {
 
       expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o', 'openai/gpt-4o:free']);
     });
+
+    it('should return all models for a non-enterprise org even if model_allow_list is set', async () => {
+      const openRouterModelsResponse = {
+        data: [
+          makeOpenRouterModel('openai/gpt-4o'),
+          makeOpenRouterModel('anthropic/claude-3-opus'),
+        ],
+      } satisfies OpenRouterModelsResponse;
+
+      const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
+
+      // requireSeats: true sets plan to 'teams'
+      const teamsOrg = await createTestOrganization(
+        'Teams Org With Allow List',
+        owner.id,
+        0,
+        { model_allow_list: ['openai/*'] },
+        true
+      );
+      await addUserToOrganization(teamsOrg.id, member.id, 'member');
+
+      const caller = await createCallerForUser(member.id);
+      const result = await caller.organizations.settings.listAvailableModels({
+        organizationId: teamsOrg.id,
+      });
+
+      // Teams orgs should see all models, ignoring the allow list
+      expect(result.data.map(model => model.id)).toEqual([
+        'openai/gpt-4o',
+        'anthropic/claude-3-opus',
+      ]);
+    });
   });
 
   describe('updateDefaultModel procedure', () => {

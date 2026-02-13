@@ -21,7 +21,7 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from './getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/providers/provider-id';
-import { isFreeModel, isStealthModelOnKiloCodeOnly } from '@/lib/models';
+import { isFreeModel, isKiloStealthModel } from '@/lib/models';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
@@ -919,7 +919,7 @@ async function processTokenData(
 
   if (
     !usageStats.model || // fallback for failure cases
-    isStealthModelOnKiloCodeOnly(usageContext.requested_model) // this can probably be removed once we're sure we only present requested_model to users
+    isKiloStealthModel(usageContext.requested_model) // this can probably be removed once we're sure we only present requested_model to users
   ) {
     usageStats.model = usageContext.requested_model;
   }

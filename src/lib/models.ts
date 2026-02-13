@@ -42,17 +42,12 @@ export function getFirstFreeModel() {
   return preferredModels.find(m => isFreeModel(m)) ?? PRIMARY_DEFAULT_MODEL;
 }
 
-const freeOpenRouterModels = [
-  'openrouter/aurora-alpha',
-  'openrouter/pony-alpha',
-  'openrouter/free',
-];
-
 export function isFreeModel(model: string): boolean {
   return (
     kiloFreeModels.some(m => m.public_id === model && m.is_enabled) ||
     (model ?? '').endsWith(':free') ||
-    freeOpenRouterModels.includes(model)
+    model === 'openrouter/free' ||
+    isOpenRouterStealthModel(model ?? '')
   );
 }
 
@@ -71,10 +66,14 @@ export const kiloFreeModels = [
   zai_glm5_free_model,
 ] as KiloFreeModel[];
 
-export function isStealthModelOnKiloCodeOnly(model: string): boolean {
+export function isKiloStealthModel(model: string): boolean {
   return kiloFreeModels.some(
     m => m.public_id === model && m.inference_providers.includes('stealth')
   );
+}
+
+function isOpenRouterStealthModel(model: string): boolean {
+  return model.startsWith('openrouter/') && (model.endsWith('-alpha') || model.endsWith('-beta'));
 }
 
 export function extraRequiredProviders(model: string) {

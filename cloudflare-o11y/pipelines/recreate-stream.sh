@@ -105,7 +105,7 @@ echo "    Deleted."
 OLD_STREAM_ID="$STREAM_ID"
 
 echo "==> Creating new stream '${STREAM_NAME}' with schema ${SCHEMA_FILE}..."
-npx wrangler pipelines streams create "$STREAM_NAME" --schema-file "$SCHEMA_FILE"
+npx wrangler pipelines streams create "$STREAM_NAME" --schema-file "$SCHEMA_FILE" --no-http-enabled
 
 NEW_STREAM_ID=$(npx wrangler pipelines streams list --json 2>/dev/null \
 	| jq -r --arg name "$STREAM_NAME" '.[] | select(.name == $name) | .id')

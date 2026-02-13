@@ -65,7 +65,11 @@ export function needsResumeConfigModal(params: {
 
   if (!loadedDbSession) return false;
 
-  if (isSlackbotOnlyModel(loadedDbSession.last_model) && !currentIndexedDbSession?.resumeConfig)
+  if (
+    loadedDbSession.last_model &&
+    isSlackbotOnlyModel(loadedDbSession.last_model) &&
+    !currentIndexedDbSession?.resumeConfig
+  )
     return true;
 
   const isCliSession = !loadedDbSession.cloud_agent_session_id;

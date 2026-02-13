@@ -2903,3 +2903,31 @@ export const kiloclaw_instances = pgTable(
 );
 
 export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;
+
+// KiloClaw Access Codes — one-time codes for authenticating browser sessions to the worker
+export const kiloclaw_access_codes = pgTable(
+  'kiloclaw_access_codes',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    code: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    status: text().$type<'active' | 'redeemed' | 'expired'>().notNull().default('active'),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    redeemed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_access_codes_code').on(table.code),
+    index('IDX_kiloclaw_access_codes_user_status').on(table.kilo_user_id, table.status),
+    uniqueIndex('UQ_kiloclaw_access_codes_one_active_per_user')
+      .on(table.kilo_user_id)
+      .where(sql`status = 'active'`),
+  ]
+);
+
+export type KiloClawAccessCode = typeof kiloclaw_access_codes.$inferSelect;

@@ -1,7 +1,5 @@
 import { redirect } from 'next/navigation';
 import { getUserFromAuth } from '@/lib/user.server';
-import { isWorkerAuthCookieStale } from '@/lib/kiloclaw/worker-auth-cookie';
-import { CookieRefresher } from './cookie-refresher';
 
 export default async function ClawLayout({ children }: { children: React.ReactNode }) {
   const { user } = await getUserFromAuth({ adminOnly: false });
@@ -12,12 +10,5 @@ export default async function ClawLayout({ children }: { children: React.ReactNo
     redirect('/');
   }
 
-  const needsCookieRefresh = await isWorkerAuthCookieStale(user.id);
-
-  return (
-    <>
-      {needsCookieRefresh && <CookieRefresher />}
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

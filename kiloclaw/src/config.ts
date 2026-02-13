@@ -11,8 +11,11 @@ export const STARTUP_TIMEOUT_MS = 180_000;
 /** Mount path for R2 persistent storage inside the container */
 export const R2_MOUNT_PATH = '/data/openclaw';
 
-/** Cookie name for worker auth token (set by Next.js, read by worker) */
-export const KILO_WORKER_AUTH_COOKIE = 'kilo-worker-auth';
+/** Cookie name for worker auth token (set by worker after access code redemption) */
+export const KILOCLAW_AUTH_COOKIE = 'kiloclaw-auth';
+
+/** Cookie max age: 24 hours */
+export const KILOCLAW_AUTH_COOKIE_MAX_AGE = 60 * 60 * 24;
 
 /** Expected JWT token version -- must match cloud's JWT_TOKEN_VERSION */
 export const KILO_TOKEN_VERSION = 3;

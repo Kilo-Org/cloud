@@ -11,6 +11,7 @@ type EmailInputFormProps = {
   onEmailChange: (value: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  disabled?: boolean;
 };
 
 /**
@@ -25,6 +26,7 @@ export function EmailInputForm({
   onEmailChange,
   placeholder = 'you@example.com',
   autoFocus = false,
+  disabled = false,
 }: EmailInputFormProps) {
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-md space-y-6">
@@ -48,7 +50,7 @@ export function EmailInputForm({
         variant="primary"
         size="lg"
         className="w-full"
-        disabled={!email.trim() || !emailValidation.isValid}
+        disabled={disabled || !email.trim() || !emailValidation.isValid}
       >
         Continue
       </Button>

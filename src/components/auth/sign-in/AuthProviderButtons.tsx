@@ -6,6 +6,7 @@ type AuthProviderButtonsProps = {
   providers?: readonly AuthProviderId[];
   onProviderClick: (provider: AuthProviderId) => void | Promise<void>;
   customLabels?: Partial<Record<AuthProviderId, string>>;
+  disabled?: boolean;
 };
 
 /**
@@ -16,6 +17,7 @@ export function AuthProviderButtons({
   providers = ProdNonSSOAuthProviders,
   onProviderClick,
   customLabels,
+  disabled = false,
 }: AuthProviderButtonsProps) {
   return (
     <>
@@ -23,7 +25,11 @@ export function AuthProviderButtons({
         const provider = getProviderById(providerId);
         const label = customLabels?.[providerId] || `Continue with ${provider.name}`;
         return (
-          <SignInButton key={providerId} onClick={() => onProviderClick(providerId)}>
+          <SignInButton
+            key={providerId}
+            onClick={() => onProviderClick(providerId)}
+            disabled={disabled}
+          >
             {provider.icon}
             {label}
           </SignInButton>

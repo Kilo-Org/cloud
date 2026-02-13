@@ -50,7 +50,7 @@ export function WelcomeTypeformModal({ userEmail }: WelcomeTypeformModalProps) {
       }}
     >
       <DialogContent
-        className="h-[50vh] max-w-[90vw] overflow-hidden p-0 sm:h-[400px] sm:max-w-xl [&>button]:text-black [&>button]:hover:text-black/80"
+        className="h-[50vh] max-w-[90vw] overflow-hidden p-0 sm:h-[400px] sm:max-w-xl [&>button]:rounded-md [&>button]:p-2 [&>button]:text-black [&>button]:transition-colors [&>button]:hover:bg-black/10 [&>button]:hover:text-black/60"
         onPointerDownOutside={e => e.preventDefault()}
         onEscapeKeyDown={e => e.preventDefault()}
       >

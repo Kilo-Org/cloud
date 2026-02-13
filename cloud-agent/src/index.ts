@@ -212,7 +212,13 @@ export default class KilocodeWorker extends WorkerEntrypoint<Env> {
         if (authResult.userId !== userId) {
           return new Response('Token does not match session user', { status: 403 });
         }
-        await this.env.R2_BUCKET.put(`logs/${sessionId}/${executionId}/${filename}`, request.body);
+        if (!request.body) {
+          return new Response('Missing request body', { status: 400 });
+        }
+        await this.env.R2_BUCKET.put(
+          `logs/${userId}/${sessionId}/${executionId}/${filename}`,
+          request.body
+        );
         return new Response(null, { status: 204 });
       }
 

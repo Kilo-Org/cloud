@@ -215,10 +215,17 @@ export default class KilocodeWorker extends WorkerEntrypoint<Env> {
         if (!request.body) {
           return new Response('Missing request body', { status: 400 });
         }
-        await this.env.R2_BUCKET.put(
-          `logs/${userId}/${sessionId}/${executionId}/logs.tar.gz`,
-          request.body
-        );
+        try {
+          const safeUserId = encodeURIComponent(userId);
+          const body = await request.arrayBuffer();
+          await this.env.R2_BUCKET.put(
+            `logs/${safeUserId}/${sessionId}/${executionId}/logs.tar.gz`,
+            body
+          );
+        } catch (err) {
+          console.error('[log-upload] R2 put failed:', err);
+          return new Response('R2 write failed', { status: 500 });
+        }
         return new Response(null, { status: 204 });
       }
 

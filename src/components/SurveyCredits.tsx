@@ -12,8 +12,8 @@ export const SurveyCredits = async (customerInfo: CustomerInfo) => {
   const posthogClient = PostHogClient();
   const isFlagEnabled = await posthogClient.isFeatureEnabled('show-feedback-form', user.id);
 
-  // if (!isFlagEnabled) return null;
-  // if (!has_used1usd_andHoldOrPayment(customerInfo).success) return null;
+  if (!isFlagEnabled) return null;
+  if (!has_used1usd_andHoldOrPayment(customerInfo).success) return null;
 
   // Check if user has already completed the survey by checking credit_transactions
   const existingSurveyCredit = await db

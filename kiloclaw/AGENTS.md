@@ -9,7 +9,7 @@ KiloClaw is a Cloudflare Worker that runs per-user OpenClaw AI assistant instanc
 These are non-negotiable. Do not reintroduce shared/fallback paths.
 
 - **No shared mode.** Every request, DO, and machine is user-scoped. There is no global machine, no shared fallback, no optional userId parameters.
-- **User scoping.** DOs are keyed by `idFromName(userId)`. Machine names use `sandboxIdFromUserId(userId)`. Both are deterministic and reversible.
+- **User scoping.** DOs are currently keyed by `idFromName(userId)` (one instance per user). Machine names use `sandboxIdFromUserId(userId)`. Both are deterministic and reversible. **Known limitation**: when multi-sandbox-per-user is needed, the DO key should change to `sandboxId` or an instance ID, and the platform API will need to accept a sandbox/instance identifier alongside userId.
 - **`buildEnvVars` requires `sandboxId` and `gatewayTokenSecret`.** Gateway token and `AUTO_APPROVE_DEVICES` are always set. No fallback to worker-level channel tokens.
 - **Next.js is the sole Postgres writer.** The worker only reads via Hyperdrive (pepper validation + DO restore). The DB stores registry data (`user_id`, `sandbox_id`, `created_at`, `destroyed_at`) plus config backup. Operational state (status, timestamps, Fly machine/volume IDs) lives in the DO only.
 - **DO restore from Postgres.** If DO SQLite is wiped, `start(userId)` reads the active instance row from Postgres and repopulates the DO state. This is the backup path for development mistakes that corrupt DO storage.

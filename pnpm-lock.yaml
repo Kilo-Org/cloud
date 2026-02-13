@@ -1000,9 +1000,6 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@cloudflare/sandbox':
-        specifier: ^0.7.0
-        version: 0.7.0
       '@eslint/js':
         specifier: ^9.38.0
         version: 9.39.2
@@ -2074,17 +2071,6 @@ packages:
 
   '@cloudflare/sandbox@0.6.9':
     resolution: {integrity: sha512-at6PKzILcbNqhdnvyH7JL7H5gw95TeMTlr3AkvmUA20mq6JKt/xI7v6b6s+im/+vHUG7do7mudBIhum6MPaRng==}
-    peerDependencies:
-      '@openai/agents': ^0.3.3
-      '@opencode-ai/sdk': ^1.0.137
-    peerDependenciesMeta:
-      '@openai/agents':
-        optional: true
-      '@opencode-ai/sdk':
-        optional: true
-
-  '@cloudflare/sandbox@0.7.0':
-    resolution: {integrity: sha512-U9e/fqc2R/epygMRoRFZxjM6z8ZSyJqQSFFykWTLWl2j+c9+kK9reBjp1G/RcvTAGtv8pH3Dac21jmvh4ZbGXg==}
     peerDependencies:
       '@openai/agents': ^0.3.3
       '@opencode-ai/sdk': ^1.0.137
@@ -13686,10 +13672,6 @@ snapshots:
       '@cloudflare/containers': 0.0.30
 
   '@cloudflare/sandbox@0.6.9':
-    dependencies:
-      '@cloudflare/containers': 0.0.30
-
-  '@cloudflare/sandbox@0.7.0':
     dependencies:
       '@cloudflare/containers': 0.0.30
 

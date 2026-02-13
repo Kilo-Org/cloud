@@ -133,7 +133,7 @@ describe('o11y worker', () => {
 		expect(aeSpy.writeDataPoint).toHaveBeenCalledOnce();
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
 		expect(call.indexes).toEqual(['anthropic/claude-sonnet-4.5']);
-		expect(call.blobs).toEqual(['openai', 'anthropic/claude-sonnet-4.5', 'kilo-gateway', '0', 'openai']);
+		expect(call.blobs).toEqual(['openai', 'anthropic/claude-sonnet-4.5', 'kilo-gateway', '0', 'openai', '0']);
 		expect(call.doubles).toEqual([45, 123, 200]);
 
 		expect(pipelineSpy.send).toHaveBeenCalledOnce();
@@ -144,6 +144,7 @@ describe('o11y worker', () => {
 				client_name: 'kilo-gateway',
 				is_error: false,
 				inference_provider: 'openai',
+				user_byok: false,
 				ttfb_ms: 45,
 				complete_request_ms: 123,
 				status_code: 200,
@@ -171,6 +172,7 @@ describe('o11y worker', () => {
 		expect(aeSpy.writeDataPoint).toHaveBeenCalledOnce();
 		const call = aeSpy.writeDataPoint.mock.calls[0][0];
 		expect(call.blobs[4]).toBe('');
+		expect(call.blobs[5]).toBe('0');
 	});
 
 	it('marks errors correctly in AE data point (statusCode >= 400)', async () => {

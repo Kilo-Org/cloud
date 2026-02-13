@@ -14,6 +14,7 @@ type ApiMetricsParams = z.infer<typeof ApiMetricsParamsSchema>;
  *   blob3   = clientName
  *   blob4   = "1" if error (statusCode >= 400), "0" otherwise
  *   blob5   = inferenceProvider (best-effort)
+ *   blob6   = "1" if userByok, "0" otherwise
  *   double1 = ttfbMs
  *   double2 = completeRequestMs
  *   double3 = statusCode
@@ -28,7 +29,7 @@ export function writeApiMetricsDataPoint(
 
 	env.O11Y_API_METRICS.writeDataPoint({
 		indexes: [params.resolvedModel],
-		blobs: [params.provider, params.resolvedModel, clientName, isError ? '1' : '0', params.inferenceProvider],
+		blobs: [params.provider, params.resolvedModel, clientName, isError ? '1' : '0', params.inferenceProvider, params.userByok ? '1' : '0'],
 		doubles: [params.ttfbMs, params.completeRequestMs, params.statusCode],
 	});
 
@@ -40,6 +41,7 @@ export function writeApiMetricsDataPoint(
 				client_name: clientName,
 				is_error: isError,
 				inference_provider: params.inferenceProvider,
+				user_byok: params.userByok,
 				ttfb_ms: params.ttfbMs,
 				complete_request_ms: params.completeRequestMs,
 				status_code: params.statusCode,

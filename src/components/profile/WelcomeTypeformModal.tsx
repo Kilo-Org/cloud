@@ -50,15 +50,13 @@ export function WelcomeTypeformModal({ userEmail }: WelcomeTypeformModalProps) {
       }}
     >
       <DialogContent
-        className="h-[50vh] max-w-[90vw] overflow-hidden p-0 sm:h-[400px] sm:max-w-xl [&>button]:rounded-md [&>button]:p-2 [&>button]:text-black [&>button]:transition-colors [&>button]:hover:bg-black/10 [&>button]:hover:text-black/60"
+        className="[&>button]:text-muted-foreground [&>button]:hover:bg-muted [&>button]:hover:text-foreground h-[50vh] max-w-[90vw] overflow-hidden p-0 sm:h-[400px] sm:max-w-xl [&>button]:rounded-md [&>button]:p-2"
         onPointerDownOutside={e => e.preventDefault()}
         onEscapeKeyDown={e => e.preventDefault()}
       >
-        <DialogTitle className="sr-only">Welcome to the app</DialogTitle>
+        <DialogTitle className="sr-only">Welcome to Kilo</DialogTitle>
         <Widget
           id={WELCOME_FORM_ID}
-          style={{ width: '100%', height: '100%', minHeight: '400px' }}
-          className="my-form"
           hidden={{
             email: userEmail,
           }}

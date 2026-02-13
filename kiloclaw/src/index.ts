@@ -18,7 +18,7 @@ import { getSandbox } from '@cloudflare/sandbox';
 
 import type { AppEnv, KiloClawEnv } from './types';
 import { OPENCLAW_PORT } from './config';
-import { publicRoutes, api, kiloclaw, debug, platform } from './routes';
+import { accessGatewayRoutes, publicRoutes, api, kiloclaw, debug, platform } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
@@ -141,6 +141,7 @@ app.use('*', logRequest);
 
 // Public routes (no auth)
 app.route('/', publicRoutes);
+app.route('/', accessGatewayRoutes);
 
 // Protected middleware chain
 app.use('*', requireEnvVars);

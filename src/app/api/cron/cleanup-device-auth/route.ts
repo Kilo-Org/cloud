@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
+import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { sentryLogger } from '@/lib/utils.server';
 
 const CRON_SECRET = process.env['CRON_SECRET'];
@@ -35,12 +36,16 @@ export async function GET(request: Request) {
   const deletedCount = await cleanupExpiredDeviceAuthRequests();
   sentryLogger('cron', 'info')(`Cleaned up ${deletedCount} expired device auth requests`);
 
+  const accessCodesDeleted = await cleanupExpiredAccessCodes();
+  sentryLogger('cron', 'info')(`Cleaned up ${accessCodesDeleted} expired access codes`);
+
   // Send heartbeat to BetterStack on success
   await fetch(BETTERSTACK_HEARTBEAT_URL);
 
   return NextResponse.json({
     success: true,
     deletedCount,
+    accessCodesDeleted,
     timestamp: new Date().toISOString(),
   });
 }

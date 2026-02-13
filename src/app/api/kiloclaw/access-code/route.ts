@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
-import { setWorkerAuthCookie } from '@/lib/kiloclaw/worker-auth-cookie';
+import { generateAccessCode } from '@/lib/kiloclaw/access-codes';
 
 export async function POST() {
   const { user } = await getUserFromAuth({ adminOnly: false });
@@ -8,6 +8,10 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  await setWorkerAuthCookie(user);
-  return NextResponse.json({ ok: true });
+  const { code, expiresAt } = await generateAccessCode(user.id);
+
+  return NextResponse.json({
+    code,
+    expiresIn: Math.floor((expiresAt.getTime() - Date.now()) / 1000),
+  });
 }

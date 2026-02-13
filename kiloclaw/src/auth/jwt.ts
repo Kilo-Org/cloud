@@ -1,5 +1,5 @@
-import { jwtVerify } from 'jose';
-import { KILO_TOKEN_VERSION } from '../config';
+import { jwtVerify, SignJWT } from 'jose';
+import { KILO_TOKEN_VERSION, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
 
 /**
  * Shape of the JWT payload issued by the cloud Next.js app.
@@ -78,4 +78,30 @@ export async function validateKiloToken(
     token,
     pepper: payload.apiTokenPepper,
   };
+}
+
+/**
+ * Sign a 24-hour JWT for setting as a worker-domain cookie after access code redemption.
+ * Same payload shape as the cloud-issued tokens so authMiddleware validates them identically.
+ */
+export async function signKiloToken(params: {
+  userId: string;
+  pepper: string | null;
+  secret: string;
+  env?: string;
+}): Promise<string> {
+  const payload: Record<string, unknown> = {
+    kiloUserId: params.userId,
+    apiTokenPepper: params.pepper,
+    version: KILO_TOKEN_VERSION,
+  };
+  if (params.env) {
+    payload.env = params.env;
+  }
+
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime(`${KILOCLAW_AUTH_COOKIE_MAX_AGE}s`)
+    .setIssuedAt()
+    .sign(new TextEncoder().encode(params.secret));
 }

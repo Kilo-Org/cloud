@@ -78,6 +78,13 @@
       "when": 1770920473054,
       "tag": "0010_giant_madame_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770937145791,
+      "tag": "0011_lyrical_klaw",
+      "breakpoints": true
     }
   ]
 }

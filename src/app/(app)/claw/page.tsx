@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useKiloClawStatus,
   useKiloClawConfig,
@@ -11,11 +11,24 @@ import { PageLayout } from '@/components/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ExternalLink, Play, Square, RotateCw, RefreshCw, Trash2, Plus, Save } from 'lucide-react';
+import {
+  ExternalLink,
+  Play,
+  Square,
+  RotateCw,
+  RefreshCw,
+  Trash2,
+  Plus,
+  Save,
+  Copy,
+  Check,
+  KeyRound,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -432,6 +445,33 @@ export default function ClawPage() {
   const { data: status, isLoading, error } = useKiloClawStatus();
   const { start } = useKiloClawMutations();
 
+  const [accessCode, setAccessCode] = useState<string | null>(null);
+  const [accessCodeLoading, setAccessCodeLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const generateAccessCode = useCallback(async () => {
+    setAccessCodeLoading(true);
+    try {
+      const res = await fetch('/api/kiloclaw/access-code', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to generate access code');
+      const data = (await res.json()) as { code: string; expiresIn: number };
+      setAccessCode(data.code);
+      setCopied(false);
+    } catch {
+      toast.error('Failed to generate access code');
+    } finally {
+      setAccessCodeLoading(false);
+    }
+  }, []);
+
+  const copyAccessCode = useCallback(async () => {
+    if (!accessCode) return;
+    await navigator.clipboard.writeText(accessCode);
+    setCopied(true);
+    toast.success('Access code copied');
+    setTimeout(() => setCopied(false), 2000);
+  }, [accessCode]);
+
   if (isLoading) {
     return (
       <PageLayout title="Claw" subtitle="Manage your KiloClaw instance">
@@ -462,7 +502,9 @@ export default function ClawPage() {
   const hasInstance = !!status?.status;
 
   const baseUrl = status?.workerUrl || 'https://claw.kilo.ai';
-  const clawUrl = status?.gatewayToken ? `${baseUrl}/#token=${status.gatewayToken}` : `${baseUrl}/`;
+  const gatewayUrl = status?.userId
+    ? `${baseUrl}/kilo-access-gateway?userId=${encodeURIComponent(status.userId)}`
+    : baseUrl;
 
   const headerActions = hasInstance ? (
     <div className="flex gap-2">
@@ -474,8 +516,35 @@ export default function ClawPage() {
       )}
       {isRunning && (
         <>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" onClick={generateAccessCode} disabled={accessCodeLoading}>
+                <KeyRound className="mr-2 h-4 w-4" />
+                {accessCodeLoading ? 'Generating...' : 'View Access Code'}
+              </Button>
+            </PopoverTrigger>
+            {accessCode && (
+              <PopoverContent className="w-auto" align="end">
+                <div className="flex flex-col gap-2">
+                  <p className="text-muted-foreground text-xs">One-time code (expires in 10 min)</p>
+                  <div className="flex items-center gap-2">
+                    <code className="bg-muted rounded px-3 py-2 font-mono text-lg tracking-widest">
+                      {accessCode}
+                    </code>
+                    <Button variant="ghost" size="icon" onClick={copyAccessCode}>
+                      {copied ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            )}
+          </Popover>
           <Button variant="outline" asChild>
-            <a href={clawUrl} target="_blank" rel="noopener noreferrer">
+            <a href={gatewayUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-2 h-4 w-4" />
               Open
             </a>

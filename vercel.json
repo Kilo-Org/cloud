@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/cleanup-device-auth",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/sync-security-alerts",

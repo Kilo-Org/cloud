@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { SignJWT } from 'jose';
 import type { AppEnv } from '../types';
 import { authMiddleware, internalApiMiddleware } from './middleware';
-import { KILO_TOKEN_VERSION, KILO_WORKER_AUTH_COOKIE } from '../config';
+import { KILO_TOKEN_VERSION, KILOCLAW_AUTH_COOKIE } from '../config';
 
 vi.mock('../db', async importOriginal => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -143,7 +143,7 @@ describe('authMiddleware', () => {
 
     const res = await app.request(
       '/protected/whoami',
-      { headers: { Cookie: `${KILO_WORKER_AUTH_COOKIE}=${token}` } },
+      { headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` } },
       ENV_WITH_HYPERDRIVE
     );
     expect(res.status).toBe(200);
@@ -168,7 +168,7 @@ describe('authMiddleware', () => {
       {
         headers: {
           Authorization: `Bearer ${bearerToken}`,
-          Cookie: `${KILO_WORKER_AUTH_COOKIE}=${cookieToken}`,
+          Cookie: `${KILOCLAW_AUTH_COOKIE}=${cookieToken}`,
         },
       },
       ENV_WITH_HYPERDRIVE

@@ -149,7 +149,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // For FREE models: check IP rate limit BEFORE auth, log at start
-  if (isRequestedModelFree) {
+  // Slackbot-only models are exempt from free model rate limits since they're
+  // already gated behind the Slack integration (internalApiUse auth).
+  const isSlackbotOnly = isSlackbotOnlyModel(originalModelIdLowerCased);
+  if (isRequestedModelFree && !isSlackbotOnly) {
     const rateLimitResult = await checkFreeModelRateLimit(ipAddress);
     if (!rateLimitResult.allowed) {
       console.warn(
@@ -195,7 +198,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRequestedModelFree) {
+  if (isRequestedModelFree && !isSlackbotOnly) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,

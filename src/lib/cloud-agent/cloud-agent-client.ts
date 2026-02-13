@@ -173,6 +173,7 @@ export type PrepareSessionInput = {
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt */
   appendSystemPrompt?: string;
+  createdOnPlatform?: string;
   /** Image attachments for the prompt */
   images?: Images;
   /** Callback configuration for execution completion events */

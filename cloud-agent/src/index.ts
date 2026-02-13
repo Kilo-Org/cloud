@@ -191,7 +191,7 @@ export default class KilocodeWorker extends WorkerEntrypoint<Env> {
         /^\/sessions\/([^/]+)\/([^/]+)\/logs\/([^/]+)\/([^/]+)$/
       );
       if (logsMatch && request.method === 'PUT') {
-        const allowedFilenames = new Set(['cli.txt', 'wrapper.log']);
+        const allowedFilenames = new Set(['logs.tar.gz']);
         let userId: string, sessionId: string, executionId: string, filename: string;
         try {
           userId = decodeURIComponent(logsMatch[1]);
@@ -216,7 +216,7 @@ export default class KilocodeWorker extends WorkerEntrypoint<Env> {
           return new Response('Missing request body', { status: 400 });
         }
         await this.env.R2_BUCKET.put(
-          `logs/${userId}/${sessionId}/${executionId}/${filename}`,
+          `logs/${userId}/${sessionId}/${executionId}/logs.tar.gz`,
           request.body
         );
         return new Response(null, { status: 204 });

@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { basename, dirname } from 'node:path';
+import { spawn } from 'node:child_process';
 import { logToFile } from './utils.js';
 
 type LogUploaderOpts = {
@@ -17,33 +19,34 @@ type LogUploader = {
   stop: () => void;
 };
 
-function readFileIfExists(path: string): string | undefined {
-  try {
-    const content = readFileSync(path, 'utf-8');
-    return content.length > 0 ? content : undefined;
-  } catch {
-    return undefined;
-  }
-}
+function createTarStream(files: Array<string>): ReadableStream<Uint8Array> | undefined {
+  const existing = files.filter(f => existsSync(f));
+  if (existing.length === 0) return undefined;
 
-async function uploadLogFile(
-  baseUrl: string,
-  userId: string,
-  sessionId: string,
-  executionId: string,
-  token: string,
-  filename: string,
-  content: string
-): Promise<void> {
-  const url = `${baseUrl}/sessions/${encodeURIComponent(userId)}/${encodeURIComponent(sessionId)}/logs/${encodeURIComponent(executionId)}/${filename}`;
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}` },
-    body: content,
-  });
-  if (!response.ok) {
-    logToFile(`Log upload failed for ${filename}: ${response.status} ${response.statusText}`);
+  // Use -C dir basename for each file so the archive contains only filenames, not full paths
+  const tarArgs = ['czf', '-'];
+  for (const f of existing) {
+    tarArgs.push('-C', dirname(f), basename(f));
   }
+  const proc = spawn('tar', tarArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+  const { stdout, stderr: stderrStream } = proc;
+  if (!stdout || !stderrStream) return undefined;
+
+  let stderr = '';
+  stderrStream.on('data', (chunk: Buffer) => {
+    stderr += chunk.toString();
+  });
+  proc.on('close', code => {
+    if (code !== 0) logToFile(`tar exited with code ${code}: ${stderr}`);
+  });
+
+  return new ReadableStream({
+    start(controller) {
+      stdout.on('data', (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+      stdout.on('end', () => controller.close());
+      stdout.on('error', err => controller.error(err));
+    },
+  });
 }
 
 export function createLogUploader(opts: LogUploaderOpts): LogUploader {
@@ -51,24 +54,19 @@ export function createLogUploader(opts: LogUploaderOpts): LogUploader {
 
   async function uploadNow(): Promise<void> {
     try {
-      const uploads: Array<{ filename: string; path: string }> = [
-        { filename: 'cli.txt', path: opts.cliLogPath },
-        { filename: 'wrapper.log', path: opts.wrapperLogPath },
-      ];
-      for (const { filename, path } of uploads) {
-        const content = readFileIfExists(path);
-        if (content === undefined) {
-          continue;
-        }
-        await uploadLogFile(
-          opts.workerBaseUrl,
-          opts.userId,
-          opts.sessionId,
-          opts.executionId,
-          opts.kilocodeToken,
-          filename,
-          content
-        );
+      const stream = createTarStream([opts.cliLogPath, opts.wrapperLogPath]);
+      if (!stream) return;
+
+      const url = `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/${encodeURIComponent(opts.executionId)}/logs.tar.gz`;
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${opts.kilocodeToken}` },
+        body: stream,
+        // @ts-expect-error -- Node/Bun fetch supports duplex for streaming request bodies
+        duplex: 'half',
+      });
+      if (!response.ok) {
+        logToFile(`Log upload failed: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       logToFile(`Log upload error: ${error instanceof Error ? error.message : String(error)}`);

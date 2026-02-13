@@ -42,9 +42,16 @@
 	 * Pipelines -- dual-write to R2 as Parquet for Snowflake export.
 	 * Requires infra setup: see pipelines/ directory for stream schemas;
 	 * provision the corresponding streams, sinks, and pipelines via wrangler CLI.
+	 *
+	 * Changing a stream schema? Streams are immutable, so you must destroy and recreate.
+	 * Use the helper script (run from cloudflare-o11y/):
+	 *   ./pipelines/recreate-stream.sh <stream-name> <schema-file> <pipeline-name> <sink-name>
+	 * e.g.:
+	 *   ./pipelines/recreate-stream.sh o11y_api_metrics_stream pipelines/api-metrics-schema.json \
+	 *     o11y_api_metrics_pipeline o11y_api_metrics_sink
 	 */
 	"pipelines": [
-		{ "pipeline": "7b8a59eeeb954bfbb6988a02b4f010de", "binding": "API_METRICS_STREAM" },
+		{ "pipeline": "a016f9db28b544f29ab5b1868be41e79", "binding": "API_METRICS_STREAM" },
 		{ "pipeline": "898bb5b1a6b44634b34f1b1a3cdcb2c6", "binding": "SESSION_METRICS_STREAM" },
 	],
 	/**

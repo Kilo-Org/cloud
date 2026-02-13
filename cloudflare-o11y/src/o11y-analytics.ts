@@ -34,6 +34,9 @@ export function writeApiMetricsDataPoint(
 	});
 
 	waitUntil(
+		// Changing this schema? Stream schemas are immutable — run:
+		//   ./pipelines/recreate-stream.sh o11y_api_metrics_stream pipelines/api-metrics-schema.json \
+		//     o11y_api_metrics_pipeline o11y_api_metrics_sink
 		env.API_METRICS_STREAM.send([
 			{
 				provider: params.provider,

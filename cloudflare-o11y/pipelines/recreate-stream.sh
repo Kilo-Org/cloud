@@ -12,27 +12,26 @@
 #   6. Deploy the worker
 #
 # Usage:
-#   ./pipelines/recreate-stream.sh <stream-name> <schema-file> <pipeline-name> <sink-name> <binding-name>
+#   ./pipelines/recreate-stream.sh <stream-name> <schema-file> <pipeline-name> <sink-name>
 #
 # Example:
 #   ./pipelines/recreate-stream.sh \
 #     o11y_api_metrics_stream \
 #     pipelines/api-metrics-schema.json \
 #     o11y_api_metrics_pipeline \
-#     o11y_api_metrics_sink \
-#     API_METRICS_STREAM
+#     o11y_api_metrics_sink
 #
 # Prerequisites:
 #   - CLOUDFLARE_API_TOKEN env var (or wrangler OAuth already configured)
+#   - jq and curl on PATH
 #   - Run from the cloudflare-o11y/ directory
 
 set -euo pipefail
 
-STREAM_NAME="${1:?Usage: $0 <stream-name> <schema-file> <pipeline-name> <sink-name> <binding-name>}"
+STREAM_NAME="${1:?Usage: $0 <stream-name> <schema-file> <pipeline-name> <sink-name>}"
 SCHEMA_FILE="${2:?Missing schema file path}"
 PIPELINE_NAME="${3:?Missing pipeline name}"
 SINK_NAME="${4:?Missing sink name}"
-BINDING_NAME="${5:?Missing binding name}"
 
 ACCOUNT_ID="e115e769bcdd4c3d66af59d3332cb394"
 CF_API="https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/pipelines/v1"
@@ -55,7 +54,7 @@ else
 		WRANGLER_CONFIG="${HOME}/.wrangler/config/default.toml"
 	fi
 	if [[ -f "$WRANGLER_CONFIG" ]]; then
-		OAUTH_TOKEN=$(grep '^oauth_token' "$WRANGLER_CONFIG" | sed 's/^oauth_token *= *"\(.*\)"/\1/')
+		OAUTH_TOKEN=$(grep '^oauth_token' "$WRANGLER_CONFIG" | sed 's/^oauth_token *= *"\(.*\)"/\1/' || true)
 	fi
 	if [[ -z "${OAUTH_TOKEN:-}" ]]; then
 		echo "Error: no CLOUDFLARE_API_TOKEN and no wrangler OAuth token found. Run 'wrangler login' first." >&2
@@ -126,7 +125,7 @@ if ! grep -q "$OLD_STREAM_ID" wrangler.jsonc; then
 	echo "Error: old stream ID ${OLD_STREAM_ID} not found in wrangler.jsonc" >&2
 	exit 1
 fi
-sed -i '' "s/${OLD_STREAM_ID}/${NEW_STREAM_ID}/g" wrangler.jsonc
+sed -i.bak "s/${OLD_STREAM_ID}/${NEW_STREAM_ID}/g" wrangler.jsonc && rm -f wrangler.jsonc.bak
 echo "    Updated."
 
 echo "==> Deploying worker..."

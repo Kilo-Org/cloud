@@ -45,10 +45,10 @@
 	 *
 	 * Changing a stream schema? Streams are immutable, so you must destroy and recreate.
 	 * Use the helper script (run from cloudflare-o11y/):
-	 *   ./pipelines/recreate-stream.sh <stream-name> <schema-file> <pipeline-name> <sink-name> <binding-name>
+	 *   ./pipelines/recreate-stream.sh <stream-name> <schema-file> <pipeline-name> <sink-name>
 	 * e.g.:
 	 *   ./pipelines/recreate-stream.sh o11y_api_metrics_stream pipelines/api-metrics-schema.json \
-	 *     o11y_api_metrics_pipeline o11y_api_metrics_sink API_METRICS_STREAM
+	 *     o11y_api_metrics_pipeline o11y_api_metrics_sink
 	 */
 	"pipelines": [
 		{ "pipeline": "a016f9db28b544f29ab5b1868be41e79", "binding": "API_METRICS_STREAM" },

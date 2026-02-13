@@ -1,11 +1,6 @@
 import type { BYOKResult } from '@/lib/byok';
-import { getEnvVariable } from '@/lib/dotenvx';
 import { isAnthropicModel, isOpusModel } from '@/lib/providers/anthropic';
-import {
-  minimax_m21_free_model,
-  minimax_m21_free_slackbot_model,
-  minimax_m25_free_model,
-} from '@/lib/providers/minimax';
+import { minimax_m21_free_model, minimax_m25_free_model } from '@/lib/providers/minimax';
 import {
   AutocompleteUserByokProviderIdSchema,
   inferVercelFirstPartyInferenceProviderForModel,
@@ -132,17 +127,6 @@ export function applyVercelSettings(
         only: [provider],
         byok: {
           [provider]: list,
-        },
-      },
-    };
-  } else if (requestedModel === minimax_m21_free_slackbot_model.public_id) {
-    requestToMutate.providerOptions = {
-      gateway: {
-        only: [VercelUserByokInferenceProviderIdSchema.enum.minimax],
-        byok: {
-          [VercelUserByokInferenceProviderIdSchema.enum.minimax]: [
-            { apiKey: getEnvVariable('MINIMAX_FREE_SLACKBOT_PROMOTION_API_KEY') },
-          ],
         },
       },
     };

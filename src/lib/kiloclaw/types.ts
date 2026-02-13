@@ -10,6 +10,29 @@ export type ProvisionInput = {
     slackBotToken?: EncryptedEnvelope;
     slackAppToken?: EncryptedEnvelope;
   };
+  kilocodeApiKey?: string;
+  kilocodeApiKeyExpiresAt?: string;
+  kilocodeDefaultModel?: string;
+  kilocodeModels?: KiloCodeModelEntry[];
+};
+
+export type KiloCodeModelEntry = {
+  id: string;
+  name: string;
+};
+
+export type KiloCodeConfigPatchInput = {
+  kilocodeApiKey?: string | null;
+  kilocodeApiKeyExpiresAt?: string | null;
+  kilocodeDefaultModel?: string | null;
+  kilocodeModels?: KiloCodeModelEntry[] | null;
+};
+
+export type KiloCodeConfigResponse = {
+  kilocodeApiKey: string | null;
+  kilocodeApiKeyExpiresAt: string | null;
+  kilocodeDefaultModel: string | null;
+  kilocodeModels: KiloCodeModelEntry[] | null;
 };
 
 /** Response from GET /api/platform/status and GET /api/kiloclaw/status */
@@ -31,6 +54,9 @@ export type PlatformStatusResponse = {
 export type UserConfigResponse = {
   envVarKeys: string[];
   secretCount: number;
+  kilocodeDefaultModel: string | null;
+  hasKiloCodeApiKey: boolean;
+  kilocodeApiKeyExpiresAt?: string | null;
   channels: {
     telegram: boolean;
     discord: boolean;

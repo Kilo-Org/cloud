@@ -56,7 +56,6 @@ import {
 } from '@/lib/kilo-pass/enums';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
-import { KiloClawInstanceStatus } from '@/lib/kiloclaw/enums';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -93,7 +92,6 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
-  KiloClawInstanceStatus,
 } as const;
 
 export const credit_transactions = pgTable(
@@ -2881,8 +2879,6 @@ export type NewAppBuilderFeedback = typeof app_builder_feedback.$inferInsert;
 
 // ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
 
-export { KiloClawInstanceStatus } from '@/lib/kiloclaw/enums';
-
 export const kiloclaw_instances = pgTable(
   'kiloclaw_instances',
   {
@@ -2894,27 +2890,43 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
-    status: text()
-      .$type<KiloClawInstanceStatus>()
-      .notNull()
-      .default(KiloClawInstanceStatus.Provisioned),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    last_started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    last_stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
-    // One active (non-destroyed) instance per user.
-    // Re-provisioning after destroy creates a new row; old row stays with destroyed_at set.
-    uniqueIndex('UQ_kiloclaw_instances_active_user')
-      .on(table.user_id)
+    // One active instance per user+sandbox combination.
+    uniqueIndex('UQ_kiloclaw_instances_active')
+      .on(table.user_id, table.sandbox_id)
       .where(isNull(table.destroyed_at)),
-    // Lookup by sandbox_id for lifecycle hooks (onStop -> find userId by sandboxId).
-    index('IDX_kiloclaw_instances_sandbox_id')
-      .on(table.sandbox_id)
-      .where(isNull(table.destroyed_at)),
-    enumCheck('kiloclaw_instances_status_check', table.status, KiloClawInstanceStatus),
   ]
 );
 
 export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;
+
+// KiloClaw Access Codes — one-time codes for authenticating browser sessions to the worker
+export const kiloclaw_access_codes = pgTable(
+  'kiloclaw_access_codes',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    code: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    status: text().$type<'active' | 'redeemed' | 'expired'>().notNull().default('active'),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    redeemed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_access_codes_code').on(table.code),
+    index('IDX_kiloclaw_access_codes_user_status').on(table.kilo_user_id, table.status),
+    uniqueIndex('UQ_kiloclaw_access_codes_one_active_per_user')
+      .on(table.kilo_user_id)
+      .where(sql`status = 'active'`),
+  ]
+);
+
+export type KiloClawAccessCode = typeof kiloclaw_access_codes.$inferSelect;

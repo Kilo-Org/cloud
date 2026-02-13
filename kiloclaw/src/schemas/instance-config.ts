@@ -7,9 +7,17 @@ export const EncryptedEnvelopeSchema = z.object({
   version: z.literal(1),
 });
 
+export type ModelEntry = { id: string; name: string };
+
+const ModelEntrySchema = z.object({ id: z.string(), name: z.string() });
+
 export const InstanceConfigSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
   encryptedSecrets: z.record(z.string(), EncryptedEnvelopeSchema).optional(),
+  kilocodeApiKey: z.string().nullable().optional(),
+  kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
+  kilocodeDefaultModel: z.string().nullable().optional(),
+  kilocodeModels: z.array(ModelEntrySchema).nullable().optional(),
   channels: z
     .object({
       telegramBotToken: EncryptedEnvelopeSchema.optional(),
@@ -54,6 +62,10 @@ export const PersistedStateSchema = z.object({
   status: z.enum(['provisioned', 'running', 'stopped']).default('stopped'),
   envVars: z.record(z.string(), z.string()).nullable().default(null),
   encryptedSecrets: z.record(z.string(), EncryptedEnvelopeSchema).nullable().default(null),
+  kilocodeApiKey: z.string().nullable().default(null),
+  kilocodeApiKeyExpiresAt: z.string().nullable().default(null),
+  kilocodeDefaultModel: z.string().nullable().default(null),
+  kilocodeModels: z.array(ModelEntrySchema).nullable().default(null),
   channels: z
     .object({
       telegramBotToken: EncryptedEnvelopeSchema.optional(),

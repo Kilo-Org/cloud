@@ -10,6 +10,9 @@ import { mergeEnvVarsWithSecrets, decryptChannelTokens } from '../utils/encrypti
 export type UserConfig = {
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
+  kilocodeApiKey?: string | null;
+  kilocodeDefaultModel?: string | null;
+  kilocodeModels?: Array<{ id: string; name: string }> | null;
   channels?: EncryptedChannelTokens;
 };
 
@@ -17,7 +20,7 @@ export type UserConfig = {
  * Build environment variables to pass to the OpenClaw container process.
  *
  * Layering order:
- * 1. Worker-level shared AI keys (platform defaults)
+ * 1. Worker-level defaults
  * 2. User-provided plaintext env vars (override platform defaults)
  * 3. User-provided encrypted secrets (override env vars on conflict)
  * 4. Decrypted channel tokens (mapped to container env var names)
@@ -35,37 +38,11 @@ export async function buildEnvVars(
   gatewayTokenSecret: string,
   userConfig?: UserConfig
 ): Promise<Record<string, string>> {
-  // Layer 1: Worker-level shared AI keys (platform defaults)
+  // Layer 1: Worker-level defaults
   const envVars: Record<string, string> = {};
 
-  // Cloudflare AI Gateway configuration (new native provider)
-  if (env.CLOUDFLARE_AI_GATEWAY_API_KEY) {
-    envVars.CLOUDFLARE_AI_GATEWAY_API_KEY = env.CLOUDFLARE_AI_GATEWAY_API_KEY;
-  }
-  if (env.CF_AI_GATEWAY_ACCOUNT_ID) {
-    envVars.CF_AI_GATEWAY_ACCOUNT_ID = env.CF_AI_GATEWAY_ACCOUNT_ID;
-  }
-  if (env.CF_AI_GATEWAY_GATEWAY_ID) {
-    envVars.CF_AI_GATEWAY_GATEWAY_ID = env.CF_AI_GATEWAY_GATEWAY_ID;
-  }
-
-  // Direct provider keys
-  if (env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY;
-  if (env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = env.OPENAI_API_KEY;
-
-  // Legacy AI Gateway support: AI_GATEWAY_BASE_URL + AI_GATEWAY_API_KEY
-  // When set, these override direct keys for backward compatibility
-  if (env.AI_GATEWAY_API_KEY && env.AI_GATEWAY_BASE_URL) {
-    const normalizedBaseUrl = env.AI_GATEWAY_BASE_URL.replace(/\/+$/, '');
-    envVars.AI_GATEWAY_BASE_URL = normalizedBaseUrl;
-    envVars.ANTHROPIC_BASE_URL = normalizedBaseUrl;
-    envVars.ANTHROPIC_API_KEY = env.AI_GATEWAY_API_KEY;
-  } else if (env.ANTHROPIC_BASE_URL) {
-    envVars.ANTHROPIC_BASE_URL = env.ANTHROPIC_BASE_URL;
-  }
-
   if (env.DEV_MODE) envVars.OPENCLAW_DEV_MODE = env.DEV_MODE;
-  if (env.CF_AI_GATEWAY_MODEL) envVars.CF_AI_GATEWAY_MODEL = env.CF_AI_GATEWAY_MODEL;
+  if (env.KILOCODE_API_BASE_URL) envVars.KILOCODE_API_BASE_URL = env.KILOCODE_API_BASE_URL;
   if (env.CF_ACCOUNT_ID) envVars.CF_ACCOUNT_ID = env.CF_ACCOUNT_ID;
 
   // Layer 2 + 3: User env vars merged with decrypted secrets.
@@ -76,6 +53,13 @@ export async function buildEnvVars(
       env.AGENT_ENV_VARS_PRIVATE_KEY
     );
     Object.assign(envVars, userEnv);
+
+    if (userConfig.kilocodeApiKey) {
+      envVars.KILOCODE_API_KEY = userConfig.kilocodeApiKey;
+    }
+    if (userConfig.kilocodeDefaultModel) {
+      envVars.KILOCODE_DEFAULT_MODEL = userConfig.kilocodeDefaultModel;
+    }
 
     // Layer 4: Decrypt channel tokens and map to container env var names
     if (userConfig.channels && env.AGENT_ENV_VARS_PRIVATE_KEY) {

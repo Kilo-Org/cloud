@@ -8,7 +8,12 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
-import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
+import {
+  ensureActiveInstance,
+  markActiveInstanceDestroyed,
+  restoreDestroyedInstance,
+} from '@/lib/kiloclaw/instance-registry';
 
 /**
  * Procedure middleware: restrict to @kilocode.ai users.
@@ -19,6 +24,8 @@ const kiloclawProcedure = baseProcedure.use(async ({ ctx, next }) => {
   }
   return next();
 });
+
+const modelEntrySchema = z.object({ id: z.string(), name: z.string() });
 
 const updateConfigSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
@@ -31,7 +38,115 @@ const updateConfigSchema = z.object({
       slackAppToken: z.string().optional(),
     })
     .optional(),
+  kilocodeDefaultModel: z
+    .string()
+    .regex(
+      /^kilocode\/[^/]+\/.+$/,
+      'kilocodeDefaultModel must start with kilocode/ and include a provider'
+    )
+    .nullable()
+    .optional(),
+  kilocodeModels: z.array(modelEntrySchema).nullable().optional(),
 });
+
+const updateKiloCodeConfigSchema = z.object({
+  kilocodeDefaultModel: z
+    .string()
+    .regex(
+      /^kilocode\/[^/]+\/.+$/,
+      'kilocodeDefaultModel must start with kilocode/ and include a provider'
+    )
+    .nullable()
+    .optional(),
+  kilocodeModels: z.array(modelEntrySchema).nullable().optional(),
+});
+
+/**
+ * Build the worker provision payload from plaintext channel tokens.
+ * The worker expects the flat encrypted envelope shape for channels.
+ */
+function buildWorkerChannels(channels: z.infer<typeof updateConfigSchema>['channels']) {
+  if (!channels) return undefined;
+  return {
+    telegramBotToken: channels.telegramBotToken
+      ? encryptKiloClawSecret(channels.telegramBotToken)
+      : undefined,
+    discordBotToken: channels.discordBotToken
+      ? encryptKiloClawSecret(channels.discordBotToken)
+      : undefined,
+    slackBotToken: channels.slackBotToken
+      ? encryptKiloClawSecret(channels.slackBotToken)
+      : undefined,
+    slackAppToken: channels.slackAppToken
+      ? encryptKiloClawSecret(channels.slackAppToken)
+      : undefined,
+  };
+}
+
+type KiloCodeConfigPublicResponse = Pick<
+  KiloCodeConfigResponse,
+  'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel' | 'kilocodeModels'
+>;
+
+function sanitizeKiloCodeConfigResponse(
+  response: KiloCodeConfigResponse
+): KiloCodeConfigPublicResponse {
+  return {
+    kilocodeApiKeyExpiresAt: response.kilocodeApiKeyExpiresAt,
+    kilocodeDefaultModel: response.kilocodeDefaultModel,
+    kilocodeModels: response.kilocodeModels,
+  };
+}
+
+async function provisionInstance(
+  user: Parameters<typeof generateApiToken>[0],
+  input: z.infer<typeof updateConfigSchema>
+) {
+  await ensureActiveInstance(user.id);
+
+  const encryptedSecrets = input.secrets
+    ? Object.fromEntries(
+        Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
+      )
+    : undefined;
+
+  const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+  const kilocodeApiKey = generateApiToken(user, undefined, {
+    expiresIn: expiresInSeconds,
+  });
+  const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+  const client = new KiloClawInternalClient();
+  return client.provision(user.id, {
+    envVars: input.envVars,
+    encryptedSecrets,
+    channels: buildWorkerChannels(input.channels),
+    kilocodeApiKey,
+    kilocodeApiKeyExpiresAt,
+    kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+    kilocodeModels: input.kilocodeModels ?? undefined,
+  });
+}
+
+async function patchConfig(
+  user: Parameters<typeof generateApiToken>[0],
+  input: z.infer<typeof updateKiloCodeConfigSchema>
+): Promise<KiloCodeConfigPublicResponse> {
+  const client = new KiloClawInternalClient();
+  const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+  const kilocodeApiKey = generateApiToken(user, undefined, {
+    expiresIn: expiresInSeconds,
+  });
+  const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+  const response = await client.patchKiloCodeConfig(user.id, {
+    ...input,
+    kilocodeApiKey,
+    kilocodeApiKeyExpiresAt,
+  });
+
+  return sanitizeKiloCodeConfigResponse(response);
+}
 
 export const kiloclawRouter = createTRPCRouter({
   // Status + gateway token (two internal client calls, merged for the dashboard)
@@ -54,7 +169,7 @@ export const kiloclawRouter = createTRPCRouter({
     return { ...status, gatewayToken, workerUrl } satisfies KiloClawDashboardStatus;
   }),
 
-  // Instance lifecycle (internal client)
+  // Instance lifecycle
   start: kiloclawProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();
     return client.start(ctx.user.id);
@@ -65,47 +180,45 @@ export const kiloclawRouter = createTRPCRouter({
     return client.stop(ctx.user.id);
   }),
 
+  // Instance lifecycle
   destroy: kiloclawProcedure
     .input(z.object({ deleteData: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
+      const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.destroy(ctx.user.id, input.deleteData);
+      try {
+        return await client.destroy(ctx.user.id, input.deleteData);
+      } catch (error) {
+        if (destroyedRow) {
+          await restoreDestroyedInstance(destroyedRow.id);
+        }
+        throw error;
+      }
     }),
 
-  // Configuration (internal client -- encrypts secrets server-side)
-  updateConfig: kiloclawProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    const encryptedSecrets = input.secrets
-      ? Object.fromEntries(
-          Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
-        )
-      : undefined;
-
-    const channels = input.channels
-      ? {
-          telegramBotToken: input.channels.telegramBotToken
-            ? encryptKiloClawSecret(input.channels.telegramBotToken)
-            : undefined,
-          discordBotToken: input.channels.discordBotToken
-            ? encryptKiloClawSecret(input.channels.discordBotToken)
-            : undefined,
-          slackBotToken: input.channels.slackBotToken
-            ? encryptKiloClawSecret(input.channels.slackBotToken)
-            : undefined,
-          slackAppToken: input.channels.slackAppToken
-            ? encryptKiloClawSecret(input.channels.slackAppToken)
-            : undefined,
-        }
-      : undefined;
-
-    const client = new KiloClawInternalClient();
-    return client.provision(ctx.user.id, {
-      envVars: input.envVars,
-      encryptedSecrets,
-      channels,
-    });
+  // Explicit lifecycle APIs
+  provision: kiloclawProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
+    return provisionInstance(ctx.user, input);
   }),
 
-  // User-facing (user client -- forwards user's JWT)
+  patchConfig: kiloclawProcedure
+    .input(updateKiloCodeConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      return patchConfig(ctx.user, input);
+    }),
+
+  // Backward-compatible aliases.
+  updateConfig: kiloclawProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
+    return provisionInstance(ctx.user, input);
+  }),
+
+  updateKiloCodeConfig: kiloclawProcedure
+    .input(updateKiloCodeConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      return patchConfig(ctx.user, input);
+    }),
+
+  // User-facing (user client -- forwards user's short-lived JWT)
   getConfig: kiloclawProcedure.query(async ({ ctx }) => {
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })

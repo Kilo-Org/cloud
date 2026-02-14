@@ -50,8 +50,6 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
 
 // ─── Tab: Overview ────────────────────────────────────────────────────
 
-type KiloClawMutations = ReturnType<typeof useKiloClawMutations>;
-
 function OverviewTab() {
   const { data: status } = useKiloClawStatus();
   const { data: storage } = useKiloClawStorageInfo();

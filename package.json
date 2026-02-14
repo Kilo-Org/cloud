@@ -37,7 +37,7 @@
   },
   "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.15",
+    "@ai-sdk/anthropic": "^3.0.41",
     "@ai-sdk/gateway": "^3.0.16",
     "@ai-sdk/mistral": "^2.0.23",
     "@ai-sdk/openai": "^2.0.52",
@@ -89,7 +89,7 @@
     "@vercel/functions": "^3.3.3",
     "@vercel/otel": "^2.1.0",
     "@workos-inc/node": "^8.0.0",
-    "ai": "^5.0.72",
+    "ai": "^6.0.78",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

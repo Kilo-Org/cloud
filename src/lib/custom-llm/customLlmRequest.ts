@@ -1,6 +1,17 @@
-import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
+import type {
+  OpenRouterChatCompletionRequest,
+  OpenRouterReasoningConfig,
+} from '@/lib/providers/openrouter/types';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { jsonSchema, streamText, type ModelMessage, type TextStreamPart, type ToolSet } from 'ai';
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import {
+  jsonSchema,
+  streamText,
+  type ModelMessage,
+  type TextStreamPart,
+  type ToolChoice,
+  type ToolSet,
+} from 'ai';
 import { NextResponse } from 'next/server';
 import type {
   ChatCompletionAssistantMessageParam,
@@ -336,6 +347,60 @@ function createStreamPartConverter() {
   };
 }
 
+function convertToolChoice(
+  toolChoice: OpenRouterChatCompletionRequest['tool_choice']
+): ToolChoice<ToolSet> | undefined {
+  if (toolChoice === undefined || toolChoice === null) return undefined;
+  if (toolChoice === 'none' || toolChoice === 'auto' || toolChoice === 'required') {
+    return toolChoice;
+  }
+  if (typeof toolChoice === 'object' && 'type' in toolChoice && toolChoice.type === 'function') {
+    return { type: 'tool', toolName: toolChoice.function.name };
+  }
+  return undefined;
+}
+
+function convertStopSequences(
+  stop: string | null | Array<string> | undefined
+): string[] | undefined {
+  if (!stop) return undefined;
+  return typeof stop === 'string' ? [stop] : stop;
+}
+
+function convertReasoningToProviderOptions(
+  reasoning: OpenRouterReasoningConfig | undefined,
+  thinking: { type?: 'enabled' | 'disabled' } | undefined
+): { anthropic: AnthropicProviderOptions } | undefined {
+  const anthropic: AnthropicProviderOptions = {};
+
+  if (
+    thinking?.type === 'disabled' ||
+    reasoning?.enabled === false ||
+    reasoning?.effort === 'none'
+  ) {
+    anthropic.thinking = { type: 'disabled' };
+  } else if (thinking?.type === 'enabled' || reasoning?.enabled === true) {
+    anthropic.thinking = {
+      type: 'enabled',
+      ...(reasoning?.max_tokens ? { budgetTokens: reasoning.max_tokens } : {}),
+    };
+  }
+
+  const effort = reasoning?.effort;
+  if (effort && effort !== 'none') {
+    const EFFORT_MAP: Record<string, AnthropicProviderOptions['effort']> = {
+      low: 'low',
+      minimal: 'low',
+      medium: 'medium',
+      high: 'high',
+    };
+    anthropic.effort = EFFORT_MAP[effort] ?? 'high';
+  }
+
+  if (Object.keys(anthropic).length === 0) return undefined;
+  return { anthropic };
+}
+
 export async function customLlmRequest(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest
@@ -350,6 +415,15 @@ export async function customLlmRequest(
     model,
     messages: convertMessages(request.messages as OpenRouterChatCompletionsInput),
     tools: convertTools(request.tools),
+    toolChoice: convertToolChoice(request.tool_choice),
+    maxOutputTokens: request.max_tokens ?? request.max_completion_tokens ?? undefined,
+    temperature: request.temperature ?? undefined,
+    topP: request.top_p ?? undefined,
+    frequencyPenalty: request.frequency_penalty ?? undefined,
+    presencePenalty: request.presence_penalty ?? undefined,
+    stopSequences: convertStopSequences(request.stop),
+    seed: request.seed ?? undefined,
+    providerOptions: convertReasoningToProviderOptions(request.reasoning, request.thinking),
   });
 
   const convertStreamPartToChunk = createStreamPartConverter();

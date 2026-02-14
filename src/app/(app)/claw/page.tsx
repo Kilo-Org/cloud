@@ -50,6 +50,8 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
 
 // ─── Tab: Overview ────────────────────────────────────────────────────
 
+type KiloClawMutations = ReturnType<typeof useKiloClawMutations>;
+
 function OverviewTab() {
   const { data: status } = useKiloClawStatus();
   const { data: storage } = useKiloClawStorageInfo();
@@ -129,7 +131,11 @@ function OverviewTab() {
           <Stat label="Status" value={status.status} />
           <Stat
             label="Sandbox ID"
-            value={<span className="truncate font-mono text-xs">{status.sandboxId}</span>}
+            value={
+              <span className="font-mono text-xs break-all whitespace-pre-wrap">
+                {status.sandboxId}
+              </span>
+            }
           />
           <Stat label="Provisioned" value={formatTs(status.provisionedAt)} />
           <Stat label="Last started" value={formatTs(status.lastStartedAt)} />

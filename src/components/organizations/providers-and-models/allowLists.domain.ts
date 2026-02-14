@@ -268,3 +268,71 @@ export function toggleAllowFutureModelsForProvider(params: {
 
   return { nextModelAllowList, nextProviderAllowList };
 }
+
+export function setAllProvidersEnabled(params: {
+  providerSlugs: ReadonlyArray<string>;
+  nextEnabled: boolean;
+  draftProviderAllowList: ReadonlyArray<string>;
+  draftModelAllowList: ReadonlyArray<string>;
+  allProviderSlugsWithEndpoints: ReadonlyArray<string>;
+  hadAllProvidersInitially: boolean;
+}): { nextProviderAllowList: string[]; nextModelAllowList: string[] } {
+  const {
+    providerSlugs,
+    nextEnabled,
+    draftProviderAllowList,
+    draftModelAllowList,
+    allProviderSlugsWithEndpoints,
+    hadAllProvidersInitially,
+  } = params;
+
+  const targetSet = new Set(providerSlugs);
+  let nextModelAllowList = [...draftModelAllowList];
+
+  // When disabling, remove provider/* wildcards from model allow list
+  if (!nextEnabled && nextModelAllowList.length !== 0) {
+    nextModelAllowList = nextModelAllowList.filter(entry => {
+      if (!entry.endsWith('/*')) return true;
+      const providerSlug = entry.slice(0, -2);
+      return !targetSet.has(providerSlug);
+    });
+  }
+  nextModelAllowList = canonicalizeModelAllowList(nextModelAllowList);
+
+  // Handle the "all providers enabled" case (empty array)
+  if (draftProviderAllowList.length === 0) {
+    if (nextEnabled) {
+      return { nextProviderAllowList: [], nextModelAllowList };
+    }
+
+    // Disabling some providers when all are enabled: create explicit list
+    return {
+      nextProviderAllowList: allProviderSlugsWithEndpoints.filter(slug => !targetSet.has(slug)),
+      nextModelAllowList,
+    };
+  }
+
+  // Build new allow set
+  const allowSet = new Set(draftProviderAllowList);
+  if (nextEnabled) {
+    for (const slug of providerSlugs) {
+      allowSet.add(slug);
+    }
+  } else {
+    for (const slug of providerSlugs) {
+      allowSet.delete(slug);
+    }
+  }
+
+  const nextProviderAllowList = canonicalizeProviderAllowList([...allowSet]);
+
+  // If we've enabled all providers and started with all enabled, return empty array
+  if (
+    hadAllProvidersInitially &&
+    nextProviderAllowList.length === allProviderSlugsWithEndpoints.length
+  ) {
+    return { nextProviderAllowList: [], nextModelAllowList };
+  }
+
+  return { nextProviderAllowList, nextModelAllowList };
+}

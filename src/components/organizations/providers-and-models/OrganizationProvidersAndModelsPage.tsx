@@ -166,6 +166,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     [actions, canEdit]
   );
 
+  const handleSetAllProvidersEnabled = useCallback(
+    (providerSlugs: string[], nextEnabled: boolean) => {
+      if (!canEdit) return;
+      actions.setAllProvidersEnabled({ providerSlugs, nextEnabled });
+    },
+    [actions, canEdit]
+  );
+
   const handleToggleModelAllowed = useCallback(
     (modelId: string, nextAllowed: boolean) => {
       if (!canEdit) return;
@@ -495,6 +503,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onProviderRetainsPromptsFilterChange={actions.setProviderRetainsPromptsFilter}
               onProviderLocationsFilterChange={actions.setProviderLocationsFilter}
               onToggleProviderEnabled={handleToggleProviderEnabled}
+              onSetAllProvidersEnabled={handleSetAllProvidersEnabled}
               onOpenProviderDetails={actions.setInfoProviderSlug}
             />
           </TabsContent>

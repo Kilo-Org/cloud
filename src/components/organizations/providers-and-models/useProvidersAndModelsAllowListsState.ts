@@ -7,6 +7,7 @@ import {
   computeAllowedModelIds,
   computeAllProviderSlugsWithEndpoints,
   computeEnabledProviderSlugs,
+  setAllProvidersEnabled,
   sortUniqueStrings,
   stringListsEqual,
   toggleAllowFutureModelsForProvider,
@@ -59,6 +60,12 @@ export type ProvidersAndModelsAllowListsAction =
   | {
       type: 'TOGGLE_PROVIDER';
       providerSlug: string;
+      nextEnabled: boolean;
+      allProviderSlugsWithEndpoints: ReadonlyArray<string>;
+    }
+  | {
+      type: 'SET_ALL_PROVIDERS_ENABLED';
+      providerSlugs: ReadonlyArray<string>;
       nextEnabled: boolean;
       allProviderSlugsWithEndpoints: ReadonlyArray<string>;
     }
@@ -176,6 +183,23 @@ export function providersAndModelsAllowListsReducer(
       };
     }
 
+    case 'SET_ALL_PROVIDERS_ENABLED': {
+      if (state.status !== 'ready') return state;
+      const { nextModelAllowList, nextProviderAllowList } = setAllProvidersEnabled({
+        providerSlugs: action.providerSlugs,
+        nextEnabled: action.nextEnabled,
+        draftProviderAllowList: state.draftProviderAllowList,
+        draftModelAllowList: state.draftModelAllowList,
+        allProviderSlugsWithEndpoints: action.allProviderSlugsWithEndpoints,
+        hadAllProvidersInitially: state.initialProviderAllowList.length === 0,
+      });
+      return {
+        ...state,
+        draftModelAllowList: nextModelAllowList,
+        draftProviderAllowList: nextProviderAllowList,
+      };
+    }
+
     case 'TOGGLE_MODEL': {
       if (state.status !== 'ready') return state;
       const nextModelAllowList = toggleModelAllowed({
@@ -272,6 +296,7 @@ export function useProvidersAndModelsAllowListsState(params: {
       providerAllowList: ReadonlyArray<string>;
     }) => void;
     toggleProvider: (params: { providerSlug: string; nextEnabled: boolean }) => void;
+    setAllProvidersEnabled: (params: { providerSlugs: string[]; nextEnabled: boolean }) => void;
     toggleModel: (params: { modelId: string; nextAllowed: boolean }) => void;
     toggleProviderWildcard: (params: { providerSlug: string; nextAllowed: boolean }) => void;
     resetToInitial: () => void;
@@ -365,6 +390,18 @@ export function useProvidersAndModelsAllowListsState(params: {
     [allProviderSlugsWithEndpoints]
   );
 
+  const setAllProvidersEnabledAction = useCallback(
+    (input: { providerSlugs: string[]; nextEnabled: boolean }) => {
+      dispatch({
+        type: 'SET_ALL_PROVIDERS_ENABLED',
+        providerSlugs: input.providerSlugs,
+        nextEnabled: input.nextEnabled,
+        allProviderSlugsWithEndpoints,
+      });
+    },
+    [allProviderSlugsWithEndpoints]
+  );
+
   const toggleModel = useCallback(
     (input: { modelId: string; nextAllowed: boolean }) => {
       const providerSlugsForModelId = modelProvidersIndex.get(input.modelId);
@@ -416,6 +453,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     () => ({
       initFromServer,
       toggleProvider,
+      setAllProvidersEnabled: setAllProvidersEnabledAction,
       toggleModel,
       toggleProviderWildcard,
       resetToInitial: () => dispatch({ type: 'RESET_TO_INITIAL' }),
@@ -436,7 +474,13 @@ export function useProvidersAndModelsAllowListsState(params: {
       setInfoProviderSlug: (value: string | null) =>
         dispatch({ type: 'SET_INFO_PROVIDER_SLUG', value }),
     }),
-    [initFromServer, toggleModel, toggleProvider, toggleProviderWildcard]
+    [
+      initFromServer,
+      setAllProvidersEnabledAction,
+      toggleModel,
+      toggleProvider,
+      toggleProviderWildcard,
+    ]
   );
 
   return {

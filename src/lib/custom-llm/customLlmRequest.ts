@@ -75,7 +75,7 @@ function convertUserContentPart(part: ChatCompletionContentPart) {
         type: 'file' as const,
         data: part.file.file_data ?? '',
         filename: part.file.filename,
-        mediaType: extractMediaType(part.file.file_data) ?? 'application/octet-stream',
+        mediaType: parseDataUrl(part.file.file_data ?? '')?.mediaType ?? 'application/octet-stream',
       };
 
     case 'input_audio':
@@ -130,11 +130,6 @@ function parseDataUrl(url: string): { data: string; mediaType: string } | null {
   const match = url.match(/^data:([^;]+);base64,(.+)$/);
   if (match) return { mediaType: match[1], data: match[2] };
   return null;
-}
-
-function extractMediaType(dataUrl: string | undefined): string | undefined {
-  if (!dataUrl) return undefined;
-  return dataUrl.match(/^data:([^;,]+)/)?.[1];
 }
 
 const AUDIO_MEDIA_TYPES: Record<string, string> = {

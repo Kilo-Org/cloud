@@ -17,7 +17,7 @@ export const opus_46_free_slackbot_model = {
   flags: ['reasoning', 'prompt_cache', 'vision'],
   gateway: 'openrouter',
   internal_id: 'anthropic/claude-opus-4.6',
-  inference_providers: ['amazon-bedrock'],
+  inference_providers: [],
   slackbot_only: true,
 } as KiloFreeModel;
 
@@ -93,7 +93,8 @@ function applyAnthropicStrictToolUse(
 
 function hasCacheControl(message: OpenAI.ChatCompletionMessageParam) {
   return (
-    Array.isArray(message.content) && message.content.some(content => 'cache_control' in content)
+    'cache_control' in message ||
+    (Array.isArray(message.content) && message.content.some(content => 'cache_control' in content))
   );
 }
 

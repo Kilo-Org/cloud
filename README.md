@@ -4,7 +4,7 @@
 
 0. If you're running on a mac and are looking for (a likely incomplete) set of system software prerequisites, here is [how I set up my macos dev env](dev/macos%20dev-environment%20installation.txt).
 
-Make sure both git and pnpm are up to date:
+Install dependencies and pull Git LFS assets:
 
 ```bash
 pnpm install

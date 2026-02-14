@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "description": "Multi-tenant OpenClaw in Cloudflare Sandbox containers",
+  "description": "Multi-tenant OpenClaw on Fly.io Machines",
   "scripts": {
     "deploy": "wrangler deploy",
     "start": "wrangler dev",
@@ -25,7 +25,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@cloudflare/sandbox": "^0.7.0",
     "@eslint/js": "^9.38.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.16.0",

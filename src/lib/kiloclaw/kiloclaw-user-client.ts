@@ -1,13 +1,7 @@
 import 'server-only';
 
 import { KILOCLAW_API_URL } from '@/lib/config.server';
-import type {
-  UserConfigResponse,
-  PlatformStatusResponse,
-  RestartGatewayResponse,
-  SyncResponse,
-  StorageInfoResponse,
-} from './types';
+import type { UserConfigResponse, PlatformStatusResponse, RestartGatewayResponse } from './types';
 
 /**
  * KiloClaw worker client for user-facing routes.
@@ -53,13 +47,5 @@ export class KiloClawUserClient {
 
   async restartGateway(): Promise<RestartGatewayResponse> {
     return this.request('/api/admin/gateway/restart', { method: 'POST' });
-  }
-
-  async syncStorage(): Promise<SyncResponse> {
-    return this.request('/api/admin/storage/sync', { method: 'POST' });
-  }
-
-  async getStorageInfo(): Promise<StorageInfoResponse> {
-    return this.request('/api/admin/storage');
   }
 }

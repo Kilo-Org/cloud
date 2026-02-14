@@ -39,15 +39,16 @@ export type KiloCodeConfigResponse = {
 export type PlatformStatusResponse = {
   userId: string | null;
   sandboxId: string | null;
-  status: 'provisioned' | 'running' | 'stopped' | null;
-  lastSyncAt: number | null;
-  syncInProgress: boolean;
+  status: 'provisioned' | 'running' | 'stopped' | 'destroying' | null;
   provisionedAt: number | null;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
   envVarCount: number;
   secretCount: number;
   channelCount: number;
+  flyMachineId: string | null;
+  flyVolumeId: string | null;
+  flyRegion: string | null;
 };
 
 /** Response from GET /api/kiloclaw/config */
@@ -69,25 +70,7 @@ export type UserConfigResponse = {
 export type RestartGatewayResponse = {
   success: boolean;
   message?: string;
-  previousProcessId?: string;
   error?: string;
-};
-
-/** Response from POST /api/admin/storage/sync */
-export type SyncResponse = {
-  success: boolean;
-  message?: string;
-  lastSync?: string;
-  error?: string;
-  details?: string;
-};
-
-/** Response from GET /api/admin/storage */
-export type StorageInfoResponse = {
-  configured: boolean;
-  lastSync: string | null;
-  syncInProgress: boolean;
-  message: string;
 };
 
 /** Combined status + gateway token returned by tRPC getStatus */

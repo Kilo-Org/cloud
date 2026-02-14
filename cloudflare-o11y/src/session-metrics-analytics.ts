@@ -49,6 +49,9 @@ export async function writeSessionMetricsDataPoint(params: SessionMetricsParams,
 		],
 	});
 
+	// Changing this schema? Stream schemas are immutable — run:
+	//   ./pipelines/recreate-stream.sh o11y_session_metrics_stream pipelines/session-metrics-schema.json \
+	//     o11y_session_metrics_pipeline o11y_session_metrics_sink
 	await env.SESSION_METRICS_STREAM.send([
 		{
 			platform: params.platform,

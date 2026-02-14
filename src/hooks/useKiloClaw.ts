@@ -17,11 +17,6 @@ export function useKiloClawConfig() {
   return useQuery(trpc.kiloclaw.getConfig.queryOptions());
 }
 
-export function useKiloClawStorageInfo() {
-  const trpc = useTRPC();
-  return useQuery(trpc.kiloclaw.getStorageInfo.queryOptions());
-}
-
 export function useKiloClawMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -47,9 +42,6 @@ export function useKiloClawMutations() {
     ),
     restartGateway: useMutation(
       trpc.kiloclaw.restartGateway.mutationOptions({ onSuccess: invalidateStatus })
-    ),
-    syncStorage: useMutation(
-      trpc.kiloclaw.syncStorage.mutationOptions({ onSuccess: invalidateStatus })
     ),
   };
 }

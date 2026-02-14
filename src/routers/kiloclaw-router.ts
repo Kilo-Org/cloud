@@ -8,6 +8,7 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
   ensureActiveInstance,
@@ -15,11 +16,10 @@ import {
   restoreDestroyedInstance,
 } from '@/lib/kiloclaw/instance-registry';
 
-/**
- * Procedure middleware: restrict to @kilocode.ai users.
- */
 const kiloclawProcedure = baseProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.user.google_user_email?.endsWith('@kilocode.ai')) {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isEnabled = await isReleaseToggleEnabled('kiloclaw', ctx.user.id);
+  if (!isEnabled && !isDevelopment) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'KiloClaw access restricted' });
   }
   return next();
@@ -181,20 +181,18 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   // Instance lifecycle
-  destroy: kiloclawProcedure
-    .input(z.object({ deleteData: z.boolean().optional() }))
-    .mutation(async ({ ctx, input }) => {
-      const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
-      const client = new KiloClawInternalClient();
-      try {
-        return await client.destroy(ctx.user.id, input.deleteData);
-      } catch (error) {
-        if (destroyedRow) {
-          await restoreDestroyedInstance(destroyedRow.id);
-        }
-        throw error;
+  destroy: kiloclawProcedure.mutation(async ({ ctx }) => {
+    const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id);
+    const client = new KiloClawInternalClient();
+    try {
+      return await client.destroy(ctx.user.id);
+    } catch (error) {
+      if (destroyedRow) {
+        await restoreDestroyedInstance(destroyedRow.id);
       }
-    }),
+      throw error;
+    }
+  }),
 
   // Explicit lifecycle APIs
   provision: kiloclawProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
@@ -226,24 +224,10 @@ export const kiloclawRouter = createTRPCRouter({
     return client.getConfig();
   }),
 
-  getStorageInfo: kiloclawProcedure.query(async ({ ctx }) => {
-    const client = new KiloClawUserClient(
-      generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
-    );
-    return client.getStorageInfo();
-  }),
-
   restartGateway: kiloclawProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
     return client.restartGateway();
-  }),
-
-  syncStorage: kiloclawProcedure.mutation(async ({ ctx }) => {
-    const client = new KiloClawUserClient(
-      generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
-    );
-    return client.syncStorage();
   }),
 });

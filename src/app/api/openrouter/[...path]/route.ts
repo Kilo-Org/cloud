@@ -14,7 +14,8 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isSlackbotOnlyModel,
-  isStealthModelOnKiloCodeOnly,
+  isKiloStealthModel,
+  isRateLimitedModel,
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
@@ -121,6 +122,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return invalidRequestResponse();
   }
 
+  delete requestBodyParsed.models; // OpenRouter specific field we do not support
   if (!requestBodyParsed.model) {
     return modelDoesNotExistResponse();
   }
@@ -140,8 +142,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const originalModelIdLowerCased = requestBodyParsed.model.toLowerCase();
 
-  const isRequestedModelFree = isFreeModel(originalModelIdLowerCased);
-
   // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (!ipAddress) {
@@ -149,7 +149,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // For FREE models: check IP rate limit BEFORE auth, log at start
-  if (isRequestedModelFree) {
+  // Slackbot-only models are exempt from free model rate limits since they're
+  // already gated behind the Slack integration (internalApiUse auth).
+  if (isRateLimitedModel(originalModelIdLowerCased)) {
     const rateLimitResult = await checkFreeModelRateLimit(ipAddress);
     if (!rateLimitResult.allowed) {
       console.warn(
@@ -182,7 +184,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (authFailedResponse) {
     // No valid auth
-    if (!isRequestedModelFree) {
+    if (!isFreeModel(originalModelIdLowerCased)) {
       // Paid model requires authentication
       return authFailedResponse;
     }
@@ -195,7 +197,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRequestedModelFree) {
+  if (isRateLimitedModel(originalModelIdLowerCased)) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,
@@ -354,7 +356,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
       provider: provider.id,
       requestedModel: requestedModelLowerCased,
-      resolvedModel: requestBodyParsed.model.toLowerCase(),
+      resolvedModel: originalModelIdLowerCased,
       toolsAvailable,
       toolsUsed,
       ttfbMs,
@@ -441,7 +443,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (isStealthModelOnKiloCodeOnly(originalModelIdLowerCased)) {
+  if (isKiloStealthModel(originalModelIdLowerCased)) {
     return redactedModelResponse(response, originalModelIdLowerCased);
   }
 

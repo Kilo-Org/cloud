@@ -5,30 +5,23 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-05-06",
   "compatibility_flags": ["nodejs_compat"],
+  "preview_urls": false,
   "observability": {
     "enabled": true,
   },
   "dev": {
     "port": 8795,
   },
-  // Production: add a custom domain route for claw.kilo.ai
-  // "routes": [{ "pattern": "claw.kilo.ai", "custom_domain": true }],
-
-  // Container configuration for KiloClaw sandbox
-  "containers": [
+  "routes": [
     {
-      "class_name": "KiloClawSandbox",
-      "image": "./Dockerfile",
-      "instance_type": "standard-2",
-      "max_instances": 500,
+      "pattern": "claw.kilosessions.ai",
+      "zone_name": "kilosessions.ai",
+      "custom_domain": true,
     },
   ],
+
   "durable_objects": {
     "bindings": [
-      {
-        "class_name": "KiloClawSandbox",
-        "name": "Sandbox",
-      },
       {
         "class_name": "KiloClawInstance",
         "name": "KILOCLAW_INSTANCE",
@@ -44,6 +37,10 @@
       "new_sqlite_classes": ["KiloClawInstance"],
       "tag": "v3",
     },
+    {
+      "deleted_classes": ["KiloClawSandbox"],
+      "tag": "v4",
+    },
   ],
   // Hyperdrive binding for Postgres (pepper validation, instance registry)
   "hyperdrive": [
@@ -53,12 +50,14 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
-  // R2 bucket for persistent storage
-  "r2_buckets": [
-    {
-      "binding": "KILOCLAW_BUCKET",
-      "bucket_name": "kiloclaw-data",
-    },
-  ],
-  // Secrets: see DEVELOPMENT.md for the full list and setup instructions
+  "vars": {
+    "FLY_APP_NAME": "kiloclaw-machines",
+    "FLY_IMAGE_TAG": "latest",
+    "FLY_REGION": "us,eu",
+    "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
+  },
+  // Secrets (set via wrangler secret put):
+  // FLY_API_TOKEN,
+  // NEXTAUTH_SECRET, INTERNAL_API_SECRET, GATEWAY_TOKEN_SECRET,
+  // AGENT_ENV_VARS_PRIVATE_KEY
 }

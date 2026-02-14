@@ -64,6 +64,7 @@ export function queryErrorRates(windowMinutes: number, minRequests: number, env:
 			SUM(_sample_interval) AS weighted_total
 		FROM o11y_api_metrics
 		WHERE timestamp > NOW() - INTERVAL '${windowMinutes}' MINUTE
+			AND blob6 = '0'
 		GROUP BY provider, model, client_name
 		HAVING weighted_total >= ${minRequests}
 		FORMAT JSON
@@ -127,6 +128,7 @@ export function queryTtfbExceedRates(
 		FROM o11y_api_metrics
 		WHERE timestamp > NOW() - INTERVAL '${windowMinutes}' MINUTE
 			AND blob4 = '0'
+			AND blob6 = '0'
 		GROUP BY provider, model, client_name
 		HAVING weighted_total >= ${minRequests}
 		FORMAT JSON

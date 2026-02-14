@@ -27,7 +27,7 @@ import { normalizeModelId } from '@/lib/providers/openrouter';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from './getRootSpan';
-import { isStealthModelOnKiloCodeOnly, kiloFreeModels } from '@/lib/models';
+import { isKiloStealthModel, kiloFreeModels } from '@/lib/models';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -165,7 +165,7 @@ export async function makeErrorReadable({
     }
   }
 
-  if (isStealthModelOnKiloCodeOnly(requestedModel)) {
+  if (isKiloStealthModel(requestedModel)) {
     return await stealthModelError(response);
   }
 
@@ -322,7 +322,10 @@ export function checkOrganizationModelRestrictions(params: {
   if (params.organizationPlan === 'enterprise' && providerAllowList.length > 0) {
     // Check if the model requires specific providers that aren't in the allow list
     const requiredProviders = extraRequiredProviders(normalizedModelId);
-    if (requiredProviders && !requiredProviders.every(p => providerAllowList.includes(p))) {
+    if (
+      requiredProviders.length > 0 &&
+      !requiredProviders.every(p => providerAllowList.includes(p))
+    ) {
       console.error(
         `This FREE model requires ALL of these providers to be allowed: ${requiredProviders.join(', ')}`
       );

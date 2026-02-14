@@ -322,3 +322,27 @@ jobs:
     if: needs.check-app-builder-changes.outputs.changed == 'true'
     uses: ./.github/workflows/deploy-app-builder.yml
     secrets: inherit
+
+  check-kiloclaw-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs.kiloclaw }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for kiloclaw changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            kiloclaw:
+              - 'kiloclaw/**'
+
+  deploy-kiloclaw:
+    needs: [check-kiloclaw-changes]
+    if: needs.check-kiloclaw-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-kiloclaw.yml
+    secrets: inherit

@@ -1,19 +1,60 @@
 import { describe, test, expect } from '@jest/globals';
-import { getFirstFreeModel, isFreeModel } from './models';
+import { getFirstFreeModel, isFreeModel, kiloFreeModels } from './models';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
-    test('should return false for former stealth models', () => {
-      expect(isFreeModel('sonic')).toBe(false);
-      expect(isFreeModel('openrouter/sonoma-dusk-alpha')).toBe(false);
-      expect(isFreeModel('openrouter/sonoma-sky-alpha')).toBe(false);
-    });
-
     test('should return true for models ending with :free', () => {
       expect(isFreeModel('gpt-4:free')).toBe(true);
       expect(isFreeModel('claude-3:free')).toBe(true);
       expect(isFreeModel('some-model:free')).toBe(true);
       expect(isFreeModel(':free')).toBe(true);
+    });
+
+    test('should return true for openrouter/free', () => {
+      expect(isFreeModel('openrouter/free')).toBe(true);
+    });
+
+    test('should return true for OpenRouter stealth models (alpha/beta)', () => {
+      expect(isFreeModel('openrouter/model-alpha')).toBe(true);
+      expect(isFreeModel('openrouter/model-beta')).toBe(true);
+      expect(isFreeModel('openrouter/sonoma-dusk-alpha')).toBe(true);
+      expect(isFreeModel('openrouter/sonoma-sky-beta')).toBe(true);
+    });
+
+    test('should return true for enabled Kilo free models', () => {
+      // Test with known Kilo free models that are enabled
+      const enabledModels = kiloFreeModels.filter(m => m.is_enabled);
+
+      // Should have at least some enabled models
+      expect(enabledModels.length).toBeGreaterThan(0);
+
+      // All enabled models should be detected as free
+      for (const model of enabledModels) {
+        expect(isFreeModel(model.public_id)).toBe(true);
+      }
+    });
+
+    test('should return false for disabled Kilo free models that do not end with :free', () => {
+      const disabledModels = kiloFreeModels.filter(
+        m => !m.is_enabled && !m.public_id.endsWith(':free')
+      );
+
+      // Disabled models without :free suffix should NOT be detected as free
+      for (const model of disabledModels) {
+        expect(isFreeModel(model.public_id)).toBe(false);
+      }
+    });
+
+    test('should return true for disabled Kilo free models that end with :free', () => {
+      const disabledModelsWithFreeSuffix = kiloFreeModels.filter(
+        m => !m.is_enabled && m.public_id.endsWith(':free')
+      );
+
+      // Disabled models with :free suffix are still considered free due to the :free suffix rule
+      // This is the current behavior - the :free suffix takes precedence over the enabled state
+      for (const model of disabledModelsWithFreeSuffix) {
+        expect(isFreeModel(model.public_id)).toBe(true);
+      }
     });
   });
 
@@ -31,10 +72,16 @@ describe('isFreeModel', () => {
       expect(isFreeModel('freemium')).toBe(false);
     });
 
-    test('should return false for models that contain "sonic" but are not exactly "sonic"', () => {
-      expect(isFreeModel('sonic-pro')).toBe(false);
-      expect(isFreeModel('supersonic')).toBe(false);
-      expect(isFreeModel('sonic/v2')).toBe(false);
+    test('should return false for OpenRouter models that do not end with -alpha or -beta', () => {
+      expect(isFreeModel('openrouter/model')).toBe(false);
+      expect(isFreeModel('openrouter/model-gamma')).toBe(false);
+      expect(isFreeModel('openrouter/model-stable')).toBe(false);
+    });
+
+    test('should return false for non-OpenRouter models ending with -alpha or -beta', () => {
+      expect(isFreeModel('anthropic/model-alpha')).toBe(false);
+      expect(isFreeModel('google/model-beta')).toBe(false);
+      expect(isFreeModel('model-alpha')).toBe(false);
     });
   });
 
@@ -49,18 +96,18 @@ describe('isFreeModel', () => {
     });
 
     test('should be case-sensitive', () => {
-      expect(isFreeModel('SONIC')).toBe(false);
-      expect(isFreeModel('Sonic')).toBe(false);
       expect(isFreeModel('model:FREE')).toBe(false);
       expect(isFreeModel('model:Free')).toBe(false);
+      expect(isFreeModel('OPENROUTER/FREE')).toBe(false);
+      expect(isFreeModel('openrouter/model-ALPHA')).toBe(false);
     });
 
     test('should handle whitespace correctly', () => {
-      expect(isFreeModel(' sonic')).toBe(false);
-      expect(isFreeModel('sonic ')).toBe(false);
-      expect(isFreeModel(' sonic ')).toBe(false);
       expect(isFreeModel('model:free ')).toBe(false);
       expect(isFreeModel(' model:free')).toBe(true);
+      expect(isFreeModel(' openrouter/free')).toBe(false);
+      expect(isFreeModel('openrouter/free ')).toBe(false);
+      expect(isFreeModel('openrouter/model-alpha ')).toBe(false);
     });
   });
 });

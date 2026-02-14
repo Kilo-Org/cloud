@@ -125,6 +125,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
         },
         branch: input.branch,
         createdByUserId: ctx.user.id,
+        createdFrom: 'deploy',
         envVars: input.envVars,
       });
     }),

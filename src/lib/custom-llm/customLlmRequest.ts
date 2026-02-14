@@ -5,6 +5,7 @@ import type {
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import {
+  APICallError,
   jsonSchema,
   streamText,
   type ModelMessage,
@@ -401,10 +402,22 @@ function convertReasoningToProviderOptions(
   return { anthropic };
 }
 
+function errorResponse(status: number, message: string) {
+  return NextResponse.json({ error: { message, code: status, type: 'error' } }, { status });
+}
+
 export async function customLlmRequest(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest
 ) {
+  let messages: ModelMessage[];
+  try {
+    messages = convertMessages(request.messages as OpenRouterChatCompletionsInput);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Invalid messages';
+    return errorResponse(400, msg);
+  }
+
   const provider = createAnthropic({
     apiKey: 'placeholder',
   });
@@ -413,7 +426,7 @@ export async function customLlmRequest(
 
   const result = streamText({
     model,
-    messages: convertMessages(request.messages as OpenRouterChatCompletionsInput),
+    messages,
     tools: convertTools(request.tools),
     toolChoice: convertToolChoice(request.tool_choice),
     maxOutputTokens: request.max_tokens ?? request.max_completion_tokens ?? undefined,
@@ -430,15 +443,30 @@ export async function customLlmRequest(
 
   const stream = new ReadableStream({
     async start(controller) {
-      for await (const chunk of result.fullStream) {
-        const converted = convertStreamPartToChunk(chunk);
-        if (converted) {
-          controller.enqueue(`data: ${JSON.stringify(converted)}\n\n`);
+      try {
+        for await (const chunk of result.fullStream) {
+          const converted = convertStreamPartToChunk(chunk);
+          if (converted) {
+            controller.enqueue(`data: ${JSON.stringify(converted)}\n\n`);
+          }
         }
-      }
 
-      controller.enqueue('data: [DONE]\n\n');
-      controller.close();
+        controller.enqueue('data: [DONE]\n\n');
+      } catch (e) {
+        const errorChunk = {
+          error: {
+            message: e instanceof Error ? e.message : 'Stream error',
+            code: APICallError.isInstance(e) ? (e.statusCode ?? 500) : 500,
+            ...(APICallError.isInstance(e) && e.responseBody
+              ? { metadata: { raw: e.responseBody } }
+              : {}),
+            type: 'error',
+          },
+        };
+        controller.enqueue(`data: ${JSON.stringify(errorChunk)}\n\n`);
+      } finally {
+        controller.close();
+      }
     },
   });
 

@@ -61,6 +61,7 @@ export type ProvidersAndModelsAllowListsAction =
       providerSlug: string;
       nextEnabled: boolean;
       allProviderSlugsWithEndpoints: ReadonlyArray<string>;
+      modelProvidersIndex: Map<string, Set<string>>;
     }
   | {
       type: 'TOGGLE_MODEL';
@@ -168,6 +169,7 @@ export function providersAndModelsAllowListsReducer(
         draftModelAllowList: state.draftModelAllowList,
         allProviderSlugsWithEndpoints: action.allProviderSlugsWithEndpoints,
         hadAllProvidersInitially: state.initialProviderAllowList.length === 0,
+        modelProvidersIndex: action.modelProvidersIndex,
       });
       return {
         ...state,
@@ -360,9 +362,10 @@ export function useProvidersAndModelsAllowListsState(params: {
         providerSlug: input.providerSlug,
         nextEnabled: input.nextEnabled,
         allProviderSlugsWithEndpoints,
+        modelProvidersIndex,
       });
     },
-    [allProviderSlugsWithEndpoints]
+    [allProviderSlugsWithEndpoints, modelProvidersIndex]
   );
 
   const toggleModel = useCallback(

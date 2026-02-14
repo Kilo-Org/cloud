@@ -120,6 +120,54 @@ export function computeAllowedModelIds(
   return allowed;
 }
 
+/**
+ * Compute which models from the current allow list would have zero enabled providers
+ * if the given provider were disabled.
+ */
+export function computeModelsOnlyFromProvider(params: {
+  providerSlug: string;
+  draftModelAllowList: ReadonlyArray<string>;
+  draftProviderAllowList: ReadonlyArray<string>;
+  allProviderSlugsWithEndpoints: ReadonlyArray<string>;
+  modelProvidersIndex: Map<string, Set<string>>;
+}): string[] {
+  const {
+    providerSlug,
+    draftModelAllowList,
+    draftProviderAllowList,
+    allProviderSlugsWithEndpoints,
+    modelProvidersIndex,
+  } = params;
+
+  // Compute which providers would remain enabled after disabling this one
+  const enabledAfterDisable = computeEnabledProviderSlugs(
+    draftProviderAllowList.length === 0
+      ? allProviderSlugsWithEndpoints.filter(slug => slug !== providerSlug)
+      : draftProviderAllowList.filter(slug => slug !== providerSlug),
+    allProviderSlugsWithEndpoints
+  );
+
+  const orphanedModels: string[] = [];
+
+  // Check each model in the allow list
+  for (const entry of draftModelAllowList) {
+    // Skip wildcards
+    if (entry.endsWith('/*')) continue;
+
+    const modelId = normalizeModelId(entry);
+    const providersForModel = modelProvidersIndex.get(modelId);
+    if (!providersForModel) continue;
+
+    // Check if this model has any enabled providers remaining
+    const hasEnabledProvider = [...providersForModel].some(p => enabledAfterDisable.has(p));
+    if (!hasEnabledProvider) {
+      orphanedModels.push(modelId);
+    }
+  }
+
+  return orphanedModels;
+}
+
 export function toggleProviderEnabled(params: {
   providerSlug: string;
   nextEnabled: boolean;
@@ -127,6 +175,7 @@ export function toggleProviderEnabled(params: {
   draftModelAllowList: ReadonlyArray<string>;
   allProviderSlugsWithEndpoints: ReadonlyArray<string>;
   hadAllProvidersInitially: boolean;
+  modelProvidersIndex?: Map<string, Set<string>>;
 }): { nextProviderAllowList: string[]; nextModelAllowList: string[] } {
   const {
     providerSlug,
@@ -135,12 +184,32 @@ export function toggleProviderEnabled(params: {
     draftModelAllowList,
     allProviderSlugsWithEndpoints,
     hadAllProvidersInitially,
+    modelProvidersIndex,
   } = params;
 
   let nextModelAllowList = [...draftModelAllowList];
   if (!nextEnabled) {
     if (nextModelAllowList.length !== 0) {
+      // Remove provider wildcard
       nextModelAllowList = nextModelAllowList.filter(entry => entry !== `${providerSlug}/*`);
+
+      // Remove models that would have zero enabled providers
+      if (modelProvidersIndex) {
+        const orphanedModels = computeModelsOnlyFromProvider({
+          providerSlug,
+          draftModelAllowList: nextModelAllowList,
+          draftProviderAllowList,
+          allProviderSlugsWithEndpoints,
+          modelProvidersIndex,
+        });
+        if (orphanedModels.length > 0) {
+          const orphanedSet = new Set(orphanedModels);
+          nextModelAllowList = nextModelAllowList.filter(entry => {
+            if (entry.endsWith('/*')) return true;
+            return !orphanedSet.has(normalizeModelId(entry));
+          });
+        }
+      }
     }
   }
   nextModelAllowList = canonicalizeModelAllowList(nextModelAllowList);

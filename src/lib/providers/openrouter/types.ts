@@ -50,6 +50,10 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
   reasoning_split?: boolean;
 
   thinking?: { type?: 'enabled' | 'disabled' };
+
+  // OpenRouter specific field we do not support
+  // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
+  models?: string[];
 };
 
 export type OpenRouterAssistantMessage = OpenAI.ChatCompletionAssistantMessageParam & {

@@ -35,18 +35,15 @@ export function WelcomeTypeformModal({ userEmail }: WelcomeTypeformModalProps) {
     markCompleteMutation.mutate();
   };
 
-  const handleSkip = () => {
-    handleComplete();
-  };
-
   if (!isOpen) return null;
 
   return (
     <Dialog
       open={isOpen}
       onOpenChange={open => {
-        if (!open) handleSkip();
-        setIsOpen(open);
+        if (!open) {
+          handleComplete();
+        }
       }}
     >
       <DialogContent
@@ -61,7 +58,7 @@ export function WelcomeTypeformModal({ userEmail }: WelcomeTypeformModalProps) {
             email: userEmail,
           }}
           onSubmit={handleComplete}
-          onClose={handleSkip}
+          onClose={handleComplete}
         />
       </DialogContent>
     </Dialog>

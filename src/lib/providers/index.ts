@@ -168,6 +168,9 @@ function getPreferredProvider(requestedModel: string): OpenRouterInferenceProvid
   if (isMoonshotModel(requestedModel)) {
     return OpenRouterInferenceProviderIdSchema.enum.moonshotai;
   }
+  if (requestedModel.startsWith('z-ai/')) {
+    return OpenRouterInferenceProviderIdSchema.enum['z-ai'];
+  }
   return null;
 }
 

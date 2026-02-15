@@ -454,15 +454,23 @@ export async function getIntegrationForOwner(
 }
 
 /**
- * Gets all platform integrations for an owner (user or organization)
+ * Gets all active platform integrations for an owner (user or organization)
  */
-export async function getAllIntegrationsForOwner(owner: Owner) {
+export async function getAllActiveIntegrationsForOwner(owner: Owner) {
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)
       : eq(platform_integrations.owned_by_organization_id, owner.id);
 
-  const integrations = await db.select().from(platform_integrations).where(ownershipCondition);
+  const integrations = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        ownershipCondition,
+        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
+      )
+    );
 
   return integrations;
 }

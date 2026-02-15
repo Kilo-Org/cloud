@@ -1,13 +1,5 @@
-import {
-  createCloudAgentClient,
-  type InitiateSessionInput,
-} from '@/lib/cloud-agent/cloud-agent-client';
-import {
-  getGitHubTokenForUser,
-  getGitHubTokenForOrganization,
-} from '@/lib/cloud-agent/github-integration-helpers';
 import type OpenAI from 'openai';
-import type { Owner } from '@/lib/integrations/core/types';
+import { getTool, type ToolExecutionContext, getToolsForOwner } from '@/lib/bot/tools';
 import {
   getInstallationByTeamId,
   getOwnerFromInstallation,
@@ -101,72 +93,12 @@ Your prompt to the agent should usually include:
 - If you can’t proceed (missing repo, missing details, permissions), say what’s missing and what you need next.`;
 
 /**
- * Tool definition for spawning Cloud Agent sessions
- */
-const SPAWN_CLOUD_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: 'function',
-  function: {
-    name: 'spawn_cloud_agent',
-    description:
-      'Spawn a Cloud Agent session to perform coding tasks on a GitHub repository. The agent can make code changes, fix bugs, implement features, and more.',
-    parameters: {
-      type: 'object',
-      properties: {
-        githubRepo: {
-          type: 'string',
-          description: 'The GitHub repository in owner/repo format (e.g., "facebook/react")',
-          pattern: '^[-a-zA-Z0-9_.]+/[-a-zA-Z0-9_.]+$',
-        },
-        prompt: {
-          type: 'string',
-          description:
-            'The task description for the Cloud Agent. Be specific about what changes or analysis you want.',
-        },
-        mode: {
-          type: 'string',
-          enum: ['architect', 'code', 'ask', 'debug', 'orchestrator'],
-          description:
-            'The agent mode: "code" for making changes, "architect" for design tasks, "ask" for questions, "debug" for troubleshooting, "orchestrator" for complex multi-step tasks',
-          default: 'code',
-        },
-      },
-      required: ['githubRepo', 'prompt'],
-    },
-  },
-};
-
-/**
- * Result from spawning a Cloud Agent session
- */
-type SpawnCloudAgentResult = {
-  response: string;
-  sessionId?: string;
-};
-
-/**
  * Information about the Slack user who requested the PR
  */
 type SlackRequesterInfo = {
   displayName: string;
   messagePermalink?: string;
 };
-
-/**
- * Build the PR signature to append to the Cloud Agent prompt
- */
-function buildPrSignature(requesterInfo: SlackRequesterInfo): string {
-  const requesterPart = requesterInfo.messagePermalink
-    ? `[${requesterInfo.displayName}](${requesterInfo.messagePermalink})`
-    : requesterInfo.displayName;
-
-  return `
-
----
-**PR Signature to include in the PR description:**
-When you create a pull request, include the following signature at the end of the PR description:
-
-Built for ${requesterPart} by [Kilo for Slack](https://kilo.ai/features/slack-integration)`;
-}
 
 /**
  * Fetch the requester info for PR signatures
@@ -209,124 +141,6 @@ async function getSlackRequesterInfo(
     displayName: userInfo.displayName,
     messagePermalink: permalink,
   };
-}
-
-/**
- * Spawn a Cloud Agent session and collect the results
- */
-async function spawnCloudAgentSession(
-  args: {
-    githubRepo: string;
-    prompt: string;
-    mode?: string;
-  },
-  owner: Owner,
-  model: string,
-  authToken: string,
-  requesterInfo?: SlackRequesterInfo
-): Promise<SpawnCloudAgentResult> {
-  console.log('[SlackBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
-  console.log('[SlackBot] Owner:', JSON.stringify(owner, null, 2));
-
-  let githubToken: string | undefined;
-  let kilocodeOrganizationId: string | undefined;
-
-  // Handle organization-owned integrations
-  if (owner.type === 'org') {
-    // Get GitHub token for the organization
-    githubToken = await getGitHubTokenForOrganization(owner.id);
-
-    // Set the organization ID for cloud agent usage attribution
-    kilocodeOrganizationId = owner.id;
-  } else {
-    // Get GitHub token for the user
-    githubToken = await getGitHubTokenForUser(owner.id);
-  }
-
-  // Skip balance check for Slackbot users - Slack integration has its own billing model
-  const cloudAgentClient = createCloudAgentClient(authToken, { skipBalanceCheck: true });
-
-  // Append PR signature to the prompt if we have requester info
-  const promptWithSignature = requesterInfo
-    ? args.prompt + buildPrSignature(requesterInfo)
-    : args.prompt;
-
-  const input: InitiateSessionInput = {
-    githubRepo: args.githubRepo,
-    prompt: promptWithSignature,
-    mode: (args.mode as InitiateSessionInput['mode']) || 'code',
-    model: model,
-    githubToken,
-    kilocodeOrganizationId,
-    createdOnPlatform: 'slack',
-  };
-
-  const statusMessages: string[] = [];
-  let completionResult: string | undefined;
-  let sessionId: string | undefined;
-  let hasError = false;
-
-  try {
-    console.log('[SlackBot] Starting to stream events from Cloud Agent...');
-    for await (const event of cloudAgentClient.initiateSessionStream(input)) {
-      if (event.sessionId) sessionId = event.sessionId;
-
-      switch (event.streamEventType) {
-        case 'complete':
-          statusMessages.push(
-            `Session completed in ${event.metadata.executionTimeMs}ms with exit code ${event.exitCode}`
-          );
-          break;
-        case 'error':
-          statusMessages.push(`Error: ${event.error}`);
-          hasError = true;
-          break;
-        case 'kilocode': {
-          const payload = event.payload;
-          if (payload.say === 'completion_result' && typeof payload.content === 'string') {
-            completionResult = payload.content;
-          }
-          break;
-        }
-        case 'output':
-          if (event.source === 'stderr') {
-            statusMessages.push(`[stderr] ${event.content}`);
-            hasError = true;
-            console.log('[SlackBot] Error flag set to true');
-          }
-          break;
-        case 'interrupted':
-          statusMessages.push(`Session interrupted: ${event.reason}`);
-          hasError = true;
-          console.log('[SlackBot] Error flag set to true');
-          break;
-      }
-    }
-    console.log(
-      `[SlackBot] Stream completed. Total status messages: ${statusMessages.length}, Has completion result: ${!!completionResult}`
-    );
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[SlackBot] Error during stream:', errorMessage, error);
-    return { response: `Error spawning Cloud Agent: ${errorMessage}`, sessionId };
-  }
-
-  if (hasError) {
-    const errorResult = `Cloud Agent session ${sessionId || 'unknown'} encountered errors:\n${statusMessages.join('\n')}`;
-    console.log('[SlackBot] Returning error result:', errorResult);
-    return { response: errorResult, sessionId };
-  }
-
-  // Return the completion result if available, otherwise show status messages
-  if (completionResult) {
-    const successResult = `Cloud Agent session ${sessionId || 'unknown'} completed:\n\n${completionResult}`;
-    console.log('[SlackBot] Returning success result');
-    return { response: successResult, sessionId };
-  }
-
-  const fallbackResult = `Cloud Agent session ${sessionId || 'unknown'} completed successfully.\n\nStatus:\n${statusMessages.slice(-5).join('\n')}`;
-  console.log('[SlackBot] Returning fallback result:', fallbackResult);
-  return { response: fallbackResult, sessionId };
 }
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
@@ -440,6 +254,19 @@ export async function processKiloBotMessage(
   const systemPrompt =
     KILO_BOT_SYSTEM_PROMPT + slackContextForPrompt + formatGitHubRepositoriesForPrompt(repoContext);
 
+  // Get available tools for this owner (based on their integrations)
+  const availableTools = await getToolsForOwner(owner);
+  const availableToolDefinitions = availableTools.map(tool => tool.definition);
+  console.log('[SlackBot] Available tools:', JSON.stringify(availableTools.map(tool => tool.name)));
+
+  // Build tool execution context for later use
+  const toolExecutionContext: ToolExecutionContext = {
+    owner,
+    authToken,
+    model: selectedModel,
+    requesterInfo: slackRequesterInfo,
+  };
+
   // Build initial messages array
   const messages: ChatMessage[] = [
     {
@@ -470,8 +297,8 @@ export async function processKiloBotMessage(
       body: {
         model: selectedModel,
         messages,
-        tools: [SPAWN_CLOUD_AGENT_TOOL],
-        tool_choice: 'auto',
+        tools: availableToolDefinitions.length > 0 ? availableToolDefinitions : undefined,
+        tool_choice: availableToolDefinitions.length > 0 ? 'auto' : undefined,
       },
       organizationId: owner.type === 'org' ? owner.id : undefined,
     });
@@ -531,56 +358,57 @@ export async function processKiloBotMessage(
           continue;
         }
 
-        // Track the tool call
-        toolCallsMade.push(toolCall.function.name);
+        const toolName = toolCall.function.name;
+        toolCallsMade.push(toolName);
 
-        if (toolCall.function.name === 'spawn_cloud_agent') {
-          console.log(
-            '[SlackBot] spawn_cloud_agent tool call - arguments:',
-            toolCall.function.arguments
-          );
-          try {
-            const args = JSON.parse(toolCall.function.arguments);
-            console.log('[SlackBot] Parsed tool arguments:', JSON.stringify(args, null, 2));
+        // Look up the tool in the registry
+        const tool = getTool(toolName);
+        if (!tool) {
+          console.log('[SlackBot] Unknown tool:', toolName);
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: `Error: Unknown tool "${toolName}"`,
+          });
+          continue;
+        }
 
-            console.log('[SlackBot] Calling spawnCloudAgentSession...');
-            const toolResult = await spawnCloudAgentSession(
-              args,
-              owner,
-              selectedModel,
-              authToken,
-              slackRequesterInfo
-            );
-            console.log('[SlackBot] Tool result received, length:', toolResult.response.length);
-            console.log('[SlackBot] Tool result preview:', toolResult.response.slice(0, 100));
+        console.log(
+          '[SlackBot] Executing tool:',
+          toolName,
+          'arguments:',
+          toolCall.function.arguments
+        );
 
-            // Track the cloud agent session ID
-            if (toolResult.sessionId) {
-              cloudAgentSessionId = toolResult.sessionId;
-            }
+        try {
+          const args = JSON.parse(toolCall.function.arguments);
+          console.log('[SlackBot] Parsed tool arguments:', JSON.stringify(args, null, 2));
 
-            // Add tool result to conversation history
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              content: toolResult.response,
-            });
-            console.log(
-              '[SlackBot] Added tool result to history, total messages:',
-              messages.length
-            );
-          } catch (error) {
-            const errMsg = error instanceof Error ? error.message : String(error);
-            console.error('[SlackBot] Error executing tool:', errMsg, error);
-            errorMessage = errMsg;
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              content: `Error executing tool: ${errMsg}`,
-            });
+          const toolResult = await tool.execute(args, toolExecutionContext);
+          console.log('[SlackBot] Tool result received, length:', toolResult.response.length);
+          console.log('[SlackBot] Tool result preview:', toolResult.response.slice(0, 100));
+
+          // Track cloud agent session ID if present in metadata
+          if (toolResult.metadata?.sessionId) {
+            cloudAgentSessionId = toolResult.metadata.sessionId as string;
           }
-        } else {
-          console.log('[SlackBot] Unknown tool:', toolCall.function.name);
+
+          // Add tool result to conversation history
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: toolResult.response,
+          });
+          console.log('[SlackBot] Added tool result to history, total messages:', messages.length);
+        } catch (error) {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          console.error('[SlackBot] Error executing tool:', errMsg, error);
+          errorMessage = errMsg;
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: `Error executing tool: ${errMsg}`,
+          });
         }
       }
     } else {

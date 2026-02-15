@@ -362,47 +362,6 @@ function convertToolChoice(
   return undefined;
 }
 
-function convertStopSequences(
-  stop: string | null | Array<string> | undefined
-): string[] | undefined {
-  if (!stop) return undefined;
-  return typeof stop === 'string' ? [stop] : stop;
-}
-
-function convertReasoningToProviderOptions(
-  reasoning: OpenRouterReasoningConfig | undefined,
-  thinking: { type?: 'enabled' | 'disabled' } | undefined
-): { anthropic: AnthropicProviderOptions } | undefined {
-  const anthropic: AnthropicProviderOptions = {};
-
-  if (
-    thinking?.type === 'disabled' ||
-    reasoning?.enabled === false ||
-    reasoning?.effort === 'none'
-  ) {
-    anthropic.thinking = { type: 'disabled' };
-  } else if (thinking?.type === 'enabled' || reasoning?.enabled === true) {
-    anthropic.thinking = {
-      type: 'enabled',
-      ...(reasoning?.max_tokens ? { budgetTokens: reasoning.max_tokens } : {}),
-    };
-  }
-
-  const effort = reasoning?.effort;
-  if (effort && effort !== 'none') {
-    const EFFORT_MAP: Record<string, AnthropicProviderOptions['effort']> = {
-      low: 'low',
-      minimal: 'low',
-      medium: 'medium',
-      high: 'high',
-    };
-    anthropic.effort = EFFORT_MAP[effort] ?? 'high';
-  }
-
-  if (Object.keys(anthropic).length === 0) return undefined;
-  return { anthropic };
-}
-
 function errorResponse(status: number, message: string) {
   return NextResponse.json({ error: { message, code: status, type: 'error' } }, { status });
 }
@@ -413,13 +372,14 @@ function buildCommonParams(messages: ModelMessage[], request: OpenRouterChatComp
     tools: convertTools(request.tools),
     toolChoice: convertToolChoice(request.tool_choice),
     maxOutputTokens: request.max_tokens ?? request.max_completion_tokens ?? undefined,
-    temperature: request.temperature ?? undefined,
-    topP: request.top_p ?? undefined,
-    frequencyPenalty: request.frequency_penalty ?? undefined,
-    presencePenalty: request.presence_penalty ?? undefined,
-    stopSequences: convertStopSequences(request.stop),
-    seed: request.seed ?? undefined,
-    providerOptions: convertReasoningToProviderOptions(request.reasoning, request.thinking),
+    headers: {
+      'anthropic-beta': 'context-1m-2025-08-07',
+    },
+    providerOptions: {
+      anthropic: {
+        thinking: { type: 'adaptive' },
+      } satisfies AnthropicProviderOptions,
+    },
   };
 }
 

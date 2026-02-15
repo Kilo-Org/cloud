@@ -453,6 +453,7 @@ function buildCommonParams(messages: ModelMessage[], request: OpenRouterChatComp
     providerOptions: {
       anthropic: {
         thinking: { type: 'adaptive' },
+        effort: request.verbosity ?? undefined,
       } satisfies AnthropicProviderOptions,
     },
   };

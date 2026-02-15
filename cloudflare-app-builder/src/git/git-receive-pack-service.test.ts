@@ -313,6 +313,68 @@ describe('GitReceivePackService', () => {
       expect(result.errors.some(e => e.includes('refs/heads/bad'))).toBe(true);
     });
 
+    it('allows ref update pointing to object from a previous push', async () => {
+      const fs = new MemFS();
+
+      // First push: index a valid packfile so its blob OID exists in the repo
+      const { packBytes: firstPack, blobOid: existingOid } = buildValidPackfile('first');
+      const firstRequest = buildPushRequest(
+        [{ oldOid: zeroOid, newOid: existingOid, refName: 'refs/heads/main' }],
+        firstPack
+      );
+      const { result: firstResult } = await GitReceivePackService.handleReceivePack(
+        fs,
+        firstRequest
+      );
+      expect(firstResult.success).toBe(true);
+
+      // Second push: a NEW packfile with a different blob, but one ref targets the old OID
+      const { packBytes: secondPack, blobOid: newOid } = buildValidPackfile('second');
+      const secondRequest = buildPushRequest(
+        [
+          { oldOid: zeroOid, newOid: newOid, refName: 'refs/heads/feature' },
+          { oldOid: zeroOid, newOid: existingOid, refName: 'refs/heads/also-main' },
+        ],
+        secondPack
+      );
+      const { result: secondResult } = await GitReceivePackService.handleReceivePack(
+        fs,
+        secondRequest
+      );
+
+      // Both refs should succeed — existingOid is in the repo from the first push
+      expect(secondResult.errors).toHaveLength(0);
+      expect(secondResult.success).toBe(true);
+
+      const alsoMainRef = await fs.readFile('.git/refs/heads/also-main', { encoding: 'utf8' });
+      expect(String(alsoMainRef)).toContain(existingOid);
+    });
+
+    it('still rejects ref pointing to truly nonexistent object across pushes', async () => {
+      const fs = new MemFS();
+
+      // First push: seed the repo with one valid object
+      const { packBytes, blobOid } = buildValidPackfile('seed');
+      const firstRequest = buildPushRequest(
+        [{ oldOid: zeroOid, newOid: blobOid, refName: 'refs/heads/main' }],
+        packBytes
+      );
+      await GitReceivePackService.handleReceivePack(fs, firstRequest);
+
+      // Second push: ref targets an OID that has never existed anywhere
+      const { packBytes: secondPack } = buildValidPackfile('other');
+      const bogusOid = 'dead'.repeat(10);
+      const secondRequest = buildPushRequest(
+        [{ oldOid: zeroOid, newOid: bogusOid, refName: 'refs/heads/bad' }],
+        secondPack
+      );
+      const { result } = await GitReceivePackService.handleReceivePack(fs, secondRequest);
+
+      expect(result.success).toBe(false);
+      expect(result.errors.some(e => e.includes('refs/heads/bad'))).toBe(true);
+      await expect(fs.readFile('.git/refs/heads/bad')).rejects.toThrow('ENOENT');
+    });
+
     it('handles push with no packfile data (delete-only)', async () => {
       const fs = new MemFS();
       await fs.writeFile('.git/refs/heads/feature', fakeNewOid);

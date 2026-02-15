@@ -512,12 +512,12 @@ export default function ClawPage() {
               </PopoverContent>
             )}
           </Popover>
-          <Button variant="outline" asChild>
-            <a href={gatewayUrl} target="_blank" rel="noopener noreferrer">
+          <a href={gatewayUrl} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline">
               <ExternalLink className="mr-2 h-4 w-4" />
               Open
-            </a>
-          </Button>
+            </Button>
+          </a>
         </>
       )}
     </div>

@@ -498,13 +498,7 @@ export async function customLlmRequest(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest
 ) {
-  let messages: ModelMessage[];
-  try {
-    messages = convertMessages(request.messages as OpenRouterChatCompletionsInput);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Invalid messages';
-    return errorResponse(400, msg);
-  }
+  const messages = convertMessages(request.messages as OpenRouterChatCompletionsInput);
 
   const provider = createAnthropic({
     apiKey: 'placeholder',

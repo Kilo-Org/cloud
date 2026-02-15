@@ -6,6 +6,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import {
   APICallError,
+  generateText,
   jsonSchema,
   streamText,
   type ModelMessage,
@@ -406,6 +407,54 @@ function errorResponse(status: number, message: string) {
   return NextResponse.json({ error: { message, code: status, type: 'error' } }, { status });
 }
 
+function buildCommonParams(messages: ModelMessage[], request: OpenRouterChatCompletionRequest) {
+  return {
+    messages,
+    tools: convertTools(request.tools),
+    toolChoice: convertToolChoice(request.tool_choice),
+    maxOutputTokens: request.max_tokens ?? request.max_completion_tokens ?? undefined,
+    temperature: request.temperature ?? undefined,
+    topP: request.top_p ?? undefined,
+    frequencyPenalty: request.frequency_penalty ?? undefined,
+    presencePenalty: request.presence_penalty ?? undefined,
+    stopSequences: convertStopSequences(request.stop),
+    seed: request.seed ?? undefined,
+    providerOptions: convertReasoningToProviderOptions(request.reasoning, request.thinking),
+  };
+}
+
+function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof generateText>>) {
+  const toolCalls = result.toolCalls.map((tc, i) => ({
+    id: tc.toolCallId,
+    type: 'function' as const,
+    index: i,
+    function: {
+      name: tc.toolName,
+      arguments: JSON.stringify(tc.input),
+    },
+  }));
+
+  return {
+    choices: [
+      {
+        message: {
+          role: 'assistant' as const,
+          content: result.text || null,
+          ...(result.reasoningText ? { reasoning: result.reasoningText } : {}),
+          ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+        },
+        finish_reason: FINISH_REASON_MAP[result.finishReason] ?? 'stop',
+        index: 0,
+      },
+    ],
+    usage: {
+      prompt_tokens: result.usage.inputTokens ?? 0,
+      completion_tokens: result.usage.outputTokens ?? 0,
+      total_tokens: result.usage.totalTokens ?? 0,
+    },
+  };
+}
+
 export async function customLlmRequest(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest
@@ -423,21 +472,22 @@ export async function customLlmRequest(
   });
 
   const model = provider('placeholder');
+  const commonParams = buildCommonParams(messages, request);
 
-  const result = streamText({
-    model,
-    messages,
-    tools: convertTools(request.tools),
-    toolChoice: convertToolChoice(request.tool_choice),
-    maxOutputTokens: request.max_tokens ?? request.max_completion_tokens ?? undefined,
-    temperature: request.temperature ?? undefined,
-    topP: request.top_p ?? undefined,
-    frequencyPenalty: request.frequency_penalty ?? undefined,
-    presencePenalty: request.presence_penalty ?? undefined,
-    stopSequences: convertStopSequences(request.stop),
-    seed: request.seed ?? undefined,
-    providerOptions: convertReasoningToProviderOptions(request.reasoning, request.thinking),
-  });
+  // Non-streaming response
+  if (!request.stream) {
+    try {
+      const result = await generateText({ model, ...commonParams });
+      return NextResponse.json(convertGenerateResultToResponse(result));
+    } catch (e) {
+      const status = APICallError.isInstance(e) ? (e.statusCode ?? 500) : 500;
+      const msg = e instanceof Error ? e.message : 'Generation failed';
+      return errorResponse(status, msg);
+    }
+  }
+
+  // Streaming response
+  const result = streamText({ model, ...commonParams });
 
   const convertStreamPartToChunk = createStreamPartConverter();
 

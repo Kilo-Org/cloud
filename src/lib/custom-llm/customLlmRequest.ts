@@ -17,8 +17,7 @@ import type {
   ChatCompletionContentPart,
   OpenRouterChatCompletionsInput,
 } from './openrouter-chat-completions-input';
-import { ReasoningDetailType } from './reasoning-details';
-import type { ReasoningDetailUnion } from './reasoning-details';
+import { ReasoningDetailType, type ReasoningDetailUnion } from './reasoning-details';
 import {
   reasoningDetailsToAiSdkParts,
   reasoningOutputToDetails,
@@ -34,7 +33,6 @@ import type * as z from 'zod';
 type ChatCompletionChunk = z.infer<typeof OpenRouterStreamChatCompletionChunkSchema>;
 
 function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage[] {
-  // Build tool call ID → name mapping so tool result messages can reference the tool name
   const toolNameByCallId = new Map<string, string>();
   for (const msg of messages) {
     if (msg.role === 'assistant' && msg.tool_calls) {
@@ -175,9 +173,6 @@ type AssistantContentPart =
 function convertAssistantContent(msg: ChatCompletionAssistantMessageParam) {
   const parts: AssistantContentPart[] = [];
 
-  // Prefer structured reasoning_details over flat reasoning string.
-  // The format field on each detail drives the providerOptions mapping
-  // (signatures, encrypted data) so the AI SDK can pass them to the provider.
   if (msg.reasoning_details && msg.reasoning_details.length > 0) {
     for (const sdkPart of reasoningDetailsToAiSdkParts(msg.reasoning_details)) {
       parts.push(sdkPart);
@@ -229,8 +224,6 @@ function convertTools(tools: OpenRouterChatCompletionRequest['tools']): ToolSet 
   }
   return result;
 }
-
-// Stream part → OpenRouter SSE chunk conversion
 
 const FINISH_REASON_MAP: Record<string, string> = {
   stop: 'stop',
@@ -476,8 +469,6 @@ function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof gener
     },
   }));
 
-  // Build reasoning_details from the structured reasoning array which
-  // includes provider metadata (signatures, encrypted data, etc.)
   const reasoning_details =
     result.reasoning.length > 0 ? reasoningOutputToDetails(result.reasoning) : undefined;
 
@@ -522,7 +513,6 @@ export async function customLlmRequest(
   const model = provider('placeholder');
   const commonParams = buildCommonParams(messages, request);
 
-  // Non-streaming response
   if (!request.stream) {
     try {
       const result = await generateText({ model, ...commonParams });
@@ -534,7 +524,6 @@ export async function customLlmRequest(
     }
   }
 
-  // Streaming response
   const result = streamText({ model, ...commonParams });
 
   const convertStreamPartToChunk = createStreamPartConverter();

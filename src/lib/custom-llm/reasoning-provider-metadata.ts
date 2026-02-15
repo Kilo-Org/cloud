@@ -1,20 +1,11 @@
 /**
  * Bidirectional conversion between reasoning_details and AI SDK provider metadata.
  *
- * Each AI SDK provider stores encrypted reasoning data and signatures in its own
- * provider-specific format.  This module maps between those formats and the
- * provider-agnostic `ReasoningDetailUnion` schema used in the OpenRouter
- * chat-completions wire format.
- *
  * Provider metadata shapes (from the AI SDK source):
- *
- *   Anthropic  – { anthropic: { signature?, redactedData? } }
- *   OpenAI     – { openai:    { itemId, reasoningEncryptedContent? } }
- *   xAI        – { xai:       { itemId?, reasoningEncryptedContent? } }
- *   Google     – { google:    { thoughtSignature? } }
- *
- * The `format` field on each reasoning detail indicates which provider format
- * was used, enabling correct translation without relying on the model name.
+ *   Anthropic – { anthropic: { signature?, redactedData? } }
+ *   OpenAI    – { openai:    { itemId, reasoningEncryptedContent? } }
+ *   xAI       – { xai:       { itemId?, reasoningEncryptedContent? } }
+ *   Google    – { google:    { thoughtSignature? } }
  */
 
 import { ReasoningFormat } from './format';
@@ -25,33 +16,16 @@ import type {
   ReasoningDetailEncrypted,
 } from './reasoning-details';
 
-// ---------------------------------------------------------------------------
-// JSON-compatible types mirroring the AI SDK's ProviderOptions
-// ---------------------------------------------------------------------------
-
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 type AiSdkProviderOptions = Record<string, Record<string, JsonValue>>;
 
-// ---------------------------------------------------------------------------
-// INPUT: reasoning_details → AI SDK reasoning content parts
-// ---------------------------------------------------------------------------
-
-/**
- * The shape of an AI SDK reasoning content part inside a ModelMessage.
- *
- * This mirrors the `ReasoningPart` type from `@ai-sdk/provider-utils` but is
- * kept here to avoid pulling in that dependency purely for a type.
- */
+/** Mirrors `ReasoningPart` from `@ai-sdk/provider-utils` without pulling in that dependency. */
 export type AiSdkReasoningPart = {
   type: 'reasoning';
   text: string;
   providerOptions?: AiSdkProviderOptions;
 };
 
-/**
- * Convert a single `ReasoningDetailUnion` to an AI SDK reasoning content part,
- * populating the correct `providerOptions` based on the detail's `format` field.
- */
 function detailToAiSdkPart(detail: ReasoningDetailUnion): AiSdkReasoningPart | null {
   switch (detail.type) {
     case ReasoningDetailType.Text: {
@@ -123,21 +97,9 @@ function buildEncryptedProviderOptions(
   }
 }
 
-/** Map from ReasoningFormat to the provider key used in AI SDK providerOptions. */
-const FORMAT_TO_PROVIDER_KEY: Partial<Record<ReasoningFormat, string>> = {
-  [ReasoningFormat.AnthropicClaudeV1]: 'anthropic',
-  [ReasoningFormat.OpenAIResponsesV1]: 'openai',
-  [ReasoningFormat.XAIResponsesV1]: 'xai',
-  [ReasoningFormat.GoogleGeminiV1]: 'google',
-};
-
 /**
- * Convert an array of reasoning_details into AI SDK reasoning content parts
- * with the correct providerOptions based on each detail's `format` field.
- *
- * For OpenAI/xAI formats, when an encrypted detail shares an `id` with a text
- * detail, the encrypted content is merged onto the text part (the AI SDK
- * provider layer groups by itemId and combines summary + encrypted_content).
+ * For OpenAI/xAI formats, encrypted details sharing an `id` with a text detail
+ * are merged onto the text part (the AI SDK groups by itemId).
  */
 export function reasoningDetailsToAiSdkParts(
   details: ReasoningDetailUnion[]
@@ -160,13 +122,14 @@ export function reasoningDetailsToAiSdkParts(
   return parts;
 }
 
-/**
- * For OpenAI/xAI formats: merge encrypted details that share an id with a text
- * detail into a single AI SDK reasoning part carrying both the summary text and
- * the `reasoningEncryptedContent` in providerOptions.
- */
+const FORMAT_TO_PROVIDER_KEY: Partial<Record<ReasoningFormat, string>> = {
+  [ReasoningFormat.AnthropicClaudeV1]: 'anthropic',
+  [ReasoningFormat.OpenAIResponsesV1]: 'openai',
+  [ReasoningFormat.XAIResponsesV1]: 'xai',
+  [ReasoningFormat.GoogleGeminiV1]: 'google',
+};
+
 function mergeEncryptedIntoTextParts(details: ReasoningDetailUnion[]): AiSdkReasoningPart[] {
-  // Build a map of id → encrypted data
   const encryptedById = new Map<string, string>();
   for (const d of details) {
     if (d.type === ReasoningDetailType.Encrypted && d.id) {
@@ -178,12 +141,11 @@ function mergeEncryptedIntoTextParts(details: ReasoningDetailUnion[]): AiSdkReas
   const parts: AiSdkReasoningPart[] = [];
 
   for (const detail of details) {
-    if (detail.type === ReasoningDetailType.Encrypted) continue; // handled below or merged
+    if (detail.type === ReasoningDetailType.Encrypted) continue;
 
     const part = detailToAiSdkPart(detail);
     if (!part) continue;
 
-    // If this text detail has an id matching an encrypted detail, attach encrypted content
     if (detail.type === ReasoningDetailType.Text && detail.id) {
       const encryptedData = encryptedById.get(detail.id);
       if (encryptedData) {
@@ -205,7 +167,6 @@ function mergeEncryptedIntoTextParts(details: ReasoningDetailUnion[]): AiSdkReas
     parts.push(part);
   }
 
-  // Emit standalone encrypted details that weren't merged
   for (const detail of details) {
     if (detail.type !== ReasoningDetailType.Encrypted) continue;
     if (detail.id && usedEncryptedIds.has(detail.id)) continue;
@@ -216,22 +177,8 @@ function mergeEncryptedIntoTextParts(details: ReasoningDetailUnion[]): AiSdkReas
   return parts;
 }
 
-// ---------------------------------------------------------------------------
-// OUTPUT: AI SDK providerMetadata → reasoning_details
-// ---------------------------------------------------------------------------
-
-/**
- * Metadata shape as it appears on `providerMetadata` in AI SDK stream parts
- * and `ReasoningOutput`.
- */
 type ProviderMetadata = Record<string, Record<string, unknown>> | undefined;
 
-/**
- * Extract a signature string from AI SDK providerMetadata.
- *
- * Anthropic: `providerMetadata.anthropic.signature`
- * Google:    `providerMetadata.google.thoughtSignature`
- */
 export function extractSignature(meta: ProviderMetadata): string | null {
   if (!meta) return null;
   const anthropicSig = meta.anthropic?.signature;
@@ -243,13 +190,6 @@ export function extractSignature(meta: ProviderMetadata): string | null {
   return null;
 }
 
-/**
- * Extract encrypted/redacted reasoning data from AI SDK providerMetadata.
- *
- * Anthropic: `providerMetadata.anthropic.redactedData`
- * OpenAI:    `providerMetadata.openai.reasoningEncryptedContent`
- * xAI:       `providerMetadata.xai.reasoningEncryptedContent`
- */
 export function extractEncryptedData(meta: ProviderMetadata): string | null {
   if (!meta) return null;
   const anthropic = meta.anthropic?.redactedData;
@@ -261,12 +201,6 @@ export function extractEncryptedData(meta: ProviderMetadata): string | null {
   return null;
 }
 
-/**
- * Extract an itemId from AI SDK providerMetadata.
- *
- * OpenAI: `providerMetadata.openai.itemId`
- * xAI:    `providerMetadata.xai.itemId`
- */
 export function extractItemId(meta: ProviderMetadata): string | null {
   if (!meta) return null;
   const openaiId = meta.openai?.itemId;
@@ -276,10 +210,6 @@ export function extractItemId(meta: ProviderMetadata): string | null {
   return null;
 }
 
-/**
- * Determine the ReasoningFormat from AI SDK providerMetadata based on which
- * provider key is present.
- */
 export function extractFormat(meta: ProviderMetadata): ReasoningFormat | null {
   if (!meta) return null;
   if (meta.anthropic) return ReasoningFormat.AnthropicClaudeV1;
@@ -289,10 +219,6 @@ export function extractFormat(meta: ProviderMetadata): ReasoningFormat | null {
   return null;
 }
 
-/**
- * Convert a single AI SDK reasoning output (from `generateText().reasoning`)
- * into one or more `ReasoningDetailUnion` entries.
- */
 export function reasoningOutputToDetails(
   reasoning: ReadonlyArray<{ type: 'reasoning'; text: string; providerMetadata?: ProviderMetadata }>
 ): ReasoningDetailUnion[] {
@@ -303,36 +229,25 @@ export function reasoningOutputToDetails(
     const encryptedData = extractEncryptedData(part.providerMetadata);
     const itemId = extractItemId(part.providerMetadata);
     const format = extractFormat(part.providerMetadata);
+    const optionalFields = {
+      ...(itemId ? { id: itemId } : {}),
+      ...(format ? { format } : {}),
+    };
 
-    // Anthropic redacted_thinking: empty text with redactedData
-    if (encryptedData && !part.text) {
-      details.push({
-        type: ReasoningDetailType.Encrypted,
-        data: encryptedData,
-        ...(itemId ? { id: itemId } : {}),
-        ...(format ? { format } : {}),
-      });
-      continue;
-    }
-
-    // Normal reasoning text (possibly with signature)
     if (part.text) {
       details.push({
         type: ReasoningDetailType.Text,
         text: part.text,
         ...(signature ? { signature } : {}),
-        ...(itemId ? { id: itemId } : {}),
-        ...(format ? { format } : {}),
+        ...optionalFields,
       });
     }
 
-    // OpenAI/xAI: encrypted content alongside summary text
-    if (encryptedData && part.text) {
+    if (encryptedData) {
       details.push({
         type: ReasoningDetailType.Encrypted,
         data: encryptedData,
-        ...(itemId ? { id: itemId } : {}),
-        ...(format ? { format } : {}),
+        ...optionalFields,
       });
     }
   }

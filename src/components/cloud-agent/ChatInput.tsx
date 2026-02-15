@@ -13,6 +13,7 @@ import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 import { ModeCombobox } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { AgentMode } from './types';
+import { useChatGhostText } from './hooks/useChatGhostText';
 
 type ChatInputProps = {
   onSend: (message: string) => void;
@@ -35,6 +36,7 @@ type ChatInputProps = {
   onModelChange?: (model: string) => void;
   /** Whether to show the toolbar (hide when no active session) */
   showToolbar?: boolean;
+  enableChatAutocomplete?: boolean;
 };
 
 export function ChatInput({
@@ -51,11 +53,21 @@ export function ChatInput({
   onModeChange,
   onModelChange,
   showToolbar = false,
+  enableChatAutocomplete = true,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const {
+    ghostText,
+    handleKeyDown: handleGhostTextKeyDown,
+    handleInputChange: handleGhostTextInputChange,
+  } = useChatGhostText({
+    textAreaRef: textareaRef,
+    enableChatAutocomplete: enableChatAutocomplete && !disabled && !isStreaming,
+  });
 
   // Filter commands based on current input
   const filteredCommands = useMemo(() => {
@@ -99,6 +111,7 @@ export function ChatInput({
 
     onSend(trimmed);
     setValue('');
+    handleGhostTextInputChange('');
     setShowAutocomplete(false);
 
     if (textareaRef.current) {
@@ -121,12 +134,14 @@ export function ChatInput({
       // Send immediately
       onSend(expansion);
       setValue('');
+      handleGhostTextInputChange('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     } else {
       // Just fill the input for editing
       setValue(expansion);
+      handleGhostTextInputChange(expansion);
       // Force height recalculation for expanded text
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -139,6 +154,10 @@ export function ChatInput({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (handleGhostTextKeyDown(e)) {
+      return;
+    }
+
     if (showAutocomplete && filteredCommands.length > 0) {
       switch (e.key) {
         case 'ArrowDown':
@@ -213,20 +232,39 @@ export function ChatInput({
       <div className="flex w-full max-w-full flex-col items-stretch gap-2 md:flex-row md:flex-wrap md:items-start md:gap-3">
         <Popover open={showAutocomplete} onOpenChange={handleOpenChange}>
           <PopoverAnchor asChild>
-            <Textarea
-              ref={textareaRef}
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              disabled={disabled}
-              className="max-h-[200px] min-h-[56px] w-full min-w-0 resize-y md:min-h-[60px] md:flex-1"
-              rows={1}
-              role="combobox"
-              aria-expanded={showAutocomplete}
-              aria-autocomplete="list"
-              aria-controls="slash-command-list"
-            />
+            <div className="relative w-full min-w-0 md:flex-1">
+              <Textarea
+                ref={textareaRef}
+                value={value}
+                onChange={e => {
+                  setValue(e.target.value);
+                  handleGhostTextInputChange(e.target.value);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+                disabled={disabled}
+                className="max-h-[200px] min-h-[56px] w-full resize-y md:min-h-[60px]"
+                rows={1}
+                role="combobox"
+                aria-expanded={showAutocomplete}
+                aria-autocomplete="list"
+                aria-controls="slash-command-list"
+              />
+              {/* Ghost text overlay */}
+              {ghostText && (
+                <div
+                  className="pointer-events-none absolute left-0 top-0 flex h-full w-full select-none items-start overflow-hidden px-3 py-2"
+                  aria-hidden="true"
+                >
+                  <span className="invisible whitespace-pre-wrap break-words">
+                    {value}
+                  </span>
+                  <span className="chat-ghost-text whitespace-pre-wrap break-words">
+                    {ghostText}
+                  </span>
+                </div>
+              )}
+            </div>
           </PopoverAnchor>
           <PopoverContent
             className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0"

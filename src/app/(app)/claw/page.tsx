@@ -110,7 +110,11 @@ function OverviewTab() {
           <Stat label="Status" value={isDestroying ? 'Destroying...' : status.status} />
           <Stat
             label="Sandbox ID"
-            value={<span className="truncate font-mono text-xs">{status.sandboxId}</span>}
+            value={
+              <span className="font-mono text-xs break-all whitespace-pre-wrap">
+                {status.sandboxId}
+              </span>
+            }
           />
           <Stat label="Provisioned" value={formatTs(status.provisionedAt)} />
           <Stat label="Last started" value={formatTs(status.lastStartedAt)} />
@@ -437,7 +441,7 @@ export default function ClawPage() {
 
   if (isLoading) {
     return (
-      <PageLayout title="Claw" subtitle="Manage your KiloClaw instance">
+      <PageLayout title="KiloClaw" subtitle="Manage your KiloClaw instance">
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">Loading...</p>
@@ -449,7 +453,7 @@ export default function ClawPage() {
 
   if (error) {
     return (
-      <PageLayout title="Claw" subtitle="Manage your KiloClaw instance">
+      <PageLayout title="KiloClaw" subtitle="Manage your KiloClaw instance">
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-red-600">Failed to load: {error.message}</p>

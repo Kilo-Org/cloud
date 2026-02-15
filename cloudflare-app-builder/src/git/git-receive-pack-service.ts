@@ -291,38 +291,51 @@ export class GitReceivePackService {
           if (cmd.newOid === zeroOid) {
             // Delete ref
             await git.deleteRef({ fs, dir: '/', ref: cmd.refName });
-          } else if (indexedOids && !indexedOids.has(cmd.newOid)) {
-            // Reject ref updates pointing to objects not in the pack
-            const errorMsg = `Ref ${cmd.refName} targets object ${cmd.newOid} which was not found in the packfile`;
-            logger.warn('Ref target not in indexed pack', {
-              refName: cmd.refName,
-              newOid: cmd.newOid,
-            });
-            result.errors.push(errorMsg);
-          } else {
-            // Create or update ref
-            await git.writeRef({
-              fs,
-              dir: '/',
-              ref: cmd.refName,
-              value: cmd.newOid,
-              force: true,
-            });
+            continue;
+          }
 
-            // If this is main/master branch, also update HEAD
-            if (cmd.refName === 'refs/heads/main' || cmd.refName === 'refs/heads/master') {
-              try {
-                // Check if HEAD is symbolic or create it
-                await git.writeRef({
-                  fs,
-                  dir: '/',
-                  ref: 'HEAD',
-                  value: cmd.newOid,
-                  force: true,
-                });
-              } catch (err) {
-                logger.warn('Failed to update HEAD', formatError(err));
-              }
+          // Validate the target object exists somewhere in the repo
+          if (indexedOids && !indexedOids.has(cmd.newOid)) {
+            let objectExists = false;
+            try {
+              await git.readObject({ fs, dir: '/', oid: cmd.newOid });
+              objectExists = true;
+            } catch {
+              // Object not found anywhere in the repo
+            }
+
+            if (!objectExists) {
+              const errorMsg = `Ref ${cmd.refName} targets object ${cmd.newOid} which was not found in the repository`;
+              logger.warn('Ref target not found in repository', {
+                refName: cmd.refName,
+                newOid: cmd.newOid,
+              });
+              result.errors.push(errorMsg);
+              continue;
+            }
+          }
+
+          // Create or update ref
+          await git.writeRef({
+            fs,
+            dir: '/',
+            ref: cmd.refName,
+            value: cmd.newOid,
+            force: true,
+          });
+
+          // If this is main/master branch, also update HEAD
+          if (cmd.refName === 'refs/heads/main' || cmd.refName === 'refs/heads/master') {
+            try {
+              await git.writeRef({
+                fs,
+                dir: '/',
+                ref: 'HEAD',
+                value: cmd.newOid,
+                force: true,
+              });
+            } catch (err) {
+              logger.warn('Failed to update HEAD', formatError(err));
             }
           }
         } catch (refError) {

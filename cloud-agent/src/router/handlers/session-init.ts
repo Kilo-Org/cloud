@@ -572,6 +572,7 @@ export function createSessionInitHandlers() {
                     setupCommands: metadata.setupCommands,
                     mcpServers: metadata.mcpServers,
                     botId: ctx.botId,
+                    createdOnPlatform: metadata.createdOnPlatform,
                     // Skip linking - backend already linked during prepareSession
                     skipLinking: true,
                     // Pass existing metadata to preserve preparedAt, initiatedAt, prompt, mode, model, autoCommit

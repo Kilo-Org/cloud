@@ -670,6 +670,7 @@ export class CloudAgentSession extends DurableObject {
     condenseOnComplete?: boolean;
     appendSystemPrompt?: string;
     upstreamBranch?: string;
+    createdOnPlatform?: string;
     callbackTarget?: CallbackTarget;
     images?: Images;
   }): Promise<OperationResult> {

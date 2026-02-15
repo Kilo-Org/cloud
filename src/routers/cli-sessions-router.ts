@@ -27,7 +27,7 @@ export const BLOB_TYPES = [
 ] as const satisfies readonly FileName[];
 
 /** Known platform values that have dedicated filters. "Extension" is everything else. */
-export const KNOWN_PLATFORMS = ['cloud-agent', 'cli', 'agent-manager'] as const;
+export const KNOWN_PLATFORMS = ['cloud-agent', 'cli', 'agent-manager', 'app-builder'] as const;
 
 const PAGE_SIZE = 10;
 

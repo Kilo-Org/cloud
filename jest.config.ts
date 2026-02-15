@@ -32,6 +32,7 @@ const config: Config = {
   testPathIgnorePatterns: [
     '<rootDir>/cloud-agent/',
     '<rootDir>/cloud-agent-next/',
+    '<rootDir>/cloudflare-app-builder/',
     '<rootDir>/cloudflare-webhook-agent-ingest/',
     '<rootDir>/cloudflare-session-ingest/',
     '<rootDir>/kiloclaw/',

@@ -34,7 +34,8 @@ export function getPreviousIssueMonth(issueMonth: string): string {
 function getSubscriptionLineItemPeriodStart(invoice: Stripe.Invoice): number | null {
   const lines = invoice.lines?.data ?? [];
   for (const line of lines) {
-    if (line.parent?.subscription_item_details) {
+    const details = line.parent?.subscription_item_details;
+    if (details && !details.proration) {
       return line.period.start;
     }
   }

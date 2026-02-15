@@ -57,7 +57,12 @@ describe('getInvoiceIssueMonth', () => {
       lines: {
         data: [
           {
-            parent: { subscription_item_details: { subscription_item: 'si_abc' } },
+            parent: {
+              subscription_item_details: {
+                subscription_item: 'si_abc',
+                proration: false,
+              },
+            },
             period: { start: 1735689600, end: 1738368000 }, // 2025-01-01 to 2025-02-01
           },
         ],
@@ -107,7 +112,12 @@ describe('getInvoiceIssueMonth', () => {
       lines: {
         data: [
           {
-            parent: { subscription_item_details: { subscription_item: 'si_abc' } },
+            parent: {
+              subscription_item_details: {
+                subscription_item: 'si_abc',
+                proration: false,
+              },
+            },
             period: { start: 1737043200, end: 1739721600 }, // 2025-01-16 to 2025-02-16
           },
         ],
@@ -129,8 +139,68 @@ describe('getInvoiceIssueMonth', () => {
             period: { start: 1733011200, end: 1735689600 }, // one-off item from December
           },
           {
-            parent: { subscription_item_details: { subscription_item: 'si_abc' } },
+            parent: {
+              subscription_item_details: {
+                subscription_item: 'si_abc',
+                proration: false,
+              },
+            },
             period: { start: 1735689600, end: 1738368000 }, // 2025-01-01 to 2025-02-01
+          },
+        ],
+      },
+    } as unknown as Stripe.Invoice;
+
+    expect(getInvoiceIssueMonth(invoice)).toBe('2025-01-01');
+  });
+
+  it('skips proration line items and uses non-proration subscription line item', () => {
+    const invoice = {
+      id: 'inv_proration',
+      period_start: 1733011200,
+      created: 1735776000,
+      lines: {
+        data: [
+          {
+            parent: {
+              subscription_item_details: {
+                subscription_item: 'si_abc',
+                proration: true,
+              },
+            },
+            period: { start: 1734393600, end: 1735689600 }, // proration from mid-December
+          },
+          {
+            parent: {
+              subscription_item_details: {
+                subscription_item: 'si_abc',
+                proration: false,
+              },
+            },
+            period: { start: 1735689600, end: 1738368000 }, // 2025-01-01 to 2025-02-01
+          },
+        ],
+      },
+    } as unknown as Stripe.Invoice;
+
+    expect(getInvoiceIssueMonth(invoice)).toBe('2025-01-01');
+  });
+
+  it('falls back to created when only proration subscription line items exist', () => {
+    const invoice = {
+      id: 'inv_only_proration',
+      period_start: 1733011200,
+      created: 1735776000, // 2025-01-02
+      lines: {
+        data: [
+          {
+            parent: {
+              subscription_item_details: {
+                subscription_item: 'si_abc',
+                proration: true,
+              },
+            },
+            period: { start: 1734393600, end: 1735689600 },
           },
         ],
       },

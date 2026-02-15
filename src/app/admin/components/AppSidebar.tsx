@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Sparkles,
   FileSearch,
+  FileText,
   GitPullRequest,
   UserX,
   Upload,
@@ -158,6 +159,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Alerting (TTFB)',
     url: '/admin/alerting-ttfb',
     icon: () => <Bell />,
+  },
+  {
+    title: () => 'API Requests',
+    url: '/admin/requests',
+    icon: () => <FileText />,
   },
 ];
 

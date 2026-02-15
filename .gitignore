@@ -80,3 +80,9 @@ run-milvus-test.sh
 # Cloudflare
 .wrangler/
 .env*.local
+
+# Gas Town (added by gt)
+.runtime/
+.claude/
+.beads/
+.logs/

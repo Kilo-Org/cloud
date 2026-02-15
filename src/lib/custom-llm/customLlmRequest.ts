@@ -48,14 +48,22 @@ function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage
         return {
           role: 'system',
           content: msg.content.map(part => part.text).join(''),
+          providerOptions: {
+            anthropic: { cacheControl: { type: 'ephemeral' } },
+          },
         };
 
-      case 'user':
+      case 'user': {
+        const content =
+          typeof msg.content === 'string' ? msg.content : msg.content.map(convertUserContentPart);
         return {
           role: 'user',
-          content:
-            typeof msg.content === 'string' ? msg.content : msg.content.map(convertUserContentPart),
+          content,
+          ...(msg.cache_control && {
+            providerOptions: { anthropic: { cacheControl: msg.cache_control } },
+          }),
         };
+      }
 
       case 'assistant':
         return {
@@ -80,12 +88,24 @@ function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage
 }
 
 function convertUserContentPart(part: ChatCompletionContentPart) {
+  const providerOptions = part.cache_control
+    ? { anthropic: { cacheControl: part.cache_control } }
+    : undefined;
+
   switch (part.type) {
     case 'text':
-      return { type: 'text' as const, text: part.text };
+      return {
+        type: 'text' as const,
+        text: part.text,
+        ...(providerOptions && { providerOptions }),
+      };
 
     case 'image_url':
-      return { type: 'image' as const, image: new URL(part.image_url.url) };
+      return {
+        type: 'image' as const,
+        image: new URL(part.image_url.url),
+        ...(providerOptions && { providerOptions }),
+      };
 
     case 'file':
       return {
@@ -93,6 +113,7 @@ function convertUserContentPart(part: ChatCompletionContentPart) {
         data: part.file.file_data ?? '',
         filename: part.file.filename,
         mediaType: parseDataUrl(part.file.file_data ?? '')?.mediaType ?? 'application/octet-stream',
+        ...(providerOptions && { providerOptions }),
       };
 
     case 'input_audio':
@@ -100,6 +121,7 @@ function convertUserContentPart(part: ChatCompletionContentPart) {
         type: 'file' as const,
         data: part.input_audio.data,
         mediaType: audioFormatToMediaType(part.input_audio.format),
+        ...(providerOptions && { providerOptions }),
       };
   }
 }
@@ -403,7 +425,9 @@ function createStreamPartConverter() {
         };
       }
 
-      case 'finish-step':
+      case 'finish-step': {
+        const cacheReadTokens = part.usage.inputTokenDetails.cacheReadTokens;
+        const cacheWriteTokens = part.usage.inputTokenDetails.cacheWriteTokens;
         return {
           choices: [
             {
@@ -415,8 +439,17 @@ function createStreamPartConverter() {
             prompt_tokens: part.usage.inputTokens ?? 0,
             completion_tokens: part.usage.outputTokens ?? 0,
             total_tokens: part.usage.totalTokens ?? 0,
+            ...(cacheReadTokens != null || cacheWriteTokens != null
+              ? {
+                  prompt_tokens_details: {
+                    cached_tokens: cacheReadTokens ?? 0,
+                    ...(cacheWriteTokens != null && { cache_write_tokens: cacheWriteTokens }),
+                  },
+                }
+              : {}),
           },
         };
+      }
 
       default:
         return null;
@@ -491,6 +524,17 @@ function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof gener
       prompt_tokens: result.usage.inputTokens ?? 0,
       completion_tokens: result.usage.outputTokens ?? 0,
       total_tokens: result.usage.totalTokens ?? 0,
+      ...(result.usage.inputTokenDetails.cacheReadTokens != null ||
+      result.usage.inputTokenDetails.cacheWriteTokens != null
+        ? {
+            prompt_tokens_details: {
+              cached_tokens: result.usage.inputTokenDetails.cacheReadTokens ?? 0,
+              ...(result.usage.inputTokenDetails.cacheWriteTokens != null && {
+                cache_write_tokens: result.usage.inputTokenDetails.cacheWriteTokens,
+              }),
+            },
+          }
+        : {}),
     },
   };
 }

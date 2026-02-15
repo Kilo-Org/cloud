@@ -36,6 +36,7 @@ import { applyMoonshotProviderSettings, isMoonshotModel } from '@/lib/providers/
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import { isOpenAiModel } from '@/lib/providers/openai';
+import { applyQwenModelSettings, isQwenModel } from '@/lib/providers/qwen';
 
 export const PROVIDERS = {
   OPENROUTER: {
@@ -225,6 +226,10 @@ export function applyProviderSpecificLogic(
 
   if (isMoonshotModel(requestedModel)) {
     applyMoonshotProviderSettings(requestToMutate);
+  }
+
+  if (isQwenModel(requestedModel)) {
+    applyQwenModelSettings(requestToMutate);
   }
 
   if (provider.id === 'gigapotato') {

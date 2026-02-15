@@ -323,6 +323,7 @@ const authOptions: NextAuthOptions = {
       client: {
         token_endpoint_auth_method: 'client_secret_post',
       },
+      checks: [],
     }),
     // Email provider for magic link authentication using CredentialsProvider
     // We use CredentialsProvider because EmailProvider requires a database adapter,

@@ -93,6 +93,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     default_model: null,
     is_bot: false,
     cohorts: {},
+    completed_welcome_form: false,
     ...overrides,
   };
 }

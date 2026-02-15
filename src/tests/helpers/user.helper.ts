@@ -29,6 +29,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     is_bot: false,
     next_credit_expiration_at: null,
     cohorts: {},
+    completed_welcome_form: false,
     ...userData,
   } satisfies User;
 }

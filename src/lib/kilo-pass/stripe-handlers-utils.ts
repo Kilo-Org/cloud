@@ -27,14 +27,31 @@ export function getPreviousIssueMonth(issueMonth: string): string {
 }
 
 /**
- * Extracts the issue month from a Stripe invoice based on period_start or created timestamp.
+ * Returns the period.start of the first subscription line item, which represents
+ * the actual service period being billed. invoice.period_start is NOT suitable
+ * because Stripe documents it as looking back one period for subscription invoices.
+ */
+function getSubscriptionLineItemPeriodStart(invoice: Stripe.Invoice): number | null {
+  const lines = invoice.lines?.data ?? [];
+  for (const line of lines) {
+    if (line.parent?.subscription_item_details) {
+      return line.period.start;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extracts the issue month from a Stripe invoice using the subscription line item's
+ * service period. Falls back to invoice.created for non-subscription invoices.
  */
 export function getInvoiceIssueMonth(invoice: Stripe.Invoice): string {
-  const preferredSeconds = invoice.period_start ?? null;
-  const fallbackSeconds = invoice.created ?? null;
-  const seconds = preferredSeconds ?? fallbackSeconds;
+  const lineItemPeriodStart = getSubscriptionLineItemPeriodStart(invoice);
+  const seconds = lineItemPeriodStart ?? invoice.created ?? null;
   if (seconds === null) {
-    throw new Error(`Invoice ${invoice.id} missing period_start and created timestamps`);
+    throw new Error(
+      `Invoice ${invoice.id} has no subscription line item period and no created timestamp`
+    );
   }
 
   return computeIssueMonth(dayjs.unix(seconds).utc());

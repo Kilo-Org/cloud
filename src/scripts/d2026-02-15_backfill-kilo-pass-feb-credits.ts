@@ -16,12 +16,11 @@
  * Prerequisites:
  *   - The fix for getInvoiceIssueMonth must be deployed first.
  *   - STRIPE_SECRET_KEY must be set in the environment (production key for prod invoices).
- *   - STRIPE_WEBHOOK_ENDPOINT_ID must be set (e.g. we_xxxxx — the webhook endpoint to deliver to).
  *   - POSTGRES_SCRIPT_URL must be set (used when IS_SCRIPT=true).
  *   - The `stripe` CLI must be installed and available on PATH.
  *
  * Usage:
- *   STRIPE_WEBHOOK_ENDPOINT_ID=we_xxxxx pnpm script src/scripts/d2026-02-15_backfill-kilo-pass-feb-credits.ts
+ *   pnpm script src/scripts/d2026-02-15_backfill-kilo-pass-feb-credits.ts
  */
 
 import Stripe from 'stripe';
@@ -101,6 +100,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+const WEBHOOK_PATH = '/api/stripe/webhook';
+
+async function findWebhookEndpoint(stripe: Stripe): Promise<string> {
+  for await (const endpoint of stripe.webhookEndpoints.list({ limit: 100 })) {
+    if (endpoint.status === 'enabled' && endpoint.url.endsWith(WEBHOOK_PATH)) {
+      return endpoint.id;
+    }
+  }
+  throw new Error(`No enabled webhook endpoint found with URL ending in ${WEBHOOK_PATH}`);
+}
+
 async function main() {
   const apiKey = getEnvVariable('STRIPE_SECRET_KEY');
   if (!apiKey) {
@@ -108,13 +118,11 @@ async function main() {
     process.exit(1);
   }
 
-  const webhookEndpoint = getEnvVariable('STRIPE_WEBHOOK_ENDPOINT_ID');
-  if (!webhookEndpoint) {
-    console.error('Error: STRIPE_WEBHOOK_ENDPOINT_ID is not set');
-    process.exit(1);
-  }
-
   const stripe = new Stripe(apiKey);
+
+  console.log('Looking up webhook endpoint...');
+  const webhookEndpoint = await findWebhookEndpoint(stripe);
+  console.log(`Using webhook endpoint: ${webhookEndpoint}\n`);
 
   console.log('Querying database for affected invoices...\n');
   const affectedRows = await fetchAffectedInvoices();

@@ -9,6 +9,7 @@ import {
   modelStats,
   cliSessions,
   credit_transactions,
+  api_request_log,
 } from '@/db/schema';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
@@ -20,7 +21,7 @@ import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router'
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import * as z from 'zod';
-import { eq, and, ne, or, ilike, desc, asc, sql, isNull } from 'drizzle-orm';
+import { eq, and, ne, or, ilike, desc, asc, sql, isNull, gte, lte } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { toNonNullish } from '@/lib/utils';
@@ -682,6 +683,123 @@ export const adminRouter = createTRPCRouter({
         }
       }),
   }),
+  requestLogs: createTRPCRouter({
+    list: adminProcedure
+      .input(
+        z.object({
+          page: z.number().min(1).default(1),
+          limit: z.number().min(1).max(100).default(50),
+          sortBy: z.enum(['created_at', 'status_code', 'provider', 'model']).default('created_at'),
+          sortOrder: z.enum(['asc', 'desc']).default('desc'),
+          requestId: z.string().optional(),
+          search: z.string().optional(),
+          fromDate: z.string().optional(),
+          toDate: z.string().optional(),
+          provider: z.string().optional(),
+          statusCode: z.number().optional(),
+          kiloUserId: z.string().optional(),
+          organizationId: z.string().optional(),
+          model: z.string().optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        const { page, limit, sortBy, sortOrder, search, requestId } = input;
+        const offset = (page - 1) * limit;
+
+        const conditions = [];
+
+        if (requestId) {
+          conditions.push(eq(api_request_log.id, BigInt(requestId)));
+        }
+
+        if (search) {
+          conditions.push(
+            or(
+              ilike(api_request_log.provider, `%${search}%`),
+              ilike(api_request_log.model, `%${search}%`),
+              ilike(api_request_log.kilo_user_id, `%${search}%`),
+              ilike(api_request_log.organization_id, `%${search}%`),
+              ilike(sql`${api_request_log.request}::text`, `%${search}%`)
+            )
+          );
+        }
+
+        if (input.fromDate) {
+          conditions.push(gte(api_request_log.created_at, input.fromDate));
+        }
+
+        if (input.toDate) {
+          conditions.push(lte(api_request_log.created_at, input.toDate));
+        }
+
+        if (input.provider) {
+          conditions.push(eq(api_request_log.provider, input.provider));
+        }
+
+        if (input.statusCode !== undefined) {
+          conditions.push(eq(api_request_log.status_code, input.statusCode));
+        }
+
+        if (input.kiloUserId) {
+          conditions.push(eq(api_request_log.kilo_user_id, input.kiloUserId));
+        }
+
+        if (input.organizationId) {
+          conditions.push(eq(api_request_log.organization_id, input.organizationId));
+        }
+
+        if (input.model) {
+          conditions.push(eq(api_request_log.model, input.model));
+        }
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const sortByMap = {
+          created_at: api_request_log.created_at,
+          status_code: api_request_log.status_code,
+          provider: api_request_log.provider,
+          model: api_request_log.model,
+        };
+
+        const orderByColumn = sortByMap[sortBy];
+        const orderFn = sortOrder === 'asc' ? asc : desc;
+
+        const results = await db
+          .select({
+            id: api_request_log.id,
+            created_at: api_request_log.created_at,
+            kilo_user_id: api_request_log.kilo_user_id,
+            organization_id: api_request_log.organization_id,
+            provider: api_request_log.provider,
+            model: api_request_log.model,
+            status_code: api_request_log.status_code,
+            request: api_request_log.request,
+            response: api_request_log.response,
+            total: sql<number>`count(*) OVER()::int`.as('total'),
+          })
+          .from(api_request_log)
+          .where(whereClause)
+          .orderBy(orderFn(orderByColumn))
+          .limit(limit)
+          .offset(offset);
+
+        const total = results[0]?.total ?? 0;
+
+        return {
+          logs: results.map(({ total: _, ...log }) => ({
+            ...log,
+            id: log.id.toString(),
+          })),
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+          },
+        };
+      }),
+  }),
+
   appBuilder: adminAppBuilderRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,

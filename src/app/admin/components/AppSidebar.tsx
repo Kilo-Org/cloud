@@ -19,6 +19,7 @@ import {
   UserX,
   Upload,
   Bell,
+  ScrollText,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -158,6 +159,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Alerting (TTFB)',
     url: '/admin/alerting-ttfb',
     icon: () => <Bell />,
+  },
+  {
+    title: () => 'Request Logs',
+    url: '/admin/requests',
+    icon: () => <ScrollText />,
   },
 ];
 

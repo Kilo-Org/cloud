@@ -100,15 +100,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const WEBHOOK_PATH = '/api/stripe/webhook';
+const WEBHOOK_URL = 'https://api.kilo.ai/api/stripe/webhook';
 
 async function findWebhookEndpoint(stripe: Stripe): Promise<string> {
   for await (const endpoint of stripe.webhookEndpoints.list({ limit: 100 })) {
-    if (endpoint.status === 'enabled' && endpoint.url.endsWith(WEBHOOK_PATH)) {
+    if (endpoint.url === WEBHOOK_URL) {
       return endpoint.id;
     }
   }
-  throw new Error(`No enabled webhook endpoint found with URL ending in ${WEBHOOK_PATH}`);
+  throw new Error(`Webhook endpoint not found for ${WEBHOOK_URL}`);
 }
 
 async function main() {

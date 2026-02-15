@@ -1,7 +1,4 @@
-import type {
-  OpenRouterChatCompletionRequest,
-  OpenRouterReasoningConfig,
-} from '@/lib/providers/openrouter/types';
+import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import {
@@ -22,6 +19,15 @@ import type {
 } from './openrouter-chat-completions-input';
 import { ReasoningDetailType } from './reasoning-details';
 import type { ReasoningDetailUnion } from './reasoning-details';
+import {
+  reasoningDetailsToAiSdkParts,
+  reasoningOutputToDetails,
+  extractSignature,
+  extractEncryptedData,
+  extractItemId,
+  extractFormat,
+  type AiSdkReasoningPart,
+} from './reasoning-provider-metadata';
 import type { OpenRouterStreamChatCompletionChunkSchema } from './schemas';
 import type * as z from 'zod';
 
@@ -161,31 +167,20 @@ function audioFormatToMediaType(format: string): string {
   return AUDIO_MEDIA_TYPES[format] ?? 'application/octet-stream';
 }
 
-function reasoningDetailToText(detail: ReasoningDetailUnion): string | null {
-  switch (detail.type) {
-    case ReasoningDetailType.Text:
-      return detail.text ?? null;
-    case ReasoningDetailType.Summary:
-      return detail.summary;
-    case ReasoningDetailType.Encrypted:
-      return null;
-  }
-}
+type AssistantContentPart =
+  | { type: 'text'; text: string }
+  | AiSdkReasoningPart
+  | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown };
 
 function convertAssistantContent(msg: ChatCompletionAssistantMessageParam) {
-  const parts: Array<
-    | { type: 'text'; text: string }
-    | { type: 'reasoning'; text: string }
-    | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
-  > = [];
+  const parts: AssistantContentPart[] = [];
 
-  // Prefer structured reasoning_details over flat reasoning string
+  // Prefer structured reasoning_details over flat reasoning string.
+  // The format field on each detail drives the providerOptions mapping
+  // (signatures, encrypted data) so the AI SDK can pass them to the provider.
   if (msg.reasoning_details && msg.reasoning_details.length > 0) {
-    for (const detail of msg.reasoning_details) {
-      const text = reasoningDetailToText(detail);
-      if (text) {
-        parts.push({ type: 'reasoning', text });
-      }
+    for (const sdkPart of reasoningDetailsToAiSdkParts(msg.reasoning_details)) {
+      parts.push(sdkPart);
     }
   } else if (msg.reasoning) {
     parts.push({ type: 'reasoning', text: msg.reasoning });
@@ -257,17 +252,104 @@ function createStreamPartConverter() {
       case 'text-delta':
         return { choices: [{ delta: { content: part.text } }] };
 
-      case 'reasoning-delta':
+      case 'reasoning-start': {
+        // Anthropic redacted_thinking: reasoning-start carries redactedData
+        const encData = extractEncryptedData(part.providerMetadata);
+        if (encData) {
+          const itemId = extractItemId(part.providerMetadata);
+          const format = extractFormat(part.providerMetadata);
+          return {
+            choices: [
+              {
+                delta: {
+                  reasoning_details: [
+                    {
+                      type: ReasoningDetailType.Encrypted,
+                      data: encData,
+                      ...(itemId ? { id: itemId } : {}),
+                      ...(format ? { format } : {}),
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+        }
+        return null;
+      }
+
+      case 'reasoning-delta': {
+        const details: ReasoningDetailUnion[] = [];
+        const signature = extractSignature(part.providerMetadata);
+        const format = extractFormat(part.providerMetadata);
+
+        if (part.text) {
+          const itemId = extractItemId(part.providerMetadata);
+          details.push({
+            type: ReasoningDetailType.Text,
+            text: part.text,
+            ...(signature ? { signature } : {}),
+            ...(itemId ? { id: itemId } : {}),
+            ...(format ? { format } : {}),
+          });
+        } else if (signature) {
+          // Signature-only delta (Anthropic sends empty text + signature_delta)
+          details.push({
+            type: ReasoningDetailType.Text,
+            text: '',
+            signature,
+            ...(format ? { format } : {}),
+          });
+        }
+
+        if (details.length === 0) return null;
+
         return {
           choices: [
             {
               delta: {
-                reasoning: part.text,
-                reasoning_details: [{ type: ReasoningDetailType.Text, text: part.text }],
+                reasoning: part.text || '',
+                reasoning_details: details,
               },
             },
           ],
         };
+      }
+
+      case 'reasoning-end': {
+        // OpenAI/xAI: encrypted content may arrive on reasoning-end
+        const encData = extractEncryptedData(part.providerMetadata);
+        const signature = extractSignature(part.providerMetadata);
+
+        if (!encData && !signature) return null;
+
+        const details: ReasoningDetailUnion[] = [];
+        const itemId = extractItemId(part.providerMetadata);
+        const format = extractFormat(part.providerMetadata);
+
+        if (encData) {
+          details.push({
+            type: ReasoningDetailType.Encrypted,
+            data: encData,
+            ...(itemId ? { id: itemId } : {}),
+            ...(format ? { format } : {}),
+          });
+        }
+
+        if (signature) {
+          details.push({
+            type: ReasoningDetailType.Text,
+            text: '',
+            signature,
+            ...(itemId ? { id: itemId } : {}),
+            ...(format ? { format } : {}),
+          });
+        }
+
+        return {
+          choices: [{ delta: { reasoning_details: details } }],
+        };
+      }
 
       case 'tool-input-start': {
         const index = nextToolIndex++;
@@ -394,6 +476,11 @@ function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof gener
     },
   }));
 
+  // Build reasoning_details from the structured reasoning array which
+  // includes provider metadata (signatures, encrypted data, etc.)
+  const reasoning_details =
+    result.reasoning.length > 0 ? reasoningOutputToDetails(result.reasoning) : undefined;
+
   return {
     choices: [
       {
@@ -401,6 +488,7 @@ function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof gener
           role: 'assistant' as const,
           content: result.text || null,
           ...(result.reasoningText ? { reasoning: result.reasoningText } : {}),
+          ...(reasoning_details ? { reasoning_details } : {}),
           ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
         },
         finish_reason: FINISH_REASON_MAP[result.finishReason] ?? 'stop',

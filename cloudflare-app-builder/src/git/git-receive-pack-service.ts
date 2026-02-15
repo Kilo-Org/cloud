@@ -169,6 +169,7 @@ export class GitReceivePackService {
       // Parse pkt-line commands and find packfile
       const { commands, packfileStart } = this.parsePktLines(requestData);
       result.refUpdates = commands;
+      let indexedOids: Set<string> | undefined;
 
       // Extract packfile data (skip PACK header check, pass all remaining data)
       if (packfileStart < requestData.length) {
@@ -234,25 +235,55 @@ export class GitReceivePackService {
 
           // Use isomorphic-git to index the packfile
           try {
-            await git.indexPack({
+            const indexResult = await git.indexPack({
               fs,
               dir: '/',
               filepath: packPath,
               gitdir: '.git',
             });
+            indexedOids = new Set(indexResult.oids);
           } catch (indexError) {
-            logger.error('indexPack failed', formatError(indexError));
+            const errorMessage =
+              indexError instanceof Error ? indexError.message : String(indexError);
+            const errorStack = indexError instanceof Error ? indexError.stack : undefined;
+
+            logger.error('indexPack failed', {
+              error: errorMessage,
+              stack: errorStack,
+              packPath,
+              packfileSize: actualPackfile.length,
+              commands: commands.map(c => c.refName),
+            });
+
+            // CLEANUP: Remove the corrupted packfile and any partial .idx to prevent leaving partial data
+            const idxPath = packPath.replace(/\.pack$/, '.idx');
+            for (const filePath of [packPath, idxPath]) {
+              try {
+                await fs.unlink(filePath);
+                logger.info('Cleaned up failed pack artifact', { filePath });
+              } catch (cleanupError) {
+                // File may not exist (e.g., .idx wasn't written yet) — that's fine
+                logger.warn('Failed to cleanup pack artifact', {
+                  filePath,
+                  cleanupError:
+                    cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+                });
+              }
+            }
+
             // Don't silently continue - this is a critical error
-            result.errors.push(
-              `Failed to index packfile: ${
-                indexError instanceof Error ? indexError.message : String(indexError)
-              }`
-            );
+            // Mark as failed and DON'T proceed with ref updates
+            result.errors.push(`Failed to index packfile: ${errorMessage}`);
+
+            // Return error response immediately - DO NOT apply refs with corrupt objects
+            result.success = false;
+            const response = this.generateReportStatus(commands, result.errors);
+            return { response, result };
           }
         }
       }
 
-      // Apply ref updates
+      // Apply ref updates — all error paths returned above
       const zeroOid = '0000000000000000000000000000000000000000';
 
       for (const cmd of commands) {
@@ -260,30 +291,51 @@ export class GitReceivePackService {
           if (cmd.newOid === zeroOid) {
             // Delete ref
             await git.deleteRef({ fs, dir: '/', ref: cmd.refName });
-          } else {
-            // Create or update ref
-            await git.writeRef({
-              fs,
-              dir: '/',
-              ref: cmd.refName,
-              value: cmd.newOid,
-              force: true,
-            });
+            continue;
+          }
 
-            // If this is main/master branch, also update HEAD
-            if (cmd.refName === 'refs/heads/main' || cmd.refName === 'refs/heads/master') {
-              try {
-                // Check if HEAD is symbolic or create it
-                await git.writeRef({
-                  fs,
-                  dir: '/',
-                  ref: 'HEAD',
-                  value: cmd.newOid,
-                  force: true,
-                });
-              } catch (err) {
-                logger.warn('Failed to update HEAD', formatError(err));
-              }
+          // Validate the target object exists somewhere in the repo
+          if (indexedOids && !indexedOids.has(cmd.newOid)) {
+            let objectExists = false;
+            try {
+              await git.readObject({ fs, dir: '/', oid: cmd.newOid });
+              objectExists = true;
+            } catch {
+              // Object not found anywhere in the repo
+            }
+
+            if (!objectExists) {
+              const errorMsg = `Ref ${cmd.refName} targets object ${cmd.newOid} which was not found in the repository`;
+              logger.warn('Ref target not found in repository', {
+                refName: cmd.refName,
+                newOid: cmd.newOid,
+              });
+              result.errors.push(errorMsg);
+              continue;
+            }
+          }
+
+          // Create or update ref
+          await git.writeRef({
+            fs,
+            dir: '/',
+            ref: cmd.refName,
+            value: cmd.newOid,
+            force: true,
+          });
+
+          // If this is main/master branch, also update HEAD
+          if (cmd.refName === 'refs/heads/main' || cmd.refName === 'refs/heads/master') {
+            try {
+              await git.writeRef({
+                fs,
+                dir: '/',
+                ref: 'HEAD',
+                value: cmd.newOid,
+                force: true,
+              });
+            } catch (err) {
+              logger.warn('Failed to update HEAD', formatError(err));
             }
           }
         } catch (refError) {

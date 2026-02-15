@@ -16,11 +16,12 @@
  * Prerequisites:
  *   - The fix for getInvoiceIssueMonth must be deployed first.
  *   - STRIPE_SECRET_KEY must be set in the environment (production key for prod invoices).
+ *   - STRIPE_WEBHOOK_ENDPOINT_ID must be set (e.g. we_xxxxx — the webhook endpoint to deliver to).
  *   - POSTGRES_SCRIPT_URL must be set (used when IS_SCRIPT=true).
  *   - The `stripe` CLI must be installed and available on PATH.
  *
  * Usage:
- *   pnpm script src/scripts/d2026-02-15_backfill-kilo-pass-feb-credits.ts
+ *   STRIPE_WEBHOOK_ENDPOINT_ID=we_xxxxx pnpm script src/scripts/d2026-02-15_backfill-kilo-pass-feb-credits.ts
  */
 
 import Stripe from 'stripe';
@@ -69,11 +70,24 @@ async function fetchAffectedInvoices(): Promise<AffectedRow[]> {
   return rows.filter((r): r is AffectedRow => r.stripe_invoice_id != null && r.created_at != null);
 }
 
-function resendEvent(eventId: string, apiKey: string): { ok: boolean; output: string } {
+function resendEvent(params: { eventId: string; apiKey: string; webhookEndpoint: string }): {
+  ok: boolean;
+  output: string;
+} {
+  const { eventId, apiKey, webhookEndpoint } = params;
   try {
     const output = execFileSync(
       'stripe',
-      ['events', 'resend', '--live', eventId, '--api-key', apiKey],
+      [
+        'events',
+        'resend',
+        '--live',
+        eventId,
+        '--api-key',
+        apiKey,
+        '--webhook-endpoint',
+        webhookEndpoint,
+      ],
       { encoding: 'utf-8', timeout: 30_000 }
     );
     return { ok: true, output: output.trim() };
@@ -91,6 +105,12 @@ async function main() {
   const apiKey = getEnvVariable('STRIPE_SECRET_KEY');
   if (!apiKey) {
     console.error('Error: STRIPE_SECRET_KEY is not set');
+    process.exit(1);
+  }
+
+  const webhookEndpoint = getEnvVariable('STRIPE_WEBHOOK_ENDPOINT_ID');
+  if (!webhookEndpoint) {
+    console.error('Error: STRIPE_WEBHOOK_ENDPOINT_ID is not set');
     process.exit(1);
   }
 
@@ -170,7 +190,7 @@ async function main() {
   let resendFail = 0;
 
   for (const { invoiceId, eventId } of eventMap) {
-    const result = resendEvent(eventId, apiKey);
+    const result = resendEvent({ eventId, apiKey, webhookEndpoint });
     if (result.ok) {
       resendOk++;
       console.log(`  [RESENT] ${eventId} (${invoiceId})`);

@@ -124,7 +124,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   delete requestBodyParsed.models; // OpenRouter specific field we do not support
-  if (!requestBodyParsed.model) {
+  if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {
     return modelDoesNotExistResponse();
   }
 

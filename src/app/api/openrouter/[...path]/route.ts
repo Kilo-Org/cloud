@@ -56,6 +56,7 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
+import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const taskId = request.headers.get('X-KiloCode-TaskId') ?? undefined;
-  const { provider, userByok } = await getProvider(
+  const { provider, userByok, customLlm } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
     user,
@@ -274,7 +275,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   setTag('ui.ai_model', requestBodyParsed.model);
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user)) {
+  if (!isAnonymousContext(user) && !customLlm) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
     if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
@@ -336,15 +337,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     userByok
   );
 
-  const response = await openRouterRequest({
-    path,
-    search: url.search,
-    method: request.method,
-    body: requestBodyParsed,
-    extraHeaders,
-    provider,
-    signal: request.signal,
-  });
+  const response = customLlm
+    ? await customLlmRequest(customLlm, requestBodyParsed)
+    : await openRouterRequest({
+        path,
+        search: url.search,
+        method: request.method,
+        body: requestBodyParsed,
+        extraHeaders,
+        provider,
+        signal: request.signal,
+      });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
 
   emitApiMetricsForResponse(

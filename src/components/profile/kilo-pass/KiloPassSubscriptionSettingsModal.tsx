@@ -275,7 +275,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
       const j = Math.floor(Math.random() * (i + 1));
       [reasons[i], reasons[j]] = [reasons[j], reasons[i]];
     }
-    return [...reasons, 'Other'] as const;
+    return [...reasons, 'Other'];
   }, [isOpen]);
 
   const toggleCancellationReason = (reason: string) => {

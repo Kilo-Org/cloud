@@ -18,8 +18,6 @@ export type KiloClawEnv = {
   // KiloCode provider configuration
   KILOCODE_API_BASE_URL?: string;
   DEV_MODE?: string;
-  DEBUG_ROUTES?: string;
-  DEBUG_ROUTES_SECRET?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_DM_POLICY?: string;
   DISCORD_BOT_TOKEN?: string;

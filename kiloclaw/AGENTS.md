@@ -57,15 +57,13 @@ src/
 │   ├── api.ts                        # /api/admin/* (DO RPC wrappers, 410 stubs for removed sync)
 │   ├── kiloclaw.ts                   # /api/kiloclaw/* (user-facing, JWT auth)
 │   ├── platform.ts                   # /api/platform/* (internal API key auth)
-│   ├── debug.ts                      # /debug/* (operator tools, ?machineId= param)
 │   ├── access-gateway.ts             # Access code redemption, cookie setting, redirects
 │   └── public.ts                     # /health (no auth)
 ├── auth/
 │   ├── middleware.ts                  # JWT auth + pepper validation via Hyperdrive
 │   ├── jwt.ts                        # Token parsing/verification
 │   ├── gateway-token.ts              # HMAC-SHA256 derivation for per-sandbox tokens
-│   ├── sandbox-id.ts                 # userId <-> sandboxId (base64url, reversible)
-│   └── debug-gate.ts                 # Debug route access control
+│   └── sandbox-id.ts                 # userId <-> sandboxId (base64url, reversible)
 ├── durable-objects/
 │   ├── kiloclaw-app.ts               # DO: per-user Fly App lifecycle (create app, allocate IPs)
 │   └── kiloclaw-instance.ts          # DO: lifecycle state machine, reconciliation, two-phase destroy
@@ -132,7 +130,6 @@ The alarm runs for ALL statuses (not just `running`). `destroying` short-circuit
 | `DISCORD_DM_POLICY`                    | Discord DM policy (passed through to machine)                                                                                                                           |
 | `OPENCLAW_ALLOWED_ORIGINS`             | Comma-separated origins for Control UI WebSocket (e.g., `http://localhost:3000,http://localhost:8795`). Production: `https://claw.kilo.ai,https://claw.kilosessions.ai` |
 | `DEV_MODE`                             | Enable dev mode features                                                                                                                                                |
-| `DEBUG_ROUTES` / `DEBUG_ROUTES_SECRET` | Enable debug endpoints                                                                                                                                                  |
 
 ### Fly.io Regions
 
@@ -169,7 +166,6 @@ Before submitting any change:
 | App DO (per-user Fly App lifecycle)   | `src/durable-objects/kiloclaw-app.test.ts`            |
 | DO lifecycle, reconciliation, destroy | `src/durable-objects/kiloclaw-instance.test.ts`       |
 | Encryption / decryption               | `src/utils/encryption.test.ts`                        |
-| Debug route gating                    | `src/auth/debug-gate.test.ts`                         |
 | Sandbox ID derivation                 | `src/auth/sandbox-id.test.ts`                         |
 | Gateway token derivation              | `src/auth/gateway-token.test.ts`                      |
 

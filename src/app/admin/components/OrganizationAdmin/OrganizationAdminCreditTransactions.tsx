@@ -24,6 +24,38 @@ export function OrganizationAdminCreditTransactions({
   const trpc = useTRPC();
   const { data: orgData } = useOrganizationWithMembers(organizationId);
 
+  const consumeCreditsMutation = useMutation({
+    mutationFn: async (amount_usd: number) => {
+      const response = await fetch(
+        `/admin/api/organizations/${encodeURIComponent(organizationId)}/consume-credits`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount_usd }),
+        }
+      );
+      if (!response.ok) {
+        const data: { error?: string } = await response.json();
+        throw new Error(data.error || 'Failed to consume credits');
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.organizations.creditTransactions.queryKey({ organizationId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.organizations.getCreditBlocks.queryKey({ organizationId }),
+      });
+      toast.success('Credits consumed');
+    },
+    onError: err => {
+      toast.error(`Failed: ${err.message}`);
+    },
+  });
+
   const forceExpirationMutation = useMutation<void, Error>({
     mutationFn: async () => {
       const response = await fetch(
@@ -41,6 +73,9 @@ export function OrganizationAdminCreditTransactions({
       });
       void queryClient.invalidateQueries({
         queryKey: trpc.organizations.creditTransactions.queryKey({ organizationId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.organizations.getCreditBlocks.queryKey({ organizationId }),
       });
       toast.success('Expiration check completed');
     },
@@ -111,6 +146,31 @@ export function OrganizationAdminCreditTransactions({
                 'Force expiration check'
               )}
             </Button>
+            {process.env.NODE_ENV !== 'production' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const input = window.prompt('Amount to consume (USD):');
+                  if (input) {
+                    const amount = parseFloat(input);
+                    if (!isNaN(amount) && amount > 0) {
+                      consumeCreditsMutation.mutate(amount);
+                    }
+                  }
+                }}
+                disabled={consumeCreditsMutation.isPending}
+              >
+                {consumeCreditsMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    Consuming...
+                  </>
+                ) : (
+                  'Consume Credits (Dev)'
+                )}
+              </Button>
+            )}
           </div>
         </div>
         <CardDescription>Recent credit transactions for this organization</CardDescription>

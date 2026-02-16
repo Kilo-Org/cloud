@@ -55,8 +55,9 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
 
-  // OpenCode specific property
+  // OpenCode specific properties
   description?: string;
+  usage?: { include: boolean };
 };
 
 export type OpenRouterAssistantMessage = OpenAI.ChatCompletionAssistantMessageParam & {

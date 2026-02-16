@@ -15,4 +15,10 @@
   },
 
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RigDO", "TownDO", "AgentIdentityDO"] }],
+
+  // Test secrets — plain text vars used in place of secrets_store_secrets
+  "vars": {
+    "INTERNAL_API_SECRET": "test-internal-secret",
+    "GASTOWN_JWT_SECRET": "test-jwt-secret-must-be-at-least-32-chars-long",
+  },
 }

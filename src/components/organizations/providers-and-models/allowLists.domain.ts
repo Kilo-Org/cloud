@@ -124,9 +124,13 @@ export function computeAllowedModelIds(
     if (enabledProviderSlugs) {
       const providersForModel = modelProvidersIndex.get(normalizedModelId);
       if (providersForModel) {
-        const hasEnabledProvider = [...providersForModel].some(providerSlug =>
-          enabledProviderSlugs.has(providerSlug)
-        );
+        let hasEnabledProvider = false;
+        for (const providerSlug of providersForModel) {
+          if (enabledProviderSlugs.has(providerSlug)) {
+            hasEnabledProvider = true;
+            break;
+          }
+        }
         if (!hasEnabledProvider) {
           continue;
         }
@@ -178,7 +182,13 @@ export function computeModelsOnlyFromProvider(params: {
     if (!providersForModel) continue;
 
     // Check if this model has any enabled providers remaining
-    const hasEnabledProvider = [...providersForModel].some(p => enabledAfterDisable.has(p));
+    let hasEnabledProvider = false;
+    for (const p of providersForModel) {
+      if (enabledAfterDisable.has(p)) {
+        hasEnabledProvider = true;
+        break;
+      }
+    }
     if (!hasEnabledProvider) {
       orphanedModels.push(modelId);
     }

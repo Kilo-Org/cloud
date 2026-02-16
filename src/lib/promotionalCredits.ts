@@ -208,6 +208,7 @@ export async function grantCreditForCategoryConfig(
         .update(organizations)
         .set({
           microdollars_balance: sql`${organizations.microdollars_balance} + ${toMicrodollars(amount_usd)}`,
+          total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
         })
         .where(eq(organizations.id, organization_id));
 

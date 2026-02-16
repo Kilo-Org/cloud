@@ -287,6 +287,7 @@ export const organizationAdminRouter = createTRPCRouter({
           .update(organizations)
           .set({
             microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
+            total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
           })
           .where(eq(organizations.id, organizationId));
       });
@@ -346,6 +347,7 @@ export const organizationAdminRouter = createTRPCRouter({
           .update(organizations)
           .set({
             microdollars_balance: 0,
+            total_microdollars_acquired: sql`${organizations.microdollars_used}`,
           })
           .where(eq(organizations.id, organizationId));
 

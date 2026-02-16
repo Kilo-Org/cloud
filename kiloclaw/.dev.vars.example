@@ -11,15 +11,21 @@ WORKER_ENV=development
 # KILOCODE_API_BASE_URL=https://api.kilo.ai/api/openrouter/
 
 # Fly.io Machines API
-# Get your API token from: https://fly.io/docs/flyctl/tokens/
+# Get an org-scoped token: fly tokens create org
 FLY_API_TOKEN=fo1_...
+# Your Fly org slug (run: fly orgs list)
+FLY_ORG_SLUG=personal
+# Shared Docker image registry app (images are pushed here, referenced by all per-user apps)
+FLY_REGISTRY_APP=kiloclaw-machines-dev
+# Legacy fallback for existing instances without per-user apps.
+# New instances get per-user apps (acct-{hash}) created automatically.
 FLY_APP_NAME=kiloclaw-machines
 # Default region for new users. Comma-separated priority list of region codes or aliases.
 # Fly tries the first region, falls back to the next if unavailable.
 # Examples: "us,eu" (try US first, then Europe), "lhr,fra" (London first, then Frankfurt)
 # The platform API can override per-user at provision time.
 FLY_REGION=us,eu
-# Docker image tag on registry.fly.io/{FLY_APP_NAME}:{tag}.
+# Docker image tag on registry.fly.io/{FLY_REGISTRY_APP}:{tag}.
 # In dev, use "latest" or run scripts/push-dev.sh which sets a timestamped tag.
 # In production, pin to a version (e.g., v40, sha-abc1234).
 FLY_IMAGE_TAG=latest

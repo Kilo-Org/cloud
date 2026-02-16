@@ -2,17 +2,38 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../types';
 import * as fly from '../fly/client';
 import type { FlyClientConfig } from '../fly/client';
+import { appNameFromUserId } from '../fly/apps';
 
 /**
  * Debug routes for inspecting Fly Machine state.
  *
- * All debug routes require a ?sandboxId= or ?machineId= query parameter.
+ * Routes that need a Fly app context accept ?userId= to derive the per-user
+ * app name. Falls back to FLY_APP_NAME for legacy instances.
  * Gated by debugRoutesGate (internal API key or debug secret).
  */
 const debug = new Hono<AppEnv>();
 
-function getFlyConfig(env: AppEnv['Bindings']): FlyClientConfig | null {
-  if (!env.FLY_API_TOKEN || !env.FLY_APP_NAME) return null;
+/**
+ * Resolve the Fly app name for a debug request.
+ * Prefers per-user app derived from ?userId=, falls back to legacy FLY_APP_NAME.
+ */
+async function resolveDebugFlyConfig(
+  env: AppEnv['Bindings'],
+  userId: string | undefined
+): Promise<FlyClientConfig | null> {
+  if (!env.FLY_API_TOKEN) return null;
+
+  if (userId) {
+    // Look up from Instance DO first (may have a cached flyAppName)
+    const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(userId));
+    const status = await stub.getStatus();
+    const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
+    const appName = status.flyAppName ?? (await appNameFromUserId(userId, prefix));
+    return { apiToken: env.FLY_API_TOKEN, appName };
+  }
+
+  // Legacy fallback
+  if (!env.FLY_APP_NAME) return null;
   return { apiToken: env.FLY_API_TOKEN, appName: env.FLY_APP_NAME };
 }
 
@@ -21,8 +42,10 @@ debug.get('/machine', async c => {
   const machineId = c.req.query('machineId');
   if (!machineId) return c.json({ error: 'machineId query parameter is required' }, 400);
 
-  const flyConfig = getFlyConfig(c.env);
-  if (!flyConfig) return c.json({ error: 'Fly API not configured' }, 503);
+  const userId = c.req.query('userId');
+  const flyConfig = await resolveDebugFlyConfig(c.env, userId);
+  if (!flyConfig)
+    return c.json({ error: 'Fly API not configured (provide ?userId= or set FLY_APP_NAME)' }, 503);
 
   try {
     const machine = await fly.getMachine(flyConfig, machineId);
@@ -38,8 +61,10 @@ debug.get('/gateway-api', async c => {
   const machineId = c.req.query('machineId');
   if (!machineId) return c.json({ error: 'machineId query parameter is required' }, 400);
 
-  const flyConfig = getFlyConfig(c.env);
-  if (!flyConfig) return c.json({ error: 'Fly API not configured' }, 503);
+  const userId = c.req.query('userId');
+  const flyConfig = await resolveDebugFlyConfig(c.env, userId);
+  if (!flyConfig)
+    return c.json({ error: 'Fly API not configured (provide ?userId= or set FLY_APP_NAME)' }, 503);
 
   const path = c.req.query('path') || '/';
 
@@ -153,6 +178,8 @@ debug.get('/env', async c => {
     has_kilocode_base_url_override: !!c.env.KILOCODE_API_BASE_URL,
     has_fly_api_token: !!c.env.FLY_API_TOKEN,
     fly_app_name: c.env.FLY_APP_NAME ?? null,
+    fly_registry_app: c.env.FLY_REGISTRY_APP ?? null,
+    fly_org_slug: c.env.FLY_ORG_SLUG ?? null,
     fly_region: c.env.FLY_REGION ?? null,
     dev_mode: c.env.DEV_MODE,
     debug_routes: c.env.DEBUG_ROUTES,

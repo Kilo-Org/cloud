@@ -22,8 +22,9 @@ import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { debugRoutesGate } from './auth/debug-gate';
 
-// Export the KiloClawInstance DO (matches wrangler.jsonc class_name)
+// Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
+export { KiloClawApp } from './durable-objects/kiloclaw-app';
 
 // =============================================================================
 // Helpers
@@ -46,7 +47,8 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
   if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
   if (!env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
-  if (!env.FLY_APP_NAME) missing.push('FLY_APP_NAME');
+  if (!env.FLY_ORG_SLUG) missing.push('FLY_ORG_SLUG');
+  if (!env.FLY_REGISTRY_APP) missing.push('FLY_REGISTRY_APP');
   return missing;
 }
 
@@ -93,7 +95,8 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
     if (!c.env.HYPERDRIVE?.connectionString) missing.push('HYPERDRIVE');
     if (!c.env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
     if (!c.env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
-    if (!c.env.FLY_APP_NAME) missing.push('FLY_APP_NAME');
+    if (!c.env.FLY_ORG_SLUG) missing.push('FLY_ORG_SLUG');
+    if (!c.env.FLY_REGISTRY_APP) missing.push('FLY_REGISTRY_APP');
     if (missing.length > 0) {
       console.error('[CONFIG] Platform route missing bindings:', missing.join(', '));
       return c.json({ error: 'Configuration error', missing }, 503);
@@ -198,22 +201,23 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
 }
 
 /**
- * Resolve the flyMachineId and status for the current user from their DO.
+ * Resolve the flyMachineId, flyAppName, and status for the current user from their DO.
  * Returns null machineId if the instance is destroying (blocks proxy during teardown).
  */
 async function resolveInstance(c: Context<AppEnv>): Promise<{
   machineId: string | null;
+  flyAppName: string | null;
   status: string | null;
 }> {
   const userId = c.get('userId');
-  if (!userId) return { machineId: null, status: null };
+  if (!userId) return { machineId: null, flyAppName: null, status: null };
 
   const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
   const s = await stub.getStatus();
 
-  if (s.status === 'destroying') return { machineId: null, status: 'destroying' };
+  if (s.status === 'destroying') return { machineId: null, flyAppName: null, status: 'destroying' };
 
-  return { machineId: s.flyMachineId, status: s.status };
+  return { machineId: s.flyMachineId, flyAppName: s.flyAppName, status: s.status };
 }
 
 app.all('*', async c => {
@@ -225,12 +229,7 @@ app.all('*', async c => {
     );
   }
 
-  const appName = c.env.FLY_APP_NAME;
-  if (!appName) {
-    return c.json({ error: 'FLY_APP_NAME not configured' }, 503);
-  }
-
-  const { machineId, status } = await resolveInstance(c);
+  const { machineId, flyAppName, status } = await resolveInstance(c);
   if (status === 'destroying') {
     return c.json(
       { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
@@ -245,6 +244,12 @@ app.all('*', async c => {
       },
       404
     );
+  }
+
+  // Per-user app name, with legacy fallback for existing instances
+  const appName = flyAppName ?? c.env.FLY_APP_NAME;
+  if (!appName) {
+    return c.json({ error: 'No Fly app name for this instance' }, 503);
   }
 
   const request = c.req.raw;

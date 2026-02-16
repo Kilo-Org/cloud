@@ -109,7 +109,7 @@ export const METADATA_KEY_SANDBOX_ID = 'kiloclaw_sandbox_id';
 type MachineIdentity = { userId: string; sandboxId: string };
 
 function buildMachineConfig(
-  appName: string,
+  registryApp: string,
   imageTag: string,
   envVars: Record<string, string>,
   guest: FlyMachineConfig['guest'],
@@ -117,7 +117,7 @@ function buildMachineConfig(
   identity: MachineIdentity
 ): FlyMachineConfig {
   return {
-    image: `registry.fly.io/${appName}:${imageTag}`,
+    image: `registry.fly.io/${registryApp}:${imageTag}`,
     env: envVars,
     guest,
     services: [
@@ -230,6 +230,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private provisionedAt: number | null = null;
   private lastStartedAt: number | null = null;
   private lastStoppedAt: number | null = null;
+  private flyAppName: string | null = null;
   private flyMachineId: string | null = null;
   private flyVolumeId: string | null = null;
   private flyRegion: string | null = null;
@@ -263,6 +264,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.provisionedAt = s.provisionedAt;
       this.lastStartedAt = s.lastStartedAt;
       this.lastStoppedAt = s.lastStoppedAt;
+      this.flyAppName = s.flyAppName;
       this.flyMachineId = s.flyMachineId;
       this.flyVolumeId = s.flyVolumeId;
       this.flyRegion = s.flyRegion;
@@ -302,6 +304,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const sandboxId = sandboxIdFromUserId(userId);
     const isNew = !this.status;
 
+    // Ensure per-user Fly App exists on first provision only.
+    // Legacy instances (flyAppName = null with existing flyMachineId/flyVolumeId)
+    // must NOT be reassigned: their resources live in the legacy FLY_APP_NAME app.
+    // They get a per-user app only after a full destroy + fresh provision cycle.
+    if (isNew && !this.flyAppName) {
+      const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(userId));
+      const { appName } = await appStub.ensureApp(userId);
+      this.flyAppName = appName;
+      await this.ctx.storage.put(storageUpdate({ flyAppName: appName }));
+      console.log('[DO] Per-user Fly App ensured:', appName);
+    }
+
     // Create Fly Volume on first provision
     if (isNew && !this.flyVolumeId) {
       const flyConfig = this.getFlyConfig();
@@ -336,6 +350,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           provisionedAt: Date.now(),
           lastStartedAt: null,
           lastStoppedAt: null,
+          flyAppName: this.flyAppName,
           flyMachineId: this.flyMachineId,
           flyVolumeId: this.flyVolumeId,
           flyRegion: this.flyRegion,
@@ -468,7 +483,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
     const identity = { userId: this.userId, sandboxId: this.sandboxId };
     const machineConfig = buildMachineConfig(
-      flyConfig.appName,
+      this.getRegistryApp(),
       imageTag,
       envVars,
       guest,
@@ -599,6 +614,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     envVarCount: number;
     secretCount: number;
     channelCount: number;
+    flyAppName: string | null;
     flyMachineId: string | null;
     flyVolumeId: string | null;
     flyRegion: string | null;
@@ -615,6 +631,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       envVarCount: this.envVars ? Object.keys(this.envVars).length : 0,
       secretCount: this.encryptedSecrets ? Object.keys(this.encryptedSecrets).length : 0,
       channelCount: this.channels ? Object.values(this.channels).filter(Boolean).length : 0,
+      flyAppName: this.flyAppName,
       flyMachineId: this.flyMachineId,
       flyVolumeId: this.flyVolumeId,
       flyRegion: this.flyRegion,
@@ -657,7 +674,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
       const identity = { userId: this.userId ?? '', sandboxId: this.sandboxId ?? '' };
       const machineConfig = buildMachineConfig(
-        flyConfig.appName,
+        this.getRegistryApp(),
         imageTag,
         envVars,
         guest,
@@ -1069,6 +1086,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.provisionedAt = null;
     this.lastStartedAt = null;
     this.lastStoppedAt = null;
+    this.flyAppName = null;
     this.flyMachineId = null;
     this.flyVolumeId = null;
     this.flyRegion = null;
@@ -1086,16 +1104,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // Infrastructure helpers
   // ========================================================================
 
+  /**
+   * Shared Docker image registry app name.
+   * Images are pushed to this app's registry and referenced by all per-user apps.
+   */
+  private getRegistryApp(): string {
+    return this.env.FLY_REGISTRY_APP ?? this.env.FLY_APP_NAME ?? 'kiloclaw-machines';
+  }
+
   private getFlyConfig(): FlyClientConfig {
     if (!this.env.FLY_API_TOKEN) {
       throw new Error('FLY_API_TOKEN is not configured');
     }
-    if (!this.env.FLY_APP_NAME) {
-      throw new Error('FLY_APP_NAME is not configured');
+    // Per-user app name, with legacy fallback for existing instances
+    const appName = this.flyAppName ?? this.env.FLY_APP_NAME;
+    if (!appName) {
+      throw new Error('No Fly app name: flyAppName not set and FLY_APP_NAME not configured');
     }
     return {
       apiToken: this.env.FLY_API_TOKEN,
-      appName: this.env.FLY_APP_NAME,
+      appName,
     };
   }
 
@@ -1212,6 +1240,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const encryptedSecrets: Record<string, EncryptedEnvelope> | null = null;
       const channels = null;
 
+      // Recover flyAppName from the App DO (which persists independently).
+      // If the user has a per-user app, the App DO still knows about it.
+      // If not (legacy user), getAppName() returns null and getFlyConfig()
+      // falls back to env.FLY_APP_NAME.
+      const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(userId));
+      const recoveredAppName = await appStub.getAppName();
+
       await this.ctx.storage.put(
         storageUpdate({
           userId,
@@ -1223,6 +1258,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           provisionedAt: Date.now(),
           lastStartedAt: null,
           lastStoppedAt: null,
+          flyAppName: recoveredAppName,
           flyMachineId: null,
           flyVolumeId: null,
           flyRegion: null,
@@ -1242,6 +1278,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.provisionedAt = Date.now();
       this.lastStartedAt = null;
       this.lastStoppedAt = null;
+      this.flyAppName = recoveredAppName;
       this.flyMachineId = null;
       this.flyVolumeId = null;
       this.flyRegion = null;

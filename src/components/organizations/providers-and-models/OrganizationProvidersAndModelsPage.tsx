@@ -200,7 +200,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
       // Find provider display name and model details
       const provider = openRouterProviders.find(p => p.slug === providerSlug);
-      const providerDisplayName = provider?.name ?? providerSlug;
+      const providerDisplayName = provider?.displayName ?? providerSlug;
 
       const modelsToRemove = currentlyEnabledOrphanedModelIds
         .map(modelId => {

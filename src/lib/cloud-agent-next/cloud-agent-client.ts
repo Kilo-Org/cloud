@@ -81,6 +81,8 @@ export type PrepareSessionInput = {
   // Generic git params for GitLab and other providers
   gitUrl?: string;
   gitToken?: string;
+  /** Explicit platform type for correct env var setup (avoids URL-based detection) */
+  platform?: 'github' | 'gitlab';
   // Common params
   kilocodeOrganizationId?: string;
   envVars?: Record<string, string>;

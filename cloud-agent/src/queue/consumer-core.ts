@@ -243,6 +243,7 @@ async function processMessage(msg: ExecutionMessage, env: Env, deps: ConsumerDep
           githubToken: ctx.githubToken,
           gitUrl: ctx.gitUrl,
           gitToken: ctx.gitToken,
+          platform: ctx.platform,
           env,
           envVars: ctx.envVars,
           encryptedSecrets: ctx.encryptedSecrets,

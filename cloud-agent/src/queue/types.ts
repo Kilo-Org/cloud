@@ -69,6 +69,8 @@ export type InitializeContext = {
   isPreparedSession?: boolean;
   /** GitHub App type for selecting correct credentials and slug */
   githubAppType?: 'standard' | 'lite';
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
 };
 
 /**
@@ -156,6 +158,8 @@ export type StartExecutionV2Request =
       condenseOnComplete?: boolean;
       upstreamBranch?: string;
       appendSystemPrompt?: string;
+      /** Git platform type for correct token/env var handling */
+      platform?: 'github' | 'gitlab';
     }
   | {
       kind: 'initiatePrepared';

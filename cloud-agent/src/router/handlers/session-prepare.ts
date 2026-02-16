@@ -193,6 +193,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         githubAppType: resolvedGithubAppType,
         gitUrl: input.gitUrl,
         gitToken: input.gitToken,
+        platform: input.platform,
         envVars: input.envVars,
         encryptedSecrets: input.encryptedSecrets,
         setupCommands: input.setupCommands,

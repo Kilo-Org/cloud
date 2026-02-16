@@ -34,6 +34,29 @@ const CreateOrganizationSchema = z.object({
 
 type CreateOrganizationForm = z.infer<typeof CreateOrganizationSchema>;
 
+const DEFAULT_ERROR = 'Failed to create organization. Please try again.';
+
+function extractErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return DEFAULT_ERROR;
+  try {
+    const parsed: unknown = JSON.parse(error.message);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const first: unknown = parsed[0];
+      if (
+        first &&
+        typeof first === 'object' &&
+        'message' in first &&
+        typeof first.message === 'string'
+      ) {
+        return first.message;
+      }
+    }
+  } catch {
+    // not JSON — use raw message
+  }
+  return error.message || DEFAULT_ERROR;
+}
+
 type CreateOrganizationPageProps = {
   mockSelectedOrgName?: string; // For Storybook
 };
@@ -107,10 +130,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
     } catch (error) {
       console.error('Failed to create organization:', error);
       setErrors({
-        general:
-          error instanceof Error
-            ? error.message
-            : 'Failed to create organization. Please try again.',
+        general: extractErrorMessage(error),
       });
       setIsSubmitting(false);
     }

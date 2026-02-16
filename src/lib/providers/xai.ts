@@ -26,6 +26,7 @@ export function applyXaiModelSettings(
   extraHeaders: Record<string, string>
 ) {
   if (provider === 'martian') {
+    delete requestToMutate.description;
     delete requestToMutate.provider;
   }
 

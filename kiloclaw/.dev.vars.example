@@ -13,7 +13,7 @@ WORKER_ENV=development
 # Fly.io Machines API
 # Get an org-scoped token: fly tokens create org
 FLY_API_TOKEN=fo1_...
-# Your Fly org slug (run: fly orgs list)
+# Your Fly org slug (run: `fly orgs list`)
 FLY_ORG_SLUG=personal
 # Shared Docker image registry app (images are pushed here, referenced by all per-user apps)
 FLY_REGISTRY_APP=kiloclaw-machines-dev

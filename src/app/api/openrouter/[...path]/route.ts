@@ -30,6 +30,7 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  slackbotFreeModelEndedResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -237,6 +238,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (isDeadFreeModel(originalModelIdLowerCased)) {
+    if (isSlackbotOnlyModel(originalModelIdLowerCased)) {
+      return slackbotFreeModelEndedResponse();
+    }
     return alphaPeriodEndedResponse();
   }
 

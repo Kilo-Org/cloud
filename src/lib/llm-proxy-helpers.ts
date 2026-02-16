@@ -104,6 +104,13 @@ export function alphaPeriodEndedResponse() {
   return NextResponse.json({ error: error, message: error }, { status: 404 });
 }
 
+export function slackbotFreeModelEndedResponse() {
+  const error = 'slackbot_free_model_ended';
+  const message =
+    'The free promotion for this model has ended. Add credits at https://app.kilo.ai to continue using Kilo.';
+  return NextResponse.json({ error, message }, { status: 404 });
+}
+
 async function stealthModelError(response: Response) {
   const error = 'Stealth model unable to process request';
   warnExceptInTest(`Responding with ${response.status} ${error}`);

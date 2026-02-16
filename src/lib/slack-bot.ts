@@ -478,7 +478,15 @@ export async function processKiloBotMessage(
 
     if (!result.ok) {
       console.error('[SlackBot] API error response:', result.error);
-      finalResponse = `Sorry, there was an error calling the AI service (${result.status}): ${result.error.slice(0, 200)}`;
+      if (result.error.includes('slackbot_free_model_ended')) {
+        finalResponse =
+          '🎉 The free promotion for this model has ended.\n\n' +
+          'To keep using *Kilo Bot*, add credits to your account:\n' +
+          '👉 <https://app.kilo.ai|Add credits at app.kilo.ai>\n\n' +
+          '_Thank you for trying Kilo!_';
+      } else {
+        finalResponse = `Sorry, there was an error calling the AI service (${result.status}): ${result.error.slice(0, 200)}`;
+      }
       break;
     }
 

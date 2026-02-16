@@ -817,6 +817,21 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 
+export const custom_llm = pgTable('custom_llm', {
+  public_id: text().notNull().primaryKey(),
+  display_name: text().notNull(),
+  context_length: integer().notNull(),
+  max_completion_tokens: integer().notNull(),
+  internal_id: text().notNull(),
+  provider: text().notNull().$type<'anthropic' | 'openai' | 'xai'>(),
+  base_url: text().notNull(),
+  api_key: text().notNull(),
+  verbosity: text().$type<'low' | 'medium' | 'high'>(),
+  organization_ids: jsonb().notNull().$type<string[]>(),
+});
+
+export type CustomLlm = typeof custom_llm.$inferSelect;
+
 export const user_admin_notes = pgTable(
   'user_admin_notes',
   {
@@ -1920,6 +1935,12 @@ export const cloud_agent_code_reviews = pgTable(
     base_ref: text().notNull(), // Base branch (e.g., "main")
     head_ref: text().notNull(), // PR branch (e.g., "feature/xyz")
     head_sha: text().notNull(), // Latest commit SHA
+
+    // Platform (github, gitlab, etc.)
+    platform: text().notNull().default('github'),
+
+    // Platform-specific project ID (e.g., GitLab numeric project ID)
+    platform_project_id: integer(),
 
     // Cloud agent session
     session_id: text(), // Cloud agent session ID (agent_xxx)

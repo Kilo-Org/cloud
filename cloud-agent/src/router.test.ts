@@ -282,6 +282,7 @@ describe('router sessionId validation', () => {
                 send: vi.fn().mockResolvedValue(undefined),
               } as unknown as TRPCContext['env']['EXECUTION_QUEUE'],
               NEXTAUTH_SECRET: 'test-secret',
+              R2_BUCKET: {} as unknown as TRPCContext['env']['R2_BUCKET'],
             },
           };
           cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -629,6 +630,7 @@ describe('router sessionId validation', () => {
               send: vi.fn().mockResolvedValue(undefined),
             } as unknown as TRPCContext['env']['EXECUTION_QUEUE'],
             NEXTAUTH_SECRET: 'test-secret',
+            R2_BUCKET: {} as unknown as TRPCContext['env']['R2_BUCKET'],
           },
         };
 
@@ -838,6 +840,7 @@ describe('router sessionId validation', () => {
               send: vi.fn().mockResolvedValue(undefined),
             } as unknown as TRPCContext['env']['EXECUTION_QUEUE'],
             NEXTAUTH_SECRET: 'test-secret',
+            R2_BUCKET: {} as unknown as TRPCContext['env']['R2_BUCKET'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;

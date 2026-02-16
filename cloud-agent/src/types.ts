@@ -65,6 +65,12 @@ export type SessionContext = {
   botId?: string;
   githubRepo?: string;
   githubToken?: string;
+  /** Generic git URL (e.g., GitLab, Bitbucket) */
+  gitUrl?: string;
+  /** Token for generic git authentication (e.g., GitLab token) */
+  gitToken?: string;
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
 };
 /** Result of interrupting a session's running processes */
@@ -133,6 +139,8 @@ export type Env = {
    * Used for looking up GitHub installation IDs from the database.
    */
   HYPERDRIVE?: { connectionString: string };
+  /** R2 bucket for object storage */
+  R2_BUCKET: R2Bucket;
 };
 
 /** tRPC context passed to all procedures */

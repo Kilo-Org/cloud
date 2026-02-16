@@ -302,7 +302,11 @@ export function AnalysisJobsCard({ organizationId, onGitHubError }: AnalysisJobs
                   {job.cli_session_id && (
                     <div className="mt-1">
                       <Link
-                        href={`/cloud/chat?sessionId=${job.cli_session_id}`}
+                        href={
+                          organizationId
+                            ? `/organizations/${organizationId}/cloud/chat?sessionId=${job.cli_session_id}`
+                            : `/cloud/chat?sessionId=${job.cli_session_id}`
+                        }
                         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
                       >
                         <ExternalLink className="h-3 w-3" />

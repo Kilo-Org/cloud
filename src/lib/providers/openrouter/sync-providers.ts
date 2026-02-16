@@ -118,7 +118,7 @@ export async function syncProviders() {
   );
 
   const mappedExtraModels = kiloFreeModels
-    .filter(model => model.is_enabled)
+    .filter(model => model.is_enabled && model.inference_providers.length > 0)
     .map(kfm => {
       const model = convertFromKiloModel(kfm);
       return {

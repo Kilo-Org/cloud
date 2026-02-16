@@ -22,7 +22,8 @@ import {
 } from '@/lib/providers/anthropic';
 import { applyGigaPotatoProviderSettings } from '@/lib/providers/gigapotato';
 import { getBYOKforOrganization, getBYOKforUser, type BYOKResult } from '@/lib/byok';
-import type { User } from '@/db/schema';
+import type { CustomLlm } from '@/db/schema';
+import { custom_llm, type User } from '@/db/schema';
 import type { OpenRouterInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   inferUserByokProviderForModel,
@@ -32,10 +33,20 @@ import { applyCoreThinkProviderSettings } from '@/lib/providers/corethink';
 import { hasAttemptCompletionTool } from '@/lib/tool-calling';
 import { applyGoogleModelSettings, isGeminiModel } from '@/lib/providers/google';
 import { db } from '@/lib/drizzle';
+import { eq } from 'drizzle-orm';
 import { applyMoonshotProviderSettings, isMoonshotModel } from '@/lib/providers/moonshotai';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import { isOpenAiModel } from '@/lib/providers/openai';
+import { applyQwenModelSettings, isQwenModel } from '@/lib/providers/qwen';
+import type { ProviderId } from '@/lib/providers/provider-id';
+
+export type Provider = {
+  id: ProviderId;
+  apiUrl: string;
+  apiKey: string;
+  hasGenerationEndpoint: boolean;
+};
 
 export const PROVIDERS = {
   OPENROUTER: {
@@ -90,9 +101,7 @@ export const PROVIDERS = {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
-    // Vercel AI Gateway has the generation endpoint: https://vercel.com/docs/ai-gateway/usage#generation-lookup
-    // but it is slow: takes >1min for the generation to appear.
-    hasGenerationEndpoint: false,
+    hasGenerationEndpoint: true,
   },
   XAI: {
     id: 'x-ai',
@@ -100,14 +109,14 @@ export const PROVIDERS = {
     apiKey: getEnvVariable('XAI_API_KEY'),
     hasGenerationEndpoint: false,
   },
-} as const;
+} as const satisfies Record<string, Provider>;
 
 export async function getProvider(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest,
   user: User | AnonymousUserContext,
   organizationId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult | null }> {
+): Promise<{ provider: Provider; userByok: BYOKResult | null; customLlm: CustomLlm | null }> {
   if (!isAnonymousContext(user)) {
     const modelProvider = inferUserByokProviderForModel(requestedModel);
     const userByok = !modelProvider
@@ -116,12 +125,31 @@ export async function getProvider(
         ? await getBYOKforOrganization(db, organizationId, modelProvider)
         : await getBYOKforUser(db, user.id, modelProvider);
     if (userByok) {
-      return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok };
+      return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok, customLlm: null };
+    }
+  }
+
+  if (requestedModel.startsWith('kilo/') && organizationId) {
+    const [customLlm] = await db
+      .select()
+      .from(custom_llm)
+      .where(eq(custom_llm.public_id, requestedModel));
+    if (customLlm && customLlm.organization_ids.includes(organizationId)) {
+      return {
+        provider: {
+          id: 'custom',
+          apiUrl: customLlm.base_url,
+          apiKey: customLlm.api_key,
+          hasGenerationEndpoint: true,
+        },
+        userByok: null,
+        customLlm,
+      };
     }
   }
 
   if (await shouldRouteToVercel(requestedModel, request, user.id)) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null };
+    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, customLlm: null };
   }
 
   const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
@@ -129,6 +157,7 @@ export async function getProvider(
     provider:
       Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway) ?? PROVIDERS.OPENROUTER,
     userByok: null,
+    customLlm: null,
   };
 }
 
@@ -168,6 +197,9 @@ function getPreferredProvider(requestedModel: string): OpenRouterInferenceProvid
   if (isMoonshotModel(requestedModel)) {
     return OpenRouterInferenceProviderIdSchema.enum.moonshotai;
   }
+  if (requestedModel.startsWith('z-ai/')) {
+    return OpenRouterInferenceProviderIdSchema.enum['z-ai'];
+  }
   return null;
 }
 
@@ -199,7 +231,9 @@ export function applyProviderSpecificLogic(
   const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
   if (kiloFreeModel) {
     requestToMutate.model = kiloFreeModel.internal_id;
-    requestToMutate.provider = { only: kiloFreeModel.inference_providers };
+    if (kiloFreeModel.inference_providers.length > 0) {
+      requestToMutate.provider = { only: kiloFreeModel.inference_providers };
+    }
   }
 
   if (isAnthropicModel(requestedModel)) {
@@ -220,6 +254,10 @@ export function applyProviderSpecificLogic(
 
   if (isMoonshotModel(requestedModel)) {
     applyMoonshotProviderSettings(requestToMutate);
+  }
+
+  if (isQwenModel(requestedModel)) {
+    applyQwenModelSettings(requestToMutate);
   }
 
   if (provider.id === 'gigapotato') {
@@ -244,8 +282,6 @@ export function applyProviderSpecificLogic(
     applyVercelSettings(requestedModel, requestToMutate, extraHeaders, userByok);
   }
 }
-
-export type Provider = (typeof PROVIDERS)[keyof typeof PROVIDERS];
 
 export async function openRouterRequest({
   path,

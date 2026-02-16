@@ -30,7 +30,7 @@ import type {
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import { SessionService, type PreparedSession } from '../session-service.js';
 import { logger } from '../logger.js';
-import { updateGitRemoteToken } from '../workspace.js';
+import { getKilocodeLogFilePath, updateGitRemoteToken } from '../workspace.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -243,6 +243,7 @@ async function processMessage(msg: ExecutionMessage, env: Env, deps: ConsumerDep
           githubToken: ctx.githubToken,
           gitUrl: ctx.gitUrl,
           gitToken: ctx.gitToken,
+          platform: ctx.platform,
           env,
           envVars: ctx.envVars,
           encryptedSecrets: ctx.encryptedSecrets,
@@ -373,6 +374,7 @@ async function processMessage(msg: ExecutionMessage, env: Env, deps: ConsumerDep
     UPSTREAM_BRANCH: upstreamBranch,
     INGEST_URL: doUrl,
     WORKSPACE_PATH: prepared.context.workspacePath,
+    CLI_LOG_PATH: getKilocodeLogFilePath(prepared.context.sessionHome),
   };
 
   logger.withFields({ promptFile }).info('Starting wrapper process');

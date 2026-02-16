@@ -187,6 +187,48 @@ export default class KilocodeWorker extends WorkerEntrypoint<Env> {
         return stub.fetch(doRequest);
       }
 
+      const logsMatch = url.pathname.match(
+        /^\/sessions\/([^/]+)\/([^/]+)\/logs\/([^/]+)\/([^/]+)$/
+      );
+      if (logsMatch && request.method === 'PUT') {
+        const allowedFilenames = new Set(['logs.tar.gz']);
+        let userId: string, sessionId: string, executionId: string, filename: string;
+        try {
+          userId = decodeURIComponent(logsMatch[1]);
+          sessionId = decodeURIComponent(logsMatch[2]);
+          executionId = decodeURIComponent(logsMatch[3]);
+          filename = decodeURIComponent(logsMatch[4]);
+        } catch {
+          return new Response('Invalid URL encoding', { status: 400 });
+        }
+        if (!allowedFilenames.has(filename)) {
+          return new Response('Invalid filename', { status: 400 });
+        }
+        const authHeader = request.headers.get('Authorization');
+        const authResult = validateKiloToken(authHeader, this.env.NEXTAUTH_SECRET);
+        if (!authResult.success) {
+          return new Response(authResult.error, { status: 401 });
+        }
+        if (authResult.userId !== userId) {
+          return new Response('Token does not match session user', { status: 403 });
+        }
+        if (!request.body) {
+          return new Response('Missing request body', { status: 400 });
+        }
+        try {
+          const safeUserId = encodeURIComponent(userId);
+          const body = await request.arrayBuffer();
+          await this.env.R2_BUCKET.put(
+            `logs/${safeUserId}/${sessionId}/${executionId}/logs.tar.gz`,
+            body
+          );
+        } catch (err) {
+          console.error('[log-upload] R2 put failed:', err);
+          return new Response('R2 write failed', { status: 500 });
+        }
+        return new Response(null, { status: 204 });
+      }
+
       // Extract procedure name for pre-flight validation
       const procedureName = extractProcedureName(url.pathname);
 

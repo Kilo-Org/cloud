@@ -4,6 +4,7 @@ import { createKilocodeRunner, type KilocodeRunner } from './kilocode-runner.js'
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
+import { createLogUploader } from './log-uploader.js';
 
 // Parse CLI args (execution-specific)
 const { values: args } = parseArgs({
@@ -24,6 +25,7 @@ let isShuttingDown = false;
 let runner: KilocodeRunner | null = null;
 let conn: Connection | null = null;
 let sentFatalError = false;
+let logUploader: ReturnType<typeof createLogUploader> | null = null;
 
 /** Grace period before force exit (20 seconds) */
 const SHUTDOWN_TIMEOUT_MS = 20_000;
@@ -78,6 +80,25 @@ async function main() {
   });
   conn = connection;
   logToFile('ingest connection established');
+
+  const workerBaseUrl = new URL(ingestUrl.replace('wss://', 'https://').replace('ws://', 'http://'))
+    .origin;
+  const cliLogPath = process.env.CLI_LOG_PATH;
+  const wrapperLogPath = process.env.WRAPPER_LOG_PATH ?? `/tmp/kilocode-wrapper-${executionId}.log`;
+
+  if (cliLogPath) {
+    logUploader = createLogUploader({
+      workerBaseUrl,
+      sessionId,
+      executionId,
+      userId,
+      kilocodeToken,
+      cliLogPath,
+      wrapperLogPath,
+    });
+    logUploader.start();
+    logToFile('log uploader started');
+  }
 
   // 2. Read prompt from file
   const prompt = await Bun.file(promptFile).text();
@@ -185,6 +206,10 @@ async function main() {
 
   // 6. Give buffer a moment to flush, then cleanup
   await new Promise(resolve => setTimeout(resolve, 500));
+  if (logUploader) {
+    await logUploader.uploadNow();
+    logUploader.stop();
+  }
   await connection.close();
   logToFile('wrapper exiting');
   process.exit(result.exitCode);
@@ -216,6 +241,11 @@ function handleShutdown(signal: string) {
     runner.kill('SIGTERM');
   }
 
+  if (logUploader) {
+    logUploader.uploadNow().catch(() => {});
+    logUploader.stop();
+  }
+
   // Force exit after timeout if child doesn't exit
   setTimeout(() => {
     console.error('Force exiting after timeout');
@@ -232,8 +262,12 @@ function handleShutdown(signal: string) {
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 process.on('SIGINT', () => handleShutdown('SIGINT'));
 
-main().catch(err => {
+main().catch(async err => {
   logToFile(`wrapper fatal error ${err instanceof Error ? err.message : String(err)}`);
   console.error('Wrapper fatal error:', err);
+  if (logUploader) {
+    await logUploader.uploadNow().catch(() => {});
+    logUploader.stop();
+  }
   process.exit(1);
 });

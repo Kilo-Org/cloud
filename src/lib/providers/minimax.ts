@@ -8,7 +8,7 @@ export const minimax_m21_free_model = {
     'MiniMax-M2.1 is a lightweight, state-of-the-art large language model optimized for coding, agentic workflows, and modern application development. With only 10 billion activated parameters, it delivers a major jump in real-world capability while maintaining exceptional latency, scalability, and cost efficiency.\n\nCompared to its predecessor, M2.1 delivers cleaner, more concise outputs and faster perceived response times. It shows leading multilingual coding performance across major systems and application languages, achieving 49.4% on Multi-SWE-Bench and 72.5% on SWE-Bench Multilingual, and serves as a versatile agent “brain” for IDEs, coding tools, and general-purpose assistance.',
   context_length: 204800,
   max_completion_tokens: 131072,
-  is_enabled: true,
+  is_enabled: false,
   flags: ['reasoning', 'prompt_cache'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.1',

@@ -650,12 +650,13 @@ export async function createDeployment(params: {
   source: DeploymentSource;
   branch: string;
   createdByUserId: string;
+  createdFrom: 'deploy' | 'app-builder';
   envVars?: PlaintextEnvVar[];
 }): Promise<CreateDeploymentResult> {
-  const { owner, source, branch, createdByUserId, envVars } = params;
+  const { owner, source, branch, createdByUserId, createdFrom, envVars } = params;
 
-  // Temporary: skip payment check for app builder sites
-  if (source.type !== 'app-builder') {
+  // App Builder sites are free to deploy; only check payment for the deploy page
+  if (createdFrom !== 'app-builder') {
     const paymentCheck = await checkOwnerHasEverPaid(owner);
     if (!paymentCheck.hasPaid) {
       return {

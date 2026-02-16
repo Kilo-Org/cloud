@@ -66,10 +66,10 @@ export class KiloClawInternalClient {
     });
   }
 
-  async destroy(userId: string, deleteData?: boolean): Promise<{ ok: true }> {
+  async destroy(userId: string): Promise<{ ok: true }> {
     return this.request('/api/platform/destroy', {
       method: 'POST',
-      body: JSON.stringify({ userId, deleteData }),
+      body: JSON.stringify({ userId }),
     });
   }
 

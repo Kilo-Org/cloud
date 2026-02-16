@@ -51,6 +51,10 @@ export function isFreeModel(model: string): boolean {
   );
 }
 
+export function isRateLimitedModel(model: string): boolean {
+  return kiloFreeModels.some(m => m.public_id === model && m.is_enabled && !m.slackbot_only);
+}
+
 export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {
   return kiloFreeModels.some(m => m.public_id === model && m.is_enabled);
 }
@@ -77,7 +81,7 @@ function isOpenRouterStealthModel(model: string): boolean {
 }
 
 export function extraRequiredProviders(model: string) {
-  return kiloFreeModels.find(m => m.public_id === model)?.inference_providers ?? null;
+  return kiloFreeModels.find(m => m.public_id === model)?.inference_providers ?? [];
 }
 
 export function isDeadFreeModel(model: string): boolean {

@@ -15,6 +15,7 @@ import {
   isDeadFreeModel,
   isSlackbotOnlyModel,
   isKiloStealthModel,
+  isRateLimitedModel,
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
@@ -55,6 +56,8 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
+import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
+import { normalizeModelId } from '@/lib/model-utils';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -121,7 +124,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return invalidRequestResponse();
   }
 
-  if (!requestBodyParsed.model) {
+  delete requestBodyParsed.models; // OpenRouter specific field we do not support
+  if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {
     return modelDoesNotExistResponse();
   }
 
@@ -140,8 +144,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const originalModelIdLowerCased = requestBodyParsed.model.toLowerCase();
 
-  const isRequestedModelFree = isFreeModel(originalModelIdLowerCased);
-
   // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (!ipAddress) {
@@ -151,8 +153,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // For FREE models: check IP rate limit BEFORE auth, log at start
   // Slackbot-only models are exempt from free model rate limits since they're
   // already gated behind the Slack integration (internalApiUse auth).
-  const isSlackbotOnly = isSlackbotOnlyModel(originalModelIdLowerCased);
-  if (isRequestedModelFree && !isSlackbotOnly) {
+  if (isRateLimitedModel(originalModelIdLowerCased)) {
     const rateLimitResult = await checkFreeModelRateLimit(ipAddress);
     if (!rateLimitResult.allowed) {
       console.warn(
@@ -185,7 +186,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (authFailedResponse) {
     // No valid auth
-    if (!isRequestedModelFree) {
+    if (!isFreeModel(originalModelIdLowerCased)) {
       // Paid model requires authentication
       return authFailedResponse;
     }
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRequestedModelFree && !isSlackbotOnly) {
+  if (isRateLimitedModel(originalModelIdLowerCased)) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const taskId = request.headers.get('X-KiloCode-TaskId') ?? undefined;
-  const { provider, userByok } = await getProvider(
+  const { provider, userByok, customLlm } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
     user,
@@ -274,7 +275,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   setTag('ui.ai_model', requestBodyParsed.model);
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user)) {
+  if (!isAnonymousContext(user) && !customLlm) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
     if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
@@ -336,15 +337,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     userByok
   );
 
-  const response = await openRouterRequest({
-    path,
-    search: url.search,
-    method: request.method,
-    body: requestBodyParsed,
-    extraHeaders,
-    provider,
-    signal: request.signal,
-  });
+  const response = customLlm
+    ? await customLlmRequest(customLlm, requestBodyParsed)
+    : await openRouterRequest({
+        path,
+        search: url.search,
+        method: request.method,
+        body: requestBodyParsed,
+        extraHeaders,
+        provider,
+        signal: request.signal,
+      });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
 
   emitApiMetricsForResponse(
@@ -357,7 +360,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
       provider: provider.id,
       requestedModel: requestedModelLowerCased,
-      resolvedModel: originalModelIdLowerCased,
+      resolvedModel: normalizeModelId(originalModelIdLowerCased),
       toolsAvailable,
       toolsUsed,
       ttfbMs,

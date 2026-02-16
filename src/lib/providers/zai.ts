@@ -25,5 +25,5 @@ export const zai_glm5_free_model = {
   flags: ['reasoning', 'prompt_cache'],
   gateway: 'openrouter',
   internal_id: 'z-ai/glm-5',
-  inference_providers: ['novita', 'fireworks'],
+  inference_providers: [],
 } as KiloFreeModel;

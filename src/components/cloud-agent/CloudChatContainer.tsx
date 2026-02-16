@@ -452,6 +452,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     preflightedCloudAgentSessionRef.current = cloudAgentSessionId;
     setNeedsLegacyPrepare(false);
     setPreflightComplete(false);
+    // Reset to false so the DO's initiatedAt is the authoritative source.
+    // Without this, hasSessionBlobs() can eagerly set it to true during DB load
+    // even when the DO has not been initiated (e.g. prepared-but-not-initiated sessions).
+    setIsSessionInitiated(false);
 
     const runPreflight = async () => {
       try {
@@ -745,7 +749,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         if (needsLegacyPrepare && effectiveSessionId && currentDbSessionId) {
           const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
-          const repoParams = buildPrepareSessionRepoParams({ repo: resumeRepo, gitUrl });
+          const repoParams = buildPrepareSessionRepoParams({
+            repo: resumeRepo,
+            platform: gitUrl ? 'gitlab' : 'github',
+          });
           if (!repoParams) {
             setError('Cannot prepare session without a repository.');
             toast.error('Cannot prepare session without a repository.');
@@ -793,7 +800,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         if (!effectiveSessionId) {
           const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
-          const repoParams = buildPrepareSessionRepoParams({ repo: resumeRepo, gitUrl });
+          const repoParams = buildPrepareSessionRepoParams({
+            repo: resumeRepo,
+            platform: gitUrl ? 'gitlab' : 'github',
+          });
           if (!repoParams) {
             setError('Cannot prepare session without a repository.');
             toast.error('Cannot prepare session without a repository.');

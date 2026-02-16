@@ -21,15 +21,56 @@ export function OrganizationAdminContextProvider({
   const session = useSession();
 
   // Get current organization role
-  const actualRole = organizationData?.members?.find(
+  const userEmail = session?.data?.user?.email;
+  const members = organizationData?.members;
+  const matchedMember = members?.find(
     (member: OrganizationMember) =>
-      member.email === session?.data?.user?.email && member.status === 'active'
-  )?.role;
+      member.email === userEmail && member.status === 'active'
+  );
+  const actualRole = matchedMember?.role;
+
+  if (!actualRole && members && userEmail) {
+    console.warn(
+      '[OrgRole] Email match failed — falling back to "member".',
+      {
+        userEmail,
+        organizationId,
+        memberEmails: members.map((m: OrganizationMember) => m.email),
+        memberStatuses: members.map((m: OrganizationMember) => ({
+          email: m.email,
+          status: m.status,
+          role: m.role,
+        })),
+      }
+    );
+  } else if (!members) {
+    console.warn('[OrgRole] Organization members not yet loaded.', {
+      organizationId,
+      userEmail,
+      hasOrgData: !!organizationData,
+    });
+  } else if (!userEmail) {
+    console.warn('[OrgRole] No user email in session.', {
+      organizationId,
+      sessionStatus: session?.status,
+      sessionData: session?.data ? Object.keys(session.data) : null,
+    });
+  }
 
   // Use assumed role if available, otherwise use actual role
   const currentRole =
     assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || actualRole || 'member';
   const isKiloAdmin = assumedRole === 'KILO ADMIN' || session?.data?.isAdmin || false;
+
+  if (currentRole === 'member' && !assumedRole) {
+    console.warn('[OrgRole] Resolved role is "member" (default fallback).', {
+      organizationId,
+      userEmail,
+      actualRole,
+      assumedRole,
+      currentRole,
+    });
+  }
 
   return (
     <OrganizationContextProvider value={{ userRole: currentRole, isKiloAdmin }}>

@@ -16,7 +16,7 @@ export type ManuallyAddedRepository = z.infer<typeof ManuallyAddedRepositorySche
  * Zod schema for CodeReviewAgentConfig
  */
 export const CodeReviewAgentConfigSchema = z.object({
-  review_style: z.enum(['strict', 'balanced', 'lenient']),
+  review_style: z.enum(['strict', 'balanced', 'lenient', 'roast']),
   focus_areas: z.array(z.string()),
   auto_approve_minor: z.boolean().optional(),
   custom_instructions: z.string().nullable().optional(),
@@ -40,6 +40,10 @@ export const RemotePromptTemplateSchema = z.object({
   reviewInstructions: z.string().optional(),
   styleGuidance: z.record(z.string(), z.string()).optional(),
   focusAreaDetails: z.record(z.string(), z.string()).optional(),
+  commentFormatOverrides: z.record(z.string(), z.string()).optional(),
+  summaryFormatOverrides: z
+    .record(z.string(), z.object({ issuesFound: z.string(), noIssues: z.string() }))
+    .optional(),
 });
 
 export type RemotePromptTemplate = z.infer<typeof RemotePromptTemplateSchema>;
@@ -49,8 +53,8 @@ export type RemotePromptTemplate = z.infer<typeof RemotePromptTemplateSchema>;
  * Ensures all config values are safe before workflow generation
  */
 export const ReviewConfigSchema = z.object({
-  reviewStyle: z.enum(['strict', 'balanced', 'lenient'], {
-    message: 'reviewStyle must be one of: strict, balanced, lenient',
+  reviewStyle: z.enum(['strict', 'balanced', 'lenient', 'roast'], {
+    message: 'reviewStyle must be one of: strict, balanced, lenient, roast',
   }),
   focusAreas: z.array(
     z.enum(['security', 'performance', 'bugs', 'style', 'testing', 'documentation'], {

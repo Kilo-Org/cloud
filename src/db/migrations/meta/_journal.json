@@ -99,6 +99,13 @@
       "when": 1771245181784,
       "tag": "0013_strong_vector",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1771252343233,
+      "tag": "0014_colorful_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

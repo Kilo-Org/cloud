@@ -6,6 +6,7 @@
  */
 
 import * as z from 'zod';
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
 import type { AutoTriageTicket } from '@/db/schema';
 import { AUTO_TRIAGE_CONSTANTS } from './constants';
 
@@ -106,7 +107,7 @@ export const AutoTriageAgentConfigSchema = z
       .describe('Custom instructions for the triage agent'),
     model_slug: z
       .string()
-      .default('anthropic/claude-sonnet-4.5')
+      .default(CLAUDE_SONNET_CURRENT_MODEL_ID)
       .describe('Model to use for classification and analysis'),
     max_classification_time_minutes: z
       .number()

@@ -4,6 +4,10 @@
  * Default configuration values and constants for the security agent.
  */
 
+import {
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_SONNET_CURRENT_MODEL_ID,
+} from '@/lib/model-constants';
 import type { SecurityAgentConfig } from './types';
 
 /**
@@ -11,11 +15,11 @@ import type { SecurityAgentConfig } from './types';
  * Order matters - first one is the default
  */
 export const SECURITY_AGENT_MODELS = [
-  { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6', free: false },
+  { id: CLAUDE_OPUS_CURRENT_MODEL_ID, name: 'Claude Opus 4.6', free: false },
   { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5', free: false },
-  { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', free: false },
+  { id: CLAUDE_SONNET_CURRENT_MODEL_ID, name: 'Claude Sonnet 4.5', free: false },
   { id: 'x-ai/grok-code-fast-1', name: 'Grok Code Fast 1 (free)', free: true },
-] as const;
+];
 
 /**
  * Default model for security agent analysis

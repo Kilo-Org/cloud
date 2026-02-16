@@ -1,3 +1,4 @@
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import { organizationMemberProcedure, organizationOwnerProcedure } from './utils';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
@@ -87,7 +88,7 @@ export const organizationAutoFixRouter = createTRPCRouter({
           selected_repository_ids: input.selected_repository_ids ?? [],
           skip_labels: input.skip_labels ?? [],
           required_labels: input.required_labels ?? [],
-          model_slug: input.model_slug ?? 'anthropic/claude-sonnet-4.5',
+          model_slug: input.model_slug ?? CLAUDE_SONNET_CURRENT_MODEL_ID,
           custom_instructions: input.custom_instructions ?? null,
           pr_title_template: input.pr_title_template ?? 'Fix #{issue_number}: {issue_title}',
           pr_body_template: input.pr_body_template ?? null,

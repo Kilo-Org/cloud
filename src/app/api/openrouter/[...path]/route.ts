@@ -55,7 +55,7 @@ import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/providers/anthropic';
+} from '@/lib/model-constants';
 import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 

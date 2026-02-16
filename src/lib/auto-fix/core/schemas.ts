@@ -6,6 +6,7 @@
  */
 
 import * as z from 'zod';
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
 import type { AutoFixTicket } from '@/db/schema';
 
 // ============================================================================
@@ -76,7 +77,7 @@ export const AutoFixAgentConfigSchema = z
       .describe('Issue labels that must be present for auto fix to proceed'),
     model_slug: z
       .string()
-      .default('anthropic/claude-sonnet-4.5')
+      .default(CLAUDE_SONNET_CURRENT_MODEL_ID)
       .describe('Model to use for PR creation'),
     custom_instructions: z
       .string()

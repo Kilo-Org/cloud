@@ -6,8 +6,8 @@ import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-  opus_46_free_slackbot_model,
-} from '@/lib/providers/anthropic';
+} from '@/lib/model-constants';
+import { opus_46_free_slackbot_model } from '@/lib/providers/anthropic';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';

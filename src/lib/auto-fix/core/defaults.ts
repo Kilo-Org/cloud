@@ -5,6 +5,7 @@
  * Used across all routers (personal, organization, and main auto-fix router).
  */
 
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
 import { AUTO_FIX_CONSTANTS, type AutoFixAgentConfig } from './schemas';
 
 /**
@@ -17,7 +18,7 @@ export const DEFAULT_AUTO_FIX_CONFIG: AutoFixAgentConfig = {
   selected_repository_ids: [],
   skip_labels: [],
   required_labels: [],
-  model_slug: 'anthropic/claude-sonnet-4.5',
+  model_slug: CLAUDE_SONNET_CURRENT_MODEL_ID,
   custom_instructions: null,
   pr_title_template: 'Fix #{issue_number}: {issue_title}',
   pr_body_template: null,

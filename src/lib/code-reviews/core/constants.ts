@@ -4,15 +4,16 @@
  * Constants used throughout the code review system.
  */
 
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
+
 // ============================================================================
 // Review Configuration
 // ============================================================================
 
 /**
  * Default model for code reviews
- * Using Claude Sonnet 4.5 as specified in the plan
  */
-export const DEFAULT_CODE_REVIEW_MODEL = 'anthropic/claude-sonnet-4.5';
+export const DEFAULT_CODE_REVIEW_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 /**
  * Default mode for cloud agent sessions

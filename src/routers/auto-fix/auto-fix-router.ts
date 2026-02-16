@@ -5,6 +5,7 @@
  * Supports both organization and personal user auto-fix.
  */
 
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import {
   organizationMemberProcedure,
@@ -372,7 +373,7 @@ export const autoFixRouter = createTRPCRouter({
           selected_repository_ids: fullInput.selected_repository_ids ?? [],
           skip_labels: fullInput.skip_labels ?? [],
           required_labels: fullInput.required_labels ?? [],
-          model_slug: fullInput.model_slug ?? 'anthropic/claude-sonnet-4.5',
+          model_slug: fullInput.model_slug ?? CLAUDE_SONNET_CURRENT_MODEL_ID,
           custom_instructions: fullInput.custom_instructions ?? null,
           pr_title_template: fullInput.pr_title_template ?? 'Fix #{issue_number}: {issue_title}',
           pr_body_template: fullInput.pr_body_template ?? null,

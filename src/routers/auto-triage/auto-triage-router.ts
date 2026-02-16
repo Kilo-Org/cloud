@@ -5,6 +5,7 @@
  * Supports both organization and personal user auto-triage.
  */
 
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import {
   organizationMemberProcedure,
@@ -287,7 +288,7 @@ export const autoTriageRouter = createTRPCRouter({
           auto_create_pr_threshold: fullInput.auto_create_pr_threshold ?? 0.9,
           max_concurrent_per_owner: fullInput.max_concurrent_per_owner ?? 10,
           custom_instructions: fullInput.custom_instructions ?? null,
-          model_slug: fullInput.model_slug ?? 'anthropic/claude-sonnet-4.5',
+          model_slug: fullInput.model_slug ?? CLAUDE_SONNET_CURRENT_MODEL_ID,
         };
 
         await upsertAgentConfig({

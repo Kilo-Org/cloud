@@ -6,6 +6,7 @@
  */
 
 import { captureException } from '@sentry/nextjs';
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -67,7 +68,7 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
       intentSummary: ticket.intent_summary || undefined,
       relatedFiles: ticket.related_files || undefined,
       customInstructions: config.custom_instructions || null,
-      modelSlug: config.model_slug || 'anthropic/claude-sonnet-4.5',
+      modelSlug: config.model_slug || CLAUDE_SONNET_CURRENT_MODEL_ID,
       prBaseBranch: config.pr_base_branch || 'main',
       prTitleTemplate: config.pr_title_template || 'Fix #{issue_number}: {issue_title}',
       prBodyTemplate: config.pr_body_template || null,

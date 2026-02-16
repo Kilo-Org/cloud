@@ -6,6 +6,7 @@
  */
 
 import { captureException } from '@sentry/nextjs';
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/model-constants';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -71,7 +72,7 @@ export async function prepareTriagePayload(
       autoCreatePrThreshold:
         config.auto_create_pr_threshold || AUTO_TRIAGE_CONSTANTS.DEFAULT_AUTO_PR_THRESHOLD,
       customInstructions: config.custom_instructions || null,
-      modelSlug: config.model_slug || 'anthropic/claude-sonnet-4.5',
+      modelSlug: config.model_slug || CLAUDE_SONNET_CURRENT_MODEL_ID,
       maxClassificationTimeMinutes: config.max_classification_time_minutes || 5,
       maxPRCreationTimeMinutes: config.max_pr_creation_time_minutes || 15,
     };

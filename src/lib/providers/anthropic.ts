@@ -3,12 +3,15 @@ import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter
 import { normalizeToolCallIds } from '@/lib/tool-calling';
 import type OpenAI from 'openai';
 
-export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.5';
-
-export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.6';
+// Re-export from the lightweight constants module for backward compatibility
+export {
+  CLAUDE_SONNET_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+} from '@/lib/model-constants';
+import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/model-constants';
 
 export const opus_46_free_slackbot_model = {
-  public_id: 'anthropic/claude-opus-4.6:slackbot',
+  public_id: `${CLAUDE_OPUS_CURRENT_MODEL_ID}:slackbot`,
   display_name: 'Anthropic: Claude Opus 4.6 (Free for Kilo for Slack)',
   description: 'Free version of Claude Opus 4.6 for use in Kilo for Slack only',
   context_length: 1_000_000,
@@ -16,10 +19,10 @@ export const opus_46_free_slackbot_model = {
   is_enabled: false,
   flags: ['reasoning', 'prompt_cache', 'vision'],
   gateway: 'openrouter',
-  internal_id: 'anthropic/claude-opus-4.6',
+  internal_id: CLAUDE_OPUS_CURRENT_MODEL_ID,
   inference_providers: [],
   slackbot_only: true,
-} as KiloFreeModel;
+} satisfies KiloFreeModel;
 
 const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;
 

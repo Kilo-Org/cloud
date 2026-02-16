@@ -489,11 +489,11 @@ function buildCommonParams(
     providerOptions: {
       anthropic: {
         thinking: { type: 'adaptive' },
-        effort: customLlm.verbosity ?? undefined,
+        effort: customLlm.verbosity ?? request.verbosity ?? undefined,
       } satisfies AnthropicProviderOptions,
       openai: {
-        textVerbosity: customLlm.verbosity,
-        reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort ?? undefined,
+        textVerbosity: customLlm.verbosity ?? request.verbosity,
+        reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort,
       } satisfies OpenAILanguageModelResponsesOptions,
     },
   };

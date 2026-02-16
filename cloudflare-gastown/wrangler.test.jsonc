@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration - stripped down for vitest-pool-workers
+  "name": "gastown-test",
+  "main": "src/gastown.worker.ts",
+  "compatibility_date": "2026-01-27",
+  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "RIG", "class_name": "RigDO" },
+      { "name": "TOWN", "class_name": "TownDO" },
+      { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
+    ],
+  },
+
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RigDO", "TownDO", "AgentIdentityDO"] }],
+}

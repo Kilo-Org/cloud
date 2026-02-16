@@ -32,7 +32,6 @@ import type * as z from 'zod';
 import type { CustomLlm } from '@/db/schema';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
-import type { XaiLanguageModelResponsesOptions } from '@ai-sdk/xai';
 import { createXai } from '@ai-sdk/xai';
 
 type ChatCompletionChunk = z.infer<typeof OpenRouterStreamChatCompletionChunkSchema>;
@@ -52,7 +51,10 @@ function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage
       case 'system':
         return {
           role: 'system',
-          content: msg.content.map(part => part.text).join(''),
+          content:
+            typeof msg.content === 'string'
+              ? msg.content
+              : msg.content.map(part => part.text).join(''),
           providerOptions: {
             anthropic: { cacheControl: { type: 'ephemeral' } },
           },
@@ -484,7 +486,6 @@ function buildCommonParams(
   messages: ModelMessage[],
   request: OpenRouterChatCompletionRequest
 ) {
-  const reasoningEffort = request.reasoning?.effort ?? request.reasoning_effort ?? undefined;
   return {
     messages,
     tools: convertTools(request.tools),
@@ -496,16 +497,12 @@ function buildCommonParams(
     providerOptions: {
       anthropic: {
         thinking: { type: 'adaptive' },
-        effort: customLlm.verbosity,
+        effort: customLlm.verbosity ?? undefined,
       } satisfies AnthropicProviderOptions,
       openai: {
         textVerbosity: customLlm.verbosity,
-        reasoningEffort: reasoningEffort,
+        reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort ?? undefined,
       } satisfies OpenAILanguageModelResponsesOptions,
-      xai: {
-        reasoningEffort:
-          reasoningEffort === 'none' || reasoningEffort === 'minimal' ? undefined : reasoningEffort,
-      } satisfies XaiLanguageModelResponsesOptions,
     },
   };
 }

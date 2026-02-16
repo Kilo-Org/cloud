@@ -144,7 +144,7 @@ export async function getProvider(
           hasGenerationEndpoint: true,
         },
         userByok: null,
-        customLlm: null,
+        customLlm,
       };
     }
   }

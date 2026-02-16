@@ -14,7 +14,7 @@ export type ChatCompletionMessageParam =
 
 export interface ChatCompletionSystemMessageParam {
   role: 'system';
-  content: Array<ChatCompletionContentPartText>;
+  content: string | Array<ChatCompletionContentPartText>;
 }
 
 export interface ChatCompletionUserMessageParam {

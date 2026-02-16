@@ -1,6 +1,6 @@
 {
-  "id": "674d8b93-12bc-4b25-ab50-5557606d8dcf",
-  "prevId": "310bbf36-d945-4234-ac26-0ce161990068",
+  "id": "1a0f5fe8-3044-4abe-8688-0029223e8609",
+  "prevId": "674d8b93-12bc-4b25-ab50-5557606d8dcf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -8368,6 +8368,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'0'"
+        },
+        "total_microdollars_acquired": {
+          "name": "total_microdollars_acquired",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "next_credit_expiration_at": {
+          "name": "next_credit_expiration_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "stripe_customer_id": {
           "name": "stripe_customer_id",

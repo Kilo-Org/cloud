@@ -47,8 +47,6 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
   if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
   if (!env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
-  if (!env.FLY_ORG_SLUG) missing.push('FLY_ORG_SLUG');
-  if (!env.FLY_REGISTRY_APP) missing.push('FLY_REGISTRY_APP');
   return missing;
 }
 
@@ -95,8 +93,6 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
     if (!c.env.HYPERDRIVE?.connectionString) missing.push('HYPERDRIVE');
     if (!c.env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
     if (!c.env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
-    if (!c.env.FLY_ORG_SLUG) missing.push('FLY_ORG_SLUG');
-    if (!c.env.FLY_REGISTRY_APP) missing.push('FLY_REGISTRY_APP');
     if (missing.length > 0) {
       console.error('[CONFIG] Platform route missing bindings:', missing.join(', '));
       return c.json({ error: 'Configuration error', missing }, 503);

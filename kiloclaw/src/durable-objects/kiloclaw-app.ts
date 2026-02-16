@@ -70,6 +70,10 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
   async ensureApp(userId: string): Promise<{ appName: string }> {
     await this.loadState();
 
+    if (this.userId && this.userId !== userId) {
+      throw new Error(`userId mismatch: DO has ${this.userId}, caller passed ${userId}`);
+    }
+
     const apiToken = this.env.FLY_API_TOKEN;
     if (!apiToken) throw new Error('FLY_API_TOKEN is not configured');
     const orgSlug = this.env.FLY_ORG_SLUG;

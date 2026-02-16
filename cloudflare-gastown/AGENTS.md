@@ -18,3 +18,33 @@
 - Prefer static queries over dynamically constructed ones. Move conditional logic into the query itself using SQL constructs like `COALESCE`, `CASE`, `NULLIF`, or `WHERE (? IS NULL OR col = ?)` patterns so the full query is always visible as a single readable string.
 - Validate/parse query results with the Zod `Record` schemas defined in the corresponding `db/tables/*.table.ts` module. For an array of rows use the `.array()` modifier, e.g. `AgentRecord.array().parse(rows)`.
 - When a column has a SQL `CHECK` constraint that restricts it to a set of values (i.e. an enum), mirror that in the Record schema using `z.enum()` rather than `z.string()`, e.g. `role: z.enum(['polecat', 'refinery', 'mayor', 'witness'])`.
+
+## HTTP routes
+
+- **Do not use Hono sub-app mounting** (e.g. `app.route('/prefix', subApp)`). Define all routes in the main worker entry point (e.g. `gastown.worker.ts`) so a human can scan one file and immediately see every route the app exposes.
+- Move handler logic into `handlers/*.handler.ts` modules. Each module owns routes for a logical domain. Name the file after the domain, e.g. `handlers/rig-agents.handler.ts` for `/api/rigs/:rigId/agents/*` routes.
+- Each handler function takes two arguments:
+  1. The Hono `Context` object (typed as the app's `HonoContext` / `GastownEnv`).
+  2. A plain object containing the route params parsed from the path, e.g. `{ rigId: string }` or `{ rigId: string; beadId: string }`.
+
+  This keeps the handler's contract explicit and testable, while the route definition in the entry point is the single source of truth for path → param shape.
+
+  ```ts
+  // gastown.worker.ts — route definition
+  app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
+
+  // handlers/rig-agents.handler.ts — handler implementation
+  export async function handleRegisterAgent(c: Context<GastownEnv>, params: { rigId: string }) {
+    // Zod validation lives in the handler, not as route middleware
+    const parsed = RegisterAgentBody.safeParse(await c.req.json());
+    if (!parsed.success) {
+      return c.json(
+        { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+        400
+      );
+    }
+    const rig = getRigDOStub(c.env, params.rigId);
+    const agent = await rig.registerAgent(parsed.data);
+    return c.json(resSuccess(agent), 201);
+  }
+  ```

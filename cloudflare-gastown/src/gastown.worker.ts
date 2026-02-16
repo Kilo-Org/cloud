@@ -11,7 +11,7 @@ import {
   handleGetBead,
   handleUpdateBeadStatus,
   handleCloseBead,
-} from './handlers/beads.handler';
+} from './handlers/rig-beads.handler';
 import {
   handleRegisterAgent,
   handleListAgents,
@@ -23,9 +23,9 @@ import {
   handleWriteCheckpoint,
   handleCheckMail,
 } from './handlers/rig-agents.handler';
-import { handleSendMail } from './handlers/mail.handler';
-import { handleSubmitToReviewQueue } from './handlers/review-queue.handler';
-import { handleCreateEscalation } from './handlers/escalations.handler';
+import { handleSendMail } from './handlers/rig-mail.handler';
+import { handleSubmitToReviewQueue } from './handlers/rig-review-queue.handler';
+import { handleCreateEscalation } from './handlers/rig-escalations.handler';
 
 export { RigDO } from './dos/Rig.do';
 export { TownDO } from './dos/Town.do';

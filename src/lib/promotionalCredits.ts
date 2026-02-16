@@ -212,7 +212,6 @@ export async function grantCreditForCategoryConfig(
       await dbOrTx
         .update(organizations)
         .set({
-          microdollars_balance: sql`${organizations.microdollars_balance} + ${toMicrodollars(amount_usd)}`,
           total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
           ...(credit_expiry_date && {
             next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,

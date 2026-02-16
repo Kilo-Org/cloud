@@ -36,7 +36,6 @@ export async function POST(
     .update(organizations)
     .set({
       microdollars_used: sql`${organizations.microdollars_used} + ${microdollars}`,
-      microdollars_balance: sql`${organizations.microdollars_balance} - ${microdollars}`,
     })
     .where(eq(organizations.id, id));
 

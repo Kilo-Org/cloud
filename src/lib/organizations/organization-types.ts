@@ -36,7 +36,6 @@ export const OrganizationSchema = z.object({
   name: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
-  microdollars_balance: z.number(),
   microdollars_used: z.number(),
   total_microdollars_acquired: z.number(),
   next_credit_expiration_at: z.string().nullable(),

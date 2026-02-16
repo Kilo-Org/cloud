@@ -396,7 +396,6 @@ describe('Organization Usage Functions', () => {
         .update(organizations)
         .set({
           require_seats: false,
-          microdollars_balance: 100000,
           total_microdollars_acquired: 100000,
         })
         .where(eq(organizations.id, organization.id));
@@ -428,7 +427,6 @@ describe('Organization Usage Functions', () => {
         .update(organizations)
         .set({
           require_seats: false,
-          microdollars_balance: 100000,
           total_microdollars_acquired: 100000,
         })
         .where(eq(organizations.id, organization.id));
@@ -460,7 +458,6 @@ describe('Organization Usage Functions', () => {
         .update(organizations)
         .set({
           require_seats: false,
-          microdollars_balance: 100000,
           total_microdollars_acquired: 100000,
         })
         .where(eq(organizations.id, organization.id));
@@ -492,7 +489,6 @@ describe('Organization Usage Functions', () => {
         .update(organizations)
         .set({
           require_seats: false,
-          microdollars_balance: 100000,
           total_microdollars_acquired: 100000,
         })
         .where(eq(organizations.id, organization.id));
@@ -534,7 +530,6 @@ describe('Organization Usage Functions', () => {
         .update(organizations)
         .set({
           require_seats: false,
-          microdollars_balance: 200000,
           total_microdollars_acquired: 200000,
         })
         .where(eq(organizations.id, organization.id));
@@ -986,7 +981,7 @@ describe('microdollars_used tracking', () => {
     expect(org.microdollars_used).toBe(500000);
   });
 
-  test('should update both microdollars_balance and microdollars_used correctly', async () => {
+  test('should update microdollars_used correctly', async () => {
     const user = await insertTestUser();
     const initialBalance = 100000;
     const organization = await createTestOrganization('Test Org', user.id, initialBalance);
@@ -997,13 +992,15 @@ describe('microdollars_used tracking', () => {
 
     const [org] = await db
       .select({
-        microdollars_balance: organizations.microdollars_balance,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
         microdollars_used: organizations.microdollars_used,
       })
       .from(organizations)
       .where(eq(organizations.id, organization.id));
 
-    expect(org.microdollars_balance).toBe(initialBalance - usageCost); // 75000
+    expect(org.total_microdollars_acquired - org.microdollars_used).toBe(
+      initialBalance - usageCost
+    ); // 75000
     expect(org.microdollars_used).toBe(usageCost); // 25000
   });
 
@@ -1032,14 +1029,16 @@ describe('microdollars_used tracking', () => {
     // Verify that all usages were properly tracked
     const [org] = await db
       .select({
-        microdollars_balance: organizations.microdollars_balance,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
         microdollars_used: organizations.microdollars_used,
       })
       .from(organizations)
       .where(eq(organizations.id, organization.id));
 
     expect(org.microdollars_used).toBe(expectedTotalUsed); // 100000
-    expect(org.microdollars_balance).toBe(initialBalance - expectedTotalUsed); // 900000
+    expect(org.total_microdollars_acquired - org.microdollars_used).toBe(
+      initialBalance - expectedTotalUsed
+    ); // 900000
   });
 
   test('should handle non-existent organization gracefully for microdollars_used', async () => {

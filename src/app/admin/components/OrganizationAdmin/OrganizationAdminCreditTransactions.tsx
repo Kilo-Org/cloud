@@ -140,10 +140,10 @@ export function OrganizationAdminCreditTransactions({
               {forceExpirationMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Checking...
+                  Recomputing...
                 </>
               ) : (
-                'Force expiration check'
+                'Recompute & check expirations'
               )}
             </Button>
             {process.env.NODE_ENV === 'development' && (

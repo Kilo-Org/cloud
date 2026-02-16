@@ -123,6 +123,7 @@ export async function getBalanceForOrganizationUser(
     microdollar_limit,
     microdollar_usage,
     organization_balance: initial_organization_balance,
+    total_microdollars_acquired,
     microdollars_used,
     settings,
     require_seats,
@@ -130,7 +131,16 @@ export async function getBalanceForOrganizationUser(
     auto_top_up_enabled,
     next_credit_expiration_at,
   } = result[0];
-  let { total_microdollars_acquired } = result[0];
+
+  // Trigger org auto-top-up on balance observation (mirrors user pattern in getBalanceForUser)
+  after(() =>
+    maybePerformOrganizationAutoTopUp({
+      id: organizationId,
+      auto_top_up_enabled,
+      total_microdollars_acquired,
+      microdollars_used,
+    })
+  );
 
   let organization_balance = initial_organization_balance;
 
@@ -151,20 +161,8 @@ export async function getBalanceForOrganizationUser(
     );
     if (expiryResult) {
       organization_balance = expiryResult.total_microdollars_acquired - microdollars_used;
-      total_microdollars_acquired = expiryResult.total_microdollars_acquired;
     }
   }
-
-  // Trigger org auto-top-up with post-expiry balance (mirrors user pattern in getBalanceForUser)
-  after(() =>
-    maybePerformOrganizationAutoTopUp({
-      id: organizationId,
-      auto_top_up_enabled,
-      microdollars_balance: organization_balance,
-      total_microdollars_acquired,
-      microdollars_used,
-    })
-  );
 
   // If organization requires seats, ignore any user limits and return full organization balance
   if (require_seats) {
@@ -214,9 +212,9 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
     // Get current balance and settings before the update
     const [orgData] = await tx
       .select({
-        microdollars_balance:
+        balance:
           sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})::float8`.as(
-            'microdollars_balance'
+            'balance'
           ),
         settings: organizations.settings,
       })
@@ -224,7 +222,7 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
       .where(eq(organizations.id, organization_id))
       .limit(1);
 
-    const currentBalance = orgData?.microdollars_balance ?? 0;
+    const currentBalance = orgData?.balance ?? 0;
 
     const minimumBalance = orgData?.settings?.minimum_balance
       ? toMicrodollars(orgData?.settings?.minimum_balance)
@@ -245,11 +243,10 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
       });
     }
 
-    // Update organization balance and usage (always happens regardless of membership)
+    // Update organization usage (always happens regardless of membership)
     await tx
       .update(organizations)
       .set({
-        microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
         microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
       })
       .where(eq(organizations.id, organization_id));

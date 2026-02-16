@@ -65,12 +65,13 @@ describe('Organization Promotions', () => {
   const getOrganizationBalance = async (orgId: string) => {
     const org = await db
       .select({
-        microdollars_balance: organizations.microdollars_balance,
         total_microdollars_acquired: organizations.total_microdollars_acquired,
+        microdollars_used: organizations.microdollars_used,
       })
       .from(organizations)
       .where(eq(organizations.id, orgId));
-    return org[0]?.microdollars_balance || 0;
+    if (!org[0]) return 0;
+    return org[0].total_microdollars_acquired - org[0].microdollars_used;
   };
 
   const getOrganizationTotalAcquired = async (orgId: string) => {

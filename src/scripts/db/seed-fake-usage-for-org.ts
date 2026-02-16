@@ -192,7 +192,7 @@ export async function run(...args: string[]) {
     `Generated ${coreRecords.length} usage records with total cost: ${totalCost} microdollars`
   );
 
-  // 5. Update organization balance to cover the new usage plus some buffer
+  // 5. Update total_microdollars_acquired to cover the new usage plus some buffer
   const currentBalance = Number(org.total_microdollars_acquired) - Number(org.microdollars_used);
   const newBalance = Math.max(currentBalance, totalCost + 1000000); // Add 1M microdollars buffer ($1)
 
@@ -200,7 +200,7 @@ export async function run(...args: string[]) {
 
   await localDb
     .update(organizations)
-    .set({ microdollars_balance: newBalance })
+    .set({ total_microdollars_acquired: sql`${organizations.microdollars_used} + ${newBalance}` })
     .where(eq(organizations.id, orgId));
 
   // 6. Insert the usage records in batches

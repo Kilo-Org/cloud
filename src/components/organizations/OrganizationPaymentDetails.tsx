@@ -69,7 +69,10 @@ export function OrganizationPaymentDetails({ organizationId, role }: Props) {
                   </span>
                   <div className="flex items-center gap-2">
                     <AnimatedDollars
-                      dollars={fromMicrodollars(organizationData?.microdollars_balance ?? 0)}
+                      dollars={fromMicrodollars(
+                        (organizationData?.total_microdollars_acquired ?? 0) -
+                          (organizationData?.microdollars_used ?? 0)
+                      )}
                       className="text-2xl font-semibold"
                     />
                     <TooltipProvider>

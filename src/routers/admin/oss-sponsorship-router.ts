@@ -266,7 +266,8 @@ export const ossSponsorshipRouter = createTRPCRouter({
         id: organizations.id,
         name: organizations.name,
         settings: organizations.settings,
-        microdollars_balance: organizations.microdollars_balance,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        microdollars_used: organizations.microdollars_used,
         created_at: organizations.created_at,
       })
       .from(organizations)
@@ -364,7 +365,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
           tier: org.settings.oss_sponsorship_tier ?? null,
           monthlyCreditsUsd: monthlyCredits ? monthlyCredits / 1_000_000 : null,
           lastResetAt: org.settings.oss_credits_last_reset_at ?? null,
-          currentBalanceUsd: org.microdollars_balance / 1_000_000,
+          currentBalanceUsd: (org.total_microdollars_acquired - org.microdollars_used) / 1_000_000,
           createdAt: org.created_at,
           hasGitHubIntegration,
           hasCodeReviewsEnabled,

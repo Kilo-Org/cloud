@@ -86,7 +86,8 @@ export async function getUserOrganizationsWithSeats(
     organizationId: result.organization.id,
     role: result.membership.role,
     memberCount: result.total_member_count,
-    balance: result.organization.microdollars_balance,
+    balance:
+      result.organization.total_microdollars_acquired - result.organization.microdollars_used,
     requireSeats: result.organization.require_seats,
     plan: result.organization.plan,
     created_at: result.organization.created_at,

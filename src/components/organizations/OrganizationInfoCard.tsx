@@ -65,7 +65,8 @@ function Inner(props: InnerProps) {
     name,
     created_at,
     updated_at,
-    microdollars_balance,
+    total_microdollars_acquired,
+    microdollars_used,
     stripe_customer_id,
     deleted_at,
     auto_top_up_enabled,
@@ -217,7 +218,7 @@ function Inner(props: InnerProps) {
             </span>{' '}
             <div className="mt-1 flex items-center gap-2">
               <AnimatedDollars
-                dollars={fromMicrodollars(microdollars_balance)}
+                dollars={fromMicrodollars(total_microdollars_acquired - microdollars_used)}
                 className="text-2xl font-semibold"
               />
               <TooltipProvider>

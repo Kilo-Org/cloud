@@ -127,7 +127,9 @@ export function OrganizationTableBody({
           </TableCell>
           <TableCell className="min-w-30">
             <span className="font-mono text-sm">
-              {formatMicrodollars(organization.microdollars_balance)}
+              {formatMicrodollars(
+                organization.total_microdollars_acquired - organization.microdollars_used
+              )}
             </span>
           </TableCell>
           <TableCell>

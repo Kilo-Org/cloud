@@ -75,6 +75,8 @@ const AdminOrganizationDetailsSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   microdollars_balance: z.number(),
+  total_microdollars_acquired: z.number(),
+  microdollars_used: z.number(),
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
@@ -234,6 +236,8 @@ export const organizationAdminRouter = createTRPCRouter({
           created_at: organizations.created_at,
           updated_at: organizations.updated_at,
           microdollars_balance: organizations.microdollars_balance,
+          total_microdollars_acquired: organizations.total_microdollars_acquired,
+          microdollars_used: organizations.microdollars_used,
           created_by_kilo_user_id: organizations.created_by_kilo_user_id,
           created_by_user_email: kilocode_users.google_user_email,
           created_by_user_name: kilocode_users.google_user_name,
@@ -308,7 +312,7 @@ export const organizationAdminRouter = createTRPCRouter({
       const result = await db.transaction(async tx => {
         const [lockedOrg] = await tx
           .select({
-            microdollars_balance: organizations.microdollars_balance,
+            total_microdollars_acquired: organizations.total_microdollars_acquired,
             microdollars_used: organizations.microdollars_used,
             name: organizations.name,
           })
@@ -323,14 +327,14 @@ export const organizationAdminRouter = createTRPCRouter({
           });
         }
 
-        if (lockedOrg.microdollars_balance <= 0) {
+        const currentBalance = lockedOrg.total_microdollars_acquired - lockedOrg.microdollars_used;
+
+        if (currentBalance <= 0) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Organization has no credits to nullify',
           });
         }
-
-        const currentBalance = lockedOrg.microdollars_balance;
 
         await tx.insert(credit_transactions).values({
           kilo_user_id: user.id,

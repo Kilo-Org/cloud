@@ -193,7 +193,7 @@ export async function run(...args: string[]) {
   );
 
   // 5. Update organization balance to cover the new usage plus some buffer
-  const currentBalance = Number(org.microdollars_balance);
+  const currentBalance = Number(org.total_microdollars_acquired) - Number(org.microdollars_used);
   const newBalance = Math.max(currentBalance, totalCost + 1000000); // Add 1M microdollars buffer ($1)
 
   console.log(`Updating organization balance from ${currentBalance} to ${newBalance} microdollars`);

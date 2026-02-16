@@ -81,7 +81,10 @@ export async function GET(request: Request) {
     .select({
       id: organizations.id,
       name: organizations.name,
-      currentBalance: organizations.microdollars_balance,
+      currentBalance:
+        sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`.as(
+          'currentBalance'
+        ),
       settings: organizations.settings,
     })
     .from(organizations)

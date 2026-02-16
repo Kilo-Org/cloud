@@ -63,7 +63,12 @@ export async function getBalanceForOrganizationUser(
     .select({
       microdollar_limit: organization_user_limits.microdollar_limit,
       microdollar_usage: organization_user_usage.microdollar_usage,
-      organization_balance: organizations.microdollars_balance,
+      organization_balance:
+        sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`.as(
+          'organization_balance'
+        ),
+      total_microdollars_acquired: organizations.total_microdollars_acquired,
+      microdollars_used: organizations.microdollars_used,
       settings: organizations.settings,
       require_seats: organizations.require_seats,
       plan: organizations.plan,
@@ -115,6 +120,8 @@ export async function getBalanceForOrganizationUser(
     microdollar_limit,
     microdollar_usage,
     organization_balance,
+    total_microdollars_acquired,
+    microdollars_used,
     settings,
     require_seats,
     plan,
@@ -127,6 +134,8 @@ export async function getBalanceForOrganizationUser(
       id: organizationId,
       auto_top_up_enabled,
       microdollars_balance: organization_balance,
+      total_microdollars_acquired,
+      microdollars_used,
     })
   );
 
@@ -178,7 +187,10 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
     // Get current balance and settings before the update
     const [orgData] = await tx
       .select({
-        microdollars_balance: organizations.microdollars_balance,
+        microdollars_balance:
+          sql<number>`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`.as(
+            'microdollars_balance'
+          ),
         settings: organizations.settings,
       })
       .from(organizations)

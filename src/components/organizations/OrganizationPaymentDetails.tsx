@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { useQuery } from '@tanstack/react-query';
 import type { OrganizationRole, TimePeriod } from '@/lib/organizations/organization-types';
 import { OrganizationContextProvider } from './OrganizationContext';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
@@ -18,7 +17,7 @@ import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } 
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
 import { PiggyBank, Bell, ChevronRight, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useExpiringCredits } from './useExpiringCredits';
 
 type Props = {
   organizationId: string;
@@ -32,20 +31,7 @@ export function OrganizationPaymentDetails({ organizationId, role }: Props) {
   const session = useSession();
   const isKiloAdmin = session?.data?.isAdmin ?? false;
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const trpc = useTRPC();
-  const { data: creditBlocksData } = useQuery(
-    trpc.organizations.getCreditBlocks.queryOptions({ organizationId })
-  );
-
-  const expiringBlocks =
-    creditBlocksData?.creditBlocks.filter(
-      block => block.expiry_date !== null && block.balance_mUsd > 0
-    ) ?? [];
-  const expiring_mUsd = expiringBlocks.reduce((sum, block) => sum + block.balance_mUsd, 0);
-  const earliestExpiry = expiringBlocks
-    .map(block => block.expiry_date)
-    .filter((date): date is string => date !== null)
-    .sort()[0];
+  const { expiringBlocks, expiring_mUsd, earliestExpiry } = useExpiringCredits(organizationId);
 
   return (
     <OrganizationContextProvider value={{ userRole, isKiloAdmin }}>

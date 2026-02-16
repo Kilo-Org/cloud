@@ -14,7 +14,17 @@ import {
   fetchGitLabProjects,
   calculateTokenExpiry,
 } from '@/lib/integrations/platforms/gitlab/adapter';
+import { normalizeInstanceUrl } from '@/lib/integrations/gitlab-service';
+import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { APP_URL } from '@/lib/constants';
+import { randomBytes } from 'crypto';
+
+/**
+ * Generates a secure random webhook secret for GitLab webhook verification
+ */
+function generateWebhookSecret(): string {
+  return randomBytes(32).toString('hex');
+}
 
 /**
  * GitLab OAuth Callback
@@ -91,19 +101,6 @@ export async function GET(request: NextRequest) {
 
     const tokenExpiresAt = calculateTokenExpiry(tokens.created_at, tokens.expires_in);
 
-    // TODO: Implement token/credential encryption?
-    const metadata: Record<string, unknown> = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      token_expires_at: tokenExpiresAt,
-      gitlab_instance_url: instanceUrl !== 'https://gitlab.com' ? instanceUrl : undefined,
-    };
-
-    if (customCredentials) {
-      metadata.client_id = customCredentials.clientId;
-      metadata.client_secret = customCredentials.clientSecret;
-    }
-
     const ownershipCondition =
       owner.type === 'user'
         ? eq(platform_integrations.owned_by_user_id, owner.id)
@@ -114,6 +111,35 @@ export async function GET(request: NextRequest) {
       .from(platform_integrations)
       .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.GITLAB)))
       .limit(1);
+
+    const existingMetadata = existing?.metadata as Record<string, unknown> | null;
+
+    // Detect if the GitLab instance URL changed (e.g. gitlab.com → self-hosted)
+    const isInstanceChange =
+      existing !== undefined &&
+      normalizeInstanceUrl(existingMetadata?.gitlab_instance_url as string | undefined) !==
+        normalizeInstanceUrl(instanceUrl);
+
+    const webhookSecret = isInstanceChange
+      ? generateWebhookSecret()
+      : ((existingMetadata?.webhook_secret as string | undefined) ?? generateWebhookSecret());
+
+    const metadata: Record<string, unknown> = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_expires_at: tokenExpiresAt,
+      gitlab_instance_url: instanceUrl !== 'https://gitlab.com' ? instanceUrl : undefined,
+      webhook_secret: webhookSecret,
+      auth_type: 'oauth',
+      // Only preserve webhooks/tokens if same instance
+      configured_webhooks: isInstanceChange ? undefined : existingMetadata?.configured_webhooks,
+      project_tokens: isInstanceChange ? undefined : existingMetadata?.project_tokens,
+    };
+
+    if (customCredentials) {
+      metadata.client_id = customCredentials.clientId;
+      metadata.client_secret = customCredentials.clientSecret;
+    }
 
     if (existing) {
       await db
@@ -128,6 +154,11 @@ export async function GET(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, existing.id));
+
+      // If instance changed, reset the code review agent config
+      if (isInstanceChange && owner) {
+        await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
+      }
     } else {
       await db.insert(platform_integrations).values({
         owned_by_user_id: owner.type === 'user' ? owner.id : null,

@@ -1,5 +1,5 @@
 {
-  "id": "951bf503-8189-4a6c-8702-c51f0a1067c0",
+  "id": "310bbf36-d945-4234-ac26-0ce161990068",
   "prevId": "889eec28-9f2c-4358-b449-ebe085fed6ea",
   "version": "7",
   "dialect": "postgresql",
@@ -2967,6 +2967,19 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'github'"
+        },
+        "platform_project_id": {
+          "name": "platform_project_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "session_id": {
           "name": "session_id",
@@ -6610,13 +6623,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
-        },
-        "completed_welcome_form": {
-          "name": "completed_welcome_form",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {},

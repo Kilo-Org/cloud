@@ -36,6 +36,7 @@ import { applyMoonshotProviderSettings, isMoonshotModel } from '@/lib/providers/
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import { isOpenAiModel } from '@/lib/providers/openai';
+import { applyQwenModelSettings, isQwenModel } from '@/lib/providers/qwen';
 
 export const PROVIDERS = {
   OPENROUTER: {
@@ -168,6 +169,9 @@ function getPreferredProvider(requestedModel: string): OpenRouterInferenceProvid
   if (isMoonshotModel(requestedModel)) {
     return OpenRouterInferenceProviderIdSchema.enum.moonshotai;
   }
+  if (requestedModel.startsWith('z-ai/')) {
+    return OpenRouterInferenceProviderIdSchema.enum['z-ai'];
+  }
   return null;
 }
 
@@ -222,6 +226,10 @@ export function applyProviderSpecificLogic(
 
   if (isMoonshotModel(requestedModel)) {
     applyMoonshotProviderSettings(requestToMutate);
+  }
+
+  if (isQwenModel(requestedModel)) {
+    applyQwenModelSettings(requestToMutate);
   }
 
   if (provider.id === 'gigapotato') {

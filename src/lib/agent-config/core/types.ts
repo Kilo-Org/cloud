@@ -1,6 +1,18 @@
 import * as z from 'zod';
 
 /**
+ * Schema for manually added repository (for GitLab where pagination limits results)
+ */
+export const ManuallyAddedRepositorySchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  full_name: z.string(),
+  private: z.boolean(),
+});
+
+export type ManuallyAddedRepository = z.infer<typeof ManuallyAddedRepositorySchema>;
+
+/**
  * Zod schema for CodeReviewAgentConfig
  */
 export const CodeReviewAgentConfigSchema = z.object({
@@ -12,6 +24,8 @@ export const CodeReviewAgentConfigSchema = z.object({
   model_slug: z.string(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
   selected_repository_ids: z.array(z.number()).optional(),
+  // Manually added repositories (for GitLab where pagination limits results)
+  manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;

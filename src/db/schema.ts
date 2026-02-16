@@ -1922,6 +1922,12 @@ export const cloud_agent_code_reviews = pgTable(
     head_ref: text().notNull(), // PR branch (e.g., "feature/xyz")
     head_sha: text().notNull(), // Latest commit SHA
 
+    // Platform (github, gitlab, etc.)
+    platform: text().notNull().default('github'),
+
+    // Platform-specific project ID (e.g., GitLab numeric project ID)
+    platform_project_id: integer(),
+
     // Cloud agent session
     session_id: text(), // Cloud agent session ID (agent_xxx)
     cli_session_id: uuid().references(() => cliSessions.session_id, { onDelete: 'set null' }), // CLI session UUID (from session_created event)

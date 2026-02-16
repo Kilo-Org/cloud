@@ -488,6 +488,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               allowedModelIds={allowedModelIds}
               enabledProviderSlugs={enabledProviderSlugs}
               filteredModelRows={filteredModelRows}
+              totalModelCount={modelRows.length}
               onToggleModelAllowed={handleToggleModelAllowed}
               onSetAllModelsAllowed={handleSetAllModelsAllowed}
               onOpenModelDetails={actions.setInfoModelId}

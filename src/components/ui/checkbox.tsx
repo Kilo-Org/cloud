@@ -10,7 +10,19 @@ interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>
 
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   ({ className, checked, indeterminate, onCheckedChange, onChange, ...props }, ref) => {
-    const internalRef = React.useRef<HTMLInputElement>(null);
+    const internalRef = React.useRef<HTMLInputElement | null>(null);
+
+    const callbackRef = React.useCallback(
+      (node: HTMLInputElement | null) => {
+        internalRef.current = node;
+        if (typeof ref === 'function') {
+          ref(node);
+        } else if (ref) {
+          ref.current = node;
+        }
+      },
+      [ref]
+    );
 
     React.useEffect(() => {
       const element = internalRef.current;
@@ -18,13 +30,6 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         element.indeterminate = indeterminate ?? false;
       }
     }, [indeterminate]);
-
-    React.useImperativeHandle(ref, () => {
-      if (!internalRef.current) {
-        throw new Error('Checkbox ref not attached');
-      }
-      return internalRef.current;
-    });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       onCheckedChange?.(e.target.checked);
@@ -34,7 +39,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
     return (
       <input
         type="checkbox"
-        ref={internalRef}
+        ref={callbackRef}
         checked={checked}
         onChange={handleChange}
         className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 ${className || ''}`}

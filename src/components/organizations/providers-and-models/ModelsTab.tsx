@@ -16,6 +16,7 @@ export function ModelsTab({
   allowedModelIds,
   enabledProviderSlugs,
   filteredModelRows,
+  totalModelCount,
   onToggleModelAllowed,
   onSetAllModelsAllowed,
   onOpenModelDetails,
@@ -29,6 +30,7 @@ export function ModelsTab({
   allowedModelIds: ReadonlySet<string>;
   enabledProviderSlugs: ReadonlySet<string>;
   filteredModelRows: ReadonlyArray<ModelRow>;
+  totalModelCount: number;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
   onSetAllModelsAllowed: (modelIds: string[], nextAllowed: boolean) => void;
   onOpenModelDetails: (modelId: string) => void;
@@ -85,7 +87,7 @@ export function ModelsTab({
                 <Checkbox
                   checked={selectAllCheckboxState.checked}
                   indeterminate={selectAllCheckboxState.indeterminate}
-                  disabled={!canEdit || filteredModelRows.length === 0}
+                  disabled={!canEdit || totalModelCount === 0 || filteredModelRows.length === 0}
                   onCheckedChange={nextChecked => {
                     const modelIds = filteredModelRows.map(r => r.modelId);
                     onSetAllModelsAllowed(modelIds, Boolean(nextChecked));

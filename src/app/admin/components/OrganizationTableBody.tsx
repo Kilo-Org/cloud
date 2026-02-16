@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { formatMicrodollars, formatRelativeTime } from '@/lib/admin-utils';
 import type { AdminOrganizationSchema } from '@/types/admin';
-import type * as z from 'zod';
+import type { z } from 'zod';
 import Link from 'next/link';
 
 type AdminOrganization = z.infer<typeof AdminOrganizationSchema>;

@@ -1,20 +1,26 @@
 import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
+const AgentRole = z.enum(['polecat', 'refinery', 'mayor', 'witness']);
+const AgentStatus = z.enum(['idle', 'working', 'blocked', 'dead']);
+
 export const AgentRecord = z.object({
   id: z.string(),
-  role: z.string(),
+  role: AgentRole,
   name: z.string(),
   identity: z.string(),
   cloud_agent_session_id: z.string().nullable(),
-  status: z.string(),
+  status: AgentStatus,
   current_hook_bead_id: z.string().nullable(),
   last_activity_at: z.string().nullable(),
-  checkpoint: z.string().nullable(),
+  checkpoint: z
+    .string()
+    .nullable()
+    .transform(v => (v === null ? null : (JSON.parse(v) as unknown))),
   created_at: z.string(),
 });
 
-export type AgentRecord = z.infer<typeof AgentRecord>;
+export type AgentRecord = z.output<typeof AgentRecord>;
 
 export const agents = getTableFromZodSchema('agents', AgentRecord);
 

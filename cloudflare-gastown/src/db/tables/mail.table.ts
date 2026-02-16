@@ -7,12 +7,12 @@ export const MailRecord = z.object({
   to_agent_id: z.string(),
   subject: z.string(),
   body: z.string(),
-  delivered: z.number(),
+  delivered: z.number().transform(v => Boolean(v)),
   created_at: z.string(),
   delivered_at: z.string().nullable(),
 });
 
-export type MailRecord = z.infer<typeof MailRecord>;
+export type MailRecord = z.output<typeof MailRecord>;
 
 export const mail = getTableFromZodSchema('mail', MailRecord);
 

@@ -1,17 +1,19 @@
 import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
+const MoleculeStatus = z.enum(['active', 'completed', 'failed']);
+
 export const MoleculeRecord = z.object({
   id: z.string(),
   bead_id: z.string(),
-  formula: z.string(),
+  formula: z.string().transform(v => JSON.parse(v) as unknown),
   current_step: z.number(),
-  status: z.string(),
+  status: MoleculeStatus,
   created_at: z.string(),
   updated_at: z.string(),
 });
 
-export type MoleculeRecord = z.infer<typeof MoleculeRecord>;
+export type MoleculeRecord = z.output<typeof MoleculeRecord>;
 
 export const molecules = getTableFromZodSchema('molecules', MoleculeRecord);
 

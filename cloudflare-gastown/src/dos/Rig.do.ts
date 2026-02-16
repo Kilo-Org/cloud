@@ -1,8 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
-import { createTableBeads, getIndexesBeads, beads } from '../db/tables/beads.table';
-import { createTableAgents, agents } from '../db/tables/agents.table';
-import { createTableMail, getIndexesMail, mail } from '../db/tables/mail.table';
-import { createTableReviewQueue, reviewQueue } from '../db/tables/review-queue.table';
+import { createTableBeads, getIndexesBeads, beads, BeadRecord } from '../db/tables/beads.table';
+import { createTableAgents, agents, AgentRecord } from '../db/tables/agents.table';
+import { createTableMail, getIndexesMail, mail, MailRecord } from '../db/tables/mail.table';
+import {
+  createTableReviewQueue,
+  reviewQueue,
+  ReviewQueueRecord,
+} from '../db/tables/review-queue.table';
 import { createTableMolecules } from '../db/tables/molecules.table';
 import { query } from '../util/query.util';
 import type {
@@ -128,7 +132,7 @@ export class RigDO extends DurableObject<Env> {
       ]),
     ];
     if (rows.length === 0) return null;
-    return this.rowToBead(rows[0]);
+    return BeadRecord.parse(rows[0]);
   }
 
   async listBeads(filter: BeadFilter): Promise<Bead[]> {
@@ -160,7 +164,7 @@ export class RigDO extends DurableObject<Env> {
         ]
       ),
     ];
-    return rows.map(r => this.rowToBead(r));
+    return BeadRecord.array().parse(rows);
   }
 
   async updateBeadStatus(beadId: string, status: string, agentId: string): Promise<Bead> {
@@ -231,7 +235,7 @@ export class RigDO extends DurableObject<Env> {
       ]),
     ];
     if (rows.length === 0) return null;
-    return this.rowToAgent(rows[0]);
+    return AgentRecord.parse(rows[0]);
   }
 
   async getAgentByIdentity(identity: string): Promise<Agent | null> {
@@ -242,7 +246,7 @@ export class RigDO extends DurableObject<Env> {
       ]),
     ];
     if (rows.length === 0) return null;
-    return this.rowToAgent(rows[0]);
+    return AgentRecord.parse(rows[0]);
   }
 
   async listAgents(filter?: AgentFilter): Promise<Agent[]> {
@@ -259,7 +263,7 @@ export class RigDO extends DurableObject<Env> {
         [filter?.role ?? null, filter?.role ?? null, filter?.status ?? null, filter?.status ?? null]
       ),
     ];
-    return rows.map(r => this.rowToAgent(r));
+    return AgentRecord.array().parse(rows);
   }
 
   async updateAgentSession(agentId: string, sessionId: string | null): Promise<void> {
@@ -411,7 +415,7 @@ export class RigDO extends DurableObject<Env> {
     }
 
     this.touchAgent(agentId);
-    return rows.map(r => this.rowToMail(r));
+    return MailRecord.array().parse(rows);
   }
 
   // ── Review Queue ───────────────────────────────────────────────────────
@@ -463,7 +467,7 @@ export class RigDO extends DurableObject<Env> {
     ];
     if (rows.length === 0) return null;
 
-    const entry = this.rowToReviewQueueEntry(rows[0]);
+    const entry = ReviewQueueRecord.parse(rows[0]);
 
     query(
       this.sql,
@@ -536,8 +540,8 @@ export class RigDO extends DurableObject<Env> {
     return {
       agent,
       hooked_bead,
-      undelivered_mail: undeliveredRows.map(r => this.rowToMail(r)),
-      open_beads: openBeadRows.map(r => this.rowToBead(r)),
+      undelivered_mail: MailRecord.array().parse(undeliveredRows),
+      open_beads: BeadRecord.array().parse(openBeadRows),
     };
   }
 
@@ -654,69 +658,6 @@ export class RigDO extends DurableObject<Env> {
       `,
       [now(), agentId]
     );
-  }
-
-  private rowToBead(row: Record<string, SqlStorageValue>): Bead {
-    return {
-      id: String(row.id),
-      type: String(row.type) as Bead['type'],
-      status: String(row.status) as Bead['status'],
-      title: String(row.title),
-      body: row.body === null ? null : String(row.body),
-      assignee_agent_id: row.assignee_agent_id === null ? null : String(row.assignee_agent_id),
-      convoy_id: row.convoy_id === null ? null : String(row.convoy_id),
-      molecule_id: row.molecule_id === null ? null : String(row.molecule_id),
-      priority: String(row.priority) as Bead['priority'],
-      labels: JSON.parse(String(row.labels)) as string[],
-      metadata: JSON.parse(String(row.metadata)) as Record<string, unknown>,
-      created_at: String(row.created_at),
-      updated_at: String(row.updated_at),
-      closed_at: row.closed_at === null ? null : String(row.closed_at),
-    };
-  }
-
-  private rowToAgent(row: Record<string, SqlStorageValue>): Agent {
-    return {
-      id: String(row.id),
-      role: String(row.role) as Agent['role'],
-      name: String(row.name),
-      identity: String(row.identity),
-      cloud_agent_session_id:
-        row.cloud_agent_session_id === null ? null : String(row.cloud_agent_session_id),
-      status: String(row.status) as Agent['status'],
-      current_hook_bead_id:
-        row.current_hook_bead_id === null ? null : String(row.current_hook_bead_id),
-      last_activity_at: row.last_activity_at === null ? null : String(row.last_activity_at),
-      checkpoint: row.checkpoint === null ? null : JSON.parse(String(row.checkpoint)),
-      created_at: String(row.created_at),
-    };
-  }
-
-  private rowToMail(row: Record<string, SqlStorageValue>): Mail {
-    return {
-      id: String(row.id),
-      from_agent_id: String(row.from_agent_id),
-      to_agent_id: String(row.to_agent_id),
-      subject: String(row.subject),
-      body: String(row.body),
-      delivered: Boolean(row.delivered),
-      created_at: String(row.created_at),
-      delivered_at: row.delivered_at === null ? null : String(row.delivered_at),
-    };
-  }
-
-  private rowToReviewQueueEntry(row: Record<string, SqlStorageValue>): ReviewQueueEntry {
-    return {
-      id: String(row.id),
-      agent_id: String(row.agent_id),
-      bead_id: String(row.bead_id),
-      branch: String(row.branch),
-      pr_url: row.pr_url === null ? null : String(row.pr_url),
-      status: String(row.status) as ReviewQueueEntry['status'],
-      summary: row.summary === null ? null : String(row.summary),
-      created_at: String(row.created_at),
-      processed_at: row.processed_at === null ? null : String(row.processed_at),
-    };
   }
 }
 

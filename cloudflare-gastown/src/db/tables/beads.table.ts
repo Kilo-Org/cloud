@@ -1,24 +1,28 @@
 import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
+const BeadType = z.enum(['issue', 'message', 'escalation', 'merge_request']);
+const BeadStatus = z.enum(['open', 'in_progress', 'closed']);
+const BeadPriority = z.enum(['low', 'medium', 'high', 'critical']);
+
 export const BeadRecord = z.object({
   id: z.string(),
-  type: z.string(),
-  status: z.string(),
+  type: BeadType,
+  status: BeadStatus,
   title: z.string(),
   body: z.string().nullable(),
   assignee_agent_id: z.string().nullable(),
   convoy_id: z.string().nullable(),
   molecule_id: z.string().nullable(),
-  priority: z.string(),
-  labels: z.string(),
-  metadata: z.string(),
+  priority: BeadPriority,
+  labels: z.string().transform(v => JSON.parse(v) as string[]),
+  metadata: z.string().transform(v => JSON.parse(v) as Record<string, unknown>),
   created_at: z.string(),
   updated_at: z.string(),
   closed_at: z.string().nullable(),
 });
 
-export type BeadRecord = z.infer<typeof BeadRecord>;
+export type BeadRecord = z.output<typeof BeadRecord>;
 
 export const beads = getTableFromZodSchema('beads', BeadRecord);
 

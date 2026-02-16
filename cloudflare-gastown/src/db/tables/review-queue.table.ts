@@ -1,19 +1,21 @@
 import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
+const ReviewStatus = z.enum(['pending', 'running', 'merged', 'failed']);
+
 export const ReviewQueueRecord = z.object({
   id: z.string(),
   agent_id: z.string(),
   bead_id: z.string(),
   branch: z.string(),
   pr_url: z.string().nullable(),
-  status: z.string(),
+  status: ReviewStatus,
   summary: z.string().nullable(),
   created_at: z.string(),
   processed_at: z.string().nullable(),
 });
 
-export type ReviewQueueRecord = z.infer<typeof ReviewQueueRecord>;
+export type ReviewQueueRecord = z.output<typeof ReviewQueueRecord>;
 
 export const reviewQueue = getTableFromZodSchema('review_queue', ReviewQueueRecord);
 

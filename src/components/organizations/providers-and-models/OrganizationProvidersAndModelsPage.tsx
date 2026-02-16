@@ -186,8 +186,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         modelProvidersIndex: selectors.modelProvidersIndex,
       });
 
-      if (orphanedModelIds.length === 0) {
-        // No orphaned models, proceed directly
+      // Filter to only include models that are currently enabled (have at least one enabled provider)
+      // This prevents showing models that are already disabled in the confirmation dialog
+      const currentlyEnabledOrphanedModelIds = orphanedModelIds.filter(modelId =>
+        allowedModelIds.has(modelId)
+      );
+
+      if (currentlyEnabledOrphanedModelIds.length === 0) {
+        // No currently enabled models would be orphaned, proceed directly
         actions.toggleProvider({ providerSlug, nextEnabled });
         return;
       }
@@ -196,7 +202,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       const provider = openRouterProviders.find(p => p.slug === providerSlug);
       const providerDisplayName = provider?.name ?? providerSlug;
 
-      const modelsToRemove = orphanedModelIds
+      const modelsToRemove = currentlyEnabledOrphanedModelIds
         .map(modelId => {
           const model = openRouterModels.find(m => normalizeModelId(m.slug) === modelId);
           return model ? { modelId, modelName: model.name } : { modelId, modelName: modelId };

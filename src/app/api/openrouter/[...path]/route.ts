@@ -179,10 +179,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   } = await getUserFromAuth({ adminOnly: false });
   authSpan.end();
 
-  if (maybeUser?.is_admin && originalModelIdLowerCased.startsWith('anthropic/')) {
-    return await customLlmRequest(originalModelIdLowerCased, requestBodyParsed);
-  }
-
   let user: typeof maybeUser | AnonymousUserContext;
   let organizationId: string | undefined = authOrganizationId;
   let internalApiUse: boolean | undefined = authInternalApiUse;
@@ -213,7 +209,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const taskId = request.headers.get('X-KiloCode-TaskId') ?? undefined;
-  const { provider, userByok } = await getProvider(
+  const { provider, userByok, customLlm } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
     user,
@@ -340,15 +336,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     userByok
   );
 
-  const response = await openRouterRequest({
-    path,
-    search: url.search,
-    method: request.method,
-    body: requestBodyParsed,
-    extraHeaders,
-    provider,
-    signal: request.signal,
-  });
+  const response = customLlm
+    ? await customLlmRequest(customLlm, requestBodyParsed)
+    : await openRouterRequest({
+        path,
+        search: url.search,
+        method: request.method,
+        body: requestBodyParsed,
+        extraHeaders,
+        provider,
+        signal: request.signal,
+      });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
 
   emitApiMetricsForResponse(

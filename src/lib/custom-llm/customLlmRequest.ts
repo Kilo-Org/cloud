@@ -29,6 +29,11 @@ import {
 } from './reasoning-provider-metadata';
 import type { OpenRouterStreamChatCompletionChunkSchema } from './schemas';
 import type * as z from 'zod';
+import type { CustomLlm } from '@/db/schema';
+import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
+import { createOpenAI } from '@ai-sdk/openai';
+import type { XaiLanguageModelResponsesOptions } from '@ai-sdk/xai';
+import { createXai } from '@ai-sdk/xai';
 
 type ChatCompletionChunk = z.infer<typeof OpenRouterStreamChatCompletionChunkSchema>;
 
@@ -474,20 +479,33 @@ function errorResponse(status: number, message: string) {
   return NextResponse.json({ error: { message, code: status, type: 'error' } }, { status });
 }
 
-function buildCommonParams(messages: ModelMessage[], request: OpenRouterChatCompletionRequest) {
+function buildCommonParams(
+  customLlm: CustomLlm,
+  messages: ModelMessage[],
+  request: OpenRouterChatCompletionRequest
+) {
+  const reasoningEffort = request.reasoning?.effort ?? request.reasoning_effort ?? undefined;
   return {
     messages,
     tools: convertTools(request.tools),
     toolChoice: convertToolChoice(request.tool_choice),
-    maxOutputTokens: request.max_tokens ?? request.max_completion_tokens ?? undefined,
+    maxOutputTokens: request.max_completion_tokens ?? request.max_tokens ?? undefined,
     headers: {
       'anthropic-beta': 'context-1m-2025-08-07',
     },
     providerOptions: {
       anthropic: {
         thinking: { type: 'adaptive' },
-        effort: request.verbosity ?? undefined,
+        effort: customLlm.verbosity,
       } satisfies AnthropicProviderOptions,
+      openai: {
+        textVerbosity: customLlm.verbosity,
+        reasoningEffort: reasoningEffort,
+      } satisfies OpenAILanguageModelResponsesOptions,
+      xai: {
+        reasoningEffort:
+          reasoningEffort === 'none' || reasoningEffort === 'minimal' ? undefined : reasoningEffort,
+      } satisfies XaiLanguageModelResponsesOptions,
     },
   };
 }
@@ -539,18 +557,39 @@ function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof gener
   };
 }
 
+function createModel(customLlm: CustomLlm) {
+  if (customLlm.provider === 'anthropic') {
+    const anthropic = createAnthropic({
+      apiKey: customLlm.api_key,
+      baseURL: customLlm.base_url,
+    });
+    return anthropic(customLlm.internal_id);
+  }
+  if (customLlm.provider === 'openai') {
+    const openai = createOpenAI({
+      apiKey: customLlm.api_key,
+      baseURL: customLlm.base_url,
+    });
+    return openai(customLlm.internal_id);
+  }
+  if (customLlm.provider === 'xai') {
+    const xai = createXai({
+      apiKey: customLlm.api_key,
+      baseURL: customLlm.base_url,
+    });
+    return xai.responses(customLlm.internal_id);
+  }
+  throw new Error(`Unknown provider: ${customLlm.provider}`);
+}
+
 export async function customLlmRequest(
-  requestedModel: string,
+  customLlm: CustomLlm,
   request: OpenRouterChatCompletionRequest
 ) {
   const messages = convertMessages(request.messages as OpenRouterChatCompletionsInput);
 
-  const provider = createAnthropic({
-    apiKey: 'placeholder',
-  });
-
-  const model = provider('placeholder');
-  const commonParams = buildCommonParams(messages, request);
+  const model = createModel(customLlm);
+  const commonParams = buildCommonParams(customLlm, messages, request);
 
   if (!request.stream) {
     try {
@@ -567,17 +606,18 @@ export async function customLlmRequest(
 
   const convertStreamPartToChunk = createStreamPartConverter();
 
+  const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of result.fullStream) {
           const converted = convertStreamPartToChunk(chunk);
           if (converted) {
-            controller.enqueue(`data: ${JSON.stringify(converted)}\n\n`);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(converted)}\n\n`));
           }
         }
 
-        controller.enqueue('data: [DONE]\n\n');
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       } catch (e) {
         const errorChunk = {
           error: {
@@ -589,7 +629,7 @@ export async function customLlmRequest(
             type: 'error',
           },
         };
-        controller.enqueue(`data: ${JSON.stringify(errorChunk)}\n\n`);
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
       } finally {
         controller.close();
       }

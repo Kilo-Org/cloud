@@ -39,8 +39,9 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.41",
     "@ai-sdk/gateway": "^3.0.16",
-    "@ai-sdk/mistral": "^2.0.23",
-    "@ai-sdk/openai": "^2.0.52",
+    "@ai-sdk/mistral": "^3.0.19",
+    "@ai-sdk/openai": "^3.0.27",
+    "@ai-sdk/xai": "^3.0.54",
     "@aws-sdk/client-s3": "^3.980.0",
     "@aws-sdk/s3-request-presigner": "^3.980.0",
     "@lottiefiles/dotlottie-react": "^0.17.6",

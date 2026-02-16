@@ -250,6 +250,7 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
       .update(organizations)
       .set({
         microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
+        microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
       })
       .where(eq(organizations.id, organization_id));
 

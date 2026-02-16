@@ -711,6 +711,8 @@ type SortField =
   | 'hasGitHubIntegration'
   | 'hasCodeReviewsEnabled'
   | 'isOnboardingComplete'
+  | 'hasCompletedCodeReview'
+  | 'lastCodeReviewDate'
   | 'tier'
   | 'monthlyCreditsUsd'
   | 'createdAt';
@@ -819,6 +821,14 @@ function SponsorshipsTable() {
         case 'isOnboardingComplete':
           comparison = Number(a.isOnboardingComplete) - Number(b.isOnboardingComplete);
           break;
+        case 'hasCompletedCodeReview':
+          comparison = Number(a.hasCompletedCodeReview) - Number(b.hasCompletedCodeReview);
+          break;
+        case 'lastCodeReviewDate':
+          comparison =
+            new Date(a.lastCodeReviewDate || 0).getTime() -
+            new Date(b.lastCodeReviewDate || 0).getTime();
+          break;
         case 'tier':
           comparison = (a.tier || 0) - (b.tier || 0);
           break;
@@ -866,6 +876,8 @@ function SponsorshipsTable() {
       'GitHub Integration',
       'Code Reviews Enabled',
       'Onboarding Complete',
+      'Has Completed Code Review',
+      'Last Code Review Date',
       'Tier',
       'Monthly Credits (USD)',
       'Current Balance (USD)',
@@ -881,6 +893,8 @@ function SponsorshipsTable() {
       s.hasGitHubIntegration ? 'Yes' : 'No',
       s.hasCodeReviewsEnabled ? 'Yes' : 'No',
       s.isOnboardingComplete ? 'Yes' : 'No',
+      s.hasCompletedCodeReview ? 'Yes' : 'No',
+      s.lastCodeReviewDate ? new Date(s.lastCodeReviewDate).toISOString() : '',
       getTierName(s.tier),
       s.monthlyCreditsUsd?.toFixed(2) || '0',
       s.currentBalanceUsd?.toFixed(2) || '0',
@@ -1109,6 +1123,24 @@ function SponsorshipsTable() {
                   </TableHead>
                   <TableHead
                     className="hover:bg-muted/50 cursor-pointer select-none"
+                    onClick={() => handleSort('hasCompletedCodeReview')}
+                  >
+                    <div className="flex items-center">
+                      Completed Review
+                      {getSortIcon('hasCompletedCodeReview')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="hover:bg-muted/50 cursor-pointer select-none"
+                    onClick={() => handleSort('lastCodeReviewDate')}
+                  >
+                    <div className="flex items-center">
+                      Last Review Date
+                      {getSortIcon('lastCodeReviewDate')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="hover:bg-muted/50 cursor-pointer select-none"
                     onClick={() => handleSort('tier')}
                   >
                     <div className="flex items-center">
@@ -1197,6 +1229,18 @@ function SponsorshipsTable() {
                       )}
                     </TableCell>
                     <TableCell>
+                      {sponsorship.hasCompletedCodeReview ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-500" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {sponsorship.lastCodeReviewDate
+                        ? new Date(sponsorship.lastCodeReviewDate).toLocaleDateString()
+                        : '—'}
+                    </TableCell>
+                    <TableCell>
                       <Badge variant="secondary">{getTierName(sponsorship.tier)}</Badge>
                     </TableCell>
                     <TableCell>
@@ -1223,6 +1267,129 @@ function SponsorshipsTable() {
   );
 }
 
+function ManualEntrySection() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [githubUrl, setGithubUrl] = useState('');
+  const [email, setEmail] = useState('');
+  const [creditsDollars, setCreditsDollars] = useState<number>(0);
+  const [tier, setTier] = useState<1 | 2 | 3>(1);
+
+  const repoName = useMemo(() => extractRepoName(githubUrl), [githubUrl]);
+  const isGithubUrlValid = githubUrl === '' || repoName !== null;
+  const isEmailValid = email === '' || email.includes('@');
+  const isCreditsValid = creditsDollars >= 0;
+  const canSubmit = githubUrl !== '' && repoName !== null && email.includes('@') && isCreditsValid;
+
+  const processOssCsvMutation = useMutation(
+    trpc.admin.ossSponsorship.processOssCsv.mutationOptions({
+      onSuccess: results => {
+        const result = results[0];
+        if (result?.success) {
+          toast.success(`Successfully created sponsorship for ${repoName}`);
+          setGithubUrl('');
+          setEmail('');
+          setCreditsDollars(0);
+          setTier(1);
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.ossSponsorship.listOssSponsorships.queryKey(),
+          });
+        } else {
+          toast.error(result?.error ?? 'Failed to create sponsorship');
+        }
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to create sponsorship');
+      },
+    })
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    processOssCsvMutation.mutate([{ githubUrl: githubUrl.match(/^https?:\/\//) ? githubUrl : `https://${githubUrl}`, email, creditsDollars, tier }]);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Plus className="h-5 w-5" />
+          Manual Entry
+        </CardTitle>
+        <CardDescription>Add a single OSS sponsorship manually</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="manual-github-url">GitHub URL</Label>
+              <Input
+                id="manual-github-url"
+                type="text"
+                placeholder="https://github.com/owner/repo"
+                value={githubUrl}
+                onChange={e => setGithubUrl(e.target.value)}
+              />
+              {githubUrl && !isGithubUrlValid && (
+                <p className="text-destructive text-sm">Invalid GitHub repository URL</p>
+              )}
+              {repoName && (
+                <p className="text-muted-foreground text-sm">
+                  Organization name: <span className="font-medium">{repoName}</span>
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-email">Email</Label>
+              <Input
+                id="manual-email"
+                type="text"
+                placeholder="user@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+              {email && !isEmailValid && (
+                <p className="text-destructive text-sm">Invalid email address</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-credits">Credits (USD)</Label>
+              <Input
+                id="manual-credits"
+                type="number"
+                min={0}
+                step={1}
+                value={creditsDollars}
+                onChange={e => setCreditsDollars(Number(e.target.value))}
+              />
+              {!isCreditsValid && (
+                <p className="text-destructive text-sm">Credits must be non-negative</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-tier">Tier</Label>
+              <select
+                id="manual-tier"
+                value={tier}
+                onChange={e => setTier(Number(e.target.value) as 1 | 2 | 3)}
+                className="bg-background border-input w-full rounded-md border px-3 py-2"
+              >
+                <option value={1}>Tier 1 — Premier</option>
+                <option value={2}>Tier 2 — Growth</option>
+                <option value={3}>Tier 3 — Seed</option>
+              </select>
+            </div>
+          </div>
+          <Button type="submit" disabled={!canSubmit || processOssCsvMutation.isPending}>
+            {processOssCsvMutation.isPending ? 'Creating...' : 'Create Sponsorship'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OssSponsorshipPage() {
   return (
     <div className="container mx-auto max-w-6xl space-y-8 p-8">
@@ -1232,6 +1399,7 @@ export default function OssSponsorshipPage() {
       </div>
 
       <CsvUploadSection />
+      <ManualEntrySection />
       <AddExistingOrgSection />
       <SponsorshipsTable />
     </div>

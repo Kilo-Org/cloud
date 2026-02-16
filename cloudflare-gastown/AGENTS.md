@@ -31,15 +31,20 @@
 
   ```ts
   // gastown.worker.ts — route definition
-  app.post('/api/rigs/:rigId/agents', zodJsonValidator(RegisterAgentBody), c =>
-    handleRegisterAgent(c, { rigId: c.req.param('rigId') })
-  );
+  app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
 
   // handlers/rig-agents.handler.ts — handler implementation
   export async function handleRegisterAgent(c: Context<GastownEnv>, params: { rigId: string }) {
-    const body = c.req.valid('json');
+    // Zod validation lives in the handler, not as route middleware
+    const parsed = RegisterAgentBody.safeParse(await c.req.json());
+    if (!parsed.success) {
+      return c.json(
+        { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+        400
+      );
+    }
     const rig = getRigDOStub(c.env, params.rigId);
-    const agent = await rig.registerAgent(body);
+    const agent = await rig.registerAgent(parsed.data);
     return c.json(resSuccess(agent), 201);
   }
   ```

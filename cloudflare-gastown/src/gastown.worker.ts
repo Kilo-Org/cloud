@@ -59,61 +59,49 @@ app.use('/api/rigs/:rigId/*', authMiddleware);
 
 // ── Beads ───────────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/beads', c => handleCreateBead(c, { rigId: c.req.param('rigId') }));
-app.get('/api/rigs/:rigId/beads', c => handleListBeads(c, { rigId: c.req.param('rigId') }));
-app.get('/api/rigs/:rigId/beads/:beadId', c =>
-  handleGetBead(c, { rigId: c.req.param('rigId'), beadId: c.req.param('beadId') })
-);
-app.patch('/api/rigs/:rigId/beads/:beadId/status', c =>
-  handleUpdateBeadStatus(c, { rigId: c.req.param('rigId'), beadId: c.req.param('beadId') })
-);
-app.post('/api/rigs/:rigId/beads/:beadId/close', c =>
-  handleCloseBead(c, { rigId: c.req.param('rigId'), beadId: c.req.param('beadId') })
-);
+app.post('/api/rigs/:rigId/beads', c => handleCreateBead(c, c.req.param()));
+app.get('/api/rigs/:rigId/beads', c => handleListBeads(c, c.req.param()));
+app.get('/api/rigs/:rigId/beads/:beadId', c => handleGetBead(c, c.req.param()));
+app.patch('/api/rigs/:rigId/beads/:beadId/status', c => handleUpdateBeadStatus(c, c.req.param()));
+app.post('/api/rigs/:rigId/beads/:beadId/close', c => handleCloseBead(c, c.req.param()));
 
 // ── Agents ──────────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, { rigId: c.req.param('rigId') }));
-app.get('/api/rigs/:rigId/agents', c => handleListAgents(c, { rigId: c.req.param('rigId') }));
-app.get('/api/rigs/:rigId/agents/:agentId', c =>
-  handleGetAgent(c, { rigId: c.req.param('rigId'), agentId: c.req.param('agentId') })
-);
+app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
+app.get('/api/rigs/:rigId/agents', c => handleListAgents(c, c.req.param()));
+app.get('/api/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
 
 // Agent-scoped routes (agentOnlyMiddleware enforces JWT agentId match)
 app.post('/api/rigs/:rigId/agents/:agentId/hook', agentOnlyMiddleware, c =>
-  handleHookBead(c, { rigId: c.req.param('rigId'), agentId: c.req.param('agentId') })
+  handleHookBead(c, c.req.param())
 );
 app.delete('/api/rigs/:rigId/agents/:agentId/hook', agentOnlyMiddleware, c =>
-  handleUnhookBead(c, { rigId: c.req.param('rigId'), agentId: c.req.param('agentId') })
+  handleUnhookBead(c, c.req.param())
 );
 app.get('/api/rigs/:rigId/agents/:agentId/prime', agentOnlyMiddleware, c =>
-  handlePrime(c, { rigId: c.req.param('rigId'), agentId: c.req.param('agentId') })
+  handlePrime(c, c.req.param())
 );
 app.post('/api/rigs/:rigId/agents/:agentId/done', agentOnlyMiddleware, c =>
-  handleAgentDone(c, { rigId: c.req.param('rigId'), agentId: c.req.param('agentId') })
+  handleAgentDone(c, c.req.param())
 );
 app.post('/api/rigs/:rigId/agents/:agentId/checkpoint', agentOnlyMiddleware, c =>
-  handleWriteCheckpoint(c, { rigId: c.req.param('rigId'), agentId: c.req.param('agentId') })
+  handleWriteCheckpoint(c, c.req.param())
 );
 app.get('/api/rigs/:rigId/agents/:agentId/mail', agentOnlyMiddleware, c =>
-  handleCheckMail(c, { rigId: c.req.param('rigId'), agentId: c.req.param('agentId') })
+  handleCheckMail(c, c.req.param())
 );
 
 // ── Mail ────────────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/mail', c => handleSendMail(c, { rigId: c.req.param('rigId') }));
+app.post('/api/rigs/:rigId/mail', c => handleSendMail(c, c.req.param()));
 
 // ── Review Queue ────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/review-queue', c =>
-  handleSubmitToReviewQueue(c, { rigId: c.req.param('rigId') })
-);
+app.post('/api/rigs/:rigId/review-queue', c => handleSubmitToReviewQueue(c, c.req.param()));
 
 // ── Escalations ─────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/escalations', c =>
-  handleCreateEscalation(c, { rigId: c.req.param('rigId') })
-);
+app.post('/api/rigs/:rigId/escalations', c => handleCreateEscalation(c, c.req.param()));
 
 // ── Error handling ──────────────────────────────────────────────────────
 

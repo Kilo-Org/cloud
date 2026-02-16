@@ -43,7 +43,7 @@ const ManuallyAddedRepositoryInputSchema = z.object({
 
 const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   platform: PlatformSchema,
-  reviewStyle: z.enum(['strict', 'balanced', 'lenient']),
+  reviewStyle: z.enum(['strict', 'balanced', 'lenient', 'roast']),
   focusAreas: z.array(z.string()),
   customInstructions: z.string().optional(),
   maxReviewTimeMinutes: z.number().min(5).max(30),

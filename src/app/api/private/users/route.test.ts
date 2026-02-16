@@ -89,7 +89,6 @@ describe('GET /api/private/users', () => {
       .insert(organizations)
       .values({
         name: 'Acme Org',
-        microdollars_balance: 0,
         auto_top_up_enabled: true,
         plan: 'enterprise',
       })

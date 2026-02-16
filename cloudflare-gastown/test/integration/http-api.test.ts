@@ -1,5 +1,5 @@
-import { SELF, env } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { SELF } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
 import { signAgentJWT } from '../../src/util/jwt.util';
 
 const INTERNAL_API_KEY = 'test-internal-secret';

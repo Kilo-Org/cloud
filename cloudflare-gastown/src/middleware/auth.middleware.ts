@@ -92,9 +92,13 @@ export function getEnforcedAgentId(c: Context<any>): string | null {
 
 export const agentOnlyMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
   const authMode = c.get('authMode');
-  if (authMode !== 'agent') {
-    // Internal auth is allowed — it acts on behalf of any agent
+  if (authMode === 'internal') {
+    // Internal auth is trusted to act on behalf of any agent
     return next();
+  }
+  if (authMode !== 'agent') {
+    // authMode is unset or unexpected — authMiddleware was not applied
+    return c.json(resError('Authentication required'), 401);
   }
 
   const jwt = c.get('agentJWT');

@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess, resError } from '../util/res.util';
+import { parseJsonBody } from '../util/parse-json-body.util';
 import { AgentRole, AgentStatus } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
@@ -26,7 +27,7 @@ const WriteCheckpointBody = z.object({
 });
 
 export async function handleRegisterAgent(c: Context<GastownEnv>, params: { rigId: string }) {
-  const parsed = RegisterAgentBody.safeParse(await c.req.json());
+  const parsed = RegisterAgentBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
@@ -39,10 +40,18 @@ export async function handleRegisterAgent(c: Context<GastownEnv>, params: { rigI
 }
 
 export async function handleListAgents(c: Context<GastownEnv>, params: { rigId: string }) {
+  const roleRaw = c.req.query('role');
+  const statusRaw = c.req.query('status');
+  const role = roleRaw !== undefined ? AgentRole.safeParse(roleRaw) : undefined;
+  const status = statusRaw !== undefined ? AgentStatus.safeParse(statusRaw) : undefined;
+  if ((role && !role.success) || (status && !status.success)) {
+    return c.json(resError('Invalid role or status filter'), 400);
+  }
+
   const rig = getRigDOStub(c.env, params.rigId);
   const agents = await rig.listAgents({
-    role: c.req.query('role') as z.infer<typeof AgentRole> | undefined,
-    status: c.req.query('status') as z.infer<typeof AgentStatus> | undefined,
+    role: role?.data,
+    status: status?.data,
   });
   return c.json(resSuccess(agents));
 }
@@ -61,7 +70,7 @@ export async function handleHookBead(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }
 ) {
-  const parsed = HookBeadBody.safeParse(await c.req.json());
+  const parsed = HookBeadBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
@@ -95,7 +104,7 @@ export async function handleAgentDone(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }
 ) {
-  const parsed = AgentDoneBody.safeParse(await c.req.json());
+  const parsed = AgentDoneBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
@@ -111,7 +120,7 @@ export async function handleWriteCheckpoint(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }
 ) {
-  const parsed = WriteCheckpointBody.safeParse(await c.req.json());
+  const parsed = WriteCheckpointBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },

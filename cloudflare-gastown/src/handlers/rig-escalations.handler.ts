@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess } from '../util/res.util';
+import { parseJsonBody } from '../util/parse-json-body.util';
 import { BeadPriority } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
@@ -13,7 +14,7 @@ const CreateEscalationBody = z.object({
 });
 
 export async function handleCreateEscalation(c: Context<GastownEnv>, params: { rigId: string }) {
-  const parsed = CreateEscalationBody.safeParse(await c.req.json());
+  const parsed = CreateEscalationBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },

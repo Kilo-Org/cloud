@@ -15,7 +15,7 @@ export function verifyAgentJWT(
   secret: string
 ): { success: true; payload: AgentJWTPayload } | { success: false; error: string } {
   try {
-    const raw = jwt.verify(token, secret, { algorithms: ['HS256'] });
+    const raw = jwt.verify(token, secret, { algorithms: ['HS256'], maxAge: '24h' });
     const parsed = AgentJWTPayload.safeParse(raw);
     if (!parsed.success) {
       return { success: false, error: 'Invalid token payload' };

@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess, resError } from '../util/res.util';
+import { parseJsonBody } from '../util/parse-json-body.util';
 import { getEnforcedAgentId } from '../middleware/auth.middleware';
 import type { GastownEnv } from '../gastown.worker';
 
@@ -14,7 +15,7 @@ const SubmitToReviewQueueBody = z.object({
 });
 
 export async function handleSubmitToReviewQueue(c: Context<GastownEnv>, params: { rigId: string }) {
-  const parsed = SubmitToReviewQueueBody.safeParse(await c.req.json());
+  const parsed = SubmitToReviewQueueBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },

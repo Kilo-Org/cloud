@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess, resError } from '../util/res.util';
+import { parseJsonBody } from '../util/parse-json-body.util';
 import { getEnforcedAgentId } from '../middleware/auth.middleware';
 import { BeadType, BeadPriority, BeadStatus } from '../types';
 import type { GastownEnv } from '../gastown.worker';
@@ -26,8 +27,10 @@ const CloseBeadBody = z.object({
   agent_id: z.string().min(1),
 });
 
+const NonNegativeInt = z.coerce.number().int().nonnegative();
+
 export async function handleCreateBead(c: Context<GastownEnv>, params: { rigId: string }) {
-  const parsed = CreateBeadBody.safeParse(await c.req.json());
+  const parsed = CreateBeadBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
@@ -42,23 +45,28 @@ export async function handleCreateBead(c: Context<GastownEnv>, params: { rigId: 
 export async function handleListBeads(c: Context<GastownEnv>, params: { rigId: string }) {
   const limitRaw = c.req.query('limit');
   const offsetRaw = c.req.query('offset');
-  const limit = limitRaw !== undefined ? parseInt(limitRaw, 10) : undefined;
-  const offset = offsetRaw !== undefined ? parseInt(offsetRaw, 10) : undefined;
-  if (
-    (limit !== undefined && (!Number.isFinite(limit) || limit < 0)) ||
-    (offset !== undefined && (!Number.isFinite(offset) || offset < 0))
-  ) {
+  const limit = limitRaw !== undefined ? NonNegativeInt.safeParse(limitRaw) : undefined;
+  const offset = offsetRaw !== undefined ? NonNegativeInt.safeParse(offsetRaw) : undefined;
+  if ((limit && !limit.success) || (offset && !offset.success)) {
     return c.json(resError('limit and offset must be non-negative integers'), 400);
+  }
+
+  const statusRaw = c.req.query('status');
+  const typeRaw = c.req.query('type');
+  const status = statusRaw !== undefined ? BeadStatus.safeParse(statusRaw) : undefined;
+  const type = typeRaw !== undefined ? BeadType.safeParse(typeRaw) : undefined;
+  if ((status && !status.success) || (type && !type.success)) {
+    return c.json(resError('Invalid status or type filter'), 400);
   }
 
   const rig = getRigDOStub(c.env, params.rigId);
   const beads = await rig.listBeads({
-    status: c.req.query('status') as z.infer<typeof BeadStatus> | undefined,
-    type: c.req.query('type') as z.infer<typeof BeadType> | undefined,
+    status: status?.data,
+    type: type?.data,
     assignee_agent_id: c.req.query('assignee_agent_id'),
     convoy_id: c.req.query('convoy_id'),
-    limit,
-    offset,
+    limit: limit?.data,
+    offset: offset?.data,
   });
   return c.json(resSuccess(beads));
 }
@@ -77,7 +85,7 @@ export async function handleUpdateBeadStatus(
   c: Context<GastownEnv>,
   params: { rigId: string; beadId: string }
 ) {
-  const parsed = UpdateBeadStatusBody.safeParse(await c.req.json());
+  const parsed = UpdateBeadStatusBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
@@ -97,7 +105,7 @@ export async function handleCloseBead(
   c: Context<GastownEnv>,
   params: { rigId: string; beadId: string }
 ) {
-  const parsed = CloseBeadBody.safeParse(await c.req.json());
+  const parsed = CloseBeadBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },

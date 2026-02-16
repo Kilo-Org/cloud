@@ -1,5 +1,5 @@
 {
-  "id": "1a0f5fe8-3044-4abe-8688-0029223e8609",
+  "id": "255e2888-12b9-4784-8833-665c53a68733",
   "prevId": "674d8b93-12bc-4b25-ab50-5557606d8dcf",
   "version": "7",
   "dialect": "postgresql",
@@ -8354,13 +8354,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "microdollars_balance": {
-          "name": "microdollars_balance",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0'"
         },
         "microdollars_used": {
           "name": "microdollars_used",

@@ -1,1 +1,0 @@
-ALTER TABLE "organizations" DROP COLUMN "microdollars_balance";

@@ -63,13 +63,12 @@ describe('withStatusQueryBoundary', () => {
 
   test('renders wrapped component when query is resolved', () => {
     const Wrapped = withStatusQueryBoundary(
-      ({ status, label }: { status: KiloClawDashboardStatus | undefined; label: string }) =>
-        createElement('div', null, `${label}:${status?.status || 'none'}`)
+      ({ status }: { status: KiloClawDashboardStatus | undefined }) =>
+        createElement('div', null, `status:${status?.status || 'none'}`)
     );
 
     const html = renderToStaticMarkup(
       createElement(Wrapped, {
-        label: 'status',
         statusQuery: {
           data: baseStatus,
           isLoading: false,

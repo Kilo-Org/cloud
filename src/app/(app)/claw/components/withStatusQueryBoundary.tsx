@@ -17,14 +17,12 @@ function formatError(error: unknown): string {
   return 'Unknown error';
 }
 
-export function withStatusQueryBoundary<P extends { status: KiloClawDashboardStatus | undefined }>(
-  Component: ComponentType<P>
-) {
-  type WrappedProps = Omit<P, 'status'> & { statusQuery: StatusQueryLike };
+type WithStatusProp = {
+  status: KiloClawDashboardStatus | undefined;
+};
 
-  return function StatusBoundary(props: WrappedProps) {
-    const { statusQuery, ...rest } = props;
-
+export function withStatusQueryBoundary(Component: ComponentType<WithStatusProp>) {
+  return function StatusBoundary({ statusQuery }: { statusQuery: StatusQueryLike }) {
     if (statusQuery.isLoading) {
       return (
         <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -49,7 +47,6 @@ export function withStatusQueryBoundary<P extends { status: KiloClawDashboardSta
       );
     }
 
-    // TS cannot infer that rest + injected status reconstructs P in this HOC pattern.
-    return <Component {...({ ...rest, status: statusQuery.data } as unknown as P)} />;
+    return <Component status={statusQuery.data} />;
   };
 }

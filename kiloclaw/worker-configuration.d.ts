@@ -20,6 +20,8 @@ declare namespace Cloudflare {
 		FLY_REGION: string;
 		OPENCLAW_ALLOWED_ORIGINS: string;
 		AGENT_ENV_VARS_PRIVATE_KEY: string;
+		DEBUG_ROUTES: string;
+		DEBUG_ROUTES_SECRET: string;
 		FLY_IMAGE_TAG: string;
 		KILOCLAW_INSTANCE: DurableObjectNamespace<import("./src/index").KiloClawInstance>;
 		KILOCLAW_APP: DurableObjectNamespace<import("./src/index").KiloClawApp>;
@@ -30,7 +32,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NEXTAUTH_SECRET" | "INTERNAL_API_SECRET" | "GATEWAY_TOKEN_SECRET" | "WORKER_ENV" | "KILOCODE_API_BASE_URL" | "FLY_REGISTRY_APP" | "FLY_ORG_SLUG" | "FLY_API_TOKEN" | "FLY_APP_NAME" | "FLY_REGION" | "OPENCLAW_ALLOWED_ORIGINS" | "AGENT_ENV_VARS_PRIVATE_KEY" | "FLY_IMAGE_TAG">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NEXTAUTH_SECRET" | "INTERNAL_API_SECRET" | "GATEWAY_TOKEN_SECRET" | "WORKER_ENV" | "KILOCODE_API_BASE_URL" | "FLY_REGISTRY_APP" | "FLY_ORG_SLUG" | "FLY_API_TOKEN" | "FLY_APP_NAME" | "FLY_REGION" | "OPENCLAW_ALLOWED_ORIGINS" | "AGENT_ENV_VARS_PRIVATE_KEY" | "DEBUG_ROUTES" | "DEBUG_ROUTES_SECRET" | "FLY_IMAGE_TAG">> {}
 }
 
 // Begin runtime types

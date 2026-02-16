@@ -6,16 +6,14 @@ import { BooleanBadge } from '@/components/ui/boolean-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { formatMicrodollars, formatRelativeTime } from '@/lib/admin-utils';
-import type { Organization } from '@/db/schema';
+import type { AdminOrganizationSchema } from '@/types/admin';
+import type * as z from 'zod';
 import Link from 'next/link';
 
+type AdminOrganization = z.infer<typeof AdminOrganizationSchema>;
+
 type OrganizationTableBodyProps = {
-  organizations: (Organization & {
-    member_count: number;
-    created_by_user_email: string | null;
-    created_by_user_name: string | null;
-    subscription_amount_usd: number | null;
-  })[];
+  organizations: AdminOrganization[];
   isLoading: boolean;
   searchTerm?: string;
   showDeleted?: boolean;

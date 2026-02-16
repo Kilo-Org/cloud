@@ -101,7 +101,6 @@ export async function processTopupForOrganization(
     await tx
       .update(organizations)
       .set({
-        microdollars_balance: sql`${organizations.microdollars_balance} + ${Math.round(creditAmountInMicrodollars)}`,
         total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${Math.round(creditAmountInMicrodollars)}`,
       })
       .where(eq(organizations.id, organization.id));

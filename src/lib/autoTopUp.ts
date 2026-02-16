@@ -34,11 +34,7 @@ type AutoTopUpResult = Result<{ stripe_id: string }, string>;
 
 type AutoTopUpOrganization = Pick<
   Organization,
-  | 'id'
-  | 'auto_top_up_enabled'
-  | 'microdollars_balance'
-  | 'total_microdollars_acquired'
-  | 'microdollars_used'
+  'id' | 'auto_top_up_enabled' | 'total_microdollars_acquired' | 'microdollars_used'
 >;
 
 /**

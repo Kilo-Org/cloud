@@ -45,7 +45,7 @@ export type UsersApiResponse = {
   pagination: PaginationMetadata;
 };
 
-const AdminOrganizationSchema = OrganizationSchema.extend({
+export const AdminOrganizationSchema = OrganizationSchema.extend({
   member_count: z.number(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),

@@ -75,7 +75,6 @@ const AdminOrganizationDetailsSchema = z.object({
   name: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
-  microdollars_balance: z.number(),
   total_microdollars_acquired: z.number(),
   microdollars_used: z.number(),
   created_by_kilo_user_id: z.string().nullable(),
@@ -238,7 +237,6 @@ export const organizationAdminRouter = createTRPCRouter({
           name: organizations.name,
           created_at: organizations.created_at,
           updated_at: organizations.updated_at,
-          microdollars_balance: organizations.microdollars_balance,
           total_microdollars_acquired: organizations.total_microdollars_acquired,
           microdollars_used: organizations.microdollars_used,
           created_by_kilo_user_id: organizations.created_by_kilo_user_id,
@@ -311,7 +309,6 @@ export const organizationAdminRouter = createTRPCRouter({
         await tx
           .update(organizations)
           .set({
-            microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
             total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
             ...(credit_expiry_date && {
               next_credit_expiration_at: sql`LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()})`,
@@ -374,7 +371,6 @@ export const organizationAdminRouter = createTRPCRouter({
         await tx
           .update(organizations)
           .set({
-            microdollars_balance: 0,
             total_microdollars_acquired: sql`${organizations.microdollars_used}`,
           })
           .where(eq(organizations.id, organizationId));
@@ -558,9 +554,19 @@ export const organizationAdminRouter = createTRPCRouter({
       }
 
       if (hasBalance === 'true') {
-        conditions.push(gt(organizations.microdollars_balance, 0));
+        conditions.push(
+          gt(
+            sql`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`,
+            0
+          )
+        );
       } else if (hasBalance === 'false') {
-        conditions.push(eq(organizations.microdollars_balance, 0));
+        conditions.push(
+          eq(
+            sql`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`,
+            0
+          )
+        );
       }
 
       if (plan === 'enterprise') {
@@ -590,11 +596,14 @@ export const organizationAdminRouter = createTRPCRouter({
       const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
       let orderCondition;
+      const orderFunction = sortOrder === 'asc' ? asc : desc;
       if (sortField === 'member_count') {
-        const orderFunction = sortOrder === 'asc' ? asc : desc;
         orderCondition = orderFunction(count(organization_memberships.id));
+      } else if (sortField === 'microdollars_balance') {
+        orderCondition = orderFunction(
+          sql`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`
+        );
       } else {
-        const orderFunction = sortOrder === 'asc' ? asc : desc;
         orderCondition = orderFunction(organizations[sortField]);
       }
 
@@ -617,7 +626,6 @@ export const organizationAdminRouter = createTRPCRouter({
         name: organizations.name,
         created_at: organizations.created_at,
         updated_at: organizations.updated_at,
-        microdollars_balance: organizations.microdollars_balance,
         microdollars_used: organizations.microdollars_used,
         total_microdollars_acquired: organizations.total_microdollars_acquired,
         next_credit_expiration_at: organizations.next_credit_expiration_at,

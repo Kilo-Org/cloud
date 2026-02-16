@@ -262,7 +262,7 @@ GitHub PRs were showing Vercel build errors referencing `MaxDuration`, despite d
 
 The issue was caused by a duplicate Vercel project (named “cloud”) existing in a separate account, which was still connected to the GitHub repository. This resulted in GitHub receiving deployment signals from both projects.
 
-### Fix
+#### Fix
 
 - Identified and deleted the duplicate “cloud” project in the secondary Vercel account.
 - Confirmed that only the intended Enterprise Vercel project remained connected to the GitHub repository.

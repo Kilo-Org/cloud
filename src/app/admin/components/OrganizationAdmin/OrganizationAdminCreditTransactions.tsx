@@ -24,6 +24,18 @@ export function OrganizationAdminCreditTransactions({
   const trpc = useTRPC();
   const { data: orgData } = useOrganizationWithMembers(organizationId);
 
+  const invalidateOrgCreditQueries = () => {
+    void queryClient.invalidateQueries({
+      queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.organizations.creditTransactions.queryKey({ organizationId }),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.organizations.getCreditBlocks.queryKey({ organizationId }),
+    });
+  };
+
   const consumeCreditsMutation = useMutation({
     mutationFn: async (amount_usd: number) => {
       const response = await fetch(
@@ -40,15 +52,7 @@ export function OrganizationAdminCreditTransactions({
       }
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: trpc.organizations.creditTransactions.queryKey({ organizationId }),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: trpc.organizations.getCreditBlocks.queryKey({ organizationId }),
-      });
+      invalidateOrgCreditQueries();
       toast.success('Credits consumed');
     },
     onError: err => {
@@ -68,15 +72,7 @@ export function OrganizationAdminCreditTransactions({
       }
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: trpc.organizations.creditTransactions.queryKey({ organizationId }),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: trpc.organizations.getCreditBlocks.queryKey({ organizationId }),
-      });
+      invalidateOrgCreditQueries();
       toast.success('Expiration check completed');
     },
     onError: err => {

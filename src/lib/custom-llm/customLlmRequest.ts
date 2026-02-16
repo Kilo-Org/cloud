@@ -492,6 +492,7 @@ function buildCommonParams(
         effort: customLlm.verbosity ?? request.verbosity ?? undefined,
       } satisfies AnthropicProviderOptions,
       openai: {
+        reasoningSummary: 'auto',
         textVerbosity: customLlm.verbosity ?? request.verbosity,
         reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort,
       } satisfies OpenAILanguageModelResponsesOptions,

@@ -23,6 +23,8 @@ const rateLimitedToDeathModelIds: ReadonlySet<string> = new Set([
   'nvidia/nemotron-3-nano-30b-a3b:free',
   'nvidia/nemotron-nano-12b-v2-vl:free',
   'nvidia/nemotron-nano-9b-v2:free',
+  'openai/gpt-oss-120b:free',
+  'openai/gpt-oss-20b:free',
   'qwen/qwen3-4b:free',
   'qwen/qwen3-coder:free',
   'qwen/qwen3-next-80b-a3b-instruct:free',

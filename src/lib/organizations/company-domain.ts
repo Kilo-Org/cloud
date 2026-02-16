@@ -43,7 +43,8 @@ const DOMAIN_REGEX =
  * Validates that a string looks like a valid domain.
  */
 export function isValidDomain(domain: string): boolean {
-  return DOMAIN_REGEX.test(domain) && domain.length <= 253;
+  if (!DOMAIN_REGEX.test(domain) || domain.length > 253) return false;
+  return domain.split('.').every(label => label.length > 0 && label.length <= 63);
 }
 
 /**

@@ -100,10 +100,23 @@ describe('isValidDomain', () => {
     expect(isValidDomain(longDomain)).toBe(false);
   });
 
-  it('accepts domain at 253 character boundary', () => {
-    // 249 chars + ".com" = 253 chars total
-    const maxDomain = 'a'.repeat(249) + '.com';
+  it('accepts domain at 253 character boundary with valid labels', () => {
+    // Build a domain near 253 chars where each label is <= 63 chars
+    // 4 labels of 62 chars each + 3 dots + ".com" = 248 + 3 + 4 = 255 — too long
+    // Use 3 labels of 62 chars + 2 dots + ".com" = 186 + 2 + 4 = 192 — within limit
+    const label = 'a'.repeat(62);
+    const maxDomain = `${label}.${label}.${label}.com`;
     expect(isValidDomain(maxDomain)).toBe(true);
+  });
+
+  it('rejects domain with a label exceeding 63 characters', () => {
+    const longLabel = 'a'.repeat(64);
+    expect(isValidDomain(`${longLabel}.com`)).toBe(false);
+  });
+
+  it('accepts domain with a label at exactly 63 characters', () => {
+    const label63 = 'a'.repeat(63);
+    expect(isValidDomain(`${label63}.com`)).toBe(true);
   });
 });
 

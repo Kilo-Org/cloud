@@ -81,11 +81,13 @@ function ProfileLink({
   url: string | null;
   label: string;
 }) {
-  if (!url) {
+  const isSafeUrl = url && /^https?:\/\//i.test(url);
+
+  if (!isSafeUrl) {
     return (
       <p className="text-muted-foreground/60 flex items-center text-sm">
         {icon}
-        <span>{label} — Not set</span>
+        <span>{url ?? `${label} — Not set`}</span>
       </p>
     );
   }

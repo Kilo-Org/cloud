@@ -126,6 +126,7 @@ function Inner(props: InnerProps) {
     const normalized = normalizeCompanyDomain(editedDomain);
 
     if (normalized === (info.company_domain ?? null)) {
+      setEditedDomain(info.company_domain ?? '');
       setIsEditingDomain(false);
       return;
     }

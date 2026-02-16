@@ -22,11 +22,11 @@ type EditProfileDialogProps = {
   githubUrl: string | null;
 };
 
-function isValidUrlOrEmpty(value: string): boolean {
+function isValidHttpUrlOrEmpty(value: string): boolean {
   if (value.trim() === '') return true;
   try {
-    new URL(value);
-    return true;
+    const url = new URL(value);
+    return /^https?:$/.test(url.protocol);
   } catch {
     return false;
   }
@@ -71,15 +71,15 @@ export function EditProfileDialog({
 
     let hasError = false;
 
-    if (trimmedLinkedin !== '' && !isValidUrlOrEmpty(trimmedLinkedin)) {
-      setLinkedinError('Please enter a valid URL');
+    if (trimmedLinkedin !== '' && !isValidHttpUrlOrEmpty(trimmedLinkedin)) {
+      setLinkedinError('URL must start with http:// or https://');
       hasError = true;
     } else {
       setLinkedinError(null);
     }
 
-    if (trimmedGithub !== '' && !isValidUrlOrEmpty(trimmedGithub)) {
-      setGithubError('Please enter a valid URL');
+    if (trimmedGithub !== '' && !isValidHttpUrlOrEmpty(trimmedGithub)) {
+      setGithubError('URL must start with http:// or https://');
       hasError = true;
     } else {
       setGithubError(null);

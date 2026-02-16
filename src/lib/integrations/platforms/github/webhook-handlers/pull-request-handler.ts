@@ -186,6 +186,7 @@ export async function handlePullRequestCodeReview(
       baseRef: pull_request.base.ref,
       headRef: pull_request.head.ref,
       headSha: pull_request.head.sha,
+      platform: 'github',
     });
 
     logExceptInTest(

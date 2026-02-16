@@ -104,6 +104,12 @@ export const CodeReviewWebhookPayloadSchema = z.object({
 // ============================================================================
 
 /**
+ * Platform type for code reviews
+ */
+export const CodeReviewPlatformSchema = z.enum(['github', 'gitlab']);
+export type CodeReviewPlatform = z.infer<typeof CodeReviewPlatformSchema>;
+
+/**
  * Create review params schema
  */
 export const CreateReviewParamsSchema = z.object({
@@ -118,6 +124,8 @@ export const CreateReviewParamsSchema = z.object({
   baseRef: z.string().min(1),
   headRef: z.string().min(1),
   headSha: z.string().min(1),
+  platform: CodeReviewPlatformSchema.default('github'),
+  platformProjectId: z.number().int().positive().optional(),
 });
 
 /**
@@ -141,6 +149,7 @@ export const ListReviewsParamsSchema = z.object({
   offset: z.number().int().min(0).default(0),
   status: CodeReviewStatusSchema.optional(),
   repoFullName: z.string().optional(),
+  platform: CodeReviewPlatformSchema.optional(),
 });
 
 // ============================================================================
@@ -156,6 +165,7 @@ export const ListCodeReviewsInputSchema = z.object({
   offset: z.number().int().min(0).default(0).optional(),
   status: CodeReviewStatusSchema.optional(),
   repoFullName: z.string().optional(),
+  platform: CodeReviewPlatformSchema.optional(),
 });
 
 /**
@@ -166,6 +176,7 @@ export const ListCodeReviewsForUserInputSchema = z.object({
   offset: z.number().int().min(0).default(0).optional(),
   status: CodeReviewStatusSchema.optional(),
   repoFullName: z.string().optional(),
+  platform: CodeReviewPlatformSchema.optional(),
 });
 
 /**

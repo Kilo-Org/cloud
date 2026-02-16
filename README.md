@@ -255,7 +255,7 @@ Then restart the dev server, and you should be able to access the app behind the
 
 Some OAuth providers restrict `redirect_uri` to be HTTPS, and others explicitly block `localhost` for security reasons.
 
-# Common errors
+## Common errors
 ### Error - Duplicate Vercel Project Causing MaxDuration Errors on PRs
 
 GitHub PRs were showing Vercel build errors referencing `MaxDuration`, despite deployments working correctly on the Enterprise Vercel account.

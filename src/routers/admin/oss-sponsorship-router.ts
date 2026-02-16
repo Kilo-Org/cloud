@@ -6,10 +6,11 @@ import {
   organization_invitations,
   organization_memberships,
   kilocode_users,
+  cloud_agent_code_reviews,
 } from '@/db/schema';
 import type { User, Organization } from '@/db/schema';
 import * as z from 'zod';
-import { eq, isNull, and, or, ilike } from 'drizzle-orm';
+import { eq, isNull, and, or, ilike, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import {
   sendOssInviteNewUserEmail,
@@ -355,6 +356,24 @@ export const ossSponsorshipRouter = createTRPCRouter({
         // Onboarding is complete if both GitHub and Code Reviews are set up
         const isOnboardingComplete = hasGitHubIntegration && hasCodeReviewsEnabled;
 
+        // Check for latest completed code review for this organization
+        const [latestCodeReview] = await db
+          .select({
+            completed_at: cloud_agent_code_reviews.completed_at,
+          })
+          .from(cloud_agent_code_reviews)
+          .where(
+            and(
+              eq(cloud_agent_code_reviews.owned_by_organization_id, org.id),
+              eq(cloud_agent_code_reviews.status, 'completed')
+            )
+          )
+          .orderBy(desc(cloud_agent_code_reviews.completed_at))
+          .limit(1);
+
+        const hasCompletedCodeReview = !!latestCodeReview;
+        const lastCodeReviewDate = latestCodeReview?.completed_at ?? null;
+
         return {
           email,
           hasKiloAccount,
@@ -369,6 +388,8 @@ export const ossSponsorshipRouter = createTRPCRouter({
           hasGitHubIntegration,
           hasCodeReviewsEnabled,
           isOnboardingComplete,
+          hasCompletedCodeReview,
+          lastCodeReviewDate,
         };
       })
     );

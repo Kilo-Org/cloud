@@ -95,6 +95,21 @@ function isMessageUpdatedEvent(
 }
 
 /**
+ * Type guard for session.idle events.
+ * Kilo server sends: {type: "session.idle", properties: {sessionID: "..."}}
+ * After mapping: {type: "session.idle", properties: {sessionID: "..."}, event: "session.idle"}
+ */
+export function isSessionIdleEvent(
+  data: unknown
+): data is { event: 'session.idle'; properties: { sessionID: string } } {
+  if (typeof data !== 'object' || data === null) return false;
+  const obj = data as Record<string, unknown>;
+  if (obj.event !== 'session.idle') return false;
+  const props = obj.properties as Record<string, unknown> | undefined;
+  return typeof props === 'object' && props !== null && typeof props.sessionID === 'string';
+}
+
+/**
  * Type guard for completed assistant message.
  */
 function isCompletedAssistantMessage(
@@ -325,8 +340,22 @@ export function createConnectionManager(
           }
 
           // session.idle is the primary completion signal - it means the assistant finished
-          // and the session is waiting for the next user input
+          // and the session is waiting for the next user input.
+          // Only the root session's idle event should trigger completion — child sessions
+          // (subagents) also emit session.idle, which we must ignore.
           if (data.event === 'session.idle') {
+            if (isSessionIdleEvent(data)) {
+              const currentSessionId = state.currentJob?.kiloSessionId;
+              if (currentSessionId && data.properties.sessionID !== currentSessionId) {
+                logToFile(
+                  `ignoring session.idle for child session: event=${data.properties.sessionID} current=${currentSessionId}`
+                );
+                return;
+              }
+            } else {
+              // Unrecognized session.idle shape — treat as root session for backwards compatibility
+              logToFile(`session.idle without parseable sessionID — treating as root session`);
+            }
             logToFile(`session.idle received - marking all inflight as complete`);
             // Complete ALL inflight messages for this job - the session is idle
             const inflightIds = state.inflightMessageIds;

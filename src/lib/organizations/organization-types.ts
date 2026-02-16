@@ -38,6 +38,8 @@ export const OrganizationSchema = z.object({
   updated_at: z.string(),
   microdollars_balance: z.number(),
   microdollars_used: z.number(),
+  total_microdollars_acquired: z.number(),
+  next_credit_expiration_at: z.string().nullable(),
   stripe_customer_id: z.string().nullable(),
   auto_top_up_enabled: z.boolean(),
   settings: OrganizationSettingsSchema,

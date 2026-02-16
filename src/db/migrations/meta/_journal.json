@@ -92,6 +92,13 @@
       "when": 1771224282035,
       "tag": "0012_absurd_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1771241997631,
+      "tag": "0013_mute_human_cannonball",
+      "breakpoints": true
     }
   ]
 }

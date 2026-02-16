@@ -589,6 +589,8 @@ export const organizationAdminRouter = createTRPCRouter({
         updated_at: organizations.updated_at,
         microdollars_balance: organizations.microdollars_balance,
         microdollars_used: organizations.microdollars_used,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        next_credit_expiration_at: organizations.next_credit_expiration_at,
         stripe_customer_id: organizations.stripe_customer_id,
         auto_top_up_enabled: organizations.auto_top_up_enabled,
         settings: organizations.settings,

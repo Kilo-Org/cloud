@@ -22,7 +22,7 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
   const router = useRouter();
 
   // Fetch user organizations
-  const { data: organizations } = useQuery(trpc.organizations.list.queryOptions());
+  const { data: organizations, isLoading } = useQuery(trpc.organizations.list.queryOptions());
 
   const handleOrganizationSwitch = (orgId: string | null) => {
     if (orgId) {
@@ -46,6 +46,15 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
 
   const currentOrg = organizations?.find(org => org.organizationId === organizationId);
   const hasOrganizations = organizations && organizations.length > 0;
+
+  // Show loading skeleton while fetching
+  if (isLoading) {
+    return (
+      <div className="mt-1">
+        <div className="h-[62px] w-full animate-pulse rounded-lg border border-gray-700 bg-gray-800" />
+      </div>
+    );
+  }
 
   // Don't render if no organizations
   if (!hasOrganizations) {

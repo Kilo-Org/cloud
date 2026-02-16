@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Check, ChevronDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -51,7 +52,17 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
   if (isLoading) {
     return (
       <div className="mt-1">
-        <div className="h-[62px] w-full animate-pulse rounded-lg border border-gray-700 bg-gray-800" />
+        <Button
+          variant="ghost"
+          disabled
+          className="h-auto w-full justify-between rounded-lg border border-gray-700 p-3 text-left"
+        >
+          <div className="flex flex-col items-start">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+          <ChevronDown className="h-4 w-4 text-gray-500" />
+        </Button>
       </div>
     );
   }

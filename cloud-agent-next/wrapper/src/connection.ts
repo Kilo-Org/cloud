@@ -89,7 +89,9 @@ function isMessageUpdatedEvent(
   if (!isRecord(data)) return false;
   if (data.event !== 'message.updated') return false;
   const props = data.properties;
-  return isRecord(props) && isRecord(props.info);
+  if (!isRecord(props)) return false;
+  const info = props.info;
+  return isRecord(info) && typeof info.role === 'string' && isRecord(info.time);
 }
 
 /**

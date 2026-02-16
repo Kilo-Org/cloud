@@ -13,7 +13,7 @@ export const opus_46_free_slackbot_model = {
   description: 'Free version of Claude Opus 4.6 for use in Kilo for Slack only',
   context_length: 1_000_000,
   max_completion_tokens: 32000,
-  is_enabled: true,
+  is_enabled: false,
   flags: ['reasoning', 'prompt_cache', 'vision'],
   gateway: 'openrouter',
   internal_id: 'anthropic/claude-opus-4.6',

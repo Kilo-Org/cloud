@@ -57,6 +57,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
 import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
+import { normalizeModelId } from '@/lib/model-utils';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   delete requestBodyParsed.models; // OpenRouter specific field we do not support
-  if (!requestBodyParsed.model) {
+  if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {
     return modelDoesNotExistResponse();
   }
 
@@ -359,7 +360,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
       provider: provider.id,
       requestedModel: requestedModelLowerCased,
-      resolvedModel: originalModelIdLowerCased,
+      resolvedModel: normalizeModelId(originalModelIdLowerCased),
       toolsAvailable,
       toolsUsed,
       ttfbMs,

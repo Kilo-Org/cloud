@@ -452,6 +452,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     preflightedCloudAgentSessionRef.current = cloudAgentSessionId;
     setNeedsLegacyPrepare(false);
     setPreflightComplete(false);
+    // Reset to false so the DO's initiatedAt is the authoritative source.
+    // Without this, hasSessionBlobs() can eagerly set it to true during DB load
+    // even when the DO has not been initiated (e.g. prepared-but-not-initiated sessions).
+    setIsSessionInitiated(false);
 
     const runPreflight = async () => {
       try {

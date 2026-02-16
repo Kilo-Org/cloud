@@ -146,7 +146,7 @@ export function OrganizationAdminCreditTransactions({
                 'Force expiration check'
               )}
             </Button>
-            {process.env.NODE_ENV !== 'production' && (
+            {process.env.NODE_ENV === 'development' && (
               <Button
                 variant="outline"
                 size="sm"

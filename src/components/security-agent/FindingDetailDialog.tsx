@@ -264,7 +264,11 @@ export function FindingDetailDialog({
                 {cliSessionId && (
                   <div className="mt-2">
                     <Link
-                      href={`/cloud/chat?sessionId=${cliSessionId}`}
+                      href={
+                        organizationId
+                          ? `/organizations/${organizationId}/cloud/chat?sessionId=${cliSessionId}`
+                          : `/cloud/chat?sessionId=${cliSessionId}`
+                      }
                       className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
                     >
                       <ExternalLink className="h-4 w-4" />
@@ -306,7 +310,11 @@ export function FindingDetailDialog({
                 {cliSessionId && (
                   <div className="mt-2">
                     <Link
-                      href={`/cloud/chat?sessionId=${cliSessionId}`}
+                      href={
+                        organizationId
+                          ? `/organizations/${organizationId}/cloud/chat?sessionId=${cliSessionId}`
+                          : `/cloud/chat?sessionId=${cliSessionId}`
+                      }
                       className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
                     >
                       <ExternalLink className="h-3 w-3" />

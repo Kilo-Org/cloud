@@ -74,6 +74,10 @@ type UserMessageInfo = {
  */
 type MessageInfo = UserMessageInfo | AssistantMessageInfo;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 /**
  * Type guard for message.updated kilocode event data.
  * Kilo server sends: {type: "message.updated", properties: {info: {...}}}
@@ -82,16 +86,10 @@ type MessageInfo = UserMessageInfo | AssistantMessageInfo;
 function isMessageUpdatedEvent(
   data: unknown
 ): data is { event: 'message.updated'; properties: { info: MessageInfo } } {
-  if (typeof data !== 'object' || data === null) return false;
-  const obj = data as Record<string, unknown>;
-  if (obj.event !== 'message.updated') return false;
-  const props = obj.properties as Record<string, unknown> | undefined;
-  return (
-    typeof props === 'object' &&
-    props !== null &&
-    typeof props.info === 'object' &&
-    props.info !== null
-  );
+  if (!isRecord(data)) return false;
+  if (data.event !== 'message.updated') return false;
+  const props = data.properties;
+  return isRecord(props) && isRecord(props.info);
 }
 
 /**
@@ -102,11 +100,10 @@ function isMessageUpdatedEvent(
 export function isSessionIdleEvent(
   data: unknown
 ): data is { event: 'session.idle'; properties: { sessionID: string } } {
-  if (typeof data !== 'object' || data === null) return false;
-  const obj = data as Record<string, unknown>;
-  if (obj.event !== 'session.idle') return false;
-  const props = obj.properties as Record<string, unknown> | undefined;
-  return typeof props === 'object' && props !== null && typeof props.sessionID === 'string';
+  if (!isRecord(data)) return false;
+  if (data.event !== 'session.idle') return false;
+  const props = data.properties;
+  return isRecord(props) && typeof props.sessionID === 'string';
 }
 
 /**
@@ -344,17 +341,16 @@ export function createConnectionManager(
           // Only the root session's idle event should trigger completion — child sessions
           // (subagents) also emit session.idle, which we must ignore.
           if (data.event === 'session.idle') {
-            if (isSessionIdleEvent(data)) {
-              const currentSessionId = state.currentJob?.kiloSessionId;
-              if (currentSessionId && data.properties.sessionID !== currentSessionId) {
-                logToFile(
-                  `ignoring session.idle for child session: event=${data.properties.sessionID} current=${currentSessionId}`
-                );
-                return;
-              }
-            } else {
-              // Unrecognized session.idle shape — treat as root session for backwards compatibility
-              logToFile(`session.idle without parseable sessionID — treating as root session`);
+            if (!isSessionIdleEvent(data)) {
+              logToFile(`session.idle without parseable sessionID — ignoring`);
+              return;
+            }
+            const currentSessionId = state.currentJob?.kiloSessionId;
+            if (currentSessionId && data.properties.sessionID !== currentSessionId) {
+              logToFile(
+                `ignoring session.idle for child session: event=${data.properties.sessionID} current=${currentSessionId}`
+              );
+              return;
             }
             logToFile(`session.idle received - marking all inflight as complete`);
             // Complete ALL inflight messages for this job - the session is idle

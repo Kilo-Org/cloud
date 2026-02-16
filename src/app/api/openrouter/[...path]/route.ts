@@ -274,7 +274,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   setTag('ui.ai_model', requestBodyParsed.model);
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user)) {
+  if (!isAnonymousContext(user) && !customLlm) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
     if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {

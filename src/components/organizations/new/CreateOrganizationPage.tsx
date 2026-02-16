@@ -58,6 +58,7 @@ const enterpriseTrialFeatures: FeatureItem[] = [
 
 export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizationPageProps = {}) {
   const [name, setName] = useState(mockSelectedOrgName || '');
+  const [companyDomain, setCompanyDomain] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
@@ -97,6 +98,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
           name: validationResult.data.organizationName,
           autoAddCreator: true,
           plan: 'enterprise',
+          company_domain: companyDomain.trim() || undefined,
         })
       ).organization.id;
 
@@ -185,6 +187,16 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
                     errors.name ? 'border-red-400 focus:ring-red-400/20' : 'focus:ring-blue-500/20'
                   }`}
                   autoFocus
+                />
+                <Input
+                  id="company_domain"
+                  name="company_domain"
+                  value={companyDomain}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setCompanyDomain(e.target.value)
+                  }
+                  placeholder="Company Website (e.g. acme.com)"
+                  className={`h-12 text-center text-lg transition-all duration-200 focus:ring-2 focus:ring-blue-500/20`}
                 />
                 <AnimatePresence>
                   {errors.name && (

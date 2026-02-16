@@ -1,4 +1,4 @@
-import type { CreditTransactionForBlocks, UserForLocalExpiration } from '@/lib/creditExpiration';
+import type { CreditTransactionForBlocks } from '@/lib/creditExpiration';
 import { getCreditBlocks } from './getCreditBlocks';
 
 const makeTransaction = (
@@ -18,23 +18,20 @@ const makeTransaction = (
   created_at: opts.created_at ?? '2024-01-01',
 });
 
-const makeUser = (
-  microdollars_used: number,
-  total_microdollars_acquired: number
-): UserForLocalExpiration => ({
-  id: 'user-1',
+const ENTITY_ID = 'user-1';
+
+const makeEntity = (microdollars_used: number, total_microdollars_acquired: number) => ({
+  id: ENTITY_ID,
   microdollars_used,
   total_microdollars_acquired,
-  next_credit_expiration_at: null,
-  updated_at: '2024-01-01',
 });
 
 describe('getCreditBlocks', () => {
   const now = new Date('2024-01-15');
 
   it('returns empty blocks when no transactions', () => {
-    const user = makeUser(0, 0);
-    const result = getCreditBlocks([], now, user);
+    const entity = makeEntity(0, 0);
+    const result = getCreditBlocks([], now, entity, ENTITY_ID);
 
     expect(result.creditBlocks).toHaveLength(0);
     expect(result.totalBalance_mUsd).toBe(0);
@@ -43,9 +40,9 @@ describe('getCreditBlocks', () => {
 
   it('returns non-expiring transaction as credit block', () => {
     const transactions = [makeTransaction('t1', 0, 1000, { is_free: false })];
-    const user = makeUser(0, 1000);
+    const entity = makeEntity(0, 1000);
 
-    const result = getCreditBlocks(transactions, now, user);
+    const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
     expect(result.creditBlocks).toHaveLength(1);
     expect(result.creditBlocks[0].balance_mUsd).toBe(1000);
@@ -60,9 +57,9 @@ describe('getCreditBlocks', () => {
         original_transaction_id: 't1',
       }),
     ];
-    const user = makeUser(0, 0);
+    const entity = makeEntity(0, 0);
 
-    const result = getCreditBlocks(transactions, now, user);
+    const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
     // t1 should be excluded since it has a matching expiration record
     expect(result.creditBlocks).toHaveLength(0);
@@ -76,18 +73,18 @@ describe('getCreditBlocks', () => {
         original_transaction_id: 't1',
       }),
     ];
-    const user = makeUser(0, 0);
+    const entity = makeEntity(0, 0);
 
-    const result = getCreditBlocks(transactions, now, user);
+    const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
     expect(result.creditBlocks).toHaveLength(0);
   });
 
   it('computes partial expiration balance correctly', () => {
     const transactions = [makeTransaction('t1', 0, 1000, { expiry_date: '2024-01-10' })];
-    const user = makeUser(400, 1000);
+    const entity = makeEntity(400, 1000);
 
-    const result = getCreditBlocks(transactions, now, user);
+    const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
     expect(result.creditBlocks).toHaveLength(1);
     // User got 1000, used 400, so 600 remaining
@@ -100,9 +97,9 @@ describe('getCreditBlocks', () => {
       makeTransaction('t2', 1000, 500, { expiry_date: '2024-01-12', created_at: '2024-01-02' }),
     ];
     // User used 600 total, t1 claims 600 usage, t2 claims 0 usage
-    const user = makeUser(600, 1500);
+    const entity = makeEntity(600, 1500);
 
-    const result = getCreditBlocks(transactions, now, user);
+    const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
     expect(result.creditBlocks).toHaveLength(2);
     // Blocks ordered by expiry date (earliest first)
@@ -123,8 +120,8 @@ describe('getCreditBlocks', () => {
     ];
     // User used 600 total, acquired 4100
     // t4: baseline=100, claims usage [100,200] = 100 used, 0 remaining
-    const user = makeUser(600, 4100);
-    const result = getCreditBlocks(transactions, now, user);
+    const entity = makeEntity(600, 4100);
+    const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
     expect(result.creditBlocks).toHaveLength(3);
     expect(result.totalBalance_mUsd).toBe(3500); // 4100 - 600
@@ -152,9 +149,9 @@ describe('getCreditBlocks', () => {
       makeTransaction('t2', 0, 500, { is_free: false, created_at: '2024-01-02' }),
       makeTransaction('t3', 0, 300, { is_free: true, created_at: '2024-01-01' }),
     ];
-    const user = makeUser(200, 1800);
+    const entity = makeEntity(200, 1800);
 
-    const result = getCreditBlocks(transactions, now, user);
+    const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
     expect(result.creditBlocks).toHaveLength(3);
     expect(result.totalBalance_mUsd).toBe(1600); // 1800 - 200
@@ -184,9 +181,9 @@ describe('getCreditBlocks', () => {
 
   it('isFirstPurchase is true when only free transactions exist', () => {
     const transactions = [makeTransaction('t1', 0, 1000, { is_free: true })];
-    const user = makeUser(0, 1000);
+    const entity = makeEntity(0, 1000);
 
-    const result = getCreditBlocks(transactions, now, user);
+    const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
     expect(result.isFirstPurchase).toBe(true);
   });

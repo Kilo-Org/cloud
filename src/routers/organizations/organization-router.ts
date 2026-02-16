@@ -32,6 +32,8 @@ import { TRPCError } from '@trpc/server';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { credit_transactions } from '@/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { organizationSsoRouter } from '@/routers/organizations/organization-sso-router';
 import { organizationAuditLogRouter } from '@/routers/organizations/organization-audit-log-router';
@@ -253,6 +255,31 @@ export const organizationsRouter = createTRPCRouter({
 
   creditTransactions: organizationMemberProcedure.query(async opts => {
     return await getCreditTransactionsForOrganization(opts.input.organizationId);
+  }),
+
+  getCreditBlocks: organizationMemberProcedure.query(async opts => {
+    const now = new Date();
+    const organizationId = opts.input.organizationId;
+
+    const org = await getOrganizationById(organizationId);
+    if (!org) throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+
+    const transactions = await db.query.credit_transactions.findMany({
+      where: eq(credit_transactions.organization_id, organizationId),
+    });
+
+    const kilo_user_id = transactions.find(t => t.kilo_user_id)?.kilo_user_id ?? 'system';
+
+    return getCreditBlocks(
+      transactions,
+      now,
+      {
+        id: org.id,
+        microdollars_used: org.microdollars_used,
+        total_microdollars_acquired: org.total_microdollars_acquired,
+      },
+      kilo_user_id
+    );
   }),
 
   seats: organizationMemberProcedure.query(async opts => {

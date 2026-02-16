@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useQuery } from '@tanstack/react-query';
 import type { OrganizationRole, TimePeriod } from '@/lib/organizations/organization-types';
 import { OrganizationContextProvider } from './OrganizationContext';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
@@ -13,10 +14,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { AnimatedDollars } from './AnimatedDollars';
-import { fromMicrodollars } from '@/lib/utils';
+import {
+  formatDollars,
+  formatIsoDateString_UsaDateOnlyFormat,
+  fromMicrodollars,
+} from '@/lib/utils';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
-import { PiggyBank, Bell, ChevronRight } from 'lucide-react';
+import { PiggyBank, Bell, ChevronRight, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { subDays } from 'date-fns';
+import { useTRPC } from '@/lib/trpc/utils';
 
 type Props = {
   organizationId: string;
@@ -30,6 +37,20 @@ export function OrganizationPaymentDetails({ organizationId, role }: Props) {
   const session = useSession();
   const isKiloAdmin = session?.data?.isAdmin ?? false;
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
+  const trpc = useTRPC();
+  const { data: creditBlocksData } = useQuery(
+    trpc.organizations.getCreditBlocks.queryOptions({ organizationId })
+  );
+
+  const expiringBlocks =
+    creditBlocksData?.creditBlocks.filter(
+      block => block.expiry_date !== null && block.balance_mUsd > 0
+    ) ?? [];
+  const expiring_mUsd = expiringBlocks.reduce((sum, block) => sum + block.balance_mUsd, 0);
+  const earliestExpiry = expiringBlocks
+    .map(block => block.expiry_date)
+    .filter((date): date is string => date !== null)
+    .sort()[0];
 
   return (
     <OrganizationContextProvider value={{ userRole, isKiloAdmin }}>
@@ -106,6 +127,18 @@ export function OrganizationPaymentDetails({ organizationId, role }: Props) {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {expiringBlocks.length > 0 && earliestExpiry && (
+          <Card>
+            <CardContent className="flex items-center gap-2 py-3">
+              <Clock className="h-4 w-4 shrink-0 text-amber-500" />
+              <span className="text-sm">
+                {formatDollars(fromMicrodollars(expiring_mUsd))} in credits expiring after{' '}
+                {formatIsoDateString_UsaDateOnlyFormat(subDays(new Date(earliestExpiry), 1))}
+              </span>
+            </CardContent>
+          </Card>
         )}
 
         <Tabs value={timePeriod} onValueChange={value => setTimePeriod(value as TimePeriod)}>

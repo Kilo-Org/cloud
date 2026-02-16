@@ -35,7 +35,12 @@ export function getCreditBlocks(
     now
   );
 
-  const expirationResult = computeExpiration(all_expiring_transactions, user, max_expiration_date);
+  const expirationResult = computeExpiration(
+    all_expiring_transactions,
+    user,
+    max_expiration_date,
+    user.id
+  );
   const expiringById = new Map(all_expiring_transactions.map(t => [t.id, t]));
 
   const expiredWithBalance = expirationResult.newTransactions

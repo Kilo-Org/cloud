@@ -16,10 +16,12 @@ import { fromMicrodollars, toMicrodollars } from '@/lib/utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { getBalanceForUser } from '@/lib/user.balance';
+import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { startInactiveSpan } from '@sentry/nextjs';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { sendBalanceAlertEmail } from '@/lib/email';
 import { after } from 'next/server';
+import { subHours } from 'date-fns';
 import { maybePerformOrganizationAutoTopUp } from '@/lib/autoTopUp';
 
 /**
@@ -73,6 +75,7 @@ export async function getBalanceForOrganizationUser(
       require_seats: organizations.require_seats,
       plan: organizations.plan,
       auto_top_up_enabled: organizations.auto_top_up_enabled,
+      next_credit_expiration_at: organizations.next_credit_expiration_at,
     })
     .from(organizations)
     .innerJoin(
@@ -119,13 +122,14 @@ export async function getBalanceForOrganizationUser(
   const {
     microdollar_limit,
     microdollar_usage,
-    organization_balance,
+    organization_balance: initial_organization_balance,
     total_microdollars_acquired,
     microdollars_used,
     settings,
     require_seats,
     plan,
     auto_top_up_enabled,
+    next_credit_expiration_at,
   } = result[0];
 
   // Trigger org auto-top-up on balance observation (mirrors user pattern in getBalanceForUser)
@@ -133,11 +137,33 @@ export async function getBalanceForOrganizationUser(
     maybePerformOrganizationAutoTopUp({
       id: organizationId,
       auto_top_up_enabled,
-      microdollars_balance: organization_balance,
+      microdollars_balance: initial_organization_balance,
       total_microdollars_acquired,
       microdollars_used,
     })
   );
+
+  let organization_balance = initial_organization_balance;
+
+  // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
+  const expireBefore = subHours(new Date(), Math.random());
+  const needsExpirationComputation =
+    next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
+
+  if (needsExpirationComputation) {
+    const expiryResult = await processOrganizationExpirations(
+      {
+        id: organizationId,
+        microdollars_used,
+        next_credit_expiration_at,
+        total_microdollars_acquired,
+      },
+      expireBefore
+    );
+    if (expiryResult) {
+      organization_balance = expiryResult.total_microdollars_acquired - microdollars_used;
+    }
+  }
 
   // If organization requires seats, ignore any user limits and return full organization balance
   if (require_seats) {

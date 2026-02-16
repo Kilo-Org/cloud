@@ -302,7 +302,7 @@ export const organizationAdminRouter = createTRPCRouter({
           credit_category: 'organization_custom',
           expiry_date: credit_expiry_date?.toISOString() ?? null,
           organization_id: organizationId,
-          original_baseline_microdollars_used: existingOrg.microdollars_used,
+          original_baseline_microdollars_used: org?.microdollars_used ?? 0,
           expiration_baseline_microdollars_used: credit_expiry_date
             ? (org?.microdollars_used ?? 0)
             : null,
@@ -376,6 +376,7 @@ export const organizationAdminRouter = createTRPCRouter({
           .set({
             microdollars_balance: 0,
             total_microdollars_acquired: sql`${organizations.microdollars_used}`,
+            next_credit_expiration_at: null,
           })
           .where(eq(organizations.id, organizationId));
 

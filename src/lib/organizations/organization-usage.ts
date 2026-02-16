@@ -123,7 +123,6 @@ export async function getBalanceForOrganizationUser(
     microdollar_limit,
     microdollar_usage,
     organization_balance: initial_organization_balance,
-    total_microdollars_acquired,
     microdollars_used,
     settings,
     require_seats,
@@ -131,17 +130,7 @@ export async function getBalanceForOrganizationUser(
     auto_top_up_enabled,
     next_credit_expiration_at,
   } = result[0];
-
-  // Trigger org auto-top-up on balance observation (mirrors user pattern in getBalanceForUser)
-  after(() =>
-    maybePerformOrganizationAutoTopUp({
-      id: organizationId,
-      auto_top_up_enabled,
-      microdollars_balance: initial_organization_balance,
-      total_microdollars_acquired,
-      microdollars_used,
-    })
-  );
+  let { total_microdollars_acquired } = result[0];
 
   let organization_balance = initial_organization_balance;
 
@@ -162,8 +151,20 @@ export async function getBalanceForOrganizationUser(
     );
     if (expiryResult) {
       organization_balance = expiryResult.total_microdollars_acquired - microdollars_used;
+      total_microdollars_acquired = expiryResult.total_microdollars_acquired;
     }
   }
+
+  // Trigger org auto-top-up with post-expiry balance (mirrors user pattern in getBalanceForUser)
+  after(() =>
+    maybePerformOrganizationAutoTopUp({
+      id: organizationId,
+      auto_top_up_enabled,
+      microdollars_balance: organization_balance,
+      total_microdollars_acquired,
+      microdollars_used,
+    })
+  );
 
   // If organization requires seats, ignore any user limits and return full organization balance
   if (require_seats) {

@@ -268,7 +268,7 @@ export const organizationsRouter = createTRPCRouter({
       where: eq(credit_transactions.organization_id, organizationId),
     });
 
-    const kilo_user_id = transactions.find(t => t.kilo_user_id)?.kilo_user_id ?? 'system';
+    const kilo_user_id = 'system';
 
     return getCreditBlocks(
       transactions,

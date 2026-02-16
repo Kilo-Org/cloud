@@ -1,6 +1,6 @@
 {
-  "id": "674d8b93-12bc-4b25-ab50-5557606d8dcf",
-  "prevId": "310bbf36-d945-4234-ac26-0ce161990068",
+  "id": "04445c37-b5f1-4ca6-b44a-5e81d549bf5b",
+  "prevId": "674d8b93-12bc-4b25-ab50-5557606d8dcf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6696,6 +6696,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
+        },
+        "linkedin_url": {
+          "name": "linkedin_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "github_url": {
+          "name": "github_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -8431,6 +8443,12 @@
         "free_trial_end_at": {
           "name": "free_trial_end_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_domain": {
+          "name": "company_domain",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }

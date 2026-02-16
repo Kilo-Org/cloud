@@ -277,20 +277,7 @@ export async function processOrganizationExpirations(
   const next_credit_expiration_at = org.next_credit_expiration_at;
   const all_expiring_transactions = await fetchExpiringTransactionsForOrganization(org.id);
 
-  const kilo_user_id = all_expiring_transactions[0]?.kilo_user_id;
-  if (!kilo_user_id && all_expiring_transactions.length > 0) {
-    sentryLogger('processOrganizationExpirations', 'error')('no kilo_user_id found', {
-      organization_id: org.id,
-    });
-    return null;
-  }
-
-  const expirationResult = computeExpiration(
-    all_expiring_transactions,
-    org,
-    now,
-    kilo_user_id ?? 'system'
-  );
+  const expirationResult = computeExpiration(all_expiring_transactions, org, now, 'system');
 
   const expiredTransactionIds = new Set(
     expirationResult.newTransactions.map(t => t.original_transaction_id)

@@ -38,7 +38,9 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
         : undefined;
 
       const expiry_date = expirationDate ? new Date(expirationDate).toISOString() : null;
-      const expiry_hours_val = expiryHours ? parseFloat(expiryHours) : null;
+      const expiry_hours_parsed = expiryHours ? parseFloat(expiryHours) : null;
+      const expiry_hours_val =
+        expiry_hours_parsed !== null && expiry_hours_parsed > 0 ? expiry_hours_parsed : null;
 
       await grantCreditMutation.mutateAsync({
         organizationId,

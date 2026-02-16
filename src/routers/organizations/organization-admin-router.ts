@@ -279,12 +279,15 @@ export const organizationAdminRouter = createTRPCRouter({
       const expiryFromHours = input.expiry_hours
         ? new Date(Date.now() + input.expiry_hours * millisecondsInHour)
         : null;
+      // Negative grants must not expire (expiring a negative would mint credits)
       const credit_expiry_date =
-        explicit_expiry_date && expiryFromHours
-          ? explicit_expiry_date < expiryFromHours
-            ? explicit_expiry_date
-            : expiryFromHours
-          : (explicit_expiry_date ?? expiryFromHours);
+        amount_usd < 0
+          ? null
+          : explicit_expiry_date && expiryFromHours
+            ? explicit_expiry_date < expiryFromHours
+              ? explicit_expiry_date
+              : expiryFromHours
+            : (explicit_expiry_date ?? expiryFromHours);
 
       await db.transaction(async tx => {
         const [org] = await tx

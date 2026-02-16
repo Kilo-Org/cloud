@@ -438,10 +438,12 @@ describe('autoTopUp', () => {
 
       // Increase balance above threshold BEFORE calling auto-top-up
       // This simulates a race condition where balance increases between the initial check and lock acquisition
+      const aboveThreshold = toMicrodollars(ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS + 10);
       await db
         .update(organizations)
         .set({
-          microdollars_balance: toMicrodollars(ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS + 10),
+          microdollars_balance: aboveThreshold,
+          total_microdollars_acquired: aboveThreshold,
         })
         .where(eq(organizations.id, testOrg.id));
 

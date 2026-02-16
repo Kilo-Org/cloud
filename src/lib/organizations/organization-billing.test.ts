@@ -461,6 +461,9 @@ describe('processTopupForOrganization', () => {
 
     const expectedBalanceIncrease = amountInCents * 10_000; // Convert to microdollars
     expect(updatedOrg?.microdollars_balance).toBe(initialBalance + expectedBalanceIncrease);
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + expectedBalanceIncrease
+    );
 
     // Verify credit transaction was created
     const creditTransaction = await db.query.credit_transactions.findFirst({
@@ -503,6 +506,9 @@ describe('processTopupForOrganization', () => {
 
     const expectedTotalIncrease = (firstAmount + secondAmount) * 10_000;
     expect(updatedOrg?.microdollars_balance).toBe(initialBalance + expectedTotalIncrease);
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + expectedTotalIncrease
+    );
 
     // Verify both credit transactions were created
     const transactions = await db.query.credit_transactions.findMany({
@@ -536,6 +542,10 @@ describe('processTopupForOrganization', () => {
 
     const expectedBalanceIncrease = amountInCents * 10_000;
     expect(updatedOrg?.microdollars_balance).toBe(existingBalance + expectedBalanceIncrease);
+    // total_microdollars_acquired should also increase (org starts at 0 acquired, then we set balance to 25000 without updating acquired)
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + expectedBalanceIncrease
+    );
   });
 
   test('should update organization updated_at timestamp', async () => {

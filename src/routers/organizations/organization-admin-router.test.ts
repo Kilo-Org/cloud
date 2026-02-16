@@ -35,7 +35,11 @@ describe('organization admin router', () => {
     beforeEach(async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 5_000_000 })
+        .set({
+          microdollars_balance: 5_000_000,
+          total_microdollars_acquired: 5_000_000,
+          microdollars_used: 0,
+        })
         .where(eq(organizations.id, testOrganization.id));
 
       await db
@@ -54,11 +58,17 @@ describe('organization admin router', () => {
       expect(result.amount_usd_nullified).toBe(5);
 
       const [updatedOrg] = await db
-        .select({ microdollars_balance: organizations.microdollars_balance })
+        .select({
+          microdollars_balance: organizations.microdollars_balance,
+          total_microdollars_acquired: organizations.total_microdollars_acquired,
+          microdollars_used: organizations.microdollars_used,
+        })
         .from(organizations)
         .where(eq(organizations.id, testOrganization.id));
 
       expect(updatedOrg.microdollars_balance).toBe(0);
+      // After nullification, total_microdollars_acquired should equal microdollars_used (zero balance)
+      expect(updatedOrg.total_microdollars_acquired).toBe(updatedOrg.microdollars_used);
     });
 
     it('should throw NOT_FOUND error when organization does not exist', async () => {
@@ -75,7 +85,7 @@ describe('organization admin router', () => {
     it('should throw BAD_REQUEST error when organization has no credits (balance = 0)', async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 0 })
+        .set({ microdollars_balance: 0, total_microdollars_acquired: 0 })
         .where(eq(organizations.id, testOrganization.id));
 
       const caller = await createCallerForUser(adminUser.id);
@@ -90,7 +100,11 @@ describe('organization admin router', () => {
     it('should throw BAD_REQUEST error when organization has negative balance', async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: -1_000_000 })
+        .set({
+          microdollars_balance: -1_000_000,
+          total_microdollars_acquired: 0,
+          microdollars_used: 1_000_000,
+        })
         .where(eq(organizations.id, testOrganization.id));
 
       const caller = await createCallerForUser(adminUser.id);
@@ -199,7 +213,7 @@ describe('organization admin router', () => {
     it('should handle small balance amounts correctly', async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 1 })
+        .set({ microdollars_balance: 1, total_microdollars_acquired: 1 })
         .where(eq(organizations.id, testOrganization.id));
 
       const caller = await createCallerForUser(adminUser.id);
@@ -220,6 +234,17 @@ describe('organization admin router', () => {
   });
 
   describe('grantCredit', () => {
+    beforeEach(async () => {
+      await db
+        .update(organizations)
+        .set({ microdollars_balance: 0, total_microdollars_acquired: 0, microdollars_used: 0 })
+        .where(eq(organizations.id, testOrganization.id));
+
+      await db
+        .delete(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+    });
+
     it('should successfully grant positive credits', async () => {
       const caller = await createCallerForUser(adminUser.id);
       const amount = 10;
@@ -233,11 +258,16 @@ describe('organization admin router', () => {
       expect(result.amount_usd).toBe(amount);
 
       const [updatedOrg] = await db
-        .select({ microdollars_balance: organizations.microdollars_balance })
+        .select({
+          microdollars_balance: organizations.microdollars_balance,
+          total_microdollars_acquired: organizations.total_microdollars_acquired,
+        })
         .from(organizations)
         .where(eq(organizations.id, testOrganization.id));
 
       expect(updatedOrg.microdollars_balance).toBe(amount * 1_000_000);
+      // total_microdollars_acquired should also increase by the grant amount
+      expect(updatedOrg.total_microdollars_acquired).toBe(amount * 1_000_000);
     });
 
     it('should successfully grant negative credits with description', async () => {

@@ -64,10 +64,21 @@ describe('Organization Promotions', () => {
 
   const getOrganizationBalance = async (orgId: string) => {
     const org = await db
-      .select({ microdollars_balance: organizations.microdollars_balance })
+      .select({
+        microdollars_balance: organizations.microdollars_balance,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+      })
       .from(organizations)
       .where(eq(organizations.id, orgId));
     return org[0]?.microdollars_balance || 0;
+  };
+
+  const getOrganizationTotalAcquired = async (orgId: string) => {
+    const org = await db
+      .select({ total_microdollars_acquired: organizations.total_microdollars_acquired })
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+    return org[0]?.total_microdollars_acquired || 0;
   };
 
   const expectPaymentTransaction = (
@@ -123,6 +134,10 @@ describe('Organization Promotions', () => {
     // Check organization balance increased by payment + bonus
     const finalBalance = await getOrganizationBalance(org.id);
     expect(finalBalance).toBe(initialBalance + 10000000 + 20000000); // $10 payment + $20 bonus
+
+    // total_microdollars_acquired should also increase by payment + bonus
+    const totalAcquired = await getOrganizationTotalAcquired(org.id);
+    expect(totalAcquired).toBe(10000000 + 20000000); // $10 payment + $20 bonus
   });
 
   test('org does NOT receive bonus credit when requirement fails (memberCount = 1)', async () => {
@@ -145,6 +160,10 @@ describe('Organization Promotions', () => {
     // Check organization balance increased by payment only
     const finalBalance = await getOrganizationBalance(org.id);
     expect(finalBalance).toBe(initialBalance + 10000000); // $10 payment only
+
+    // total_microdollars_acquired should also increase by payment only
+    const totalAcquired = await getOrganizationTotalAcquired(org.id);
+    expect(totalAcquired).toBe(10000000); // $10 payment only
   });
 
   test('org promotion idempotency: same user multiple topups - bonus granted only once', async () => {
@@ -177,6 +196,10 @@ describe('Organization Promotions', () => {
     // Check organization balance increased by both payments + one bonus
     const finalBalance = await getOrganizationBalance(org.id);
     expect(finalBalance).toBe(initialBalance + 10000000 + 20000000 + 20000000); // $10 + $20 payments + $20 bonus
+
+    // total_microdollars_acquired should also increase by both payments + one bonus
+    const totalAcquired = await getOrganizationTotalAcquired(org.id);
+    expect(totalAcquired).toBe(10000000 + 20000000 + 20000000); // $10 + $20 payments + $20 bonus
   });
 
   test('org promotion idempotency: cross-user test - bonus granted only once even when different users topup', async () => {
@@ -210,5 +233,9 @@ describe('Organization Promotions', () => {
     // Check organization balance: two payments + one bonus
     const finalBalance = await getOrganizationBalance(org.id);
     expect(finalBalance).toBe(initialBalance + 10000000 + 10000000 + 20000000); // $10 + $10 + $20
+
+    // total_microdollars_acquired should also increase by two payments + one bonus
+    const totalAcquired = await getOrganizationTotalAcquired(org.id);
+    expect(totalAcquired).toBe(10000000 + 10000000 + 20000000); // $10 + $10 + $20
   });
 });

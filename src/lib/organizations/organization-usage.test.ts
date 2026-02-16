@@ -394,7 +394,11 @@ describe('Organization Usage Functions', () => {
       const organization = await createOrganization('Test Org', user.id);
       await db
         .update(organizations)
-        .set({ require_seats: false, microdollars_balance: 100000 })
+        .set({
+          require_seats: false,
+          microdollars_balance: 100000,
+          total_microdollars_acquired: 100000,
+        })
         .where(eq(organizations.id, organization.id));
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
@@ -422,7 +426,11 @@ describe('Organization Usage Functions', () => {
       const organization = await createOrganization('Test Org', user.id);
       await db
         .update(organizations)
-        .set({ require_seats: false, microdollars_balance: 100000 })
+        .set({
+          require_seats: false,
+          microdollars_balance: 100000,
+          total_microdollars_acquired: 100000,
+        })
         .where(eq(organizations.id, organization.id));
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
@@ -450,7 +458,11 @@ describe('Organization Usage Functions', () => {
       const organization = await createOrganization('Test Org', user.id);
       await db
         .update(organizations)
-        .set({ require_seats: false, microdollars_balance: 100000 })
+        .set({
+          require_seats: false,
+          microdollars_balance: 100000,
+          total_microdollars_acquired: 100000,
+        })
         .where(eq(organizations.id, organization.id));
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
@@ -478,7 +490,11 @@ describe('Organization Usage Functions', () => {
       const organization = await createOrganization('Test Org', user.id);
       await db
         .update(organizations)
-        .set({ require_seats: false, microdollars_balance: 100000 })
+        .set({
+          require_seats: false,
+          microdollars_balance: 100000,
+          total_microdollars_acquired: 100000,
+        })
         .where(eq(organizations.id, organization.id));
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
@@ -516,7 +532,11 @@ describe('Organization Usage Functions', () => {
       const organization = await createOrganization('Test Org', user1.id);
       await db
         .update(organizations)
-        .set({ require_seats: false, microdollars_balance: 200000 })
+        .set({
+          require_seats: false,
+          microdollars_balance: 200000,
+          total_microdollars_acquired: 200000,
+        })
         .where(eq(organizations.id, organization.id));
 
       await addUserToOrganization(organization.id, user2.id, 'member');

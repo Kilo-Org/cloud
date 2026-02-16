@@ -16,6 +16,8 @@ export async function createTestOrganization(
     .update(organizations)
     .set({
       microdollars_balance: microdollarBalance,
+      total_microdollars_acquired: microdollarBalance > 0 ? microdollarBalance : 0,
+      microdollars_used: microdollarBalance < 0 ? Math.abs(microdollarBalance) : 0,
       ...(settings ? { settings } : {}),
       ...(requireSeats !== undefined ? { require_seats: requireSeats } : {}),
       plan: requireSeats ? 'teams' : 'enterprise',

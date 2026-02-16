@@ -24,6 +24,13 @@ export async function POST(
   // Recompute balances first to fix any ledger drift
   const recomputeResult = await recomputeOrganizationBalances({ organizationId: id });
 
+  if (!recomputeResult.success) {
+    return NextResponse.json(
+      { error: 'Balance recomputation failed (concurrent modification) — retry' },
+      { status: 409 }
+    );
+  }
+
   // Re-fetch org since balance may have changed
   const updatedOrg = await getOrganizationById(id);
   if (updatedOrg) {
@@ -40,6 +47,6 @@ export async function POST(
 
   return NextResponse.json({
     success: true,
-    recomputed: recomputeResult.success,
+    recomputed: true,
   });
 }

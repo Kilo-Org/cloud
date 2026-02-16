@@ -279,4 +279,35 @@ export const userRouter = createTRPCRouter({
       .where(eq(kilocode_users.id, ctx.user.id));
     return successResult();
   }),
+
+  updateProfile: baseProcedure
+    .input(
+      z.object({
+        linkedin_url: z
+          .string()
+          .url()
+          .refine(val => /^https?:\/\//i.test(val), { message: 'URL must use http or https' })
+          .nullable()
+          .optional(),
+        github_url: z
+          .string()
+          .url()
+          .refine(val => /^https?:\/\//i.test(val), { message: 'URL must use http or https' })
+          .nullable()
+          .optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const updates: Partial<typeof kilocode_users.$inferInsert> = {};
+      if (input.linkedin_url !== undefined) updates.linkedin_url = input.linkedin_url;
+      if (input.github_url !== undefined) updates.github_url = input.github_url;
+
+      if (Object.keys(updates).length === 0) {
+        return successResult();
+      }
+
+      await db.update(kilocode_users).set(updates).where(eq(kilocode_users.id, ctx.user.id));
+
+      return successResult();
+    }),
 });

@@ -1,7 +1,5 @@
 import type { ChatErrorError } from './openrouter-api-types';
-
-//import { createJsonErrorResponseHandler } from '@ai-sdk/provider-utils';
-import { z } from 'zod/v4';
+import * as z from 'zod/v4';
 
 export const OpenRouterErrorResponseSchema = z
   .object({
@@ -19,10 +17,3 @@ export const OpenRouterErrorResponseSchema = z
   .passthrough();
 
 export type OpenRouterErrorData = z.infer<typeof OpenRouterErrorResponseSchema>;
-
-/*
-export const openrouterFailedResponseHandler = createJsonErrorResponseHandler({
-  errorSchema: OpenRouterErrorResponseSchema,
-  errorToMessage: (data: OpenRouterErrorData) => data.error.message,
-});
-*/

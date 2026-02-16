@@ -1,8 +1,4 @@
-import {
-  credit_transactions as creditTransactionsTable,
-  organizations,
-  microdollar_usage,
-} from '@/db/schema';
+import { credit_transactions as creditTransactionsTable, organizations } from '@/db/schema';
 import {
   processOrganizationExpirations,
   fetchExpiringTransactionsForOrganization,
@@ -10,7 +6,7 @@ import {
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 async function createTestOrg(

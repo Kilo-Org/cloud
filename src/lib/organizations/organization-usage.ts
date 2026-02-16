@@ -65,10 +65,6 @@ export async function getBalanceForOrganizationUser(
     .select({
       microdollar_limit: organization_user_limits.microdollar_limit,
       microdollar_usage: organization_user_usage.microdollar_usage,
-      organization_balance:
-        sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})::float8`.as(
-          'organization_balance'
-        ),
       total_microdollars_acquired: organizations.total_microdollars_acquired,
       microdollars_used: organizations.microdollars_used,
       settings: organizations.settings,
@@ -122,7 +118,6 @@ export async function getBalanceForOrganizationUser(
   const {
     microdollar_limit,
     microdollar_usage,
-    organization_balance: initial_organization_balance,
     total_microdollars_acquired: initial_total_microdollars_acquired,
     microdollars_used,
     settings,
@@ -132,8 +127,8 @@ export async function getBalanceForOrganizationUser(
     next_credit_expiration_at,
   } = result[0];
 
-  let organization_balance = initial_organization_balance;
   let total_microdollars_acquired = initial_total_microdollars_acquired;
+  let organization_balance = total_microdollars_acquired - microdollars_used;
 
   // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
   const expireBefore = subHours(new Date(), Math.random());
@@ -214,17 +209,16 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
     // Get current balance and settings before the update
     const [orgData] = await tx
       .select({
-        balance:
-          sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})::float8`.as(
-            'balance'
-          ),
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        microdollars_used: organizations.microdollars_used,
         settings: organizations.settings,
       })
       .from(organizations)
       .where(eq(organizations.id, organization_id))
       .limit(1);
 
-    const currentBalance = orgData?.balance ?? 0;
+    const currentBalance =
+      (orgData?.total_microdollars_acquired ?? 0) - (orgData?.microdollars_used ?? 0);
 
     const minimumBalance = orgData?.settings?.minimum_balance
       ? toMicrodollars(orgData?.settings?.minimum_balance)

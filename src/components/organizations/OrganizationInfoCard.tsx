@@ -14,7 +14,17 @@ import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { AnimatedDollars } from './AnimatedDollars';
 import { useState } from 'react';
-import { Edit, Check, X, PiggyBank, Building2, ExternalLink, Bell, Plus } from 'lucide-react';
+import {
+  Edit,
+  Check,
+  X,
+  PiggyBank,
+  Building2,
+  ExternalLink,
+  Bell,
+  Plus,
+  Clock,
+} from 'lucide-react';
 import {
   useIsKiloAdmin,
   useUserOrganizationRole,
@@ -26,9 +36,11 @@ import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/Tri
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { fromMicrodollars } from '@/lib/utils';
+import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -83,6 +95,20 @@ function Inner(props: InnerProps) {
   const updateOrganizationName = useUpdateOrganizationName();
   const adminToggleCodeIndexing = useAdminToggleCodeIndexing();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
+
+  const trpc = useTRPC();
+  const { data: creditBlocksData } = useQuery(
+    trpc.organizations.getCreditBlocks.queryOptions({ organizationId: id })
+  );
+  const expiringBlocks =
+    creditBlocksData?.creditBlocks.filter(
+      block => block.expiry_date !== null && block.balance_mUsd > 0
+    ) ?? [];
+  const expiring_mUsd = expiringBlocks.reduce((sum, block) => sum + block.balance_mUsd, 0);
+  const earliestExpiry = expiringBlocks
+    .map(block => block.expiry_date)
+    .filter((date): date is string => date !== null)
+    .sort()[0];
 
   const handleSave = async () => {
     if (editedName.trim() === name) {
@@ -251,6 +277,13 @@ function Inner(props: InnerProps) {
                 <Link href={`/organizations/${id}/payment-details`}>View Billing</Link>
               </Button>
             </div>
+            {expiringBlocks.length > 0 && earliestExpiry && (
+              <div className="mt-2 flex items-center gap-1 text-sm text-amber-600">
+                <Clock className="h-3.5 w-3.5" />
+                {formatDollars(fromMicrodollars(expiring_mUsd))} expiring at{' '}
+                {formatIsoDateTime_IsoOrderNoSeconds(earliestExpiry)}
+              </div>
+            )}
           </div>
         )}
         {isInAdminDashboard && (

@@ -283,7 +283,7 @@ describe('getUserOrganizationsWithSeats', () => {
     // Add some balance to the organization
     await db
       .update(organizations)
-      .set({ microdollars_balance: 1000000, total_microdollars_acquired: 1000000 }) // $1.00 in microdollars
+      .set({ total_microdollars_acquired: 1000000 }) // $1.00 in microdollars
       .where(sql`${organizations.id} = ${organization.id}`);
 
     // Create seat purchase

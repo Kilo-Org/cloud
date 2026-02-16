@@ -88,7 +88,6 @@ describe('autoTopUp', () => {
       .set({
         stripe_customer_id: `cus_org_${Date.now()}`,
         auto_top_up_enabled: false,
-        microdollars_balance: 0,
       })
       .where(eq(organizations.id, testOrg.id));
   });
@@ -275,7 +274,6 @@ describe('autoTopUp', () => {
         .update(organizations)
         .set({
           auto_top_up_enabled: false,
-          microdollars_balance: 0,
         })
         .where(eq(organizations.id, testOrg.id));
       await db
@@ -287,7 +285,6 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: false,
-        microdollars_balance: 0,
         total_microdollars_acquired: 0,
         microdollars_used: 0,
       };
@@ -306,7 +303,6 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: balanceAboveThreshold,
         total_microdollars_acquired: balanceAboveThreshold,
         microdollars_used: 0,
       };
@@ -330,7 +326,6 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: 0,
         total_microdollars_acquired: 0,
         microdollars_used: 0,
       };
@@ -361,7 +356,6 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: 0,
         total_microdollars_acquired: 0,
         microdollars_used: 0,
       };
@@ -399,7 +393,6 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: 0,
         total_microdollars_acquired: 0,
         microdollars_used: 0,
       };
@@ -432,7 +425,6 @@ describe('autoTopUp', () => {
         .update(organizations)
         .set({
           auto_top_up_enabled: true,
-          microdollars_balance: 0,
         })
         .where(eq(organizations.id, testOrg.id));
 
@@ -442,7 +434,6 @@ describe('autoTopUp', () => {
       await db
         .update(organizations)
         .set({
-          microdollars_balance: aboveThreshold,
           total_microdollars_acquired: aboveThreshold,
         })
         .where(eq(organizations.id, testOrg.id));
@@ -450,7 +441,6 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: 0, // Pass old balance to trigger the check
         total_microdollars_acquired: 0,
         microdollars_used: 0,
       };
@@ -494,7 +484,6 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: justBelowThreshold,
         total_microdollars_acquired: justBelowThreshold,
         microdollars_used: 0,
       };
@@ -514,7 +503,6 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: exactlyAtThreshold,
         total_microdollars_acquired: exactlyAtThreshold,
         microdollars_used: 0,
       };

@@ -36,7 +36,6 @@ describe('organization admin router', () => {
       await db
         .update(organizations)
         .set({
-          microdollars_balance: 5_000_000,
           total_microdollars_acquired: 5_000_000,
           microdollars_used: 0,
         })
@@ -59,14 +58,13 @@ describe('organization admin router', () => {
 
       const [updatedOrg] = await db
         .select({
-          microdollars_balance: organizations.microdollars_balance,
           total_microdollars_acquired: organizations.total_microdollars_acquired,
           microdollars_used: organizations.microdollars_used,
         })
         .from(organizations)
         .where(eq(organizations.id, testOrganization.id));
 
-      expect(updatedOrg.microdollars_balance).toBe(0);
+      expect(updatedOrg.total_microdollars_acquired - updatedOrg.microdollars_used).toBe(0);
       // After nullification, total_microdollars_acquired should equal microdollars_used (zero balance)
       expect(updatedOrg.total_microdollars_acquired).toBe(updatedOrg.microdollars_used);
     });
@@ -85,7 +83,7 @@ describe('organization admin router', () => {
     it('should throw BAD_REQUEST error when organization has no credits (balance = 0)', async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 0, total_microdollars_acquired: 0 })
+        .set({ total_microdollars_acquired: 0 })
         .where(eq(organizations.id, testOrganization.id));
 
       const caller = await createCallerForUser(adminUser.id);
@@ -101,7 +99,6 @@ describe('organization admin router', () => {
       await db
         .update(organizations)
         .set({
-          microdollars_balance: -1_000_000,
           total_microdollars_acquired: 0,
           microdollars_used: 1_000_000,
         })
@@ -213,7 +210,7 @@ describe('organization admin router', () => {
     it('should handle small balance amounts correctly', async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 1, total_microdollars_acquired: 1 })
+        .set({ total_microdollars_acquired: 1 })
         .where(eq(organizations.id, testOrganization.id));
 
       const caller = await createCallerForUser(adminUser.id);
@@ -237,7 +234,7 @@ describe('organization admin router', () => {
     beforeEach(async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 0, total_microdollars_acquired: 0, microdollars_used: 0 })
+        .set({ total_microdollars_acquired: 0, microdollars_used: 0 })
         .where(eq(organizations.id, testOrganization.id));
 
       await db
@@ -259,13 +256,15 @@ describe('organization admin router', () => {
 
       const [updatedOrg] = await db
         .select({
-          microdollars_balance: organizations.microdollars_balance,
           total_microdollars_acquired: organizations.total_microdollars_acquired,
+          microdollars_used: organizations.microdollars_used,
         })
         .from(organizations)
         .where(eq(organizations.id, testOrganization.id));
 
-      expect(updatedOrg.microdollars_balance).toBe(amount * 1_000_000);
+      expect(updatedOrg.total_microdollars_acquired - updatedOrg.microdollars_used).toBe(
+        amount * 1_000_000
+      );
       // total_microdollars_acquired should also increase by the grant amount
       expect(updatedOrg.total_microdollars_acquired).toBe(amount * 1_000_000);
     });

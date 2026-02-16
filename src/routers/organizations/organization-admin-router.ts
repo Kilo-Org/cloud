@@ -314,7 +314,7 @@ export const organizationAdminRouter = createTRPCRouter({
             microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
             total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
             ...(credit_expiry_date && {
-              next_credit_expiration_at: sql`LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()})`,
+              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
             }),
           })
           .where(eq(organizations.id, organizationId));

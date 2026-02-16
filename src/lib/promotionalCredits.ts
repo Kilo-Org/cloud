@@ -173,7 +173,9 @@ export async function grantCreditForCategoryConfig(
           ? (entity.organization?.microdollars_used ?? 0)
           : user.microdollars_used
         : null,
-      original_baseline_microdollars_used: user.microdollars_used,
+      original_baseline_microdollars_used: organization_id
+        ? (entity.organization?.microdollars_used ?? 0)
+        : user.microdollars_used,
       check_category_uniqueness: promotion.is_idempotent,
     });
     const insertResult = await (promotion.is_idempotent
@@ -202,7 +204,7 @@ export async function grantCreditForCategoryConfig(
           total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
           // Update next_credit_expiration_at to the earlier of current value and new expiry
           ...(credit_expiry_date && {
-            next_credit_expiration_at: sql`LEAST(${kilocode_users.next_credit_expiration_at}, ${credit_expiry_date.toISOString()})`,
+            next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
           }),
         })
         .where(eq(kilocode_users.id, user.id));
@@ -213,7 +215,7 @@ export async function grantCreditForCategoryConfig(
           microdollars_balance: sql`${organizations.microdollars_balance} + ${toMicrodollars(amount_usd)}`,
           total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
           ...(credit_expiry_date && {
-            next_credit_expiration_at: sql`LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()})`,
+            next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
           }),
         })
         .where(eq(organizations.id, organization_id));

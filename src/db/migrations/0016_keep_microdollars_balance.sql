@@ -1,1 +1,0 @@
--- no-op: microdollars_balance is kept for rollback safety (0015 no longer drops it)

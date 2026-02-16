@@ -8457,6 +8457,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "microdollars_balance": {
+          "name": "microdollars_balance",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
         }
       },
       "indexes": {

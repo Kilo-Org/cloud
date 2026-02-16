@@ -113,13 +113,6 @@
       "when": 1771257687734,
       "tag": "0015_dear_vampiro",
       "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "7",
-      "when": 1771271058974,
-      "tag": "0016_keep_microdollars_balance",
-      "breakpoints": true
     }
   ]
 }

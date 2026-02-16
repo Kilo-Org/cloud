@@ -5,7 +5,7 @@ import {
   organizations,
 } from '@/db/schema';
 import { db } from '@/lib/drizzle';
-import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, inArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { sentryLogger } from '@/lib/utils.server';
 
@@ -301,6 +301,7 @@ export async function processOrganizationExpirations(
       .set({
         next_credit_expiration_at: new_next_expiration,
         total_microdollars_acquired: new_total_microdollars_acquired,
+        microdollars_balance: sql`${organizations.microdollars_balance} + ${total_expired}`,
       })
       .where(
         and(

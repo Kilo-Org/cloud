@@ -314,6 +314,7 @@ export const organizationAdminRouter = createTRPCRouter({
           .update(organizations)
           .set({
             total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
+            microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
             ...(credit_expiry_date && {
               next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
             }),
@@ -376,6 +377,7 @@ export const organizationAdminRouter = createTRPCRouter({
           .update(organizations)
           .set({
             total_microdollars_acquired: sql`${organizations.microdollars_used}`,
+            microdollars_balance: 0,
             next_credit_expiration_at: null,
           })
           .where(eq(organizations.id, organizationId));

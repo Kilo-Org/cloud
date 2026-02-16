@@ -995,6 +995,11 @@ export const organizations = pgTable(
     microdollars_used: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
+    // Deprecated: balance is now computed as total_microdollars_acquired - microdollars_used.
+    // Kept in sync for rollback safety; will be removed in a future migration.
+    microdollars_balance: bigint({ mode: 'number' })
+      .default(sql`'0'`)
+      .notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),

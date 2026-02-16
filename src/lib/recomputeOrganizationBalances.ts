@@ -21,7 +21,10 @@ type OrganizationBalanceUpdates = {
     Organization,
     'id' | 'updated_at' | 'microdollars_used' | 'total_microdollars_acquired'
   >;
-  org_update: Pick<Organization, 'microdollars_used' | 'total_microdollars_acquired'>;
+  org_update: Pick<
+    Organization,
+    'microdollars_used' | 'total_microdollars_acquired' | 'microdollars_balance'
+  >;
   accounting_error_mUsd: number;
   updatesForOriginalBaseline: { id: string; baseline: number; db: number | null }[];
   updatesForExpirationBaseline: { id: string; baseline: number; db: number | null }[];
@@ -145,6 +148,7 @@ export async function recomputeOrganizationBalances(args: {
     org_update: {
       microdollars_used: new_microdollars_used,
       total_microdollars_acquired: new_total_microdollars_acquired,
+      microdollars_balance: new_total_microdollars_acquired - new_microdollars_used,
     },
     accounting_error_mUsd,
     updatesForOriginalBaseline,

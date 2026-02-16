@@ -200,7 +200,10 @@ export async function run(...args: string[]) {
 
   await localDb
     .update(organizations)
-    .set({ total_microdollars_acquired: sql`${organizations.microdollars_used} + ${newBalance}` })
+    .set({
+      total_microdollars_acquired: sql`${organizations.microdollars_used} + ${newBalance}`,
+      microdollars_balance: newBalance,
+    })
     .where(eq(organizations.id, orgId));
 
   // 6. Insert the usage records in batches

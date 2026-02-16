@@ -133,42 +133,31 @@ export class RigDO extends DurableObject<Env> {
 
   async listBeads(filter: BeadFilter): Promise<Bead[]> {
     await this.ensureInitialized();
-    const conditions: string[] = [];
-    const params: unknown[] = [];
 
-    if (filter.status) {
-      conditions.push(`${beads.columns.status} = ?`);
-      params.push(filter.status);
-    }
-    if (filter.type) {
-      conditions.push(`${beads.columns.type} = ?`);
-      params.push(filter.type);
-    }
-    if (filter.assignee_agent_id) {
-      conditions.push(`${beads.columns.assignee_agent_id} = ?`);
-      params.push(filter.assignee_agent_id);
-    }
-    if (filter.convoy_id) {
-      conditions.push(`${beads.columns.convoy_id} = ?`);
-      params.push(filter.convoy_id);
-    }
-
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const limit = filter.limit ?? 100;
-    const offset = filter.offset ?? 0;
-
-    // Dynamic query — can't use type-safe query() since the shape depends on filters
     const rows = [
-      ...this.sql.exec(
+      ...query(
+        this.sql,
         /* sql */ `
           SELECT * FROM ${beads}
-          ${where}
+          WHERE (? IS NULL OR ${beads.columns.status} = ?)
+            AND (? IS NULL OR ${beads.columns.type} = ?)
+            AND (? IS NULL OR ${beads.columns.assignee_agent_id} = ?)
+            AND (? IS NULL OR ${beads.columns.convoy_id} = ?)
           ORDER BY ${beads.columns.created_at} DESC
           LIMIT ? OFFSET ?
         `,
-        ...params,
-        limit,
-        offset
+        [
+          filter.status ?? null,
+          filter.status ?? null,
+          filter.type ?? null,
+          filter.type ?? null,
+          filter.assignee_agent_id ?? null,
+          filter.assignee_agent_id ?? null,
+          filter.convoy_id ?? null,
+          filter.convoy_id ?? null,
+          filter.limit ?? 100,
+          filter.offset ?? 0,
+        ]
       ),
     ];
     return rows.map(r => this.rowToBead(r));
@@ -258,21 +247,18 @@ export class RigDO extends DurableObject<Env> {
 
   async listAgents(filter?: AgentFilter): Promise<Agent[]> {
     await this.ensureInitialized();
-    const conditions: string[] = [];
-    const params: unknown[] = [];
 
-    if (filter?.role) {
-      conditions.push(`${agents.columns.role} = ?`);
-      params.push(filter.role);
-    }
-    if (filter?.status) {
-      conditions.push(`${agents.columns.status} = ?`);
-      params.push(filter.status);
-    }
-
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    // Dynamic query — can't use type-safe query() since the shape depends on filters
-    const rows = [...this.sql.exec(/* sql */ `SELECT * FROM ${agents} ${where}`, ...params)];
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${agents}
+          WHERE (? IS NULL OR ${agents.columns.role} = ?)
+            AND (? IS NULL OR ${agents.columns.status} = ?)
+        `,
+        [filter?.role ?? null, filter?.role ?? null, filter?.status ?? null, filter?.status ?? null]
+      ),
+    ];
     return rows.map(r => this.rowToAgent(r));
   }
 

@@ -17,6 +17,7 @@ import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createProviderAwareModelAllowPredicate } from '@/lib/model-allow.server';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import { listAvailableCustomLlms } from '@/lib/custom-llm/listAvailableCustomLlms';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -176,6 +177,8 @@ export const organizationsSettingsRouter = createTRPCRouter({
         }
         filteredModels = models;
       }
+
+      filteredModels.push(...(await listAvailableCustomLlms(organizationId)));
 
       return {
         ...responseData,

@@ -1307,7 +1307,7 @@ function ManualEntrySection() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    processOssCsvMutation.mutate([{ githubUrl, email, creditsDollars, tier }]);
+    processOssCsvMutation.mutate([{ githubUrl: githubUrl.match(/^https?:\/\//) ? githubUrl : `https://${githubUrl}`, email, creditsDollars, tier }]);
   };
 
   return (

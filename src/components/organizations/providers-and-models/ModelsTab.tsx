@@ -14,8 +14,10 @@ export function ModelsTab({
   onSelectedOnlyChange,
   allowedModelIds,
   enabledProviderSlugs,
+  totalModelCount,
   filteredModelRows,
   onToggleModelAllowed,
+  onSetAllModelsAllowed,
   onOpenModelDetails,
 }: {
   isLoading: boolean;
@@ -26,10 +28,15 @@ export function ModelsTab({
   onSelectedOnlyChange: (value: boolean) => void;
   allowedModelIds: ReadonlySet<string>;
   enabledProviderSlugs: ReadonlySet<string>;
+  totalModelCount: number;
   filteredModelRows: ReadonlyArray<ModelRow>;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
+  onSetAllModelsAllowed: (nextAllowed: boolean) => void;
   onOpenModelDetails: (modelId: string) => void;
 }) {
+  const allSelected = totalModelCount > 0 && allowedModelIds.size === totalModelCount;
+  const noneSelected = allowedModelIds.size === 0;
+  const selectAllIndeterminate = !allSelected && !noneSelected;
   return (
     <div className="flex flex-col gap-y-4">
       <p className="text-muted-foreground text-sm">
@@ -58,7 +65,17 @@ export function ModelsTab({
 
           <div className="rounded-lg border">
             <div className="bg-muted/50 flex items-center justify-between gap-4 border-b px-4 py-3">
-              <div className="text-sm font-medium">Models</div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={selectAllIndeterminate}
+                  disabled={!canEdit}
+                  onCheckedChange={nextChecked => {
+                    onSetAllModelsAllowed(Boolean(nextChecked));
+                  }}
+                />
+                Models
+              </label>
               <div className="text-muted-foreground text-xs">
                 {allowedModelIds.size} allowed • {filteredModelRows.length} shown
               </div>

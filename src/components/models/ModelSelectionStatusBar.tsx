@@ -19,6 +19,8 @@ export function ModelSelectionStatusBar({
   onSave,
   onCancel,
 }: ModelSelectionStatusBarProps) {
+  const noModelsSelected = selectedModelsCount === 0;
+
   return (
     <div
       className={cn(
@@ -28,11 +30,18 @@ export function ModelSelectionStatusBar({
     >
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <span className="text-foreground font-medium">
-              {selectedProvidersCount} {selectedProvidersCount === 1 ? 'Provider' : 'Providers'} and{' '}
-              {selectedModelsCount} {selectedModelsCount === 1 ? 'model' : 'models'} selected
-            </span>
+          <div className="flex flex-col gap-1">
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <span className="text-foreground font-medium">
+                {selectedProvidersCount} {selectedProvidersCount === 1 ? 'Provider' : 'Providers'}{' '}
+                and {selectedModelsCount} {selectedModelsCount === 1 ? 'model' : 'models'} selected
+              </span>
+            </div>
+            {noModelsSelected ? (
+              <span className="text-destructive text-xs font-medium">
+                At least 1 model must be selected to save.
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -47,6 +56,7 @@ export function ModelSelectionStatusBar({
             <Button
               variant="primary"
               onClick={onSave}
+              disabled={noModelsSelected}
               size="sm"
               className="flex items-center gap-2"
             >

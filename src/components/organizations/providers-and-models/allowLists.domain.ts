@@ -1,6 +1,9 @@
 import { isModelAllowedProviderAwareClient } from '@/lib/model-allow.client';
 import { normalizeModelId } from '@/lib/model-utils';
 
+/** Sentinel value representing "no models allowed" in the model allow list. */
+export const MODEL_ALLOW_NONE_SENTINEL = '__none__';
+
 export type OpenRouterModelSlugSnapshot = {
   slug: string;
 };
@@ -101,6 +104,11 @@ export function computeAllowedModelIds(
     for (const model of openRouterModels) {
       allowed.add(normalizeModelId(model.slug));
     }
+    return allowed;
+  }
+
+  // Explicit sentinel check for "no models allowed"
+  if (draftModelAllowList.length === 1 && draftModelAllowList[0] === MODEL_ALLOW_NONE_SENTINEL) {
     return allowed;
   }
 
@@ -267,6 +275,40 @@ export function toggleAllowFutureModelsForProvider(params: {
   });
 
   return { nextModelAllowList, nextProviderAllowList };
+}
+
+export function setAllModelsAllowed(params: {
+  nextAllowed: boolean;
+  draftModelAllowList: ReadonlyArray<string>;
+  allModelIds: ReadonlyArray<string>;
+  hadAllModelsInitially: boolean;
+}): string[] {
+  const { nextAllowed, draftModelAllowList, allModelIds, hadAllModelsInitially } = params;
+
+  if (nextAllowed) {
+    // Selecting all: if we started with all models (empty list), return empty.
+    // Otherwise return explicit list of all model IDs (preserving any wildcards).
+    if (hadAllModelsInitially) {
+      return [];
+    }
+    const wildcards = draftModelAllowList.filter(
+      entry => entry.endsWith('/*') && entry !== MODEL_ALLOW_NONE_SENTINEL
+    );
+    return canonicalizeModelAllowList([...allModelIds, ...wildcards]);
+  }
+
+  // Deselecting all: return a sentinel value that won't match any model ID.
+  return [MODEL_ALLOW_NONE_SENTINEL];
+}
+
+/**
+ * Sanitizes a model allow list for persistence to the backend.
+ * Removes any client-side sentinel values that shouldn't be stored.
+ */
+export function sanitizeModelAllowListForPersistence(
+  modelAllowList: ReadonlyArray<string>
+): string[] {
+  return modelAllowList.filter(entry => entry !== MODEL_ALLOW_NONE_SENTINEL);
 }
 
 export function setAllProvidersEnabled(params: {

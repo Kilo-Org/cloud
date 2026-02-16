@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   // Test configuration - stripped down for vitest-pool-workers
   "name": "gastown-test",
-  "main": "src/index.ts",
+  "main": "src/gastown.worker.ts",
   "compatibility_date": "2026-01-27",
   "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
 

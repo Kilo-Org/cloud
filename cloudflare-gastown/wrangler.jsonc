@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "gastown",
-  "main": "src/index.ts",
+  "main": "src/gastown.worker.ts",
   "compatibility_date": "2026-01-27",
   "compatibility_flags": ["nodejs_compat"],
   "placement": { "mode": "smart" },

@@ -71,25 +71,16 @@ app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents', c => handleListAgents(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
 
-// Agent-scoped routes (agentOnlyMiddleware enforces JWT agentId match)
-app.post('/api/rigs/:rigId/agents/:agentId/hook', agentOnlyMiddleware, c =>
-  handleHookBead(c, c.req.param())
-);
-app.delete('/api/rigs/:rigId/agents/:agentId/hook', agentOnlyMiddleware, c =>
-  handleUnhookBead(c, c.req.param())
-);
-app.get('/api/rigs/:rigId/agents/:agentId/prime', agentOnlyMiddleware, c =>
-  handlePrime(c, c.req.param())
-);
-app.post('/api/rigs/:rigId/agents/:agentId/done', agentOnlyMiddleware, c =>
-  handleAgentDone(c, c.req.param())
-);
-app.post('/api/rigs/:rigId/agents/:agentId/checkpoint', agentOnlyMiddleware, c =>
+// Agent-scoped routes — agentOnlyMiddleware enforces JWT agentId match
+app.use('/api/rigs/:rigId/agents/:agentId/*', agentOnlyMiddleware);
+app.post('/api/rigs/:rigId/agents/:agentId/hook', c => handleHookBead(c, c.req.param()));
+app.delete('/api/rigs/:rigId/agents/:agentId/hook', c => handleUnhookBead(c, c.req.param()));
+app.get('/api/rigs/:rigId/agents/:agentId/prime', c => handlePrime(c, c.req.param()));
+app.post('/api/rigs/:rigId/agents/:agentId/done', c => handleAgentDone(c, c.req.param()));
+app.post('/api/rigs/:rigId/agents/:agentId/checkpoint', c =>
   handleWriteCheckpoint(c, c.req.param())
 );
-app.get('/api/rigs/:rigId/agents/:agentId/mail', agentOnlyMiddleware, c =>
-  handleCheckMail(c, c.req.param())
-);
+app.get('/api/rigs/:rigId/agents/:agentId/mail', c => handleCheckMail(c, c.req.param()));
 
 // ── Mail ────────────────────────────────────────────────────────────────
 

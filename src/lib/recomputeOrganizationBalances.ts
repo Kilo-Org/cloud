@@ -1,8 +1,15 @@
 /**
- * Logic for recomputing an organization's balance and credit transactions from the source of truth.
+ * Repair tool for reconciling an organization's denormalized balance columns with the ledger.
  *
- * This module handles the re-calculation of an org's balance based on their credit transactions
- * and usage history, ensuring the denormalized organization record matches the ledger.
+ * Design choice: this intentionally preserves the user-visible balance (total_acquired - used)
+ * and corrects the underlying columns to be internally consistent. When the recomputed
+ * microdollars_used (from usage records) differs from the cached value, we adjust
+ * total_microdollars_acquired to keep the balance unchanged. If that causes total_acquired
+ * to diverge from the credit_transactions sum, we insert a corrective accounting_adjustment
+ * transaction to reconcile the *ledger* to match the cached balance — not the other way around.
+ *
+ * This avoids surprising balance changes for users while still ensuring the org row and
+ * credit transaction baselines are self-consistent.
  */
 import { db } from '@/lib/drizzle';
 import {
@@ -139,6 +146,9 @@ export async function recomputeOrganizationBalances(args: {
     (acc, txn) => acc + txn.amount_microdollars,
     0
   );
+  // Preserve the user-visible balance while correcting microdollars_used from the ledger.
+  // If microdollars_used drifted, total_acquired shifts to compensate, and an
+  // accounting_adjustment transaction reconciles the ledger to match.
   const current_balance = org.total_microdollars_acquired - org.microdollars_used;
   const new_total_microdollars_acquired = current_balance + new_microdollars_used;
   const accounting_error_mUsd = new_total_microdollars_acquired - credit_transactions_sum;

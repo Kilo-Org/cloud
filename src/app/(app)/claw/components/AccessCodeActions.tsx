@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAccessCode } from '../hooks/useAccessCode';
 
+const OPEN_BUTTON_ACCENT_CLASS =
+  'animate-pulse-once bg-[oklch(95%_0.15_108)] text-black shadow-[0_0_20px_rgba(237,255,0,0.3)] ring-[oklch(95%_0.15_108)]/20 transition-all duration-500 ease-in-out hover:bg-[oklch(95%_0.15_108)]/90 hover:ring-[oklch(95%_0.15_108)]/40';
+
 export function AccessCodeActions({
   canShow,
   gatewayUrl,
@@ -46,7 +49,7 @@ export function AccessCodeActions({
           </PopoverContent>
         )}
       </Popover>
-      <Button variant="outline" asChild>
+      <Button variant="primary" asChild className={OPEN_BUTTON_ACCENT_CLASS}>
         <a href={gatewayUrl} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="mr-2 h-4 w-4" />
           Open

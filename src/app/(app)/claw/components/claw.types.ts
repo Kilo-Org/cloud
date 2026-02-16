@@ -1,6 +1,33 @@
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 
 export type ClawState = KiloClawDashboardStatus['status'];
+export type ClawInstanceTypeName = 'shared-cpu-2x2' | 'shared-cpu-2x4' | 'performance-cpu-2x4';
+export type ClawInstanceType = {
+  name: ClawInstanceTypeName;
+  description: string;
+  isDefault: boolean;
+};
+
+export const CLAW_INSTANCE_TYPES = [
+  {
+    name: 'shared-cpu-2x2',
+    description: '2 vCPU, 2 GB RAM',
+    isDefault: false,
+  },
+  {
+    name: 'shared-cpu-2x4',
+    description: '2 vCPU, 4 GB RAM',
+    isDefault: true,
+  },
+  {
+    name: 'performance-cpu-2x4',
+    description: '2 vCPU, 4 GB RAM (Performance CPU)',
+    isDefault: false,
+  },
+] satisfies readonly [ClawInstanceType, ...ClawInstanceType[]];
+
+export const DEFAULT_CLAW_INSTANCE_TYPE =
+  CLAW_INSTANCE_TYPES.find(instanceType => instanceType.isDefault) ?? CLAW_INSTANCE_TYPES[0];
 
 export const CLAW_STATUS_BADGE: Record<
   Exclude<ClawState, null>,

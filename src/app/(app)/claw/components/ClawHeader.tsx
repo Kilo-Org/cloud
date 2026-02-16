@@ -17,6 +17,7 @@ export function ClawHeader({
   gatewayUrl: string;
 }) {
   const statusInfo = status ? CLAW_STATUS_BADGE[status] : null;
+  const displayRegion = region ? region.toUpperCase() : 'Region pending';
 
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -34,7 +35,7 @@ export function ClawHeader({
             )}
           </div>
           <p className="text-muted-foreground font-mono text-sm">
-            {region || 'Region pending'} {sandboxId ? `- ${sandboxId}` : ''}
+            {displayRegion} {sandboxId ? `- ${sandboxId}` : ''}
           </p>
         </div>
       </div>

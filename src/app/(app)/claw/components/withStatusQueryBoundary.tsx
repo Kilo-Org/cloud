@@ -27,7 +27,7 @@ export function withStatusQueryBoundary<P extends { status: KiloClawDashboardSta
 
     if (statusQuery.isLoading) {
       return (
-        <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">Loading...</p>
@@ -39,7 +39,7 @@ export function withStatusQueryBoundary<P extends { status: KiloClawDashboardSta
 
     if (statusQuery.error) {
       return (
-        <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-red-600">Failed to load: {formatError(statusQuery.error)}</p>

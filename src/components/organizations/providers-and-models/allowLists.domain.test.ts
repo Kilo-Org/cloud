@@ -231,4 +231,33 @@ describe('allowLists.domain', () => {
 
     expect([...allowed].sort()).toEqual(['cerebras/llama-70b', 'openai/gpt-4.1']);
   });
+
+  test('computeModelsOnlyFromProvider expands wildcards to detect orphaned models', () => {
+    const modelProvidersIndex = buildModelProvidersIndex([
+      {
+        slug: 'cerebras',
+        models: [
+          { slug: 'cerebras/llama-70b', endpoint: {} },
+          { slug: 'shared/model-1', endpoint: {} },
+        ],
+      },
+      {
+        slug: 'openai',
+        models: [{ slug: 'shared/model-1', endpoint: {} }],
+      },
+    ]);
+
+    const orphaned = computeModelsOnlyFromProvider({
+      providerSlug: 'cerebras',
+      draftModelAllowList: ['cerebras/*'],
+      draftProviderAllowList: ['cerebras', 'openai'],
+      allProviderSlugsWithEndpoints: ['cerebras', 'openai'],
+      modelProvidersIndex,
+    });
+
+    // cerebras/* expands to cerebras/llama-70b and shared/model-1
+    // cerebras/llama-70b is only from cerebras, so it's orphaned
+    // shared/model-1 is also from openai, so it's NOT orphaned
+    expect(orphaned).toEqual(['cerebras/llama-70b']);
+  });
 });

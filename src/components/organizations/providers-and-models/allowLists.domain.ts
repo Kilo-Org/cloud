@@ -189,12 +189,23 @@ export function computeModelsOnlyFromProvider(params: {
 
   const orphanedModels: string[] = [];
 
-  // Check each model in the allow list
+  // Collect all model IDs to check, expanding wildcards to concrete models
+  const modelIdsToCheck = new Set<string>();
   for (const entry of draftModelAllowList) {
-    // Skip wildcards
-    if (entry.endsWith('/*')) continue;
+    if (entry.endsWith('/*')) {
+      const providerPrefix = entry.slice(0, -2);
+      for (const [modelId, providers] of modelProvidersIndex) {
+        if (providers.has(providerPrefix)) {
+          modelIdsToCheck.add(modelId);
+        }
+      }
+    } else {
+      modelIdsToCheck.add(normalizeModelId(entry));
+    }
+  }
 
-    const modelId = normalizeModelId(entry);
+  // Check each model for orphan status
+  for (const modelId of modelIdsToCheck) {
     const providersForModel = modelProvidersIndex.get(modelId);
     if (!providersForModel) continue;
 

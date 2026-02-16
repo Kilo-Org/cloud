@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import type { Organization, organization_invitations } from '@/db/schema';
 import type { Result } from '@/lib/maybe-result';
+import { CompanyDomainSchema } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
@@ -29,6 +30,7 @@ export const OrganizationCreateRequestSchema = z.object({
   name: OrganizationNameSchema,
   autoAddCreator: z.boolean().optional().default(false),
   plan: OrganizationPlanSchema.optional().default('teams'),
+  company_domain: CompanyDomainSchema.optional(),
 });
 
 export const OrganizationSchema = z.object({
@@ -49,6 +51,7 @@ export const OrganizationSchema = z.object({
   sso_domain: z.string().nullable(),
   plan: z.enum(['teams', 'enterprise']),
   free_trial_end_at: z.string().nullable(),
+  company_domain: z.string().nullable(),
 });
 
 export type UserOrganizationWithSeats = {

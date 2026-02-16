@@ -647,6 +647,7 @@ export const organizationAdminRouter = createTRPCRouter({
         sso_domain: organizations.sso_domain,
         plan: organizations.plan,
         free_trial_end_at: organizations.free_trial_end_at,
+        company_domain: organizations.company_domain,
         subscription_amount_usd: latestSubscriptions.amount_usd,
       };
 

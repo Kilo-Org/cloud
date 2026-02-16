@@ -26,7 +26,7 @@ export async function POST(
 
   const body = await request.json();
   const amount_usd = body.amount_usd;
-  if (typeof amount_usd !== 'number' || amount_usd <= 0) {
+  if (typeof amount_usd !== 'number' || !Number.isFinite(amount_usd) || amount_usd <= 0) {
     return NextResponse.json({ error: 'amount_usd must be a positive number' }, { status: 400 });
   }
 

@@ -156,7 +156,8 @@ export async function createOrganization(
   // this is only used in tests
   // TODO(bmc): remove this from tests in the future. nbd rn.
   userId?: User['id'] | null,
-  addUserAsOwner: boolean = true
+  addUserAsOwner: boolean = true,
+  company_domain?: string
 ): Promise<Organization> {
   return await db.transaction(async tx => {
     const now = new Date();
@@ -175,6 +176,7 @@ export async function createOrganization(
           // all new orgs will have code indexing enabled by default
           code_indexing_enabled: true,
         },
+        ...(company_domain ? { company_domain } : {}),
       })
       .returning();
 

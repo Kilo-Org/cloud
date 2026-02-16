@@ -20,4 +20,4 @@ const ImageResponseWithUnknownSchema = z.union([
 
 export const ImageResponseArraySchema = z
   .array(ImageResponseWithUnknownSchema)
-  .transform((d) => d.filter((d): d is ImageResponse => !!d));
+  .transform(d => d.filter((d): d is ImageResponse => !!d));

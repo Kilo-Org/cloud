@@ -3,7 +3,8 @@ import { createTableBeads, getIndexesBeads, beads } from '../db/tables/beads.tab
 import { createTableAgents, agents } from '../db/tables/agents.table';
 import { createTableMail, getIndexesMail, mail } from '../db/tables/mail.table';
 import { createTableReviewQueue, reviewQueue } from '../db/tables/review-queue.table';
-import { createTableMolecules, molecules } from '../db/tables/molecules.table';
+import { createTableMolecules } from '../db/tables/molecules.table';
+import { query } from '../util/query.util';
 import type {
   Bead,
   CreateBeadInput,
@@ -53,19 +54,19 @@ export class RigDO extends DurableObject<Env> {
 
   private async initializeDatabase(): Promise<void> {
     // Tables must be created in dependency order (beads first, then agents, etc.)
-    this.sql.exec(createTableBeads());
+    query(this.sql, createTableBeads(), []);
     for (const idx of getIndexesBeads()) {
-      this.sql.exec(idx);
+      query(this.sql, idx, []);
     }
 
-    this.sql.exec(createTableAgents());
-    this.sql.exec(createTableMail());
+    query(this.sql, createTableAgents(), []);
+    query(this.sql, createTableMail(), []);
     for (const idx of getIndexesMail()) {
-      this.sql.exec(idx);
+      query(this.sql, idx, []);
     }
 
-    this.sql.exec(createTableReviewQueue());
-    this.sql.exec(createTableMolecules());
+    query(this.sql, createTableReviewQueue(), []);
+    query(this.sql, createTableMolecules(), []);
   }
 
   // ── Beads ──────────────────────────────────────────────────────────────
@@ -77,20 +78,37 @@ export class RigDO extends DurableObject<Env> {
     const labelsJson = JSON.stringify(input.labels ?? []);
     const metadataJson = JSON.stringify(input.metadata ?? {});
 
-    this.sql.exec(
-      `INSERT INTO ${beads} (${beads.columns.id}, ${beads.columns.type}, ${beads.columns.status}, ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.assignee_agent_id}, ${beads.columns.convoy_id}, ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata}, ${beads.columns.created_at}, ${beads.columns.updated_at})
-       VALUES (?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      id,
-      input.type,
-      input.title,
-      input.body ?? null,
-      input.assignee_agent_id ?? null,
-      input.convoy_id ?? null,
-      input.priority ?? 'medium',
-      labelsJson,
-      metadataJson,
-      timestamp,
-      timestamp
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${beads} (
+          ${beads.columns.id},
+          ${beads.columns.type},
+          ${beads.columns.status},
+          ${beads.columns.title},
+          ${beads.columns.body},
+          ${beads.columns.assignee_agent_id},
+          ${beads.columns.convoy_id},
+          ${beads.columns.priority},
+          ${beads.columns.labels},
+          ${beads.columns.metadata},
+          ${beads.columns.created_at},
+          ${beads.columns.updated_at}
+        ) VALUES (?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        id,
+        input.type,
+        input.title,
+        input.body ?? null,
+        input.assignee_agent_id ?? null,
+        input.convoy_id ?? null,
+        input.priority ?? 'medium',
+        labelsJson,
+        metadataJson,
+        timestamp,
+        timestamp,
+      ]
     );
 
     const result = this.getBead(id);
@@ -104,7 +122,11 @@ export class RigDO extends DurableObject<Env> {
   }
 
   private getBead(beadId: string): Bead | null {
-    const rows = [...this.sql.exec(`SELECT * FROM ${beads} WHERE ${beads.columns.id} = ?`, beadId)];
+    const rows = [
+      ...query(this.sql, /* sql */ `SELECT * FROM ${beads} WHERE ${beads.columns.id} = ?`, [
+        beadId,
+      ]),
+    ];
     if (rows.length === 0) return null;
     return this.rowToBead(rows[0]);
   }
@@ -135,9 +157,15 @@ export class RigDO extends DurableObject<Env> {
     const limit = filter.limit ?? 100;
     const offset = filter.offset ?? 0;
 
+    // Dynamic query — can't use type-safe query() since the shape depends on filters
     const rows = [
       ...this.sql.exec(
-        `SELECT * FROM ${beads} ${where} ORDER BY ${beads.columns.created_at} DESC LIMIT ? OFFSET ?`,
+        /* sql */ `
+          SELECT * FROM ${beads}
+          ${where}
+          ORDER BY ${beads.columns.created_at} DESC
+          LIMIT ? OFFSET ?
+        `,
         ...params,
         limit,
         offset
@@ -151,15 +179,18 @@ export class RigDO extends DurableObject<Env> {
     const timestamp = now();
     const closedAt = status === 'closed' ? timestamp : null;
 
-    this.sql.exec(
-      `UPDATE ${beads} SET ${beads.columns.status} = ?, ${beads.columns.updated_at} = ?, ${beads.columns.closed_at} = COALESCE(?, ${beads.columns.closed_at}) WHERE ${beads.columns.id} = ?`,
-      status,
-      timestamp,
-      closedAt,
-      beadId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.status} = ?,
+            ${beads.columns.updated_at} = ?,
+            ${beads.columns.closed_at} = COALESCE(?, ${beads.columns.closed_at})
+        WHERE ${beads.columns.id} = ?
+      `,
+      [status, timestamp, closedAt, beadId]
     );
 
-    // Update agent activity
     this.touchAgent(agentId);
 
     const bead = this.getBead(beadId);
@@ -178,15 +209,20 @@ export class RigDO extends DurableObject<Env> {
     const id = generateId();
     const timestamp = now();
 
-    this.sql.exec(
-      `INSERT INTO ${agents} (${agents.columns.id}, ${agents.columns.role}, ${agents.columns.name}, ${agents.columns.identity}, ${agents.columns.status}, ${agents.columns.created_at}, ${agents.columns.last_activity_at})
-       VALUES (?, ?, ?, ?, 'idle', ?, ?)`,
-      id,
-      input.role,
-      input.name,
-      input.identity,
-      timestamp,
-      timestamp
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${agents} (
+          ${agents.columns.id},
+          ${agents.columns.role},
+          ${agents.columns.name},
+          ${agents.columns.identity},
+          ${agents.columns.status},
+          ${agents.columns.created_at},
+          ${agents.columns.last_activity_at}
+        ) VALUES (?, ?, ?, ?, 'idle', ?, ?)
+      `,
+      [id, input.role, input.name, input.identity, timestamp, timestamp]
     );
 
     const agent = this.getAgent(id);
@@ -201,7 +237,9 @@ export class RigDO extends DurableObject<Env> {
 
   private getAgent(agentId: string): Agent | null {
     const rows = [
-      ...this.sql.exec(`SELECT * FROM ${agents} WHERE ${agents.columns.id} = ?`, agentId),
+      ...query(this.sql, /* sql */ `SELECT * FROM ${agents} WHERE ${agents.columns.id} = ?`, [
+        agentId,
+      ]),
     ];
     if (rows.length === 0) return null;
     return this.rowToAgent(rows[0]);
@@ -210,7 +248,9 @@ export class RigDO extends DurableObject<Env> {
   async getAgentByIdentity(identity: string): Promise<Agent | null> {
     await this.ensureInitialized();
     const rows = [
-      ...this.sql.exec(`SELECT * FROM ${agents} WHERE ${agents.columns.identity} = ?`, identity),
+      ...query(this.sql, /* sql */ `SELECT * FROM ${agents} WHERE ${agents.columns.identity} = ?`, [
+        identity,
+      ]),
     ];
     if (rows.length === 0) return null;
     return this.rowToAgent(rows[0]);
@@ -231,27 +271,36 @@ export class RigDO extends DurableObject<Env> {
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = [...this.sql.exec(`SELECT * FROM ${agents} ${where}`, ...params)];
+    // Dynamic query — can't use type-safe query() since the shape depends on filters
+    const rows = [...this.sql.exec(/* sql */ `SELECT * FROM ${agents} ${where}`, ...params)];
     return rows.map(r => this.rowToAgent(r));
   }
 
   async updateAgentSession(agentId: string, sessionId: string | null): Promise<void> {
     await this.ensureInitialized();
-    this.sql.exec(
-      `UPDATE ${agents} SET ${agents.columns.cloud_agent_session_id} = ?, ${agents.columns.last_activity_at} = ? WHERE ${agents.columns.id} = ?`,
-      sessionId,
-      now(),
-      agentId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agents}
+        SET ${agents.columns.cloud_agent_session_id} = ?,
+            ${agents.columns.last_activity_at} = ?
+        WHERE ${agents.columns.id} = ?
+      `,
+      [sessionId, now(), agentId]
     );
   }
 
   async updateAgentStatus(agentId: string, status: string): Promise<void> {
     await this.ensureInitialized();
-    this.sql.exec(
-      `UPDATE ${agents} SET ${agents.columns.status} = ?, ${agents.columns.last_activity_at} = ? WHERE ${agents.columns.id} = ?`,
-      status,
-      now(),
-      agentId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agents}
+        SET ${agents.columns.status} = ?,
+            ${agents.columns.last_activity_at} = ?
+        WHERE ${agents.columns.id} = ?
+      `,
+      [status, now(), agentId]
     );
   }
 
@@ -273,28 +322,43 @@ export class RigDO extends DurableObject<Env> {
       throw new Error(`Agent ${agentId} is already hooked to bead ${agent.current_hook_bead_id}`);
     }
 
-    this.sql.exec(
-      `UPDATE ${agents} SET ${agents.columns.current_hook_bead_id} = ?, ${agents.columns.status} = 'working', ${agents.columns.last_activity_at} = ? WHERE ${agents.columns.id} = ?`,
-      beadId,
-      now(),
-      agentId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agents}
+        SET ${agents.columns.current_hook_bead_id} = ?,
+            ${agents.columns.status} = 'working',
+            ${agents.columns.last_activity_at} = ?
+        WHERE ${agents.columns.id} = ?
+      `,
+      [beadId, now(), agentId]
     );
 
-    // Update bead status to in_progress and assign
-    this.sql.exec(
-      `UPDATE ${beads} SET ${beads.columns.status} = 'in_progress', ${beads.columns.assignee_agent_id} = ?, ${beads.columns.updated_at} = ? WHERE ${beads.columns.id} = ?`,
-      agentId,
-      now(),
-      beadId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.status} = 'in_progress',
+            ${beads.columns.assignee_agent_id} = ?,
+            ${beads.columns.updated_at} = ?
+        WHERE ${beads.columns.id} = ?
+      `,
+      [agentId, now(), beadId]
     );
   }
 
   async unhookBead(agentId: string): Promise<void> {
     await this.ensureInitialized();
-    this.sql.exec(
-      `UPDATE ${agents} SET ${agents.columns.current_hook_bead_id} = NULL, ${agents.columns.status} = 'idle', ${agents.columns.last_activity_at} = ? WHERE ${agents.columns.id} = ?`,
-      now(),
-      agentId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agents}
+        SET ${agents.columns.current_hook_bead_id} = NULL,
+            ${agents.columns.status} = 'idle',
+            ${agents.columns.last_activity_at} = ?
+        WHERE ${agents.columns.id} = ?
+      `,
+      [now(), agentId]
     );
   }
 
@@ -312,15 +376,19 @@ export class RigDO extends DurableObject<Env> {
     const id = generateId();
     const timestamp = now();
 
-    this.sql.exec(
-      `INSERT INTO ${mail} (${mail.columns.id}, ${mail.columns.from_agent_id}, ${mail.columns.to_agent_id}, ${mail.columns.subject}, ${mail.columns.body}, ${mail.columns.created_at})
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      id,
-      input.from_agent_id,
-      input.to_agent_id,
-      input.subject,
-      input.body,
-      timestamp
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${mail} (
+          ${mail.columns.id},
+          ${mail.columns.from_agent_id},
+          ${mail.columns.to_agent_id},
+          ${mail.columns.subject},
+          ${mail.columns.body},
+          ${mail.columns.created_at}
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [id, input.from_agent_id, input.to_agent_id, input.subject, input.body, timestamp]
     );
   }
 
@@ -329,18 +397,30 @@ export class RigDO extends DurableObject<Env> {
     const timestamp = now();
 
     const rows = [
-      ...this.sql.exec(
-        `SELECT * FROM ${mail} WHERE ${mail.columns.to_agent_id} = ? AND ${mail.columns.delivered} = 0 ORDER BY ${mail.columns.created_at} ASC`,
-        agentId
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${mail}
+          WHERE ${mail.columns.to_agent_id} = ?
+            AND ${mail.columns.delivered} = 0
+          ORDER BY ${mail.columns.created_at} ASC
+        `,
+        [agentId]
       ),
     ];
 
     // Mark as delivered
     if (rows.length > 0) {
-      this.sql.exec(
-        `UPDATE ${mail} SET ${mail.columns.delivered} = 1, ${mail.columns.delivered_at} = ? WHERE ${mail.columns.to_agent_id} = ? AND ${mail.columns.delivered} = 0`,
-        timestamp,
-        agentId
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${mail}
+          SET ${mail.columns.delivered} = 1,
+              ${mail.columns.delivered_at} = ?
+          WHERE ${mail.columns.to_agent_id} = ?
+            AND ${mail.columns.delivered} = 0
+        `,
+        [timestamp, agentId]
       );
     }
 
@@ -355,16 +435,28 @@ export class RigDO extends DurableObject<Env> {
     const id = generateId();
     const timestamp = now();
 
-    this.sql.exec(
-      `INSERT INTO ${reviewQueue} (${reviewQueue.columns.id}, ${reviewQueue.columns.agent_id}, ${reviewQueue.columns.bead_id}, ${reviewQueue.columns.branch}, ${reviewQueue.columns.pr_url}, ${reviewQueue.columns.summary}, ${reviewQueue.columns.created_at})
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      id,
-      input.agent_id,
-      input.bead_id,
-      input.branch,
-      input.pr_url ?? null,
-      input.summary ?? null,
-      timestamp
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${reviewQueue} (
+          ${reviewQueue.columns.id},
+          ${reviewQueue.columns.agent_id},
+          ${reviewQueue.columns.bead_id},
+          ${reviewQueue.columns.branch},
+          ${reviewQueue.columns.pr_url},
+          ${reviewQueue.columns.summary},
+          ${reviewQueue.columns.created_at}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        id,
+        input.agent_id,
+        input.bead_id,
+        input.branch,
+        input.pr_url ?? null,
+        input.summary ?? null,
+        timestamp,
+      ]
     );
   }
 
@@ -372,19 +464,30 @@ export class RigDO extends DurableObject<Env> {
     await this.ensureInitialized();
 
     const rows = [
-      ...this.sql.exec(
-        `SELECT * FROM ${reviewQueue} WHERE ${reviewQueue.columns.status} = 'pending' ORDER BY ${reviewQueue.columns.created_at} ASC LIMIT 1`
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${reviewQueue}
+          WHERE ${reviewQueue.columns.status} = 'pending'
+          ORDER BY ${reviewQueue.columns.created_at} ASC
+          LIMIT 1
+        `,
+        []
       ),
     ];
     if (rows.length === 0) return null;
 
     const entry = this.rowToReviewQueueEntry(rows[0]);
 
-    // Mark as running
-    this.sql.exec(
-      `UPDATE ${reviewQueue} SET ${reviewQueue.columns.status} = 'running', ${reviewQueue.columns.processed_at} = ? WHERE ${reviewQueue.columns.id} = ?`,
-      now(),
-      entry.id
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${reviewQueue}
+        SET ${reviewQueue.columns.status} = 'running',
+            ${reviewQueue.columns.processed_at} = ?
+        WHERE ${reviewQueue.columns.id} = ?
+      `,
+      [now(), entry.id]
     );
 
     return { ...entry, status: 'running' };
@@ -392,11 +495,15 @@ export class RigDO extends DurableObject<Env> {
 
   async completeReview(entryId: string, status: 'merged' | 'failed'): Promise<void> {
     await this.ensureInitialized();
-    this.sql.exec(
-      `UPDATE ${reviewQueue} SET ${reviewQueue.columns.status} = ?, ${reviewQueue.columns.processed_at} = ? WHERE ${reviewQueue.columns.id} = ?`,
-      status,
-      now(),
-      entryId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${reviewQueue}
+        SET ${reviewQueue.columns.status} = ?,
+            ${reviewQueue.columns.processed_at} = ?
+        WHERE ${reviewQueue.columns.id} = ?
+      `,
+      [status, now(), entryId]
     );
   }
 
@@ -412,19 +519,29 @@ export class RigDO extends DurableObject<Env> {
       ? this.getBead(agent.current_hook_bead_id)
       : null;
 
-    // Get undelivered mail (but don't mark as delivered — prime is read-only)
     const undeliveredRows = [
-      ...this.sql.exec(
-        `SELECT * FROM ${mail} WHERE ${mail.columns.to_agent_id} = ? AND ${mail.columns.delivered} = 0 ORDER BY ${mail.columns.created_at} ASC`,
-        agentId
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${mail}
+          WHERE ${mail.columns.to_agent_id} = ?
+            AND ${mail.columns.delivered} = 0
+          ORDER BY ${mail.columns.created_at} ASC
+        `,
+        [agentId]
       ),
     ];
 
-    // Get open beads assigned to this agent
     const openBeadRows = [
-      ...this.sql.exec(
-        `SELECT * FROM ${beads} WHERE ${beads.columns.assignee_agent_id} = ? AND ${beads.columns.status} != 'closed' ORDER BY ${beads.columns.created_at} DESC`,
-        agentId
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${beads}
+          WHERE ${beads.columns.assignee_agent_id} = ?
+            AND ${beads.columns.status} != 'closed'
+          ORDER BY ${beads.columns.created_at} DESC
+        `,
+        [agentId]
       ),
     ];
 
@@ -442,11 +559,15 @@ export class RigDO extends DurableObject<Env> {
 
   async writeCheckpoint(agentId: string, data: unknown): Promise<void> {
     await this.ensureInitialized();
-    this.sql.exec(
-      `UPDATE ${agents} SET ${agents.columns.checkpoint} = ?, ${agents.columns.last_activity_at} = ? WHERE ${agents.columns.id} = ?`,
-      JSON.stringify(data),
-      now(),
-      agentId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agents}
+        SET ${agents.columns.checkpoint} = ?,
+            ${agents.columns.last_activity_at} = ?
+        WHERE ${agents.columns.id} = ?
+      `,
+      [JSON.stringify(data), now(), agentId]
     );
   }
 
@@ -487,28 +608,44 @@ export class RigDO extends DurableObject<Env> {
 
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
 
-    // Find dead agents (status = 'dead')
     const deadRows = [
-      ...this.sql.exec(
-        `SELECT ${agents.columns.id} FROM ${agents} WHERE ${agents.columns.status} = 'dead'`
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${agents.columns.id} FROM ${agents}
+          WHERE ${agents.columns.status} = 'dead'
+        `,
+        []
       ),
     ];
 
-    // Find stale agents (working but no recent activity)
     const staleRows = [
-      ...this.sql.exec(
-        `SELECT ${agents.columns.id} FROM ${agents} WHERE ${agents.columns.status} = 'working' AND ${agents.columns.last_activity_at} < ?`,
-        staleThreshold
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${agents.columns.id} FROM ${agents}
+          WHERE ${agents.columns.status} = 'working'
+            AND ${agents.columns.last_activity_at} < ?
+        `,
+        [staleThreshold]
       ),
     ];
 
-    // Find orphaned beads (in_progress but assignee is dead or doesn't exist)
     const orphanedRows = [
-      ...this.sql.exec(
-        `SELECT ${beads.columns.id} FROM ${beads}
-         WHERE ${beads.columns.status} = 'in_progress'
-         AND (${beads.columns.assignee_agent_id} IS NULL
-              OR ${beads.columns.assignee_agent_id} NOT IN (SELECT ${agents.columns.id} FROM ${agents} WHERE ${agents.columns.status} != 'dead'))`
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${beads.columns.id} FROM ${beads}
+          WHERE ${beads.columns.status} = 'in_progress'
+            AND (
+              ${beads.columns.assignee_agent_id} IS NULL
+              OR ${beads.columns.assignee_agent_id} NOT IN (
+                SELECT ${agents.columns.id} FROM ${agents}
+                WHERE ${agents.columns.status} != 'dead'
+              )
+            )
+        `,
+        []
       ),
     ];
 
@@ -519,13 +656,17 @@ export class RigDO extends DurableObject<Env> {
     };
   }
 
-  // ── Row mappers ────────────────────────────────────────────────────────
+  // ── Private helpers ────────────────────────────────────────────────────
 
   private touchAgent(agentId: string): void {
-    this.sql.exec(
-      `UPDATE ${agents} SET ${agents.columns.last_activity_at} = ? WHERE ${agents.columns.id} = ?`,
-      now(),
-      agentId
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agents}
+        SET ${agents.columns.last_activity_at} = ?
+        WHERE ${agents.columns.id} = ?
+      `,
+      [now(), agentId]
     );
   }
 

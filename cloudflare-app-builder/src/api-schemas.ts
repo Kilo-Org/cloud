@@ -57,7 +57,14 @@ export type InitResponse = z.infer<typeof InitResponseSchema>;
 // GET /apps/{app_id}/preview
 // ============================================
 
-export const PreviewStateSchema = z.enum(['uninitialized', 'idle', 'building', 'running', 'error']);
+export const PreviewStateSchema = z.enum([
+  'uninitialized',
+  'idle',
+  'building',
+  'running',
+  'error',
+  'sleeping',
+]);
 export type PreviewState = z.infer<typeof PreviewStateSchema>;
 
 export const GetPreviewResponseSchema = z.object({

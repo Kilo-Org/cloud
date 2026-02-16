@@ -163,9 +163,17 @@ export default {
       }
 
       // Handle SSE event stream (GET /apps/{app_id}/events)
+      // This is fetched cross-origin from app.kilo.ai, so needs CORS headers.
       const eventsMatch = pathname.match(EVENTS_PATTERN);
-      if (eventsMatch && request.method === 'GET') {
-        return handleEvents(request, env, eventsMatch[1]);
+      if (eventsMatch) {
+        const allowedOrigin = getAllowedOrigin(request, env);
+        if (allowedOrigin && request.method === 'OPTIONS') {
+          return withCorsHeaders(new Response(null, { status: 204 }), allowedOrigin);
+        }
+        if (request.method === 'GET') {
+          const response = await handleEvents(request, env, eventsMatch[1]);
+          return allowedOrigin ? withCorsHeaders(response, allowedOrigin) : response;
+        }
       }
 
       // Handle migrate to GitHub requests (POST /apps/{app_id}/migrate-to-github)

@@ -4,6 +4,9 @@
 // Environment Types
 // ============================================
 import type { Sandbox } from '@cloudflare/sandbox';
+import type { PreviewState } from './api-schemas';
+
+export type { PreviewState };
 
 export const DEFAULT_SANDBOX_PORT = 8080;
 
@@ -146,15 +149,7 @@ export interface ErrnoException extends Error {
 // Preview Types
 // ============================================
 
-/**
- * Possible states for a preview sandbox
- * - uninitialized: DO not configured with appId yet
- * - idle: appId set, no dev server process running
- * - building: dev server process exists, port not yet open
- * - running: dev server process exists AND port is open
- * - error: process failed/killed (auto-clears on next build)
- */
-export type PreviewState = 'uninitialized' | 'idle' | 'building' | 'running' | 'error' | 'sleeping';
+// PreviewState is re-exported from api-schemas.ts (single source of truth via zod enum)
 
 /**
  * Database credentials - both fields are always present together

@@ -175,6 +175,8 @@ export const kilocode_users = pgTable(
     is_bot: boolean().default(false).notNull(),
     default_model: text(),
     cohorts: jsonb().$type<Record<string, number>>().default({}).notNull(),
+    linkedin_url: text(),
+    github_url: text(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
@@ -1006,6 +1008,7 @@ export const organizations = pgTable(
     sso_domain: text(),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
+    company_domain: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),

@@ -101,9 +101,7 @@ export const PROVIDERS = {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
-    // Vercel AI Gateway has the generation endpoint: https://vercel.com/docs/ai-gateway/usage#generation-lookup
-    // but it is slow: takes >1min for the generation to appear.
-    hasGenerationEndpoint: false,
+    hasGenerationEndpoint: true,
   },
   XAI: {
     id: 'x-ai',

@@ -141,17 +141,16 @@ export function computeAllowedModelIds(
     // offering this model is enabled
     if (enabledProviderSlugs && modelProvidersIndex) {
       const providersForModel = modelProvidersIndex.get(normalizedModelId);
-      if (providersForModel) {
-        let hasEnabledProvider = false;
-        for (const providerSlug of providersForModel) {
-          if (enabledProviderSlugs.has(providerSlug)) {
-            hasEnabledProvider = true;
-            break;
-          }
+      if (!providersForModel) continue; // Exclude models with unknown providers
+      let hasEnabledProvider = false;
+      for (const providerSlug of providersForModel) {
+        if (enabledProviderSlugs.has(providerSlug)) {
+          hasEnabledProvider = true;
+          break;
         }
-        if (!hasEnabledProvider) {
-          continue;
-        }
+      }
+      if (!hasEnabledProvider) {
+        continue;
       }
     }
 

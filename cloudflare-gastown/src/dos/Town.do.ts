@@ -9,3 +9,7 @@ export class TownDO extends DurableObject<Env> {
     return 'pong';
   }
 }
+
+export function getTownDOStub(env: Env, townId: string) {
+  return env.TOWN.get(env.TOWN.idFromName(townId));
+}

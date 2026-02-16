@@ -592,3 +592,7 @@ export class RigDO extends DurableObject<Env> {
     };
   }
 }
+
+export function getRigDOStub(env: Env, rigId: string) {
+  return env.RIG.get(env.RIG.idFromName(rigId));
+}

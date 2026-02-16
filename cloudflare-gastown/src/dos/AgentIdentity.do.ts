@@ -10,3 +10,7 @@ export class AgentIdentityDO extends DurableObject<Env> {
     return 'pong';
   }
 }
+
+export function getAgentIdentityDOStub(env: Env, agentIdentity: string) {
+  return env.AGENT_IDENTITY.get(env.AGENT_IDENTITY.idFromName(agentIdentity));
+}

@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -41,7 +40,6 @@ export function ProvidersTab({
   onProviderRetainsPromptsFilterChange,
   onProviderLocationsFilterChange,
   onToggleProviderEnabled,
-  onSetAllProvidersEnabled,
   onOpenProviderDetails,
 }: {
   isLoading: boolean;
@@ -61,29 +59,8 @@ export function ProvidersTab({
   onProviderRetainsPromptsFilterChange: (value: ProviderPolicyFilter) => void;
   onProviderLocationsFilterChange: (value: string[]) => void;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
-  onSetAllProvidersEnabled: (providerSlugs: string[], nextEnabled: boolean) => void;
   onOpenProviderDetails: (providerSlug: string) => void;
 }) {
-  const selectAllCheckboxState = useMemo(() => {
-    if (filteredProviderRows.length === 0) {
-      return { checked: false, indeterminate: false };
-    }
-
-    let enabledCount = 0;
-    for (const row of filteredProviderRows) {
-      if (enabledProviderSlugs.has(row.providerSlug)) {
-        enabledCount++;
-      }
-    }
-
-    if (enabledCount === 0) {
-      return { checked: false, indeterminate: false };
-    }
-    if (enabledCount === filteredProviderRows.length) {
-      return { checked: true, indeterminate: false };
-    }
-    return { checked: false, indeterminate: true };
-  }, [filteredProviderRows, enabledProviderSlugs]);
   return (
     <div className="flex flex-col gap-y-4">
       <p className="text-muted-foreground text-sm">
@@ -160,19 +137,7 @@ export function ProvidersTab({
             <div className="min-w-0 flex-1">
               <div className="rounded-lg border">
                 <div className="bg-muted/50 flex items-center justify-between gap-4 border-b px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      checked={selectAllCheckboxState.checked}
-                      indeterminate={selectAllCheckboxState.indeterminate}
-                      disabled={!canEdit || filteredProviderRows.length === 0}
-                      onCheckedChange={nextChecked => {
-                        const providerSlugs = filteredProviderRows.map(r => r.providerSlug);
-                        onSetAllProvidersEnabled(providerSlugs, Boolean(nextChecked));
-                      }}
-                      aria-label="Select all providers"
-                    />
-                    <div className="text-sm font-medium">Providers</div>
-                  </div>
+                  <div className="text-sm font-medium">Providers</div>
                   <div className="text-muted-foreground text-xs">
                     {enabledProviderSlugs.size} enabled • {filteredProviderRows.length} shown
                   </div>

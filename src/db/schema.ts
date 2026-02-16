@@ -176,6 +176,8 @@ export const kilocode_users = pgTable(
     default_model: text(),
     cohorts: jsonb().$type<Record<string, number>>().default({}).notNull(),
     completed_welcome_form: boolean().default(false).notNull(),
+    linkedin_url: text(),
+    github_url: text(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
@@ -818,6 +820,21 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 
+export const custom_llm = pgTable('custom_llm', {
+  public_id: text().notNull().primaryKey(),
+  display_name: text().notNull(),
+  context_length: integer().notNull(),
+  max_completion_tokens: integer().notNull(),
+  internal_id: text().notNull(),
+  provider: text().notNull().$type<'anthropic' | 'openai' | 'xai'>(),
+  base_url: text().notNull(),
+  api_key: text().notNull(),
+  verbosity: text().$type<'low' | 'medium' | 'high'>(),
+  organization_ids: jsonb().notNull().$type<string[]>(),
+});
+
+export type CustomLlm = typeof custom_llm.$inferSelect;
+
 export const user_admin_notes = pgTable(
   'user_admin_notes',
   {
@@ -992,6 +1009,7 @@ export const organizations = pgTable(
     sso_domain: text(),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
+    company_domain: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),

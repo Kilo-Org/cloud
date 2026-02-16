@@ -34,6 +34,8 @@ const mockUser: User = {
   is_bot: false,
   cohorts: {},
   completed_welcome_form: false,
+  linkedin_url: null,
+  github_url: null,
 };
 
 describe('Token Functions', () => {

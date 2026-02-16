@@ -1,5 +1,5 @@
 {
-  "id": "397ce3da-a8da-4a77-b546-b8294020690e",
+  "id": "674d8b93-12bc-4b25-ab50-5557606d8dcf",
   "prevId": "310bbf36-d945-4234-ac26-0ce161990068",
   "version": "7",
   "dialect": "postgresql",
@@ -4074,6 +4074,79 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.custom_llm": {
+      "name": "custom_llm",
+      "schema": "",
+      "columns": {
+        "public_id": {
+          "name": "public_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "context_length": {
+          "name": "context_length",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_completion_tokens": {
+          "name": "max_completion_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "internal_id": {
+          "name": "internal_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_url": {
+          "name": "base_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "api_key": {
+          "name": "api_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verbosity": {
+          "name": "verbosity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_ids": {
+          "name": "organization_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.deployment_builds": {
       "name": "deployment_builds",
       "schema": "",
@@ -6623,13 +6696,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
-        },
-        "completed_welcome_form": {
-          "name": "completed_welcome_form",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {},

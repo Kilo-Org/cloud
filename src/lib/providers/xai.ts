@@ -9,7 +9,7 @@ export const grok_code_fast_1_optimized_free_model = {
     'An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.',
   context_length: 256_000,
   max_completion_tokens: 10_000,
-  is_enabled: false,
+  is_enabled: true,
   flags: ['reasoning', 'prompt_cache'],
   gateway: 'martian',
   internal_id: 'x-ai/grok-code-fast-1:optimized',

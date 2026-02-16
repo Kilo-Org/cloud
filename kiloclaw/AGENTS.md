@@ -9,7 +9,8 @@ KiloClaw is a Cloudflare Worker that runs per-user OpenClaw AI assistant instanc
 These are non-negotiable. Do not reintroduce shared/fallback paths.
 
 - **No shared mode.** Every request, DO, and machine is user-scoped. There is no global machine, no shared fallback, no optional userId parameters.
-- **User scoping.** DOs are currently keyed by `idFromName(userId)` (one instance per user). Machine names use `sandboxIdFromUserId(userId)`. Both are deterministic and reversible. **Known limitation**: when multi-sandbox-per-user is needed, the DO key should change to `sandboxId` or an instance ID, and the platform API will need to accept a sandbox/instance identifier alongside userId.
+- **User scoping.** Each user gets a dedicated Fly App (`acct-{hash}` in production, `dev-{hash}` in development), managed by the `KiloClawApp` DO. Instance DOs (`KiloClawInstance`) are keyed by `idFromName(userId)` (one instance per user). Machine names use `sandboxIdFromUserId(userId)`. Both are deterministic. **Known limitation**: when multi-sandbox-per-user is needed, the Instance DO key should change to `sandboxId` or an instance ID, and the platform API will need to accept a sandbox/instance identifier alongside userId. The App DO already supports this (one app per user, multiple instances per app).
+- **Per-user Fly Apps.** New instances get a per-user Fly app created by `KiloClawApp.ensureApp()`. The app name (`flyAppName`) is cached in the Instance DO for proxy routing. Legacy instances without `flyAppName` fall back to `FLY_APP_NAME`. Apps are kept alive after instance destroy (empty apps cost nothing) and reused on re-provision.
 - **`buildEnvVars` requires `sandboxId` and `gatewayTokenSecret`.** Gateway token and `AUTO_APPROVE_DEVICES` are always set. No fallback to worker-level channel tokens.
 - **Next.js is the sole Postgres writer.** The worker only reads via Hyperdrive (pepper validation + DO restore). The DB stores registry data (`user_id`, `sandbox_id`, `created_at`, `destroyed_at`) plus config backup. Operational state (status, timestamps, Fly machine/volume IDs) lives in the DO only.
 - **DO restore from Postgres.** If DO SQLite is wiped, `start(userId)` reads the active instance row from Postgres and repopulates the DO state. This is the backup path for development mistakes that corrupt DO storage.
@@ -33,10 +34,12 @@ Browser -> CF Worker (claw.kilo.ai)
 
 ### Fly Proxy Routing
 
-The worker forwards all requests to `https://{FLY_APP_NAME}.fly.dev` with the
-`fly-force-instance-id: {machineId}` header, which pins the request to a specific
-Fly Machine. Fly Proxy handles TLS and strips the header before forwarding to the
-machine. WebSocket upgrade requests use the same header for connection pinning.
+Each user gets a dedicated Fly App (`acct-{hash}` in production, `dev-{hash}` in development). The worker forwards
+requests to `https://{flyAppName}.fly.dev` with the `fly-force-instance-id: {machineId}`
+header, which pins the request to a specific Fly Machine. Fly Proxy handles TLS and
+strips the header before forwarding to the machine. WebSocket upgrade requests use
+the same header for connection pinning. Legacy instances without a per-user app fall
+back to `FLY_APP_NAME`.
 
 ### Persistence
 
@@ -64,8 +67,10 @@ src/
 │   ├── sandbox-id.ts                 # userId <-> sandboxId (base64url, reversible)
 │   └── debug-gate.ts                 # Debug route access control
 ├── durable-objects/
+│   ├── kiloclaw-app.ts               # DO: per-user Fly App lifecycle (create app, allocate IPs)
 │   └── kiloclaw-instance.ts          # DO: lifecycle state machine, reconciliation, two-phase destroy
 ├── fly/
+│   ├── apps.ts                       # Fly Apps + IP allocation REST API (per-user apps)
 │   ├── client.ts                     # Fly Machines + Volumes API HTTP client
 │   └── types.ts                      # Fly API type definitions (incl. FlyWaitableState)
 ├── gateway/
@@ -106,13 +111,15 @@ The alarm runs for ALL statuses (not just `running`). `destroying` short-circuit
 
 ### Required (set via `wrangler secret put`)
 
-| Variable               | Purpose                                                       |
-| ---------------------- | ------------------------------------------------------------- |
-| `FLY_API_TOKEN`        | Bearer token for Fly Machines API                             |
-| `FLY_APP_NAME`         | Fly App hosting all user machines (e.g., `kiloclaw-machines`) |
-| `NEXTAUTH_SECRET`      | JWT verification secret (shared with Next.js)                 |
-| `INTERNAL_API_SECRET`  | Platform API auth key                                         |
-| `GATEWAY_TOKEN_SECRET` | HMAC secret for per-user gateway tokens                       |
+| Variable               | Purpose                                                          |
+| ---------------------- | ---------------------------------------------------------------- |
+| `FLY_API_TOKEN`        | Bearer token for Fly Machines API (org-scoped)                   |
+| `FLY_ORG_SLUG`         | Fly org for creating per-user apps (e.g., `kilo-679`)            |
+| `FLY_REGISTRY_APP`     | Shared app for Docker image registry (e.g., `kiloclaw-machines`) |
+| `FLY_APP_NAME`         | Legacy fallback for existing instances without per-user apps     |
+| `NEXTAUTH_SECRET`      | JWT verification secret (shared with Next.js)                    |
+| `INTERNAL_API_SECRET`  | Platform API auth key                                            |
+| `GATEWAY_TOKEN_SECRET` | HMAC secret for per-user gateway tokens                          |
 
 ### Optional
 
@@ -158,6 +165,8 @@ Before submitting any change:
 | Auth middleware, JWT, pepper          | `src/auth/middleware.test.ts`, `src/auth/jwt.test.ts` |
 | Gateway env var building              | `src/gateway/env.test.ts`                             |
 | Fly API client                        | `src/fly/client.test.ts`                              |
+| Fly Apps / IP allocation              | `src/fly/apps.test.ts`                                |
+| App DO (per-user Fly App lifecycle)   | `src/durable-objects/kiloclaw-app.test.ts`            |
 | DO lifecycle, reconciliation, destroy | `src/durable-objects/kiloclaw-instance.test.ts`       |
 | Encryption / decryption               | `src/utils/encryption.test.ts`                        |
 | Debug route gating                    | `src/auth/debug-gate.test.ts`                         |

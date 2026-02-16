@@ -12,4 +12,5 @@ export type ProviderId =
   | 'x-ai'
   | 'vercel'
   | 'anthropic'
+  | 'custom'
   | 'dev-tools';

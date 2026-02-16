@@ -156,6 +156,14 @@ config.agents.defaults = config.agents.defaults || {};
 config.agents.defaults.model = { primary: defaultModel };
 console.log('KiloCode provider configured with base URL ' + baseUrl);
 
+// Explicitly lock down exec tool security (defense-in-depth).
+// OpenClaw defaults to these values, but pinning them here prevents
+// silent regression if upstream defaults change in a future version.
+config.tools = config.tools || {};
+config.tools.exec = config.tools.exec || {};
+config.tools.exec.security = 'deny';
+config.tools.exec.ask = 'on-miss';
+
 // Telegram configuration
 if (process.env.TELEGRAM_BOT_TOKEN) {
     const dmPolicy = process.env.TELEGRAM_DM_POLICY || 'pairing';

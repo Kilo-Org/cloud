@@ -11,6 +11,7 @@ import { ilike, or, asc, desc, count, eq, and, gt, isNull, isNotNull, sql } from
 import * as z from 'zod';
 import { OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { isValidUUID, toMicrodollars } from '@/lib/utils';
+import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,
   getOrganizationById,
@@ -87,6 +88,8 @@ const GrantCreditInputSchema = z
     organizationId: z.uuid(),
     amount_usd: z.number().refine(n => n !== 0, 'Amount cannot be zero'),
     description: z.string().optional(),
+    expiry_date: z.string().datetime().nullable().optional(),
+    expiry_hours: z.number().positive().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.amount_usd < 0 && (!data.description || data.description.trim().length === 0)) {
@@ -274,24 +277,45 @@ export const organizationAdminRouter = createTRPCRouter({
 
       const amountMicrodollars = toMicrodollars(amount_usd);
 
+      const explicit_expiry_date = input.expiry_date ? new Date(input.expiry_date) : null;
+      const expiryFromHours = input.expiry_hours
+        ? new Date(Date.now() + input.expiry_hours * millisecondsInHour)
+        : null;
+      const credit_expiry_date =
+        explicit_expiry_date && expiryFromHours
+          ? explicit_expiry_date < expiryFromHours
+            ? explicit_expiry_date
+            : expiryFromHours
+          : (explicit_expiry_date ?? expiryFromHours);
+
       await db.transaction(async tx => {
+        const [org] = await tx
+          .select({ microdollars_used: organizations.microdollars_used })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId));
+
         await tx.insert(credit_transactions).values({
           kilo_user_id: user.id,
           is_free: true,
           amount_microdollars: amountMicrodollars,
           description: description?.trim() || 'Admin credit grant',
           credit_category: 'organization_custom',
-          expiry_date: null,
+          expiry_date: credit_expiry_date?.toISOString() ?? null,
           organization_id: organizationId,
           original_baseline_microdollars_used: existingOrg.microdollars_used,
+          expiration_baseline_microdollars_used: credit_expiry_date
+            ? (org?.microdollars_used ?? 0)
+            : null,
         });
 
-        // Update organization balance
         await tx
           .update(organizations)
           .set({
             microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
             total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
+            ...(credit_expiry_date && {
+              next_credit_expiration_at: sql`LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()})`,
+            }),
           })
           .where(eq(organizations.id, organizationId));
       });

@@ -199,9 +199,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       const modelsToRemove = orphanedModelIds
         .map(modelId => {
           const model = openRouterModels.find(m => normalizeModelId(m.slug) === modelId);
-          return model
-            ? { modelId, modelName: model.name }
-            : { modelId, modelName: modelId };
+          return model ? { modelId, modelName: model.name } : { modelId, modelName: modelId };
         })
         .sort((a, b) => a.modelName.localeCompare(b.modelName));
 
@@ -226,9 +224,25 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const handleToggleModelAllowed = useCallback(
     (modelId: string, nextAllowed: boolean) => {
       if (!canEdit) return;
+
+      // If trying to enable a model, check if it has any enabled providers
+      if (nextAllowed) {
+        const providersForModel = selectors.modelProvidersIndex.get(modelId);
+        if (providersForModel) {
+          const hasEnabledProvider = [...providersForModel].some(providerSlug =>
+            enabledProviderSlugs.has(providerSlug)
+          );
+          if (!hasEnabledProvider) {
+            // No enabled providers - open the model details dialog instead
+            actions.setInfoModelId(modelId);
+            return;
+          }
+        }
+      }
+
       actions.toggleModel({ modelId, nextAllowed });
     },
-    [actions, canEdit]
+    [actions, canEdit, enabledProviderSlugs, selectors.modelProvidersIndex]
   );
 
   const handleToggleAllowFutureModelsForProvider = useCallback(

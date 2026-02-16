@@ -145,7 +145,10 @@ describe('allowLists.domain', () => {
       },
       {
         slug: 'openai',
-        models: [{ slug: 'openai/gpt-4.1', endpoint: {} }, { slug: 'shared/model-1', endpoint: {} }],
+        models: [
+          { slug: 'openai/gpt-4.1', endpoint: {} },
+          { slug: 'shared/model-1', endpoint: {} },
+        ],
       },
     ]);
 
@@ -164,5 +167,68 @@ describe('allowLists.domain', () => {
     // openai/gpt-4.1 should remain (from openai)
     expect(nextModelAllowList.sort()).toEqual(['openai/gpt-4.1', 'shared/model-1']);
     expect(nextProviderAllowList).toEqual(['openai']);
+  });
+
+  test('computeAllowedModelIds filters out models when their providers are disabled', () => {
+    const openRouterModels = [
+      { slug: 'cerebras/llama-70b' },
+      { slug: 'openai/gpt-4.1' },
+      { slug: 'shared/model-1' },
+    ];
+    const openRouterProviders = [
+      {
+        slug: 'cerebras',
+        models: [
+          { slug: 'cerebras/llama-70b', endpoint: {} },
+          { slug: 'shared/model-1', endpoint: {} },
+        ],
+      },
+      {
+        slug: 'openai',
+        models: [
+          { slug: 'openai/gpt-4.1', endpoint: {} },
+          { slug: 'shared/model-1', endpoint: {} },
+        ],
+      },
+    ];
+
+    // All models are in the allow list
+    const modelAllowList = ['cerebras/llama-70b', 'openai/gpt-4.1', 'shared/model-1'];
+
+    // But only openai provider is enabled
+    const enabledProviderSlugs = new Set(['openai']);
+
+    const allowed = computeAllowedModelIds(
+      modelAllowList,
+      openRouterModels,
+      openRouterProviders,
+      enabledProviderSlugs
+    );
+
+    // cerebras/llama-70b should be filtered out (only from cerebras, which is disabled)
+    // openai/gpt-4.1 should be included (from openai, which is enabled)
+    // shared/model-1 should be included (available from openai, which is enabled)
+    expect([...allowed].sort()).toEqual(['openai/gpt-4.1', 'shared/model-1']);
+  });
+
+  test('computeAllowedModelIds includes all models when enabledProviderSlugs is not provided', () => {
+    const openRouterModels = [{ slug: 'cerebras/llama-70b' }, { slug: 'openai/gpt-4.1' }];
+    const openRouterProviders = [
+      {
+        slug: 'cerebras',
+        models: [{ slug: 'cerebras/llama-70b', endpoint: {} }],
+      },
+      {
+        slug: 'openai',
+        models: [{ slug: 'openai/gpt-4.1', endpoint: {} }],
+      },
+    ];
+
+    const modelAllowList = ['cerebras/llama-70b', 'openai/gpt-4.1'];
+
+    // Not passing enabledProviderSlugs - should include all models in allow list
+    const allowed = computeAllowedModelIds(modelAllowList, openRouterModels, openRouterProviders);
+
+    expect([...allowed].sort()).toEqual(['cerebras/llama-70b', 'openai/gpt-4.1']);
   });
 });

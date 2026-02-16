@@ -93,7 +93,8 @@ export function computeEnabledProviderSlugs(
 export function computeAllowedModelIds(
   draftModelAllowList: ReadonlyArray<string>,
   openRouterModels: ReadonlyArray<OpenRouterModelSlugSnapshot>,
-  openRouterProviders: OpenRouterProviderModelsSnapshot
+  openRouterProviders: OpenRouterProviderModelsSnapshot,
+  enabledProviderSlugs?: ReadonlySet<string>
 ): Set<string> {
   const allowed = new Set<string>();
 
@@ -105,6 +106,8 @@ export function computeAllowedModelIds(
   }
 
   const allowListArray = [...draftModelAllowList];
+  const modelProvidersIndex = buildModelProvidersIndex(openRouterProviders);
+
   for (const model of openRouterModels) {
     const normalizedModelId = normalizeModelId(model.slug);
     const isAllowed = isModelAllowedProviderAwareClient(
@@ -112,9 +115,25 @@ export function computeAllowedModelIds(
       allowListArray,
       openRouterProviders
     );
-    if (isAllowed) {
-      allowed.add(normalizedModelId);
+    if (!isAllowed) {
+      continue;
     }
+
+    // If enabledProviderSlugs is provided, also check that at least one provider
+    // offering this model is enabled
+    if (enabledProviderSlugs) {
+      const providersForModel = modelProvidersIndex.get(normalizedModelId);
+      if (providersForModel) {
+        const hasEnabledProvider = [...providersForModel].some(providerSlug =>
+          enabledProviderSlugs.has(providerSlug)
+        );
+        if (!hasEnabledProvider) {
+          continue;
+        }
+      }
+    }
+
+    allowed.add(normalizedModelId);
   }
 
   return allowed;

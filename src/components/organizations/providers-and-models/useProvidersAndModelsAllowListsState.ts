@@ -321,8 +321,13 @@ export function useProvidersAndModelsAllowListsState(params: {
 
   const allowedModelIds = useMemo(() => {
     if (!draftModelAllowList) return new Set<string>();
-    return computeAllowedModelIds(draftModelAllowList, openRouterModels, openRouterProviders);
-  }, [draftModelAllowList, openRouterModels, openRouterProviders]);
+    return computeAllowedModelIds(
+      draftModelAllowList,
+      openRouterModels,
+      openRouterProviders,
+      enabledProviderSlugs
+    );
+  }, [draftModelAllowList, openRouterModels, openRouterProviders, enabledProviderSlugs]);
 
   const hasUnsavedChanges = useMemo(() => {
     if (

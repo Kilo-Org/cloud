@@ -220,6 +220,22 @@ describe('allocateIP', () => {
     expect(sentBody.type).toBe('shared_v4');
   });
 
+  it('treats 409 as success (IP already allocated)', async () => {
+    mockFetchText(409, 'already allocated');
+
+    const result = await allocateIP(TOKEN, 'acct-test', 'v6');
+
+    expect(result.shared).toBe(false);
+  });
+
+  it('treats 422 as success (IP already allocated)', async () => {
+    mockFetchText(422, 'already allocated');
+
+    const result = await allocateIP(TOKEN, 'acct-test', 'shared_v4');
+
+    expect(result.shared).toBe(true);
+  });
+
   it('throws FlyApiError on 404 (app not found)', async () => {
     mockFetchText(404, 'app not found');
 

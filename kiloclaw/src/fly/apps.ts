@@ -138,6 +138,10 @@ export async function allocateIP(
     method: 'POST',
     body: JSON.stringify({ type: ipType }),
   });
+  // 409/422 = IP already allocated (safe to treat as success during retries)
+  if (resp.status === 409 || resp.status === 422) {
+    return { ip: '', region: '', created_at: '', shared: ipType === 'shared_v4' };
+  }
   await assertOk(resp, 'allocateIP');
   return resp.json();
 }

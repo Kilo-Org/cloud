@@ -48,6 +48,7 @@ import {
 import type { FlyClientConfig } from '../fly/client';
 import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
 import * as fly from '../fly/client';
+import { appNameFromUserId } from '../fly/apps';
 
 type InstanceStatus = PersistedState['status'];
 
@@ -1242,10 +1243,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       // Recover flyAppName from the App DO (which persists independently).
       // If the user has a per-user app, the App DO still knows about it.
-      // If not (legacy user), getAppName() returns null and getFlyConfig()
-      // falls back to env.FLY_APP_NAME.
+      // If both DOs were wiped, derive the app name deterministically so
+      // restore remains self-healing (the Fly app still exists on Fly's side).
+      // For legacy users who never had a per-user app, derivation produces a
+      // name that won't exist on Fly, but getFlyConfig() falls back to
+      // env.FLY_APP_NAME in that case since the derived app won't route.
       const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(userId));
-      const recoveredAppName = await appStub.getAppName();
+      const prefix = this.env.WORKER_ENV === 'development' ? 'dev' : undefined;
+      const recoveredAppName =
+        (await appStub.getAppName()) ?? (await appNameFromUserId(userId, prefix));
 
       await this.ctx.storage.put(
         storageUpdate({

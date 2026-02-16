@@ -13,6 +13,7 @@ import {
 import { getBalanceForUser } from '@/lib/user.balance';
 import { MIN_BALANCE_FOR_APP_BUILDER } from '@/lib/app-builder/constants';
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
+import { signEventTicket } from '@/lib/app-builder/events-ticket';
 
 export const appBuilderRouter = createTRPCRouter({
   /**
@@ -34,6 +35,19 @@ export const appBuilderRouter = createTRPCRouter({
       template: input.template,
       mode: input.mode,
     });
+  }),
+
+  /**
+   * Get a short-lived JWT ticket for connecting to the SSE events stream.
+   * The ticket is verified by the worker to authenticate the EventSource connection.
+   */
+  getEventsTicket: baseProcedure.input(projectIdBaseSchema).query(async ({ ctx, input }) => {
+    // getPreviewUrl already validates project ownership, but we need to validate here too
+    // since this ticket grants access to the event stream
+    const owner = { type: 'user' as const, id: ctx.user.id };
+    await appBuilderService.getPreviewUrl(input.projectId, owner);
+
+    return signEventTicket(input.projectId, ctx.user.id);
   }),
 
   /**

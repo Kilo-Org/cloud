@@ -8,44 +8,35 @@
  * - store.ts: State management and subscriber notifications
  * - messages.ts: Message creation and version tracking
  * - streaming.ts: WebSocket-based streaming coordination (V2 API)
- * - preview-polling.ts: Preview status polling and build triggers
+ * - usePreviewEvents.ts: SSE-based real-time preview events
  * - deployments.ts: Production deployment logic
  * - logging.ts: Prefixed console logging
  */
 
 import { type TRPCClient } from '@trpc/client';
 import type { RootRouter } from '@/routers/root-router';
-import type { CloudMessage } from '@/components/cloud-agent/types';
 import type { DeployProjectResult, ProjectWithMessages } from '@/lib/app-builder/types';
 import type { Images } from '@/lib/images-schema';
 import { createLogger, type Logger } from './project-manager/logging';
 import { createProjectStore, createInitialState } from './project-manager/store';
-import type { ProjectStore, V2StreamingCoordinator } from './project-manager/types';
-import { startPreviewPolling, type PreviewPollingState } from './project-manager/preview-polling';
+import type {
+  ProjectStore,
+  V2StreamingCoordinator,
+  PreviewStatus,
+  ProjectState,
+} from './project-manager/types';
+import { startPreviewEvents } from './project-manager/usePreviewEvents';
+import type { PreviewEventsHandle } from './project-manager/types';
 import { createStreamingCoordinator } from './project-manager/streaming';
 import { deploy as deployProject } from './project-manager/deployments';
+
+export type { PreviewStatus, ProjectState };
 
 // =============================================================================
 // Type Definitions
 // =============================================================================
 
 type AppTRPCClient = TRPCClient<RootRouter>;
-
-export type PreviewStatus = 'idle' | 'building' | 'running' | 'error';
-
-export type ProjectState = {
-  messages: CloudMessage[];
-  isStreaming: boolean;
-  isInterrupting: boolean;
-  previewUrl: string | null;
-  previewStatus: PreviewStatus;
-  deploymentId: string | null;
-  model: string;
-  /** Current URL the user is viewing in the preview iframe (tracked via postMessage) */
-  currentIframeUrl: string | null;
-  /** GitHub repo name if migrated (e.g., "owner/repo"), null if not migrated */
-  gitRepoFullName: string | null;
-};
 
 export type ProjectManagerConfig = {
   project: ProjectWithMessages;
@@ -64,7 +55,7 @@ export class ProjectManager {
   readonly organizationId: string | null;
 
   private store: ProjectStore;
-  private previewPollingState: PreviewPollingState | null = null;
+  private previewEventsHandle: PreviewEventsHandle | null = null;
   private trpcClient: AppTRPCClient;
   private logger: Logger;
   private streamingCoordinator: V2StreamingCoordinator;
@@ -101,7 +92,7 @@ export class ProjectManager {
       organizationId: this.organizationId,
       trpcClient: this.trpcClient,
       store: this.store,
-      onStreamComplete: () => this.startPreviewPollingIfNeeded(),
+      onStreamComplete: () => this.handleStreamComplete(),
       cloudAgentSessionId: this.cloudAgentSessionId,
       sessionPrepared: project.sessionPrepared,
     });
@@ -115,8 +106,8 @@ export class ProjectManager {
       // Existing project with session - reconnect to WebSocket for live updates
       this.pendingReconnect = true;
     } else {
-      // Existing project with no session ID - just start preview polling
-      this.startPreviewPollingIfNeeded();
+      // Existing project with no session ID - just start SSE events
+      this.startPreviewEventsIfNeeded();
     }
   }
 
@@ -139,9 +130,9 @@ export class ProjectManager {
       // This guarantees React's subscription setup is complete
       queueMicrotask(() => {
         if (!this.destroyed) {
-          // Start preview polling immediately for faster initial display
+          // Start SSE events immediately for real-time updates
           setTimeout(() => {
-            this.startPreviewPollingIfNeeded();
+            this.startPreviewEventsIfNeeded();
           }, 100);
           this.streamingCoordinator.startInitialStreaming();
         }
@@ -151,7 +142,7 @@ export class ProjectManager {
       // Reconnect to existing session for live updates
       queueMicrotask(() => {
         if (!this.destroyed && this.cloudAgentSessionId) {
-          this.startPreviewPollingIfNeeded();
+          this.startPreviewEventsIfNeeded();
           // Connect to WebSocket but don't replay events (undefined fromId)
           void this.streamingCoordinator.connectToExistingSession(this.cloudAgentSessionId);
         }
@@ -191,6 +182,23 @@ export class ProjectManager {
   /** Interrupt the current streaming response. */
   interrupt(): void {
     this.streamingCoordinator.interrupt();
+  }
+
+  /**
+   * Resume from sleeping state: trigger a build and start polling.
+   * Called when the user clicks "Resume" in the SleepingState UI.
+   */
+  resumeFromSleep(): void {
+    if (this.destroyed) return;
+    this.store.setState({ previewStatus: 'building' });
+    this.triggerBuild();
+    // The previous SSE handle may still be alive (container-stopped doesn't
+    // call stop()). Tear it down so startPreviewEventsIfNeeded can reconnect.
+    if (this.previewEventsHandle) {
+      this.previewEventsHandle.stop();
+      this.previewEventsHandle = null;
+    }
+    this.startPreviewEventsIfNeeded();
   }
 
   /** Update the GitHub repo full name after migration (e.g., "owner/repo"). */
@@ -233,10 +241,10 @@ export class ProjectManager {
     // Clean up streaming coordinator
     this.streamingCoordinator.destroy();
 
-    // Stop preview polling
-    if (this.previewPollingState) {
-      this.previewPollingState.stop();
-      this.previewPollingState = null;
+    // Stop SSE events
+    if (this.previewEventsHandle) {
+      this.previewEventsHandle.stop();
+      this.previewEventsHandle = null;
     }
   }
 
@@ -244,14 +252,50 @@ export class ProjectManager {
   // Private Methods
   // ===========================================================================
 
-  private startPreviewPollingIfNeeded(): void {
-    // Prevent multiple concurrent polling loops
-    if (this.previewPollingState?.isPolling || this.destroyed) {
+  /**
+   * Called when the LLM finishes a streaming turn.
+   * Triggers a build (wakes a sleeping container). SSE events handle status updates.
+   */
+  private handleStreamComplete(): void {
+    if (this.destroyed) return;
+    // Avoid flicker: keep showing the running iframe while the build starts
+    const currentStatus = this.store.getState().previewStatus;
+    if (currentStatus !== 'running') {
+      this.store.setState({ previewStatus: 'building' });
+    }
+    this.triggerBuild();
+    this.startPreviewEventsIfNeeded();
+  }
+
+  /**
+   * Trigger a build via tRPC (fire-and-forget).
+   * SSE events will deliver status updates in real time.
+   */
+  private triggerBuild(): void {
+    const buildPromise = this.organizationId
+      ? this.trpcClient.organizations.appBuilder.triggerBuild.mutate({
+          projectId: this.projectId,
+          organizationId: this.organizationId,
+        })
+      : this.trpcClient.appBuilder.triggerBuild.mutate({
+          projectId: this.projectId,
+        });
+
+    buildPromise.catch(() => {
+      if (!this.destroyed) {
+        this.store.setState({ previewStatus: 'error' });
+      }
+    });
+  }
+
+  private startPreviewEventsIfNeeded(): void {
+    // Prevent duplicate SSE connections
+    if (this.previewEventsHandle || this.destroyed) {
       return;
     }
 
-    this.logger.log('Starting preview polling');
-    this.previewPollingState = startPreviewPolling({
+    this.logger.log('Starting SSE events');
+    this.previewEventsHandle = startPreviewEvents({
       projectId: this.projectId,
       organizationId: this.organizationId,
       trpcClient: this.trpcClient,

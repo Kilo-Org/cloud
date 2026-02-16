@@ -83,20 +83,6 @@ export const BuildTriggerErrorResponseSchema = z.object({
 export type BuildTriggerErrorResponse = z.infer<typeof BuildTriggerErrorResponseSchema>;
 
 // ============================================
-// Build Logs Streaming Endpoint Schemas
-// GET /apps/{app_id}/build/logs
-// ============================================
-
-// Returns Server-Sent Events stream on success
-// Returns error response on failure
-export const BuildLogsErrorResponseSchema = z.object({
-  error: z.enum(['no_logs_available', 'internal_error']),
-  message: z.string(),
-});
-
-export type BuildLogsErrorResponse = z.infer<typeof BuildLogsErrorResponseSchema>;
-
-// ============================================
 // Token Generation Endpoint Schemas
 // POST /apps/{app_id}/token
 // ============================================

@@ -216,13 +216,8 @@ export async function handleTriggerBuild(
   }
 }
 
-export async function handleStreamBuildLogs(
-  request: Request,
-  env: Env,
-  appId: string
-): Promise<Response> {
+export async function handleGitPush(request: Request, env: Env, appId: string): Promise<Response> {
   try {
-    // 1. Verify Bearer token authentication
     const authResult = verifyBearerToken(request, env);
     if (!authResult.isAuthenticated) {
       if (!authResult.errorResponse) {
@@ -232,31 +227,13 @@ export async function handleStreamBuildLogs(
     }
 
     const previewStub = getPreviewDO(appId, env);
-    const logStream = await previewStub.streamBuildLogs();
+    await previewStub.onGitPush();
 
-    if (!logStream) {
-      return new Response(
-        JSON.stringify({
-          error: 'no_logs_available',
-          message: 'No build process is currently running or process ID not available',
-        }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Return the stream as Server-Sent Events
-    return new Response(logStream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
+    return new Response('', {
+      status: 202, // Accepted - build will run if user is connected
     });
   } catch (error) {
-    logger.error('Stream build logs error', formatError(error));
+    logger.error('Git push notification error', formatError(error));
     return new Response(
       JSON.stringify({
         error: 'internal_error',

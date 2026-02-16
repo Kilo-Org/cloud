@@ -92,6 +92,8 @@ export const MILVUS_TOKEN = getEnvVariable('MILVUS_TOKEN');
 export const APP_BUILDER_URL = getEnvVariable('APP_BUILDER_URL');
 export const APP_BUILDER_AUTH_TOKEN = getEnvVariable('APP_BUILDER_AUTH_TOKEN');
 
+export const APP_BUILDER_TICKET_SECRET = getEnvVariable('APP_BUILDER_TICKET_SECRET');
+
 // App Builder DB Proxy
 export const APP_BUILDER_DB_PROXY_URL = getEnvVariable('APP_BUILDER_DB_PROXY_URL');
 export const APP_BUILDER_DB_PROXY_AUTH_TOKEN = getEnvVariable('APP_BUILDER_DB_PROXY_AUTH_TOKEN');

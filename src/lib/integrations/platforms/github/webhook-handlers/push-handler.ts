@@ -12,7 +12,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { PushEventPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { extractBranchNameFromRef } from '@/lib/integrations/platforms/github/utils';
-import { triggerBuild } from '@/lib/app-builder/app-builder-client';
+import { notifyGitPush } from '@/lib/app-builder/app-builder-client';
 
 export async function handlePushEvent(event: PushEventPayload, integration: PlatformIntegration) {
   const branchName = extractBranchNameFromRef(event.ref);
@@ -99,7 +99,7 @@ async function rebuildMatchingAppBuilderPreviews(
   await Promise.allSettled(
     projects.map(async ({ id }) => {
       try {
-        await triggerBuild(id);
+        await notifyGitPush(id);
       } catch (error) {
         logExceptInTest('Failed to trigger app builder preview rebuild', {
           projectId: id,

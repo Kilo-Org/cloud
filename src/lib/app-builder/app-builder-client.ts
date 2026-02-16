@@ -131,7 +131,7 @@ export async function getPreview(projectId: string): Promise<GetPreviewResponse>
  * Trigger a build for a project.
  *
  * This is a fire-and-forget operation. The build runs asynchronously.
- * Use getPreview() to poll for status or streamBuildLogs() to watch progress.
+ * Use getPreview() to check status.
  *
  * @param projectId - The unique identifier for the project
  * @throws AppBuilderError if the request fails
@@ -159,20 +159,23 @@ export async function triggerBuild(projectId: string): Promise<void> {
 }
 
 /**
- * Stream build logs for a project via Server-Sent Events.
+ * Notify the App Builder worker of a git push.
+ *
+ * Unlike triggerBuild(), this defers the build when no user is actively
+ * viewing the preview (no SSE connections). The deferred build runs
+ * automatically when a user reconnects.
  *
  * @param projectId - The unique identifier for the project
- * @returns A ReadableStream of SSE events containing build logs
- * @throws AppBuilderError if the request fails or no logs are available
+ * @throws AppBuilderError if the request fails
  */
-export async function streamBuildLogs(projectId: string): Promise<ReadableStream<Uint8Array>> {
+export async function notifyGitPush(projectId: string): Promise<void> {
   const baseUrl = getBaseUrl();
-  const endpoint = `${baseUrl}/apps/${encodeURIComponent(projectId)}/build/logs`;
+  const endpoint = `${baseUrl}/apps/${encodeURIComponent(projectId)}/push`;
 
   const response = await fetch(endpoint, {
-    method: 'GET',
+    method: 'POST',
     headers: {
-      Accept: 'text/event-stream',
+      'Content-Type': 'application/json',
       ...(APP_BUILDER_AUTH_TOKEN && { Authorization: `Bearer ${APP_BUILDER_AUTH_TOKEN}` }),
     },
   });
@@ -180,21 +183,11 @@ export async function streamBuildLogs(projectId: string): Promise<ReadableStream
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
     throw new AppBuilderError(
-      `Failed to stream build logs for project ${projectId}: ${response.status} ${response.statusText} - ${errorText}`,
+      `Failed to notify git push for project ${projectId}: ${response.status} ${response.statusText} - ${errorText}`,
       response.status,
       endpoint
     );
   }
-
-  if (!response.body) {
-    throw new AppBuilderError(
-      `No response body for build logs stream for project ${projectId}`,
-      response.status,
-      endpoint
-    );
-  }
-
-  return response.body;
 }
 
 /**

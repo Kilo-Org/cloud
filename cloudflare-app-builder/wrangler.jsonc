@@ -17,6 +17,8 @@
     "GIT_TOKEN_EXPIRY_SECONDS": "21600",
     "DB_PROXY_URL": "https://db-proxy.engineering-e11.workers.dev",
     "ALLOWED_ORIGINS": "https://app.kilo.ai",
+    // Set via `wrangler secret put` in production
+    "APP_BUILDER_TICKET_SECRET": "",
   },
   "routes": [
     {
@@ -49,7 +51,7 @@
         "name": "PREVIEW",
       },
       {
-        "class_name": "Sandbox",
+        "class_name": "AppBuilderSandbox",
         "name": "SANDBOX",
       },
     ],
@@ -74,7 +76,7 @@
   ],
   "containers": [
     {
-      "class_name": "Sandbox",
+      "class_name": "AppBuilderSandbox",
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "max_instances": 170,
@@ -84,6 +86,10 @@
     {
       "new_sqlite_classes": ["GitRepositoryDO", "PreviewDO", "Sandbox"],
       "tag": "v1",
+    },
+    {
+      "renamed_classes": [{ "from": "Sandbox", "to": "AppBuilderSandbox" }],
+      "tag": "v2",
     },
   ],
   "workers_dev": false,

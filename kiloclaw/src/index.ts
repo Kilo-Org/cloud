@@ -8,7 +8,6 @@
  * Auth model:
  * - User routes + catch-all proxy: JWT via authMiddleware (Bearer header or cookie)
  * - Platform routes: x-internal-api-key via internalApiMiddleware
- * - Debug routes: internal API key or debug secret via debugRoutesGate
  * - Public routes: no auth (health check only)
  */
 
@@ -16,11 +15,10 @@ import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 
 import type { AppEnv, KiloClawEnv } from './types';
-import { accessGatewayRoutes, publicRoutes, api, kiloclaw, debug, platform } from './routes';
+import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
-import { debugRoutesGate } from './auth/debug-gate';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
@@ -68,21 +66,15 @@ async function logRequest(c: Context<AppEnv>, next: Next) {
   await next();
 }
 
-/** Debug routes bypass env validation and auth -- gated by DEBUG_ROUTES + secret. */
-function isDebugRoute(c: Context<AppEnv>): boolean {
-  const path = new URL(c.req.url).pathname;
-  return path === '/debug' || path.startsWith('/debug/');
-}
-
 /** Platform routes use internalApiMiddleware instead of JWT auth. */
 function isPlatformRoute(c: Context<AppEnv>): boolean {
   const path = new URL(c.req.url).pathname;
   return path === '/api/platform' || path.startsWith('/api/platform/');
 }
 
-/** Reject early if required secrets are missing (skip for debug routes and dev mode). */
+/** Reject early if required secrets are missing (skip in dev mode). */
 async function requireEnvVars(c: Context<AppEnv>, next: Next) {
-  if (isDebugRoute(c) || c.env.DEV_MODE === 'true') {
+  if (c.env.DEV_MODE === 'true') {
     return next();
   }
 
@@ -117,9 +109,9 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
   return next();
 }
 
-/** Authenticate user via JWT (Bearer header or cookie). Skip for debug and platform routes. */
+/** Authenticate user via JWT (Bearer header or cookie). Skip for platform routes. */
 async function authGuard(c: Context<AppEnv>, next: Next) {
-  if (isDebugRoute(c) || isPlatformRoute(c)) {
+  if (isPlatformRoute(c)) {
     return next();
   }
   return authMiddleware(c, next);
@@ -149,6 +141,10 @@ app.use('*', logRequest);
 app.route('/', publicRoutes);
 app.route('/', accessGatewayRoutes);
 
+// Debug routes are removed.
+app.all('/debug', c => c.notFound());
+app.all('/debug/*', c => c.notFound());
+
 // Protected middleware chain
 app.use('*', requireEnvVars);
 app.use('*', authGuard);
@@ -161,10 +157,6 @@ app.route('/api/kiloclaw', kiloclaw);
 // Platform routes (backend-to-backend, x-internal-api-key)
 app.use('/api/platform/*', internalApiMiddleware);
 app.route('/api/platform', platform);
-
-// Debug routes (gated by env flag + secret/internal key)
-app.use('/debug/*', debugRoutesGate);
-app.route('/debug', debug);
 
 // =============================================================================
 // CATCH-ALL: Proxy to per-user OpenClaw gateway via Fly Proxy
@@ -264,13 +256,7 @@ app.all('*', async c => {
 
   // WebSocket proxy
   if (isWebSocketRequest) {
-    const debugLogs = c.env.DEBUG_ROUTES === 'true';
-    const redactedSearch = redactSensitiveParams(url);
-
     console.log('[WS] Proxying WebSocket connection to OpenClaw via Fly Proxy');
-    if (debugLogs) {
-      console.log('[WS] URL:', url.pathname + redactedSearch);
-    }
 
     let containerResponse: Response;
     try {
@@ -315,10 +301,6 @@ app.all('*', async c => {
       return containerResponse;
     }
 
-    if (debugLogs) {
-      console.log('[WS] Got container WebSocket, setting up relay');
-    }
-
     const [clientWs, serverWs] = Object.values(new WebSocketPair());
 
     serverWs.accept();
@@ -326,13 +308,6 @@ app.all('*', async c => {
 
     // Client -> Container relay
     serverWs.addEventListener('message', event => {
-      if (debugLogs) {
-        console.log(
-          '[WS] Client -> Container:',
-          typeof event.data,
-          typeof event.data === 'string' ? event.data.slice(0, 200) : '(binary)'
-        );
-      }
       if (containerWs.readyState === WebSocket.OPEN) {
         containerWs.send(event.data);
       }
@@ -433,16 +408,7 @@ app.all('*', async c => {
     }
   }
   console.log('[HTTP] Response status:', httpResponse.status);
-
-  const newHeaders = new Headers(httpResponse.headers);
-  newHeaders.set('X-Worker-Debug', 'proxy-to-openclaw');
-  newHeaders.set('X-Debug-Path', url.pathname);
-
-  return new Response(httpResponse.body, {
-    status: httpResponse.status,
-    statusText: httpResponse.statusText,
-    headers: newHeaders,
-  });
+  return httpResponse;
 });
 
 export default {

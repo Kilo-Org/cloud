@@ -118,7 +118,7 @@ const defaultModels = [
 let models = defaultModels;
 
 // Prefer KILOCODE_MODELS_JSON env var (set by buildEnvVars from DO config).
-// Falls back to file-based override for manual/debug use, then baked-in defaults.
+// Falls back to file-based override for manual use, then baked-in defaults.
 if (process.env.KILOCODE_MODELS_JSON) {
     try {
         const parsed = JSON.parse(process.env.KILOCODE_MODELS_JSON);

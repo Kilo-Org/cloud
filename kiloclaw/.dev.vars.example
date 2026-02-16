@@ -45,5 +45,3 @@ OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795
 
 # Development
 DEV_MODE=true
-DEBUG_ROUTES=true
-DEBUG_ROUTES_SECRET=dev-debug-secret

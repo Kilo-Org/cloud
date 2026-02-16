@@ -105,8 +105,6 @@ user-provided encrypted secrets and channel tokens are silently skipped.
 | Variable              | Description                                                                                         |
 | --------------------- | --------------------------------------------------------------------------------------------------- |
 | `DEV_MODE`            | Set to `true` to skip JWT auth and enable `allowInsecureAuth` in the container. **Local dev only.** |
-| `DEBUG_ROUTES`        | Set to `true` to enable `/debug/*` endpoints.                                                       |
-| `DEBUG_ROUTES_SECRET` | Auth key for debug routes (sent as `x-debug-api-key` header). Required when `DEBUG_ROUTES=true`.    |
 | `WORKER_ENV`          | Set to `production` to enforce JWT `env` claim matching. When unset, env validation is skipped.     |
 
 ### Optional
@@ -192,8 +190,6 @@ User browser ──[JWT cookie]──> catch-all proxy ───┤
   crashed instances on the next request.
 - **Admin routes** (`/api/admin/*`): JWT cookie auth. Storage sync, gateway restart.
   Delegates to the DO via RPC.
-- **Debug routes** (`/debug/*`): Requires `DEBUG_ROUTES=true` + API key header.
-  Accepts `?sandboxId=` param to target a specific sandbox.
 
 ## WebSocket Auth Flow
 
@@ -240,7 +236,7 @@ curl http://localhost:8787/api/platform/status?userId=test-user-123 \
 account has [Containers enabled](https://dash.cloudflare.com/?to=/:account/workers/containers).
 
 **Gateway fails to start inside container:** Usually a missing AI provider key.
-Check debug logs at `/debug/logs?sandboxId=<id>` (requires `DEBUG_ROUTES=true`).
+Check `npx wrangler tail` and Fly machine logs for startup errors.
 
 **WebSocket connections fail:** `wrangler dev` has known issues with WebSocket
 proxying through sandboxes. Deploy to Cloudflare for full WebSocket support.
@@ -249,7 +245,7 @@ proxying through sandboxes. Deploy to Cloudflare for full WebSocket support.
 Verify all three R2 secrets are set.
 
 **`validateRequiredEnv` blocking requests:** Only `NEXTAUTH_SECRET` and
-`GATEWAY_TOKEN_SECRET` are checked. If either is missing, non-debug/non-platform
+`GATEWAY_TOKEN_SECRET` are checked. If either is missing, non-platform
 routes return 500.
 
 **Typecheck fails after changing wrangler.jsonc:** Run `pnpm types` to regenerate

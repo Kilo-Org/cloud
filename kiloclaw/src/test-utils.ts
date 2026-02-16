@@ -10,6 +10,7 @@ import type { KiloClawEnv } from './types';
 export function createMockEnv(overrides: Partial<KiloClawEnv> = {}): KiloClawEnv {
   return {
     KILOCLAW_INSTANCE: {} as unknown as KiloClawEnv['KILOCLAW_INSTANCE'],
+    KILOCLAW_APP: {} as unknown as KiloClawEnv['KILOCLAW_APP'],
     HYPERDRIVE: {} as unknown as KiloClawEnv['HYPERDRIVE'],
     ...overrides,
   };

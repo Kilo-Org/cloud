@@ -97,7 +97,7 @@ export type OrganizationSortableField =
   | 'name'
   | 'created_at'
   | 'microdollars_used'
-  | 'microdollars_balance'
+  | 'balance'
   | 'member_count';
 
 export type CreditCategorySortableField =

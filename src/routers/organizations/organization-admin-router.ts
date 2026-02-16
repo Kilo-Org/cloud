@@ -27,7 +27,7 @@ const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100_000).default(25),
   sortBy: z
-    .enum(['name', 'created_at', 'microdollars_used', 'microdollars_balance', 'member_count'])
+    .enum(['name', 'created_at', 'microdollars_used', 'balance', 'member_count'])
     .default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional().default(''),
@@ -606,7 +606,7 @@ export const organizationAdminRouter = createTRPCRouter({
       const orderFunction = sortOrder === 'asc' ? asc : desc;
       if (sortField === 'member_count') {
         orderCondition = orderFunction(count(organization_memberships.id));
-      } else if (sortField === 'microdollars_balance') {
+      } else if (sortField === 'balance') {
         orderCondition = orderFunction(
           sql`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`
         );

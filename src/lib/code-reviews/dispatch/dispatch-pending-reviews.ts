@@ -19,7 +19,6 @@ import { updateCodeReviewStatus } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import type { CodeReviewPlatform } from '../core/schemas';
 
 const MAX_CONCURRENT_REVIEWS_PER_OWNER = 20;

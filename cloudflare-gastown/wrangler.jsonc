@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gastown",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-01-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "placement": { "mode": "smart" },
+  "observability": { "enabled": true },
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "RIG", "class_name": "RigDO" },
+      { "name": "TOWN", "class_name": "TownDO" },
+      { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
+    ],
+  },
+
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RigDO", "TownDO", "AgentIdentityDO"] }],
+}

@@ -243,13 +243,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (isRateLimitedToDeath(originalModelIdLowerCased)) {
-    return NextResponse.json(
-      {
-        error: 'Model unavailable',
-        message: 'This model is currently unavailable due to heavy rate limiting.',
-      },
-      { status: 422 }
-    );
+    return modelDoesNotExistResponse();
   }
 
   // Slackbot-only models are only available through Kilo for Slack (internalApiUse)

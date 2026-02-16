@@ -19,7 +19,12 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
       }
     }, [indeterminate]);
 
-    React.useImperativeHandle(ref, () => internalRef.current!);
+    React.useImperativeHandle(ref, () => {
+      if (!internalRef.current) {
+        throw new Error('Checkbox ref not attached');
+      }
+      return internalRef.current;
+    });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       onCheckedChange?.(e.target.checked);

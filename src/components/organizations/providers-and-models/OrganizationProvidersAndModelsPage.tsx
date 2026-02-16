@@ -184,9 +184,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   );
 
   const handleSetAllModelsAllowed = useCallback(
-    (nextAllowed: boolean) => {
+    (modelIds: string[], nextAllowed: boolean) => {
       if (!canEdit) return;
-      actions.setAllModelsAllowed({ nextAllowed });
+      actions.setAllModelsAllowed({ modelIds, nextAllowed });
     },
     [actions, canEdit]
   );
@@ -487,7 +487,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onSelectedOnlyChange={actions.setModelSelectedOnly}
               allowedModelIds={allowedModelIds}
               enabledProviderSlugs={enabledProviderSlugs}
-              totalModelCount={modelRows.length}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}
               onSetAllModelsAllowed={handleSetAllModelsAllowed}

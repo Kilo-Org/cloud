@@ -83,6 +83,7 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     state = providersAndModelsAllowListsReducer(state, {
       type: 'SET_ALL_MODELS_ALLOWED',
+      targetModelIds: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4.1'],
       nextAllowed: true,
       allModelIds: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4.1'],
     });
@@ -109,6 +110,7 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     state = providersAndModelsAllowListsReducer(state, {
       type: 'SET_ALL_MODELS_ALLOWED',
+      targetModelIds: ['openai/gpt-4.1'],
       nextAllowed: false,
       allModelIds: ['openai/gpt-4.1'],
     });

@@ -79,6 +79,7 @@ export type ProvidersAndModelsAllowListsAction =
     }
   | {
       type: 'SET_ALL_MODELS_ALLOWED';
+      targetModelIds: ReadonlyArray<string>;
       nextAllowed: boolean;
       allModelIds: ReadonlyArray<string>;
     }
@@ -226,6 +227,7 @@ export function providersAndModelsAllowListsReducer(
       if (state.status !== 'ready') return state;
       const nextModelAllowList = setAllModelsAllowed({
         nextAllowed: action.nextAllowed,
+        targetModelIds: action.targetModelIds,
         draftModelAllowList: state.draftModelAllowList,
         allModelIds: action.allModelIds,
         hadAllModelsInitially: state.initialModelAllowList.length === 0,
@@ -318,7 +320,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     toggleProvider: (params: { providerSlug: string; nextEnabled: boolean }) => void;
     setAllProvidersEnabled: (params: { providerSlugs: string[]; nextEnabled: boolean }) => void;
     toggleModel: (params: { modelId: string; nextAllowed: boolean }) => void;
-    setAllModelsAllowed: (params: { nextAllowed: boolean }) => void;
+    setAllModelsAllowed: (params: { modelIds: string[]; nextAllowed: boolean }) => void;
     toggleProviderWildcard: (params: { providerSlug: string; nextAllowed: boolean }) => void;
     resetToInitial: () => void;
     markSaved: () => void;
@@ -440,9 +442,10 @@ export function useProvidersAndModelsAllowListsState(params: {
   );
 
   const setAllModelsAllowedAction = useCallback(
-    (input: { nextAllowed: boolean }) => {
+    (input: { modelIds: string[]; nextAllowed: boolean }) => {
       dispatch({
         type: 'SET_ALL_MODELS_ALLOWED',
+        targetModelIds: input.modelIds,
         nextAllowed: input.nextAllowed,
         allModelIds,
       });

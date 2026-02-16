@@ -279,26 +279,57 @@ export function toggleAllowFutureModelsForProvider(params: {
 
 export function setAllModelsAllowed(params: {
   nextAllowed: boolean;
+  targetModelIds: ReadonlyArray<string>;
   draftModelAllowList: ReadonlyArray<string>;
   allModelIds: ReadonlyArray<string>;
   hadAllModelsInitially: boolean;
 }): string[] {
-  const { nextAllowed, draftModelAllowList, allModelIds, hadAllModelsInitially } = params;
+  const { nextAllowed, targetModelIds, draftModelAllowList, allModelIds, hadAllModelsInitially } =
+    params;
+
+  const targetSet = new Set(targetModelIds);
 
   if (nextAllowed) {
-    // Selecting all: if we started with all models (empty list), return empty.
-    // Otherwise return explicit list of all model IDs (preserving any wildcards).
-    if (hadAllModelsInitially) {
+    // When the draft is the sentinel (nothing allowed), start from scratch with just the targets.
+    if (draftModelAllowList.length === 1 && draftModelAllowList[0] === MODEL_ALLOW_NONE_SENTINEL) {
+      if (hadAllModelsInitially && targetSet.size === allModelIds.length) {
+        return [];
+      }
+      return canonicalizeModelAllowList([...targetModelIds]);
+    }
+
+    // Merge targets into the existing allow list.
+    const merged = new Set(draftModelAllowList);
+    for (const id of targetModelIds) {
+      merged.add(id);
+    }
+
+    // If we've now selected every model and started with all, return empty (= all allowed).
+    if (hadAllModelsInitially && allModelIds.every(id => merged.has(id))) {
       return [];
     }
-    const wildcards = draftModelAllowList.filter(
-      entry => entry.endsWith('/*') && entry !== MODEL_ALLOW_NONE_SENTINEL
-    );
-    return canonicalizeModelAllowList([...allModelIds, ...wildcards]);
+
+    return canonicalizeModelAllowList([...merged]);
   }
 
-  // Deselecting all: return a sentinel value that won't match any model ID.
-  return [MODEL_ALLOW_NONE_SENTINEL];
+  // Deselecting: remove targets from the allow list.
+  if (draftModelAllowList.length === 0) {
+    // Currently "all allowed" (empty list) — create explicit list of everything except targets.
+    const remaining = allModelIds.filter(id => !targetSet.has(id));
+    if (remaining.length === 0) {
+      return [MODEL_ALLOW_NONE_SENTINEL];
+    }
+    return canonicalizeModelAllowList(remaining);
+  }
+
+  const remaining = draftModelAllowList.filter(
+    entry => !targetSet.has(entry) && entry !== MODEL_ALLOW_NONE_SENTINEL
+  );
+  // Preserve wildcards that don't correspond to a target model ID
+  if (remaining.length === 0) {
+    return [MODEL_ALLOW_NONE_SENTINEL];
+  }
+  return canonicalizeModelAllowList(remaining);
 }
 
 /**

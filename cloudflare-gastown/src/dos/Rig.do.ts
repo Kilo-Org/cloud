@@ -11,9 +11,11 @@ import { createTableMolecules } from '../db/tables/molecules.table';
 import { query } from '../util/query.util';
 import type {
   Bead,
+  BeadStatus,
   CreateBeadInput,
   BeadFilter,
   Agent,
+  AgentStatus,
   RegisterAgentInput,
   AgentFilter,
   Mail,
@@ -167,7 +169,7 @@ export class RigDO extends DurableObject<Env> {
     return BeadRecord.array().parse(rows);
   }
 
-  async updateBeadStatus(beadId: string, status: string, agentId: string): Promise<Bead> {
+  async updateBeadStatus(beadId: string, status: BeadStatus, agentId: string): Promise<Bead> {
     await this.ensureInitialized();
     const timestamp = now();
     const closedAt = status === 'closed' ? timestamp : null;
@@ -280,7 +282,7 @@ export class RigDO extends DurableObject<Env> {
     );
   }
 
-  async updateAgentStatus(agentId: string, status: string): Promise<void> {
+  async updateAgentStatus(agentId: string, status: AgentStatus): Promise<void> {
     await this.ensureInitialized();
     query(
       this.sql,

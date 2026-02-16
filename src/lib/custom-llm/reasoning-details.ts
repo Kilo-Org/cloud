@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { isDefinedOrNotNull } from './type-guards';
+import { isDefinedAndNotNull } from './type-guards';
 import { ReasoningFormat } from './format';
 
 export enum ReasoningDetailType {
@@ -67,18 +67,18 @@ export const OutputUnionToReasoningDetailsSchema = z.union([
         reasoning_details: z.array(ReasoningDetailsWithUnknownSchema),
       }),
     })
-    .transform(data => data.delta.reasoning_details.filter(isDefinedOrNotNull)),
+    .transform(data => data.delta.reasoning_details.filter(isDefinedAndNotNull)),
   z
     .object({
       message: z.object({
         reasoning_details: z.array(ReasoningDetailsWithUnknownSchema),
       }),
     })
-    .transform(data => data.message.reasoning_details.filter(isDefinedOrNotNull)),
+    .transform(data => data.message.reasoning_details.filter(isDefinedAndNotNull)),
   z
     .object({
       text: z.string(),
       reasoning_details: z.array(ReasoningDetailsWithUnknownSchema),
     })
-    .transform(data => data.reasoning_details.filter(isDefinedOrNotNull)),
+    .transform(data => data.reasoning_details.filter(isDefinedAndNotNull)),
 ]);

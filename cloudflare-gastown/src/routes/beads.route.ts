@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zodJsonValidator } from '../util/validation.util';
 import { resSuccess, resError } from '../util/res.util';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, getEnforcedAgentId } from '../middleware/auth.middleware';
 import { getRigStubFromContext } from './rig-stub.route';
 import { BeadType, BeadPriority, BeadStatus } from '../types';
 import type { GastownEnv } from '../gastown.worker';
@@ -42,13 +42,25 @@ beadRoutes.post('/', zodJsonValidator(CreateBeadBody), async c => {
 // GET /api/rigs/:rigId/beads → listBeads
 beadRoutes.get('/', async c => {
   const rig = getRigStubFromContext(c);
+
+  const limitRaw = c.req.query('limit');
+  const offsetRaw = c.req.query('offset');
+  const limit = limitRaw !== undefined ? parseInt(limitRaw, 10) : undefined;
+  const offset = offsetRaw !== undefined ? parseInt(offsetRaw, 10) : undefined;
+  if (
+    (limit !== undefined && (!Number.isFinite(limit) || limit < 0)) ||
+    (offset !== undefined && (!Number.isFinite(offset) || offset < 0))
+  ) {
+    return c.json(resError('limit and offset must be non-negative integers'), 400);
+  }
+
   const filter = {
     status: c.req.query('status') as z.infer<typeof BeadStatus> | undefined,
     type: c.req.query('type') as z.infer<typeof BeadType> | undefined,
     assignee_agent_id: c.req.query('assignee_agent_id'),
     convoy_id: c.req.query('convoy_id'),
-    limit: c.req.query('limit') ? Number(c.req.query('limit')) : undefined,
-    offset: c.req.query('offset') ? Number(c.req.query('offset')) : undefined,
+    limit,
+    offset,
   };
   const beads = await rig.listBeads(filter);
   return c.json(resSuccess(beads));
@@ -65,6 +77,10 @@ beadRoutes.get('/:beadId', async c => {
 // PATCH /api/rigs/:rigId/beads/:beadId/status → updateBeadStatus
 beadRoutes.patch('/:beadId/status', zodJsonValidator(UpdateBeadStatusBody), async c => {
   const body = c.req.valid('json');
+  const enforced = getEnforcedAgentId(c);
+  if (enforced && enforced !== body.agent_id) {
+    return c.json(resError('agent_id does not match authenticated agent'), 403);
+  }
   const rig = getRigStubFromContext(c);
   const bead = await rig.updateBeadStatus(c.req.param('beadId'), body.status, body.agent_id);
   return c.json(resSuccess(bead));
@@ -73,6 +89,10 @@ beadRoutes.patch('/:beadId/status', zodJsonValidator(UpdateBeadStatusBody), asyn
 // POST /api/rigs/:rigId/beads/:beadId/close → closeBead
 beadRoutes.post('/:beadId/close', zodJsonValidator(CloseBeadBody), async c => {
   const body = c.req.valid('json');
+  const enforced = getEnforcedAgentId(c);
+  if (enforced && enforced !== body.agent_id) {
+    return c.json(resError('agent_id does not match authenticated agent'), 403);
+  }
   const rig = getRigStubFromContext(c);
   const bead = await rig.closeBead(c.req.param('beadId'), body.agent_id);
   return c.json(resSuccess(bead));

@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zodJsonValidator } from '../util/validation.util';
-import { resSuccess } from '../util/res.util';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { resSuccess, resError } from '../util/res.util';
+import { authMiddleware, getEnforcedAgentId } from '../middleware/auth.middleware';
 import { getRigStubFromContext } from './rig-stub.route';
 import type { GastownEnv } from '../gastown.worker';
 
@@ -21,6 +21,10 @@ reviewQueueRoutes.use('/*', authMiddleware);
 // POST /api/rigs/:rigId/review-queue → submitToReviewQueue
 reviewQueueRoutes.post('/', zodJsonValidator(SubmitToReviewQueueBody), async c => {
   const body = c.req.valid('json');
+  const enforced = getEnforcedAgentId(c);
+  if (enforced && enforced !== body.agent_id) {
+    return c.json(resError('agent_id does not match authenticated agent'), 403);
+  }
   const rig = getRigStubFromContext(c);
   await rig.submitToReviewQueue(body);
   return c.json(resSuccess({ submitted: true }), 201);

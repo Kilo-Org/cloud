@@ -1,3 +1,4 @@
+import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { verifyAgentJWT, type AgentJWTPayload } from '../util/jwt.util';
 import { resError } from '../util/res.util';
@@ -78,6 +79,17 @@ export const authMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
  * Restricts a route to agent auth only. Must be applied after `authMiddleware`.
  * Validates the agentId route param matches the JWT agentId.
  */
+/**
+ * When the request is agent-authenticated, returns the JWT's agentId.
+ * For internal auth returns null (caller is trusted to supply any agent_id).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getEnforcedAgentId(c: Context<any>): string | null {
+  if (c.get('authMode') !== 'agent') return null;
+  const jwt = c.get('agentJWT') as AgentJWTPayload | null;
+  return jwt?.agentId ?? null;
+}
+
 export const agentOnlyMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
   const authMode = c.get('authMode');
   if (authMode !== 'agent') {

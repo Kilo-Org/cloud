@@ -654,4 +654,174 @@ describe('HTTP API', () => {
       expect(body.data.priority).toBe('critical');
     });
   });
+
+  // ── Agent identity enforcement ─────────────────────────────────────────
+
+  describe('agent identity enforcement', () => {
+    it('should reject bead status update with mismatched agent_id via JWT', async () => {
+      const id = rigId();
+      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `enforce-status-${id}` }),
+      });
+      const agent = (await agentRes.json()).data;
+
+      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ type: 'issue', title: 'Enforce test' }),
+      });
+      const bead = (await beadRes.json()).data;
+
+      // JWT is for agent.id, but body claims a different agent_id
+      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const res = await SELF.fetch(api(`/api/rigs/${id}/beads/${bead.id}/status`), {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status: 'in_progress', agent_id: 'impersonated-agent' }),
+      });
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.error).toBe('agent_id does not match authenticated agent');
+    });
+
+    it('should reject bead close with mismatched agent_id via JWT', async () => {
+      const id = rigId();
+      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `enforce-close-${id}` }),
+      });
+      const agent = (await agentRes.json()).data;
+
+      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ type: 'issue', title: 'Enforce close' }),
+      });
+      const bead = (await beadRes.json()).data;
+
+      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const res = await SELF.fetch(api(`/api/rigs/${id}/beads/${bead.id}/close`), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ agent_id: 'impersonated-agent' }),
+      });
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.error).toBe('agent_id does not match authenticated agent');
+    });
+
+    it('should reject mail send with mismatched from_agent_id via JWT', async () => {
+      const id = rigId();
+      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `enforce-mail-${id}` }),
+      });
+      const agent = (await agentRes.json()).data;
+
+      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const res = await SELF.fetch(api(`/api/rigs/${id}/mail`), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          from_agent_id: 'impersonated-agent',
+          to_agent_id: agent.id,
+          subject: 'Spoofed',
+          body: 'This should fail',
+        }),
+      });
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.error).toBe('from_agent_id does not match authenticated agent');
+    });
+
+    it('should reject review-queue submit with mismatched agent_id via JWT', async () => {
+      const id = rigId();
+      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `enforce-rq-${id}` }),
+      });
+      const agent = (await agentRes.json()).data;
+
+      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ type: 'issue', title: 'Enforce RQ' }),
+      });
+      const bead = (await beadRes.json()).data;
+
+      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const res = await SELF.fetch(api(`/api/rigs/${id}/review-queue`), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          agent_id: 'impersonated-agent',
+          bead_id: bead.id,
+          branch: 'feature/spoof',
+        }),
+      });
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.error).toBe('agent_id does not match authenticated agent');
+    });
+
+    it('should allow internal auth to act as any agent_id', async () => {
+      const id = rigId();
+      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `internal-any-${id}` }),
+      });
+      const agent = (await agentRes.json()).data;
+
+      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({ type: 'issue', title: 'Internal acts as any' }),
+      });
+      const bead = (await beadRes.json()).data;
+
+      // Internal auth can specify any agent_id
+      const res = await SELF.fetch(api(`/api/rigs/${id}/beads/${bead.id}/status`), {
+        method: 'PATCH',
+        headers: internalHeaders(),
+        body: JSON.stringify({ status: 'in_progress', agent_id: agent.id }),
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // ── Query param validation ─────────────────────────────────────────────
+
+  describe('query param validation', () => {
+    it('should reject non-numeric limit', async () => {
+      const id = rigId();
+      const res = await SELF.fetch(api(`/api/rigs/${id}/beads?limit=abc`), {
+        headers: internalHeaders(),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain('non-negative integers');
+    });
+
+    it('should reject negative offset', async () => {
+      const id = rigId();
+      const res = await SELF.fetch(api(`/api/rigs/${id}/beads?offset=-1`), {
+        headers: internalHeaders(),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('should accept valid limit and offset', async () => {
+      const id = rigId();
+      const res = await SELF.fetch(api(`/api/rigs/${id}/beads?limit=10&offset=0`), {
+        headers: internalHeaders(),
+      });
+      expect(res.status).toBe(200);
+    });
+  });
 });

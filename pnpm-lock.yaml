@@ -851,6 +851,9 @@ importers:
       hono:
         specifier: ^4.11.4
         version: 4.11.7
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
       zod:
         specifier: ^4.3.5
         version: 4.3.6
@@ -858,6 +861,9 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.12.8
         version: 0.12.8(@cloudflare/workers-types@4.20260130.0)(@vitest/runner@4.0.18)(@vitest/snapshot@4.0.18)(vitest@3.2.4)
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       '@types/node':
         specifier: ^22
         version: 22.19.1

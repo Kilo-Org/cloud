@@ -56,7 +56,7 @@ export const authMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
       return c.json(resError('Internal server error'), 500);
     }
 
-    const result = await verifyAgentJWT(token, secret);
+    const result = verifyAgentJWT(token, secret);
     if (!result.success) {
       return c.json(resError(result.error), 401);
     }

@@ -13,11 +13,11 @@ function internalHeaders(extra: Record<string, string> = {}): Record<string, str
   };
 }
 
-async function agentHeaders(
+function agentHeaders(
   payload: { agentId: string; rigId: string; townId?: string; userId?: string },
   extra: Record<string, string> = {}
-): Promise<Record<string, string>> {
-  const token = await signAgentJWT(
+): Record<string, string> {
+  const token = signAgentJWT(
     {
       agentId: payload.agentId,
       rigId: payload.rigId,
@@ -82,7 +82,7 @@ describe('HTTP API', () => {
 
     it('should reject JWT with mismatched rigId', async () => {
       const id = rigId();
-      const headers = await agentHeaders({ agentId: 'agent-1', rigId: 'wrong-rig' });
+      const headers = agentHeaders({ agentId: 'agent-1', rigId: 'wrong-rig' });
       const res = await SELF.fetch(api(`/api/rigs/${id}/beads`), { headers });
       expect(res.status).toBe(403);
       const body = await res.json();
@@ -91,7 +91,7 @@ describe('HTTP API', () => {
 
     it('should accept valid agent JWT', async () => {
       const id = rigId();
-      const headers = await agentHeaders({ agentId: 'agent-1', rigId: id });
+      const headers = agentHeaders({ agentId: 'agent-1', rigId: id });
       const res = await SELF.fetch(api(`/api/rigs/${id}/beads`), { headers });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -414,7 +414,7 @@ describe('HTTP API', () => {
       const bead = (await beadRes.json()).data;
 
       // Hook via agent JWT
-      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const headers = agentHeaders({ agentId: agent.id, rigId: id });
       const hookRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/hook`), {
         method: 'POST',
         headers,
@@ -433,7 +433,7 @@ describe('HTTP API', () => {
       const agent = (await agentRes.json()).data;
 
       // JWT with different agentId
-      const headers = await agentHeaders({ agentId: 'wrong-agent-id', rigId: id });
+      const headers = agentHeaders({ agentId: 'wrong-agent-id', rigId: id });
       const res = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/hook`), {
         method: 'POST',
         headers,
@@ -675,7 +675,7 @@ describe('HTTP API', () => {
       const bead = (await beadRes.json()).data;
 
       // JWT is for agent.id, but body claims a different agent_id
-      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const headers = agentHeaders({ agentId: agent.id, rigId: id });
       const res = await SELF.fetch(api(`/api/rigs/${id}/beads/${bead.id}/status`), {
         method: 'PATCH',
         headers,
@@ -702,7 +702,7 @@ describe('HTTP API', () => {
       });
       const bead = (await beadRes.json()).data;
 
-      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const headers = agentHeaders({ agentId: agent.id, rigId: id });
       const res = await SELF.fetch(api(`/api/rigs/${id}/beads/${bead.id}/close`), {
         method: 'POST',
         headers,
@@ -722,7 +722,7 @@ describe('HTTP API', () => {
       });
       const agent = (await agentRes.json()).data;
 
-      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const headers = agentHeaders({ agentId: agent.id, rigId: id });
       const res = await SELF.fetch(api(`/api/rigs/${id}/mail`), {
         method: 'POST',
         headers,
@@ -754,7 +754,7 @@ describe('HTTP API', () => {
       });
       const bead = (await beadRes.json()).data;
 
-      const headers = await agentHeaders({ agentId: agent.id, rigId: id });
+      const headers = agentHeaders({ agentId: agent.id, rigId: id });
       const res = await SELF.fetch(api(`/api/rigs/${id}/review-queue`), {
         method: 'POST',
         headers,

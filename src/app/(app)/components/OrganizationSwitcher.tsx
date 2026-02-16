@@ -48,7 +48,7 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
   const currentOrg = organizations?.find(org => org.organizationId === organizationId);
   const hasOrganizations = organizations && organizations.length > 0;
 
-  // Show loading skeleton while fetching (only when no cached data)
+  // Show loading skeleton on initial load (before any data is available)
   if (isPending) {
     return (
       <div className="mt-1">

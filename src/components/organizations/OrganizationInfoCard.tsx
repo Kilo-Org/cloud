@@ -52,7 +52,7 @@ const OSS_TIER_NAMES: Record<number, string> = {
 function useCanManagePaymentInfo() {
   const isKiloAdmin = useIsKiloAdmin();
   const orgRole = useUserOrganizationRole();
-  return isKiloAdmin || orgRole === 'owner';
+  return isKiloAdmin || orgRole === 'owner' || orgRole === 'billing_manager';
 }
 
 type InnerProps = {
@@ -141,6 +141,7 @@ function Inner(props: InnerProps) {
         organizationId: id,
         company_domain: normalized,
       });
+      setEditedDomain(normalized ?? '');
       setIsEditingDomain(false);
     } catch (error) {
       console.error('Failed to update company domain:', error);

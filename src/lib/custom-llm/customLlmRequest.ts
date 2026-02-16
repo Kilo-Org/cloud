@@ -220,7 +220,7 @@ function convertAssistantContent(msg: ChatCompletionAssistantMessageParam) {
         type: 'tool-call',
         toolCallId: tc.id,
         toolName: tc.function.name,
-        input: safeJsonParse(tc.function.arguments),
+        input: JSON.parse(tc.function.arguments),
       });
     }
   }
@@ -230,14 +230,6 @@ function convertAssistantContent(msg: ChatCompletionAssistantMessageParam) {
   }
 
   return parts.length > 0 ? parts : '';
-}
-
-function safeJsonParse(str: string): unknown {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return str;
-  }
 }
 
 function convertTools(tools: OpenRouterChatCompletionRequest['tools']): ToolSet | undefined {

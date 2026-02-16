@@ -66,7 +66,7 @@ export async function getBalanceForOrganizationUser(
       microdollar_limit: organization_user_limits.microdollar_limit,
       microdollar_usage: organization_user_usage.microdollar_usage,
       organization_balance:
-        sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})`.as(
+        sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})::float8`.as(
           'organization_balance'
         ),
       total_microdollars_acquired: organizations.total_microdollars_acquired,
@@ -215,7 +215,7 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
     const [orgData] = await tx
       .select({
         balance:
-          sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})`.as(
+          sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})::float8`.as(
             'balance'
           ),
         settings: organizations.settings,

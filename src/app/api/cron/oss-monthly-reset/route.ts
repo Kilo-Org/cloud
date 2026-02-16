@@ -82,7 +82,7 @@ export async function GET(request: Request) {
       id: organizations.id,
       name: organizations.name,
       currentBalance:
-        sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})`.as(
+        sql<number>`(${organizations.total_microdollars_acquired} - ${organizations.microdollars_used})::float8`.as(
           'currentBalance'
         ),
       settings: organizations.settings,

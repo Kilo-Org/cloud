@@ -292,7 +292,8 @@ export const organizationAdminRouter = createTRPCRouter({
         const [org] = await tx
           .select({ microdollars_used: organizations.microdollars_used })
           .from(organizations)
-          .where(eq(organizations.id, organizationId));
+          .where(eq(organizations.id, organizationId))
+          .for('update');
 
         await tx.insert(credit_transactions).values({
           kilo_user_id: user.id,

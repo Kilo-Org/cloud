@@ -97,16 +97,34 @@ export function computeAllowedModelIds(
   enabledProviderSlugs?: ReadonlySet<string>
 ): Set<string> {
   const allowed = new Set<string>();
+  const modelProvidersIndex = enabledProviderSlugs
+    ? buildModelProvidersIndex(openRouterProviders)
+    : null;
 
   if (draftModelAllowList.length === 0) {
     for (const model of openRouterModels) {
-      allowed.add(normalizeModelId(model.slug));
+      const normalizedModelId = normalizeModelId(model.slug);
+
+      // If enabledProviderSlugs is provided, filter models without enabled providers
+      if (enabledProviderSlugs && modelProvidersIndex) {
+        const providersForModel = modelProvidersIndex.get(normalizedModelId);
+        if (!providersForModel) continue; // Exclude models with unknown providers
+        let hasEnabledProvider = false;
+        for (const providerSlug of providersForModel) {
+          if (enabledProviderSlugs.has(providerSlug)) {
+            hasEnabledProvider = true;
+            break;
+          }
+        }
+        if (!hasEnabledProvider) continue;
+      }
+
+      allowed.add(normalizedModelId);
     }
     return allowed;
   }
 
   const allowListArray = [...draftModelAllowList];
-  const modelProvidersIndex = buildModelProvidersIndex(openRouterProviders);
 
   for (const model of openRouterModels) {
     const normalizedModelId = normalizeModelId(model.slug);
@@ -121,7 +139,7 @@ export function computeAllowedModelIds(
 
     // If enabledProviderSlugs is provided, also check that at least one provider
     // offering this model is enabled
-    if (enabledProviderSlugs) {
+    if (enabledProviderSlugs && modelProvidersIndex) {
       const providersForModel = modelProvidersIndex.get(normalizedModelId);
       if (providersForModel) {
         let hasEnabledProvider = false;

@@ -218,6 +218,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     },
     [
       actions,
+      allowedModelIds,
       canEdit,
       openRouterModels,
       openRouterProviders,

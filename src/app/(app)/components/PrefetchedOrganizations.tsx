@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createTRPCContext } from '@/lib/trpc/init';
@@ -18,9 +19,10 @@ export async function PrefetchedOrganizations({ children }: { children: ReactNod
     const ctx = await createTRPCContext();
     const trpc = createTRPCOptionsProxy({ router: rootRouter, ctx, queryClient });
     await queryClient.prefetchQuery(trpc.organizations.list.queryOptions());
-  } catch {
-    // If prefetch fails (e.g. user not authenticated), render children without prefetched data.
-    // The client-side query will handle fetching.
+  } catch (error) {
+    // Prefetch failures are non-fatal — the client-side query will handle fetching.
+    // Still report to Sentry so real server failures don't go unnoticed.
+    Sentry.captureException(error);
   }
 
   return <HydrationBoundary state={dehydrate(queryClient)}>{children}</HydrationBoundary>;

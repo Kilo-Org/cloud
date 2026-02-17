@@ -9,6 +9,10 @@ import { logger, formatError } from '../utils/logger';
 import type { RefUpdate, ReceivePackResult } from '../types';
 import { MAX_OBJECT_SIZE } from './constants';
 
+export type ReceivePackError =
+  | { kind: 'global'; message: string }
+  | { kind: 'ref'; refName: string; message: string };
+
 export class GitReceivePackService {
   /**
    * Handle info/refs request for receive-pack service
@@ -164,6 +168,8 @@ export class GitReceivePackService {
       refUpdates: [],
       errors: [],
     };
+    // Structured errors for report-status generation (separate from result.errors which is string[])
+    const reportErrors: ReceivePackError[] = [];
 
     try {
       // Parse pkt-line commands and find packfile
@@ -214,7 +220,9 @@ export class GitReceivePackService {
             result.success = false;
 
             // Return error response immediately - DO NOT index or update refs
-            const response = this.generateReportStatus(commands, [errorMsg]);
+            const response = this.generateReportStatus(commands, [
+              { kind: 'global', message: errorMsg },
+            ]);
             return { response, result };
           }
 
@@ -273,11 +281,14 @@ export class GitReceivePackService {
 
             // Don't silently continue - this is a critical error
             // Mark as failed and DON'T proceed with ref updates
-            result.errors.push(`Failed to index packfile: ${errorMessage}`);
+            const indexErrorMsg = `Failed to index packfile: ${errorMessage}`;
+            result.errors.push(indexErrorMsg);
 
             // Return error response immediately - DO NOT apply refs with corrupt objects
             result.success = false;
-            const response = this.generateReportStatus(commands, result.errors);
+            const response = this.generateReportStatus(commands, [
+              { kind: 'global', message: indexErrorMsg },
+            ]);
             return { response, result };
           }
         }
@@ -311,6 +322,7 @@ export class GitReceivePackService {
                 newOid: cmd.newOid,
               });
               result.errors.push(errorMsg);
+              reportErrors.push({ kind: 'ref', refName: cmd.refName, message: errorMsg });
               continue;
             }
           }
@@ -324,18 +336,30 @@ export class GitReceivePackService {
             force: true,
           });
 
-          // If this is main/master branch, also update HEAD
+          // If this is main/master branch, ensure HEAD points to it symbolically.
+          // Only set HEAD when it doesn't already resolve (e.g. first push).
           if (cmd.refName === 'refs/heads/main' || cmd.refName === 'refs/heads/master') {
+            let headExists = false;
             try {
-              await git.writeRef({
-                fs,
-                dir: '/',
-                ref: 'HEAD',
-                value: cmd.newOid,
-                force: true,
-              });
-            } catch (err) {
-              logger.warn('Failed to update HEAD', formatError(err));
+              await git.resolveRef({ fs, dir: '/', ref: 'HEAD' });
+              headExists = true;
+            } catch {
+              // HEAD doesn't resolve — needs to be set
+            }
+
+            if (!headExists) {
+              try {
+                await git.writeRef({
+                  fs,
+                  dir: '/',
+                  ref: 'HEAD',
+                  value: cmd.refName,
+                  force: true,
+                  symbolic: true,
+                });
+              } catch (err) {
+                logger.warn('Failed to update HEAD', formatError(err));
+              }
             }
           }
         } catch (refError) {
@@ -344,43 +368,53 @@ export class GitReceivePackService {
           }`;
           logger.error('Ref update failed', { refName: cmd.refName, ...formatError(refError) });
           result.errors.push(errorMsg);
+          reportErrors.push({ kind: 'ref', refName: cmd.refName, message: errorMsg });
         }
       }
 
       result.success = result.errors.length === 0;
 
       // Generate report-status response
-      const response = this.generateReportStatus(commands, result.errors);
+      const response = this.generateReportStatus(commands, reportErrors);
 
       return { response, result };
     } catch (error) {
       logger.error('Failed to handle receive-pack', formatError(error));
       result.success = false;
-      result.errors.push(error instanceof Error ? error.message : String(error));
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      result.errors.push(errorMsg);
 
-      const response = this.generateReportStatus(
-        [],
-        [error instanceof Error ? error.message : 'Unknown error']
-      );
+      const response = this.generateReportStatus([], [{ kind: 'global', message: errorMsg }]);
       return { response, result };
     }
   }
 
   /**
-   * Generate report-status response for push
+   * Generate report-status response for push.
+   * Global errors (pack-size, indexPack failure) mark all refs as ng.
+   * Per-ref errors only mark the specific ref as ng.
    */
-  private static generateReportStatus(commands: RefUpdate[], errors: string[]): Uint8Array {
+  static generateReportStatus(commands: RefUpdate[], errors: ReceivePackError[]): Uint8Array {
     const chunks: Uint8Array[] = [];
     const encoder = new TextEncoder();
 
-    // Unpack status
-    const unpackStatus = errors.length === 0 ? 'unpack ok\n' : 'unpack error\n';
+    const globalError = errors.find(e => e.kind === 'global');
+
+    // Unpack status — only report error for global failures (pack-level).
+    // Per-ref failures are reported via ng lines; the pack itself unpacked fine.
+    const unpackStatus = globalError ? 'unpack error\n' : 'unpack ok\n';
     chunks.push(this.createSidebandPacket(1, encoder.encode(this.formatPacketLine(unpackStatus))));
 
     // Ref statuses
     for (const cmd of commands) {
-      const refError = errors.find(e => e.includes(cmd.refName));
-      const status = refError ? `ng ${cmd.refName} ${refError}\n` : `ok ${cmd.refName}\n`;
+      let status: string;
+      if (globalError) {
+        // Global failure applies to all refs
+        status = `ng ${cmd.refName} ${globalError.message}\n`;
+      } else {
+        const refError = errors.find(e => e.kind === 'ref' && e.refName === cmd.refName);
+        status = refError ? `ng ${cmd.refName} ${refError.message}\n` : `ok ${cmd.refName}\n`;
+      }
       chunks.push(this.createSidebandPacket(1, encoder.encode(this.formatPacketLine(status))));
     }
 

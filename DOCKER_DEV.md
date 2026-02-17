@@ -97,7 +97,7 @@ From your host machine, services are still accessible at `localhost:<port>` via 
 
 ### Next.js backend
 
-The Next.js service loads `env_file: .env` from the repo root. Make sure this file exists:
+The Next.js service loads `env_file: ../.env` (repo root `.env`). Make sure this file exists:
 
 ```bash
 # If you have an .env.example, copy it

@@ -1,4 +1,4 @@
-import type { ApiResponse, Bead, GastownEnv, Mail, PrimeContext } from './types';
+import type { ApiResponse, Bead, BeadPriority, GastownEnv, Mail, PrimeContext } from './types';
 
 function isApiResponse(value: unknown): value is ApiResponse<unknown> {
   return (
@@ -36,9 +36,9 @@ export class GastownClient {
       response = await fetch(url, {
         ...init,
         headers: {
+          ...init?.headers,
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.token}`,
-          ...init?.headers,
         },
       });
     } catch (err) {
@@ -117,7 +117,7 @@ export class GastownClient {
   async createEscalation(input: {
     title: string;
     body?: string;
-    priority?: string;
+    priority?: BeadPriority;
     metadata?: Record<string, unknown>;
   }): Promise<Bead> {
     return this.request<Bead>(this.rigPath('/escalations'), {

@@ -6,8 +6,8 @@
   "description": "OpenCode plugin exposing Gastown tools to agents",
   "main": "src/index.ts",
   "dependencies": {
-    "@opencode-ai/plugin": "latest",
-    "@opencode-ai/sdk": "latest",
+    "@opencode-ai/plugin": "^1.1.64",
+    "@opencode-ai/sdk": "^1.1.64",
     "zod": "^4.3.5"
   },
   "devDependencies": {

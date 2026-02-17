@@ -49,6 +49,7 @@ import type { FlyClientConfig } from '../fly/client';
 import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
 import * as fly from '../fly/client';
 import { appNameFromUserId } from '../fly/apps';
+import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../utils/env-encryption';
 
 type InstanceStatus = PersistedState['status'];
 
@@ -460,12 +461,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const flyConfig = this.getFlyConfig();
-    const envVars = await this.buildUserEnvVars();
 
     // Ensure a volume exists
     await this.ensureVolume(flyConfig, 'start');
 
     // If status is 'running', verify the machine is actually alive.
+    // Check BEFORE building env vars — buildUserEnvVars calls ensureEnvKey
+    // which writes to the Fly secrets API and could fail on transient errors.
     if (this.status === 'running' && this.flyMachineId) {
       try {
         const machine = await fly.getMachine(flyConfig, this.flyMachineId);
@@ -480,6 +482,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
     const guest = guestFromSize(this.machineSize);
     const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
     const identity = { userId: this.userId, sandboxId: this.sandboxId };
@@ -493,9 +496,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     );
 
     if (this.flyMachineId) {
-      await this.startExistingMachine(flyConfig, machineConfig);
+      await this.startExistingMachine(flyConfig, machineConfig, minSecretsVersion);
     } else {
-      await this.createNewMachine(flyConfig, machineConfig);
+      await this.createNewMachine(flyConfig, machineConfig, minSecretsVersion);
     }
 
     // Update state
@@ -670,7 +673,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       await fly.stopMachine(flyConfig, this.flyMachineId);
       await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
 
-      const envVars = await this.buildUserEnvVars();
+      const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
       const guest = guestFromSize(this.machineSize);
       const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
       const identity = { userId: this.userId ?? '', sandboxId: this.sandboxId ?? '' };
@@ -683,7 +686,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         identity
       );
 
-      await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig);
+      await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig, { minSecretsVersion });
       await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
 
       return { success: true };
@@ -1164,14 +1167,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    */
   private async startExistingMachine(
     flyConfig: FlyClientConfig,
-    machineConfig: FlyMachineConfig
+    machineConfig: FlyMachineConfig,
+    minSecretsVersion?: number
   ): Promise<void> {
     if (!this.flyMachineId) return;
 
     try {
       const machine = await fly.getMachine(flyConfig, this.flyMachineId);
       if (machine.state === 'stopped' || machine.state === 'created') {
-        await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig);
+        await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig, { minSecretsVersion });
         await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
         console.log('[DO] Machine updated and started:', this.flyMachineId);
       } else if (machine.state === 'started') {
@@ -1185,7 +1189,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         console.log('[DO] Machine gone (404), creating new one');
         this.flyMachineId = null;
         await this.ctx.storage.put(storageUpdate({ flyMachineId: null }));
-        await this.createNewMachine(flyConfig, machineConfig);
+        await this.createNewMachine(flyConfig, machineConfig, minSecretsVersion);
       } else {
         // Transient error (timeout, 500, network) — don't create a duplicate.
         // Let the caller surface the error; reconciliation will repair later.
@@ -1197,11 +1201,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async createNewMachine(
     flyConfig: FlyClientConfig,
-    machineConfig: FlyMachineConfig
+    machineConfig: FlyMachineConfig,
+    minSecretsVersion?: number
   ): Promise<void> {
     const machine = await fly.createMachine(flyConfig, machineConfig, {
       name: this.sandboxId ?? undefined,
       region: this.flyRegion ?? this.env.FLY_REGION ?? undefined,
+      minSecretsVersion,
     });
     this.flyMachineId = machine.id;
 
@@ -1311,16 +1317,42 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
-  private async buildUserEnvVars(): Promise<Record<string, string>> {
+  private async buildUserEnvVars(): Promise<{
+    envVars: Record<string, string>;
+    minSecretsVersion: number;
+  }> {
     if (!this.sandboxId || !this.env.GATEWAY_TOKEN_SECRET) {
       throw new Error('Cannot build env vars: sandboxId or GATEWAY_TOKEN_SECRET missing');
     }
-    return buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET, {
-      envVars: this.envVars ?? undefined,
-      encryptedSecrets: this.encryptedSecrets ?? undefined,
-      kilocodeApiKey: this.kilocodeApiKey ?? undefined,
-      kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
-      channels: this.channels ?? undefined,
-    });
+    if (!this.userId) {
+      throw new Error('Cannot build env vars: userId missing');
+    }
+
+    const { env: plainEnv, sensitive } = await buildEnvVars(
+      this.env,
+      this.sandboxId,
+      this.env.GATEWAY_TOKEN_SECRET,
+      {
+        envVars: this.envVars ?? undefined,
+        encryptedSecrets: this.encryptedSecrets ?? undefined,
+        kilocodeApiKey: this.kilocodeApiKey ?? undefined,
+        kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
+        kilocodeModels: this.kilocodeModels ?? undefined,
+        channels: this.channels ?? undefined,
+      }
+    );
+
+    // Get the env encryption key from the App DO, creating it if needed (legacy migration).
+    // Also returns the Fly secrets version for min_secrets_version on machine create/update.
+    const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(this.userId));
+    const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(this.userId);
+
+    // Encrypt sensitive values and prefix their names with KILOCLAW_ENC_
+    const result: Record<string, string> = { ...plainEnv };
+    for (const [name, value] of Object.entries(sensitive)) {
+      result[`${ENCRYPTED_ENV_PREFIX}${name}`] = encryptEnvValue(envKey, value);
+    }
+
+    return { envVars: result, minSecretsVersion: secretsVersion };
   }
 }

@@ -56,7 +56,16 @@ vi.mock('../db', () => ({
 
 // -- Mock gateway/env --
 vi.mock('../gateway/env', () => ({
-  buildEnvVars: vi.fn().mockResolvedValue({ KILOCODE_API_KEY: 'test' }),
+  buildEnvVars: vi.fn().mockResolvedValue({
+    env: { AUTO_APPROVE_DEVICES: 'true' },
+    sensitive: { KILOCODE_API_KEY: 'test', OPENCLAW_GATEWAY_TOKEN: 'gw-token' },
+  }),
+}));
+
+// -- Mock utils/env-encryption --
+vi.mock('../utils/env-encryption', () => ({
+  ENCRYPTED_ENV_PREFIX: 'KILOCLAW_ENC_',
+  encryptEnvValue: vi.fn((_key: string, value: string) => `enc:v1:fake_${value}`),
 }));
 
 import { KiloClawInstance } from './kiloclaw-instance';
@@ -107,13 +116,27 @@ function createFakeStorage() {
   };
 }
 
+function createFakeAppStub() {
+  return {
+    ensureEnvKey: vi.fn().mockResolvedValue({
+      key: 'dGVzdC1rZXktMzItYnl0ZXMtcGFkZGVkLi4uLg==',
+      secretsVersion: 1,
+    }),
+  };
+}
+
 function createFakeEnv() {
+  const appStub = createFakeAppStub();
   return {
     FLY_API_TOKEN: 'test-token',
     FLY_APP_NAME: 'test-app',
     FLY_REGION: 'us,eu',
     GATEWAY_TOKEN_SECRET: 'test-secret',
     KILOCLAW_INSTANCE: {} as unknown,
+    KILOCLAW_APP: {
+      idFromName: vi.fn().mockReturnValue('fake-do-id'),
+      get: vi.fn().mockReturnValue(appStub),
+    } as unknown,
     HYPERDRIVE: { connectionString: '' } as unknown,
   };
 }

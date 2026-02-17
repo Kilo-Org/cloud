@@ -27,7 +27,7 @@ services:
     network_mode: host
     restart: unless-stopped
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -43,7 +43,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "pnpm install --frozen-lockfile && pnpm dev"
+    command: sh -c "pnpm dev"
 
   # ── 2. cloud-agent (port 8788) ─────────────────────────────────────
   cloud-agent:

@@ -109,7 +109,7 @@ cp cloud-agent/.dev.vars.example cloud-agent/.dev.vars
 
 - **Shared Docker image** (`dev/Dockerfile.dev`): `node:22-slim` with pnpm, wrangler, and bun pre-installed.
 - **Volume mount**: The entire repo is mounted at `/app` — file changes are reflected immediately (hot reload works).
-- **`network_mode: host`**: All services bind directly to the host network, so they can reach each other on `localhost` just like bare-metal dev.
+- **`network_mode: host`**: All services bind directly to the host network, so they can reach each other on `localhost` just like bare-metal dev. **Note:** `network_mode: host` only works natively on Linux. Docker Desktop (macOS/Windows) does not support host networking the same way. If you're on macOS or Windows, you'll need to replace `network_mode: host` with explicit `ports:` mappings in `docker-compose.dev.yml`.
 - **Existing `dev/docker-compose.yml`** is untouched — it continues to work standalone for PostgreSQL-only usage.
 
 ## Troubleshooting

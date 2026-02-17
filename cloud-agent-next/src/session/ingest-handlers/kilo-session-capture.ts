@@ -4,7 +4,6 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 export type KiloSessionCaptureContext = {
   updateKiloSessionId: (id: string) => Promise<void>;
-  linkToBackend: (kiloSessionId: string) => Promise<void>;
   logger: {
     info: (msg: string, data?: object) => void;
     warn: (msg: string, data?: object) => void;
@@ -37,14 +36,6 @@ export async function handleKilocodeEvent(
 
   await ctx.updateKiloSessionId(kiloSessionId);
   ctx.logger.info('Captured kiloSessionId', { kiloSessionId });
-
-  // Backend link is async/non-blocking
-  void ctx.linkToBackend(kiloSessionId).catch(err => {
-    ctx.logger.warn('Failed to link kiloSessionId to backend', {
-      kiloSessionId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  });
 
   return true;
 }

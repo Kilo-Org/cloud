@@ -4,6 +4,17 @@ vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
     constructor(_state: unknown, _env: unknown) {}
   },
+  WorkerEntrypoint: class WorkerEntrypoint {
+    env: unknown;
+    ctx: ExecutionContext;
+    constructor() {
+      this.env = undefined;
+      this.ctx = {
+        waitUntil: () => {},
+        passThroughOnException: () => {},
+      } as unknown as ExecutionContext;
+    }
+  },
 }));
 
 vi.mock('./db/kysely', () => ({
@@ -17,14 +28,16 @@ vi.mock('./dos/SessionIngestDO', () => ({
 import { getDb } from './db/kysely';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 
-let app: { fetch: (req: Request, env: TestBindings) => Response | Promise<Response> };
-
 type TestBindings = {
   HYPERDRIVE: { connectionString: string };
   SESSION_INGEST_DO: unknown;
   SESSION_ACCESS_CACHE_DO: unknown;
   NEXTAUTH_SECRET: unknown;
   NEXTAUTH_SECRET_RAW?: string;
+};
+
+let WorkerClass: {
+  new (): { env: unknown; ctx: unknown; fetch: (req: Request) => Promise<Response> };
 };
 
 function makeDbFakes() {
@@ -42,10 +55,16 @@ function makeDbFakes() {
   return { db, selectExecuteTakeFirst };
 }
 
+function createWorker(env: TestBindings) {
+  const worker = new WorkerClass();
+  worker.env = env;
+  return worker;
+}
+
 describe('public session route', () => {
   beforeAll(async () => {
     const mod = await import('./index');
-    app = mod.default;
+    WorkerClass = mod.default as unknown as typeof WorkerClass;
   });
 
   beforeEach(() => {
@@ -61,7 +80,8 @@ describe('public session route', () => {
       NEXTAUTH_SECRET_RAW: 'secret',
     };
 
-    const res = await app.fetch(new Request('http://local/session/not-a-uuid'), env);
+    const worker = createWorker(env);
+    const res = await worker.fetch(new Request('http://local/session/not-a-uuid'));
     expect(res.status).toBe(400);
   });
 
@@ -78,9 +98,9 @@ describe('public session route', () => {
       NEXTAUTH_SECRET_RAW: 'secret',
     };
 
-    const res = await app.fetch(
-      new Request('http://local/session/11111111-1111-4111-8111-111111111111'),
-      env
+    const worker = createWorker(env);
+    const res = await worker.fetch(
+      new Request('http://local/session/11111111-1111-4111-8111-111111111111')
     );
 
     expect(res.status).toBe(404);
@@ -109,9 +129,9 @@ describe('public session route', () => {
       NEXTAUTH_SECRET_RAW: 'secret',
     };
 
-    const res = await app.fetch(
-      new Request('http://local/session/11111111-1111-4111-8111-111111111111'),
-      env
+    const worker = createWorker(env);
+    const res = await worker.fetch(
+      new Request('http://local/session/11111111-1111-4111-8111-111111111111')
     );
 
     expect(res.status).toBe(200);

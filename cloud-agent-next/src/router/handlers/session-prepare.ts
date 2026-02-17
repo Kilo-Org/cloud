@@ -190,35 +190,6 @@ const prepareSessionHandler = internalApiProtectedProcedure
         }
       }
 
-      // NOTE: Backend session creation (createKiloSessionInBackend) is temporarily disabled.
-      // The kiloSessionId will now come from the kilo CLI server's POST /session API.
-      // This can be re-enabled later if backend analytics/tracking is needed.
-      // const gitUrlForBackend = input.githubRepo
-      //   ? `https://github.com/${input.githubRepo}`
-      //   : input.gitUrl;
-      // let backendKiloSessionId: string;
-      // try {
-      //   backendKiloSessionId = await sessionService.createKiloSessionInBackend(
-      //     cloudAgentSessionId,
-      //     ctx.authToken,
-      //     ctx.env,
-      //     input.kilocodeOrganizationId,
-      //     input.mode,
-      //     input.model,
-      //     gitUrlForBackend
-      //   );
-      // } catch (error) {
-      //   logger
-      //     .withFields({ error: error instanceof Error ? error.message : String(error) })
-      //     .error('Failed to create cliSession in backend');
-      //   throw new TRPCError({
-      //     code: 'INTERNAL_SERVER_ERROR',
-      //     message: `Failed to create session in backend: ${
-      //       error instanceof Error ? error.message : String(error)
-      //     }`,
-      //   });
-      // }
-
       // 3. Get sandbox
       logger.info('Getting sandbox');
       const sandbox = getSandbox(ctx.env.Sandbox, sandboxId, { sleepAfter: 900 });
@@ -327,52 +298,98 @@ const prepareSessionHandler = internalApiProtectedProcedure
       logger.setTags({ kiloSessionId });
       logger.info('Created kilo CLI session');
 
-      // 12. Get DO stub and store metadata
+      // 12. Create cli_sessions_v2 record via session-ingest RPC (blocking)
+      logger.info('Creating cli_sessions_v2 record via session-ingest');
+      try {
+        await sessionService.createCliSessionViaSessionIngest(
+          kiloSessionId,
+          cloudAgentSessionId,
+          ctx.userId,
+          ctx.env,
+          input.kilocodeOrganizationId,
+          'cloud-agent'
+        );
+      } catch (error) {
+        logger
+          .withFields({ error: error instanceof Error ? error.message : String(error) })
+          .error('Failed to create cli_sessions_v2 record');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Failed to create session record: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+
+      const rollbackCliSession = async () => {
+        await sessionService
+          .deleteCliSessionViaSessionIngest(kiloSessionId, ctx.userId, ctx.env)
+          .catch((rollbackError: unknown) => {
+            logger
+              .withFields({
+                error:
+                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+              })
+              .error('Failed to rollback cli_sessions_v2 record');
+          });
+      };
+
+      // 13. Get DO stub and store metadata
       const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${cloudAgentSessionId}`);
       const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
 
-      const prepareResult = await stub.prepare({
-        sessionId: cloudAgentSessionId,
-        userId: ctx.userId,
-        orgId: input.kilocodeOrganizationId,
-        botId: ctx.botId,
-        kiloSessionId,
-        prompt: input.prompt,
-        mode: input.mode,
-        model: input.model,
-        kilocodeToken: ctx.authToken,
-        githubRepo: input.githubRepo,
-        githubToken: input.githubToken,
-        githubInstallationId: resolvedInstallationId,
-        githubAppType: resolvedGithubAppType,
-        gitUrl: input.gitUrl,
-        gitToken: input.gitToken,
-        envVars: input.envVars,
-        encryptedSecrets: input.encryptedSecrets,
-        setupCommands: input.setupCommands,
-        mcpServers: input.mcpServers,
-        upstreamBranch: input.upstreamBranch,
-        autoCommit: input.autoCommit,
-        condenseOnComplete: input.condenseOnComplete,
-        appendSystemPrompt: input.appendSystemPrompt,
-        callbackTarget: input.callbackTarget,
-        images: input.images,
-        // Workspace metadata
-        workspacePath,
-        sessionHome,
-        branchName,
-        sandboxId,
-      });
+      let prepareResult;
+      try {
+        prepareResult = await stub.prepare({
+          sessionId: cloudAgentSessionId,
+          userId: ctx.userId,
+          orgId: input.kilocodeOrganizationId,
+          botId: ctx.botId,
+          kiloSessionId,
+          prompt: input.prompt,
+          mode: input.mode,
+          model: input.model,
+          kilocodeToken: ctx.authToken,
+          githubRepo: input.githubRepo,
+          githubToken: input.githubToken,
+          githubInstallationId: resolvedInstallationId,
+          githubAppType: resolvedGithubAppType,
+          gitUrl: input.gitUrl,
+          gitToken: input.gitToken,
+          envVars: input.envVars,
+          encryptedSecrets: input.encryptedSecrets,
+          setupCommands: input.setupCommands,
+          mcpServers: input.mcpServers,
+          upstreamBranch: input.upstreamBranch,
+          autoCommit: input.autoCommit,
+          condenseOnComplete: input.condenseOnComplete,
+          appendSystemPrompt: input.appendSystemPrompt,
+          callbackTarget: input.callbackTarget,
+          images: input.images,
+          // Workspace metadata
+          workspacePath,
+          sessionHome,
+          branchName,
+          sandboxId,
+        });
+      } catch (error) {
+        logger
+          .withFields({ error: error instanceof Error ? error.message : String(error) })
+          .error('DO prepare() threw, rolling back cli_sessions_v2 record');
+        await rollbackCliSession();
+        throw error;
+      }
 
       if (!prepareResult.success) {
         logger.withFields({ error: prepareResult.error }).error('Failed to prepare session in DO');
+        await rollbackCliSession();
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: prepareResult.error ?? 'Failed to prepare session',
         });
       }
 
-      // 13. Record kilo server activity for idle timeout tracking
+      // 14. Record kilo server activity for idle timeout tracking
       try {
         await withDORetry(
           () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
@@ -388,7 +405,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
 
       logger.info('Session prepared successfully');
 
-      // 14. Return both IDs
+      // 15. Return both IDs
       return { cloudAgentSessionId, kiloSessionId };
     });
   });

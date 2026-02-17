@@ -225,7 +225,6 @@ export class CloudAgentSession extends DurableObject {
       // Create DO context for the ingest handler to call back into the DO
       const doContext: IngestDOContext = {
         updateKiloSessionId: (id: string) => this.updateKiloSessionId(id),
-        linkKiloSessionInBackend: (id: string) => this.linkKiloSessionInBackend(id),
         updateUpstreamBranch: (branch: string) => this.updateUpstreamBranch(branch),
         clearActiveExecution: () => this.clearActiveExecution(),
         getExecution: async (executionId: string) => {
@@ -572,41 +571,6 @@ export class CloudAgentSession extends DurableObject {
     };
 
     await this.updateMetadata(updated);
-  }
-
-  /**
-   * Link the kiloSessionId to the backend for analytics/tracking.
-   * Called when a session_created event is received from the CLI.
-   *
-   * @param kiloSessionId - The kilo CLI session ID to link
-   */
-  async linkKiloSessionInBackend(kiloSessionId: string): Promise<void> {
-    const metadata = await this.getMetadata();
-    if (!metadata?.kilocodeToken) {
-      throw new Error('Cannot link session: missing kilocodeToken');
-    }
-
-    const backendUrl = (this.env as unknown as WorkerEnv).KILOCODE_BACKEND_BASE_URL;
-    if (!backendUrl) {
-      throw new Error('Cannot link session: KILOCODE_BACKEND_BASE_URL not configured');
-    }
-
-    const response = await fetch(`${backendUrl}/api/cloud-sessions/linkSessions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${metadata.kilocodeToken}`,
-      },
-      body: JSON.stringify({
-        cloudSessionId: this.sessionId,
-        kiloSessionId: kiloSessionId,
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Backend link failed: ${response.status} ${text}`);
-    }
   }
 
   // ---------------------------------------------------------------------------

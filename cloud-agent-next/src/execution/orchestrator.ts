@@ -322,7 +322,6 @@ export class ExecutionOrchestrator {
           setupCommands: initContext.setupCommands,
           mcpServers: initContext.mcpServers,
           botId: initContext.botId,
-          skipLinking: true,
           githubAppType: initContext.githubAppType,
           // Note: existingMetadata requires CloudAgentSessionState, not our simplified type
           ...gitSource,

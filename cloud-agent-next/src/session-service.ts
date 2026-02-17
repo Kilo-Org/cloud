@@ -8,7 +8,6 @@ import type {
   InterruptResult,
 } from './types.js';
 import type { ExecutionParams as _ExecutionParams } from './schema.js';
-import { DEFAULT_BACKEND_URL } from './constants.js';
 import { generateSandboxId } from './sandbox-id.js';
 import {
   checkDiskSpace,
@@ -769,7 +768,6 @@ export class SessionService {
     let isFirstCall = true;
     let capturedKiloSessionId: string | undefined = undefined;
 
-    const linkKiloSessionInBackend = this.linkKiloSessionInBackend.bind(this);
     const captureAndStoreBranch = this.captureAndStoreBranch.bind(this);
 
     return {
@@ -804,16 +802,6 @@ export class SessionService {
           ) {
             capturedKiloSessionId = String(event.payload.sessionId);
             logger.setTags({ kiloSessionId: capturedKiloSessionId });
-            void linkKiloSessionInBackend(
-              capturedKiloSessionId,
-              sessionId,
-              kilocodeToken,
-              env
-            ).catch((error: unknown) => {
-              logger
-                .withFields({ error: error instanceof Error ? error.message : String(error) })
-                .error('Failed to link sessions in backend');
-            });
           }
           yield event;
         }
@@ -949,7 +937,6 @@ export class SessionService {
       setupCommands,
       mcpServers,
       botId,
-      skipLinking,
       githubAppType,
       existingMetadata,
     } = options;
@@ -1083,20 +1070,6 @@ export class SessionService {
       },
       metadataToPreserve
     );
-
-    // Skip linking if requested (e.g., for prepared sessions where backend already linked)
-    if (!skipLinking) {
-      try {
-        await this.linkKiloSessionInBackend(kiloSessionId, sessionId, kilocodeToken, env);
-        logger.info('Linked cloud-agent session to kilo session in backend');
-      } catch (error) {
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .warn('Failed to link sessions in backend');
-      }
-    } else {
-      logger.debug('Skipping backend linking (prepared session mode)');
-    }
 
     const captureAndStoreBranch = this.captureAndStoreBranch.bind(this);
 
@@ -1625,145 +1598,39 @@ export class SessionService {
   }
 
   /**
-   * Create a minimal cliSession in kilocode-backend.
-   * Uses the customer's auth token (forwarded from the original request).
-   * Returns the generated kiloSessionId.
+   * Create a cli_sessions_v2 record via session-ingest RPC.
+   * Called during session preparation so the DB record exists before execution.
    */
-  async createKiloSessionInBackend(
+  async createCliSessionViaSessionIngest(
+    kiloSessionId: string,
     cloudAgentSessionId: string,
-    authToken: string,
+    kiloUserId: string,
     env: PersistenceEnv,
     organizationId?: string,
-    lastMode?: string,
-    lastModel?: string,
-    gitUrl?: string
-  ): Promise<string> {
-    const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
-
-    const input = {
-      created_on_platform: 'cloud-agent',
-      organization_id: organizationId ?? null,
-      cloud_agent_session_id: cloudAgentSessionId,
-      version: 2,
-      last_mode: lastMode,
-      last_model: lastModel,
-      git_url: gitUrl,
-    };
-
-    const response = await fetch(`${backendUrl}/api/trpc/cliSessions.createV2`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
+    createdOnPlatform?: string
+  ): Promise<void> {
+    await env.SESSION_INGEST.createSessionForCloudAgent({
+      sessionId: kiloSessionId,
+      kiloUserId,
+      cloudAgentSessionId,
+      organizationId,
+      createdOnPlatform,
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('[createKiloSessionInBackend] Backend error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: '[redacted]',
-        backendUrl,
-        organizationId,
-        cloudAgentSessionId,
-      });
-      throw new Error(
-        `Failed to create kilo session: ${response.status} - ${text.substring(0, 200)}`
-      );
-    }
-
-    const result = await response.json();
-
-    type TrpcResponse = { result?: { data?: { session_id?: string } } };
-    const typedResult = result as TrpcResponse;
-
-    const sessionId = typedResult.result?.data?.session_id;
-    if (!sessionId) {
-      throw new Error('Backend did not return session_id');
-    }
-
-    return sessionId;
   }
 
   /**
-   * Delete a cliSession in kilocode-backend.
-   * Used for rollback when DO prepare() fails after backend session was created.
+   * Delete a cli_sessions_v2 record via session-ingest RPC.
+   * Used for rollback when DO prepare() fails after the record was created.
    */
-  async deleteKiloSessionInBackend(
+  async deleteCliSessionViaSessionIngest(
     kiloSessionId: string,
-    authToken: string,
+    kiloUserId: string,
     env: PersistenceEnv
   ): Promise<void> {
-    const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
-
-    const input = {
-      session_id: kiloSessionId,
-    };
-
-    const response = await fetch(`${backendUrl}/api/trpc/cliSessions.delete`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
+    await env.SESSION_INGEST.deleteSessionForCloudAgent({
+      sessionId: kiloSessionId,
+      kiloUserId,
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Failed to delete kilo session: ${response.status} ${text}`);
-    }
-
-    const result = await response.json();
-
-    type TrpcResponse = { result?: { data?: { success?: boolean } } };
-    const typedResult = result as TrpcResponse;
-
-    if (!typedResult.result?.data?.success) {
-      throw new Error('Backend did not confirm successful deletion');
-    }
-  }
-
-  /**
-   * Helper to link sessions in backend using tRPC wire format
-   */
-  private async linkKiloSessionInBackend(
-    kiloSessionId: string,
-    cloudAgentSessionId: string,
-    authToken: string,
-    env: PersistenceEnv
-  ): Promise<void> {
-    const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
-
-    const input = {
-      kilo_session_id: kiloSessionId,
-      cloud_agent_session_id: cloudAgentSessionId,
-    };
-
-    const response = await fetch(`${backendUrl}/api/trpc/cliSessions.linkCloudAgent`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Failed to link sessions: ${response.status} ${text}`);
-    }
-
-    const result = await response.json();
-
-    type TrpcResponse = { result?: { data?: { success?: boolean } } };
-    const typedResult = result as TrpcResponse;
-
-    if (!typedResult.result?.data?.success) {
-      throw new Error('Backend did not confirm successful link');
-    }
   }
 
   /**
@@ -1908,7 +1775,6 @@ type InitiateFromKiloSessionBaseOptions = {
   setupCommands?: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   botId?: string;
-  skipLinking?: boolean;
   /** GitHub App type for selecting correct slug/bot identity */
   githubAppType?: 'standard' | 'lite';
   /**

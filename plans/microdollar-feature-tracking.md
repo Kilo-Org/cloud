@@ -2,304 +2,179 @@
 
 ## Problem
 
-Track which feature/product generates each microdollar usage record. Currently extensions and autocomplete rely on telemetry — opted-out users are invisible. We also need to measure direct gateway API usage for marketing campaigns.
+Track which feature/product generates each token usage record in `microdollar_usage`. Currently there's no way to distinguish features that share the same gateway endpoint. Per-feature WAU ends up overrelying on PostHog telemetry which loses a significant number of users to ad blockers.
 
-## Findings
+## Solution
 
-### Schema
+**One header, one column, validated at the gateway.** Every caller sends `X-KILOCODE-FEATURE: <value>`. The gateway validates it against an allow-list and stores it in `microdollar_usage.feature`. No header = NULL (unattributed). To add a new feature: add the value to the allow-list and have the caller send the header.
 
-All token consumption lives in [`microdollar_usage`](src/db/schema.ts:549-582) with metadata in [`microdollar_usage_metadata`](src/db/schema.ts:584-619). No explicit field distinguishes which feature generated the usage.
+### Architecture
 
-### Deterministic Identifiers
+All LLM traffic flows through two gateway endpoints:
+1. [`/api/openrouter/[...path]/route.ts`](src/app/api/openrouter/[...path]/route.ts) — chat completions
+2. [`/api/fim/completions/route.ts`](src/app/api/fim/completions/route.ts) — autocomplete (FIM)
 
-1. **`provider = 'mistral'`** → autocomplete (100% confidence). FIM endpoint [`/api/fim/completions`](src/app/api/fim/completions/route.ts) exclusively uses this provider. Model defaults to [`codestral-2508`](src/lib/constants.ts:33).
-2. **`editor_name`** → editor/CLI detection (high confidence when set, nullable). Stored in lookup table [`editor_name`](src/db/schema.ts:710-717), set via `X-KiloCode-EditorName` header. Needs version-number stripping. "Kilo Code CLI" and "opencode" (21% of traffic) both map to CLI category.
-
-### Heuristic Identifiers (1-minute time window)
-
-No direct identifier exists for cloud-agent or internal services in `microdollar_usage`. Detection requires joining on `kilo_user_id` + time window against feature-specific tables:
-
-| Table | Feature | User ID Column |
-|---|---|---|
-| [`cli_sessions_v2`](src/db/schema.ts:2053-2094) | cloud-agent / cli | `kilo_user_id` (+ `created_on_platform`) |
-| [`app_builder_projects`](src/db/schema.ts:2133) | app-builder | `owned_by_user_id` OR `created_by_user_id` |
-| [`cloud_agent_code_reviews`](src/db/schema.ts:1902) | code-reviews | `owned_by_user_id` |
-| [`code_indexing_manifest`](src/db/schema.ts:1545) / [`code_indexing_search`](src/db/schema.ts:1519) | managed-indexes | `kilo_user_id` |
-| [`security_findings`](src/db/schema.ts:2226) | security-agent | `owned_by_user_id` |
-| [`slack_bot_requests`](src/db/schema.ts:2338) | slack-bot | `owned_by_user_id` |
-
-### Anonymous Usage
-
-Format: `kilo_user_id LIKE 'anon:%'` (e.g. `anon:192.168.1.1`). Limited to gateway-direct and extensions with free models. Rate limited at 200 req/hour per IP.
-
-### Short-Term Limitations
-
-1. No positive identification of gateway-direct — falls into "unknown"
-2. Time-bound heuristics are approximate (1-min window may misattribute)
-3. OpenCode third-party agent accounts for 21% of traffic
-4. Recent features may be under-detected if feature tables lag
+All callers set headers at one of three places:
+1. **Old extension** → [`customRequestOptions()`](https://github.com/Kilo-Org/kilocode/blob/main/src/api/providers/kilocode-openrouter.ts) in `Kilo-Org/kilocode`
+2. **New extension + CLI + Cloud features** → [`kilo-gateway/src/api/constants.ts`](https://github.com/Kilo-Org/kilo/blob/main/packages/kilo-gateway/src/api/constants.ts) in `Kilo-Org/kilo` (reads `KILOCODE_FEATURE` env var)
+3. **Internal services** → [`sendProxiedChatCompletion`](src/lib/llm-proxy-helpers.ts:638) in `Kilo-Org/cloud`
 
 ## Feature Values
 
 ```typescript
-const FEATURE_TYPES = [
+const FEATURE_VALUES = [
+  // Extension features (set by kilocode extension)
+  'extension',               // VS Code/Cursor/JetBrains chat/code/agent
+  'extension-autocomplete',  // FIM completions (tab autocomplete)
+  'parallel-agent',          // Parallel Agents running inside VS Code
+  'managed-indexes',         // Managed Indexing LLM calls from extension
+
+  // CLI features (set by kilo-gateway via env var)
   'cli',                     // Kilo CLI direct human use
-  'extension',               // VS Code/Cursor/JetBrains chat/agent
-  'extension-autocomplete',  // FIM completions
+
+  // Cloud features (set by kilo-gateway via KILOCODE_FEATURE env var)
   'cloud-agent',             // Cloud Agent sessions
-  'security-agent',          // Security scanning
-  'app-builder',             // App Builder
-  'code-review',             // PR reviews
-  'auto-triage',             // Issue auto-triage
-  'auto-fix',                // Issue auto-fix
-  'kilo-claw',               // Kilo Claw conversations
+  'code-review',             // PR reviews (via cloud-agent)
+  'auto-triage',             // Issue auto-triage (via cloud-agent)
+  'auto-fix',                // Issue auto-fix (via cloud-agent)
+  'app-builder',             // App Builder (via cloud-agent)
   'agent-manager',           // Agent Manager orchestrated tasks
-  'gateway-direct',          // Direct API calls / Kilo Gateway consumers
+
+  // Internal services (set by sendProxiedChatCompletion)
+  'security-agent',          // Security scanning
   'slack-bot',               // Kilo for Slack
-  'unknown',                 // Cannot be determined
+
+  // Other
+  'kilo-claw',               // Kilo Claw conversations
 ] as const;
+// NULL = no header sent (unattributed, e.g. direct gateway consumers or pre-rollout data)
 ```
 
-Not tracked (no LLM gateway calls): Seats, Managed Indexing, Kilo for Data.
+**Not tracked** (no LLM gateway calls): Seats, Kilo Pass, AI Adoption Score, Auto Top Ups, Skills, Sessions, Voice Prompting, Deploy.
+
 Editor distinction (vscode vs cursor vs jetbrains) uses existing `editor_name` field, not `feature`.
 
-## Short-Term: Inference Query
+## Implementation
 
-Used to analyze historical data before the explicit field exists. Detection priority:
-
-1. `provider = 'mistral'` → autocomplete
-2. `editor_name` patterns → specific editors / CLI
-3. Recent activity in feature-specific tables (1-min window) → cloud-agent, app-builder, code-reviews, managed-indexes, security-agent, slack-bot
-4. `cli_sessions_v2.created_on_platform` → cloud-agent, cli, cli-other
-5. Everything else → unknown
-
-```sql
-WITH base AS (
-  SELECT
-    mu.id,
-    mu.kilo_user_id,
-    mu.provider,
-    mu.cost,
-    mu.input_tokens,
-    mu.output_tokens,
-    mu.created_at,
-    NULLIF(TRIM(en.editor_name), '') as editor_raw
-  FROM backend_prod.public.microdollar_usage mu
-  LEFT JOIN backend_prod.public.microdollar_usage_metadata mum ON mu.id = mum.id
-  LEFT JOIN backend_prod.public.editor_name en ON mum.editor_name_id = en.editor_name_id
-  WHERE mu.created_at >= CURRENT_DATE - INTERVAL '90 days'
-),
-
-clean AS (
-  SELECT
-    id,
-    kilo_user_id,
-    provider,
-    cost,
-    input_tokens,
-    output_tokens,
-    created_at,
-    editor_raw,
-    LOWER(TRIM(
-      REGEXP_REPLACE(
-        editor_raw,
-        '\\s+v?[0-9]+(\\.[0-9]+){1,3}(-[A-Za-z0-9]+)?(\\+[0-9]+)?$',
-        ''
-      )
-    )) as editor_lc
-  FROM base
-),
-
-app_builder_matches AS (
-  SELECT DISTINCT c.id as usage_id
-  FROM clean c
-  INNER JOIN backend_prod.public.app_builder_projects abp
-    ON (abp.owned_by_user_id = c.kilo_user_id OR abp.created_by_user_id = c.kilo_user_id)
-    AND abp.created_at <= c.created_at
-    AND abp.created_at >= c.created_at - INTERVAL '1 minute'
-),
-
-code_review_matches AS (
-  SELECT DISTINCT c.id as usage_id
-  FROM clean c
-  INNER JOIN backend_prod.public.cloud_agent_code_reviews cacr
-    ON cacr.owned_by_user_id = c.kilo_user_id
-    AND cacr.created_at <= c.created_at
-    AND cacr.created_at >= c.created_at - INTERVAL '1 minute'
-),
-
-indexing_manifest_matches AS (
-  SELECT DISTINCT c.id as usage_id
-  FROM clean c
-  INNER JOIN backend_prod.public.code_indexing_manifest cim
-    ON cim.kilo_user_id = c.kilo_user_id
-    AND cim.created_at <= c.created_at
-    AND cim.created_at >= c.created_at - INTERVAL '1 minute'
-),
-
-indexing_search_matches AS (
-  SELECT DISTINCT c.id as usage_id
-  FROM clean c
-  INNER JOIN backend_prod.public.code_indexing_search cis
-    ON cis.kilo_user_id = c.kilo_user_id
-    AND cis.created_at <= c.created_at
-    AND cis.created_at >= c.created_at - INTERVAL '1 minute'
-),
-
-security_finding_matches AS (
-  SELECT DISTINCT c.id as usage_id
-  FROM clean c
-  INNER JOIN backend_prod.public.security_findings sf
-    ON sf.owned_by_user_id = c.kilo_user_id
-    AND sf.created_at <= c.created_at
-    AND sf.created_at >= c.created_at - INTERVAL '1 minute'
-),
-
-slack_bot_matches AS (
-  SELECT DISTINCT c.id as usage_id
-  FROM clean c
-  INNER JOIN backend_prod.public.slack_bot_requests sbr
-    ON sbr.owned_by_user_id = c.kilo_user_id
-    AND sbr.created_at <= c.created_at
-    AND sbr.created_at >= c.created_at - INTERVAL '1 minute'
-),
-
-cli_session_matches AS (
-  SELECT
-    c.id as usage_id,
-    cs.created_on_platform,
-    ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY cs.created_at DESC) as rn
-  FROM clean c
-  INNER JOIN backend_prod.public.cli_sessions_v2 cs
-    ON cs.kilo_user_id = c.kilo_user_id
-    AND cs.created_at <= c.created_at
-    AND cs.created_at >= c.created_at - INTERVAL '1 minute'
-),
-
-cli_session_latest AS (
-  SELECT usage_id, created_on_platform
-  FROM cli_session_matches
-  WHERE rn = 1
-),
-
-with_features AS (
-  SELECT
-    c.*,
-    abm.usage_id as has_app_builder,
-    crm.usage_id as has_code_reviews,
-    imm.usage_id as has_indexing_manifest,
-    ism.usage_id as has_indexing_search,
-    sfm.usage_id as has_security_findings,
-    sbm.usage_id as has_slack_bot,
-    csm.created_on_platform as session_platform
-  FROM clean c
-  LEFT JOIN app_builder_matches abm ON abm.usage_id = c.id
-  LEFT JOIN code_review_matches crm ON crm.usage_id = c.id
-  LEFT JOIN indexing_manifest_matches imm ON imm.usage_id = c.id
-  LEFT JOIN indexing_search_matches ism ON ism.usage_id = c.id
-  LEFT JOIN security_finding_matches sfm ON sfm.usage_id = c.id
-  LEFT JOIN slack_bot_matches sbm ON sbm.usage_id = c.id
-  LEFT JOIN cli_session_latest csm ON csm.usage_id = c.id
-)
-
-SELECT
-  DATE_TRUNC('day', created_at) as date,
-  CASE
-    WHEN provider = 'mistral' THEN 'autocomplete'
-    WHEN editor_lc LIKE '%kilo code cli%' THEN 'cli'
-    WHEN editor_lc LIKE 'opencode%' THEN 'cli'
-    WHEN REGEXP_LIKE(editor_lc, '^(visual studio code|vscode|vs code|vscodium|code|code-oss|code-server)') THEN 'vscode'
-    WHEN editor_lc LIKE 'cursor%' THEN 'cursor'
-    WHEN editor_lc LIKE 'windsurf%' THEN 'windsurf'
-    WHEN REGEXP_LIKE(editor_lc, '^(jetbrains|intellij|phpstorm|webstorm|rider|goland|clion|datagrip|rubymine|dataspell|android studio|pycharm|rustover)') THEN 'jetbrains'
-    WHEN editor_lc LIKE 'antigravity%' THEN 'antigravity'
-    WHEN editor_lc LIKE 'trae%' THEN 'trae'
-    WHEN editor_raw IS NOT NULL THEN 'other-editor'
-    WHEN has_app_builder IS NOT NULL THEN 'app-builder'
-    WHEN has_code_reviews IS NOT NULL THEN 'code-reviews'
-    WHEN has_indexing_manifest IS NOT NULL OR has_indexing_search IS NOT NULL THEN 'managed-indexes'
-    WHEN has_security_findings IS NOT NULL THEN 'security-agent'
-    WHEN has_slack_bot IS NOT NULL THEN 'slack-bot'
-    WHEN session_platform = 'cloud-agent' THEN 'cloud-agent'
-    WHEN session_platform IN ('cli', 'unknown') THEN 'cli'
-    WHEN session_platform IS NOT NULL THEN 'cli-other'
-    ELSE 'unknown'
-  END as feature,
-  COUNT(*) as usage_count,
-  SUM(cost) as total_cost_microdollars,
-  SUM(input_tokens) as total_input_tokens,
-  SUM(output_tokens) as total_output_tokens
-FROM with_features
-GROUP BY date, feature
-ORDER BY date, feature;
-```
-
-## Long-Term: Add Explicit `feature` Column
-
-### Step 1: Database Schema
+### Step 1: Database Schema (cloud repo)
 
 Add nullable `feature` column to [`microdollar_usage`](src/db/schema.ts:549-582):
 
 ```sql
 ALTER TABLE microdollar_usage ADD COLUMN feature TEXT;
-CREATE INDEX idx_microdollar_usage_feature ON microdollar_usage(feature);
+CREATE INDEX idx_microdollar_usage_feature ON microdollar_usage(feature) WHERE feature IS NOT NULL;
 ```
 
-### Step 2: Update TypeScript Types and Data Flow
+Update Drizzle schema to include `feature: text()` in the table definition.
 
-1. Add `FeatureType` and `detectFeature()` in new file `src/lib/feature-detection.ts`
-2. Add `feature` to [`MicrodollarUsageContext`](src/lib/processUsage.ts:154-178) type
-3. Update [`extractUsageContextInfo`](src/lib/processUsage.ts:181) to include `feature`
-4. Update [`toInsertableDbUsageRecord`](src/lib/processUsage.ts:212) — destructure `feature` into core fields (not metadata)
-5. **Critical:** Update raw SQL in [`insertUsageAndMetadataWithBalanceUpdate`](src/lib/processUsage.ts:470) — add `feature` to both column list and VALUES. If missed, column stays NULL in production.
+### Step 2: Create `src/lib/feature-detection.ts` (cloud repo)
 
-### Step 3: Feature Detection Logic
+New file with:
+- `FEATURE_VALUES` const array (the allow-list)
+- `FeatureValue` type derived from the array
+- `FEATURE_HEADER = 'x-kilocode-feature'` constant
+- `validateFeatureHeader(headerValue: string | null): FeatureValue | null` function:
+  - If header is present and matches a valid `FeatureValue` → return it
+  - Otherwise → return `null` (stored as NULL in the database)
 
-Create `src/lib/feature-detection.ts`:
-- Check `x-kilocode-feature` header first (most explicit)
-- Fall back to user-agent for CLI detection (`kilo-cli`)
-- Fall back to `editor_name` presence → `extension`
-- Default to `gateway-direct` for authenticated calls
+No fallback heuristics in the write path. The column is nullable. If a caller doesn't send the header, the value is NULL.
 
-Validation: only accept values from the `FEATURE_TYPES` enum.
+### Step 3: Wire into processUsage Pipeline (cloud repo)
 
-### Step 4: Update Gateway Entry Points
+1. Add `feature: FeatureValue | null` to [`MicrodollarUsageContext`](src/lib/processUsage.ts:154-178)
+2. Add `feature` to [`extractUsageContextInfo`](src/lib/processUsage.ts:181) return value
+3. In [`toInsertableDbUsageRecord`](src/lib/processUsage.ts:205), destructure `feature` into core fields (alongside `kilo_user_id`, `organization_id`, `project_id`, `provider`)
+4. **Critical:** In [`insertUsageAndMetadataWithBalanceUpdate`](src/lib/processUsage.ts:470), add `feature` to both the column list and VALUES in the raw SQL INSERT
 
-1. [`src/app/api/openrouter/[...path]/route.ts`](src/app/api/openrouter/[...path]/route.ts) — call `detectFeature()`, pass to `MicrodollarUsageContext`
-2. [`src/app/api/fim/completions/route.ts`](src/app/api/fim/completions/route.ts) — same
+### Step 4: Update Gateway Entry Points (cloud repo)
 
-### Step 5: Internal Services Send `X-KiloCode-Feature` Header
+Both gateway routes extract the header and validate it:
 
-Each service sets the header on its LLM requests:
-- Cloud Agent → `cloud-agent`
-- Security Agent → `security-agent`
-- App Builder → `app-builder`
-- Slack Bot → `slack-bot`
+1. [`src/app/api/openrouter/[...path]/route.ts`](src/app/api/openrouter/[...path]/route.ts:253) — extract `X-KILOCODE-FEATURE` header, call `validateFeatureHeader()`, add to `usageContext`
+2. [`src/app/api/fim/completions/route.ts`](src/app/api/fim/completions/route.ts:130) — same pattern
 
-### Step 6: Extension (Kilo-Org/kilocode repo)
+### Step 5: Update `sendProxiedChatCompletion` (cloud repo)
 
-1. Add `X_KILOCODE_FEATURE` constant to [`src/shared/kilocode/headers.ts`](https://github.com/Kilo-Org/kilocode/blob/main/src/shared/kilocode/headers.ts)
-2. In [`customRequestOptions()`](https://github.com/Kilo-Org/kilocode/blob/main/src/api/providers/kilocode-openrouter.ts) — default to `extension`
-3. In [`streamFim()`](https://github.com/Kilo-Org/kilocode/blob/main/src/api/providers/kilocode-openrouter.ts) — override to `extension-autocomplete`
+Add optional `feature` field to [`ProxiedChatCompletionRequest`](src/lib/llm-proxy-helpers.ts:622). When set, include `X-KILOCODE-FEATURE` header in the fetch call at [line 652](src/lib/llm-proxy-helpers.ts:652).
 
-### Step 7: CLI Gateway (Kilo-Org/kilo repo)
+Update callers:
+- **Security Agent** ([`extraction-service.ts`](src/lib/security-agent/services/extraction-service.ts:284), [`triage-service.ts`](src/lib/security-agent/services/triage-service.ts:237)) → `feature: 'security-agent'`
+- **Slack Bot** ([`slack-bot.ts`](src/lib/slack-bot.ts:466)) → `feature: 'slack-bot'`
+
+### Step 6: Old Extension — `Kilo-Org/kilocode` repo
+
+1. Add `X_KILOCODE_FEATURE = "X-KiloCode-Feature"` to [`src/shared/kilocode/headers.ts`](https://github.com/Kilo-Org/kilocode/blob/main/src/shared/kilocode/headers.ts)
+2. In [`customRequestOptions()`](https://github.com/Kilo-Org/kilocode/blob/main/src/api/providers/kilocode-openrouter.ts) — default to `'extension'`. The `metadata` parameter already carries context from each feature (mode, taskId), so parallel agents and managed indexes can override the value at their call sites.
+3. In [`streamFim()`](https://github.com/Kilo-Org/kilocode/blob/main/src/api/providers/kilocode-openrouter.ts) — set to `'extension-autocomplete'`
+
+### Step 7: CLI Gateway + New Extension — `Kilo-Org/kilo` repo
 
 In [`packages/kilo-gateway/src/api/constants.ts`](https://github.com/Kilo-Org/kilo/blob/main/packages/kilo-gateway/src/api/constants.ts):
-- Add `HEADER_FEATURE = "X-KILOCODE-FEATURE"`, `DEFAULT_FEATURE = "cli"`, `ENV_FEATURE = "KILOCODE_FEATURE"`
-- Read from env var `KILOCODE_FEATURE`, default to `cli`
-- Include in request headers alongside `HEADER_EDITORNAME`
 
-### Step 8: Cloud Agent Environment
+```typescript
+export const HEADER_FEATURE = "X-KILOCODE-FEATURE"
+export const DEFAULT_FEATURE = "cli"
+export const ENV_FEATURE = "KILOCODE_FEATURE"
+```
 
-Cloud agents run `kilo serve` (CLI) inside a sandbox. The agent must pass feature identity via env var.
+In the request-building code (where `HEADER_EDITORNAME` is set), also set:
+```typescript
+headers[HEADER_FEATURE] = process.env[ENV_FEATURE] || DEFAULT_FEATURE
+```
 
-In [`cloud-agent-next/src/kilo/server-manager.ts`](cloud-agent-next/src/kilo/server-manager.ts), set `KILOCODE_FEATURE: 'cloud-agent'` when launching `kilo serve`. Same pattern for any service that launches `kilo serve`.
+This covers both the new opencode-based extension (which uses kilo-gateway) and the CLI. Cloud features override via env var:
+- **Cloud Agent** → `KILOCODE_FEATURE=cloud-agent`
+- **Code Reviews** → `KILOCODE_FEATURE=code-review`
+- **Auto-Triage** → `KILOCODE_FEATURE=auto-triage`
+- **Auto-Fix** → `KILOCODE_FEATURE=auto-fix`
+- **App Builder** → `KILOCODE_FEATURE=app-builder`
 
-**Without this, all cloud-agent requests get tagged as `cli`.**
+### Step 8: Cloud Agent Environment (cloud repo)
 
-### Migration Strategy
+In [`cloud-agent-next/src/kilo/server-manager.ts`](cloud-agent-next/src/kilo/server-manager.ts), [`buildKiloServeCommand`](cloud-agent-next/src/kilo/server-manager.ts:212) needs to include `KILOCODE_FEATURE={feature}` in the command. The feature value depends on what launched the session (cloud-agent vs code-review vs auto-triage vs auto-fix vs app-builder). Pass it as a parameter through the session creation flow.
 
-1. Add nullable column, deploy
-2. Update code to detect and set feature, deploy
-3. Optionally backfill historical data using heuristics from the inference query
-4. After sufficient data, consider making column NOT NULL with default `unknown`
+**Without this, all cloud feature requests get tagged as `cli`.**
+
+### Step 9: Update Test Helpers (cloud repo)
+
+Add `feature` to:
+- [`createBaseUsageContext`](src/lib/processUsage.test.ts:311) in processUsage tests
+- [`createMockUsageContext`](src/tests/helpers/microdollar-usage.helper.ts:82) in test helper
+- [`defineDefaultContextInfo`](src/tests/helpers/microdollar-usage.helper.ts:35) in test helper
+- [`/api/dev/consume-credits`](src/app/api/dev/consume-credits/route.ts:66) dev route
+
+## Deployment Order
+
+No strict dependencies between repos. Backend first is recommended so the column exists when callers start sending the header. Callers can be deployed in any order after that.
+
+| Priority | Change | Repo |
+|---|---|---|
+| 1 | Add `feature` column + validation logic + gateway wiring | `cloud` |
+| 2 | Add `HEADER_FEATURE` to kilo-gateway | `kilo` |
+| 3 | Pass `KILOCODE_FEATURE` env var in cloud-agent-next | `cloud` |
+| 4 | Add `X-KiloCode-Feature` header to old extension | `kilocode` |
+| 5 | Add feature to `sendProxiedChatCompletion` callers | `cloud` |
+
+## Feature Coverage Matrix
+
+| Feature | How it sends the header | Value |
+|---|---|---|
+| Extension (chat/code/agent) | kilocode extension `customRequestOptions()` | `extension` |
+| Extension Autocomplete | kilocode extension `streamFim()` | `extension-autocomplete` |
+| Parallel Agents | kilocode extension (parallel agent code path) | `parallel-agent` |
+| Managed Indexes | kilocode extension (indexing code path) | `managed-indexes` |
+| CLI | kilo-gateway default | `cli` |
+| Cloud Agent | kilo-gateway + `KILOCODE_FEATURE=cloud-agent` env | `cloud-agent` |
+| Code Reviews | kilo-gateway + `KILOCODE_FEATURE=code-review` env | `code-review` |
+| Auto-Triage | kilo-gateway + `KILOCODE_FEATURE=auto-triage` env | `auto-triage` |
+| Auto-Fix | kilo-gateway + `KILOCODE_FEATURE=auto-fix` env | `auto-fix` |
+| App Builder | kilo-gateway + `KILOCODE_FEATURE=app-builder` env | `app-builder` |
+| Agent Manager | kilo-gateway + `KILOCODE_FEATURE=agent-manager` env | `agent-manager` |
+| Security Agent | `sendProxiedChatCompletion` with `feature` field | `security-agent` |
+| Slack Bot | `sendProxiedChatCompletion` with `feature` field | `slack-bot` |
+| Kilo Claw | Separate billing system | `kilo-claw` (if integrated) |
+| Gateway Direct | No header sent | `NULL` |
+
+## Historical Data Backfill
+
+For data before the `feature` column is populated, use the inference query in `plans/microdollar-feature-inference.sql` which joins `microdollar_usage` against feature-specific tables using 1-minute time windows and `editor_name` patterns.

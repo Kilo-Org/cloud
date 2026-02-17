@@ -6,9 +6,9 @@ Cloud-first rewrite of gastown's core tenets as a Kilo platform feature. See `do
 
 - All orchestration state lives in Durable Objects (SQLite) + Postgres (read replica for dashboard)
 - Agents interact with gastown via **tool calls** backed by DO RPCs — no filesystem coordination
-- Each agent is a Cloud Agent session running Kilo CLI with the gastown tool plugin
+- Each agent is a cloud-agent-next session running Kilo CLI with the gastown tool plugin
 - LLM calls route through the Kilo gateway (`KILO_API_URL`)
-- Watchdog/health monitoring uses DO alarms (mechanical) + ephemeral Cloud Agent sessions (intelligent triage)
+- Watchdog/health monitoring uses DO alarms (mechanical) + ephemeral cloud-agent-next sessions (intelligent triage)
 
 ---
 
@@ -90,7 +90,7 @@ export const gastown_agents = pgTable(
     role: text().notNull().$type<'mayor' | 'polecat' | 'witness' | 'refinery'>(),
     name: text().notNull(), // e.g., "Toast", "Maple"
     identity: text().notNull(), // full identity string: "rig/role/name"
-    cloud_agent_session_id: text(), // current Cloud Agent session (null if no active session)
+    cloud_agent_session_id: text(), // current cloud-agent-next session (null if no active session)
     status: text().notNull().$type<'idle' | 'working' | 'stalled' | 'dead'>().default('idle'),
     current_hook_bead_id: uuid(), // FK added after gastown_beads defined
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -433,7 +433,7 @@ GET    /api/rigs/:rigId/convoys                    → listConvoys (Phase 2)
 Two auth modes (following KiloClaw pattern):
 
 - **Internal** (`x-internal-api-key`): Next.js backend → worker
-- **Agent** (`Authorization: Bearer <session-token>`): tool plugin → worker. Token is a short-lived JWT containing `{ agentId, rigId, townId, userId }`, minted by Next.js when creating a Cloud Agent session.
+- **Agent** (`Authorization: Bearer <session-token>`): tool plugin → worker. Token is a short-lived JWT containing `{ agentId, rigId, townId, userId }`, minted by Next.js when creating a cloud-agent-next session.
 
 ---
 
@@ -443,7 +443,7 @@ Two auth modes (following KiloClaw pattern):
 
 #### Location
 
-This should be a standalone package that gets bundled into Cloud Agent session configs:
+This should be a standalone package that gets bundled into cloud-agent-next session configs:
 
 ```
 cloud/cloudflare-gastown/plugin/
@@ -477,7 +477,7 @@ cloud/cloudflare-gastown/plugin/
 | `session.compacted` | Re-call `gt_prime` to restore context after compaction               |
 | `session.deleted`   | Notify Rig DO that the session has ended (for cleanup/cost tracking) |
 
-#### Environment Variables (set by Cloud Agent session config)
+#### Environment Variables (set by cloud-agent-next session config via `envVars`)
 
 | Var                     | Value                                               |
 | ----------------------- | --------------------------------------------------- |
@@ -489,9 +489,9 @@ cloud/cloudflare-gastown/plugin/
 
 ---
 
-### PR 5: Cloud Agent Session Integration
+### PR 5: Cloud Agent Session Integration (cloud-agent-next)
 
-**Goal:** Wire up the Next.js backend to create Cloud Agent sessions with the gastown tool plugin pre-configured.
+**Goal:** Wire up the Next.js backend to create cloud-agent-next sessions with the gastown tool plugin pre-configured.
 
 #### New Service: `src/lib/gastown/`
 
@@ -500,13 +500,19 @@ src/lib/gastown/
 ├── types.ts                  # GasTownConfig, RigConfig, AgentConfig types
 ├── gastown-service.ts        # Core service: create town, create rig, sling work
 ├── gastown-internal-client.ts # HTTP client for gastown worker (internal auth)
-├── session-factory.ts        # Creates Cloud Agent sessions for gastown agents
+├── session-factory.ts        # Creates cloud-agent-next sessions for gastown agents
 └── token.ts                  # Mints short-lived JWTs for agent → worker auth
 ```
 
 #### `session-factory.ts` — the key integration point
 
+Uses the **cloud-agent-next** API (two-step prepare → initiate flow via `CloudAgentNextClient`).
+
 ```typescript
+import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
+
+const cloudAgentNextClient = createCloudAgentNextClient(env.INTERNAL_API_SECRET);
+
 export async function createPolecatSession(input: {
   userId: string;
   townId: string;
@@ -517,7 +523,7 @@ export async function createPolecatSession(input: {
   gitUrl: string;
   branch: string;
   model: string;
-}): Promise<{ sessionId: string; streamUrl: string }> {
+}): Promise<{ cloudAgentSessionId: string; streamUrl: string }> {
   const token = mintAgentToken({
     agentId: input.agentId,
     rigId: input.rigId,
@@ -525,11 +531,15 @@ export async function createPolecatSession(input: {
     userId: input.userId,
   });
 
-  const session = await cloudAgentClient.prepareSession({
-    userId: input.userId,
+  // Step 1: Prepare the session (creates DB record + DO entry)
+  const prepared = await cloudAgentNextClient.prepareSession({
+    prompt: POLECAT_INITIAL_PROMPT,
+    mode: 'custom',
     model: input.model,
-    systemPrompt: POLECAT_SYSTEM_PROMPT,
-    env: {
+    appendSystemPrompt: POLECAT_SYSTEM_PROMPT,
+    gitUrl: input.gitUrl,
+    upstreamBranch: input.branch,
+    envVars: {
       GASTOWN_API_URL: env.GASTOWN_WORKER_URL,
       GASTOWN_SESSION_TOKEN: token,
       GASTOWN_AGENT_ID: input.agentId,
@@ -537,15 +547,18 @@ export async function createPolecatSession(input: {
       KILO_API_URL: env.KILO_API_URL,
       OPENCODE_PERMISSION: '{"*":"allow"}',
     },
-    // The gastown tool plugin is pre-installed in the Cloud Agent sandbox
+    // The gastown tool plugin is pre-installed in the cloud-agent-next sandbox
     // via opencode.json config that includes it as a plugin
-    gitUrl: input.gitUrl,
-    gitBranch: input.branch,
+  });
+
+  // Step 2: Initiate execution (starts the sandbox, returns WebSocket stream URL)
+  const initiated = await cloudAgentNextClient.initiateFromPreparedSession({
+    cloudAgentSessionId: prepared.cloudAgentSessionId,
   });
 
   return {
-    sessionId: session.id,
-    streamUrl: session.streamUrl,
+    cloudAgentSessionId: initiated.cloudAgentSessionId,
+    streamUrl: initiated.streamUrl,
   };
 }
 ```
@@ -644,7 +657,7 @@ export const gastownRouter = router({
       // 1. Create bead in Rig DO
       // 2. Register or pick an agent
       // 3. Hook bead to agent
-      // 4. Create Cloud Agent session via session-factory
+      // 4. Create cloud-agent-next session via session-factory
       // 5. Return agent/session info
     }),
 
@@ -656,7 +669,7 @@ export const gastownRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      /* return Cloud Agent WebSocket stream URL */
+      /* return cloud-agent-next WebSocket stream URL via getSession() */
     }),
 });
 ```
@@ -681,7 +694,7 @@ This is a thin first pass. Follow existing dashboard patterns.
 
 - **Bead board**: Simple list/kanban of beads by status (open → in_progress → closed). Read from Postgres via tRPC.
 - **Agent card**: Shows agent identity, status, current hook. Links to conversation stream.
-- **Agent stream**: Embeds Cloud Agent WebSocket stream (reuse existing `WebSocketManager` from `cloud-agent-client.ts`).
+- **Agent stream**: Embeds cloud-agent-next WebSocket stream (reuse existing `WebSocketManager` from `@/lib/cloud-agent-next/websocket-manager.ts`).
 - **Sling dialog**: Form to create a bead and assign it. Inputs: title, body, model selector.
 
 ---
@@ -708,7 +721,7 @@ Merge processing (alarm handler):
 4. If merge fails (conflict) → update entry status to `failed`, create escalation bead
 5. Sync results to Postgres
 
-In Phase 1, the merge is done via the **git service** (App Builder's existing git worker or a new git service endpoint). We don't spin up a Cloud Agent session for merging — that's Phase 2 (Refinery).
+In Phase 1, the merge is done via the **git service** (App Builder's existing git worker or a new git service endpoint). We don't spin up a cloud-agent-next session for merging — that's Phase 2 (Refinery).
 
 ---
 
@@ -795,7 +808,7 @@ async witnessPatrol(): Promise<void> {
   ).all('polecat', 'idle');
 
   for (const agent of agents) {
-    // 1. Check if Cloud Agent session is alive
+    // 1. Check if cloud-agent-next session is alive (via getSession → execution.health)
     const sessionAlive = await this.checkSessionHealth(agent.cloud_agent_session_id);
 
     if (!sessionAlive && agent.current_hook_bead_id) {
@@ -821,7 +834,7 @@ async witnessPatrol(): Promise<void> {
 }
 ```
 
-For ambiguous cases (ZFC principle — is the agent stuck or just thinking?), the witness alarm can spawn a short-lived "triage" Cloud Agent session to assess. This is the Boot equivalent from gastown. Defer to Phase 3 if complexity is too high here.
+For ambiguous cases (ZFC principle — is the agent stuck or just thinking?), the witness alarm can spawn a short-lived "triage" cloud-agent-next session (via `prepareSession` → `initiateFromPreparedSession`) to assess. This is the Boot equivalent from gastown. Defer to Phase 3 if complexity is too high here.
 
 ---
 
@@ -832,7 +845,7 @@ For ambiguous cases (ZFC principle — is the agent stuck or just thinking?), th
 When a merge queue entry is ready:
 
 1. Rig DO alarm fires
-2. Spawn a short-lived Cloud Agent session (the "refinery") that:
+2. Spawn a short-lived cloud-agent-next session (the "refinery") via `prepareSession` → `initiateFromPreparedSession` that:
    - Checks out the branch
    - Runs quality gates (configurable: `npm test`, `npm run build`, lint, etc.)
    - If passing → merge to main, update merge queue entry
@@ -911,7 +924,7 @@ Town DO alarm checks unacknowledged escalations every heartbeat (3 min). If unac
 
 ### PR 16: Mayor Agent Session
 
-**Goal:** The Mayor is a persistent Cloud Agent session that coordinates work across rigs.
+**Goal:** The Mayor is a persistent cloud-agent-next session that coordinates work across rigs.
 
 The Mayor:
 
@@ -971,7 +984,7 @@ Each agent gets a persistent DO that accumulates:
 
 - Convoy progress visualization (progress bar, timeline)
 - Real-time updates via WebSocket or polling
-- Agent conversation history (read from R2/Cloud Agent session storage)
+- Agent conversation history (read from R2/cloud-agent-next session storage)
 - Cost tracking per town/rig/convoy/agent
 
 ---
@@ -990,7 +1003,7 @@ Each agent gets a persistent DO that accumulates:
 - Split-brain: two sessions for same agent (race on restart) → Rig DO enforces single-writer per agent
 - Concurrent writes to same bead → SQLite serialization in DO handles this, but add optimistic locking for cross-DO operations
 - DO eviction during alarm → alarms are durable and will re-fire
-- Cloud Agent session timeout → witness alarm detects and restarts
+- cloud-agent-next session timeout → witness alarm detects and restarts
 - Gateway outage → agent retries built into Kilo CLI; escalation if persistent
 
 ### PR 22: Observability
@@ -1019,18 +1032,18 @@ Each agent gets a persistent DO that accumulates:
 
 1. **Git service**: Do we build a new git management worker or reuse the App Builder's `GitRepositoryDO`? The App Builder worker already handles repo init, branch management, and builds. May need forking rather than direct reuse since gastown has different branching semantics (polecat branches, merge queue).
 
-2. **Tool plugin distribution**: How does the gastown tool plugin get into Cloud Agent sessions? Options:
-   - Baked into the Cloud Agent sandbox image (requires Cloud Agent team coordination)
+2. **Tool plugin distribution**: How does the gastown tool plugin get into cloud-agent-next sessions? Options:
+   - Baked into the cloud-agent-next sandbox image (requires cloud-agent-next team coordination)
    - Passed as an MCP server config at session creation time
    - Installed via `OPENCODE_CONFIG_CONTENT` env var pointing at a config that includes the plugin
    - The simplest option is likely `OPENCODE_CONFIG_CONTENT` with the plugin URL
 
-3. **Refinery quality gates**: Should quality gates run inside the same Cloud Agent session as the refinery (agent runs `npm test`)? Or should they be a separate non-AI process (cheaper, deterministic)? The gastown philosophy says the refinery is an AI agent that can reason about test failures, but a non-AI gate is cheaper and faster for simple pass/fail.
+3. **Refinery quality gates**: Should quality gates run inside the same cloud-agent-next session as the refinery (agent runs `npm test`)? Or should they be a separate non-AI process (cheaper, deterministic)? The gastown philosophy says the refinery is an AI agent that can reason about test failures, but a non-AI gate is cheaper and faster for simple pass/fail.
 
-4. **Mayor session persistence**: The Mayor should be long-lived (persistent coordination). Cloud Agent sessions have idle timeouts. Options:
-   - Extend Cloud Agent to support long-lived sessions
+4. **Mayor session persistence**: The Mayor should be long-lived (persistent coordination). cloud-agent-next sessions have idle timeouts. Options:
+   - Extend cloud-agent-next to support long-lived sessions
    - Restart Mayor session on demand (when user sends a message or when work needs coordination)
-   - Make the Mayor "demand-spawned" — Town DO alarm spawns a Mayor session only when there's work to coordinate, then lets it die
+   - Make the Mayor "demand-spawned" — Town DO alarm spawns a cloud-agent-next session only when there's work to coordinate, then lets it die
 
 5. **DO storage limits**: Durable Object SQLite has a 10GB limit. A rig with thousands of beads over months could approach this. Archival strategy: periodically move closed beads to Postgres and purge from DO SQLite. The DO is the hot path; Postgres is the cold archive.
 

@@ -276,7 +276,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
       [reasons[i], reasons[j]] = [reasons[j], reasons[i]];
     }
     return [...reasons, 'Other'];
-  });
+  }, []);
 
   const toggleCancellationReason = (reason: string) => {
     setSelectedCancellationReasons(current =>

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // ── Agent roles (mirrors worker types) ──────────────────────────────────
 
-export const AgentRole = z.enum(['mayor', 'polecat', 'refinery']);
+export const AgentRole = z.enum(['mayor', 'polecat', 'refinery', 'witness']);
 export type AgentRole = z.infer<typeof AgentRole>;
 
 // ── Control server request/response schemas ─────────────────────────────

@@ -52,6 +52,7 @@ export { TownContainerDO } from './dos/TownContainer.do';
 type GastownSecrets = {
   INTERNAL_API_SECRET: SecretsStoreSecret | string;
   GASTOWN_JWT_SECRET: SecretsStoreSecret | string;
+  ENVIRONMENT?: string;
 };
 
 export type GastownEnv = {
@@ -64,6 +65,12 @@ const app = new Hono<GastownEnv>();
 // ── Dashboard UI ────────────────────────────────────────────────────────
 
 app.get('/', async c => {
+  // Only serve the debug dashboard in non-production environments.
+  // It exposes the internal API secret in page source for convenience.
+  if (c.env.ENVIRONMENT === 'production') {
+    return c.notFound();
+  }
+
   let key: string;
   try {
     const secret = c.env.INTERNAL_API_SECRET;

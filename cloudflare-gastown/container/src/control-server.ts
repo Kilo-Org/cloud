@@ -46,7 +46,7 @@ app.post('/agents/:agentId/stop', async c => {
   const parsed = StopAgentRequest.safeParse(body);
   const signal = parsed.success ? parsed.data.signal : undefined;
 
-  await stopProcess(agentId, signal);
+  await stopProcess(agentId, signal ?? 'SIGTERM');
   return c.json({ stopped: true });
 });
 

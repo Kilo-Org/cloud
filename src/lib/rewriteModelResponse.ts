@@ -4,7 +4,7 @@ import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 
-export async function redactedModelResponse(response: Response, model: string) {
+export async function rewriteModelResponse(response: Response, model: string) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -36,6 +36,15 @@ export async function redactedModelResponse(response: Response, model: string) {
           if (json.model) {
             json.model = model;
           }
+
+          const delta = json.choices?.[0]?.delta;
+          if (delta) {
+            // Some APIs set null here, which is not accepted by OpenCode
+            if (delta?.role === null) {
+              delete delta.role;
+            }
+          }
+
           controller.enqueue('data: ' + JSON.stringify(json) + '\n\n');
         },
       });

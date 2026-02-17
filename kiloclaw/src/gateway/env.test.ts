@@ -49,28 +49,28 @@ beforeAll(() => {
 describe('buildEnvVars', () => {
   // ─── Platform defaults (Layer 1) ─────────────────────────────────────
 
-  it('always sets OPENCLAW_GATEWAY_TOKEN and AUTO_APPROVE_DEVICES', async () => {
+  it('puts OPENCLAW_GATEWAY_TOKEN in sensitive and AUTO_APPROVE_DEVICES in env', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
 
     const expectedToken = await deriveGatewayToken(SANDBOX_ID, SECRET);
-    expect(result.OPENCLAW_GATEWAY_TOKEN).toBe(expectedToken);
-    expect(result.OPENCLAW_GATEWAY_TOKEN).toHaveLength(64);
-    expect(result.AUTO_APPROVE_DEVICES).toBe('true');
+    expect(result.sensitive.OPENCLAW_GATEWAY_TOKEN).toBe(expectedToken);
+    expect(result.sensitive.OPENCLAW_GATEWAY_TOKEN).toHaveLength(64);
+    expect(result.env.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
-  it('maps DEV_MODE to OPENCLAW_DEV_MODE for container', async () => {
+  it('maps DEV_MODE to OPENCLAW_DEV_MODE in env bucket', async () => {
     const env = createMockEnv({ DEV_MODE: 'true' });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.OPENCLAW_DEV_MODE).toBe('true');
+    expect(result.env.OPENCLAW_DEV_MODE).toBe('true');
   });
 
-  it('passes KILOCODE_API_BASE_URL override to container', async () => {
+  it('passes KILOCODE_API_BASE_URL override in env bucket', async () => {
     const env = createMockEnv({
       KILOCODE_API_BASE_URL: 'https://example.internal/openrouter/',
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.KILOCODE_API_BASE_URL).toBe('https://example.internal/openrouter/');
+    expect(result.env.KILOCODE_API_BASE_URL).toBe('https://example.internal/openrouter/');
   });
 
   it('does not pass worker-level channel tokens (user config only)', async () => {
@@ -82,10 +82,10 @@ describe('buildEnvVars', () => {
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
 
-    expect(result.TELEGRAM_BOT_TOKEN).toBeUndefined();
-    expect(result.DISCORD_BOT_TOKEN).toBeUndefined();
-    expect(result.SLACK_BOT_TOKEN).toBeUndefined();
-    expect(result.SLACK_APP_TOKEN).toBeUndefined();
+    expect(result.sensitive.TELEGRAM_BOT_TOKEN).toBeUndefined();
+    expect(result.sensitive.DISCORD_BOT_TOKEN).toBeUndefined();
+    expect(result.sensitive.SLACK_BOT_TOKEN).toBeUndefined();
+    expect(result.sensitive.SLACK_APP_TOKEN).toBeUndefined();
   });
 
   // ─── User config merging (Layers 2-4) ────────────────────────────────
@@ -96,12 +96,12 @@ describe('buildEnvVars', () => {
       envVars: { CUSTOM_VAR: 'custom-value', NODE_ENV: 'production' },
     });
 
-    expect(result.OPENCLAW_DEV_MODE).toBe('true');
-    expect(result.CUSTOM_VAR).toBe('custom-value');
-    expect(result.NODE_ENV).toBe('production');
+    expect(result.env.OPENCLAW_DEV_MODE).toBe('true');
+    expect(result.env.CUSTOM_VAR).toBe('custom-value');
+    expect(result.env.NODE_ENV).toBe('production');
   });
 
-  it('passes KiloCode overrides from user config', async () => {
+  it('puts KILOCODE_API_KEY in sensitive, model/models in env', async () => {
     const env = createMockEnv({ AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey });
     const models = [
       { id: 'anthropic/claude-opus-4.5', name: 'Anthropic: Claude Opus 4.5' },
@@ -113,9 +113,9 @@ describe('buildEnvVars', () => {
       kilocodeModels: models,
     });
 
-    expect(result.KILOCODE_API_KEY).toBe('kc-user-key');
-    expect(result.KILOCODE_DEFAULT_MODEL).toBe('kilocode/anthropic/claude-opus-4.5');
-    expect(result.KILOCODE_MODELS_JSON).toBe(JSON.stringify(models));
+    expect(result.sensitive.KILOCODE_API_KEY).toBe('kc-user-key');
+    expect(result.env.KILOCODE_DEFAULT_MODEL).toBe('kilocode/anthropic/claude-opus-4.5');
+    expect(result.env.KILOCODE_MODELS_JSON).toBe(JSON.stringify(models));
   });
 
   it('does not set KILOCODE_MODELS_JSON when kilocodeModels is null or absent', async () => {
@@ -124,15 +124,15 @@ describe('buildEnvVars', () => {
       kilocodeApiKey: 'kc-key',
       kilocodeModels: null,
     });
-    expect(result.KILOCODE_MODELS_JSON).toBeUndefined();
+    expect(result.env.KILOCODE_MODELS_JSON).toBeUndefined();
 
     const result2 = await buildEnvVars(env, SANDBOX_ID, SECRET, {
       kilocodeApiKey: 'kc-key',
     });
-    expect(result2.KILOCODE_MODELS_JSON).toBeUndefined();
+    expect(result2.env.KILOCODE_MODELS_JSON).toBeUndefined();
   });
 
-  it('decrypts and merges encrypted secrets', async () => {
+  it('puts decrypted secrets in sensitive bucket', async () => {
     const env = createMockEnv({
       AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
     });
@@ -142,7 +142,8 @@ describe('buildEnvVars', () => {
       },
     });
 
-    expect(result.SECRET_API_KEY).toBe('decrypted-secret');
+    expect(result.sensitive.SECRET_API_KEY).toBe('decrypted-secret');
+    expect(result.env.SECRET_API_KEY).toBeUndefined();
   });
 
   it('encrypted secrets override plaintext env vars on key conflict', async () => {
@@ -156,10 +157,12 @@ describe('buildEnvVars', () => {
       },
     });
 
-    expect(result.MY_KEY).toBe('encrypted-value');
+    // Encrypted secrets win and go to sensitive bucket
+    expect(result.sensitive.MY_KEY).toBe('encrypted-value');
+    expect(result.env.MY_KEY).toBeUndefined();
   });
 
-  it('decrypts channel tokens and maps to container env vars', async () => {
+  it('puts decrypted channel tokens in sensitive bucket', async () => {
     const env = createMockEnv({
       AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,
     });
@@ -171,47 +174,47 @@ describe('buildEnvVars', () => {
     };
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, { channels });
 
-    expect(result.TELEGRAM_BOT_TOKEN).toBe('tg-token-123');
-    expect(result.DISCORD_BOT_TOKEN).toBe('discord-token-456');
-    expect(result.SLACK_BOT_TOKEN).toBe('slack-bot-789');
-    expect(result.SLACK_APP_TOKEN).toBe('slack-app-012');
+    expect(result.sensitive.TELEGRAM_BOT_TOKEN).toBe('tg-token-123');
+    expect(result.sensitive.DISCORD_BOT_TOKEN).toBe('discord-token-456');
+    expect(result.sensitive.SLACK_BOT_TOKEN).toBe('slack-bot-789');
+    expect(result.sensitive.SLACK_APP_TOKEN).toBe('slack-app-012');
   });
 
   // ─── Worker-level DM policy passthrough ─────────────────────────────
 
-  it('passes TELEGRAM_DM_POLICY and DISCORD_DM_POLICY from worker env', async () => {
+  it('passes TELEGRAM_DM_POLICY and DISCORD_DM_POLICY in env bucket', async () => {
     const env = createMockEnv({
       TELEGRAM_DM_POLICY: 'open',
       DISCORD_DM_POLICY: 'pairing',
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
 
-    expect(result.TELEGRAM_DM_POLICY).toBe('open');
-    expect(result.DISCORD_DM_POLICY).toBe('pairing');
+    expect(result.env.TELEGRAM_DM_POLICY).toBe('open');
+    expect(result.env.DISCORD_DM_POLICY).toBe('pairing');
   });
 
   it('does not set DM policy vars when not configured on worker', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
 
-    expect(result.TELEGRAM_DM_POLICY).toBeUndefined();
-    expect(result.DISCORD_DM_POLICY).toBeUndefined();
+    expect(result.env.TELEGRAM_DM_POLICY).toBeUndefined();
+    expect(result.env.DISCORD_DM_POLICY).toBeUndefined();
   });
 
-  it('passes OPENCLAW_ALLOWED_ORIGINS from worker env', async () => {
+  it('passes OPENCLAW_ALLOWED_ORIGINS in env bucket', async () => {
     const env = createMockEnv({
       OPENCLAW_ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:8795',
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
 
-    expect(result.OPENCLAW_ALLOWED_ORIGINS).toBe('http://localhost:3000,http://localhost:8795');
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe('http://localhost:3000,http://localhost:8795');
   });
 
   it('does not set OPENCLAW_ALLOWED_ORIGINS when not configured', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
 
-    expect(result.OPENCLAW_ALLOWED_ORIGINS).toBeUndefined();
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBeUndefined();
   });
 
   // ─── Reserved system vars (Layer 5) ──────────────────────────────────
@@ -229,8 +232,8 @@ describe('buildEnvVars', () => {
       },
     });
 
-    expect(result.OPENCLAW_GATEWAY_TOKEN).toBe(expectedToken);
-    expect(result.AUTO_APPROVE_DEVICES).toBe('true');
+    expect(result.sensitive.OPENCLAW_GATEWAY_TOKEN).toBe(expectedToken);
+    expect(result.env.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
   it('skips channel decryption when no private key configured', async () => {
@@ -240,7 +243,7 @@ describe('buildEnvVars', () => {
     };
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, { channels });
 
-    expect(result.TELEGRAM_BOT_TOKEN).toBeUndefined();
+    expect(result.sensitive.TELEGRAM_BOT_TOKEN).toBeUndefined();
   });
 
   it('works with userConfig containing only channels (no envVars/secrets)', async () => {
@@ -253,14 +256,45 @@ describe('buildEnvVars', () => {
       },
     });
 
-    expect(result.TELEGRAM_BOT_TOKEN).toBe('tg-only');
-    expect(result.AUTO_APPROVE_DEVICES).toBe('true');
+    expect(result.sensitive.TELEGRAM_BOT_TOKEN).toBe('tg-only');
+    expect(result.env.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
   it('handles empty userConfig gracefully', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {});
 
-    expect(result.AUTO_APPROVE_DEVICES).toBe('true');
+    expect(result.env.AUTO_APPROVE_DEVICES).toBe('true');
+  });
+
+  // ─── Reserved prefix validation ──────────────────────────────────────
+
+  it('rejects user envVars with KILOCLAW_ENC_ prefix', async () => {
+    const env = createMockEnv();
+    await expect(
+      buildEnvVars(env, SANDBOX_ID, SECRET, {
+        envVars: { KILOCLAW_ENC_FOO: 'bad' },
+      })
+    ).rejects.toThrow('reserved prefix');
+  });
+
+  it('rejects user encryptedSecrets with KILOCLAW_ENV_ prefix', async () => {
+    const env = createMockEnv({ AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey });
+    await expect(
+      buildEnvVars(env, SANDBOX_ID, SECRET, {
+        encryptedSecrets: {
+          KILOCLAW_ENV_BAD: encryptForTest('val', testPublicKey),
+        },
+      })
+    ).rejects.toThrow('reserved prefix');
+  });
+
+  it('rejects user envVars with invalid shell identifier', async () => {
+    const env = createMockEnv();
+    await expect(
+      buildEnvVars(env, SANDBOX_ID, SECRET, {
+        envVars: { 'MY-VAR': 'bad' },
+      })
+    ).rejects.toThrow('valid shell identifier');
   });
 });

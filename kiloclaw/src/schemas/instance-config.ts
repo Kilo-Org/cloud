@@ -19,9 +19,22 @@ const MachineSizeSchema = z.object({
 
 export type MachineSize = z.infer<typeof MachineSizeSchema>;
 
+/**
+ * Valid env var name: must be a valid shell identifier and must not use
+ * reserved prefixes (KILOCLAW_ENC_, KILOCLAW_ENV_) which are reserved
+ * for the env var encryption system.
+ */
+const envVarNameSchema = z
+  .string()
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Must be a valid shell identifier')
+  .refine(
+    s => !s.startsWith('KILOCLAW_ENC_') && !s.startsWith('KILOCLAW_ENV_'),
+    'Uses reserved prefix (KILOCLAW_ENC_ or KILOCLAW_ENV_)'
+  );
+
 export const InstanceConfigSchema = z.object({
-  envVars: z.record(z.string(), z.string()).optional(),
-  encryptedSecrets: z.record(z.string(), EncryptedEnvelopeSchema).optional(),
+  envVars: z.record(envVarNameSchema, z.string()).optional(),
+  encryptedSecrets: z.record(envVarNameSchema, EncryptedEnvelopeSchema).optional(),
   kilocodeApiKey: z.string().nullable().optional(),
   kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
   kilocodeDefaultModel: z.string().nullable().optional(),

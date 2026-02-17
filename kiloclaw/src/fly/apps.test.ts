@@ -104,7 +104,8 @@ function mockFetchSequence(responses: Array<[number, unknown]>): void {
   const fn = vi.fn();
   for (const [status, body] of responses) {
     const responseBody = typeof body === 'string' ? body : JSON.stringify(body);
-    const headers = typeof body === 'string' ? {} : { 'Content-Type': 'application/json' };
+    const headers: HeadersInit =
+      typeof body === 'string' ? {} : { 'Content-Type': 'application/json' };
     fn.mockResolvedValueOnce(new Response(responseBody, { status, headers }));
   }
   vi.stubGlobal('fetch', fn);

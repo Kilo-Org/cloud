@@ -113,7 +113,7 @@ subdomainApp.all('*', async c => {
     if (contentType.toLowerCase().includes('text/html')) {
       try {
         if (await isBannerEnabled(c.env.DEPLOY_KV, workerName)) {
-          return injectBanner(response);
+          return injectBanner(response, c.env.BANNER_LINK_URL);
         }
       } catch (bannerError) {
         console.error('Banner injection failed, serving original response:', bannerError);

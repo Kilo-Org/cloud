@@ -4,8 +4,6 @@
  * inside an iframe for complete style isolation from the host page.
  */
 
-const KILO_APP_BUILDER_URL = 'https://app.kilo.ai/app-builder';
-
 /**
  * Generates a cryptographically secure base64-encoded nonce for CSP.
  * Uses 16 random bytes (128 bits) encoded as base64.
@@ -96,7 +94,7 @@ const KILO_LOGO_SVG =
   'M234 91H190V140.5H234V91Z" fill="#FAF74F"/>' +
   '</svg>';
 
-function getBannerScript(nonce: string): string {
+function getBannerScript(nonce: string, bannerLinkUrl: string): string {
   const srcdoc =
     '<!DOCTYPE html>' +
     '<html><head><style>' +
@@ -124,7 +122,7 @@ function getBannerScript(nonce: string): string {
     'svg { flex-shrink: 0; border-radius: 6px; }' +
     '</style></head><body>' +
     '<a href="' +
-    KILO_APP_BUILDER_URL +
+    bannerLinkUrl +
     '" target="_blank" rel="noopener noreferrer">' +
     KILO_LOGO_SVG +
     '<span>Made with Kilo</span>' +
@@ -154,9 +152,9 @@ function getBannerScript(nonce: string): string {
  * Injects the "Made with Kilo" banner into an HTML response
  * using HTMLRewriter. Handles CSP nonce injection.
  */
-export function injectBanner(response: Response): Response {
+export function injectBanner(response: Response, bannerLinkUrl: string): Response {
   const nonce = generateCSPNonce();
-  const bannerScript = getBannerScript(nonce);
+  const bannerScript = getBannerScript(nonce, bannerLinkUrl);
 
   const newHeaders = new Headers(response.headers);
   newHeaders.delete('content-length');

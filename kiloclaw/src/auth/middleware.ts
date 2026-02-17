@@ -112,12 +112,14 @@ export async function internalApiMiddleware(c: Context<AppEnv>, next: Next) {
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+
+  if (aBytes.length !== bBytes.length) {
+    // Compare a against itself so the timing is constant regardless of length mismatch
+    crypto.subtle.timingSafeEqual(aBytes, aBytes);
     return false;
   }
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
+  return crypto.subtle.timingSafeEqual(aBytes, bBytes);
 }

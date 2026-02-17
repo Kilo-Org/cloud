@@ -23,7 +23,15 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
   const router = useRouter();
 
   // Fetch user organizations
-  const { data: organizations, isPending } = useQuery(trpc.organizations.list.queryOptions());
+  const { data: organizations, isPending } = useQuery(
+    trpc.organizations.list.queryOptions(undefined, {
+      trpc: {
+        context: {
+          skipBatch: true,
+        },
+      },
+    })
+  );
 
   const handleOrganizationSwitch = (orgId: string | null) => {
     if (orgId) {

@@ -13,7 +13,8 @@ x-worker-base: &worker-base
     dockerfile: dev/Dockerfile.dev
   volumes:
     - ..:/app
-  network_mode: host
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   restart: unless-stopped
 
 services:
@@ -24,7 +25,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
-    network_mode: host
+    ports:
+      - "5432:5432"
     restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -38,6 +40,8 @@ services:
   nextjs:
     <<: *worker-base
     profiles: ["core", "all"]
+    ports:
+      - "3000:3000"
     env_file:
       - ../.env
     depends_on:
@@ -49,144 +53,174 @@ services:
   cloud-agent:
     <<: *worker-base
     profiles: ["agents", "all"]
+    ports:
+      - "8788:8788"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloud-agent && pnpm dev --port 8788"
+    command: sh -c "cd /app/cloud-agent && pnpm dev --port 8788 --ip 0.0.0.0"
 
   # ── 3. cloud-agent-next (port 8794) ────────────────────────────────
   cloud-agent-next:
     <<: *worker-base
     profiles: ["agents", "all"]
+    ports:
+      - "8794:8794"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloud-agent-next && pnpm dev --port 8794"
+    command: sh -c "cd /app/cloud-agent-next && pnpm dev --port 8794 --ip 0.0.0.0"
 
   # ── 4. cloudflare-ai-attribution (port 8787) ───────────────────────
   cloudflare-ai-attribution:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8787:8787"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-ai-attribution && pnpm dev --port 8787"
+    command: sh -c "cd /app/cloudflare-ai-attribution && pnpm dev --port 8787 --ip 0.0.0.0"
 
   # ── 5. cloudflare-app-builder (port 8790) ──────────────────────────
   cloudflare-app-builder:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8790:8790"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-app-builder && pnpm dev --port 8790"
+    command: sh -c "cd /app/cloudflare-app-builder && pnpm dev --port 8790 --ip 0.0.0.0"
 
   # ── 6. cloudflare-auto-fix-infra (port 8796) ──────────────────────
   cloudflare-auto-fix-infra:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8796:8796"
     depends_on:
       postgres:
         condition: service_healthy
       cloud-agent:
         condition: service_started
-    command: sh -c "cd /app/cloudflare-auto-fix-infra && pnpm dev --port 8796"
+    command: sh -c "cd /app/cloudflare-auto-fix-infra && pnpm dev --port 8796 --ip 0.0.0.0"
 
   # ── 7. cloudflare-auto-triage-infra (port 8791) ───────────────────
   cloudflare-auto-triage-infra:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8791:8791"
     depends_on:
       postgres:
         condition: service_healthy
       cloud-agent:
         condition: service_started
-    command: sh -c "cd /app/cloudflare-auto-triage-infra && pnpm dev --port 8791"
+    command: sh -c "cd /app/cloudflare-auto-triage-infra && pnpm dev --port 8791 --ip 0.0.0.0"
 
   # ── 8. cloudflare-code-review-infra (port 8789) ───────────────────
   cloudflare-code-review-infra:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8789:8789"
     depends_on:
       postgres:
         condition: service_healthy
       cloud-agent:
         condition: service_started
-    command: sh -c "cd /app/cloudflare-code-review-infra && pnpm dev --port 8789"
+    command: sh -c "cd /app/cloudflare-code-review-infra && pnpm dev --port 8789 --ip 0.0.0.0"
 
   # ── 9. cloudflare-db-proxy (port 8797) ─────────────────────────────
   cloudflare-db-proxy:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8797:8797"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-db-proxy && pnpm dev --port 8797"
+    command: sh -c "cd /app/cloudflare-db-proxy && pnpm dev --port 8797 --ip 0.0.0.0"
 
   # ── 10. cloudflare-deploy-infra/builder (port 8798) ────────────────
   cloudflare-deploy-builder:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8798:8798"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-deploy-infra/builder && pnpm dev --port 8798"
+    command: sh -c "cd /app/cloudflare-deploy-infra/builder && pnpm dev --port 8798 --ip 0.0.0.0"
 
   # ── 11. cloudflare-deploy-infra/dispatcher (port 8799) ─────────────
   cloudflare-deploy-dispatcher:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8799:8799"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-deploy-infra/dispatcher && pnpm dev --port 8799"
+    command: sh -c "cd /app/cloudflare-deploy-infra/dispatcher && pnpm dev --port 8799 --ip 0.0.0.0"
 
   # ── 12. cloudflare-session-ingest (port 8800) ─────────────────────
   cloudflare-session-ingest:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8800:8800"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-session-ingest && pnpm dev --port 8800"
+    command: sh -c "cd /app/cloudflare-session-ingest && pnpm dev --port 8800 --ip 0.0.0.0"
 
   # ── 13. cloudflare-o11y (port 8801) ────────────────────────────────
   cloudflare-o11y:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8801:8801"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-o11y && pnpm dev --port 8801"
+    command: sh -c "cd /app/cloudflare-o11y && pnpm dev --port 8801 --ip 0.0.0.0"
 
   # ── 14. cloudflare-webhook-agent-ingest (port 8793) ────────────────
   cloudflare-webhook-agent-ingest:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8793:8793"
     depends_on:
       postgres:
         condition: service_healthy
       cloud-agent:
         condition: service_started
-    command: sh -c "cd /app/cloudflare-webhook-agent-ingest && pnpm dev --port 8793"
+    command: sh -c "cd /app/cloudflare-webhook-agent-ingest && pnpm dev --port 8793 --ip 0.0.0.0"
 
   # ── 15. cloudflare-git-token-service (port 8802) ──────────────────
   cloudflare-git-token-service:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8802:8802"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-git-token-service && pnpm dev --port 8802"
+    command: sh -c "cd /app/cloudflare-git-token-service && pnpm dev --port 8802 --ip 0.0.0.0"
 
   # ── 16. kiloclaw (port 8795) ───────────────────────────────────────
   kiloclaw:
     <<: *worker-base
     profiles: ["workers", "all"]
+    ports:
+      - "8795:8795"
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/kiloclaw && pnpm dev --port 8795"
+    command: sh -c "cd /app/kiloclaw && pnpm dev --port 8795 --ip 0.0.0.0"
 
 volumes:
   postgres_data:

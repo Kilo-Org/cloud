@@ -20,8 +20,13 @@ export const GastownPlugin: Plugin = async ({ client }) => {
   const gastownClient = createClientFromEnv();
   const tools = createTools(gastownClient);
 
-  function log(level: 'info' | 'error', message: string) {
-    return client.app.log({ body: { service: SERVICE, level, message } });
+  // Best-effort logging — never let telemetry failures break tool execution
+  async function log(level: 'info' | 'error', message: string) {
+    try {
+      await client.app.log({ body: { service: SERVICE, level, message } });
+    } catch {
+      // Swallow — logging is non-critical
+    }
   }
 
   // Prime on session start and inject into context

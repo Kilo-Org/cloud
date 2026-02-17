@@ -625,9 +625,9 @@ export class RigDO extends DurableObject<Env> {
   async alarm(): Promise<void> {
     await this.ensureInitialized();
 
-    const scheduledAgents = await this.schedulePendingWork();
-    const patrol = await this.witnessPatrol();
-    const reviewProcessed = await this.processReviewQueue();
+    await this.schedulePendingWork();
+    await this.witnessPatrol();
+    await this.processReviewQueue();
 
     // Re-arm with adaptive interval
     const nextAlarmMs = this.hasActiveWork() ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
@@ -806,17 +806,15 @@ export class RigDO extends DurableObject<Env> {
   // ── Process Review Queue ──────────────────────────────────────────────
 
   /**
-   * Pop the next pending review entry and trigger merge in the container.
+   * Check for a pending review entry and trigger merge in the container.
+   * Checks townId before popping to avoid losing entries.
    */
   private async processReviewQueue(): Promise<boolean> {
+    const townId = await this.getTownId();
+    if (!townId) return false;
+
     const entry = await this.popReviewQueue();
     if (!entry) return false;
-
-    const townId = await this.getTownId();
-    if (!townId) {
-      console.warn('processReviewQueue: no townId configured, skipping merge');
-      return false;
-    }
 
     await this.startMergeInContainer(townId, entry);
     return true;

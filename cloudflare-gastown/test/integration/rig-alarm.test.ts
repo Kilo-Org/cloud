@@ -94,14 +94,32 @@ describe('Rig DO Alarm', () => {
   // ── Alarm handler behavior ──────────────────────────────────────────────
 
   describe('alarm handler', () => {
-    it('should re-arm after firing (adaptive interval)', async () => {
+    it('should re-arm when there is active work', async () => {
       await rig.setTownId('town-test');
-      // First alarm from setTownId
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `rearm-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Active work' });
+      await rig.hookBead(agent.id, bead.id);
+
+      // First alarm from hookBead
       await runDurableObjectAlarm(rig);
 
-      // Alarm should re-arm itself — run it again
+      // Agent is working with an in-progress bead — alarm should re-arm
       const ranAgain = await runDurableObjectAlarm(rig);
       expect(ranAgain).toBe(true);
+    });
+
+    it('should not re-arm when there is no active work', async () => {
+      await rig.setTownId('town-idle');
+      // First alarm from setTownId — no active work
+      await runDurableObjectAlarm(rig);
+
+      // No active work means alarm should not re-arm
+      const ranAgain = await runDurableObjectAlarm(rig);
+      expect(ranAgain).toBe(false);
     });
 
     it('should process review queue entries during alarm', async () => {

@@ -625,13 +625,17 @@ export class RigDO extends DurableObject<Env> {
   async alarm(): Promise<void> {
     await this.ensureInitialized();
 
-    await this.schedulePendingWork();
+    // witnessPatrol first: resets dead-container agents to idle so
+    // schedulePendingWork can re-dispatch them in the same tick
     await this.witnessPatrol();
+    await this.schedulePendingWork();
     await this.processReviewQueue();
 
-    // Re-arm with adaptive interval
-    const nextAlarmMs = this.hasActiveWork() ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
-    await this.ctx.storage.setAlarm(Date.now() + nextAlarmMs);
+    // Only re-arm if there's active work; armAlarmIfNeeded() restarts
+    // the loop when new work arrives
+    if (this.hasActiveWork()) {
+      await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
+    }
   }
 
   /**
@@ -939,14 +943,31 @@ export class RigDO extends DurableObject<Env> {
           continue;
         }
 
-        // GUPP violation check (30 min no progress)
+        // GUPP violation check (30 min no progress).
+        // Only send if no undelivered GUPP_CHECK mail already exists for this agent.
         if (row.last_activity_at && String(row.last_activity_at) < guppThreshold) {
-          await this.sendMail({
-            from_agent_id: 'witness',
-            to_agent_id: agentId,
-            subject: 'GUPP_CHECK',
-            body: 'You have had work hooked for 30+ minutes with no activity. Are you stuck? If so, call gt_escalate.',
-          });
+          const existingGupp = [
+            ...query(
+              this.sql,
+              /* sql */ `
+                SELECT ${mail.columns.id} FROM ${mail}
+                WHERE ${mail.columns.to_agent_id} = ?
+                  AND ${mail.columns.subject} = 'GUPP_CHECK'
+                  AND ${mail.columns.delivered} = 0
+                LIMIT 1
+              `,
+              [agentId]
+            ),
+          ];
+
+          if (existingGupp.length === 0) {
+            await this.sendMail({
+              from_agent_id: 'witness',
+              to_agent_id: agentId,
+              subject: 'GUPP_CHECK',
+              body: 'You have had work hooked for 30+ minutes with no activity. Are you stuck? If so, call gt_escalate.',
+            });
+          }
         }
       }
     }

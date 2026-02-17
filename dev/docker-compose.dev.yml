@@ -54,7 +54,7 @@ services:
     <<: *worker-base
     profiles: ["core", "all"]
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     env_file:
       - ../.env
     # Override localhost URLs so Next.js can reach other services on the

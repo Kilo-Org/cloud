@@ -1,7 +1,10 @@
 /**
  * HTMLRewriter-based banner injection for deployed sites.
- * Injects a "Made with Kilo" badge in the bottom-right corner.
+ * Injects a "Made with Kilo" badge in the bottom-right corner
+ * inside an iframe for complete style isolation from the host page.
  */
+
+const KILO_APP_BUILDER_URL = 'https://app.kilo.ai/app-builder';
 
 /**
  * Generates a cryptographically secure base64-encoded nonce for CSP.
@@ -21,7 +24,7 @@ function addNonceToDirective(value: string, nonceValue: string): string {
   if (value.includes("'none'")) {
     return value.replace("'none'", nonceValue);
   }
-  return `${value} ${nonceValue}`;
+  return value ? `${value} ${nonceValue}` : nonceValue;
 }
 
 /**
@@ -38,7 +41,7 @@ function addNonceToCSP(csp: string, nonce: string): string {
 
   const directiveMap = new Map<string, string>();
   for (const directive of directives) {
-    const spaceIndex = directive.indexOf(' ');
+    const spaceIndex = directive.search(/\s/);
     if (spaceIndex === -1) {
       directiveMap.set(directive.toLowerCase(), '');
     } else {
@@ -63,6 +66,17 @@ function addNonceToCSP(csp: string, nonce: string): string {
     directiveMap.set('script-src-elem', addNonceToDirective(current, nonceValue));
   }
 
+  // Ensure frame-src (or child-src) allows our srcdoc iframe.
+  // Only needed when the directive is explicitly present and restrictive.
+  for (const directive of ['frame-src', 'child-src']) {
+    if (directiveMap.has(directive)) {
+      const current = directiveMap.get(directive) ?? '';
+      if (!current.includes("'self'") && !current.includes('*')) {
+        directiveMap.set(directive, addNonceToDirective(current, "'self'"));
+      }
+    }
+  }
+
   const result: string[] = [];
   for (const [name, value] of directiveMap) {
     result.push(value ? `${name} ${value}` : name);
@@ -70,21 +84,65 @@ function addNonceToCSP(csp: string, nonce: string): string {
   return result.join('; ');
 }
 
+const KILO_LOGO_SVG =
+  '<svg width="24" height="24" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+  '<rect width="512" height="512" rx="80" fill="#18181b"/>' +
+  '<path d="M322 377H377V421H307.857L278 391.143V322H322V377Z' +
+  'M421 307.857L391.143 278H322V322L377 322V377H421V307.857Z' +
+  'M234 278H190V322H234V278Z' +
+  'M91 391.143L120.857 421H234V377H135V278H91V391.143Z' +
+  'M371.172 189.999V120.856L341.315 90.9995H278V135H327.172V189.999H278V233.999H421V189.999H371.172Z' +
+  'M135 91H91V233.999H135V184.5H190V233.999H234V184.5L190 140.5H135V91Z' +
+  'M234 91H190V140.5H234V91Z" fill="#FAF74F"/>' +
+  '</svg>';
+
 function getBannerScript(nonce: string): string {
+  const srcdoc =
+    '<!DOCTYPE html>' +
+    '<html><head><style>' +
+    'body { margin: 0; background: transparent; display: flex; justify-content: center; }' +
+    'a {' +
+    '  display: inline-flex;' +
+    '  align-items: center;' +
+    '  gap: 8px;' +
+    '  padding: 6px 12px 6px 6px;' +
+    '  background: rgba(24,24,27,0.85);' +
+    '  color: #fafafa;' +
+    '  font: 500 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;' +
+    '  border-radius: 10px;' +
+    '  border: 1px solid rgba(255,255,255,0.08);' +
+    '  text-decoration: none;' +
+    '  box-shadow: 0 4px 12px rgba(0,0,0,0.4);' +
+    '  backdrop-filter: blur(12px);' +
+    '  -webkit-backdrop-filter: blur(12px);' +
+    '  transition: transform 0.2s, box-shadow 0.2s;' +
+    '}' +
+    'a:hover {' +
+    '  transform: translateY(-1px);' +
+    '  box-shadow: 0 6px 16px rgba(0,0,0,0.5);' +
+    '}' +
+    'svg { flex-shrink: 0; border-radius: 6px; }' +
+    '</style></head><body>' +
+    '<a href="' +
+    KILO_APP_BUILDER_URL +
+    '" target="_blank" rel="noopener noreferrer">' +
+    KILO_LOGO_SVG +
+    '<span>Made with Kilo</span>' +
+    '</a></body></html>';
+
+  // JSON.stringify handles all JS-string escaping (quotes, backslashes, backticks, ${, etc.).
+  // setAttribute then handles HTML-attribute escaping at runtime.
+  const srcdocJs = JSON.stringify(srcdoc);
+
   return `<script nonce="${nonce}" data-kilo-banner>
 (function() {
   function inject() {
-    var badge = document.createElement('a');
-    badge.href = 'https://app.kilo.ai/app-builder';
-    badge.target = '_blank';
-    badge.rel = 'noopener noreferrer';
-    badge.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;background:rgba(24,24,27,0.85);color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:500;line-height:1;border-radius:10px;border:1px solid rgba(255,255,255,0.08);text-decoration:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:transform 0.2s,box-shadow 0.2s;';
-    badge.innerHTML = '<svg width="24" height="24" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:6px"><rect width="512" height="512" rx="80" fill="#18181b"/><path d="M322 377H377V421H307.857L278 391.143V322H322V377ZM421 307.857L391.143 278H322V322L377 322V377H421V307.857ZM234 278H190V322H234V278ZM91 391.143L120.857 421H234V377H135V278H91V391.143ZM371.172 189.999V120.856L341.315 90.9995H278V135H327.172V189.999H278V233.999H421V189.999H371.172ZM135 91H91V233.999H135V184.5H190V233.999H234V184.5L190 140.5H135V91ZM234 91H190V140.5H234V91Z" fill="#FAF74F"/></svg><span>Made with Kilo</span>';
-
-    badge.addEventListener('mouseenter', function() { badge.style.transform = 'translateY(-1px)'; badge.style.boxShadow = '0 6px 16px rgba(0,0,0,0.5)'; });
-    badge.addEventListener('mouseleave', function() { badge.style.transform = 'none'; badge.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)'; });
-
-    document.body.appendChild(badge);
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;border:none;width:195px;height:38px;overflow:hidden;pointer-events:auto;color-scheme:none;background:transparent;';
+    iframe.setAttribute('srcdoc', ${srcdocJs});
+    iframe.setAttribute('title', 'Made with Kilo');
+    iframe.setAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox');
+    document.body.appendChild(iframe);
   }
   if (document.body) { inject(); }
   else { document.addEventListener('DOMContentLoaded', inject); }
@@ -104,6 +162,9 @@ export function injectBanner(response: Response): Response {
   newHeaders.delete('content-length');
   // HTMLRewriter produces an uncompressed body, so the original encoding is no longer valid
   newHeaders.delete('content-encoding');
+  // Validators no longer match the rewritten body
+  newHeaders.delete('etag');
+  newHeaders.delete('last-modified');
 
   // Modify CSP headers to allow our nonced script
   const csp = response.headers.get('content-security-policy');

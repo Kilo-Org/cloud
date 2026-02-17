@@ -110,7 +110,7 @@ subdomainApp.all('*', async c => {
     // Banner injection is best-effort: if KV or HTMLRewriter fails,
     // return the original response rather than turning it into a 500.
     const contentType = response.headers.get('content-type') ?? '';
-    if (contentType.includes('text/html')) {
+    if (contentType.toLowerCase().includes('text/html')) {
       try {
         if (await isBannerEnabled(c.env.DEPLOY_KV, workerName)) {
           return injectBanner(response);

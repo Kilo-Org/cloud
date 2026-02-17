@@ -43,8 +43,4 @@
       "secret_name": "GASTOWN_JWT_SECRET_PROD",
     },
   ],
-
-  // Local dev: plain-text fallback for secrets.
-  // .dev.vars values override secrets_store_secrets in local dev mode.
-  "vars": {},
 }

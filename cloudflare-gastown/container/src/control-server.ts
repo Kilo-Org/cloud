@@ -12,7 +12,10 @@ import { startHeartbeat, stopHeartbeat } from './heartbeat';
 import { StartAgentRequest, StopAgentRequest, SendMessageRequest } from './types';
 import type { AgentStatusResponse, HealthResponse, StreamTicketResponse } from './types';
 
-// Simple stream ticket store (ticket -> agentId, expires after 60s)
+// TODO: Add a WebSocket consumer endpoint (GET /agents/:agentId/stream) that
+// validates and consumes tickets. Until then, tickets are only used as a
+// placeholder for the upcoming streaming implementation.
+const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
 export const app = new Hono();
@@ -42,6 +45,9 @@ app.post('/agents/start', async c => {
 // POST /agents/:agentId/stop
 app.post('/agents/:agentId/stop', async c => {
   const { agentId } = c.req.param();
+  if (!getProcessStatus(agentId)) {
+    return c.json({ error: `Agent ${agentId} not found` }, 404);
+  }
   const body = await c.req.json().catch(() => ({}));
   const parsed = StopAgentRequest.safeParse(body);
   const signal = parsed.success ? parsed.data.signal : undefined;
@@ -53,6 +59,9 @@ app.post('/agents/:agentId/stop', async c => {
 // POST /agents/:agentId/message
 app.post('/agents/:agentId/message', async c => {
   const { agentId } = c.req.param();
+  if (!getProcessStatus(agentId)) {
+    return c.json({ error: `Agent ${agentId} not found` }, 404);
+  }
   const body = await c.req.json().catch(() => null);
   const parsed = SendMessageRequest.safeParse(body);
   if (!parsed.success) {
@@ -94,9 +103,13 @@ app.post('/agents/:agentId/stream-ticket', c => {
   const expiresAt = Date.now() + 60_000;
   streamTickets.set(ticket, { agentId, expiresAt });
 
-  // Clean up expired tickets
+  // Clean up expired tickets and enforce cap
   for (const [t, v] of streamTickets) {
     if (v.expiresAt < Date.now()) streamTickets.delete(t);
+  }
+  if (streamTickets.size > MAX_TICKETS) {
+    const oldest = streamTickets.keys().next().value;
+    if (oldest) streamTickets.delete(oldest);
   }
 
   const response: StreamTicketResponse = {

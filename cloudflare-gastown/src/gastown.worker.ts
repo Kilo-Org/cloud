@@ -44,19 +44,8 @@ export { TownDO } from './dos/Town.do';
 export { AgentIdentityDO } from './dos/AgentIdentity.do';
 export { TownContainerDO } from './dos/TownContainer.do';
 
-// Extend the generated Env with secrets store bindings.
-// The generated worker-configuration.d.ts only contains DO namespace bindings;
-// secrets_store_secrets bindings must be declared manually until `wrangler types`
-// is re-run after the wrangler.jsonc change.
-// In production, secrets are SecretsStoreSecret (with .get()); in tests they're plain strings
-type GastownSecrets = {
-  INTERNAL_API_SECRET: SecretsStoreSecret | string;
-  GASTOWN_JWT_SECRET: SecretsStoreSecret | string;
-  ENVIRONMENT?: string;
-};
-
 export type GastownEnv = {
-  Bindings: Env & GastownSecrets;
+  Bindings: Env;
   Variables: AuthVariables;
 };
 
@@ -65,12 +54,6 @@ const app = new Hono<GastownEnv>();
 // ── Dashboard UI ────────────────────────────────────────────────────────
 
 app.get('/', async c => {
-  // Only serve the debug dashboard in non-production environments.
-  // It exposes the internal API secret in page source for convenience.
-  if (c.env.ENVIRONMENT === 'production') {
-    return c.notFound();
-  }
-
   let key: string;
   try {
     const secret = c.env.INTERNAL_API_SECRET;

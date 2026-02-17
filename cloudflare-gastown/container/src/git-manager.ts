@@ -19,6 +19,30 @@ function validatePathSegment(value: string, label: string): void {
 }
 
 /**
+ * Validate a git URL — only allow https:// and git@ protocols.
+ * Blocks local paths and exotic transports.
+ */
+function validateGitUrl(url: string): void {
+  if (!url) throw new Error('gitUrl is required');
+  if (!/^(https?:\/\/|git@)/.test(url)) {
+    throw new Error(`gitUrl must use https:// or git@ protocol, got: ${url.slice(0, 50)}`);
+  }
+}
+
+/**
+ * Validate a branch name — block control characters and shell metacharacters.
+ */
+function validateBranchName(branch: string, label: string): void {
+  if (!branch) throw new Error(`${label} is required`);
+  if (/[\x00-\x1f\x7f ~^:?*\[\\]/.test(branch)) {
+    throw new Error(`${label} contains invalid characters`);
+  }
+  if (branch.startsWith('-')) {
+    throw new Error(`${label} cannot start with a hyphen`);
+  }
+}
+
+/**
  * Verify a resolved path is inside the workspace root.
  * Protects against symlink-based escapes.
  */
@@ -71,6 +95,8 @@ function worktreeDir(rigId: string, branch: string): string {
  * If the repo is already cloned, fetches latest instead.
  */
 export async function cloneRepo(options: CloneOptions): Promise<string> {
+  validateGitUrl(options.gitUrl);
+  validateBranchName(options.defaultBranch, 'defaultBranch');
   const dir = repoDir(options.rigId);
 
   if (await pathExists(join(dir, '.git'))) {

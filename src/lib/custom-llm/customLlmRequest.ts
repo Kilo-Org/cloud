@@ -478,6 +478,7 @@ function buildCommonParams(
   messages: ModelMessage[],
   request: OpenRouterChatCompletionRequest
 ) {
+  const verbosity = customLlm.verbosity ?? request.verbosity ?? undefined;
   return {
     messages,
     tools: convertTools(request.tools),
@@ -489,11 +490,11 @@ function buildCommonParams(
     providerOptions: {
       anthropic: {
         thinking: { type: 'adaptive' },
-        effort: customLlm.verbosity ?? request.verbosity ?? undefined,
+        effort: verbosity,
       } satisfies AnthropicProviderOptions,
       openai: {
         reasoningSummary: 'auto',
-        textVerbosity: customLlm.verbosity ?? request.verbosity,
+        textVerbosity: verbosity === 'max' ? 'high' : verbosity,
         reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort,
       } satisfies OpenAILanguageModelResponsesOptions,
     },

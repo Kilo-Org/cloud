@@ -16,7 +16,8 @@ export const AgentRecord = z.object({
   checkpoint: z
     .string()
     .nullable()
-    .transform(v => (v === null ? null : (JSON.parse(v) as unknown))),
+    .transform(v => (v === null ? null : JSON.parse(v)))
+    .pipe(z.unknown()),
   created_at: z.string(),
 });
 

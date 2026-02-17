@@ -1,5 +1,9 @@
+import { ReasoningDetailType } from '@/lib/custom-llm/reasoning-details';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
-import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
+import type {
+  MessageWithReasoning,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/providers/openrouter/types';
 import type { ProviderId } from '@/lib/providers/provider-id';
 
 export const grok_code_fast_1_optimized_free_model = {
@@ -29,6 +33,24 @@ export function applyXaiModelSettings(
     delete requestToMutate.description;
     delete requestToMutate.provider;
     delete requestToMutate.usage;
+    delete requestToMutate.transforms;
+    delete requestToMutate.reasoningEffort;
+
+    for (const message of requestToMutate.messages) {
+      if (message.role !== 'assistant') {
+        continue;
+      }
+      const msgWithReasoning = message as MessageWithReasoning;
+      const reasoningDetailsText = (msgWithReasoning.reasoning_details ?? [])
+        .filter(r => r.type === ReasoningDetailType.Text)
+        .map(r => r.text)
+        .join('');
+      if (reasoningDetailsText) {
+        msgWithReasoning.reasoning_content = reasoningDetailsText;
+        delete msgWithReasoning.reasoning_details;
+        delete msgWithReasoning.reasoning;
+      }
+    }
   }
 
   // https://kilo-code.slack.com/archives/C09922UFQHF/p1767968746782459

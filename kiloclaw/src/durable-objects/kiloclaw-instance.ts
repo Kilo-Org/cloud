@@ -483,8 +483,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
-    console.log('[DO] DEBUG envVars keys:', Object.keys(envVars));
-    console.log('[DO] DEBUG minSecretsVersion:', minSecretsVersion);
     const guest = guestFromSize(this.machineSize);
     const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
     const identity = { userId: this.userId, sandboxId: this.sandboxId };

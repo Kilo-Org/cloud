@@ -47,7 +47,7 @@ function escapeIlikePattern(str: string): string {
 function extractRepoNameFromUrl(githubUrl: string): string | null {
   try {
     const parsed = new URL(githubUrl);
-    if (!parsed.hostname.includes('github.com')) {
+    if (parsed.hostname !== 'github.com' && parsed.hostname !== 'www.github.com') {
       return null;
     }
     const pathParts = parsed.pathname.split('/').filter(Boolean);

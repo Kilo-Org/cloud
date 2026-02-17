@@ -21,7 +21,13 @@ export type DeleteSessionForCloudAgentParams = {
   kiloUserId: string;
 };
 
+export type ExportSessionParams = {
+  sessionId: string;
+  kiloUserId: string;
+};
+
 export type SessionIngestBinding = Fetcher & {
   createSessionForCloudAgent(params: CreateSessionForCloudAgentParams): Promise<void>;
   deleteSessionForCloudAgent(params: DeleteSessionForCloudAgentParams): Promise<void>;
+  exportSession(params: ExportSessionParams): Promise<string | null>;
 };

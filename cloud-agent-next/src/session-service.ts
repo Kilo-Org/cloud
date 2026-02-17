@@ -288,6 +288,27 @@ export async function writeMCPSettings(
     .info('Configured MCP servers');
 }
 
+// Write Kilo auth file so the CLI's KiloSessions can call session ingest.
+// The CLI reads ~/.local/share/kilo/auth.json via Auth.get("kilo") but we
+// never run `kilo auth login` — credentials are injected purely via env vars
+// for config (KILO_CONFIG_CONTENT). The session ingest code path ignores the
+// provider config and only reads the auth file.
+export async function writeAuthFile(
+  sandbox: SandboxInstance,
+  sessionHome: string,
+  kilocodeToken: string
+): Promise<void> {
+  const authDir = `${sessionHome}/.local/share/kilo`;
+  const authPath = `${authDir}/auth.json`;
+
+  await sandbox.exec(`mkdir -p ${authDir}`);
+
+  const authContent = JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } }, null, 2);
+  await sandbox.writeFile(authPath, authContent);
+
+  logger.info('Wrote kilo auth file for session ingest');
+}
+
 /**
  * Fetch session metadata from Durable Object using RPC with retry logic.
  * Creates a fresh stub for each retry attempt as recommended by Cloudflare.
@@ -552,6 +573,8 @@ export class SessionService {
 
     if (env.KILOCODE_BACKEND_BASE_URL) {
       envVars.KILOCODE_BACKEND_BASE_URL = env.KILOCODE_BACKEND_BASE_URL;
+      // Used by kilo server to check user auth to send to ingest
+      envVars.KILO_API_URL = env.KILOCODE_BACKEND_BASE_URL;
     }
 
     if (env.KILO_SESSION_INGEST_URL) {
@@ -746,6 +769,9 @@ export class SessionService {
       await writeMCPSettings(sandbox, context.sessionHome, mcpServers);
     }
 
+    // Write auth file for session ingest
+    await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
+
     // Save metadata to Durable Object
     const existingMetadata = await this.loadSessionMetadata(env, context);
     await this.saveSessionMetadata(
@@ -814,38 +840,24 @@ export class SessionService {
   private async restoreSessionSnapshot(
     session: ExecutionSession,
     sessionId: string,
-    authToken: string,
+    kiloSessionId: string,
     env: PersistenceEnv,
     userId: string
   ): Promise<void> {
     const tmpPath = `/tmp/kilo-session-export-${sessionId}.json`;
     let wroteSnapshot = false;
     try {
-      const response = await env.SESSION_INGEST.fetch(
-        `https://session-ingest/api/session/${sessionId}/export`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
+      const payload = await env.SESSION_INGEST.exportSession({
+        sessionId: kiloSessionId,
+        kiloUserId: userId,
+      });
 
-      if (!response) {
-        throw new Error('Session ingest fetch returned no response');
-      }
-
-      if (response.status === 401 || response.status === 404) {
+      if (payload === null) {
         throw new SessionSnapshotRestoreError(
-          `Session snapshot restore failed with status ${response.status}`,
-          response.status
+          `Session snapshot restore failed: session not found`,
+          404
         );
       }
-
-      if (!response.ok) {
-        throw new Error(`Session ingest returned ${response.status}`);
-      }
-
-      const payload = await response.text();
       await session.writeFile(tmpPath, payload);
       wroteSnapshot = true;
 
@@ -1049,6 +1061,9 @@ export class SessionService {
     if (mcpServers && Object.keys(mcpServers).length > 0) {
       await writeMCPSettings(sandbox, context.sessionHome, mcpServers);
     }
+
+    // Write auth file for session ingest
+    await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
 
     // Fetch metadata from DO if not provided, to ensure we preserve existing fields
     const metadataToPreserve =
@@ -1273,7 +1288,12 @@ export class SessionService {
     }
 
     // Cold-start resume must restore snapshot or fail.
-    await this.restoreSessionSnapshot(session, sessionId, kilocodeToken, env, userId);
+    if (!metadata.kiloSessionId) {
+      throw new Error(
+        `Session ${sessionId} has no kiloSessionId in metadata. Cannot restore snapshot.`
+      );
+    }
+    await this.restoreSessionSnapshot(session, sessionId, metadata.kiloSessionId, env, userId);
 
     await restoreWorkspace(session, context.workspacePath, context.branchName, {
       githubRepo: metadata.githubRepo,
@@ -1294,6 +1314,9 @@ export class SessionService {
     if (metadata.mcpServers && Object.keys(metadata.mcpServers).length > 0) {
       await writeMCPSettings(sandbox, context.sessionHome, metadata.mcpServers);
     }
+
+    // Re-write auth file (fresh clone)
+    await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
   }
 
   /**

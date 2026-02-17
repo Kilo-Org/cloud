@@ -6,6 +6,7 @@ import {
   SessionService,
   determineBranchName,
   runSetupCommands,
+  writeAuthFile,
   writeMCPSettings,
 } from '../../session-service.js';
 import { InstallationLookupService } from '../../services/installation-lookup-service.js';
@@ -280,6 +281,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
           .info('Writing MCP settings');
         await writeMCPSettings(sandbox, sessionHome, input.mcpServers);
       }
+
+      // 9b. Write auth file for session ingest
+      await writeAuthFile(sandbox, sessionHome, ctx.authToken);
 
       // 10. Start kilo server
       logger.info('Starting kilo server');

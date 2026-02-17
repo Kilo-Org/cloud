@@ -118,7 +118,7 @@
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "1.0.16",
+        "KILOCODE_CLI_VERSION": "1.0.22",
       },
       "max_instances": 20,
       "rollout_active_grace_period": 120,

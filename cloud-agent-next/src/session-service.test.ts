@@ -46,11 +46,9 @@ import type { PersistenceEnv, CloudAgentSessionState } from './persistence/types
 describe('SessionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockEnv.SESSION_INGEST.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: vi.fn().mockResolvedValue(JSON.stringify({ info: {}, messages: [] })),
-    }) as unknown as PersistenceEnv['SESSION_INGEST']['fetch'];
+    mockEnv.SESSION_INGEST.exportSession = vi
+      .fn()
+      .mockResolvedValue(JSON.stringify({ info: {}, messages: [] }));
   });
 
   const mockedSetupWorkspace = vi.mocked(mockSetupWorkspace);
@@ -74,7 +72,7 @@ describe('SessionService', () => {
     } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
     NEXTAUTH_SECRET: 'mock-secret',
     SESSION_INGEST: {
-      fetch: vi.fn(),
+      exportSession: vi.fn(),
     } as unknown as PersistenceEnv['SESSION_INGEST'],
   };
 
@@ -117,6 +115,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_test_123';
       mockedSetupWorkspace.mockResolvedValue({
@@ -170,17 +170,14 @@ describe('SessionService', () => {
       expect(result.streamKilocodeExec).toBeDefined();
     });
 
-    it('does not restore session snapshot during initiate (no fetch)', async () => {
-      const payload = JSON.stringify({ info: {}, messages: [] });
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: vi.fn().mockResolvedValue(payload),
-      });
+    it('does not restore session snapshot during initiate (no exportSession call)', async () => {
+      const exportSessionMock = vi
+        .fn()
+        .mockResolvedValue(JSON.stringify({ info: {}, messages: [] }));
       const envWithIngest: PersistenceEnv = {
         ...mockEnv,
         SESSION_INGEST: {
-          fetch: fetchMock,
+          exportSession: exportSessionMock,
         } as unknown as PersistenceEnv['SESSION_INGEST'],
       };
 
@@ -194,6 +191,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_restore_test_skip';
       mockedSetupWorkspace.mockResolvedValue({
@@ -214,7 +213,7 @@ describe('SessionService', () => {
         env: envWithIngest,
       });
 
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(exportSessionMock).not.toHaveBeenCalled();
       expect(fakeSession.writeFile).not.toHaveBeenCalled();
       expect(fakeSession.exec).not.toHaveBeenCalledWith(
         `kilo import "/tmp/kilo-session-export-${sessionId}.json"`
@@ -235,6 +234,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_test_456';
       mockedSetupWorkspace.mockResolvedValue({
@@ -281,6 +282,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const service = new SessionService();
       const sessionId: SessionId = 'agent_test_456';
@@ -331,6 +334,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_first_call';
       mockedSetupWorkspace.mockResolvedValue({
@@ -395,6 +400,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_resume_first_flag';
 
@@ -447,6 +454,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
 
       const service = new SessionService();
@@ -499,6 +508,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_capture_test';
       mockedSetupWorkspace.mockResolvedValue({
@@ -574,6 +585,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
 
       const mockDOGetMetadata = vi.fn();
@@ -598,6 +611,7 @@ describe('SessionService', () => {
         timestamp: 123456789,
         githubRepo: 'facebook/react',
         githubToken: 'test-token',
+        kiloSessionId: 'ses_test_kilo_session_id_0001',
       };
       mockDOGetMetadata.mockResolvedValue(metadata);
 
@@ -642,6 +656,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
 
       const mockDOGetMetadata = vi.fn();
@@ -658,6 +674,7 @@ describe('SessionService', () => {
       };
 
       // Mock: DO returns metadata with STALE token
+      const kiloSessionId = 'ses_test_kilo_session_id_0001';
       const metadata = {
         version: 123456789,
         sessionId,
@@ -665,7 +682,8 @@ describe('SessionService', () => {
         userId,
         timestamp: 123456789,
         githubRepo: 'facebook/react',
-        githubToken: 'stale-token-from-metadata',
+        githubToken: 'test-token',
+        kiloSessionId,
       };
       mockDOGetMetadata.mockResolvedValue(metadata);
 
@@ -709,6 +727,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
 
       const mockDOGetMetadata = vi.fn();
@@ -733,6 +753,7 @@ describe('SessionService', () => {
         timestamp: 123456789,
         githubRepo: 'facebook/react',
         githubToken: 'metadata-token',
+        kiloSessionId: 'ses_test_kilo_session_id_0001',
       };
       mockDOGetMetadata.mockResolvedValue(metadata);
 
@@ -769,6 +790,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
 
       const testEnv = {
@@ -804,15 +827,11 @@ describe('SessionService', () => {
     it('restores session snapshot before reclone when workspace is missing', async () => {
       const mockDOGetMetadata = vi.fn();
       const payload = JSON.stringify({ info: {}, messages: [] });
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: vi.fn().mockResolvedValue(payload),
-      });
+      const exportSessionMock = vi.fn().mockResolvedValue(payload);
       const envWithIngest: PersistenceEnv = {
         ...mockEnv,
         SESSION_INGEST: {
-          fetch: fetchMock,
+          exportSession: exportSessionMock,
         } as unknown as PersistenceEnv['SESSION_INGEST'],
         CLOUD_AGENT_SESSION: {
           idFromName: vi.fn(() => 'mock-do-id' as unknown as DurableObjectId),
@@ -835,8 +854,11 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
 
+      const kiloSessionId = 'ses_test_kilo_session_id_0001';
       const metadata = {
         version: 123456789,
         sessionId,
@@ -845,6 +867,7 @@ describe('SessionService', () => {
         timestamp: 123456789,
         githubRepo: 'facebook/react',
         githubToken: 'test-token',
+        kiloSessionId,
       };
       mockDOGetMetadata.mockResolvedValue(metadata);
 
@@ -860,14 +883,10 @@ describe('SessionService', () => {
         env: envWithIngest,
       });
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        `https://session-ingest/api/session/${sessionId}/export`,
-        {
-          headers: {
-            Authorization: 'Bearer test-token',
-          },
-        }
-      );
+      expect(exportSessionMock).toHaveBeenCalledWith({
+        sessionId: kiloSessionId,
+        kiloUserId: userId,
+      });
       expect(fakeSession.writeFile).toHaveBeenCalledWith(
         `/tmp/kilo-session-export-${sessionId}.json`,
         payload
@@ -895,6 +914,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_envtest_123';
       mockedSetupWorkspace.mockResolvedValue({
@@ -952,6 +973,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_special_chars';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1001,6 +1024,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_no_env';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1051,6 +1076,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_gh_token_test';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1094,6 +1121,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_gh_token_override';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1142,6 +1171,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_no_gh_token';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1179,6 +1210,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_empty_gh_token';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1216,6 +1249,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_giturl_with_ghtoken';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1254,6 +1289,7 @@ describe('SessionService', () => {
         timestamp: 123456789,
         githubRepo: 'acme/repo',
         setupCommands: ['npm install', 'npm run build', 'npm test'],
+        kiloSessionId: 'ses_test_kilo_session_id_0001',
       };
 
       const { env: testEnv } = createMetadataEnv({
@@ -1283,6 +1319,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: vi.fn().mockResolvedValue(fakeSession),
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
 
       const service = new SessionService();
@@ -1337,6 +1375,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_failfast_test';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1382,6 +1422,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_timeout_test';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1420,6 +1462,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_cwd_test';
       const workspacePath = `/workspace/org/user/sessions/${sessionId}`;
@@ -1463,6 +1507,8 @@ describe('SessionService', () => {
       const sandbox = {
         createSession: sandboxCreateSession,
         mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
       } as unknown as SandboxInstance;
       const sessionId: SessionId = 'agent_empty_commands';
       mockedSetupWorkspace.mockResolvedValue({
@@ -1886,6 +1932,7 @@ describe('SessionService', () => {
         timestamp: 123456789,
         githubRepo: 'acme/repo',
         setupCommands: ['npm install', 'npm run build'],
+        kiloSessionId: 'ses_test_kilo_session_id_0001',
       };
 
       const { env: testEnv } = createMetadataEnv({
@@ -1930,6 +1977,7 @@ describe('SessionService', () => {
         userId: 'user',
         timestamp: 123456789,
         githubRepo: 'acme/repo',
+        kiloSessionId: 'ses_test_kilo_session_id_0001',
         mcpServers: {
           puppeteer: {
             command: 'npx',
@@ -2040,6 +2088,7 @@ describe('SessionService', () => {
         envVars: { API_KEY: 'test' },
         setupCommands: ['npm install'],
         mcpServers: { test: { command: 'test-server' } },
+        kiloSessionId: 'ses_test_kilo_session_id_0001',
       };
 
       const { env: testEnv } = createMetadataEnv({

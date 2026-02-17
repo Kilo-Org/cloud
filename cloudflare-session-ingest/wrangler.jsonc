@@ -5,6 +5,11 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-01-27",
   "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    "port": 8787,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
   "placement": {
     "mode": "smart",
   },

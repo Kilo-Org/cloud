@@ -9,6 +9,7 @@ import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { SessionSyncInputSchema } from '../types/session-sync';
 import { withDORetry } from '../util/do-retry';
 import { splitIngestBatchForDO } from '../util/ingest-batching';
+import { getSessionExport } from '../services/session-export';
 
 export type ApiContext = {
   Bindings: Env;
@@ -31,6 +32,7 @@ const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
+  console.log('POST /api/session called', { sessionId: body.sessionId, userId: c.get('user_id') });
 
   // Persist a placeholder session row.
   // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
@@ -64,6 +66,10 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
 
 api.delete('/session/:sessionId', async c => {
   const rawSessionId = c.req.param('sessionId');
+  console.log('DELETE /api/session/:sessionId called', {
+    sessionId: rawSessionId,
+    userId: c.get('user_id'),
+  });
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
@@ -158,6 +164,10 @@ api.delete('/session/:sessionId', async c => {
 
 api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), async c => {
   const rawSessionId = c.req.param('sessionId');
+  console.log('POST /api/session/:sessionId/ingest called', {
+    sessionId: rawSessionId,
+    userId: c.get('user_id'),
+  });
   const sessionIdParseResult = sessionIdSchema.safeParse(rawSessionId);
   if (!sessionIdParseResult.success) {
     return c.json(
@@ -288,30 +298,21 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
 
 api.get('/session/:sessionId/export', async c => {
   const rawSessionId = c.req.param('sessionId');
+  console.log('GET /api/session/:sessionId/export called', {
+    sessionId: rawSessionId,
+    userId: c.get('user_id'),
+  });
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
-  const db = getDb(c.env.HYPERDRIVE);
   const kiloUserId = c.get('user_id');
+  const json = await getSessionExport(c.env, parsed.data, kiloUserId);
 
-  const session = await db
-    .selectFrom('cli_sessions_v2')
-    .select(['session_id'])
-    .where('session_id', '=', parsed.data)
-    .where('kilo_user_id', '=', kiloUserId)
-    .executeTakeFirst();
-
-  if (!session) {
+  if (json === null) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  const json = await withDORetry(
-    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-    stub => stub.getAll(),
-    'SessionIngestDO.getAll'
-  );
 
   return c.body(json, 200, {
     'content-type': 'application/json; charset=utf-8',
@@ -320,6 +321,10 @@ api.get('/session/:sessionId/export', async c => {
 
 api.post('/session/:sessionId/share', async c => {
   const rawSessionId = c.req.param('sessionId');
+  console.log('POST /api/session/:sessionId/share called', {
+    sessionId: rawSessionId,
+    userId: c.get('user_id'),
+  });
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
@@ -372,6 +377,10 @@ api.post('/session/:sessionId/share', async c => {
 
 api.post('/session/:sessionId/unshare', async c => {
   const rawSessionId = c.req.param('sessionId');
+  console.log('POST /api/session/:sessionId/unshare called', {
+    sessionId: rawSessionId,
+    userId: c.get('user_id'),
+  });
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);

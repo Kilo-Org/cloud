@@ -44,7 +44,7 @@ export function applyXaiModelSettings(
       const reasoningDetailsText = (msgWithReasoning.reasoning_details ?? [])
         .filter(r => r.type === ReasoningDetailType.Text)
         .map(r => r.text)
-        .join();
+        .join('');
       if (reasoningDetailsText) {
         msgWithReasoning.reasoning_content = reasoningDetailsText;
         delete msgWithReasoning.reasoning_details;

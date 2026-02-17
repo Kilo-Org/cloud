@@ -74,7 +74,7 @@ services:
   # service names before starting wrangler dev.
   cloud-agent:
     <<: *worker-base
-    profiles: ["agents", "all"]
+    profiles: ["agents", "workers", "all"]
     ports:
       - "127.0.0.1:8788:8788"
     depends_on:

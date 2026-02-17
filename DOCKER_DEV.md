@@ -34,7 +34,7 @@ Services are grouped into profiles for selective startup. PostgreSQL always star
 |---------|----------|
 | `core` | PostgreSQL + Next.js backend |
 | `agents` | PostgreSQL + cloud-agent + cloud-agent-next |
-| `workers` | PostgreSQL + all Cloudflare Workers |
+| `workers` | PostgreSQL + cloud-agent + all Cloudflare Workers |
 | `all` | Everything |
 
 ```bash

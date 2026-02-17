@@ -8,6 +8,7 @@
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "test:git": "tsx src/_integration_tests/test-git-integration.ts"
   },
   "dependencies": {
@@ -18,13 +19,14 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.9",
     "@cloudflare/containers": "^0.0.30",
     "@cloudflare/sandbox": "0.6.7",
     "@cloudflare/workers-types": "^4.20251014.0",
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.10.1",
     "tsx": "^4.7.0",
     "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
     "wrangler": "^4.61.0"
   }
 }

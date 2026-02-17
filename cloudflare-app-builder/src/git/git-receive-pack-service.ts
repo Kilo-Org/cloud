@@ -9,6 +9,15 @@ import { logger, formatError } from '../utils/logger';
 import type { RefUpdate, ReceivePackResult } from '../types';
 import { MAX_OBJECT_SIZE } from './constants';
 
+export type ReceivePackError =
+  | { kind: 'global'; message: string }
+  | { kind: 'ref'; refName: string; message: string };
+
+/** Collapse newlines and strip control characters so a message is safe for a single pkt-line. */
+function sanitizeStatusMessage(msg: string): string {
+  return msg.replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1f]/g, '');
+}
+
 export class GitReceivePackService {
   /**
    * Handle info/refs request for receive-pack service
@@ -164,11 +173,14 @@ export class GitReceivePackService {
       refUpdates: [],
       errors: [],
     };
+    // Structured errors for report-status generation (separate from result.errors which is string[])
+    const reportErrors: ReceivePackError[] = [];
 
     try {
       // Parse pkt-line commands and find packfile
       const { commands, packfileStart } = this.parsePktLines(requestData);
       result.refUpdates = commands;
+      let indexedOids: Set<string> | undefined;
 
       // Extract packfile data (skip PACK header check, pass all remaining data)
       if (packfileStart < requestData.length) {
@@ -213,7 +225,9 @@ export class GitReceivePackService {
             result.success = false;
 
             // Return error response immediately - DO NOT index or update refs
-            const response = this.generateReportStatus(commands, [errorMsg]);
+            const response = this.generateReportStatus(commands, [
+              { kind: 'global', message: errorMsg },
+            ]);
             return { response, result };
           }
 
@@ -234,25 +248,58 @@ export class GitReceivePackService {
 
           // Use isomorphic-git to index the packfile
           try {
-            await git.indexPack({
+            const indexResult = await git.indexPack({
               fs,
               dir: '/',
               filepath: packPath,
               gitdir: '.git',
             });
+            indexedOids = new Set(indexResult.oids);
           } catch (indexError) {
-            logger.error('indexPack failed', formatError(indexError));
+            const errorMessage =
+              indexError instanceof Error ? indexError.message : String(indexError);
+            const errorStack = indexError instanceof Error ? indexError.stack : undefined;
+
+            logger.error('indexPack failed', {
+              error: errorMessage,
+              stack: errorStack,
+              packPath,
+              packfileSize: actualPackfile.length,
+              commands: commands.map(c => c.refName),
+            });
+
+            // CLEANUP: Remove the corrupted packfile and any partial .idx to prevent leaving partial data
+            const idxPath = packPath.replace(/\.pack$/, '.idx');
+            for (const filePath of [packPath, idxPath]) {
+              try {
+                await fs.unlink(filePath);
+                logger.info('Cleaned up failed pack artifact', { filePath });
+              } catch (cleanupError) {
+                // File may not exist (e.g., .idx wasn't written yet) — that's fine
+                logger.warn('Failed to cleanup pack artifact', {
+                  filePath,
+                  cleanupError:
+                    cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+                });
+              }
+            }
+
             // Don't silently continue - this is a critical error
-            result.errors.push(
-              `Failed to index packfile: ${
-                indexError instanceof Error ? indexError.message : String(indexError)
-              }`
-            );
+            // Mark as failed and DON'T proceed with ref updates
+            const indexErrorMsg = `Failed to index packfile: ${errorMessage}`;
+            result.errors.push(indexErrorMsg);
+
+            // Return error response immediately - DO NOT apply refs with corrupt objects
+            result.success = false;
+            const response = this.generateReportStatus(commands, [
+              { kind: 'global', message: indexErrorMsg },
+            ]);
+            return { response, result };
           }
         }
       }
 
-      // Apply ref updates
+      // Apply ref updates — all error paths returned above
       const zeroOid = '0000000000000000000000000000000000000000';
 
       for (const cmd of commands) {
@@ -260,26 +307,60 @@ export class GitReceivePackService {
           if (cmd.newOid === zeroOid) {
             // Delete ref
             await git.deleteRef({ fs, dir: '/', ref: cmd.refName });
-          } else {
-            // Create or update ref
-            await git.writeRef({
-              fs,
-              dir: '/',
-              ref: cmd.refName,
-              value: cmd.newOid,
-              force: true,
-            });
+            continue;
+          }
 
-            // If this is main/master branch, also update HEAD
-            if (cmd.refName === 'refs/heads/main' || cmd.refName === 'refs/heads/master') {
+          // Validate the target object exists somewhere in the repo
+          if (indexedOids && !indexedOids.has(cmd.newOid)) {
+            let objectExists = false;
+            try {
+              await git.readObject({ fs, dir: '/', oid: cmd.newOid });
+              objectExists = true;
+            } catch {
+              // Object not found anywhere in the repo
+            }
+
+            if (!objectExists) {
+              const errorMsg = `Ref ${cmd.refName} targets object ${cmd.newOid} which was not found in the repository`;
+              logger.warn('Ref target not found in repository', {
+                refName: cmd.refName,
+                newOid: cmd.newOid,
+              });
+              result.errors.push(errorMsg);
+              reportErrors.push({ kind: 'ref', refName: cmd.refName, message: errorMsg });
+              continue;
+            }
+          }
+
+          // Create or update ref
+          await git.writeRef({
+            fs,
+            dir: '/',
+            ref: cmd.refName,
+            value: cmd.newOid,
+            force: true,
+          });
+
+          // If this is main/master branch, ensure HEAD points to it symbolically.
+          // Only set HEAD when it doesn't already resolve (e.g. first push).
+          if (cmd.refName === 'refs/heads/main' || cmd.refName === 'refs/heads/master') {
+            let headExists = false;
+            try {
+              await git.resolveRef({ fs, dir: '/', ref: 'HEAD' });
+              headExists = true;
+            } catch {
+              // HEAD doesn't resolve — needs to be set
+            }
+
+            if (!headExists) {
               try {
-                // Check if HEAD is symbolic or create it
                 await git.writeRef({
                   fs,
                   dir: '/',
                   ref: 'HEAD',
-                  value: cmd.newOid,
+                  value: cmd.refName,
                   force: true,
+                  symbolic: true,
                 });
               } catch (err) {
                 logger.warn('Failed to update HEAD', formatError(err));
@@ -292,43 +373,55 @@ export class GitReceivePackService {
           }`;
           logger.error('Ref update failed', { refName: cmd.refName, ...formatError(refError) });
           result.errors.push(errorMsg);
+          reportErrors.push({ kind: 'ref', refName: cmd.refName, message: errorMsg });
         }
       }
 
       result.success = result.errors.length === 0;
 
       // Generate report-status response
-      const response = this.generateReportStatus(commands, result.errors);
+      const response = this.generateReportStatus(commands, reportErrors);
 
       return { response, result };
     } catch (error) {
       logger.error('Failed to handle receive-pack', formatError(error));
       result.success = false;
-      result.errors.push(error instanceof Error ? error.message : String(error));
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      result.errors.push(errorMsg);
 
-      const response = this.generateReportStatus(
-        [],
-        [error instanceof Error ? error.message : 'Unknown error']
-      );
+      const response = this.generateReportStatus([], [{ kind: 'global', message: errorMsg }]);
       return { response, result };
     }
   }
 
   /**
-   * Generate report-status response for push
+   * Generate report-status response for push.
+   * Global errors (pack-size, indexPack failure) mark all refs as ng.
+   * Per-ref errors only mark the specific ref as ng.
    */
-  private static generateReportStatus(commands: RefUpdate[], errors: string[]): Uint8Array {
+  static generateReportStatus(commands: RefUpdate[], errors: ReceivePackError[]): Uint8Array {
     const chunks: Uint8Array[] = [];
     const encoder = new TextEncoder();
 
-    // Unpack status
-    const unpackStatus = errors.length === 0 ? 'unpack ok\n' : 'unpack error\n';
+    const globalError = errors.find(e => e.kind === 'global');
+
+    // Unpack status — only report error for global failures (pack-level).
+    // Per-ref failures are reported via ng lines; the pack itself unpacked fine.
+    const unpackStatus = globalError ? 'unpack error\n' : 'unpack ok\n';
     chunks.push(this.createSidebandPacket(1, encoder.encode(this.formatPacketLine(unpackStatus))));
 
     // Ref statuses
     for (const cmd of commands) {
-      const refError = errors.find(e => e.includes(cmd.refName));
-      const status = refError ? `ng ${cmd.refName} ${refError}\n` : `ok ${cmd.refName}\n`;
+      let status: string;
+      if (globalError) {
+        // Global failure applies to all refs
+        status = `ng ${cmd.refName} ${sanitizeStatusMessage(globalError.message)}\n`;
+      } else {
+        const refError = errors.find(e => e.kind === 'ref' && e.refName === cmd.refName);
+        status = refError
+          ? `ng ${cmd.refName} ${sanitizeStatusMessage(refError.message)}\n`
+          : `ok ${cmd.refName}\n`;
+      }
       chunks.push(this.createSidebandPacket(1, encoder.encode(this.formatPacketLine(status))));
     }
 
@@ -373,11 +466,12 @@ export class GitReceivePackService {
   }
 
   /**
-   * Format git packet line (4-byte hex length + data)
+   * Format git packet line (4-byte hex length prefix + data).
+   * The length counts UTF-8 encoded bytes (not JS string length) per the git protocol spec.
    */
   private static formatPacketLine(data: string): string {
-    const length = data.length + 4;
-    const hexLength = length.toString(16).padStart(4, '0');
+    const byteLength = new TextEncoder().encode(data).length;
+    const hexLength = (byteLength + 4).toString(16).padStart(4, '0');
     return hexLength + data;
   }
 

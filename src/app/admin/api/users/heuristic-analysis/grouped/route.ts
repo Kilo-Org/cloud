@@ -74,7 +74,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<HeuristicA
         SUM(cost) / 1000000.0 as cost_dollars,
         SUM(input_tokens) as input_tokens,
         SUM(output_tokens) as output_tokens
-      FROM microdollar_usage_view
+      FROM microdollar_usage_view_with_session
       CROSS JOIN LATERAL (
         SELECT
           CASE

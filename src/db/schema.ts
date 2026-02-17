@@ -2017,6 +2017,111 @@ export const cliSessions = pgTable(
 
 export type CliSession = typeof cliSessions.$inferSelect;
 
+export const microdollar_usage_view_with_session = pgView('microdollar_usage_view_with_session', {
+  id: uuid().notNull(),
+  kilo_user_id: text().notNull(),
+  message_id: text(),
+  cost: bigint({ mode: 'number' }).notNull(),
+  input_tokens: bigint({ mode: 'number' }).notNull(),
+  output_tokens: bigint({ mode: 'number' }).notNull(),
+  cache_write_tokens: bigint({ mode: 'number' }).notNull(),
+  cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  http_x_forwarded_for: text(),
+  http_x_vercel_ip_city: text(),
+  http_x_vercel_ip_country: text(),
+  http_x_vercel_ip_latitude: real(),
+  http_x_vercel_ip_longitude: real(),
+  http_x_vercel_ja4_digest: text(),
+  provider: text(),
+  model: text(),
+  requested_model: text(),
+  user_prompt_prefix: text(),
+  system_prompt_prefix: text(),
+  system_prompt_length: integer(),
+  http_user_agent: text(),
+  cache_discount: bigint({ mode: 'number' }),
+  max_tokens: bigint({ mode: 'number' }),
+  has_middle_out_transform: boolean(),
+  has_error: boolean().notNull(),
+  abuse_classification: smallint().notNull().$type<AbuseClassification>(),
+  organization_id: uuid(),
+  inference_provider: text(),
+  project_id: text(),
+  status_code: smallint(),
+  upstream_id: text(),
+  finish_reason: text(),
+  latency: real(),
+  moderation_latency: real(),
+  generation_time: real(),
+  is_byok: boolean(),
+  is_user_byok: boolean(),
+  streamed: boolean(),
+  cancelled: boolean(),
+  editor_name: text(),
+  has_tools: boolean(),
+  machine_id: text(),
+  session_id: uuid(),
+}).as(sql`
+  SELECT
+    mu.id,
+    mu.kilo_user_id,
+    meta.message_id,
+    mu.cost,
+    mu.input_tokens,
+    mu.output_tokens,
+    mu.cache_write_tokens,
+    mu.cache_hit_tokens,
+    mu.created_at,
+    ip.http_ip AS http_x_forwarded_for,
+    city.vercel_ip_city AS http_x_vercel_ip_city,
+    country.vercel_ip_country AS http_x_vercel_ip_country,
+    meta.vercel_ip_latitude AS http_x_vercel_ip_latitude,
+    meta.vercel_ip_longitude AS http_x_vercel_ip_longitude,
+    ja4.ja4_digest AS http_x_vercel_ja4_digest,
+    mu.provider,
+    mu.model,
+    mu.requested_model,
+    meta.user_prompt_prefix,
+    spp.system_prompt_prefix,
+    meta.system_prompt_length,
+    ua.http_user_agent,
+    mu.cache_discount,
+    meta.max_tokens,
+    meta.has_middle_out_transform,
+    mu.has_error,
+    mu.abuse_classification,
+    mu.organization_id,
+    mu.inference_provider,
+    mu.project_id,
+    meta.status_code,
+    meta.upstream_id,
+    frfr.finish_reason,
+    meta.latency,
+    meta.moderation_latency,
+    meta.generation_time,
+    meta.is_byok,
+    meta.is_user_byok,
+    meta.streamed,
+    meta.cancelled,
+    edit.editor_name,
+    meta.has_tools,
+    meta.machine_id,
+    cs.session_id AS session_id
+  FROM ${microdollar_usage} mu
+  LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
+  LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
+  LEFT JOIN ${vercel_ip_city} city ON meta.vercel_ip_city_id = city.vercel_ip_city_id
+  LEFT JOIN ${vercel_ip_country} country ON meta.vercel_ip_country_id = country.vercel_ip_country_id
+  LEFT JOIN ${ja4_digest} ja4 ON meta.ja4_digest_id = ja4.ja4_digest_id
+  LEFT JOIN ${system_prompt_prefix} spp ON meta.system_prompt_prefix_id = spp.system_prompt_prefix_id
+  LEFT JOIN ${http_user_agent} ua ON meta.http_user_agent_id = ua.http_user_agent_id
+  LEFT JOIN ${finish_reason} frfr ON meta.finish_reason_id = frfr.finish_reason_id
+  LEFT JOIN ${editor_name} edit ON meta.editor_name_id = edit.editor_name_id
+  LEFT JOIN "app_builder_project_sessions" abps ON mu.project_id = abps.project_id AND abps.ended_at IS NULL
+  LEFT JOIN "cli_sessions" cs ON abps.cloud_agent_session_id = cs.cloud_agent_session_id
+`);
+
 export const sharedCliSessions = pgTable(
   'shared_cli_sessions',
   {

@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage_view } from '@/db/schema';
+import { microdollar_usage_view_with_session } from '@/db/schema';
 import { eq, desc, count, and, gt } from 'drizzle-orm';
 import type { HeuristicAnalysisResponse } from '../types';
 import { ABUSE_CLASSIFICATION } from '@/types/AbuseClassification';
@@ -21,24 +21,27 @@ export async function GET(request: NextRequest): Promise<NextResponse<HeuristicA
     return NextResponse.json({ error: 'userId is required' }, { status: 400 });
   }
 
-  const baseCondition = eq(microdollar_usage_view.kilo_user_id, userId);
+  const baseCondition = eq(microdollar_usage_view_with_session.kilo_user_id, userId);
   const whereCondition = onlyAbuse
     ? and(
         baseCondition,
-        gt(microdollar_usage_view.abuse_classification, ABUSE_CLASSIFICATION.NOT_CLASSIFIED)
+        gt(
+          microdollar_usage_view_with_session.abuse_classification,
+          ABUSE_CLASSIFICATION.NOT_CLASSIFIED
+        )
       )
     : baseCondition;
 
   const totalQuery = db
     .select({ total: count() })
-    .from(microdollar_usage_view)
+    .from(microdollar_usage_view_with_session)
     .where(whereCondition);
 
   const dataQuery = db
     .select()
-    .from(microdollar_usage_view)
+    .from(microdollar_usage_view_with_session)
     .where(whereCondition)
-    .orderBy(desc(microdollar_usage_view.created_at))
+    .orderBy(desc(microdollar_usage_view_with_session.created_at))
     .limit(limit)
     .offset((page - 1) * limit);
 

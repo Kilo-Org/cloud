@@ -22,7 +22,11 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-function parseBody(req: IncomingMessage): Promise<unknown> {
+/**
+ * Safely parse request body as JSON. Returns null on malformed input
+ * so callers can respond with 400 rather than letting it bubble as 500.
+ */
+function parseBody(req: IncomingMessage): Promise<unknown | null> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -33,8 +37,8 @@ function parseBody(req: IncomingMessage): Promise<unknown> {
       }
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString()));
-      } catch (err) {
-        reject(new Error('Invalid JSON body'));
+      } catch {
+        resolve(null);
       }
     });
     req.on('error', reject);
@@ -185,9 +189,10 @@ export function startControlServer(): void {
     void handleRequest(req, res);
   });
 
-  // Start heartbeat if env vars are configured
+  // Start heartbeat if env vars are configured.
+  // INTERNAL_API_SECRET matches the worker's auth middleware secret name.
   const apiUrl = process.env.GASTOWN_API_URL;
-  const apiKey = process.env.GASTOWN_INTERNAL_API_KEY;
+  const apiKey = process.env.INTERNAL_API_SECRET;
   if (apiUrl && apiKey) {
     startHeartbeat(apiUrl, apiKey);
   }

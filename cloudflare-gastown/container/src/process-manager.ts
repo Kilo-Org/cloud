@@ -124,10 +124,12 @@ export async function stopProcess(
   managed.child.kill(signal);
 
   if (signal === 'SIGTERM') {
-    // Wait for graceful shutdown, then force kill
+    // Wait for graceful shutdown, then force kill.
+    // Note: child.killed is true once *any* signal is sent, so check
+    // exitCode to determine if the process actually exited.
     await new Promise<void>(resolve => {
       const timeout = setTimeout(() => {
-        if (managed.child && !managed.child.killed) {
+        if (managed.child && managed.child.exitCode === null) {
           managed.child.kill('SIGKILL');
         }
         resolve();

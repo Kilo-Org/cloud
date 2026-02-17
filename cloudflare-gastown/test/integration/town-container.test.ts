@@ -1,7 +1,9 @@
 import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
+import { signAgentJWT } from '../../src/util/jwt.util';
 
 const INTERNAL_API_KEY = 'test-internal-secret';
+const JWT_SECRET = 'test-jwt-secret-must-be-at-least-32-chars-long';
 
 function internalHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return {
@@ -38,6 +40,23 @@ describe('Town Container Routes', () => {
         headers: internalHeaders(),
       });
       expect(res.status).toBe(500);
+    });
+
+    it('should reject container routes with agent JWT auth (internal-only)', async () => {
+      const id = townId();
+      const token = signAgentJWT(
+        { agentId: 'a-1', rigId: 'r-1', townId: id, userId: 'u-1' },
+        JWT_SECRET
+      );
+      const res = await SELF.fetch(api(`/api/towns/${id}/container/health`), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      expect(res.status).toBe(403);
+      const body: { error: string } = await res.json();
+      expect(body.error).toContain('internal auth required');
     });
   });
 

@@ -1,9 +1,33 @@
 import { execFile } from 'node:child_process';
-import { mkdir, access } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, access, realpath } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import type { CloneOptions, WorktreeOptions } from './types.js';
 
 const WORKSPACE_ROOT = '/workspace/rigs';
+
+/**
+ * Reject path segments that could escape the workspace via traversal.
+ * Allows alphanumeric, hyphens, underscores, dots, and forward slashes
+ * (for branch names like `polecat/name/bead-id`), but blocks `..` segments.
+ */
+function validatePathSegment(value: string, label: string): void {
+  if (!value || /\.\.[/\\]|[/\\]\.\.|^\.\.$/.test(value)) {
+    throw new Error(`${label} contains path traversal`);
+  }
+  if (/[\x00-\x1f]/.test(value)) {
+    throw new Error(`${label} contains control characters`);
+  }
+}
+
+/**
+ * Verify a resolved path is inside the workspace root.
+ * Protects against symlink-based escapes.
+ */
+function assertInsideWorkspace(resolvedPath: string): void {
+  if (!resolvedPath.startsWith(WORKSPACE_ROOT + '/') && resolvedPath !== WORKSPACE_ROOT) {
+    throw new Error(`Path ${resolvedPath} escapes workspace root`);
+  }
+}
 
 function exec(cmd: string, args: string[], cwd?: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -27,13 +51,19 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 function repoDir(rigId: string): string {
-  return join(WORKSPACE_ROOT, rigId, 'repo');
+  validatePathSegment(rigId, 'rigId');
+  const dir = resolve(WORKSPACE_ROOT, rigId, 'repo');
+  assertInsideWorkspace(dir);
+  return dir;
 }
 
 function worktreeDir(rigId: string, branch: string): string {
-  // Sanitize branch name for filesystem path
+  validatePathSegment(rigId, 'rigId');
+  validatePathSegment(branch, 'branch');
   const safeBranch = branch.replace(/\//g, '__');
-  return join(WORKSPACE_ROOT, rigId, 'worktrees', safeBranch);
+  const dir = resolve(WORKSPACE_ROOT, rigId, 'worktrees', safeBranch);
+  assertInsideWorkspace(dir);
+  return dir;
 }
 
 /**

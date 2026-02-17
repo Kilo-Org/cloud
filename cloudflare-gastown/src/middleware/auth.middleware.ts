@@ -90,6 +90,18 @@ export function getEnforcedAgentId(c: Context<any>): string | null {
   return jwt?.agentId ?? null;
 }
 
+/**
+ * Restricts a route to internal auth only (X-Internal-API-Key).
+ * Rejects agent JWT auth. Must be applied after `authMiddleware`.
+ */
+export const internalOnlyMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
+  const authMode = c.get('authMode');
+  if (authMode !== 'internal') {
+    return c.json(resError('Forbidden: internal auth required'), 403);
+  }
+  return next();
+});
+
 export const agentOnlyMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
   const authMode = c.get('authMode');
   if (authMode === 'internal') {

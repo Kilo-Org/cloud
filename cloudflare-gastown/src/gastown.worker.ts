@@ -3,6 +3,7 @@ import { resError } from './util/res.util';
 import {
   authMiddleware,
   agentOnlyMiddleware,
+  internalOnlyMiddleware,
   type AuthVariables,
 } from './middleware/auth.middleware';
 import {
@@ -67,6 +68,7 @@ app.get('/health', c => c.json({ status: 'ok' }));
 
 app.use('/api/rigs/:rigId/*', authMiddleware);
 app.use('/api/towns/:townId/*', authMiddleware);
+app.use('/api/towns/:townId/*', internalOnlyMiddleware);
 
 // ── Beads ───────────────────────────────────────────────────────────────
 

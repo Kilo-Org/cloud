@@ -33,33 +33,42 @@ export type OpenRouterReasoningConfig = {
   enabled?: boolean;
 };
 
+type OpenCodeSpecificRequestProperties = {
+  description?: string;
+  usage?: { include: boolean };
+
+  /**
+   * @deprecated
+   * Probably a typo, standard is reasoning_effort,
+   * which is still not what we use which is reasoning: { effort }
+   * */
+  reasoningEffort?: string;
+};
+
 /**
  * Approximately OpenRouter API request type. Actually based on OpenAI's, but the differences aren't huge.
  */
-export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreateParams & {
-  max_tokens?: number;
-  transforms?: string[];
+export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreateParams &
+  OpenCodeSpecificRequestProperties & {
+    max_tokens?: number;
+    transforms?: string[];
 
-  // https://openrouter.ai/docs/features/provider-routing#requiring-providers-to-comply-with-data-policies
-  provider?: OpenRouterProviderConfig;
-  providerOptions?: VercelProviderConfig;
+    // https://openrouter.ai/docs/features/provider-routing#requiring-providers-to-comply-with-data-policies
+    provider?: OpenRouterProviderConfig;
+    providerOptions?: VercelProviderConfig;
 
-  // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
-  reasoning?: OpenRouterReasoningConfig;
+    // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
+    reasoning?: OpenRouterReasoningConfig;
 
-  // https://platform.minimax.io/docs/api-reference/text-openai-api#4-important-note
-  reasoning_split?: boolean;
+    // https://platform.minimax.io/docs/api-reference/text-openai-api#4-important-note
+    reasoning_split?: boolean;
 
-  thinking?: { type?: 'enabled' | 'disabled' };
+    thinking?: { type?: 'enabled' | 'disabled' };
 
-  // OpenRouter specific field we do not support
-  // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
-  models?: string[];
-
-  // OpenCode specific properties
-  description?: string;
-  usage?: { include: boolean };
-};
+    // OpenRouter specific field we do not support
+    // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
+    models?: string[];
+  };
 
 export type MessageWithReasoning = {
   reasoning?: string;

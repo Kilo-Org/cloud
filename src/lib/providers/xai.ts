@@ -33,6 +33,8 @@ export function applyXaiModelSettings(
     delete requestToMutate.description;
     delete requestToMutate.provider;
     delete requestToMutate.usage;
+    delete requestToMutate.transforms;
+    delete requestToMutate.reasoningEffort;
 
     for (const message of requestToMutate.messages) {
       if (message.role !== 'assistant') {

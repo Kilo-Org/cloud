@@ -160,7 +160,7 @@ export const MetadataSchema = z.object({
     })
     .optional(),
   upstreamBranch: branchNameSchema.optional(),
-  createdOnPlatform: z.string().optional(),
+  createdOnPlatform: z.string().max(100).optional(),
   kiloSessionId: z.string().uuid().optional(),
 
   // Execution params

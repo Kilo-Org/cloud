@@ -743,7 +743,7 @@ export class RigDO extends DurableObject<Env> {
         identity: agent.identity,
         beadId,
         beadTitle: bead.title,
-        checkpoint: agent.checkpoint ? String(agent.checkpoint) : null,
+        checkpoint: agent.checkpoint ?? null,
       });
 
       if (started) {
@@ -779,7 +779,7 @@ export class RigDO extends DurableObject<Env> {
       identity: string;
       beadId: string;
       beadTitle: string;
-      checkpoint: string | null;
+      checkpoint: unknown;
     }
   ): Promise<boolean> {
     try {

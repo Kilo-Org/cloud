@@ -19,6 +19,7 @@ import {
   UserX,
   Upload,
   Bell,
+  Server,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -120,6 +121,11 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'App Builder',
     url: '/admin/app-builder',
     icon: () => <Blocks />,
+  },
+  {
+    title: () => 'KiloClaw Instances',
+    url: '/admin/kiloclaw-instances',
+    icon: () => <Server />,
   },
   {
     title: () => 'Managed Indexing',

@@ -1,37 +1,30 @@
 import 'server-only';
 
+import { z } from 'zod';
 import {
   USER_DEPLOYMENTS_DISPATCHER_URL,
   USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY,
 } from '@/lib/config.server';
 import { fetchWithTimeout } from '@/lib/user-deployments/fetch-utils';
 
-// Password protection types
-export type GetPasswordStatusResponse =
-  | { protected: true; passwordSetAt: number }
-  | { protected: false };
+const successResponseSchema = z.object({ success: z.literal(true) });
 
-export type SetPasswordResponse = {
-  success: true;
-  passwordSetAt: number;
-};
+const getPasswordStatusResponseSchema = z.discriminatedUnion('protected', [
+  z.object({ protected: z.literal(true), passwordSetAt: z.number() }),
+  z.object({ protected: z.literal(false) }),
+]);
 
-export type DeletePasswordResponse = {
-  success: true;
-};
+const setPasswordResponseSchema = z.object({
+  success: z.literal(true),
+  passwordSetAt: z.number(),
+});
 
-// Slug mapping types
-export type SetSlugMappingResponse = {
-  success: true;
-};
-
-export type DeleteSlugMappingResponse = {
-  success: true;
-};
+export type GetPasswordStatusResponse = z.infer<typeof getPasswordStatusResponseSchema>;
+export type SetPasswordResponse = z.infer<typeof setPasswordResponseSchema>;
 
 /**
  * Client for the deploy dispatcher worker API.
- * Handles password protection and slug-to-worker mappings.
+ * Handles password protection, slug-to-worker mappings, and banner management.
  */
 class DispatcherClient {
   private readonly baseUrl: string;
@@ -60,7 +53,7 @@ class DispatcherClient {
       throw new Error(`Failed to get password status: ${response.statusText}`);
     }
 
-    return (await response.json()) as GetPasswordStatusResponse;
+    return getPasswordStatusResponseSchema.parse(await response.json());
   }
 
   async setPassword(workerSlug: string, password: string): Promise<SetPasswordResponse> {
@@ -81,10 +74,10 @@ class DispatcherClient {
       throw new Error(`Failed to set password: ${errorText}`);
     }
 
-    return (await response.json()) as SetPasswordResponse;
+    return setPasswordResponseSchema.parse(await response.json());
   }
 
-  async removePassword(workerSlug: string): Promise<DeletePasswordResponse> {
+  async removePassword(workerSlug: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/password/${workerSlug}`,
       {
@@ -98,12 +91,12 @@ class DispatcherClient {
       throw new Error(`Failed to remove password: ${response.statusText}`);
     }
 
-    return (await response.json()) as DeletePasswordResponse;
+    return successResponseSchema.parse(await response.json());
   }
 
   // ---- Slug mappings ----
 
-  async setSlugMapping(workerName: string, slug: string): Promise<SetSlugMappingResponse> {
+  async setSlugMapping(workerName: string, slug: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/slug-mapping/${workerName}`,
       {
@@ -121,10 +114,10 @@ class DispatcherClient {
       throw new Error(`Failed to set slug mapping: ${errorText}`);
     }
 
-    return (await response.json()) as SetSlugMappingResponse;
+    return successResponseSchema.parse(await response.json());
   }
 
-  async deleteSlugMapping(workerName: string): Promise<DeleteSlugMappingResponse> {
+  async deleteSlugMapping(workerName: string) {
     const response = await fetchWithTimeout(
       `${this.baseUrl}/api/slug-mapping/${workerName}`,
       {
@@ -138,7 +131,44 @@ class DispatcherClient {
       throw new Error(`Failed to delete slug mapping: ${response.statusText}`);
     }
 
-    return (await response.json()) as DeleteSlugMappingResponse;
+    return successResponseSchema.parse(await response.json());
+  }
+
+  // ---- Banner ----
+
+  async enableBanner(workerName: string) {
+    const response = await fetchWithTimeout(
+      `${this.baseUrl}/api/app-builder-banner/${workerName}`,
+      {
+        method: 'PUT',
+        headers: this.getHeaders(),
+      },
+      { maxRetries: 0 }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to enable banner: ${errorText}`);
+    }
+
+    return successResponseSchema.parse(await response.json());
+  }
+
+  async disableBanner(workerName: string) {
+    const response = await fetchWithTimeout(
+      `${this.baseUrl}/api/app-builder-banner/${workerName}`,
+      {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      },
+      { maxRetries: 0 }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to disable banner: ${response.statusText}`);
+    }
+
+    return successResponseSchema.parse(await response.json());
   }
 }
 

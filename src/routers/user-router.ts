@@ -121,7 +121,7 @@ export const userRouter = createTRPCRouter({
       });
 
       return {
-        ...getCreditBlocks(transactions, now, ctx.user),
+        ...getCreditBlocks(transactions, now, ctx.user, ctx.user.id),
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };
     }),
@@ -276,6 +276,14 @@ export const userRouter = createTRPCRouter({
     await db
       .update(kilocode_users)
       .set({ auto_top_up_enabled: false })
+      .where(eq(kilocode_users.id, ctx.user.id));
+    return successResult();
+  }),
+
+  markWelcomeFormCompleted: baseProcedure.mutation(async ({ ctx }) => {
+    await db
+      .update(kilocode_users)
+      .set({ completed_welcome_form: true })
       .where(eq(kilocode_users.id, ctx.user.id));
     return successResult();
   }),

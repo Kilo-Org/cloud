@@ -64,10 +64,22 @@ describe('Organization Promotions', () => {
 
   const getOrganizationBalance = async (orgId: string) => {
     const org = await db
-      .select({ microdollars_balance: organizations.microdollars_balance })
+      .select({
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        microdollars_used: organizations.microdollars_used,
+      })
       .from(organizations)
       .where(eq(organizations.id, orgId));
-    return org[0]?.microdollars_balance || 0;
+    if (!org[0]) return 0;
+    return org[0].total_microdollars_acquired - org[0].microdollars_used;
+  };
+
+  const getOrganizationTotalAcquired = async (orgId: string) => {
+    const org = await db
+      .select({ total_microdollars_acquired: organizations.total_microdollars_acquired })
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+    return org[0]?.total_microdollars_acquired || 0;
   };
 
   const expectPaymentTransaction = (
@@ -93,7 +105,7 @@ describe('Organization Promotions', () => {
     );
     expect(bonusTransactions).toHaveLength(expectedCount);
     if (expectedCount > 0) {
-      expect(bonusTransactions[0].amount_microdollars).toBe(20000000); // $20 bonus
+      expect(bonusTransactions[0].amount_microdollars).toBe(20_000_000); // $20 bonus
       expect(bonusTransactions[0].is_free).toBe(true);
       if (orgId) {
         expect(bonusTransactions[0].organization_id).toBe(orgId);
@@ -117,12 +129,16 @@ describe('Organization Promotions', () => {
     // Check organization transactions
     const transactions = await getOrganizationTransactions(org.id);
     expect(transactions).toHaveLength(2); // payment + bonus
-    expectPaymentTransaction(transactions, 'pi_test_123', 10000000, org.id);
+    expectPaymentTransaction(transactions, 'pi_test_123', 10_000_000, org.id);
     expectBonusTransaction(transactions, 1, org.id);
 
     // Check organization balance increased by payment + bonus
     const finalBalance = await getOrganizationBalance(org.id);
-    expect(finalBalance).toBe(initialBalance + 10000000 + 20000000); // $10 payment + $20 bonus
+    expect(finalBalance).toBe(initialBalance + 10_000_000 + 20_000_000); // $10 payment + $20 bonus
+
+    // total_microdollars_acquired should also increase by payment + bonus
+    const totalAcquired = await getOrganizationTotalAcquired(org.id);
+    expect(totalAcquired).toBe(10_000_000 + 20_000_000); // $10 payment + $20 bonus
   });
 
   test('org does NOT receive bonus credit when requirement fails (memberCount = 1)', async () => {
@@ -139,12 +155,16 @@ describe('Organization Promotions', () => {
     // Check organization transactions
     const transactions = await getOrganizationTransactions(org.id);
     expect(transactions).toHaveLength(1); // only payment, no bonus
-    expectPaymentTransaction(transactions, 'pi_test_123', 10000000, org.id);
+    expectPaymentTransaction(transactions, 'pi_test_123', 10_000_000, org.id);
     expectBonusTransaction(transactions, 0);
 
     // Check organization balance increased by payment only
     const finalBalance = await getOrganizationBalance(org.id);
-    expect(finalBalance).toBe(initialBalance + 10000000); // $10 payment only
+    expect(finalBalance).toBe(initialBalance + 10_000_000); // $10 payment only
+
+    // total_microdollars_acquired should also increase by payment only
+    const totalAcquired = await getOrganizationTotalAcquired(org.id);
+    expect(totalAcquired).toBe(10_000_000); // $10 payment only
   });
 
   test('org promotion idempotency: same user multiple topups - bonus granted only once', async () => {
@@ -170,13 +190,17 @@ describe('Organization Promotions', () => {
     const transactions = await getOrganizationTransactions(org.id);
     expect(transactions).toHaveLength(3); // payment1 + bonus + payment2
 
-    expectPaymentTransaction(transactions, 'pi_test_first', 10000000, org.id);
-    expectPaymentTransaction(transactions, 'pi_test_second', 20000000, org.id);
+    expectPaymentTransaction(transactions, 'pi_test_first', 10_000_000, org.id);
+    expectPaymentTransaction(transactions, 'pi_test_second', 20_000_000, org.id);
     expectBonusTransaction(transactions, 1, org.id); // Only one bonus despite two topups
 
     // Check organization balance increased by both payments + one bonus
     const finalBalance = await getOrganizationBalance(org.id);
-    expect(finalBalance).toBe(initialBalance + 10000000 + 20000000 + 20000000); // $10 + $20 payments + $20 bonus
+    expect(finalBalance).toBe(initialBalance + 10_000_000 + 20_000_000 + 20_000_000); // $10 + $20 payments + $20 bonus
+
+    // total_microdollars_acquired should also increase by both payments + one bonus
+    const totalAcquired = await getOrganizationTotalAcquired(org.id);
+    expect(totalAcquired).toBe(10_000_000 + 20_000_000 + 20_000_000); // $10 + $20 payments + $20 bonus
   });
 
   test('org promotion idempotency: cross-user test - bonus granted only once even when different users topup', async () => {
@@ -203,12 +227,16 @@ describe('Organization Promotions', () => {
     // Verify only ONE bonus was granted
     const transactions = await getOrganizationTransactions(org.id);
     expect(transactions).toHaveLength(3); // payment1 + bonus + payment2
-    expectPaymentTransaction(transactions, 'pi_user_a', 10000000, org.id);
-    expectPaymentTransaction(transactions, 'pi_user_b', 10000000, org.id);
+    expectPaymentTransaction(transactions, 'pi_user_a', 10_000_000, org.id);
+    expectPaymentTransaction(transactions, 'pi_user_b', 10_000_000, org.id);
     expectBonusTransaction(transactions, 1, org.id); // ONLY ONE bonus
 
     // Check organization balance: two payments + one bonus
     const finalBalance = await getOrganizationBalance(org.id);
-    expect(finalBalance).toBe(initialBalance + 10000000 + 10000000 + 20000000); // $10 + $10 + $20
+    expect(finalBalance).toBe(initialBalance + 10_000_000 + 10_000_000 + 20_000_000); // $10 + $10 + $20
+
+    // total_microdollars_acquired should also increase by two payments + one bonus
+    const totalAcquired = await getOrganizationTotalAcquired(org.id);
+    expect(totalAcquired).toBe(10_000_000 + 10_000_000 + 20_000_000); // $10 + $10 + $20
   });
 });

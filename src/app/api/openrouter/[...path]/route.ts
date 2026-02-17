@@ -14,7 +14,6 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isSlackbotOnlyModel,
-  isKiloStealthModel,
   isRateLimitedModel,
 } from '@/lib/models';
 import {
@@ -37,7 +36,7 @@ import {
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
-import { redactedModelResponse } from '@/lib/redactedModelResponse';
+import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -58,6 +57,7 @@ import {
 } from '@/lib/providers/anthropic';
 import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
+import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -239,6 +239,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (isDeadFreeModel(originalModelIdLowerCased)) {
     return alphaPeriodEndedResponse();
+  }
+
+  if (isRateLimitedToDeath(originalModelIdLowerCased)) {
+    return modelDoesNotExistResponse();
   }
 
   // Slackbot-only models are only available through Kilo for Slack (internalApiUse)
@@ -447,8 +451,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (isKiloStealthModel(originalModelIdLowerCased)) {
-    return redactedModelResponse(response, originalModelIdLowerCased);
+  if (provider.requiresResponseRewrite) {
+    return rewriteModelResponse(response, originalModelIdLowerCased);
   }
 
   return wrapInSafeNextResponse(response);

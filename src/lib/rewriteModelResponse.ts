@@ -1,16 +1,41 @@
+import { ReasoningDetailType } from '@/lib/custom-llm/reasoning-details';
 import { getOutputHeaders } from '@/lib/llm-proxy-helpers';
+import type { MessageWithReasoning } from '@/lib/providers/openrouter/types';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 
-export async function redactedModelResponse(response: Response, model: string) {
+function convertReasoningToOpenRouterFormat(message: MessageWithReasoning) {
+  if (!message.reasoning_content) {
+    return;
+  }
+  if (!message.reasoning) {
+    message.reasoning = message.reasoning_content;
+  }
+  if (!message.reasoning_details) {
+    message.reasoning_details = [
+      {
+        type: ReasoningDetailType.Text,
+        text: message.reasoning_content,
+      },
+    ];
+  }
+  delete message.reasoning_content;
+}
+
+export async function rewriteModelResponse(response: Response, model: string) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
     const json = (await response.json()) as OpenAI.ChatCompletion;
     if (json.model) {
       json.model = model;
+    }
+
+    const message = json.choices?.[0]?.message;
+    if (message) {
+      convertReasoningToOpenRouterFormat(message as MessageWithReasoning);
     }
     return NextResponse.json(json, {
       status: response.status,
@@ -36,6 +61,22 @@ export async function redactedModelResponse(response: Response, model: string) {
           if (json.model) {
             json.model = model;
           }
+
+          const delta = json.choices?.[0]?.delta;
+          if (delta) {
+            // Some APIs set null here, which is not accepted by OpenCode
+            if (delta?.role === null) {
+              delete delta.role;
+            }
+
+            convertReasoningToOpenRouterFormat(delta as MessageWithReasoning);
+          }
+
+          if (!json.choices) {
+            // Some APIs leave this out when returning usage, which is not accepted by OpenCode
+            json.choices = [];
+          }
+
           controller.enqueue('data: ' + JSON.stringify(json) + '\n\n');
         },
       });

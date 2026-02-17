@@ -1,9 +1,10 @@
 #!/bin/bash
 # Startup script for OpenClaw on Fly.io Machines
 # This script:
-# 1. Runs openclaw onboard --non-interactive to configure from env vars (first run only)
-# 2. Patches config for features onboard doesn't cover (channels, gateway auth)
-# 3. Starts the gateway
+# 1. Decrypts KILOCLAW_ENC_* environment variables (if encryption key is present)
+# 2. Runs openclaw onboard --non-interactive to configure from env vars (first run only)
+# 3. Patches config for features onboard doesn't cover (channels, gateway auth)
+# 4. Starts the gateway
 
 set -e
 
@@ -21,6 +22,93 @@ echo "Config directory: $CONFIG_DIR"
 mkdir -p "$CONFIG_DIR"
 mkdir -p "$WORKSPACE_DIR"
 cd "$WORKSPACE_DIR"
+
+# ============================================================
+# DECRYPT ENCRYPTED ENV VARS
+# ============================================================
+# Encrypted env vars use KILOCLAW_ENC_ prefix in config.env.
+# The decryption key (KILOCLAW_ENV_KEY) is a Fly app secret
+# injected at boot, never in config.env.
+KILOCLAW_DECRYPT_FILE="/tmp/.kiloclaw-decrypted-env.sh"
+
+# Fail closed: if KILOCLAW_ENC_* vars exist, KILOCLAW_ENV_KEY must be set
+if env | grep -q '^KILOCLAW_ENC_' && [ -z "${KILOCLAW_ENV_KEY:-}" ]; then
+    echo "FATAL: Encrypted env vars (KILOCLAW_ENC_*) found but KILOCLAW_ENV_KEY is not set"
+    exit 1
+fi
+
+if [ -n "${KILOCLAW_ENV_KEY:-}" ]; then
+    echo "Decrypting encrypted environment variables..."
+    node << 'EOFDECRYPT'
+const crypto = require('crypto');
+const fs = require('fs');
+
+const key = Buffer.from(process.env.KILOCLAW_ENV_KEY, 'base64');
+const ENC_PREFIX = 'KILOCLAW_ENC_';
+const VALUE_PREFIX = 'enc:v1:';
+const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const lines = [];
+let count = 0;
+
+for (const [envName, value] of Object.entries(process.env)) {
+    if (!envName.startsWith(ENC_PREFIX)) continue;
+
+    const name = envName.slice(ENC_PREFIX.length);
+
+    // Validate stripped name is a safe shell identifier
+    if (!VALID_NAME.test(name)) {
+        console.error('FATAL: Invalid env var name after stripping prefix: ' + name);
+        process.exit(1);
+    }
+
+    // Validate value has the expected format prefix
+    if (!value.startsWith(VALUE_PREFIX)) {
+        console.error('FATAL: ' + envName + ' does not start with ' + VALUE_PREFIX);
+        process.exit(1);
+    }
+
+    const data = Buffer.from(value.slice(VALUE_PREFIX.length), 'base64');
+    const iv = data.subarray(0, 12);
+    const tag = data.subarray(data.length - 16);
+    const ciphertext = data.subarray(12, data.length - 16);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    let plain = decipher.update(ciphertext, undefined, 'utf8');
+    plain += decipher.final('utf8');
+
+    // Shell-safe: single-quote value, escape inner single quotes
+    const escaped = plain.replace(/'/g, "'\\''");
+    lines.push("export " + name + "='" + escaped + "'");
+    count++;
+}
+
+fs.writeFileSync('/tmp/.kiloclaw-decrypted-env.sh', lines.join('\n') + '\n');
+console.log('Decrypted ' + count + ' encrypted environment variables');
+EOFDECRYPT
+
+    # Source decrypted values into shell environment, then immediately delete
+    . "$KILOCLAW_DECRYPT_FILE"
+    rm -f "$KILOCLAW_DECRYPT_FILE"
+
+    # Post-decrypt presence check: critical vars must exist after decryption
+    if [ -z "${KILOCODE_API_KEY:-}" ]; then
+        echo "FATAL: KILOCODE_API_KEY missing after decryption"
+        exit 1
+    fi
+    if [ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]; then
+        echo "FATAL: OPENCLAW_GATEWAY_TOKEN missing after decryption"
+        exit 1
+    fi
+
+    # Clean up encryption artifacts — don't leak key material to openclaw process
+    unset KILOCLAW_ENV_KEY 2>/dev/null || true
+    for _enc_var in "${!KILOCLAW_ENC_@}"; do
+        unset "$_enc_var"
+    done
+    unset _enc_var 2>/dev/null || true
+else
+    echo "No KILOCLAW_ENV_KEY found, using env vars as-is"
+fi
 
 # ============================================================
 # ONBOARD (only if no config exists yet)
@@ -118,7 +206,7 @@ const defaultModels = [
 let models = defaultModels;
 
 // Prefer KILOCODE_MODELS_JSON env var (set by buildEnvVars from DO config).
-// Falls back to file-based override for manual/debug use, then baked-in defaults.
+// Falls back to file-based override for manual use, then baked-in defaults.
 if (process.env.KILOCODE_MODELS_JSON) {
     try {
         const parsed = JSON.parse(process.env.KILOCODE_MODELS_JSON);
@@ -155,6 +243,14 @@ config.agents = config.agents || {};
 config.agents.defaults = config.agents.defaults || {};
 config.agents.defaults.model = { primary: defaultModel };
 console.log('KiloCode provider configured with base URL ' + baseUrl);
+
+// Explicitly lock down exec tool security (defense-in-depth).
+// OpenClaw defaults to these values, but pinning them here prevents
+// silent regression if upstream defaults change in a future version.
+config.tools = config.tools || {};
+config.tools.exec = config.tools.exec || {};
+config.tools.exec.security = 'deny';
+config.tools.exec.ask = 'on-miss';
 
 // Telegram configuration
 if (process.env.TELEGRAM_BOT_TOKEN) {

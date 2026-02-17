@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Check, ChevronDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -22,7 +23,15 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
   const router = useRouter();
 
   // Fetch user organizations
-  const { data: organizations } = useQuery(trpc.organizations.list.queryOptions());
+  const { data: organizations, isPending } = useQuery(
+    trpc.organizations.list.queryOptions(undefined, {
+      trpc: {
+        context: {
+          skipBatch: true,
+        },
+      },
+    })
+  );
 
   const handleOrganizationSwitch = (orgId: string | null) => {
     if (orgId) {
@@ -46,6 +55,25 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
 
   const currentOrg = organizations?.find(org => org.organizationId === organizationId);
   const hasOrganizations = organizations && organizations.length > 0;
+
+  // Show loading skeleton on initial load (before any data is available)
+  if (isPending) {
+    return (
+      <div className="mt-1">
+        <Button
+          variant="ghost"
+          disabled
+          className="h-auto w-full justify-between rounded-lg border border-gray-700 p-3 text-left"
+        >
+          <div className="flex flex-col items-start gap-1">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+          <ChevronDown className="h-4 w-4 text-gray-500" />
+        </Button>
+      </div>
+    );
+  }
 
   // Don't render if no organizations
   if (!hasOrganizations) {

@@ -35,7 +35,7 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy startup script
-# Build cache bust: 2026-02-13-v42-allowed-origins
+# Build cache bust: 2026-02-16-v43-env-encryption
 RUN echo "4"
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 RUN chmod +x /usr/local/bin/start-openclaw.sh

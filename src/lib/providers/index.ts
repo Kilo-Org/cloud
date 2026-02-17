@@ -46,6 +46,7 @@ export type Provider = {
   apiUrl: string;
   apiKey: string;
   hasGenerationEndpoint: boolean;
+  requiresResponseRewrite: boolean;
 };
 
 export const PROVIDERS = {
@@ -54,60 +55,70 @@ export const PROVIDERS = {
     apiUrl: 'https://openrouter.ai/api/v1',
     apiKey: getEnvVariable('OPENROUTER_API_KEY'),
     hasGenerationEndpoint: true,
+    requiresResponseRewrite: false,
   },
   GIGAPOTATO: {
     id: 'gigapotato',
     apiUrl: getEnvVariable('GIGAPOTATO_API_URL'),
     apiKey: getEnvVariable('GIGAPOTATO_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: true,
   },
   CORETHINK: {
     id: 'corethink',
     apiUrl: 'https://api.corethink.ai/v1/code',
     apiKey: getEnvVariable('CORETHINK_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: true,
   },
   INCEPTION: {
     id: 'inception',
     apiUrl: 'https://api.inceptionlabs.ai/v1',
     apiKey: getEnvVariable('INCEPTION_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
   MARTIAN: {
     id: 'martian',
     apiUrl: 'https://api.withmartian.com/v1',
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: true,
   },
   MISTRAL: {
     id: 'mistral',
     apiUrl: 'https://api.mistral.ai/v1',
     apiKey: getEnvVariable('MISTRAL_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
   MINIMAX: {
     id: 'minimax',
     apiUrl: 'https://api.minimax.io/v1',
     apiKey: getEnvVariable('MINIMAX_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
   STREAMLAKE: {
     id: 'streamlake',
     apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',
     apiKey: getEnvVariable('STREAMLAKE_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
     hasGenerationEndpoint: true,
+    requiresResponseRewrite: false,
   },
   XAI: {
     id: 'x-ai',
     apiUrl: 'https://api.x.ai/v1',
     apiKey: getEnvVariable('XAI_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
 } as const satisfies Record<string, Provider>;
 
@@ -141,6 +152,7 @@ export async function getProvider(
           apiUrl: customLlm.base_url,
           apiKey: customLlm.api_key,
           hasGenerationEndpoint: true,
+          requiresResponseRewrite: false,
         },
         userByok: null,
         customLlm,

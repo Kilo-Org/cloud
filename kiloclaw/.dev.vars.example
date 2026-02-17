@@ -8,6 +8,8 @@ GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
 WORKER_ENV=development
 
 # Optional: Override KiloCode base URL (dev)
+# In dev you'll want to use ngrok or cloudflare tunnel to route back to your nextjs app
+# e.g.: `cloudflared tunnel --url http://localhost:3000`
 # KILOCODE_API_BASE_URL=https://api.kilo.ai/api/openrouter/
 
 # Fly.io Machines API
@@ -33,7 +35,9 @@ FLY_APP_NAME=kiloclaw-machines
 
 # Allowed origins for the OpenClaw Control UI WebSocket (comma-separated).
 # Must include the origins that the browser connects from.
-OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795
+# NOTE: wrangler dev rewrites the Origin header to match the custom domain route
+# (claw.kilosessions.ai), so that origin must be included for local dev.
+OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795,http://claw.kilosessions.ai
 
 # Encryption (for user secrets)
 # AGENT_ENV_VARS_PRIVATE_KEY=...
@@ -45,5 +49,3 @@ OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795
 
 # Development
 DEV_MODE=true
-DEBUG_ROUTES=true
-DEBUG_ROUTES_SECRET=dev-debug-secret

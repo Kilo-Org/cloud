@@ -26,7 +26,9 @@ export function applyXaiModelSettings(
   extraHeaders: Record<string, string>
 ) {
   if (provider === 'martian') {
+    delete requestToMutate.description;
     delete requestToMutate.provider;
+    delete requestToMutate.usage;
   }
 
   // https://kilo-code.slack.com/archives/C09922UFQHF/p1767968746782459

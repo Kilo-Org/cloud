@@ -58,6 +58,7 @@ import {
 } from '@/lib/providers/anthropic';
 import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
+import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -239,6 +240,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (isDeadFreeModel(originalModelIdLowerCased)) {
     return alphaPeriodEndedResponse();
+  }
+
+  if (isRateLimitedToDeath(originalModelIdLowerCased)) {
+    return modelDoesNotExistResponse();
   }
 
   // Slackbot-only models are only available through Kilo for Slack (internalApiUse)

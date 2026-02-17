@@ -452,7 +452,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (isKiloStealthModel(originalModelIdLowerCased)) {
+  if (provider.requiresResponseRewrite) {
     return rewriteModelResponse(response, originalModelIdLowerCased);
   }
 

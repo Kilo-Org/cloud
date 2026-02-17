@@ -72,6 +72,11 @@ export async function rewriteModelResponse(response: Response, model: string) {
             convertReasoningToOpenRouterFormat(delta as MessageWithReasoning);
           }
 
+          if (!json.choices) {
+            // Some APIs leave this out when returning usage, which is not accepted by OpenCode
+            json.choices = [];
+          }
+
           controller.enqueue('data: ' + JSON.stringify(json) + '\n\n');
         },
       });

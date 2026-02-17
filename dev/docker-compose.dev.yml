@@ -1,5 +1,18 @@
 # Docker Compose dev orchestration for the full monorepo.
 #
+# Networking: All services share the default bridge network created by Docker
+# Compose. Services can reach each other by their Compose service name (e.g.,
+# "postgres", "nextjs", "cloud-agent") via Docker's built-in DNS. This works
+# on both macOS (Docker Desktop) and Linux — no network_mode: host needed.
+#
+# Because wrangler.jsonc files hardcode "localhost" for inter-service URLs
+# (Hyperdrive connection strings, KILOCODE_BACKEND_BASE_URL, etc.), wrangler
+# workers use dev/docker-wrangler-entrypoint.sh which creates a patched copy
+# of wrangler.jsonc at startup, replacing "localhost" with Docker service names.
+#
+# The Next.js service overrides env vars directly via the `environment:` key
+# so that POSTGRES_URL, CLOUD_AGENT_API_URL, etc. point to Docker service names.
+#
 # Usage:
 #   docker compose -f dev/docker-compose.dev.yml up                          # everything
 #   docker compose -f dev/docker-compose.dev.yml up postgres nextjs          # core only
@@ -44,12 +57,21 @@ services:
       - "3000:3000"
     env_file:
       - ../.env
+    # Override localhost URLs so Next.js can reach other services on the
+    # Docker bridge network by service name.
+    environment:
+      - POSTGRES_URL=postgres://postgres:postgres@postgres:5432/postgres
+      - CLOUD_AGENT_API_URL=http://cloud-agent:8788
+      - WEBHOOK_AGENT_URL=http://cloudflare-webhook-agent-ingest:8793
     depends_on:
       postgres:
         condition: service_healthy
     command: sh -c "pnpm dev"
 
   # ── 2. cloud-agent (port 8788) ─────────────────────────────────────
+  # Uses docker-wrangler-entrypoint.sh to patch wrangler.jsonc localhost
+  # references (KILOCODE_BACKEND_BASE_URL, Hyperdrive, etc.) to Docker
+  # service names before starting wrangler dev.
   cloud-agent:
     <<: *worker-base
     profiles: ["agents", "all"]
@@ -58,7 +80,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloud-agent && pnpm dev --port 8788 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloud-agent --env dev --port 8788 --ip 0.0.0.0
 
   # ── 3. cloud-agent-next (port 8794) ────────────────────────────────
   cloud-agent-next:
@@ -69,7 +91,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloud-agent-next && pnpm dev --port 8794 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloud-agent-next --env dev --port 8794 --ip 0.0.0.0
 
   # ── 4. cloudflare-ai-attribution (port 8787) ───────────────────────
   cloudflare-ai-attribution:
@@ -80,7 +102,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-ai-attribution && pnpm dev --port 8787 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-ai-attribution --env dev --port 8787 --ip 0.0.0.0
 
   # ── 5. cloudflare-app-builder (port 8790) ──────────────────────────
   cloudflare-app-builder:
@@ -91,7 +113,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-app-builder && pnpm dev --port 8790 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-app-builder --port 8790 --ip 0.0.0.0
 
   # ── 6. cloudflare-auto-fix-infra (port 8796) ──────────────────────
   cloudflare-auto-fix-infra:
@@ -104,7 +126,7 @@ services:
         condition: service_healthy
       cloud-agent:
         condition: service_started
-    command: sh -c "cd /app/cloudflare-auto-fix-infra && pnpm dev --port 8796 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-auto-fix-infra --port 8796 --ip 0.0.0.0
 
   # ── 7. cloudflare-auto-triage-infra (port 8791) ───────────────────
   cloudflare-auto-triage-infra:
@@ -117,7 +139,7 @@ services:
         condition: service_healthy
       cloud-agent:
         condition: service_started
-    command: sh -c "cd /app/cloudflare-auto-triage-infra && pnpm dev --port 8791 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-auto-triage-infra --port 8791 --ip 0.0.0.0
 
   # ── 8. cloudflare-code-review-infra (port 8789) ───────────────────
   cloudflare-code-review-infra:
@@ -130,7 +152,7 @@ services:
         condition: service_healthy
       cloud-agent:
         condition: service_started
-    command: sh -c "cd /app/cloudflare-code-review-infra && pnpm dev --port 8789 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-code-review-infra --port 8789 --ip 0.0.0.0
 
   # ── 9. cloudflare-db-proxy (port 8797) ─────────────────────────────
   cloudflare-db-proxy:
@@ -141,7 +163,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-db-proxy && pnpm dev --port 8797 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-db-proxy --port 8797 --ip 0.0.0.0
 
   # ── 10. cloudflare-deploy-infra/builder (port 8798) ────────────────
   cloudflare-deploy-builder:
@@ -152,7 +174,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-deploy-infra/builder && pnpm dev --port 8798 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-deploy-infra/builder --port 8798 --ip 0.0.0.0
 
   # ── 11. cloudflare-deploy-infra/dispatcher (port 8799) ─────────────
   cloudflare-deploy-dispatcher:
@@ -163,7 +185,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-deploy-infra/dispatcher && pnpm dev --port 8799 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-deploy-infra/dispatcher --port 8799 --ip 0.0.0.0
 
   # ── 12. cloudflare-session-ingest (port 8800) ─────────────────────
   cloudflare-session-ingest:
@@ -174,7 +196,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-session-ingest && pnpm dev --port 8800 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-session-ingest --port 8800 --ip 0.0.0.0
 
   # ── 13. cloudflare-o11y (port 8801) ────────────────────────────────
   cloudflare-o11y:
@@ -185,7 +207,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-o11y && pnpm dev --port 8801 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-o11y --port 8801 --ip 0.0.0.0
 
   # ── 14. cloudflare-webhook-agent-ingest (port 8793) ────────────────
   cloudflare-webhook-agent-ingest:
@@ -198,7 +220,7 @@ services:
         condition: service_healthy
       cloud-agent:
         condition: service_started
-    command: sh -c "cd /app/cloudflare-webhook-agent-ingest && pnpm dev --port 8793 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-webhook-agent-ingest --env dev --port 8793 --ip 0.0.0.0
 
   # ── 15. cloudflare-git-token-service (port 8802) ──────────────────
   cloudflare-git-token-service:
@@ -209,7 +231,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/cloudflare-git-token-service && pnpm dev --port 8802 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh cloudflare-git-token-service --port 8802 --ip 0.0.0.0
 
   # ── 16. kiloclaw (port 8795) ───────────────────────────────────────
   kiloclaw:
@@ -220,7 +242,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "cd /app/kiloclaw && pnpm dev --port 8795 --ip 0.0.0.0"
+    command: /app/dev/docker-wrangler-entrypoint.sh kiloclaw --port 8795 --ip 0.0.0.0
 
 volumes:
   postgres_data:

@@ -76,6 +76,23 @@ docker compose -f dev/docker-compose.dev.yml up postgres nextjs cloud-agent
 
 > Ports are overridden via `--port` in the wrangler dev command to avoid conflicts between workers that share the same default port in their `wrangler.jsonc`.
 
+## Networking
+
+All services share the default Docker Compose bridge network. Services reach each other by their Compose service name (e.g., `postgres`, `nextjs`, `cloud-agent`) via Docker's built-in DNS — no `network_mode: host` needed, so this works on both **macOS** (Docker Desktop) and **Linux**.
+
+### How inter-service URLs are resolved
+
+The wrangler.jsonc files in each worker hardcode `localhost` for inter-service URLs (e.g., `KILOCODE_BACKEND_BASE_URL: "http://localhost:3000"`, Hyperdrive `localConnectionString: "postgres://...@localhost:5432/..."`). Inside Docker containers on a bridge network, `localhost` refers to the container itself, not other services.
+
+To fix this without modifying the shared wrangler.jsonc files:
+
+- **Wrangler workers** use [`dev/docker-wrangler-entrypoint.sh`](dev/docker-wrangler-entrypoint.sh) which creates a temporary patched copy of `wrangler.jsonc` at startup, replacing `localhost` references with Docker service names (e.g., `localhost:3000` → `nextjs:3000`, `localhost:5432` → `postgres:5432`).
+- **Next.js** overrides env vars directly via the `environment:` key in docker-compose (e.g., `POSTGRES_URL`, `CLOUD_AGENT_API_URL`), which take precedence over values in `.env`.
+
+### Accessing services from the host
+
+From your host machine, services are still accessible at `localhost:<port>` via Docker's port forwarding (the `ports:` mappings in docker-compose).
+
 ## Environment Variables
 
 ### Next.js backend
@@ -87,6 +104,8 @@ The Next.js service loads `env_file: .env` from the repo root. Make sure this fi
 cp .env.example .env
 # Then fill in the required values
 ```
+
+The docker-compose file overrides `POSTGRES_URL`, `CLOUD_AGENT_API_URL`, and `WEBHOOK_AGENT_URL` to use Docker service names. You don't need to set these in `.env` for Docker dev.
 
 ### Cloudflare Workers
 
@@ -105,11 +124,14 @@ cp cloud-agent/.dev.vars.example cloud-agent/.dev.vars
 # kiloclaw
 ```
 
+> **Note:** You do NOT need to change `localhost` references in `.dev.vars` files for Docker — the entrypoint script handles URL rewriting automatically via the wrangler.jsonc patching.
+
 ## Architecture
 
 - **Shared Docker image** (`dev/Dockerfile.dev`): `node:22-slim` with pnpm, wrangler, and bun pre-installed.
 - **Volume mount**: The entire repo is mounted at `/app` — file changes are reflected immediately (hot reload works).
 - **Port mappings**: Each service exposes its port via explicit `ports:` mappings, which works on both macOS (Docker Desktop) and Linux.
+- **Inter-service networking**: Docker Compose bridge network with DNS-based service discovery. See [Networking](#networking) above.
 - **Existing `dev/docker-compose.yml`** is untouched — it continues to work standalone for PostgreSQL-only usage.
 
 ## Troubleshooting
@@ -140,6 +162,16 @@ pnpm install
 # Then restart the containers
 docker compose -f dev/docker-compose.dev.yml --profile all restart
 ```
+
+### Inter-service connection refused
+
+If a worker can't reach another service (e.g., `ECONNREFUSED` to `nextjs:3000`), make sure the target service is running. Check with:
+
+```bash
+docker compose -f dev/docker-compose.dev.yml ps
+```
+
+Services only start if their profile is active. For example, `cloud-agent` requires the `agents` or `all` profile.
 
 ### Viewing logs for a single service
 

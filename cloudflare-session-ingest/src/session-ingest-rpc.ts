@@ -21,7 +21,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
     kiloUserId: string;
     cloudAgentSessionId: string;
     organizationId?: string;
-    createdOnPlatform?: string;
+    createdOnPlatform: string;
   }): Promise<void> {
     const parsed = z
       .object({
@@ -29,7 +29,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
         kiloUserId: z.string().min(1),
         cloudAgentSessionId: z.string().min(1),
         organizationId: z.string().optional(),
-        createdOnPlatform: z.string().optional(),
+        createdOnPlatform: z.string().min(1),
       })
       .parse(params);
 
@@ -42,7 +42,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
         kilo_user_id: parsed.kiloUserId,
         cloud_agent_session_id: parsed.cloudAgentSessionId,
         organization_id: parsed.organizationId ?? null,
-        created_on_platform: parsed.createdOnPlatform ?? 'cloud-agent',
+        created_on_platform: parsed.createdOnPlatform,
         version: 0,
       })
       .onConflict(oc =>

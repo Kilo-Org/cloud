@@ -13,7 +13,7 @@ export type CreateSessionForCloudAgentParams = {
   kiloUserId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
-  createdOnPlatform?: string;
+  createdOnPlatform: string;
 };
 
 export type DeleteSessionForCloudAgentParams = {

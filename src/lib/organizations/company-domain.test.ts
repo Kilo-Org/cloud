@@ -68,6 +68,14 @@ describe('normalizeCompanyDomain', () => {
   it('extracts hostname from URL with user@ only', () => {
     expect(normalizeCompanyDomain('https://user@acme.com')).toBe('acme.com');
   });
+
+  it('ignores @ in URL path (not userinfo)', () => {
+    expect(normalizeCompanyDomain('https://example.com/contact@other.com')).toBe('example.com');
+  });
+
+  it('handles userinfo and @ in path together', () => {
+    expect(normalizeCompanyDomain('https://user:pass@acme.com/contact@other.com')).toBe('acme.com');
+  });
 });
 
 describe('isValidDomain', () => {

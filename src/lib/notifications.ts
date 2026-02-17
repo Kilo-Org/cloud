@@ -12,7 +12,7 @@ import * as z from 'zod';
 import { subDays } from 'date-fns';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 import { readDb } from '@/lib/drizzle';
-import { and, eq, inArray, gte } from 'drizzle-orm';
+import { and, eq, inArray, gte, like, gt } from 'drizzle-orm';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { db } from '@/lib/drizzle';
 import { fromMicrodollars } from '@/lib/utils';
@@ -75,6 +75,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateFirstDayWelcomeNotification,
     generateAutocompleteNotification,
     generateKiloPassNotification,
+    generateXaiGrokCodeFastNotification,
   ];
 
   const resolvedConditionalNotifications = (
@@ -329,4 +330,42 @@ async function generateKiloPassNotification(user: User): Promise<KiloNotificatio
       showIn: ['cli', 'extension'],
     },
   ];
+}
+
+async function generateXaiGrokCodeFastNotification(user: User): Promise<KiloNotification[]> {
+  try {
+    const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
+    const result = await readDb
+      .select({ kilo_user_id: microdollar_usage.kilo_user_id })
+      .from(microdollar_usage)
+      .where(
+        and(
+          eq(microdollar_usage.kilo_user_id, user.id),
+          like(microdollar_usage.requested_model, 'x-ai/%'),
+          gt(microdollar_usage.cost, 0),
+          gte(microdollar_usage.created_at, thirtyDaysAgo)
+        )
+      )
+      .limit(1);
+
+    if (result.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'xai-grok-code-fast-feb-17',
+        title: 'Grok Code Fast — Now Free',
+        message: 'Try a new, optimized version of Grok Code Fast, totally free in Kilo.',
+        action: {
+          actionText: 'Learn More',
+          actionURL: 'https://blog.kilo.ai/p/grok-code-fast-optimized',
+        },
+        showIn: ['extension', 'cli'],
+      },
+    ];
+  } catch (e) {
+    console.error('[generateXaiGrokCodeFastNotification]', e);
+    return [];
+  }
 }

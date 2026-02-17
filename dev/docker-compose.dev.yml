@@ -76,7 +76,7 @@ services:
     <<: *worker-base
     profiles: ["agents", "all"]
     ports:
-      - "8788:8788"
+      - "127.0.0.1:8788:8788"
     depends_on:
       postgres:
         condition: service_healthy

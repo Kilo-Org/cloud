@@ -107,7 +107,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.552.0",
     "motion": "^12.23.24",
-    "next": "^15.5.10",
+    "next": "^15.5.12",
     "next-auth": "^4.24.13",
     "openai": "^6.8.1",
     "pg": "^8.16.3",
@@ -180,7 +180,7 @@
     "overrides": {
       "mdast-util-to-hast": "^13.2.1",
       "storybook": "^9.1.17",
-      "next": "^15.5.10",
+      "next": "^15.5.12",
       "preact": "10.28.3",
       "glob": ">=13.0.1",
       "esbuild": ">=0.25.0",

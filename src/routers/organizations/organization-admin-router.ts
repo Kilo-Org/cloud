@@ -562,17 +562,11 @@ export const organizationAdminRouter = createTRPCRouter({
 
       if (hasBalance === 'true') {
         conditions.push(
-          gt(
-            sql`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`,
-            0
-          )
+          gt(organizations.total_microdollars_acquired, organizations.microdollars_used)
         );
       } else if (hasBalance === 'false') {
         conditions.push(
-          eq(
-            sql`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`,
-            0
-          )
+          eq(organizations.total_microdollars_acquired, organizations.microdollars_used)
         );
       }
 

@@ -246,11 +246,7 @@ export async function fetchExpiringTransactionsForOrganization(
       expiredCredits,
       and(
         eq(expiredCredits.organization_id, organizationId),
-        inArray(expiredCredits.credit_category, [
-          'credits_expired',
-          'orb_credit_expired',
-          'orb_credit_voided',
-        ]),
+        eq(expiredCredits.credit_category, 'credits_expired'),
         eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
       )
     )

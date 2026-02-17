@@ -6,11 +6,16 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews } from '@/db/schema';
-import { eq, and, desc, count, ne, inArray } from 'drizzle-orm';
+import { cloud_agent_code_reviews, cliSessions, microdollar_usage } from '@/db/schema';
+import { eq, and, desc, count, ne, inArray, sql, sum } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview } from '@/db/schema';
+
+export type CodeReviewWithCostAndModel = CloudAgentCodeReview & {
+  total_cost_microdollars: number | null;
+  model: string | null;
+};
 
 /**
  * Creates a new code review record
@@ -137,8 +142,11 @@ export async function updateCodeReviewStatus(
  * Lists code reviews for an owner (org or user)
  * Supports filtering by status and repository
  * Returns reviews sorted by creation date (newest first)
+ * Includes cost (from microdollar_usage) and model (from cliSessions) when available
  */
-export async function listCodeReviews(params: ListReviewsParams): Promise<CloudAgentCodeReview[]> {
+export async function listCodeReviews(
+  params: ListReviewsParams
+): Promise<CodeReviewWithCostAndModel[]> {
   try {
     const { owner, limit = 50, offset = 0, status, repoFullName, platform } = params;
 
@@ -174,9 +182,50 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CloudA
       conditions.push(eq(cloud_agent_code_reviews.platform, platform));
     }
 
+    // Cost subquery: sum microdollar_usage.cost where project_id matches the cli_session_id
+    const costSubquery = db
+      .select({
+        session_id: microdollar_usage.project_id,
+        total_cost: sum(microdollar_usage.cost).as('total_cost'),
+      })
+      .from(microdollar_usage)
+      .groupBy(microdollar_usage.project_id)
+      .as('cost_sq');
+
     const reviews = await db
-      .select()
+      .select({
+        id: cloud_agent_code_reviews.id,
+        owned_by_organization_id: cloud_agent_code_reviews.owned_by_organization_id,
+        owned_by_user_id: cloud_agent_code_reviews.owned_by_user_id,
+        platform_integration_id: cloud_agent_code_reviews.platform_integration_id,
+        repo_full_name: cloud_agent_code_reviews.repo_full_name,
+        pr_number: cloud_agent_code_reviews.pr_number,
+        pr_url: cloud_agent_code_reviews.pr_url,
+        pr_title: cloud_agent_code_reviews.pr_title,
+        pr_author: cloud_agent_code_reviews.pr_author,
+        pr_author_github_id: cloud_agent_code_reviews.pr_author_github_id,
+        base_ref: cloud_agent_code_reviews.base_ref,
+        head_ref: cloud_agent_code_reviews.head_ref,
+        head_sha: cloud_agent_code_reviews.head_sha,
+        platform: cloud_agent_code_reviews.platform,
+        platform_project_id: cloud_agent_code_reviews.platform_project_id,
+        session_id: cloud_agent_code_reviews.session_id,
+        cli_session_id: cloud_agent_code_reviews.cli_session_id,
+        status: cloud_agent_code_reviews.status,
+        error_message: cloud_agent_code_reviews.error_message,
+        started_at: cloud_agent_code_reviews.started_at,
+        completed_at: cloud_agent_code_reviews.completed_at,
+        created_at: cloud_agent_code_reviews.created_at,
+        updated_at: cloud_agent_code_reviews.updated_at,
+        total_cost_microdollars: sql<number | null>`${costSubquery.total_cost}::bigint`,
+        model: cliSessions.last_model,
+      })
       .from(cloud_agent_code_reviews)
+      .leftJoin(cliSessions, eq(cloud_agent_code_reviews.cli_session_id, cliSessions.session_id))
+      .leftJoin(
+        costSubquery,
+        sql`${costSubquery.session_id} = ${cloud_agent_code_reviews.cli_session_id}::text`
+      )
       .where(and(...conditions))
       .orderBy(desc(cloud_agent_code_reviews.created_at))
       .limit(limit)

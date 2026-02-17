@@ -14,7 +14,6 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isSlackbotOnlyModel,
-  isKiloStealthModel,
   isRateLimitedModel,
 } from '@/lib/models';
 import {
@@ -37,7 +36,7 @@ import {
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
-import { redactedModelResponse } from '@/lib/redactedModelResponse';
+import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -452,8 +451,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (isKiloStealthModel(originalModelIdLowerCased)) {
-    return redactedModelResponse(response, originalModelIdLowerCased);
+  if (provider.requiresResponseRewrite) {
+    return rewriteModelResponse(response, originalModelIdLowerCased);
   }
 
   return wrapInSafeNextResponse(response);

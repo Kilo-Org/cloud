@@ -29,6 +29,7 @@
   "vars": {
     "SESSION_DURATION_SECONDS": 2592000, // 30 days
     "HOSTNAME_SUFFIX": ".d.kiloapps.io",
+    "BANNER_LINK_URL": "https://app.kilo.ai/app-builder",
   },
   "dispatch_namespaces": [
     {
@@ -79,6 +80,7 @@
       "vars": {
         "SESSION_DURATION_SECONDS": 604800,
         "HOSTNAME_SUFFIX": ".d-staging.kiloapps.io",
+        "BANNER_LINK_URL": "https://app.kilo.ai/app-builder",
       },
       "dispatch_namespaces": [
         {

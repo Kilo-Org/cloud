@@ -1415,6 +1415,7 @@ export const deployments = pgTable(
     last_deployed_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_build_id: uuid().notNull(),
     threat_status: text().$type<'pending_scan' | 'safe' | 'flagged'>(),
+    created_from: text().$type<'deploy' | 'app-builder'>(),
   },
   table => [
     index('idx_deployments_owned_by_user_id').on(table.owned_by_user_id),

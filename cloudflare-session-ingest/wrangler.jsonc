@@ -58,6 +58,8 @@
       "binding": "NEXTAUTH_SECRET_PROD",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "NEXTAUTH_SECRET_PROD",
+      // To set: wrangler secrets-store secret create 342a86d9e3a94da698e82d0c6e2a36f0 --name NEXTAUTH_SECRET_PROD --scopes workers
+      // docs https://developers.cloudflare.com/workers/wrangler/commands/#secrets-store-secret
     },
   ],
 }

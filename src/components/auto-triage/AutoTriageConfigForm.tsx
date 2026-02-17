@@ -3,11 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+// import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
+// import { Slider } from '@/components/ui/slider';
 import { Settings, Save } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -359,7 +359,7 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
             </div>
 
             {/* Thresholds */}
-            <div className="space-y-6">
+            {/* <div className="space-y-6">
               <div className="space-y-3">
                 <Label htmlFor="duplicate-threshold">
                   Duplicate Detection Threshold: {duplicateThreshold}
@@ -396,10 +396,10 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
                   strict)
                 </p>
               </div>
-            </div>
+            </div> */}
 
             {/* Timeout Configuration */}
-            <div className="space-y-6">
+            {/* <div className="space-y-6">
               <div className="space-y-3">
                 <Label>Maximum Classification Time: {maxClassificationTime[0]} minutes</Label>
                 <Slider
@@ -414,10 +414,10 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
                   Timeout for issue classification (1-15 minutes)
                 </p>
               </div>
-            </div>
+            </div> */}
 
             {/* Custom Instructions */}
-            <div className="space-y-3">
+            {/* <div className="space-y-3">
               <Label htmlFor="custom-instructions">Custom Instructions (Optional)</Label>
               <Textarea
                 id="custom-instructions"
@@ -430,7 +430,7 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
               <p className="text-muted-foreground text-sm">
                 Add specific guidelines for your team's triage standards
               </p>
-            </div>
+            </div> */}
 
             {/* Save Button */}
             <div className="flex justify-end pt-2">

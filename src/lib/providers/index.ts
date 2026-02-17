@@ -90,7 +90,7 @@ export const PROVIDERS = {
     apiUrl: 'https://api.mistral.ai/v1',
     apiKey: getEnvVariable('MISTRAL_API_KEY'),
     hasGenerationEndpoint: false,
-    requiresResponseRewrite: true,
+    requiresResponseRewrite: false,
   },
   MINIMAX: {
     id: 'minimax',

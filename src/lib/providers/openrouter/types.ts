@@ -1,6 +1,7 @@
 import type OpenAI from 'openai';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import type { ReasoningDetailUnion } from '@/lib/custom-llm/reasoning-details';
 
 // Base types for OpenRouter API that don't depend on other lib files
 // This breaks circular dependencies with mistral.ts, minimax.ts, etc.
@@ -60,8 +61,10 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
   usage?: { include: boolean };
 };
 
-export type OpenRouterAssistantMessage = OpenAI.ChatCompletionAssistantMessageParam & {
-  reasoning_details?: { format?: string }[];
+export type MessageWithReasoning = {
+  reasoning?: string;
+  reasoning_content?: string;
+  reasoning_details?: ReasoningDetailUnion[];
 };
 
 export type OpenRouterGeneration = {

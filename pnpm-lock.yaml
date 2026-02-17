@@ -432,7 +432,7 @@ importers:
     dependencies:
       '@cloudflare/sandbox':
         specifier: 0.6.7
-        version: 0.6.7
+        version: 0.6.7(@opencode-ai/sdk@1.1.64)
       '@octokit/auth-app':
         specifier: ^8.1.2
         version: 8.1.2
@@ -502,7 +502,7 @@ importers:
     dependencies:
       '@cloudflare/sandbox':
         specifier: 0.6.7
-        version: 0.6.7
+        version: 0.6.7(@opencode-ai/sdk@1.1.64)
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.9.0(typescript@5.9.3))(hono@4.11.7)
@@ -658,7 +658,7 @@ importers:
         version: 0.0.30
       '@cloudflare/sandbox':
         specifier: 0.6.7
-        version: 0.6.7
+        version: 0.6.7(@opencode-ai/sdk@1.1.64)
       '@cloudflare/workers-types':
         specifier: ^4.20251014.0
         version: 4.20251014.0
@@ -780,7 +780,7 @@ importers:
     devDependencies:
       '@cloudflare/sandbox':
         specifier: 0.6.9
-        version: 0.6.9
+        version: 0.6.9(@opencode-ai/sdk@1.1.64)
       '@cloudflare/workers-types':
         specifier: ^4.20260120.0
         version: 4.20260130.0
@@ -879,6 +879,28 @@ importers:
       wrangler:
         specifier: ^4.61.0
         version: 4.61.1(@cloudflare/workers-types@4.20260130.0)
+
+  cloudflare-gastown/plugin:
+    dependencies:
+      '@opencode-ai/plugin':
+        specifier: latest
+        version: 1.1.64
+      '@opencode-ai/sdk':
+        specifier: latest
+        version: 1.1.64
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^22
+        version: 22.19.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1)
 
   cloudflare-git-token-service:
     dependencies:
@@ -3363,6 +3385,12 @@ packages:
 
   '@octokit/types@16.0.0':
     resolution: {integrity: sha512-sKq+9r1Mm4efXW1FCk7hFSeJo4QKreL/tTbR0rz/qx/r1Oa2VV83LTA/H/MuCOX7uCIJmQVRKBcbmWoySjAnSg==}
+
+  '@opencode-ai/plugin@1.1.64':
+    resolution: {integrity: sha512-3UAChQQf9L2uZPxGLgn9dFS7d9gtMeW1VEKPWfRV16ZgraaBT0bxjGqt4vc9Ne8mZgntAe/qpBfqY4BSpfZQbA==}
+
+  '@opencode-ai/sdk@1.1.64':
+    resolution: {integrity: sha512-g+bZGx/86JlRTKyPWsD1oFu1SoENIHeKK4LhzWWFToPv4tpN3MSLVGSUsoTSi2XqSd9JzkfPBHPdTeFvqcbzMA==}
 
   '@opentelemetry/api-logs@0.208.0':
     resolution: {integrity: sha512-CjruKY9V6NMssL/T1kAFgzosF1v9o6oeN+aX5JB/C/xPNtmgIJqcXHG7fA82Ou1zCpWGl4lROQUKwUNE1pMCyg==}
@@ -12152,6 +12180,9 @@ packages:
   zod@4.1.13:
     resolution: {integrity: sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig==}
 
+  zod@4.1.8:
+    resolution: {integrity: sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ==}
+
   zod@4.3.4:
     resolution: {integrity: sha512-Zw/uYiiyF6pUT1qmKbZziChgNPRu+ZRneAsMUDU6IwmXdWt5JwcUfy2bvLOCUtz5UniaN/Zx5aFttZYbYc7O/A==}
 
@@ -13701,13 +13732,17 @@ snapshots:
 
   '@cloudflare/kv-asset-handler@0.4.2': {}
 
-  '@cloudflare/sandbox@0.6.7':
+  '@cloudflare/sandbox@0.6.7(@opencode-ai/sdk@1.1.64)':
     dependencies:
       '@cloudflare/containers': 0.0.30
+    optionalDependencies:
+      '@opencode-ai/sdk': 1.1.64
 
-  '@cloudflare/sandbox@0.6.9':
+  '@cloudflare/sandbox@0.6.9(@opencode-ai/sdk@1.1.64)':
     dependencies:
       '@cloudflare/containers': 0.0.30
+    optionalDependencies:
+      '@opencode-ai/sdk': 1.1.64
 
   '@cloudflare/unenv-preset@2.12.0(unenv@2.0.0-rc.24)(workerd@1.20260128.0)':
     dependencies:
@@ -14974,6 +15009,13 @@ snapshots:
   '@octokit/types@16.0.0':
     dependencies:
       '@octokit/openapi-types': 27.0.0
+
+  '@opencode-ai/plugin@1.1.64':
+    dependencies:
+      '@opencode-ai/sdk': 1.1.64
+      zod: 4.1.8
+
+  '@opencode-ai/sdk@1.1.64': {}
 
   '@opentelemetry/api-logs@0.208.0':
     dependencies:
@@ -26054,6 +26096,8 @@ snapshots:
   zod@4.1.12: {}
 
   zod@4.1.13: {}
+
+  zod@4.1.8: {}
 
   zod@4.3.4: {}
 

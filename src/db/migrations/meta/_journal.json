@@ -113,6 +113,13 @@
       "when": 1771279683060,
       "tag": "0015_huge_stardust",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1771320623405,
+      "tag": "0016_shiny_sasquatch",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-# Makefile — convenience targets for kilocode-backend
+# Makefile — convenience targets for Kilo-Org/cloud
 
 COMPOSE_DEV := docker compose -f dev/docker-compose.dev.yml
 

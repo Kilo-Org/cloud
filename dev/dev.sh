@@ -28,8 +28,14 @@ if ! docker compose version &>/dev/null; then
 fi
 
 if [ ! -d "$REPO_ROOT/node_modules" ]; then
+  if ! command -v pnpm &>/dev/null; then
+    echo "❌ pnpm is not installed and node_modules is missing."
+    echo "   Install pnpm first: corepack enable && corepack prepare pnpm@10.27.0 --activate"
+    echo "   Then run: pnpm install"
+    exit 1
+  fi
   echo "⚠️  node_modules not found. Running pnpm install first..."
-  (cd "$REPO_ROOT" && pnpm install --frozen-lockfile)
+  (cd "$REPO_ROOT" && pnpm install)
 fi
 
 if [ ! -f "$REPO_ROOT/.env" ]; then

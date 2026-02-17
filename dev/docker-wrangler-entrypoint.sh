@@ -19,6 +19,12 @@
 
 set -euo pipefail
 
+if [ $# -lt 1 ]; then
+  echo "Usage: docker-wrangler-entrypoint.sh <worker-dir> [wrangler-dev-args...]"
+  echo "  e.g. docker-wrangler-entrypoint.sh cloud-agent --env dev --port 8788 --ip 0.0.0.0"
+  exit 1
+fi
+
 WORKER_DIR="$1"
 shift  # remaining args are passed to wrangler dev
 

@@ -6,7 +6,7 @@ Run the entire monorepo (Next.js backend + all Cloudflare Workers + PostgreSQL) 
 
 | Tool | Version | Check |
 |------|---------|-------|
-| Docker Desktop | 4.x+ | `docker --version` |
+| Docker Desktop (macOS/Windows) / Docker Engine (Linux) | 4.x+ | `docker --version` |
 | Docker Compose v2 | 2.20+ | `docker compose version` |
 | pnpm | 10.27.0 | `pnpm --version` |
 | Node.js | ^22 | `node --version` |

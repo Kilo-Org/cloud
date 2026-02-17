@@ -23,8 +23,23 @@ import { TRPCError } from '@trpc/server';
 import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';
 
+/**
+ * Validate that a URL is strictly a GitHub.com URL.
+ * Rejects lookalike hostnames like github.com.evil.com.
+ */
+function isStrictGitHubUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com';
+  } catch {
+    return false;
+  }
+}
+
 const OssCsvRowSchema = z.object({
-  githubUrl: z.string().url(),
+  githubUrl: z.string().url().refine(isStrictGitHubUrl, {
+    message: 'URL must be a github.com URL',
+  }),
   email: z.string().email(),
   creditsDollars: z.number().nonnegative(),
   tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
@@ -47,7 +62,7 @@ function escapeIlikePattern(str: string): string {
 function extractRepoNameFromUrl(githubUrl: string): string | null {
   try {
     const parsed = new URL(githubUrl);
-    if (!parsed.hostname.includes('github.com')) {
+    if (parsed.hostname !== 'github.com' && parsed.hostname !== 'www.github.com') {
       return null;
     }
     const pathParts = parsed.pathname.split('/').filter(Boolean);

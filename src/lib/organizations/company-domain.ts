@@ -22,7 +22,7 @@ export function normalizeCompanyDomain(input: string): string | null {
   // Strip userinfo (user:pass@) — only before the first path separator
   const slashIndex = authority.indexOf('/');
   const authorityPart = slashIndex !== -1 ? authority.slice(0, slashIndex) : authority;
-  const atIndex = authorityPart.indexOf('@');
+  const atIndex = authorityPart.lastIndexOf('@');
   if (atIndex !== -1) authority = authority.slice(atIndex + 1);
 
   // Extract hostname (before port, path, query, or fragment)

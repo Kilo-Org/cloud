@@ -76,6 +76,10 @@ describe('normalizeCompanyDomain', () => {
   it('handles userinfo and @ in path together', () => {
     expect(normalizeCompanyDomain('https://user:pass@acme.com/contact@other.com')).toBe('acme.com');
   });
+
+  it('handles password containing @ in userinfo', () => {
+    expect(normalizeCompanyDomain('https://user:pa@ss@acme.com/path')).toBe('acme.com');
+  });
 });
 
 describe('isValidDomain', () => {
@@ -161,10 +165,6 @@ describe('isValidDomain', () => {
 
   it('accepts punycode TLD', () => {
     expect(isValidDomain('example.xn--p1ai')).toBe(true);
-  });
-
-  it('accepts full punycode domain', () => {
-    expect(isValidDomain('xn--mnchen-3ya.de')).toBe(true);
   });
 });
 

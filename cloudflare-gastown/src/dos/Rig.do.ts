@@ -279,13 +279,13 @@ export class RigDO extends DurableObject<Env> {
     return AgentRecord.array().parse(rows);
   }
 
-  async updateAgentSession(agentId: string, sessionId: string | null): Promise<void> {
+  async updateContainerSession(agentId: string, sessionId: string | null): Promise<void> {
     await this.ensureInitialized();
     query(
       this.sql,
       /* sql */ `
         UPDATE ${agents}
-        SET ${agents.columns.cloud_agent_session_id} = ?,
+        SET ${agents.columns.container_session_id} = ?,
             ${agents.columns.last_activity_at} = ?
         WHERE ${agents.columns.id} = ?
       `,
@@ -359,7 +359,7 @@ export class RigDO extends DurableObject<Env> {
       /* sql */ `
         UPDATE ${agents}
         SET ${agents.columns.current_hook_bead_id} = NULL,
-            ${agents.columns.cloud_agent_session_id} = NULL,
+            ${agents.columns.container_session_id} = NULL,
             ${agents.columns.status} = 'idle',
             ${agents.columns.last_activity_at} = ?
         WHERE ${agents.columns.id} = ?
@@ -701,7 +701,7 @@ export class RigDO extends DurableObject<Env> {
    *  1. Fresh hook: hookBead sets status='working' but no container process exists yet
    *  2. Crash recovery: witnessPatrol resets dead container agents to 'idle'
    *
-   * We use cloud_agent_session_id IS NULL as the marker for "not yet dispatched".
+   * We use container_session_id IS NULL as the marker for "not yet dispatched".
    */
   private async schedulePendingWork(): Promise<string[]> {
     const pendingRows = [
@@ -717,7 +717,7 @@ export class RigDO extends DurableObject<Env> {
           FROM ${agents}
           WHERE ${agents.columns.status} IN ('idle', 'working')
             AND ${agents.columns.current_hook_bead_id} IS NOT NULL
-            AND ${agents.columns.cloud_agent_session_id} IS NULL
+            AND ${agents.columns.container_session_id} IS NULL
         `,
         []
       ),
@@ -756,7 +756,7 @@ export class RigDO extends DurableObject<Env> {
           /* sql */ `
             UPDATE ${agents}
             SET ${agents.columns.status} = 'working',
-                ${agents.columns.cloud_agent_session_id} = ?,
+                ${agents.columns.container_session_id} = ?,
                 ${agents.columns.last_activity_at} = ?
             WHERE ${agents.columns.id} = ?
           `,
@@ -934,7 +934,7 @@ export class RigDO extends DurableObject<Env> {
             /* sql */ `
               UPDATE ${agents}
               SET ${agents.columns.status} = 'idle',
-                  ${agents.columns.cloud_agent_session_id} = NULL,
+                  ${agents.columns.container_session_id} = NULL,
                   ${agents.columns.last_activity_at} = ?
               WHERE ${agents.columns.id} = ?
             `,

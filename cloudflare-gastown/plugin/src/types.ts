@@ -30,7 +30,7 @@ export type Agent = {
   role: AgentRole;
   name: string;
   identity: string;
-  cloud_agent_session_id: string | null;
+  container_session_id: string | null;
   status: AgentStatus;
   current_hook_bead_id: string | null;
   last_activity_at: string | null;

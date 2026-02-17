@@ -145,13 +145,13 @@ describe('RigDO', () => {
         identity: `session-test-${rigName}`,
       });
 
-      await rig.updateAgentSession(agent.id, 'session-123');
+      await rig.updateContainerSession(agent.id, 'session-123');
       const updated = await rig.getAgentAsync(agent.id);
-      expect(updated?.cloud_agent_session_id).toBe('session-123');
+      expect(updated?.container_session_id).toBe('session-123');
 
-      await rig.updateAgentSession(agent.id, null);
+      await rig.updateContainerSession(agent.id, null);
       const cleared = await rig.getAgentAsync(agent.id);
-      expect(cleared?.cloud_agent_session_id).toBeNull();
+      expect(cleared?.container_session_id).toBeNull();
     });
 
     it('should update agent status', async () => {

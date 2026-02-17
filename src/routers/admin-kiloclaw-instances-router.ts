@@ -9,7 +9,7 @@ import {
 import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { eq, and, or, desc, asc, isNull, isNotNull, sql, gte, type SQL } from 'drizzle-orm';
+import { eq, and, or, desc, asc, ilike, isNull, isNotNull, sql, gte, type SQL } from 'drizzle-orm';
 
 const ListInstancesSchema = z.object({
   offset: z.number().min(0).default(0),
@@ -94,14 +94,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const conditions: SQL[] = [];
 
     if (searchTerm) {
+      const ilikePattern = `%${searchTerm}%`;
       const searchConditions: SQL[] = [
-        eq(kiloclaw_instances.user_id, searchTerm),
-        eq(kiloclaw_instances.sandbox_id, searchTerm),
+        ilike(kiloclaw_instances.sandbox_id, ilikePattern),
+        ilike(kilocode_users.google_user_email, ilikePattern),
       ];
 
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidRegex.test(searchTerm)) {
         searchConditions.push(eq(kiloclaw_instances.id, searchTerm));
+        searchConditions.push(eq(kiloclaw_instances.user_id, searchTerm));
       }
 
       const searchCondition = or(...searchConditions);
@@ -136,6 +138,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const totalCountResult = await db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(kiloclaw_instances)
+      .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
       .where(whereCondition);
 
     const totalCount = totalCountResult[0]?.count || 0;

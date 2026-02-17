@@ -4,16 +4,16 @@
   "type": "module",
   "private": true,
   "description": "Town container control server for Gastown agent orchestration",
-  "main": "dist/main.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/main.js"
+    "start": "bun run src/main.ts",
+    "typecheck": "bun x tsc --noEmit"
   },
   "dependencies": {
+    "hono": "^4.11.4",
     "zod": "^4.3.5"
   },
   "devDependencies": {
-    "@types/node": "^22",
+    "@types/bun": "^1.2.17",
     "typescript": "^5.9.3"
   }
 }

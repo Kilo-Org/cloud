@@ -1,5 +1,5 @@
-import { listProcesses } from './process-manager.js';
-import type { HeartbeatPayload } from './types.js';
+import { listProcesses } from './process-manager';
+import type { HeartbeatPayload } from './types';
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
@@ -38,9 +38,6 @@ export function stopHeartbeat(): void {
   console.log('Heartbeat reporter stopped');
 }
 
-/**
- * Send heartbeat for all active agent processes.
- */
 async function sendHeartbeats(): Promise<void> {
   if (!gastownApiUrl || !internalApiKey) return;
 
@@ -74,7 +71,6 @@ async function sendHeartbeats(): Promise<void> {
         );
       }
     } catch (err) {
-      // Best-effort: don't let heartbeat failures crash the container
       console.warn(`Heartbeat error for agent ${agent.agentId}:`, err);
     }
   }

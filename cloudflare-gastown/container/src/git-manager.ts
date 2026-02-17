@@ -1,7 +1,6 @@
-import { execFile } from 'node:child_process';
-import { mkdir, access, realpath } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import type { CloneOptions, WorktreeOptions } from './types.js';
+import type { CloneOptions, WorktreeOptions } from './types';
 
 const WORKSPACE_ROOT = '/workspace/rigs';
 
@@ -29,25 +28,26 @@ function assertInsideWorkspace(resolvedPath: string): void {
   }
 }
 
-function exec(cmd: string, args: string[], cwd?: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(`${cmd} ${args.join(' ')} failed: ${stderr || error.message}`));
-        return;
-      }
-      resolve(stdout.trim());
-    });
+async function exec(cmd: string, args: string[], cwd?: string): Promise<string> {
+  const proc = Bun.spawn([cmd, ...args], {
+    cwd,
+    stdout: 'pipe',
+    stderr: 'pipe',
   });
+
+  const exitCode = await proc.exited;
+  const stdout = await new Response(proc.stdout).text();
+
+  if (exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`${cmd} ${args.join(' ')} failed: ${stderr || `exit code ${exitCode}`}`);
+  }
+
+  return stdout.trim();
 }
 
 async function pathExists(p: string): Promise<boolean> {
-  try {
-    await access(p);
-    return true;
-  } catch {
-    return false;
-  }
+  return Bun.file(p).exists();
 }
 
 function repoDir(rigId: string): string {
@@ -74,7 +74,6 @@ export async function cloneRepo(options: CloneOptions): Promise<string> {
   const dir = repoDir(options.rigId);
 
   if (await pathExists(join(dir, '.git'))) {
-    // Already cloned — fetch latest
     await exec('git', ['fetch', '--all', '--prune'], dir);
     console.log(`Fetched latest for rig ${options.rigId}`);
     return dir;
@@ -102,7 +101,6 @@ export async function createWorktree(options: WorktreeOptions): Promise<string> 
   const dir = worktreeDir(options.rigId, options.branch);
 
   if (await pathExists(dir)) {
-    // Worktree already exists — pull latest
     await exec('git', ['checkout', options.branch], dir);
     await exec('git', ['pull', '--rebase', '--autostash'], dir).catch(() => {
       // Pull may fail if remote branch doesn't exist yet; that's fine
@@ -111,11 +109,9 @@ export async function createWorktree(options: WorktreeOptions): Promise<string> 
     return dir;
   }
 
-  // Create the branch locally if it doesn't exist
   try {
     await exec('git', ['branch', '--track', options.branch, `origin/${options.branch}`], repo);
   } catch {
-    // Branch might not exist on remote yet — create it from HEAD
     await exec('git', ['branch', options.branch], repo);
   }
 

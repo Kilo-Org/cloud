@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import { resError } from './util/res.util';
+import { dashboardHtml } from './ui/dashboard.ui';
 import {
   authMiddleware,
   agentOnlyMiddleware,
   internalOnlyMiddleware,
+  LOCAL_DEV_SECRET,
   type AuthVariables,
 } from './middleware/auth.middleware';
 import {
@@ -58,6 +60,21 @@ export type GastownEnv = {
 };
 
 const app = new Hono<GastownEnv>();
+
+// ── Dashboard UI ────────────────────────────────────────────────────────
+
+app.get('/', async c => {
+  let key: string;
+  try {
+    const secret = c.env.INTERNAL_API_SECRET;
+    key = typeof secret === 'string' ? secret : await secret.get();
+  } catch {
+    // Secrets Store unavailable in local dev — use the same fallback
+    // the auth middleware uses so the dashboard can authenticate.
+    key = LOCAL_DEV_SECRET;
+  }
+  return c.html(dashboardHtml(key));
+});
 
 // ── Health ──────────────────────────────────────────────────────────────
 

@@ -1,11 +1,7 @@
-import { cloneRepo, createWorktree } from './git-manager.js';
-import { startProcess } from './process-manager.js';
-import type { AgentProcess, StartAgentRequest } from './types.js';
+import { cloneRepo, createWorktree } from './git-manager';
+import { startProcess } from './process-manager';
+import type { AgentProcess, StartAgentRequest } from './types';
 
-/**
- * Configure environment variables for a Kilo CLI agent process.
- * These env vars tell the tool plugin how to reach the Gastown worker API.
- */
 /**
  * Resolve an env var: prefer the request-provided value, then the container's
  * inherited process env, then undefined (omitted from the child env so the
@@ -17,12 +13,10 @@ function resolveEnv(request: StartAgentRequest, key: string): string | undefined
 
 function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   const env: Record<string, string> = {
-    // Always set — these are agent-specific identity vars
     GASTOWN_AGENT_ID: request.agentId,
     GASTOWN_RIG_ID: request.rigId,
     GASTOWN_TOWN_ID: request.townId,
 
-    // Git config for commits
     GIT_AUTHOR_NAME: `${request.name} (gastown)`,
     GIT_AUTHOR_EMAIL: `${request.name}@gastown.local`,
     GIT_COMMITTER_NAME: `${request.name} (gastown)`,
@@ -30,8 +24,7 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   };
 
   // Conditionally set config vars — only when a value is available from
-  // the request or the container's own environment. This avoids overwriting
-  // inherited process.env values with empty strings.
+  // the request or the container's own environment.
   const conditionalKeys = [
     'GASTOWN_API_URL',
     'GASTOWN_SESSION_TOKEN',
@@ -45,7 +38,6 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     }
   }
 
-  // Merge any additional env vars from the request
   if (request.envVars) {
     for (const [key, value] of Object.entries(request.envVars)) {
       if (!(key in env)) {
@@ -57,11 +49,8 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   return env;
 }
 
-/**
- * Build the Kilo CLI arguments for the agent.
- */
 function buildCliArgs(request: StartAgentRequest): string[] {
-  const args = [
+  return [
     'code',
     '--model',
     request.model,
@@ -71,8 +60,6 @@ function buildCliArgs(request: StartAgentRequest): string[] {
     request.prompt,
     '--non-interactive',
   ];
-
-  return args;
 }
 
 /**
@@ -82,23 +69,19 @@ function buildCliArgs(request: StartAgentRequest): string[] {
  * 3. Spawn the Kilo CLI process in that worktree
  */
 export async function runAgent(request: StartAgentRequest): Promise<AgentProcess> {
-  // 1. Clone or fetch the rig repo
   await cloneRepo({
     rigId: request.rigId,
     gitUrl: request.gitUrl,
     defaultBranch: request.defaultBranch,
   });
 
-  // 2. Create worktree for this agent's branch
   const workdir = await createWorktree({
     rigId: request.rigId,
     branch: request.branch,
   });
 
-  // 3. Build env and CLI args
   const env = buildAgentEnv(request);
   const cliArgs = buildCliArgs(request);
 
-  // 4. Spawn the process
   return startProcess(request, workdir, cliArgs, env);
 }

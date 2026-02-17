@@ -1,3 +1,3 @@
-import { startControlServer } from './control-server.js';
+import { startControlServer } from './control-server';
 
 startControlServer();

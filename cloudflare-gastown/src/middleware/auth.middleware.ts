@@ -13,9 +13,18 @@ export type AuthVariables = {
  * Resolves a secret value from either a `SecretsStoreSecret` (production, has `.get()`)
  * or a plain string (test env vars set in wrangler.test.jsonc).
  */
+// Well-known local dev secret, used when Secrets Store is unavailable.
+export const LOCAL_DEV_SECRET = 'gastown-local-dev-secret';
+
 async function resolveSecret(binding: SecretsStoreSecret | string): Promise<string> {
   if (typeof binding === 'string') return binding;
-  return binding.get();
+  try {
+    return await binding.get();
+  } catch {
+    // Secrets Store unavailable in local dev — fall back to a well-known
+    // dev secret so wrangler dev + the dashboard work out of the box.
+    return LOCAL_DEV_SECRET;
+  }
 }
 
 /**

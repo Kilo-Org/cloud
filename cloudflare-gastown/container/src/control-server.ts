@@ -1,5 +1,5 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { runAgent } from './agent-runner.js';
+import { Hono } from 'hono';
+import { runAgent } from './agent-runner';
 import {
   stopProcess,
   sendMessage,
@@ -7,190 +7,121 @@ import {
   activeProcessCount,
   getUptime,
   stopAll,
-} from './process-manager.js';
-import { startHeartbeat, stopHeartbeat } from './heartbeat.js';
-import { StartAgentRequest, StopAgentRequest, SendMessageRequest } from './types.js';
-import type { AgentStatusResponse, HealthResponse, StreamTicketResponse } from './types.js';
+} from './process-manager';
+import { startHeartbeat, stopHeartbeat } from './heartbeat';
+import { StartAgentRequest, StopAgentRequest, SendMessageRequest } from './types';
+import type { AgentStatusResponse, HealthResponse, StreamTicketResponse } from './types';
 
-const PORT = 8080;
-
-// Simple stream ticket store (ticket → agentId, expires after 60s)
+// Simple stream ticket store (ticket -> agentId, expires after 60s)
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
-function json(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(body));
-}
+export const app = new Hono();
 
-/**
- * Safely parse request body as JSON. Returns null on malformed input
- * so callers can respond with 400 rather than letting it bubble as 500.
- */
-function parseBody(req: IncomingMessage): Promise<unknown | null> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
-    req.on('end', () => {
-      if (chunks.length === 0) {
-        resolve({});
-        return;
-      }
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString()));
-      } catch {
-        resolve(null);
-      }
-    });
-    req.on('error', reject);
-  });
-}
+// GET /health
+app.get('/health', c => {
+  const response: HealthResponse = {
+    status: 'ok',
+    agents: activeProcessCount(),
+    uptime: getUptime(),
+  };
+  return c.json(response);
+});
 
-/**
- * Match a URL path against a pattern with named params.
- * Pattern uses :paramName syntax, e.g. "/agents/:agentId/stop"
- */
-function matchRoute(pattern: string, pathname: string): Record<string, string> | null {
-  const patternParts = pattern.split('/');
-  const pathParts = pathname.split('/');
-
-  if (patternParts.length !== pathParts.length) return null;
-
-  const params: Record<string, string> = {};
-  for (let i = 0; i < patternParts.length; i++) {
-    const pp = patternParts[i];
-    if (pp.startsWith(':')) {
-      params[pp.slice(1)] = pathParts[i];
-    } else if (pp !== pathParts[i]) {
-      return null;
-    }
+// POST /agents/start
+app.post('/agents/start', async c => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = StartAgentRequest.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
-  return params;
-}
 
-async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const method = req.method ?? 'GET';
-  const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
-  const pathname = url.pathname;
+  const agentProcess = await runAgent(parsed.data);
+  return c.json(agentProcess, 201);
+});
 
-  try {
-    // GET /health
-    if (method === 'GET' && pathname === '/health') {
-      const response: HealthResponse = {
-        status: 'ok',
-        agents: activeProcessCount(),
-        uptime: getUptime(),
-      };
-      json(res, 200, response);
-      return;
-    }
+// POST /agents/:agentId/stop
+app.post('/agents/:agentId/stop', async c => {
+  const { agentId } = c.req.param();
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = StopAgentRequest.safeParse(body);
+  const signal = parsed.success ? parsed.data.signal : undefined;
 
-    // POST /agents/start
-    if (method === 'POST' && pathname === '/agents/start') {
-      const body = await parseBody(req);
-      const parsed = StartAgentRequest.safeParse(body);
-      if (!parsed.success) {
-        json(res, 400, { error: 'Invalid request body', issues: parsed.error.issues });
-        return;
-      }
+  await stopProcess(agentId, signal);
+  return c.json({ stopped: true });
+});
 
-      const agentProcess = await runAgent(parsed.data);
-      json(res, 201, agentProcess);
-      return;
-    }
-
-    // POST /agents/:agentId/stop
-    const stopMatch = matchRoute('/agents/:agentId/stop', pathname);
-    if (method === 'POST' && stopMatch) {
-      const body = await parseBody(req);
-      const parsed = StopAgentRequest.safeParse(body);
-      const signal = parsed.success ? parsed.data.signal : undefined;
-
-      await stopProcess(stopMatch.agentId, signal);
-      json(res, 200, { stopped: true });
-      return;
-    }
-
-    // POST /agents/:agentId/message
-    const msgMatch = matchRoute('/agents/:agentId/message', pathname);
-    if (method === 'POST' && msgMatch) {
-      const body = await parseBody(req);
-      const parsed = SendMessageRequest.safeParse(body);
-      if (!parsed.success) {
-        json(res, 400, { error: 'Invalid request body', issues: parsed.error.issues });
-        return;
-      }
-
-      sendMessage(msgMatch.agentId, parsed.data.prompt);
-      json(res, 200, { sent: true });
-      return;
-    }
-
-    // GET /agents/:agentId/status
-    const statusMatch = matchRoute('/agents/:agentId/status', pathname);
-    if (method === 'GET' && statusMatch) {
-      const proc = getProcessStatus(statusMatch.agentId);
-      if (!proc) {
-        json(res, 404, { error: `Agent ${statusMatch.agentId} not found` });
-        return;
-      }
-
-      const response: AgentStatusResponse = {
-        agentId: proc.agentId,
-        status: proc.status,
-        pid: proc.pid,
-        exitCode: proc.exitCode,
-        startedAt: proc.startedAt,
-        lastActivityAt: proc.lastActivityAt,
-      };
-      json(res, 200, response);
-      return;
-    }
-
-    // POST /agents/:agentId/stream-ticket
-    const ticketMatch = matchRoute('/agents/:agentId/stream-ticket', pathname);
-    if (method === 'POST' && ticketMatch) {
-      const proc = getProcessStatus(ticketMatch.agentId);
-      if (!proc) {
-        json(res, 404, { error: `Agent ${ticketMatch.agentId} not found` });
-        return;
-      }
-
-      const ticket = crypto.randomUUID();
-      const expiresAt = Date.now() + 60_000;
-      streamTickets.set(ticket, { agentId: ticketMatch.agentId, expiresAt });
-
-      // Clean up expired tickets
-      for (const [t, v] of streamTickets) {
-        if (v.expiresAt < Date.now()) streamTickets.delete(t);
-      }
-
-      const response: StreamTicketResponse = {
-        ticket,
-        expiresAt: new Date(expiresAt).toISOString(),
-      };
-      json(res, 200, response);
-      return;
-    }
-
-    json(res, 404, { error: 'Not found' });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error';
-    console.error('Control server error:', err);
-    json(res, 500, { error: message });
+// POST /agents/:agentId/message
+app.post('/agents/:agentId/message', async c => {
+  const { agentId } = c.req.param();
+  const body = await c.req.json().catch(() => null);
+  const parsed = SendMessageRequest.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
-}
+
+  sendMessage(agentId, parsed.data.prompt);
+  return c.json({ sent: true });
+});
+
+// GET /agents/:agentId/status
+app.get('/agents/:agentId/status', c => {
+  const { agentId } = c.req.param();
+  const proc = getProcessStatus(agentId);
+  if (!proc) {
+    return c.json({ error: `Agent ${agentId} not found` }, 404);
+  }
+
+  const response: AgentStatusResponse = {
+    agentId: proc.agentId,
+    status: proc.status,
+    pid: proc.pid,
+    exitCode: proc.exitCode,
+    startedAt: proc.startedAt,
+    lastActivityAt: proc.lastActivityAt,
+  };
+  return c.json(response);
+});
+
+// POST /agents/:agentId/stream-ticket
+app.post('/agents/:agentId/stream-ticket', c => {
+  const { agentId } = c.req.param();
+  const proc = getProcessStatus(agentId);
+  if (!proc) {
+    return c.json({ error: `Agent ${agentId} not found` }, 404);
+  }
+
+  const ticket = crypto.randomUUID();
+  const expiresAt = Date.now() + 60_000;
+  streamTickets.set(ticket, { agentId, expiresAt });
+
+  // Clean up expired tickets
+  for (const [t, v] of streamTickets) {
+    if (v.expiresAt < Date.now()) streamTickets.delete(t);
+  }
+
+  const response: StreamTicketResponse = {
+    ticket,
+    expiresAt: new Date(expiresAt).toISOString(),
+  };
+  return c.json(response);
+});
+
+// Catch-all
+app.notFound(c => c.json({ error: 'Not found' }, 404));
+
+app.onError((err, c) => {
+  const message = err instanceof Error ? err.message : 'Internal server error';
+  console.error('Control server error:', err);
+  return c.json({ error: message }, 500);
+});
 
 /**
- * Start the control server on the configured port.
- * This is the entrypoint for the container image.
+ * Start the control server using Bun.serve + Hono.
  */
 export function startControlServer(): void {
-  const server = createServer((req, res) => {
-    void handleRequest(req, res);
-  });
+  const PORT = 8080;
 
-  // Start heartbeat if env vars are configured.
-  // INTERNAL_API_SECRET matches the worker's auth middleware secret name.
+  // Start heartbeat if env vars are configured
   const apiUrl = process.env.GASTOWN_API_URL;
   const apiKey = process.env.INTERNAL_API_SECRET;
   if (apiUrl && apiKey) {
@@ -202,16 +133,16 @@ export function startControlServer(): void {
     console.log('Shutting down control server...');
     stopHeartbeat();
     await stopAll();
-    server.close(() => {
-      console.log('Control server stopped');
-      process.exit(0);
-    });
+    process.exit(0);
   };
 
   process.on('SIGTERM', () => void shutdown());
   process.on('SIGINT', () => void shutdown());
 
-  server.listen(PORT, () => {
-    console.log(`Town container control server listening on port ${PORT}`);
+  Bun.serve({
+    port: PORT,
+    fetch: app.fetch,
   });
+
+  console.log(`Town container control server listening on port ${PORT}`);
 }

@@ -218,12 +218,17 @@ export async function deleteDeployment(deploymentId: string, owner: Owner) {
     });
   }
 
-  // Clean up KV slug mapping
-  await dispatcherClient.deleteSlugMapping(deployment[0].internal_worker_name);
-
   // Delete worker deployment from Cloudflare FIRST
-  // If this fails, we don't proceed with database deletion to avoid orphan deployments
-  await deployApiClient.deleteWorker(deployment[0].internal_worker_name);
+  // If this fails, we don't proceed with database/KV cleanup to avoid exposing a still-live deployment
+  const workerName = deployment[0].internal_worker_name;
+  await deployApiClient.deleteWorker(workerName);
+
+  // Clean up KV records after worker is confirmed deleted (slug mapping, password protection, banner)
+  await Promise.allSettled([
+    dispatcherClient.deleteSlugMapping(workerName),
+    dispatcherClient.removePassword(workerName),
+    dispatcherClient.disableBanner(workerName),
+  ]);
 
   // Unlink app builder projects that reference this deployment
   await db
@@ -746,6 +751,7 @@ export async function createDeployment(params: {
           source_type: resolved.sourceType,
           git_auth_token: resolved.encryptedToken,
           last_build_id: builderResponse.buildId,
+          created_from: createdFrom,
         })
         .returning();
 
@@ -776,6 +782,16 @@ export async function createDeployment(params: {
       return { success: false, error: 'slug_taken', message: 'Please try again' };
     }
     throw error;
+  }
+
+  // Auto-enable banner for app-builder deployments
+  if (createdFrom === 'app-builder') {
+    try {
+      await dispatcherClient.enableBanner(internalWorkerName);
+    } catch (error) {
+      // Non-fatal: deployment was created successfully, banner is secondary
+      console.error('Failed to enable banner for app-builder deployment:', error);
+    }
   }
 
   return { success: true, deploymentId, deploymentSlug, deploymentUrl };

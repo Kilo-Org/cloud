@@ -883,10 +883,10 @@ importers:
   cloudflare-gastown/plugin:
     dependencies:
       '@opencode-ai/plugin':
-        specifier: latest
+        specifier: ^1.1.64
         version: 1.1.64
       '@opencode-ai/sdk':
-        specifier: latest
+        specifier: ^1.1.64
         version: 1.1.64
       zod:
         specifier: ^4.3.5

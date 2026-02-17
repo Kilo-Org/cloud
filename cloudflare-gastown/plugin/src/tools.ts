@@ -5,7 +5,7 @@ function parseJsonArg(value: string, label: string): unknown {
   try {
     return JSON.parse(value);
   } catch {
-    throw new Error(`Invalid JSON in "${label}": ${value.slice(0, 200)}`);
+    throw new Error(`Invalid JSON in "${label}"`);
   }
 }
 

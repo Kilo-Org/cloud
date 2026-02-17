@@ -20,9 +20,9 @@ RUN mkdir -p /workspace/rigs /app
 
 WORKDIR /app
 
-# Copy container package files and install deps
-COPY package.json ./
-RUN npm install --production
+# Copy container package files and install deps deterministically
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 # Copy compiled control server
 COPY dist/ ./dist/

@@ -6,17 +6,21 @@ import type { AgentProcess, StartAgentRequest } from './types.js';
  * Configure environment variables for a Kilo CLI agent process.
  * These env vars tell the tool plugin how to reach the Gastown worker API.
  */
+/**
+ * Resolve an env var: prefer the request-provided value, then the container's
+ * inherited process env, then undefined (omitted from the child env so the
+ * inherited value from process.env flows through naturally via mergedEnv).
+ */
+function resolveEnv(request: StartAgentRequest, key: string): string | undefined {
+  return request.envVars?.[key] ?? process.env[key];
+}
+
 function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   const env: Record<string, string> = {
-    // Gastown tool plugin config
-    GASTOWN_API_URL: request.envVars?.GASTOWN_API_URL ?? '',
-    GASTOWN_SESSION_TOKEN: request.envVars?.GASTOWN_SESSION_TOKEN ?? '',
+    // Always set — these are agent-specific identity vars
     GASTOWN_AGENT_ID: request.agentId,
     GASTOWN_RIG_ID: request.rigId,
     GASTOWN_TOWN_ID: request.townId,
-
-    // Kilo CLI / LLM config
-    KILO_API_URL: request.envVars?.KILO_API_URL ?? '',
 
     // Git config for commits
     GIT_AUTHOR_NAME: `${request.name} (gastown)`,
@@ -25,10 +29,25 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     GIT_COMMITTER_EMAIL: `${request.name}@gastown.local`,
   };
 
+  // Conditionally set config vars — only when a value is available from
+  // the request or the container's own environment. This avoids overwriting
+  // inherited process.env values with empty strings.
+  const conditionalKeys = [
+    'GASTOWN_API_URL',
+    'GASTOWN_SESSION_TOKEN',
+    'KILO_API_URL',
+    'INTERNAL_API_SECRET',
+  ];
+  for (const key of conditionalKeys) {
+    const value = resolveEnv(request, key);
+    if (value) {
+      env[key] = value;
+    }
+  }
+
   // Merge any additional env vars from the request
   if (request.envVars) {
     for (const [key, value] of Object.entries(request.envVars)) {
-      // Don't overwrite the ones we explicitly set above
       if (!(key in env)) {
         env[key] = value;
       }

@@ -162,11 +162,6 @@ describe('Rig DO Alarm', () => {
       const bead = await rig.createBead({ type: 'issue', title: 'Pending bead' });
       await rig.hookBead(agent.id, bead.id);
 
-      // hookBead sets agent to 'working', but for schedulePendingWork to find
-      // agents, they need to be 'idle' with a hooked bead — which is the state
-      // after a container crash restarts them. Simulate that:
-      await rig.updateAgentStatus(agent.id, 'idle');
-
       // Run alarm — no townId, so scheduling should be skipped
       await runDurableObjectAlarm(rig);
 
@@ -186,17 +181,12 @@ describe('Rig DO Alarm', () => {
       const bead = await rig.createBead({ type: 'issue', title: 'Dispatch bead' });
       await rig.hookBead(agent.id, bead.id);
 
-      // Simulate agent reset to idle (e.g., after container crash)
-      await rig.updateAgentStatus(agent.id, 'idle');
-
       // Run alarm — container not available in tests, so startAgentInContainer
       // will fail, but the attempt should be made
       await runDurableObjectAlarm(rig);
 
-      // In test env without a real container, the fetch will throw and
-      // startAgentInContainer returns false, so agent remains idle
-      const updatedAgent = await rig.getAgentAsync(agent.id);
       // Agent stays idle because container start failed
+      const updatedAgent = await rig.getAgentAsync(agent.id);
       expect(updatedAgent?.status).toBe('idle');
     });
   });
@@ -262,15 +252,17 @@ describe('Rig DO Alarm', () => {
       });
       await rig.hookBead(agent.id, bead.id);
 
-      // hookBead arms alarm — run it
+      // hookBead arms alarm — run it (container unavailable in tests,
+      // so agent stays idle since dispatch fails)
       const alarmRan = await runDurableObjectAlarm(rig);
       expect(alarmRan).toBe(true);
 
-      // Agent should still be working (hookBead set it to working)
       const agentAfterAlarm = await rig.getAgentAsync(agent.id);
-      expect(agentAfterAlarm?.status).toBe('working');
+      expect(agentAfterAlarm?.status).toBe('idle');
+      expect(agentAfterAlarm?.current_hook_bead_id).toBe(bead.id);
 
-      // Agent finishes work
+      // Simulate agent completing work (in production the container
+      // would have started the agent and it would call agentDone)
       await rig.agentDone(agent.id, {
         branch: 'feature/e2e',
         pr_url: 'https://github.com/org/repo/pull/99',

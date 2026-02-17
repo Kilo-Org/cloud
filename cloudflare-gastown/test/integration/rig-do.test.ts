@@ -138,22 +138,6 @@ describe('RigDO', () => {
       expect(refineries).toHaveLength(1);
     });
 
-    it('should update agent session', async () => {
-      const agent = await rig.registerAgent({
-        role: 'polecat',
-        name: 'P1',
-        identity: `session-test-${rigName}`,
-      });
-
-      await rig.updateContainerSession(agent.id, 'session-123');
-      const updated = await rig.getAgentAsync(agent.id);
-      expect(updated?.container_session_id).toBe('session-123');
-
-      await rig.updateContainerSession(agent.id, null);
-      const cleared = await rig.getAgentAsync(agent.id);
-      expect(cleared?.container_session_id).toBeNull();
-    });
-
     it('should update agent status', async () => {
       const agent = await rig.registerAgent({
         role: 'polecat',
@@ -184,7 +168,7 @@ describe('RigDO', () => {
 
       const hookedAgent = await rig.getAgentAsync(agent.id);
       expect(hookedAgent?.current_hook_bead_id).toBe(bead.id);
-      expect(hookedAgent?.status).toBe('working');
+      expect(hookedAgent?.status).toBe('idle');
 
       const hookedBead = await rig.getBeadAsync(bead.id);
       expect(hookedBead?.status).toBe('in_progress');

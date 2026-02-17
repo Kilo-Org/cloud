@@ -281,20 +281,6 @@ export class RigDO extends DurableObject<Env> {
     return AgentRecord.array().parse(rows);
   }
 
-  async updateContainerSession(agentId: string, sessionId: string | null): Promise<void> {
-    await this.ensureInitialized();
-    query(
-      this.sql,
-      /* sql */ `
-        UPDATE ${agents}
-        SET ${agents.columns.container_session_id} = ?,
-            ${agents.columns.last_activity_at} = ?
-        WHERE ${agents.columns.id} = ?
-      `,
-      [sessionId, now(), agentId]
-    );
-  }
-
   async updateAgentStatus(agentId: string, status: AgentStatus): Promise<void> {
     await this.ensureInitialized();
     query(
@@ -332,7 +318,6 @@ export class RigDO extends DurableObject<Env> {
       /* sql */ `
         UPDATE ${agents}
         SET ${agents.columns.current_hook_bead_id} = ?,
-            ${agents.columns.status} = 'working',
             ${agents.columns.last_activity_at} = ?
         WHERE ${agents.columns.id} = ?
       `,
@@ -361,7 +346,6 @@ export class RigDO extends DurableObject<Env> {
       /* sql */ `
         UPDATE ${agents}
         SET ${agents.columns.current_hook_bead_id} = NULL,
-            ${agents.columns.container_session_id} = NULL,
             ${agents.columns.status} = 'idle',
             ${agents.columns.last_activity_at} = ?
         WHERE ${agents.columns.id} = ?
@@ -698,12 +682,9 @@ export class RigDO extends DurableObject<Env> {
   // ── Schedule Pending Work ─────────────────────────────────────────────
 
   /**
-   * Find agents that have hooked beads but haven't been started in the container.
-   * This covers two cases:
-   *  1. Fresh hook: hookBead sets status='working' but no container process exists yet
-   *  2. Crash recovery: witnessPatrol resets dead container agents to 'idle'
-   *
-   * We use container_session_id IS NULL as the marker for "not yet dispatched".
+   * Find idle agents that have hooked beads and dispatch them to the container.
+   * Covers fresh hooks and crash recovery (witnessPatrol resets dead agents to idle).
+   * The scheduler is the only path that transitions an agent to 'working'.
    */
   private async schedulePendingWork(): Promise<string[]> {
     const rows = [
@@ -711,9 +692,8 @@ export class RigDO extends DurableObject<Env> {
         this.sql,
         /* sql */ `
           SELECT * FROM ${agents}
-          WHERE ${agents.columns.status} IN ('idle', 'working')
+          WHERE ${agents.columns.status} = 'idle'
             AND ${agents.columns.current_hook_bead_id} IS NOT NULL
-            AND ${agents.columns.container_session_id} IS NULL
         `,
         []
       ),
@@ -747,17 +727,15 @@ export class RigDO extends DurableObject<Env> {
       });
 
       if (started) {
-        // Mark as working with a session ID so it won't be re-dispatched
         query(
           this.sql,
           /* sql */ `
             UPDATE ${agents}
             SET ${agents.columns.status} = 'working',
-                ${agents.columns.container_session_id} = ?,
                 ${agents.columns.last_activity_at} = ?
             WHERE ${agents.columns.id} = ?
           `,
-          [`container:${agent.id}`, now(), agent.id]
+          [now(), agent.id]
         );
         scheduledAgentIds.push(agent.id);
       }
@@ -955,14 +933,13 @@ export class RigDO extends DurableObject<Env> {
         const containerStatus = await this.checkAgentContainerStatus(townId, working.id);
 
         if (containerStatus === 'not_found' || containerStatus === 'exited') {
-          // Agent process is gone — reset to idle and clear session so
-          // schedulePendingWork() can re-dispatch on the next alarm
+          // Agent process is gone — reset to idle so schedulePendingWork()
+          // can re-dispatch on the next alarm tick
           query(
             this.sql,
             /* sql */ `
               UPDATE ${agents}
               SET ${agents.columns.status} = 'idle',
-                  ${agents.columns.container_session_id} = NULL,
                   ${agents.columns.last_activity_at} = ?
               WHERE ${agents.columns.id} = ?
             `,

@@ -393,12 +393,12 @@ describe('HTTP API', () => {
       const hookBody = await hookRes.json();
       expect(hookBody.data.hooked).toBe(true);
 
-      // Verify agent is working
+      // Verify agent has hooked bead (stays idle until alarm dispatches to container)
       const agentCheck = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}`), {
         headers: internalHeaders(),
       });
       const agentState = (await agentCheck.json()).data;
-      expect(agentState.status).toBe('working');
+      expect(agentState.status).toBe('idle');
       expect(agentState.current_hook_bead_id).toBe(bead.id);
 
       // Unhook

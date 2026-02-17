@@ -102,6 +102,21 @@ export async function stopMachine(config: FlyClientConfig, machineId: string): P
   await assertOk(resp, 'stopMachine');
 }
 
+/**
+ * Stop a machine and wait for it to reach the 'stopped' state.
+ * Fly requires instance_id when waiting for 'stopped', so this fetches
+ * the current machine state after issuing the stop to get the instance_id.
+ */
+export async function stopMachineAndWait(
+  config: FlyClientConfig,
+  machineId: string,
+  timeoutSeconds = 60
+): Promise<void> {
+  await stopMachine(config, machineId);
+  const machine = await getMachine(config, machineId);
+  await waitForState(config, machineId, 'stopped', timeoutSeconds, machine.instance_id);
+}
+
 export async function destroyMachine(
   config: FlyClientConfig,
   machineId: string,

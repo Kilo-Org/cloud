@@ -83,6 +83,18 @@ export function enumCheck<T extends Record<string, string>>(
   );
 }
 
+const GastownTownStatus = {
+  provisioning: 'provisioning',
+  running: 'running',
+  stopped: 'stopped',
+  destroyed: 'destroyed',
+} as const;
+
+const GastownRigStatus = {
+  active: 'active',
+  removed: 'removed',
+} as const;
+
 export const SCHEMA_CHECK_ENUMS = {
   KiloPassTier,
   KiloPassCadence,
@@ -92,6 +104,8 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
+  GastownTownStatus,
+  GastownRigStatus,
 } as const;
 
 export const credit_transactions = pgTable(
@@ -2956,3 +2970,78 @@ export const kiloclaw_access_codes = pgTable(
 );
 
 export type KiloClawAccessCode = typeof kiloclaw_access_codes.$inferSelect;
+
+// ─── Gastown (sandbox-per-town hosted Gastown) ───────────────────────
+
+export const gastown_towns = pgTable(
+  'gastown_towns',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    town_name: text().notNull(),
+    sandbox_id: text().notNull().unique(),
+    fly_machine_id: text(),
+    fly_volume_id: text(),
+    fly_region: text().default('iad'),
+    status: text()
+      .$type<(typeof GastownTownStatus)[keyof typeof GastownTownStatus]>()
+      .notNull()
+      .default('provisioning'),
+    last_r2_sync_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_heartbeat_at: timestamp({ withTimezone: true, mode: 'string' }),
+    config: jsonb()
+      .$type<{
+        rigs?: unknown;
+        models?: unknown;
+        max_polecats?: number;
+      }>()
+      .default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_gastown_towns_active_per_user_name')
+      .on(table.user_id, table.town_name)
+      .where(isNull(table.destroyed_at)),
+    enumCheck('gastown_towns_status_check', table.status, GastownTownStatus),
+  ]
+);
+
+export type GastownTown = typeof gastown_towns.$inferSelect;
+export type NewGastownTown = typeof gastown_towns.$inferInsert;
+
+export const gastown_rigs = pgTable(
+  'gastown_rigs',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    town_id: uuid()
+      .notNull()
+      .references(() => gastown_towns.id, { onDelete: 'cascade' }),
+    rig_name: text().notNull(),
+    repo_url: text().notNull(),
+    branch: text().default('main'),
+    status: text()
+      .$type<(typeof GastownRigStatus)[keyof typeof GastownRigStatus]>()
+      .notNull()
+      .default('active'),
+    config: jsonb().$type<Record<string, unknown>>().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_gastown_rigs_town_name')
+      .on(table.town_id, table.rig_name)
+      .where(sql`status = 'active'`),
+    enumCheck('gastown_rigs_status_check', table.status, GastownRigStatus),
+  ]
+);
+
+export type GastownRig = typeof gastown_rigs.$inferSelect;
+export type NewGastownRig = typeof gastown_rigs.$inferInsert;

@@ -143,6 +143,13 @@ export const AGENT_ENV_VARS_PUBLIC_KEY = getEnvVariable('AGENT_ENV_VARS_PUBLIC_K
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
 export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
 
+// Gastown (sandbox-per-town)
+export const GASTOWN_FLY_API_TOKEN = getEnvVariable('GASTOWN_FLY_API_TOKEN') || '';
+export const GASTOWN_FLY_APP_NAME = getEnvVariable('GASTOWN_FLY_APP_NAME') || '';
+export const GASTOWN_FLY_REGION = getEnvVariable('GASTOWN_FLY_REGION') || 'iad';
+export const GASTOWN_SANDBOX_IMAGE = getEnvVariable('GASTOWN_SANDBOX_IMAGE') || '';
+export const GASTOWN_INTERNAL_API_SECRET = getEnvVariable('GASTOWN_INTERNAL_API_SECRET') || '';
+
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';

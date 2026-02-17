@@ -175,6 +175,7 @@ export const kilocode_users = pgTable(
     is_bot: boolean().default(false).notNull(),
     default_model: text(),
     cohorts: jsonb().$type<Record<string, number>>().default({}).notNull(),
+    completed_welcome_form: boolean().default(false).notNull(),
     linkedin_url: text(),
     github_url: text(),
   },

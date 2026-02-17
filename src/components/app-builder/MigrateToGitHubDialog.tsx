@@ -267,14 +267,28 @@ export function MigrateToGitHubDialog({
 
           {/* Migration not available - no GitHub integration */}
           {canMigrateData && !canMigrateData.hasGitHubIntegration && (
-            <div className="flex items-start gap-3 rounded-md bg-yellow-500/10 p-4 text-sm text-yellow-400">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                <p className="font-medium">GitHub App not installed</p>
-                <p className="text-muted-foreground mt-1">
-                  Install the Kilo GitHub App to export your project to GitHub.
-                </p>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 rounded-md bg-yellow-500/10 p-4 text-sm text-yellow-400">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">GitHub App not installed</p>
+                  <p className="text-muted-foreground mt-1">
+                    Install the Kilo GitHub App to export your project to GitHub.
+                  </p>
+                </div>
               </div>
+              <Button asChild className="w-full gap-2">
+                <a
+                  href={
+                    organizationId
+                      ? `/organizations/${organizationId}/integrations/github`
+                      : '/integrations/github'
+                  }
+                >
+                  <Github className="h-4 w-4" />
+                  Set up GitHub Integration
+                </a>
+              </Button>
             </div>
           )}
 

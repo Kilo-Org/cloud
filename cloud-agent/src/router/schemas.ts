@@ -452,6 +452,15 @@ export const PrepareSessionInput = z
       'Optional callback target configuration for execution completion notifications'
     ),
 
+    // Platform identifier
+    createdOnPlatform: z
+      .string()
+      .max(100)
+      .optional()
+      .describe(
+        'Platform identifier for session creation (e.g., "app-builder"). Defaults to "cloud-agent" if not specified.'
+      ),
+
     // Organization context
     kilocodeOrganizationId: z
       .string()

@@ -118,6 +118,7 @@ export async function createProject(input: CreateProjectInput): Promise<CreatePr
       kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
       images,
       appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
+      createdOnPlatform: 'app-builder',
     });
 
     // Save session ID and track it atomically
@@ -511,6 +512,7 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
         kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
         images,
         appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
+        createdOnPlatform: 'app-builder',
       });
 
       const result = await client.initiateFromKilocodeSessionV2({

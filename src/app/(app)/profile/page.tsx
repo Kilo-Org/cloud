@@ -22,6 +22,7 @@ import { ProfileOrganizationsSection } from '@/components/profile/ProfileOrganiz
 import { ProfileKiloPassSection } from '@/components/profile/ProfileKiloPassSection';
 import { CreateKilocodeOrgButton } from '@/components/dev/CreateKilocodeOrgButton';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { WelcomeTypeformModal } from '@/components/profile/WelcomeTypeformModal';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
 
 export default async function ProfilePage({ searchParams }: AppPageProps) {
@@ -41,6 +42,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
     : 'Remaining Credits';
   return (
     <>
+      {!user.completed_welcome_form && <WelcomeTypeformModal userEmail={user.google_user_email} />}
       {/* NOTE: When making changes to this structure, make sure to also update the structure in the loading.tsx file */}
       <PageLayout title="Profile">
         <div className="flex w-full flex-col gap-4 lg:flex-row">

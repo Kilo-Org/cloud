@@ -9,14 +9,14 @@ export const AgentRecord = z.object({
   role: AgentRole,
   name: z.string(),
   identity: z.string(),
-  cloud_agent_session_id: z.string().nullable(),
   status: AgentStatus,
   current_hook_bead_id: z.string().nullable(),
   last_activity_at: z.string().nullable(),
   checkpoint: z
     .string()
     .nullable()
-    .transform(v => (v === null ? null : (JSON.parse(v) as unknown))),
+    .transform(v => (v === null ? null : JSON.parse(v)))
+    .pipe(z.unknown()),
   created_at: z.string(),
 });
 
@@ -30,7 +30,6 @@ export function createTableAgents(): string {
     role: `text not null check(role in ('polecat', 'refinery', 'mayor', 'witness'))`,
     name: `text not null`,
     identity: `text not null unique`,
-    cloud_agent_session_id: `text`,
     status: `text not null default 'idle' check(status in ('idle', 'working', 'blocked', 'dead'))`,
     current_hook_bead_id: `text references beads(id)`,
     last_activity_at: `text`,

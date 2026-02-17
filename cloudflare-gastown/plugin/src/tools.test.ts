@@ -26,7 +26,6 @@ function makeFakeClient(overrides: Partial<GastownClient> = {}): GastownClient {
         role: 'polecat',
         name: 'Test Polecat',
         identity: 'test-polecat-1',
-        cloud_agent_session_id: null,
         status: 'working',
         current_hook_bead_id: 'bead-1',
         last_activity_at: '2026-02-16T00:00:00Z',

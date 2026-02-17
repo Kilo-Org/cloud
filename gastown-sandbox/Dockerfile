@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 # Pinned versions for reproducible builds
 ENV NODE_VERSION=22.13.1
 ENV DOLT_VERSION=1.35.0
-ENV KILO_CLI_VERSION=latest
+ENV KILO_CLI_VERSION=1.0.23
 
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive

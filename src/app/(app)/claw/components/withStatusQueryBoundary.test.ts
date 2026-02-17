@@ -14,6 +14,7 @@ const baseStatus: KiloClawDashboardStatus = {
   envVarCount: 1,
   secretCount: 2,
   channelCount: 3,
+  flyAppName: null,
   flyMachineId: null,
   flyVolumeId: null,
   flyRegion: null,

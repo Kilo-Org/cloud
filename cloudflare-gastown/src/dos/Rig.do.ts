@@ -42,9 +42,11 @@ const STALE_THRESHOLD_MS = 10 * 60 * 1000;
 // GUPP violation threshold: 30 minutes with no progress
 const GUPP_THRESHOLD_MS = 30 * 60 * 1000;
 
-// Alarm intervals
-const ACTIVE_ALARM_INTERVAL_MS = 30_000; // 30s when there's active work
-const IDLE_ALARM_INTERVAL_MS = 300_000; // 5 min when idle
+// Alarm interval while there's active work (agents working, beads in progress, reviews pending)
+const ACTIVE_ALARM_INTERVAL_MS = 30_000;
+
+// Timeout for review entries stuck in 'running' state (container crashed mid-merge)
+const REVIEW_RUNNING_TIMEOUT_MS = 5 * 60 * 1000;
 
 // KV key for storing the town ID associated with this rig
 const TOWN_ID_KEY = 'townId';
@@ -806,9 +808,12 @@ export class RigDO extends DurableObject<Env> {
 
   /**
    * Check for a pending review entry and trigger merge in the container.
+   * Also recovers entries stuck in 'running' for longer than REVIEW_RUNNING_TIMEOUT_MS.
    * Checks townId before popping to avoid losing entries.
    */
   private async processReviewQueue(): Promise<boolean> {
+    this.recoverStuckReviews();
+
     const townId = await this.getTownId();
     if (!townId) return false;
 
@@ -817,6 +822,25 @@ export class RigDO extends DurableObject<Env> {
 
     await this.startMergeInContainer(townId, entry);
     return true;
+  }
+
+  /**
+   * Reset review entries stuck in 'running' past the timeout back to 'pending'
+   * so they can be retried.
+   */
+  private recoverStuckReviews(): void {
+    const timeout = new Date(Date.now() - REVIEW_RUNNING_TIMEOUT_MS).toISOString();
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${reviewQueue}
+        SET ${reviewQueue.columns.status} = 'pending',
+            ${reviewQueue.columns.processed_at} = NULL
+        WHERE ${reviewQueue.columns.status} = 'running'
+          AND ${reviewQueue.columns.processed_at} < ?
+      `,
+      [timeout]
+    );
   }
 
   /**
@@ -856,8 +880,11 @@ export class RigDO extends DurableObject<Env> {
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
     const guppThreshold = new Date(Date.now() - GUPP_THRESHOLD_MS).toISOString();
 
+    const AgentId = AgentRecord.pick({ id: true });
+    const BeadId = BeadRecord.pick({ id: true });
+
     // Detect dead agents
-    const deadRows = [
+    const deadAgents = AgentId.array().parse([
       ...query(
         this.sql,
         /* sql */ `
@@ -866,10 +893,10 @@ export class RigDO extends DurableObject<Env> {
         `,
         []
       ),
-    ];
+    ]);
 
     // Detect stale agents (working but no activity for STALE_THRESHOLD_MS)
-    const staleRows = [
+    const staleAgents = AgentId.array().parse([
       ...query(
         this.sql,
         /* sql */ `
@@ -879,10 +906,10 @@ export class RigDO extends DurableObject<Env> {
         `,
         [staleThreshold]
       ),
-    ];
+    ]);
 
     // Detect orphaned beads (in_progress with no live assignee)
-    const orphanedRows = [
+    const orphanedBeads = BeadId.array().parse([
       ...query(
         this.sql,
         /* sql */ `
@@ -898,12 +925,17 @@ export class RigDO extends DurableObject<Env> {
         `,
         []
       ),
-    ];
+    ]);
 
     // Check container process health for working/blocked agents
     const townId = await this.getTownId();
     if (townId) {
-      const workingRows = [
+      const WorkingAgent = AgentRecord.pick({
+        id: true,
+        current_hook_bead_id: true,
+        last_activity_at: true,
+      });
+      const workingAgents = WorkingAgent.array().parse([
         ...query(
           this.sql,
           /* sql */ `
@@ -915,11 +947,12 @@ export class RigDO extends DurableObject<Env> {
           `,
           []
         ),
-      ];
+      ]);
 
-      for (const row of workingRows) {
-        const agentId = String(row.id);
-        const containerStatus = await this.checkAgentContainerStatus(townId, agentId);
+      const MailId = MailRecord.pick({ id: true });
+
+      for (const working of workingAgents) {
+        const containerStatus = await this.checkAgentContainerStatus(townId, working.id);
 
         if (containerStatus === 'not_found' || containerStatus === 'exited') {
           // Agent process is gone — reset to idle and clear session so
@@ -933,15 +966,15 @@ export class RigDO extends DurableObject<Env> {
                   ${agents.columns.last_activity_at} = ?
               WHERE ${agents.columns.id} = ?
             `,
-            [now(), agentId]
+            [now(), working.id]
           );
           continue;
         }
 
         // GUPP violation check (30 min no progress).
         // Only send if no undelivered GUPP_CHECK mail already exists for this agent.
-        if (row.last_activity_at && String(row.last_activity_at) < guppThreshold) {
-          const existingGupp = [
+        if (working.last_activity_at && working.last_activity_at < guppThreshold) {
+          const existingGupp = MailId.array().parse([
             ...query(
               this.sql,
               /* sql */ `
@@ -951,14 +984,14 @@ export class RigDO extends DurableObject<Env> {
                   AND ${mail.columns.delivered} = 0
                 LIMIT 1
               `,
-              [agentId]
+              [working.id]
             ),
-          ];
+          ]);
 
           if (existingGupp.length === 0) {
             await this.sendMail({
               from_agent_id: 'witness',
-              to_agent_id: agentId,
+              to_agent_id: working.id,
               subject: 'GUPP_CHECK',
               body: 'You have had work hooked for 30+ minutes with no activity. Are you stuck? If so, call gt_escalate.',
             });
@@ -968,9 +1001,9 @@ export class RigDO extends DurableObject<Env> {
     }
 
     return {
-      dead_agents: deadRows.map(r => String(r.id)),
-      stale_agents: staleRows.map(r => String(r.id)),
-      orphaned_beads: orphanedRows.map(r => String(r.id)),
+      dead_agents: deadAgents.map(a => a.id),
+      stale_agents: staleAgents.map(a => a.id),
+      orphaned_beads: orphanedBeads.map(b => b.id),
     };
   }
 

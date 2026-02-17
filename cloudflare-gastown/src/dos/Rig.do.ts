@@ -704,17 +704,11 @@ export class RigDO extends DurableObject<Env> {
    * We use container_session_id IS NULL as the marker for "not yet dispatched".
    */
   private async schedulePendingWork(): Promise<string[]> {
-    const pendingRows = [
+    const rows = [
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${agents.columns.id},
-                 ${agents.columns.name},
-                 ${agents.columns.role},
-                 ${agents.columns.identity},
-                 ${agents.columns.current_hook_bead_id},
-                 ${agents.columns.checkpoint}
-          FROM ${agents}
+          SELECT * FROM ${agents}
           WHERE ${agents.columns.status} IN ('idle', 'working')
             AND ${agents.columns.current_hook_bead_id} IS NOT NULL
             AND ${agents.columns.container_session_id} IS NULL
@@ -722,8 +716,9 @@ export class RigDO extends DurableObject<Env> {
         []
       ),
     ];
+    const pendingAgents = AgentRecord.array().parse(rows);
 
-    if (pendingRows.length === 0) return [];
+    if (pendingAgents.length === 0) return [];
 
     const townId = await this.getTownId();
     if (!townId) {
@@ -733,20 +728,20 @@ export class RigDO extends DurableObject<Env> {
 
     const scheduledAgentIds: string[] = [];
 
-    for (const row of pendingRows) {
-      const agentId = String(row.id);
-      const beadId = String(row.current_hook_bead_id);
+    for (const agent of pendingAgents) {
+      const beadId = agent.current_hook_bead_id;
+      if (!beadId) continue;
       const bead = this.getBead(beadId);
       if (!bead) continue;
 
       const started = await this.startAgentInContainer(townId, {
-        agentId,
-        agentName: String(row.name),
-        role: String(row.role),
-        identity: String(row.identity),
+        agentId: agent.id,
+        agentName: agent.name,
+        role: agent.role,
+        identity: agent.identity,
         beadId,
         beadTitle: bead.title,
-        checkpoint: row.checkpoint ? String(row.checkpoint) : null,
+        checkpoint: agent.checkpoint ? String(agent.checkpoint) : null,
       });
 
       if (started) {
@@ -760,9 +755,9 @@ export class RigDO extends DurableObject<Env> {
                 ${agents.columns.last_activity_at} = ?
             WHERE ${agents.columns.id} = ?
           `,
-          [`container:${agentId}`, now(), agentId]
+          [`container:${agent.id}`, now(), agent.id]
         );
-        scheduledAgentIds.push(agentId);
+        scheduledAgentIds.push(agent.id);
       }
     }
 

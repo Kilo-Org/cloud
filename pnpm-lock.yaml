@@ -848,6 +848,9 @@ importers:
 
   cloudflare-gastown:
     dependencies:
+      '@cloudflare/containers':
+        specifier: ^0.1.0
+        version: 0.1.0
       hono:
         specifier: ^4.11.4
         version: 4.11.7
@@ -2109,6 +2112,9 @@ packages:
 
   '@cloudflare/containers@0.0.30':
     resolution: {integrity: sha512-i148xBgmyn/pje82ZIyuTr/Ae0BT/YWwa1/GTJcw6DxEjUHAzZLaBCiX446U9OeuJ2rBh/L/9FIzxX5iYNt1AQ==}
+
+  '@cloudflare/containers@0.1.0':
+    resolution: {integrity: sha512-nuXnmkpJZzbjYdguRI2hB0sw1QCBMWdNuGDNQwEiJSLebtKRFpBt/d6AStGjp+8wGD2plPbd2U/mQerYF9kzJg==}
 
   '@cloudflare/kv-asset-handler@0.4.2':
     resolution: {integrity: sha512-SIOD2DxrRRwQ+jgzlXCqoEFiKOFqaPjhnNTGKXSRLvp1HiOvapLaFG2kEr9dYQTYe8rKrd9uvDUzmAITeNyaHQ==}
@@ -13729,6 +13735,8 @@ snapshots:
       postcss: 8.5.6
 
   '@cloudflare/containers@0.0.30': {}
+
+  '@cloudflare/containers@0.1.0': {}
 
   '@cloudflare/kv-asset-handler@0.4.2': {}
 

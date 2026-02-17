@@ -99,6 +99,19 @@ describe('HTTP API', () => {
     });
   });
 
+  // ── Dashboard ──────────────────────────────────────────────────────────
+
+  describe('dashboard', () => {
+    it('should serve HTML at /', async () => {
+      const res = await SELF.fetch(api('/'));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Type')).toContain('text/html');
+      const html = await res.text();
+      expect(html).toContain('Gastown Dashboard');
+      expect(html).toContain('API_KEY');
+    });
+  });
+
   // ── Health ─────────────────────────────────────────────────────────────
 
   describe('health', () => {

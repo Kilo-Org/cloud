@@ -1,0 +1,32 @@
+FROM oven/bun:1-slim
+
+# Install git and gh CLI
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git curl ca-certificates && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends gh && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Kilo CLI globally
+RUN bun install -g @kilocode/cli
+
+# Create workspace directories
+RUN mkdir -p /workspace/rigs /app
+
+WORKDIR /app
+
+# Copy package files and install deps deterministically
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+# Copy source (bun runs TypeScript directly — no build step needed)
+COPY src/ ./src/
+
+EXPOSE 8080
+
+CMD ["bun", "run", "src/main.ts"]

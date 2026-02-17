@@ -140,3 +140,16 @@ export async function handleCheckMail(
   const messages = await rig.checkMail(params.agentId);
   return c.json(resSuccess(messages));
 }
+
+/**
+ * Heartbeat endpoint called by the container's heartbeat reporter.
+ * Updates the agent's last_activity_at timestamp in the Rig DO.
+ */
+export async function handleHeartbeat(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const rig = getRigDOStub(c.env, params.rigId);
+  await rig.touchAgentHeartbeat(params.agentId);
+  return c.json(resSuccess({ heartbeat: true }));
+}

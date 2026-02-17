@@ -1,0 +1,19 @@
+{
+  "name": "gastown-container",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Town container control server for Gastown agent orchestration",
+  "scripts": {
+    "start": "bun run src/main.ts",
+    "typecheck": "bun x tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.11.4",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.17",
+    "typescript": "^5.9.3"
+  }
+}

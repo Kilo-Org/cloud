@@ -42,69 +42,52 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
     organizationId?: string;
     createdOnPlatform: string;
   }): Promise<void> {
-    console.log('SessionIngestRPC.createSessionForCloudAgent called', {
-      sessionId: params.sessionId,
-      kiloUserId: params.kiloUserId,
-      cloudAgentSessionId: params.cloudAgentSessionId,
-      organizationId: params.organizationId,
-      createdOnPlatform: params.createdOnPlatform,
-      envKeys: Object.keys(this.env),
-      hasHyperdrive: !!this.env.HYPERDRIVE,
-    });
+    const parsed = z
+      .object({
+        sessionId: sessionIdSchema,
+        kiloUserId: z.string().min(1),
+        cloudAgentSessionId: z.string().min(1),
+        organizationId: z.string().optional(),
+        createdOnPlatform: z.string().min(1),
+      })
+      .parse(params);
 
-    try {
-      const parsed = z
-        .object({
-          sessionId: sessionIdSchema,
-          kiloUserId: z.string().min(1),
-          cloudAgentSessionId: z.string().min(1),
-          organizationId: z.string().optional(),
-          createdOnPlatform: z.string().min(1),
-        })
-        .parse(params);
+    const db = getDb(this.env.HYPERDRIVE);
 
-      const db = getDb(this.env.HYPERDRIVE);
-
-      await db
-        .insertInto('cli_sessions_v2')
-        .values({
-          session_id: parsed.sessionId,
-          kilo_user_id: parsed.kiloUserId,
+    await db
+      .insertInto('cli_sessions_v2')
+      .values({
+        session_id: parsed.sessionId,
+        kilo_user_id: parsed.kiloUserId,
+        cloud_agent_session_id: parsed.cloudAgentSessionId,
+        organization_id: parsed.organizationId ?? null,
+        created_on_platform: parsed.createdOnPlatform,
+        version: 0,
+      })
+      .onConflict(oc =>
+        oc.columns(['session_id', 'kilo_user_id']).doUpdateSet({
           cloud_agent_session_id: parsed.cloudAgentSessionId,
-          organization_id: parsed.organizationId ?? null,
-          created_on_platform: parsed.createdOnPlatform,
-          version: 0,
+          ...(parsed.organizationId !== undefined
+            ? { organization_id: parsed.organizationId }
+            : {}),
         })
-        .onConflict(oc =>
-          oc.columns(['session_id', 'kilo_user_id']).doUpdateSet({
-            cloud_agent_session_id: parsed.cloudAgentSessionId,
-            ...(parsed.organizationId !== undefined
-              ? { organization_id: parsed.organizationId }
-              : {}),
-          })
-        )
-        .execute();
+      )
+      .execute();
 
-      // Warm the session cache so subsequent ingests can skip Postgres.
-      // Best-effort: cache miss is acceptable; don't fail the create if the DO is unavailable.
-      try {
-        await withDORetry(
-          () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
-          sessionCache => sessionCache.add(parsed.sessionId),
-          'SessionAccessCacheDO.add'
-        );
-      } catch (cacheError) {
-        console.error('Failed to warm session cache after create (non-fatal)', {
-          sessionId: parsed.sessionId,
-          kiloUserId: parsed.kiloUserId,
-          error: cacheError instanceof Error ? cacheError.message : String(cacheError),
-        });
-      }
-    } catch (error) {
-      console.error('createSessionForCloudAgent FAILED', {
-        error: error instanceof Error ? (error.stack ?? error.message) : String(error),
+    // Warm the session cache so subsequent ingests can skip Postgres.
+    // Best-effort: cache miss is acceptable; don't fail the create if the DO is unavailable.
+    try {
+      await withDORetry(
+        () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
+        sessionCache => sessionCache.add(parsed.sessionId),
+        'SessionAccessCacheDO.add'
+      );
+    } catch (cacheError) {
+      console.error('Failed to warm session cache after create (non-fatal)', {
+        sessionId: parsed.sessionId,
+        kiloUserId: parsed.kiloUserId,
+        error: cacheError instanceof Error ? cacheError.message : String(cacheError),
       });
-      throw error;
     }
   }
 
@@ -118,11 +101,6 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
     sessionId: string;
     kiloUserId: string;
   }): Promise<void> {
-    console.log('SessionIngestRPC.deleteSessionForCloudAgent called', {
-      sessionId: params.sessionId,
-      kiloUserId: params.kiloUserId,
-    });
-
     const parsed = z
       .object({
         sessionId: sessionIdSchema,

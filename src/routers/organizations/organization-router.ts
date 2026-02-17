@@ -191,7 +191,7 @@ export const organizationsRouter = createTRPCRouter({
   withMembers: organizationMemberProcedure.query<OrganizationWithMembers>(async opts => {
     const organizationId = opts.input.organizationId;
 
-    const organization = await getOrganizationById(organizationId);
+    let organization = await getOrganizationById(organizationId);
 
     if (!organization) {
       throw new TRPCError({
@@ -215,7 +215,7 @@ export const organizationsRouter = createTRPCRouter({
         new Date()
       );
       if (expiryResult) {
-        organization.total_microdollars_acquired = expiryResult.total_microdollars_acquired;
+        organization = (await getOrganizationById(organizationId)) ?? organization;
       }
     }
 

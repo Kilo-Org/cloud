@@ -14,7 +14,6 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isSlackbotOnlyModel,
-  isKiloStealthModel,
   isRateLimitedModel,
 } from '@/lib/models';
 import {

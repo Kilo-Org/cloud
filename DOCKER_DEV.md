@@ -128,7 +128,7 @@ cp cloud-agent/.dev.vars.example cloud-agent/.dev.vars
 
 ## Architecture
 
-- **Shared Docker image** (`dev/Dockerfile.dev`): `node:22-slim` with pnpm, wrangler, and bun pre-installed.
+- **Shared Docker image** (`dev/Dockerfile.dev`): `node:22.14.0-slim` with pnpm, wrangler, and bun pre-installed.
 - **Volume mount**: The entire repo is mounted at `/app` — file changes are reflected immediately (hot reload works).
 - **Port mappings**: Each service exposes its port via explicit `ports:` mappings, which works on both macOS (Docker Desktop) and Linux.
 - **Inter-service networking**: Docker Compose bridge network with DNS-based service discovery. See [Networking](#networking) above.

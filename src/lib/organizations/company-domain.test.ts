@@ -48,6 +48,18 @@ describe('normalizeCompanyDomain', () => {
   it('handles subdomain', () => {
     expect(normalizeCompanyDomain('sub.acme.com')).toBe('sub.acme.com');
   });
+
+  it('preserves unicode/IDN domain', () => {
+    expect(normalizeCompanyDomain('münchen.de')).toBe('münchen.de');
+  });
+
+  it('preserves unicode domain from URL', () => {
+    expect(normalizeCompanyDomain('https://münchen.de/about')).toBe('münchen.de');
+  });
+
+  it('preserves non-latin IDN domain', () => {
+    expect(normalizeCompanyDomain('例え.jp')).toBe('例え.jp');
+  });
 });
 
 describe('isValidDomain', () => {
@@ -118,6 +130,18 @@ describe('isValidDomain', () => {
     const label63 = 'a'.repeat(63);
     expect(isValidDomain(`${label63}.com`)).toBe(true);
   });
+
+  it('accepts punycode-encoded domain', () => {
+    expect(isValidDomain('xn--mnchen-3ya.de')).toBe(true);
+  });
+
+  it('accepts unicode domain', () => {
+    expect(isValidDomain('münchen.de')).toBe(true);
+  });
+
+  it('accepts non-latin unicode domain', () => {
+    expect(isValidDomain('例え.jp')).toBe(true);
+  });
 });
 
 describe('CompanyDomainSchema', () => {
@@ -149,5 +173,15 @@ describe('CompanyDomainSchema', () => {
   it('rejects domain without TLD after URL normalization', () => {
     const result = CompanyDomainSchema.safeParse('https://localhost');
     expect(result.success).toBe(false);
+  });
+
+  it('accepts unicode domain and preserves it', () => {
+    const result = CompanyDomainSchema.parse('münchen.de');
+    expect(result).toBe('münchen.de');
+  });
+
+  it('accepts unicode domain URL and preserves unicode', () => {
+    const result = CompanyDomainSchema.parse('https://例え.jp');
+    expect(result).toBe('例え.jp');
   });
 });

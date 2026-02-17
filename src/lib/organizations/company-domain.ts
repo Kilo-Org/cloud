@@ -4,11 +4,14 @@ import * as z from 'zod';
  * Normalizes a company domain input. Accepts bare domains or full URLs.
  * Returns just the hostname, or null if the input is empty/whitespace.
  *
+ * Unicode/IDN domains are preserved in their original form (e.g. "münchen.de").
+ *
  * Examples:
  *   "acme.com" → "acme.com"
  *   "https://acme.com" → "acme.com"
  *   "https://acme.com/about" → "acme.com"
  *   "http://www.acme.com" → "www.acme.com"
+ *   "münchen.de" → "münchen.de"
  *   "  " → null
  *   "" → null
  */
@@ -16,31 +19,36 @@ export function normalizeCompanyDomain(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  // If it looks like a URL (has ://), try to parse it
+  let hostname = trimmed;
+
+  // If it looks like a URL (has ://), extract the hostname manually
   if (trimmed.includes('://')) {
     try {
-      const url = new URL(trimmed);
-      return url.hostname;
+      // Extract hostname between :// and the next /, ?, #, or :
+      const afterProtocol = trimmed.split('://')[1];
+      if (afterProtocol) {
+        hostname = afterProtocol.split(/[/?#:]/)[0];
+      }
     } catch {
       // Fall through to treat as bare domain
     }
+  } else {
+    // Extract hostname from bare domain (before /, ?, #, or :)
+    hostname = trimmed.split(/[/?#:]/)[0];
   }
 
-  // Try adding https:// to see if it parses as a URL
-  try {
-    const url = new URL(`https://${trimmed}`);
-    return url.hostname;
-  } catch {
-    return trimmed; // Return as-is if nothing works
-  }
+  return hostname || null;
 }
 
-// Basic domain format regex: allows subdomains, hyphens, requires TLD of 2+ chars
+// Basic domain format regex: allows subdomains, hyphens, unicode characters, requires TLD of 2+ chars
+// Using \p{L} for unicode letters, \p{N} for unicode numbers (requires 'u' flag)
+// Each label must start and end with alphanumeric, can contain hyphens in the middle
 const DOMAIN_REGEX =
-  /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+  /^[\p{L}\p{N}]([\p{L}\p{N}-]*[\p{L}\p{N}])?(\.[\p{L}\p{N}]([\p{L}\p{N}-]*[\p{L}\p{N}])?)*\.[\p{L}]{2,}$/u;
 
 /**
  * Validates that a string looks like a valid domain.
+ * Accepts both ASCII and unicode (IDN) domains.
  */
 export function isValidDomain(domain: string): boolean {
   if (!DOMAIN_REGEX.test(domain) || domain.length > 253) return false;

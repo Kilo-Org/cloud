@@ -87,7 +87,7 @@ services:
     <<: *worker-base
     profiles: ["agents", "all"]
     ports:
-      - "8794:8794"
+      - "127.0.0.1:8794:8794"
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,7 +98,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8787:8787"
+      - "127.0.0.1:8787:8787"
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,7 +109,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8790:8790"
+      - "127.0.0.1:8790:8790"
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,7 +120,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8796:8796"
+      - "127.0.0.1:8796:8796"
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,7 +133,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8791:8791"
+      - "127.0.0.1:8791:8791"
     depends_on:
       postgres:
         condition: service_healthy
@@ -146,7 +146,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8789:8789"
+      - "127.0.0.1:8789:8789"
     depends_on:
       postgres:
         condition: service_healthy
@@ -159,7 +159,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8797:8797"
+      - "127.0.0.1:8797:8797"
     depends_on:
       postgres:
         condition: service_healthy
@@ -170,7 +170,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8798:8798"
+      - "127.0.0.1:8798:8798"
     depends_on:
       postgres:
         condition: service_healthy
@@ -181,7 +181,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8799:8799"
+      - "127.0.0.1:8799:8799"
     depends_on:
       postgres:
         condition: service_healthy
@@ -192,7 +192,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8800:8800"
+      - "127.0.0.1:8800:8800"
     depends_on:
       postgres:
         condition: service_healthy
@@ -203,7 +203,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8801:8801"
+      - "127.0.0.1:8801:8801"
     depends_on:
       postgres:
         condition: service_healthy
@@ -214,7 +214,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8793:8793"
+      - "127.0.0.1:8793:8793"
     depends_on:
       postgres:
         condition: service_healthy
@@ -227,7 +227,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8802:8802"
+      - "127.0.0.1:8802:8802"
     depends_on:
       postgres:
         condition: service_healthy
@@ -238,7 +238,7 @@ services:
     <<: *worker-base
     profiles: ["workers", "all"]
     ports:
-      - "8795:8795"
+      - "127.0.0.1:8795:8795"
     depends_on:
       postgres:
         condition: service_healthy

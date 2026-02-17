@@ -105,7 +105,7 @@ export function BuildLogViewer({ deploymentId, buildId, status, className }: Bui
   }
 
   return (
-    <div className="relative">
+    <div className="relative overflow-hidden">
       {isActiveBuild && (
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2 rounded-md bg-gray-900/90 px-3 py-1.5 text-xs text-gray-400 backdrop-blur-sm">
           <Loader2 className="size-3 animate-spin" />
@@ -115,7 +115,7 @@ export function BuildLogViewer({ deploymentId, buildId, status, className }: Bui
       <pre
         ref={scrollRef}
         className={cn(
-          'max-h-96 overflow-auto rounded-lg bg-gray-950 p-4 font-mono text-sm break-words whitespace-pre-wrap text-gray-300',
+          'max-h-96 min-w-0 overflow-auto rounded-lg bg-gray-950 p-4 font-mono text-sm break-all whitespace-pre-wrap text-gray-300',
           className
         )}
       >

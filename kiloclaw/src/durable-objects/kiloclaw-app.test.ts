@@ -128,7 +128,9 @@ describe('ensureApp', () => {
     expect(appsClient.createApp).toHaveBeenCalledWith(
       { apiToken: 'test-token' },
       result.appName,
-      'test-org'
+      'test-org',
+      'user-1',
+      'kiloclaw_user_id'
     );
     expect(appsClient.allocateIP).toHaveBeenCalledTimes(2);
     expect(appsClient.allocateIP).toHaveBeenCalledWith('test-token', result.appName, 'v6');

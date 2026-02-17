@@ -9,8 +9,29 @@
  */
 
 import { FlyApiError } from './client';
+import type { FlyMachine } from './types';
 
 const FLY_API_BASE = 'https://api.machines.dev';
+
+/**
+ * Error thrown when a Fly app name collision is detected.
+ * Two different userIds produced the same truncated SHA-256 hash,
+ * resulting in the same Fly app name. This is a tenant isolation breach
+ * at the network layer — machines from different users would share
+ * a private network namespace.
+ */
+export class AppNameCollisionError extends Error {
+  constructor(
+    readonly appName: string,
+    readonly requestingUserId: string
+  ) {
+    super(
+      `Fly app name collision detected: app "${appName}" exists and belongs to a different user. ` +
+        `Requesting userId: "${requestingUserId}". This indicates a SHA-256 hash truncation collision.`
+    );
+    this.name = 'AppNameCollisionError';
+  }
+}
 
 // -- App name derivation --
 
@@ -74,20 +95,74 @@ async function assertOk(resp: Response, context: string): Promise<void> {
  *
  * Each per-user app gets `network: appName` so machines in different
  * user apps cannot reach each other over Fly's internal `.internal` DNS.
+ *
+ * On 409 (app already exists), verifies ownership by listing machines
+ * and checking that any existing machines belong to the requesting userId.
+ * Throws AppNameCollisionError if the app belongs to a different user —
+ * this indicates a SHA-256 hash truncation collision (see PC-1 finding).
+ *
+ * @param userId - The userId requesting this app. Used to verify ownership on 409.
+ * @param userIdMetadataKey - The metadata key used to tag machines with userId.
  */
 export async function createApp(
   config: FlyAppConfig,
   appName: string,
-  orgSlug: string
+  orgSlug: string,
+  userId: string,
+  userIdMetadataKey: string
 ): Promise<FlyApp> {
   const resp = await apiFetch(config.apiToken, '/v1/apps', {
     method: 'POST',
     body: JSON.stringify({ app_name: appName, org_slug: orgSlug, network: appName }),
   });
-  // 409 = app already exists (race with alarm retry or Fly API eventual consistency)
-  if (resp.status === 409) return { id: appName, created_at: 0 };
+
+  if (resp.status === 409) {
+    // App already exists — could be a retry (same user) or a hash collision (different user).
+    // Verify ownership by listing machines and checking their userId metadata.
+    await verifyAppOwnership(config.apiToken, appName, userId, userIdMetadataKey);
+    return { id: appName, created_at: 0 };
+  }
+
   await assertOk(resp, 'createApp');
   return resp.json();
+}
+
+/**
+ * Verify that an existing Fly app belongs to the expected userId.
+ *
+ * Lists machines in the app and checks the userId metadata tag.
+ * If the app has machines belonging to a different user, throws
+ * AppNameCollisionError. If the app is empty (no machines yet)
+ * or all machines match the expected userId, returns normally.
+ */
+async function verifyAppOwnership(
+  apiToken: string,
+  appName: string,
+  expectedUserId: string,
+  userIdMetadataKey: string
+): Promise<void> {
+  const machinesResp = await apiFetch(apiToken, `/v1/apps/${encodeURIComponent(appName)}/machines`);
+
+  // If we can't list machines (e.g. app in weird state), fail open —
+  // this is the same behavior as before the collision check was added.
+  if (!machinesResp.ok) return;
+
+  const machines: FlyMachine[] = await machinesResp.json();
+
+  // No machines = app exists but is empty (e.g. previous retry created the app
+  // but crashed before creating a machine). Safe to proceed.
+  if (machines.length === 0) return;
+
+  // Check if any machine belongs to a different user.
+  const foreignMachine = machines.find(
+    m =>
+      m.config?.metadata?.[userIdMetadataKey] !== undefined &&
+      m.config.metadata[userIdMetadataKey] !== expectedUserId
+  );
+
+  if (foreignMachine) {
+    throw new AppNameCollisionError(appName, expectedUserId);
+  }
 }
 
 /**

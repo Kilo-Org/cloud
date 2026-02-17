@@ -20,6 +20,7 @@ import type { KiloClawEnv } from '../types';
 import * as apps from '../fly/apps';
 import { setAppSecret } from '../fly/secrets';
 import { generateEnvKey } from '../utils/env-encryption';
+import { METADATA_KEY_USER_ID } from './kiloclaw-instance';
 
 // -- Persisted state schema --
 
@@ -114,7 +115,7 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
       if (!this.ipv4Allocated || !this.ipv6Allocated) {
         const existing = await apps.getApp({ apiToken }, appName);
         if (!existing) {
-          await apps.createApp({ apiToken }, appName, orgSlug);
+          await apps.createApp({ apiToken }, appName, orgSlug, userId, METADATA_KEY_USER_ID);
           console.log('[AppDO] Created Fly App:', appName);
         }
       }

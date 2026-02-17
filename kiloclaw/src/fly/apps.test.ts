@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { appNameFromUserId, createApp, getApp, deleteApp, allocateIP } from './apps';
+import {
+  appNameFromUserId,
+  createApp,
+  getApp,
+  deleteApp,
+  allocateIP,
+  AppNameCollisionError,
+} from './apps';
 import { FlyApiError } from './client';
 
 // ============================================================================
@@ -70,6 +77,8 @@ describe('appNameFromUserId', () => {
 
 const TOKEN = 'test-token';
 const CONFIG = { apiToken: TOKEN };
+const USER_ID = 'user-123';
+const METADATA_KEY = 'kiloclaw_user_id';
 
 function mockFetch(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -87,6 +96,20 @@ function mockFetchText(status: number, body: string): void {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status })));
 }
 
+/**
+ * Mock fetch to return different responses on sequential calls.
+ * Each entry is [status, body] — body can be string or object (JSON-serialized).
+ */
+function mockFetchSequence(responses: Array<[number, unknown]>): void {
+  const fn = vi.fn();
+  for (const [status, body] of responses) {
+    const responseBody = typeof body === 'string' ? body : JSON.stringify(body);
+    const headers = typeof body === 'string' ? {} : { 'Content-Type': 'application/json' };
+    fn.mockResolvedValueOnce(new Response(responseBody, { status, headers }));
+  }
+  vi.stubGlobal('fetch', fn);
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -95,7 +118,7 @@ describe('createApp', () => {
   it('returns FlyApp on 201', async () => {
     mockFetch(201, { id: 'app-123', created_at: 1234567890 });
 
-    const result = await createApp(CONFIG, 'acct-test', 'test-org');
+    const result = await createApp(CONFIG, 'acct-test', 'test-org', USER_ID, METADATA_KEY);
 
     expect(result).toEqual({ id: 'app-123', created_at: 1234567890 });
 
@@ -109,16 +132,135 @@ describe('createApp', () => {
   it('passes network param matching app name for isolation', async () => {
     mockFetch(201, { id: 'app-123', created_at: 0 });
 
-    await createApp(CONFIG, 'acct-abc123', 'org');
+    await createApp(CONFIG, 'acct-abc123', 'org', USER_ID, METADATA_KEY);
 
     const sentBody = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
     expect(sentBody.network).toBe('acct-abc123');
   });
 
-  it('treats 409 as success (app already exists)', async () => {
-    mockFetchText(409, 'app already exists');
+  it('treats 409 as success when app has no machines (empty app)', async () => {
+    // First call: 409 from createApp. Second call: empty machines list.
+    mockFetchSequence([
+      [409, 'app already exists'],
+      [200, []],
+    ]);
 
-    const result = await createApp(CONFIG, 'acct-dup', 'org');
+    const result = await createApp(CONFIG, 'acct-dup', 'org', USER_ID, METADATA_KEY);
+
+    expect(result).toEqual({ id: 'acct-dup', created_at: 0 });
+  });
+
+  it('treats 409 as success when machines belong to same user (retry)', async () => {
+    mockFetchSequence([
+      [409, 'app already exists'],
+      [
+        200,
+        [
+          {
+            id: 'machine-1',
+            name: 'test',
+            state: 'started',
+            region: 'iad',
+            instance_id: 'inst-1',
+            created_at: '',
+            updated_at: '',
+            config: { image: 'test', metadata: { [METADATA_KEY]: USER_ID } },
+          },
+        ],
+      ],
+    ]);
+
+    const result = await createApp(CONFIG, 'acct-dup', 'org', USER_ID, METADATA_KEY);
+
+    expect(result).toEqual({ id: 'acct-dup', created_at: 0 });
+  });
+
+  it('throws AppNameCollisionError on 409 when machines belong to different user', async () => {
+    mockFetchSequence([
+      [409, 'app already exists'],
+      [
+        200,
+        [
+          {
+            id: 'machine-1',
+            name: 'test',
+            state: 'started',
+            region: 'iad',
+            instance_id: 'inst-1',
+            created_at: '',
+            updated_at: '',
+            config: { image: 'test', metadata: { [METADATA_KEY]: 'other-user-456' } },
+          },
+        ],
+      ],
+    ]);
+
+    await expect(createApp(CONFIG, 'acct-collision', 'org', USER_ID, METADATA_KEY)).rejects.toThrow(
+      AppNameCollisionError
+    );
+
+    try {
+      // Reset mock for second call
+      mockFetchSequence([
+        [409, 'app already exists'],
+        [
+          200,
+          [
+            {
+              id: 'machine-1',
+              name: 'test',
+              state: 'started',
+              region: 'iad',
+              instance_id: 'inst-1',
+              created_at: '',
+              updated_at: '',
+              config: { image: 'test', metadata: { [METADATA_KEY]: 'other-user-456' } },
+            },
+          ],
+        ],
+      ]);
+      await createApp(CONFIG, 'acct-collision', 'org', USER_ID, METADATA_KEY);
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppNameCollisionError);
+      expect((err as AppNameCollisionError).appName).toBe('acct-collision');
+      expect((err as AppNameCollisionError).requestingUserId).toBe(USER_ID);
+    }
+  });
+
+  it('fails open on 409 when machine listing returns an error', async () => {
+    // If we can't list machines, treat as normal 409 (same behavior as before)
+    mockFetchSequence([
+      [409, 'app already exists'],
+      [500, 'internal error'],
+    ]);
+
+    const result = await createApp(CONFIG, 'acct-dup', 'org', USER_ID, METADATA_KEY);
+
+    expect(result).toEqual({ id: 'acct-dup', created_at: 0 });
+  });
+
+  it('treats 409 as success when machines have no metadata (legacy machines)', async () => {
+    mockFetchSequence([
+      [409, 'app already exists'],
+      [
+        200,
+        [
+          {
+            id: 'machine-1',
+            name: 'test',
+            state: 'started',
+            region: 'iad',
+            instance_id: 'inst-1',
+            created_at: '',
+            updated_at: '',
+            config: { image: 'test' },
+          },
+        ],
+      ],
+    ]);
+
+    const result = await createApp(CONFIG, 'acct-dup', 'org', USER_ID, METADATA_KEY);
 
     expect(result).toEqual({ id: 'acct-dup', created_at: 0 });
   });
@@ -127,7 +269,7 @@ describe('createApp', () => {
     mockFetchText(422, 'app name taken');
 
     try {
-      await createApp(CONFIG, 'acct-bad', 'org');
+      await createApp(CONFIG, 'acct-bad', 'org', USER_ID, METADATA_KEY);
       expect.fail('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(FlyApiError);

@@ -122,11 +122,25 @@ export function createStreamingCoordinator(
   /**
    * Calls the appropriate mutation to send a message.
    */
+  /**
+   * Extract pathname from a full URL, returning '/' on failure.
+   */
+  function getPreviewPath(): string | undefined {
+    const currentIframeUrl = store.getState().currentIframeUrl;
+    if (!currentIframeUrl) return undefined;
+    try {
+      return new URL(currentIframeUrl).pathname;
+    } catch {
+      return undefined;
+    }
+  }
+
   async function callSendMessage(
     message: string,
     images?: Images,
     model?: string
   ): Promise<string> {
+    const previewPath = getPreviewPath();
     if (organizationId) {
       const result = await trpcClient.organizations.appBuilder.sendMessage.mutate({
         projectId,
@@ -134,6 +148,7 @@ export function createStreamingCoordinator(
         message,
         images,
         model,
+        previewPath,
       });
       return result.cloudAgentSessionId;
     } else {
@@ -142,6 +157,7 @@ export function createStreamingCoordinator(
         message,
         images,
         model,
+        previewPath,
       });
       return result.cloudAgentSessionId;
     }

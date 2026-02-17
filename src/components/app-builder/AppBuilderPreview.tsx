@@ -441,6 +441,24 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
     manager.setCurrentIframeUrl(null);
   }, [previewUrl, manager]);
 
+  // Register a preview navigation handler so chat links can navigate the iframe
+  useEffect(() => {
+    return manager.onPreviewNavigate(path => {
+      if (!previewUrl || !iframeRef.current?.contentWindow) return;
+      try {
+        const targetUrl = new URL(previewUrl);
+        targetUrl.pathname = path;
+        targetUrl.search = '';
+        iframeRef.current.contentWindow.postMessage(
+          { type: 'kilo-preview-navigate', url: targetUrl.toString() },
+          targetUrl.origin
+        );
+      } catch {
+        // Invalid URL, ignore
+      }
+    });
+  }, [manager, previewUrl]);
+
   // Get tRPC for queries
   const trpc = useTRPC();
 

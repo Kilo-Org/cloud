@@ -236,6 +236,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
         authToken,
         images: input.images,
         model: input.model,
+        previewPath: input.previewPath,
       });
 
       return { cloudAgentSessionId: result.cloudAgentSessionId };

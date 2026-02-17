@@ -94,9 +94,11 @@ function UserMessageBubble({ message }: { message: CloudMessage }) {
 function AssistantMessageBubble({
   message,
   isStreaming,
+  onPreviewNavigate,
 }: {
   message: CloudMessage;
   isStreaming?: boolean;
+  onPreviewNavigate?: (path: string) => void;
 }) {
   const content = message.text || message.content || '';
 
@@ -126,6 +128,7 @@ function AssistantMessageBubble({
           metadata={message.metadata}
           partial={message.partial}
           isStreaming={isStreaming && message.partial}
+          onPreviewNavigate={onPreviewNavigate}
         />
       </div>
     </div>
@@ -135,7 +138,13 @@ function AssistantMessageBubble({
 /**
  * Memoized static messages - never re-render once complete
  */
-const StaticMessages = memo(function StaticMessages({ messages }: { messages: CloudMessage[] }) {
+const StaticMessages = memo(function StaticMessages({
+  messages,
+  onPreviewNavigate,
+}: {
+  messages: CloudMessage[];
+  onPreviewNavigate?: (path: string) => void;
+}) {
   return (
     <>
       {messages.map(msg => {
@@ -143,7 +152,13 @@ const StaticMessages = memo(function StaticMessages({ messages }: { messages: Cl
         if (role === 'user') {
           return <UserMessageBubble key={msg.ts} message={msg} />;
         }
-        return <AssistantMessageBubble key={msg.ts} message={msg} />;
+        return (
+          <AssistantMessageBubble
+            key={msg.ts}
+            message={msg}
+            onPreviewNavigate={onPreviewNavigate}
+          />
+        );
       })}
     </>
   );
@@ -155,9 +170,11 @@ const StaticMessages = memo(function StaticMessages({ messages }: { messages: Cl
 function DynamicMessages({
   messages,
   isStreaming,
+  onPreviewNavigate,
 }: {
   messages: CloudMessage[];
   isStreaming: boolean;
+  onPreviewNavigate?: (path: string) => void;
 }) {
   return (
     <>
@@ -171,6 +188,7 @@ function DynamicMessages({
             key={`${msg.ts}-${msg.partial}`}
             message={msg}
             isStreaming={isStreaming}
+            onPreviewNavigate={onPreviewNavigate}
           />
         );
       })}
@@ -379,6 +397,14 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     setHasImages(hasUploadedImages);
   }, []);
 
+  // Handle preview navigation from clickable links in chat messages
+  const handlePreviewNavigate = useCallback(
+    (path: string) => {
+      manager.navigatePreview(path);
+    },
+    [manager]
+  );
+
   // Handle interrupt using ProjectManager
   const handleInterrupt = useCallback(() => {
     manager.interrupt();
@@ -431,8 +457,12 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
                   </Button>
                 </div>
               )}
-              <StaticMessages messages={staticMessages} />
-              <DynamicMessages messages={dynamicMessages} isStreaming={isStreaming} />
+              <StaticMessages messages={staticMessages} onPreviewNavigate={handlePreviewNavigate} />
+              <DynamicMessages
+                messages={dynamicMessages}
+                isStreaming={isStreaming}
+                onPreviewNavigate={handlePreviewNavigate}
+              />
               {isStreaming && dynamicMessages.length === 0 && <TypingIndicator />}
             </>
           )}

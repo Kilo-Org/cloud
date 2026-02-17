@@ -4,6 +4,7 @@ import type { CloudAgentSession } from './CloudAgentSession.js';
 import type { EncryptedSecrets } from '../router/schemas.js';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { Images } from './schemas.js';
+import type { SessionIngestBinding } from '../session-ingest-binding.js';
 
 /**
  * Base configuration shared by all MCP server types

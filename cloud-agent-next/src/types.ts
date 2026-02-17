@@ -1,6 +1,7 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CallbackJob } from './callbacks/index.js';
+import type { SessionIngestBinding } from './session-ingest-binding.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 

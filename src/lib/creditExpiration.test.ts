@@ -51,7 +51,7 @@ describe('computeExpiration', () => {
     const transactions = [makeTransaction('t1', '2024-02-01', 0, 1000)];
     const user = userMicrodollarsUsed(500);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
     expect(result.newTransactions).toHaveLength(0);
     expect(result.newBaselines.size).toBe(0);
   });
@@ -60,7 +60,7 @@ describe('computeExpiration', () => {
     const transactions = [makeTransaction('t1', '2024-01-10', 0, 1000)];
     const user = userMicrodollarsUsed(0);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
 
     expect(result.newTransactions).toHaveLength(1);
     expect(result.newTransactions[0].amount_microdollars).toBe(-1000);
@@ -71,7 +71,7 @@ describe('computeExpiration', () => {
     const transactions = [makeTransaction('t1', '2024-01-10', 0, 1000)];
     const user = userMicrodollarsUsed(1500);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
 
     expect(result.newTransactions).toHaveLength(1);
     expect(result.newTransactions[0].amount_microdollars).toBe(0);
@@ -82,7 +82,7 @@ describe('computeExpiration', () => {
     const transactions = [makeTransaction('t1', '2024-01-10', 0, 1000)];
     const user = userMicrodollarsUsed(400);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
 
     expect(result.newTransactions).toHaveLength(1);
     expect(result.newTransactions[0].amount_microdollars).toBe(-600);
@@ -92,7 +92,7 @@ describe('computeExpiration', () => {
     const transactions = [makeTransaction('t1', '2024-01-10', 0, 1000, 'Promo credits')];
     const user = userMicrodollarsUsed(0);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
 
     expect(result.newTransactions[0].kilo_user_id).toBe('ignored');
     expect(result.newTransactions[0].credit_category).toBe('credits_expired');
@@ -108,7 +108,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(500);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
     expect(result.newTransactions.reduce((sum, t) => sum + t.amount_microdollars, 0)).toBe(-2500);
     expect(result.newTransactions).toHaveLength(2);
     expect(result.newTransactions[0].original_transaction_id).toBe('t1');
@@ -129,7 +129,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(4000);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
     expect(result.newTransactions.reduce((sum, t) => sum + t.amount_microdollars, 0)).toBe(-5000);
 
     expect(result.newTransactions).toHaveLength(3);
@@ -155,7 +155,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(16000);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
     expect(result.newTransactions.reduce((sum, t) => sum + t.amount_microdollars, 0)).toBe(-1500);
 
     expect(result.newTransactions).toHaveLength(2);
@@ -178,7 +178,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(700);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
 
     expect(result.newBaselines.has('t1')).toBe(false);
     expect(result.newBaselines.get('t2')).toBe(700);
@@ -193,7 +193,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(1700);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
 
     expect(result.newBaselines.has('t1')).toBe(false);
     expect(result.newBaselines.get('t2')).toBe(1000);
@@ -208,7 +208,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(1700);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
     expect(result.newTransactions.reduce((sum, t) => sum + t.amount_microdollars, 0)).toBe(-2300);
 
     expect(result.newTransactions[0].original_transaction_id).toBe('t2');
@@ -230,7 +230,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(1700);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
     expect(result.newTransactions.reduce((sum, t) => sum + t.amount_microdollars, 0)).toBe(-2300);
 
     expect(result.newTransactions[0].original_transaction_id).toBe('t3');
@@ -253,7 +253,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(1700);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
     expect(result.newTransactions.reduce((sum, t) => sum + t.amount_microdollars, 0)).toBe(-4300);
 
     expect(result.newTransactions[0].original_transaction_id).toBe('t3');
@@ -278,7 +278,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(1700);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
     expect(result.newTransactions.reduce((sum, t) => sum + t.amount_microdollars, 0)).toBe(-4300);
 
     expect(result.newTransactions[0].original_transaction_id).toBe('t3');
@@ -301,7 +301,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(15);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
 
     expect(result.newTransactions[0].original_transaction_id).toBe('t2');
     expect(result.newTransactions[0].amount_microdollars).toBe(0);
@@ -319,7 +319,7 @@ describe('computeExpiration', () => {
     ];
     const user = userMicrodollarsUsed(15);
 
-    const result = computeExpiration(transactions, user, now);
+    const result = computeExpiration(transactions, user, now, user.id);
 
     expect(result.newTransactions.reduce((sum, t) => sum + t.amount_microdollars, 0)).toBe(-5);
     expect(result.newTransactions[0].original_transaction_id).toBe('t3');
@@ -360,7 +360,7 @@ describe('computeExpiration', () => {
         let currentTransactions = initialTransactions;
         const collectedTransactions: NewTransaction[] = [];
         for (const date of dates) {
-          const result = computeExpiration(currentTransactions, user, date);
+          const result = computeExpiration(currentTransactions, user, date, user.id);
           collectedTransactions.push(...result.newTransactions);
           currentTransactions = applyExpirationResult(currentTransactions, result);
         }
@@ -373,7 +373,12 @@ describe('computeExpiration', () => {
       });
 
       it('immediate mode produces same results as incremental', () => {
-        const immediateResult = computeExpiration(scenario.transactions, user, scenario.finalDate);
+        const immediateResult = computeExpiration(
+          scenario.transactions,
+          user,
+          scenario.finalDate,
+          user.id
+        );
         expectTransactionsMatch(immediateResult.newTransactions, scenario.expectedResults);
       });
 

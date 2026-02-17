@@ -65,13 +65,14 @@ async function assertOk(resp: Response, context: string): Promise<void> {
 export async function createMachine(
   config: FlyClientConfig,
   machineConfig: FlyMachineConfig,
-  options?: { name?: string; region?: string; skipLaunch?: boolean }
+  options?: { name?: string; region?: string; skipLaunch?: boolean; minSecretsVersion?: number }
 ): Promise<FlyMachine> {
-  const body: CreateMachineRequest = {
+  const body: CreateMachineRequest & { min_secrets_version?: number } = {
     config: machineConfig,
     name: options?.name,
     region: options?.region,
     skip_launch: options?.skipLaunch,
+    min_secrets_version: options?.minSecretsVersion,
   };
   const resp = await flyFetch(config, '/machines', {
     method: 'POST',
@@ -99,6 +100,21 @@ export async function stopMachine(config: FlyClientConfig, machineId: string): P
     method: 'POST',
   });
   await assertOk(resp, 'stopMachine');
+}
+
+/**
+ * Stop a machine and wait for it to reach the 'stopped' state.
+ * Fly requires instance_id when waiting for 'stopped', so this fetches
+ * the current machine state after issuing the stop to get the instance_id.
+ */
+export async function stopMachineAndWait(
+  config: FlyClientConfig,
+  machineId: string,
+  timeoutSeconds = 60
+): Promise<void> {
+  await stopMachine(config, machineId);
+  const machine = await getMachine(config, machineId);
+  await waitForState(config, machineId, 'stopped', timeoutSeconds, machine.instance_id);
 }
 
 export async function destroyMachine(
@@ -149,11 +165,16 @@ export async function waitForState(
 export async function updateMachine(
   config: FlyClientConfig,
   machineId: string,
-  machineConfig: FlyMachineConfig
+  machineConfig: FlyMachineConfig,
+  options?: { minSecretsVersion?: number }
 ): Promise<FlyMachine> {
+  const body: { config: FlyMachineConfig; min_secrets_version?: number } = {
+    config: machineConfig,
+    min_secrets_version: options?.minSecretsVersion,
+  };
   const resp = await flyFetch(config, `/machines/${machineId}`, {
     method: 'POST',
-    body: JSON.stringify({ config: machineConfig }),
+    body: JSON.stringify(body),
   });
   await assertOk(resp, 'updateMachine');
   return resp.json();

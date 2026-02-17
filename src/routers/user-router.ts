@@ -121,7 +121,7 @@ export const userRouter = createTRPCRouter({
       });
 
       return {
-        ...getCreditBlocks(transactions, now, ctx.user),
+        ...getCreditBlocks(transactions, now, ctx.user, ctx.user.id),
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };
     }),

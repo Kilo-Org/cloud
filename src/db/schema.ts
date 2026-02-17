@@ -993,12 +993,18 @@ export const organizations = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
-    microdollars_balance: bigint({ mode: 'number' })
-      .default(sql`'0'`)
-      .notNull(),
     microdollars_used: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
+    // Deprecated: balance is now computed as total_microdollars_acquired - microdollars_used.
+    // Kept in sync for rollback safety; will be removed in a future migration.
+    microdollars_balance: bigint({ mode: 'number' })
+      .default(sql`'0'`)
+      .notNull(),
+    total_microdollars_acquired: bigint({ mode: 'number' })
+      .default(sql`'0'`)
+      .notNull(),
+    next_credit_expiration_at: timestamp({ withTimezone: true, mode: 'string' }),
     stripe_customer_id: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     settings: jsonb().default({}).$type<OrganizationSettings>().notNull(),

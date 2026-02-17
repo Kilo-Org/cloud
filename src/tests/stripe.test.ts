@@ -1054,7 +1054,10 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       where: eq(organizations.id, org.id),
     });
     const expectedIncrease = amountInCents * 10_000;
-    expect(updatedOrg?.microdollars_balance).toBe(org.microdollars_balance + expectedIncrease);
+    const orgComputedBalance = org.total_microdollars_acquired - org.microdollars_used;
+    const updatedComputedBalance =
+      (updatedOrg?.total_microdollars_acquired ?? 0) - (updatedOrg?.microdollars_used ?? 0);
+    expect(updatedComputedBalance).toBe(orgComputedBalance + expectedIncrease);
 
     const creditTx = await db.query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, piId),

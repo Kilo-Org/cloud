@@ -99,7 +99,7 @@ describe('Organizations', () => {
       expect(organization.name).toBe(orgName);
       expect(organization.created_at).toBeDefined();
       expect(organization.updated_at).toBeDefined();
-      expect(organization.microdollars_balance).toBe(0);
+      expect(organization.total_microdollars_acquired - organization.microdollars_used).toBe(0);
       expect(organization.auto_top_up_enabled).toBe(false);
 
       // Verify membership was created by checking getUserOrganizationsWithSeats

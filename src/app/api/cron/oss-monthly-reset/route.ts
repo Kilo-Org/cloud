@@ -81,7 +81,8 @@ export async function GET(request: Request) {
     .select({
       id: organizations.id,
       name: organizations.name,
-      currentBalance: organizations.microdollars_balance,
+      total_microdollars_acquired: organizations.total_microdollars_acquired,
+      microdollars_used: organizations.microdollars_used,
       settings: organizations.settings,
     })
     .from(organizations)
@@ -110,7 +111,11 @@ export async function GET(request: Request) {
   const now = new Date().toISOString();
 
   // Process each organization individually to prevent one failure from blocking others
-  for (const org of orgsDueForReset) {
+  for (const rawOrg of orgsDueForReset) {
+    const org = {
+      ...rawOrg,
+      currentBalance: rawOrg.total_microdollars_acquired - rawOrg.microdollars_used,
+    };
     const monthlyAmountMicrodollars = org.settings.oss_monthly_credit_amount_microdollars ?? 0;
 
     const result: ResetResult = {

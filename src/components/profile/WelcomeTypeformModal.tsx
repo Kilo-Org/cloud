@@ -57,7 +57,7 @@ export function WelcomeTypeformModal({ userEmail, kiloUserId }: WelcomeTypeformM
           id={WELCOME_FORM_ID}
           hidden={{
             email: userEmail,
-            kilo_user_id: kiloUserId,
+            user_id: kiloUserId,
           }}
           onSubmit={handleComplete}
           onClose={handleComplete}

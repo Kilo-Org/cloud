@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Check, ChevronDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -22,7 +23,7 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
   const router = useRouter();
 
   // Fetch user organizations
-  const { data: organizations } = useQuery(trpc.organizations.list.queryOptions());
+  const { data: organizations, isLoading } = useQuery(trpc.organizations.list.queryOptions());
 
   const handleOrganizationSwitch = (orgId: string | null) => {
     if (orgId) {
@@ -46,6 +47,18 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
 
   const currentOrg = organizations?.find(org => org.organizationId === organizationId);
   const hasOrganizations = organizations && organizations.length > 0;
+
+  // Show skeleton while loading
+  if (isLoading) {
+    return (
+      <div className="mt-1">
+        <div className="rounded-lg border border-gray-700 p-3">
+          <Skeleton className="mb-1.5 h-4 w-24" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      </div>
+    );
+  }
 
   // Don't render if no organizations
   if (!hasOrganizations) {

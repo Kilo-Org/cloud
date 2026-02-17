@@ -60,6 +60,14 @@ describe('normalizeCompanyDomain', () => {
   it('preserves non-latin IDN domain', () => {
     expect(normalizeCompanyDomain('例え.jp')).toBe('例え.jp');
   });
+
+  it('extracts hostname from URL with userinfo (user:pass@)', () => {
+    expect(normalizeCompanyDomain('https://user:pass@acme.com/path')).toBe('acme.com');
+  });
+
+  it('extracts hostname from URL with user@ only', () => {
+    expect(normalizeCompanyDomain('https://user@acme.com')).toBe('acme.com');
+  });
 });
 
 describe('isValidDomain', () => {
@@ -142,6 +150,14 @@ describe('isValidDomain', () => {
   it('accepts non-latin unicode domain', () => {
     expect(isValidDomain('例え.jp')).toBe(true);
   });
+
+  it('accepts punycode TLD', () => {
+    expect(isValidDomain('example.xn--p1ai')).toBe(true);
+  });
+
+  it('accepts full punycode domain', () => {
+    expect(isValidDomain('xn--mnchen-3ya.de')).toBe(true);
+  });
 });
 
 describe('CompanyDomainSchema', () => {
@@ -183,5 +199,15 @@ describe('CompanyDomainSchema', () => {
   it('accepts unicode domain URL and preserves unicode', () => {
     const result = CompanyDomainSchema.parse('https://例え.jp');
     expect(result).toBe('例え.jp');
+  });
+
+  it('handles URL with userinfo by extracting hostname', () => {
+    const result = CompanyDomainSchema.parse('https://user:pass@acme.com/path');
+    expect(result).toBe('acme.com');
+  });
+
+  it('accepts punycode TLD domain', () => {
+    const result = CompanyDomainSchema.parse('example.xn--p1ai');
+    expect(result).toBe('example.xn--p1ai');
   });
 });

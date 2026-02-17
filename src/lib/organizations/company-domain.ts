@@ -6,53 +6,42 @@ import * as z from 'zod';
  *
  * Unicode/IDN domains are preserved in their original form (e.g. "münchen.de").
  *
- * Examples:
- *   "acme.com" → "acme.com"
- *   "https://acme.com" → "acme.com"
- *   "https://acme.com/about" → "acme.com"
- *   "http://www.acme.com" → "www.acme.com"
- *   "münchen.de" → "münchen.de"
- *   "  " → null
- *   "" → null
+ * We avoid new URL() because it punycode-encodes unicode hostnames
+ * and domainToUnicode() from node:url isn't available in the browser.
  */
 export function normalizeCompanyDomain(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  let hostname = trimmed;
+  let authority = trimmed;
 
-  // If it looks like a URL (has ://), extract the hostname manually
-  if (trimmed.includes('://')) {
-    try {
-      // Extract hostname between :// and the next /, ?, #, or :
-      const afterProtocol = trimmed.split('://')[1];
-      if (afterProtocol) {
-        hostname = afterProtocol.split(/[/?#:]/)[0];
-      }
-    } catch {
-      // Fall through to treat as bare domain
-    }
-  } else {
-    // Extract hostname from bare domain (before /, ?, #, or :)
-    hostname = trimmed.split(/[/?#:]/)[0];
-  }
+  // Strip protocol
+  const protoEnd = authority.indexOf('://');
+  if (protoEnd !== -1) authority = authority.slice(protoEnd + 3);
+
+  // Strip userinfo (user:pass@)
+  const atIndex = authority.indexOf('@');
+  if (atIndex !== -1) authority = authority.slice(atIndex + 1);
+
+  // Extract hostname (before port, path, query, or fragment)
+  const hostname = authority.split(/[/:?#]/)[0];
 
   return hostname || null;
 }
 
-// Basic domain format regex: allows subdomains, hyphens, unicode characters, requires TLD of 2+ chars
-// Using \p{L} for unicode letters, \p{N} for unicode numbers (requires 'u' flag)
-// Each label must start and end with alphanumeric, can contain hyphens in the middle
+// Each label: starts/ends with letter or digit, may contain hyphens in the middle.
+// TLD must be 2+ chars. Supports unicode via \p{L} and \p{N}.
 const DOMAIN_REGEX =
-  /^[\p{L}\p{N}]([\p{L}\p{N}-]*[\p{L}\p{N}])?(\.[\p{L}\p{N}]([\p{L}\p{N}-]*[\p{L}\p{N}])?)*\.[\p{L}]{2,}$/u;
+  /^(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}][\p{L}\p{N}-]*[\p{L}\p{N}]$/u;
 
 /**
  * Validates that a string looks like a valid domain.
- * Accepts both ASCII and unicode (IDN) domains.
+ * Accepts ASCII, unicode (IDN), and punycode domains.
  */
 export function isValidDomain(domain: string): boolean {
-  if (!DOMAIN_REGEX.test(domain) || domain.length > 253) return false;
-  return domain.split('.').every(label => label.length > 0 && label.length <= 63);
+  if (domain.length > 253) return false;
+  if (!DOMAIN_REGEX.test(domain)) return false;
+  return domain.split('.').every(label => label.length <= 63);
 }
 
 /**

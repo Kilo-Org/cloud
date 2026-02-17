@@ -94,7 +94,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const conditions: SQL[] = [];
 
     if (searchTerm) {
-      const ilikePattern = `%${searchTerm}%`;
+      const escapedTerm = searchTerm.replace(/[%_\\]/g, '\\$&');
+      const ilikePattern = `%${escapedTerm}%`;
       const searchConditions: SQL[] = [
         ilike(kiloclaw_instances.sandbox_id, ilikePattern),
         ilike(kilocode_users.google_user_email, ilikePattern),

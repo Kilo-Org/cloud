@@ -9,6 +9,16 @@ function parseJsonArg(value: string, label: string): unknown {
   }
 }
 
+function parseJsonObject(value: string, label: string): Record<string, unknown> {
+  const parsed = parseJsonArg(value, label);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `"${label}" must be a JSON object, got ${Array.isArray(parsed) ? 'array' : typeof parsed}`
+    );
+  }
+  return parsed as Record<string, unknown>;
+}
+
 export function createTools(client: GastownClient) {
   return {
     gt_prime: tool({
@@ -118,9 +128,7 @@ export function createTools(client: GastownClient) {
           .optional(),
       },
       async execute(args) {
-        const metadata = args.metadata
-          ? (parseJsonArg(args.metadata, 'metadata') as Record<string, unknown>)
-          : undefined;
+        const metadata = args.metadata ? parseJsonObject(args.metadata, 'metadata') : undefined;
         const bead = await client.createEscalation({
           title: args.title,
           body: args.body,

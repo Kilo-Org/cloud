@@ -31,19 +31,22 @@ export class GastownClient {
   }
 
   private async request<T>(url: string, init?: RequestInit): Promise<T> {
+    // Normalize headers so callers can pass plain objects, Headers instances, or tuples
+    const headers = new Headers(init?.headers);
+    headers.set('Content-Type', 'application/json');
+    headers.set('Authorization', `Bearer ${this.token}`);
+
     let response: Response;
     try {
-      response = await fetch(url, {
-        ...init,
-        headers: {
-          ...init?.headers,
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.token}`,
-        },
-      });
+      response = await fetch(url, { ...init, headers });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new GastownApiError(`Network error: ${message}`, 0);
+    }
+
+    // 204 No Content — nothing to parse, return early
+    if (response.status === 204) {
+      return undefined as T;
     }
 
     let body: unknown;

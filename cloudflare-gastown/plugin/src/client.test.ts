@@ -49,9 +49,9 @@ describe('GastownClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/agents/agent-111/prime');
-    expect(init.headers).toEqual(
-      expect.objectContaining({ Authorization: 'Bearer test-jwt-token' })
-    );
+    const headers = new Headers(init.headers);
+    expect(headers.get('Authorization')).toBe('Bearer test-jwt-token');
+    expect(headers.get('Content-Type')).toBe('application/json');
   });
 
   it('prime() calls the correct endpoint', async () => {
@@ -212,6 +212,26 @@ describe('GastownClient', () => {
 
     await expect(client.getBead('bead-1')).rejects.toThrow(GastownApiError);
     await expect(client.getBead('bead-1')).rejects.toThrow('Unexpected response shape');
+  });
+
+  it('handles 204 No Content as success', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ status: 204 });
+
+    // done() returns void, so 204 should not throw
+    await expect(client.done({ branch: 'feat/test' })).resolves.toBeUndefined();
+  });
+
+  it('normalizes Headers instances from callers', async () => {
+    const fetchMock = mockFetch(undefined);
+    globalThis.fetch = fetchMock;
+
+    // Internally request() receives init?.headers — verify it doesn't drop them
+    // by calling a method and checking the auth header is still set
+    await client.done({ branch: 'test' });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(headers.get('Authorization')).toBe('Bearer test-jwt-token');
   });
 
   it('strips trailing slashes from baseUrl', () => {

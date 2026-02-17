@@ -13,6 +13,11 @@ export type ReceivePackError =
   | { kind: 'global'; message: string }
   | { kind: 'ref'; refName: string; message: string };
 
+/** Collapse newlines and strip control characters so a message is safe for a single pkt-line. */
+function sanitizeStatusMessage(msg: string): string {
+  return msg.replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1f]/g, '');
+}
+
 export class GitReceivePackService {
   /**
    * Handle info/refs request for receive-pack service
@@ -410,10 +415,12 @@ export class GitReceivePackService {
       let status: string;
       if (globalError) {
         // Global failure applies to all refs
-        status = `ng ${cmd.refName} ${globalError.message}\n`;
+        status = `ng ${cmd.refName} ${sanitizeStatusMessage(globalError.message)}\n`;
       } else {
         const refError = errors.find(e => e.kind === 'ref' && e.refName === cmd.refName);
-        status = refError ? `ng ${cmd.refName} ${refError.message}\n` : `ok ${cmd.refName}\n`;
+        status = refError
+          ? `ng ${cmd.refName} ${sanitizeStatusMessage(refError.message)}\n`
+          : `ok ${cmd.refName}\n`;
       }
       chunks.push(this.createSidebandPacket(1, encoder.encode(this.formatPacketLine(status))));
     }
@@ -459,11 +466,12 @@ export class GitReceivePackService {
   }
 
   /**
-   * Format git packet line (4-byte hex length + data)
+   * Format git packet line (4-byte hex length prefix + data).
+   * The length counts UTF-8 encoded bytes (not JS string length) per the git protocol spec.
    */
   private static formatPacketLine(data: string): string {
-    const length = data.length + 4;
-    const hexLength = length.toString(16).padStart(4, '0');
+    const byteLength = new TextEncoder().encode(data).length;
+    const hexLength = (byteLength + 4).toString(16).padStart(4, '0');
     return hexLength + data;
   }
 

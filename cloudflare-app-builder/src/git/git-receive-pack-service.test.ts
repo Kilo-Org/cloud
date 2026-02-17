@@ -623,6 +623,40 @@ describe('GitReceivePackService', () => {
       expect(status.unpack).toBe('error');
       expect(status.refs).toEqual([]);
     });
+
+    it('sanitizes multi-line error messages into a single status line', () => {
+      const commands = [{ oldOid: zeroOid, newOid: fakeNewOid, refName: 'refs/heads/main' }];
+      const errors = [
+        {
+          kind: 'global' as const,
+          message: 'Packfile too large: 100KB exceeds 50KB limit.\nTry:\n  1. Push fewer files',
+        },
+      ];
+
+      const response = GitReceivePackService.generateReportStatus(commands, errors);
+      const status = parseReportStatus(response);
+
+      // Newlines should be collapsed to spaces
+      expect(status.refs[0].status).toBe('ng');
+      expect(status.refs[0]).toHaveProperty(
+        'message',
+        'Packfile too large: 100KB exceeds 50KB limit. Try:   1. Push fewer files'
+      );
+      // The message must not contain newlines
+      expect(status.refs[0]).toHaveProperty('message', expect.not.stringContaining('\n'));
+    });
+
+    it('sanitizes per-ref error messages containing control characters', () => {
+      const commands = [{ oldOid: zeroOid, newOid: fakeNewOid, refName: 'refs/heads/main' }];
+      const errors = [
+        { kind: 'ref' as const, refName: 'refs/heads/main', message: 'bad\x00object\r\nfound' },
+      ];
+
+      const response = GitReceivePackService.generateReportStatus(commands, errors);
+      const status = parseReportStatus(response);
+
+      expect(status.refs[0]).toHaveProperty('message', 'badobject found');
+    });
   });
 });
 

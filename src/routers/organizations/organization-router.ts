@@ -35,6 +35,7 @@ import { and, count, desc, eq, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { credit_transactions } from '@/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { organizationSsoRouter } from '@/routers/organizations/organization-sso-router';
@@ -198,6 +199,26 @@ export const organizationsRouter = createTRPCRouter({
         message: 'Organization not found',
       });
     }
+
+    // Process pending credit expirations before returning stale balance
+    if (
+      organization.next_credit_expiration_at &&
+      new Date() >= new Date(organization.next_credit_expiration_at)
+    ) {
+      const expiryResult = await processOrganizationExpirations(
+        {
+          id: organizationId,
+          microdollars_used: organization.microdollars_used,
+          next_credit_expiration_at: organization.next_credit_expiration_at,
+          total_microdollars_acquired: organization.total_microdollars_acquired,
+        },
+        new Date()
+      );
+      if (expiryResult) {
+        organization.total_microdollars_acquired = expiryResult.total_microdollars_acquired;
+      }
+    }
+
     const members = await getOrganizationMembers(organizationId);
 
     return {

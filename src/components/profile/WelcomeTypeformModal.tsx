@@ -10,9 +10,10 @@ const WELCOME_FORM_ID = 'xNTrQO4E';
 
 type WelcomeTypeformModalProps = {
   userEmail: string;
+  kiloUserId: string;
 };
 
-export function WelcomeTypeformModal({ userEmail }: WelcomeTypeformModalProps) {
+export function WelcomeTypeformModal({ userEmail, kiloUserId }: WelcomeTypeformModalProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [hasMarkedComplete, setHasMarkedComplete] = useState(false);
   const trpc = useTRPC();
@@ -56,6 +57,7 @@ export function WelcomeTypeformModal({ userEmail }: WelcomeTypeformModalProps) {
           id={WELCOME_FORM_ID}
           hidden={{
             email: userEmail,
+            kilo_user_id: kiloUserId,
           }}
           onSubmit={handleComplete}
           onClose={handleComplete}

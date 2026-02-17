@@ -7,6 +7,7 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   opus_46_free_slackbot_model,
+  sonnet_46_free_review_model,
 } from '@/lib/providers/anthropic';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
@@ -65,6 +66,7 @@ export const kiloFreeModels = [
   minimax_m21_free_model,
   minimax_m25_free_model,
   opus_46_free_slackbot_model,
+  sonnet_46_free_review_model,
   grok_code_fast_1_optimized_free_model,
   zai_glm47_free_model,
   zai_glm5_free_model,
@@ -95,4 +97,42 @@ export function isDeadFreeModel(model: string): boolean {
  */
 export function isSlackbotOnlyModel(model: string): boolean {
   return !!kiloFreeModels.find(m => m.public_id === model && m.slackbot_only);
+}
+
+/**
+ * Check if a model is a review-only promotional model.
+ * These models are hidden from the public model list and only available in Code Reviewer.
+ */
+export function isReviewOnlyModel(model: string): boolean {
+  return !!kiloFreeModels.find(m => m.public_id === model && m.review_only);
+}
+
+/**
+ * Check if a review-only promotional model is currently within its active promotion window.
+ * Returns false for non-review-only models or if the promotion has expired.
+ */
+export function isReviewPromotionActive(model: string, now = new Date()): boolean {
+  const freeModel = kiloFreeModels.find(
+    m => m.public_id === model && m.review_only && m.is_enabled
+  );
+  if (!freeModel) return false;
+  if (freeModel.promotion_start && now < new Date(freeModel.promotion_start)) return false;
+  if (freeModel.promotion_end && now >= new Date(freeModel.promotion_end)) return false;
+  return true;
+}
+
+/**
+ * Get the active review promotion model, if any.
+ * Returns the model config if a review-only promotion is currently active, null otherwise.
+ */
+export function getActiveReviewPromotionModel(now = new Date()): KiloFreeModel | null {
+  return (
+    kiloFreeModels.find(
+      m =>
+        m.review_only &&
+        m.is_enabled &&
+        (!m.promotion_start || now >= new Date(m.promotion_start)) &&
+        (!m.promotion_end || now < new Date(m.promotion_end))
+    ) ?? null
+  );
 }

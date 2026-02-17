@@ -1,8 +1,9 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews, kilocode_users, organizations } from '@/db/schema';
+import { cloud_agent_code_reviews, cliSessions, kilocode_users, organizations } from '@/db/schema';
 import * as z from 'zod';
 import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, type SQL } from 'drizzle-orm';
+import { sonnet_46_free_review_model } from '@/lib/providers/anthropic';
 
 /**
  * SQL condition to exclude "Insufficient credits" errors from failure metrics.
@@ -371,4 +372,72 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
       return result;
     }),
+
+  // Sonnet 4.6 free review promotion tracking
+  getReviewPromotionStats: adminProcedure.query(async () => {
+    const promoModel = sonnet_46_free_review_model;
+    const promoStart = promoModel.promotion_start ?? '2026-02-18T00:00:00Z';
+    const promoEnd = promoModel.promotion_end ?? '2026-02-25T00:00:00Z';
+    const promoModelId = promoModel.internal_id;
+
+    // Query code reviews that used the promotional model during the promotion window
+    // Join with cli_sessions to check last_model
+    const result = await db
+      .select({
+        total_promo_reviews: sql<number>`COUNT(*)`,
+        completed_promo_reviews: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
+        failed_promo_reviews: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed')`,
+        unique_users: sql<number>`COUNT(DISTINCT COALESCE(${cloud_agent_code_reviews.owned_by_user_id}, ${cloud_agent_code_reviews.owned_by_organization_id}))`,
+        unique_orgs: sql<number>`COUNT(DISTINCT ${cloud_agent_code_reviews.owned_by_organization_id})`,
+      })
+      .from(cloud_agent_code_reviews)
+      .innerJoin(cliSessions, eq(cloud_agent_code_reviews.cli_session_id, cliSessions.session_id))
+      .where(
+        and(
+          gte(cloud_agent_code_reviews.created_at, promoStart),
+          lt(cloud_agent_code_reviews.created_at, promoEnd),
+          eq(cliSessions.last_model, promoModelId)
+        )
+      );
+
+    // Daily breakdown
+    const dailyBreakdown = await db
+      .select({
+        day: sql<string>`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})::date::text`,
+        total: sql<number>`COUNT(*)`,
+        completed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
+        unique_users: sql<number>`COUNT(DISTINCT COALESCE(${cloud_agent_code_reviews.owned_by_user_id}, ${cloud_agent_code_reviews.owned_by_organization_id}))`,
+      })
+      .from(cloud_agent_code_reviews)
+      .innerJoin(cliSessions, eq(cloud_agent_code_reviews.cli_session_id, cliSessions.session_id))
+      .where(
+        and(
+          gte(cloud_agent_code_reviews.created_at, promoStart),
+          lt(cloud_agent_code_reviews.created_at, promoEnd),
+          eq(cliSessions.last_model, promoModelId)
+        )
+      )
+      .groupBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
+      .orderBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`);
+
+    const stats = result[0];
+    return {
+      promotionModelId: promoModel.public_id,
+      promotionInternalModelId: promoModelId,
+      promotionStart: promoStart,
+      promotionEnd: promoEnd,
+      isActive: new Date() >= new Date(promoStart) && new Date() < new Date(promoEnd),
+      totalPromoReviews: Number(stats.total_promo_reviews) || 0,
+      completedPromoReviews: Number(stats.completed_promo_reviews) || 0,
+      failedPromoReviews: Number(stats.failed_promo_reviews) || 0,
+      uniqueUsers: Number(stats.unique_users) || 0,
+      uniqueOrgs: Number(stats.unique_orgs) || 0,
+      dailyBreakdown: dailyBreakdown.map(row => ({
+        day: row.day,
+        total: Number(row.total) || 0,
+        completed: Number(row.completed) || 0,
+        uniqueUsers: Number(row.unique_users) || 0,
+      })),
+    };
+  }),
 });

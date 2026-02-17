@@ -16,6 +16,12 @@ export type KiloFreeModel = {
   inference_providers: OpenRouterInferenceProviderId[];
   /** If true, this model is only available through Kilo for Slack (internalApiUse) and hidden from public model list */
   slackbot_only?: boolean;
+  /** If true, this model is only available in Code Reviewer (review mode) and hidden from the public model list */
+  review_only?: boolean;
+  /** Promotion start date (ISO 8601). If set, the model is only active after this date. */
+  promotion_start?: string;
+  /** Promotion end date (ISO 8601). If set, the model is disabled after this date. */
+  promotion_end?: string;
 };
 
 export function convertFromKiloModel(model: KiloFreeModel) {

@@ -37,7 +37,8 @@ import type {
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { getCodeReviewById } from '../db/code-reviews';
-import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
+import { DEFAULT_CODE_REVIEW_MODE, getDefaultCodeReviewModel } from '../core/constants';
+import { getActiveReviewPromotionModel } from '@/lib/models';
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
@@ -341,7 +342,7 @@ export async function prepareReviewPayload(
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-            model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+            model: config.model_slug || getDefaultCodeReviewModel(),
             upstreamBranch: review.head_ref,
           }
         : {
@@ -351,7 +352,7 @@ export async function prepareReviewPayload(
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-            model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+            model: config.model_slug || getDefaultCodeReviewModel(),
             upstreamBranch: review.head_ref,
           };
 
@@ -362,6 +363,21 @@ export async function prepareReviewPayload(
         hasGitToken: !!sessionInput.gitToken,
         upstreamBranch: sessionInput.upstreamBranch,
         model: sessionInput.model,
+      });
+    }
+
+    // 6b. Log if a promotional model is being used for tracking
+    const activePromoModel = getActiveReviewPromotionModel();
+    const effectiveModel = sessionInput.model;
+    if (activePromoModel && effectiveModel === activePromoModel.internal_id) {
+      logExceptInTest('[prepareReviewPayload] Using promotional model for code review', {
+        reviewId,
+        promotionModel: activePromoModel.public_id,
+        effectiveModel,
+        promotionStart: activePromoModel.promotion_start,
+        promotionEnd: activePromoModel.promotion_end,
+        ownerType: owner.type,
+        ownerId: owner.id,
       });
     }
 

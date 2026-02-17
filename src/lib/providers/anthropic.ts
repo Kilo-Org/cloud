@@ -21,6 +21,24 @@ export const opus_46_free_slackbot_model = {
   slackbot_only: true,
 } as KiloFreeModel;
 
+export const SONNET_46_REVIEW_PROMO_MODEL_ID = 'anthropic/claude-sonnet-4-6-20250514:review';
+
+export const sonnet_46_free_review_model = {
+  public_id: SONNET_46_REVIEW_PROMO_MODEL_ID,
+  display_name: 'Anthropic: Claude Sonnet 4.6 (Free for Code Reviewer)',
+  description: 'Claude Sonnet 4.6 — free for one week in Code Reviewer (review mode)',
+  context_length: 200_000,
+  max_completion_tokens: 16384,
+  is_enabled: true,
+  flags: ['reasoning', 'prompt_cache', 'vision'],
+  gateway: 'openrouter',
+  internal_id: 'anthropic/claude-sonnet-4-6-20250514',
+  inference_providers: ['anthropic'],
+  review_only: true,
+  promotion_start: '2026-02-18T00:00:00Z',
+  promotion_end: '2026-02-25T00:00:00Z',
+} as KiloFreeModel;
+
 const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;
 
 const ENABLE_ANTHROPIC_AUTOMATIC_CACHING = true;

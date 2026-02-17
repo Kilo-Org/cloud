@@ -14,6 +14,8 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isSlackbotOnlyModel,
+  isReviewOnlyModel,
+  isReviewPromotionActive,
   isRateLimitedModel,
 } from '@/lib/models';
 import {
@@ -248,6 +250,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Slackbot-only models are only available through Kilo for Slack (internalApiUse)
   if (isSlackbotOnlyModel(originalModelIdLowerCased) && !internalApiUse) {
     return modelDoesNotExistResponse();
+  }
+
+  // Review-only promotional models are only available through Code Reviewer (internalApiUse)
+  // and only during the active promotion window
+  if (isReviewOnlyModel(originalModelIdLowerCased)) {
+    if (!internalApiUse || !isReviewPromotionActive(originalModelIdLowerCased)) {
+      return modelDoesNotExistResponse();
+    }
   }
 
   // Extract properties for usage context

@@ -4,15 +4,29 @@
  * Constants used throughout the code review system.
  */
 
+import { getActiveReviewPromotionModel } from '@/lib/models';
+
 // ============================================================================
 // Review Configuration
 // ============================================================================
 
 /**
- * Default model for code reviews
- * Using Claude Sonnet 4.5 as specified in the plan
+ * Default model for code reviews.
+ * Falls back to Claude Sonnet 4.5 when no promotion is active.
  */
-export const DEFAULT_CODE_REVIEW_MODEL = 'anthropic/claude-sonnet-4.5';
+const BASE_CODE_REVIEW_MODEL = 'anthropic/claude-sonnet-4.5';
+
+/**
+ * Returns the effective default model for code reviews.
+ * If a review-only promotional model is currently active, it takes precedence.
+ */
+export function getDefaultCodeReviewModel(): string {
+  const promoModel = getActiveReviewPromotionModel();
+  return promoModel?.internal_id ?? BASE_CODE_REVIEW_MODEL;
+}
+
+/** @deprecated Use getDefaultCodeReviewModel() for promotion-aware model selection */
+export const DEFAULT_CODE_REVIEW_MODEL = BASE_CODE_REVIEW_MODEL;
 
 /**
  * Default mode for cloud agent sessions

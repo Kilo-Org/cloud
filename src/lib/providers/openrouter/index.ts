@@ -60,7 +60,11 @@ function enhancedModelList(models: OpenRouterModel[]) {
         !kiloFreeModels.some(m => m.public_id === model.id && m.is_enabled) &&
         !isRateLimitedToDeath(model.id)
     )
-    .concat(kiloFreeModels.filter(m => m.is_enabled).map(model => convertFromKiloModel(model)))
+    .concat(
+      kiloFreeModels
+        .filter(m => m.is_enabled && !m.slackbot_only && !m.review_only)
+        .map(model => convertFromKiloModel(model))
+    )
     .concat([autoModel])
     .map((model: OpenRouterModel) => {
       const preferredIndex =

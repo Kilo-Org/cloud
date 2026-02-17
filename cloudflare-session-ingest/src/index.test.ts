@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
@@ -25,6 +25,7 @@ vi.mock('./dos/SessionIngestDO', () => ({
   getSessionIngestDO: vi.fn(),
 }));
 
+import app from './index';
 import { getDb } from './db/kysely';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 
@@ -34,10 +35,6 @@ type TestBindings = {
   SESSION_ACCESS_CACHE_DO: unknown;
   NEXTAUTH_SECRET: unknown;
   NEXTAUTH_SECRET_RAW?: string;
-};
-
-let WorkerClass: {
-  new (): { env: unknown; ctx: unknown; fetch: (req: Request) => Promise<Response> };
 };
 
 function makeDbFakes() {
@@ -55,33 +52,21 @@ function makeDbFakes() {
   return { db, selectExecuteTakeFirst };
 }
 
-function createWorker(env: TestBindings) {
-  const worker = new WorkerClass();
-  worker.env = env;
-  return worker;
-}
+const defaultEnv: TestBindings = {
+  HYPERDRIVE: { connectionString: 'postgres://test' },
+  SESSION_INGEST_DO: {},
+  SESSION_ACCESS_CACHE_DO: {},
+  NEXTAUTH_SECRET: {},
+  NEXTAUTH_SECRET_RAW: 'secret',
+};
 
 describe('public session route', () => {
-  beforeAll(async () => {
-    const mod = await import('./index');
-    WorkerClass = mod.default as unknown as typeof WorkerClass;
-  });
-
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
   it('returns 400 for invalid uuid', async () => {
-    const env: TestBindings = {
-      HYPERDRIVE: { connectionString: 'postgres://test' },
-      SESSION_INGEST_DO: {},
-      SESSION_ACCESS_CACHE_DO: {},
-      NEXTAUTH_SECRET: {},
-      NEXTAUTH_SECRET_RAW: 'secret',
-    };
-
-    const worker = createWorker(env);
-    const res = await worker.fetch(new Request('http://local/session/not-a-uuid'));
+    const res = await app.request('/session/not-a-uuid', {}, defaultEnv);
     expect(res.status).toBe(400);
   });
 
@@ -90,18 +75,7 @@ describe('public session route', () => {
     vi.mocked(getDb).mockReturnValue(db as never);
     selectExecuteTakeFirst.mockResolvedValueOnce(undefined);
 
-    const env: TestBindings = {
-      HYPERDRIVE: { connectionString: 'postgres://test' },
-      SESSION_INGEST_DO: {},
-      SESSION_ACCESS_CACHE_DO: {},
-      NEXTAUTH_SECRET: {},
-      NEXTAUTH_SECRET_RAW: 'secret',
-    };
-
-    const worker = createWorker(env);
-    const res = await worker.fetch(
-      new Request('http://local/session/11111111-1111-4111-8111-111111111111')
-    );
+    const res = await app.request('/session/11111111-1111-4111-8111-111111111111', {}, defaultEnv);
 
     expect(res.status).toBe(404);
   });
@@ -121,18 +95,7 @@ describe('public session route', () => {
       stub as unknown as ReturnType<typeof getSessionIngestDO>
     );
 
-    const env: TestBindings = {
-      HYPERDRIVE: { connectionString: 'postgres://test' },
-      SESSION_INGEST_DO: {},
-      SESSION_ACCESS_CACHE_DO: {},
-      NEXTAUTH_SECRET: {},
-      NEXTAUTH_SECRET_RAW: 'secret',
-    };
-
-    const worker = createWorker(env);
-    const res = await worker.fetch(
-      new Request('http://local/session/11111111-1111-4111-8111-111111111111')
-    );
+    const res = await app.request('/session/11111111-1111-4111-8111-111111111111', {}, defaultEnv);
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');

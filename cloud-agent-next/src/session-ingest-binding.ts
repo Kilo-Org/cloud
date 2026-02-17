@@ -5,7 +5,7 @@
  * shape comes from the session-ingest worker's WorkerEntrypoint and is
  * declared here so the generated file can be freely regenerated.
  *
- * Keep in sync with: cloudflare-session-ingest/src/index.ts
+ * Keep in sync with: cloudflare-session-ingest/src/session-ingest-rpc.ts
  */
 
 export type CreateSessionForCloudAgentParams = {

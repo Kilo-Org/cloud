@@ -73,6 +73,7 @@
     {
       "binding": "SESSION_INGEST",
       "service": "session-ingest",
+      "entrypoint": "SessionIngestRPC",
     },
   ],
   /**
@@ -228,6 +229,7 @@
         {
           "binding": "SESSION_INGEST",
           "service": "session-ingest",
+          "entrypoint": "SessionIngestRPC",
         },
       ],
       "r2_buckets": [

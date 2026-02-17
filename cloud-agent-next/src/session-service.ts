@@ -1609,13 +1609,25 @@ export class SessionService {
     organizationId?: string,
     createdOnPlatform?: string
   ): Promise<void> {
-    await env.SESSION_INGEST.createSessionForCloudAgent({
-      sessionId: kiloSessionId,
-      kiloUserId,
-      cloudAgentSessionId,
-      organizationId,
-      createdOnPlatform,
-    });
+    try {
+      await env.SESSION_INGEST.createSessionForCloudAgent({
+        sessionId: kiloSessionId,
+        kiloUserId,
+        cloudAgentSessionId,
+        organizationId,
+        createdOnPlatform,
+      });
+    } catch (error) {
+      logger
+        .withFields({
+          kiloSessionId,
+          cloudAgentSessionId,
+          kiloUserId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('session-ingest RPC createSessionForCloudAgent failed');
+      throw error;
+    }
   }
 
   /**
@@ -1627,10 +1639,21 @@ export class SessionService {
     kiloUserId: string,
     env: PersistenceEnv
   ): Promise<void> {
-    await env.SESSION_INGEST.deleteSessionForCloudAgent({
-      sessionId: kiloSessionId,
-      kiloUserId,
-    });
+    try {
+      await env.SESSION_INGEST.deleteSessionForCloudAgent({
+        sessionId: kiloSessionId,
+        kiloUserId,
+      });
+    } catch (error) {
+      logger
+        .withFields({
+          kiloSessionId,
+          kiloUserId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('session-ingest RPC deleteSessionForCloudAgent failed');
+      throw error;
+    }
   }
 
   /**

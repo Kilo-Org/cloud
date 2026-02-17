@@ -80,6 +80,18 @@ describe('normalizeCompanyDomain', () => {
   it('handles password containing @ in userinfo', () => {
     expect(normalizeCompanyDomain('https://user:pa@ss@acme.com/path')).toBe('acme.com');
   });
+
+  it('ignores @ in query string (no path)', () => {
+    expect(normalizeCompanyDomain('https://example.com?next=@evil.com')).toBe('example.com');
+  });
+
+  it('ignores @ in fragment (no path)', () => {
+    expect(normalizeCompanyDomain('https://example.com#@evil.com')).toBe('example.com');
+  });
+
+  it('ignores @ in query string with path', () => {
+    expect(normalizeCompanyDomain('https://example.com/path?next=@evil.com')).toBe('example.com');
+  });
 });
 
 describe('isValidDomain', () => {

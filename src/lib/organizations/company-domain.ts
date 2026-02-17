@@ -19,9 +19,9 @@ export function normalizeCompanyDomain(input: string): string | null {
   const protoEnd = authority.indexOf('://');
   if (protoEnd !== -1) authority = authority.slice(protoEnd + 3);
 
-  // Strip userinfo (user:pass@) — only before the first path separator
-  const slashIndex = authority.indexOf('/');
-  const authorityPart = slashIndex !== -1 ? authority.slice(0, slashIndex) : authority;
+  // Strip userinfo (user:pass@) — only within the authority (before /, ?, or #)
+  const authorityEnd = authority.search(/[/?#]/);
+  const authorityPart = authorityEnd !== -1 ? authority.slice(0, authorityEnd) : authority;
   const atIndex = authorityPart.lastIndexOf('@');
   if (atIndex !== -1) authority = authority.slice(atIndex + 1);
 

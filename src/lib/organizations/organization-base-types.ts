@@ -32,6 +32,8 @@ const OrganizationSettingsSchema = z.object({
   oss_monthly_credit_amount_microdollars: z.number().nullable().optional(),
   // When credits were last reset (ISO timestamp string)
   oss_credits_last_reset_at: z.string().nullable().optional(),
+  // Full GitHub URL for OSS sponsored repos (e.g., https://github.com/org/repo)
+  oss_github_url: z.string().url().nullable().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;

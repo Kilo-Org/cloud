@@ -8,6 +8,7 @@ import {
   ReviewQueueRecord,
 } from '../db/tables/review-queue.table';
 import { createTableMolecules } from '../db/tables/molecules.table';
+import { getTownContainerStub } from './TownContainer.do';
 import { query } from '../util/query.util';
 import type {
   Bead,
@@ -37,6 +38,16 @@ function now(): string {
 
 // Stale threshold: agents with no activity for 10 minutes
 const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+
+// GUPP violation threshold: 30 minutes with no progress
+const GUPP_THRESHOLD_MS = 30 * 60 * 1000;
+
+// Alarm intervals
+const ACTIVE_ALARM_INTERVAL_MS = 30_000; // 30s when there's active work
+const IDLE_ALARM_INTERVAL_MS = 300_000; // 5 min when idle
+
+// KV key for storing the town ID associated with this rig
+const TOWN_ID_KEY = 'townId';
 
 export class RigDO extends DurableObject<Env> {
   private sql: SqlStorage;
@@ -337,6 +348,8 @@ export class RigDO extends DurableObject<Env> {
       `,
       [agentId, now(), beadId]
     );
+
+    await this.armAlarmIfNeeded();
   }
 
   async unhookBead(agentId: string): Promise<void> {
@@ -346,6 +359,7 @@ export class RigDO extends DurableObject<Env> {
       /* sql */ `
         UPDATE ${agents}
         SET ${agents.columns.current_hook_bead_id} = NULL,
+            ${agents.columns.cloud_agent_session_id} = NULL,
             ${agents.columns.status} = 'idle',
             ${agents.columns.last_activity_at} = ?
         WHERE ${agents.columns.id} = ?
@@ -591,15 +605,261 @@ export class RigDO extends DurableObject<Env> {
 
     // Unhook and set to idle
     await this.unhookBead(agentId);
+
+    await this.armAlarmIfNeeded();
   }
 
-  // ── Health (called by alarms) ──────────────────────────────────────────
+  // ── Town ID (links this rig to its town container) ─────────────────────
+
+  async setTownId(townId: string): Promise<void> {
+    await this.ctx.storage.put(TOWN_ID_KEY, townId);
+    await this.armAlarmIfNeeded();
+  }
+
+  async getTownId(): Promise<string | null> {
+    return (await this.ctx.storage.get<string>(TOWN_ID_KEY)) ?? null;
+  }
+
+  // ── Alarm ─────────────────────────────────────────────────────────────
+
+  async alarm(): Promise<void> {
+    await this.ensureInitialized();
+
+    const scheduledAgents = await this.schedulePendingWork();
+    const patrol = await this.witnessPatrol();
+    const reviewProcessed = await this.processReviewQueue();
+
+    // Re-arm with adaptive interval
+    const nextAlarmMs = this.hasActiveWork() ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
+    await this.ctx.storage.setAlarm(Date.now() + nextAlarmMs);
+  }
+
+  /**
+   * Arm the alarm if not already armed. Called when new work arrives
+   * (hookBead, agentDone, heartbeat, setTownId).
+   */
+  private async armAlarmIfNeeded(): Promise<void> {
+    const currentAlarm = await this.ctx.storage.getAlarm();
+    if (!currentAlarm) {
+      await this.ctx.storage.setAlarm(Date.now() + 5_000);
+    }
+  }
+
+  /**
+   * Check whether there are active agents or pending beads/review entries.
+   */
+  private hasActiveWork(): boolean {
+    const activeAgentRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT COUNT(*) as cnt FROM ${agents}
+          WHERE ${agents.columns.status} IN ('working', 'blocked')
+        `,
+        []
+      ),
+    ];
+
+    const pendingBeadRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT COUNT(*) as cnt FROM ${beads}
+          WHERE ${beads.columns.status} = 'in_progress'
+        `,
+        []
+      ),
+    ];
+
+    const pendingReviewRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT COUNT(*) as cnt FROM ${reviewQueue}
+          WHERE ${reviewQueue.columns.status} IN ('pending', 'running')
+        `,
+        []
+      ),
+    ];
+
+    const activeAgents = Number(activeAgentRows[0]?.cnt ?? 0);
+    const pendingBeads = Number(pendingBeadRows[0]?.cnt ?? 0);
+    const pendingReviews = Number(pendingReviewRows[0]?.cnt ?? 0);
+
+    return activeAgents > 0 || pendingBeads > 0 || pendingReviews > 0;
+  }
+
+  // ── Schedule Pending Work ─────────────────────────────────────────────
+
+  /**
+   * Find agents that have hooked beads but haven't been started in the container.
+   * This covers two cases:
+   *  1. Fresh hook: hookBead sets status='working' but no container process exists yet
+   *  2. Crash recovery: witnessPatrol resets dead container agents to 'idle'
+   *
+   * We use cloud_agent_session_id IS NULL as the marker for "not yet dispatched".
+   */
+  private async schedulePendingWork(): Promise<string[]> {
+    const pendingRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${agents.columns.id},
+                 ${agents.columns.name},
+                 ${agents.columns.role},
+                 ${agents.columns.identity},
+                 ${agents.columns.current_hook_bead_id},
+                 ${agents.columns.checkpoint}
+          FROM ${agents}
+          WHERE ${agents.columns.status} IN ('idle', 'working')
+            AND ${agents.columns.current_hook_bead_id} IS NOT NULL
+            AND ${agents.columns.cloud_agent_session_id} IS NULL
+        `,
+        []
+      ),
+    ];
+
+    if (pendingRows.length === 0) return [];
+
+    const townId = await this.getTownId();
+    if (!townId) {
+      console.warn('schedulePendingWork: no townId configured, skipping container dispatch');
+      return [];
+    }
+
+    const scheduledAgentIds: string[] = [];
+
+    for (const row of pendingRows) {
+      const agentId = String(row.id);
+      const beadId = String(row.current_hook_bead_id);
+      const bead = this.getBead(beadId);
+      if (!bead) continue;
+
+      const started = await this.startAgentInContainer(townId, {
+        agentId,
+        agentName: String(row.name),
+        role: String(row.role),
+        identity: String(row.identity),
+        beadId,
+        beadTitle: bead.title,
+        checkpoint: row.checkpoint ? String(row.checkpoint) : null,
+      });
+
+      if (started) {
+        // Mark as working with a session ID so it won't be re-dispatched
+        query(
+          this.sql,
+          /* sql */ `
+            UPDATE ${agents}
+            SET ${agents.columns.status} = 'working',
+                ${agents.columns.cloud_agent_session_id} = ?,
+                ${agents.columns.last_activity_at} = ?
+            WHERE ${agents.columns.id} = ?
+          `,
+          [`container:${agentId}`, now(), agentId]
+        );
+        scheduledAgentIds.push(agentId);
+      }
+    }
+
+    return scheduledAgentIds;
+  }
+
+  /**
+   * Signal the container to start an agent process.
+   * Returns true if the container accepted the request.
+   */
+  private async startAgentInContainer(
+    townId: string,
+    params: {
+      agentId: string;
+      agentName: string;
+      role: string;
+      identity: string;
+      beadId: string;
+      beadTitle: string;
+      checkpoint: string | null;
+    }
+  ): Promise<boolean> {
+    try {
+      const container = getTownContainerStub(this.env, townId);
+      const response = await container.fetch('http://container/agents/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: params.agentId,
+          agent_name: params.agentName,
+          role: params.role,
+          identity: params.identity,
+          bead_id: params.beadId,
+          bead_title: params.beadTitle,
+          checkpoint: params.checkpoint,
+        }),
+      });
+      return response.ok;
+    } catch (err) {
+      console.error(`Failed to start agent ${params.agentId} in container:`, err);
+      return false;
+    }
+  }
+
+  // ── Process Review Queue ──────────────────────────────────────────────
+
+  /**
+   * Pop the next pending review entry and trigger merge in the container.
+   */
+  private async processReviewQueue(): Promise<boolean> {
+    const entry = await this.popReviewQueue();
+    if (!entry) return false;
+
+    const townId = await this.getTownId();
+    if (!townId) {
+      console.warn('processReviewQueue: no townId configured, skipping merge');
+      return false;
+    }
+
+    await this.startMergeInContainer(townId, entry);
+    return true;
+  }
+
+  /**
+   * Signal the container to run a deterministic merge for a review queue entry.
+   */
+  private async startMergeInContainer(townId: string, entry: ReviewQueueEntry): Promise<void> {
+    try {
+      const container = getTownContainerStub(this.env, townId);
+      const response = await container.fetch('http://container/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entry_id: entry.id,
+          branch: entry.branch,
+          bead_id: entry.bead_id,
+          agent_id: entry.agent_id,
+          pr_url: entry.pr_url,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error(`Merge request failed for entry ${entry.id}: ${response.status}`);
+        await this.completeReview(entry.id, 'failed');
+      }
+      // On success, the container will call back to completeReview when merge finishes
+    } catch (err) {
+      console.error(`Failed to start merge for entry ${entry.id}:`, err);
+      await this.completeReview(entry.id, 'failed');
+    }
+  }
+
+  // ── Health (called by alarm) ──────────────────────────────────────────
 
   async witnessPatrol(): Promise<PatrolResult> {
     await this.ensureInitialized();
 
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
+    const guppThreshold = new Date(Date.now() - GUPP_THRESHOLD_MS).toISOString();
 
+    // Detect dead agents
     const deadRows = [
       ...query(
         this.sql,
@@ -611,6 +871,7 @@ export class RigDO extends DurableObject<Env> {
       ),
     ];
 
+    // Detect stale agents (working but no activity for STALE_THRESHOLD_MS)
     const staleRows = [
       ...query(
         this.sql,
@@ -623,6 +884,7 @@ export class RigDO extends DurableObject<Env> {
       ),
     ];
 
+    // Detect orphaned beads (in_progress with no live assignee)
     const orphanedRows = [
       ...query(
         this.sql,
@@ -641,6 +903,56 @@ export class RigDO extends DurableObject<Env> {
       ),
     ];
 
+    // Check container process health for working/blocked agents
+    const townId = await this.getTownId();
+    if (townId) {
+      const workingRows = [
+        ...query(
+          this.sql,
+          /* sql */ `
+            SELECT ${agents.columns.id},
+                   ${agents.columns.current_hook_bead_id},
+                   ${agents.columns.last_activity_at}
+            FROM ${agents}
+            WHERE ${agents.columns.status} IN ('working', 'blocked')
+          `,
+          []
+        ),
+      ];
+
+      for (const row of workingRows) {
+        const agentId = String(row.id);
+        const containerStatus = await this.checkAgentContainerStatus(townId, agentId);
+
+        if (containerStatus === 'not_found' || containerStatus === 'exited') {
+          // Agent process is gone — reset to idle and clear session so
+          // schedulePendingWork() can re-dispatch on the next alarm
+          query(
+            this.sql,
+            /* sql */ `
+              UPDATE ${agents}
+              SET ${agents.columns.status} = 'idle',
+                  ${agents.columns.cloud_agent_session_id} = NULL,
+                  ${agents.columns.last_activity_at} = ?
+              WHERE ${agents.columns.id} = ?
+            `,
+            [now(), agentId]
+          );
+          continue;
+        }
+
+        // GUPP violation check (30 min no progress)
+        if (row.last_activity_at && String(row.last_activity_at) < guppThreshold) {
+          await this.sendMail({
+            from_agent_id: 'witness',
+            to_agent_id: agentId,
+            subject: 'GUPP_CHECK',
+            body: 'You have had work hooked for 30+ minutes with no activity. Are you stuck? If so, call gt_escalate.',
+          });
+        }
+      }
+    }
+
     return {
       dead_agents: deadRows.map(r => String(r.id)),
       stale_agents: staleRows.map(r => String(r.id)),
@@ -648,11 +960,28 @@ export class RigDO extends DurableObject<Env> {
     };
   }
 
+  /**
+   * Check the container for an agent's process status.
+   * Returns the status string or 'unknown' on failure.
+   */
+  private async checkAgentContainerStatus(townId: string, agentId: string): Promise<string> {
+    try {
+      const container = getTownContainerStub(this.env, townId);
+      const response = await container.fetch(`http://container/agents/${agentId}/status`);
+      if (!response.ok) return 'unknown';
+      const data = await response.json<{ status: string }>();
+      return data.status;
+    } catch {
+      return 'unknown';
+    }
+  }
+
   // ── Heartbeat ──────────────────────────────────────────────────────────
 
   async touchAgentHeartbeat(agentId: string): Promise<void> {
     await this.ensureInitialized();
     this.touchAgent(agentId);
+    await this.armAlarmIfNeeded();
   }
 
   // ── Private helpers ────────────────────────────────────────────────────

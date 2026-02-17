@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { Env } from './types';
 import { getPasswordRecord } from './auth/password-store';
+import { isBannerEnabled } from './banner/banner-store';
+import { injectBanner } from './banner/inject-banner';
 import { validateAuthCookie } from './auth/jwt';
 import { api } from './routes/api';
 import { auth } from './routes/auth';
@@ -103,7 +105,22 @@ subdomainApp.all('*', async c => {
 
   // Forward request
   try {
-    return (await worker.fetch(c.req.raw)) as unknown as Response;
+    const response = (await worker.fetch(c.req.raw)) as unknown as Response;
+
+    // Banner injection is best-effort: if KV or HTMLRewriter fails,
+    // return the original response rather than turning it into a 500.
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.includes('text/html')) {
+      try {
+        if (await isBannerEnabled(c.env.DEPLOY_KV, workerName)) {
+          return injectBanner(response);
+        }
+      } catch (bannerError) {
+        console.error('Banner injection failed, serving original response:', bannerError);
+      }
+    }
+
+    return response;
   } catch {
     return c.text('Error forwarding request', 500);
   }

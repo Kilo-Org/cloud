@@ -118,7 +118,7 @@ const defaultModels = [
 let models = defaultModels;
 
 // Prefer KILOCODE_MODELS_JSON env var (set by buildEnvVars from DO config).
-// Falls back to file-based override for manual/debug use, then baked-in defaults.
+// Falls back to file-based override for manual use, then baked-in defaults.
 if (process.env.KILOCODE_MODELS_JSON) {
     try {
         const parsed = JSON.parse(process.env.KILOCODE_MODELS_JSON);
@@ -155,6 +155,14 @@ config.agents = config.agents || {};
 config.agents.defaults = config.agents.defaults || {};
 config.agents.defaults.model = { primary: defaultModel };
 console.log('KiloCode provider configured with base URL ' + baseUrl);
+
+// Explicitly lock down exec tool security (defense-in-depth).
+// OpenClaw defaults to these values, but pinning them here prevents
+// silent regression if upstream defaults change in a future version.
+config.tools = config.tools || {};
+config.tools.exec = config.tools.exec || {};
+config.tools.exec.security = 'deny';
+config.tools.exec.ask = 'on-miss';
 
 // Telegram configuration
 if (process.env.TELEGRAM_BOT_TOKEN) {

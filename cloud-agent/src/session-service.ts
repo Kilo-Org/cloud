@@ -1508,12 +1508,13 @@ export class SessionService {
     organizationId?: string,
     lastMode?: string,
     lastModel?: string,
-    gitUrl?: string
+    gitUrl?: string,
+    createdOnPlatform?: string
   ): Promise<string> {
     const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
 
     const input = {
-      created_on_platform: 'cloud-agent',
+      created_on_platform: createdOnPlatform ?? 'cloud-agent',
       organization_id: organizationId ?? null,
       cloud_agent_session_id: cloudAgentSessionId,
       version: 2,

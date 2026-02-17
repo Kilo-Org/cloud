@@ -26,6 +26,10 @@
         "class_name": "KiloClawInstance",
         "name": "KILOCLAW_INSTANCE",
       },
+      {
+        "class_name": "KiloClawApp",
+        "name": "KILOCLAW_APP",
+      },
     ],
   },
   "migrations": [
@@ -41,6 +45,10 @@
       "deleted_classes": ["KiloClawSandbox"],
       "tag": "v4",
     },
+    {
+      "new_sqlite_classes": ["KiloClawApp"],
+      "tag": "v5",
+    },
   ],
   // Hyperdrive binding for Postgres (pepper validation, instance registry)
   "hyperdrive": [
@@ -51,7 +59,9 @@
     },
   ],
   "vars": {
-    "FLY_APP_NAME": "kiloclaw-machines",
+    "FLY_APP_NAME": "kiloclaw-machines", // Legacy fallback for existing instances
+    "FLY_REGISTRY_APP": "kiloclaw-machines", // Shared Docker image registry
+    "FLY_ORG_SLUG": "kilo-679", // Org for creating per-user Fly apps
     "FLY_IMAGE_TAG": "latest",
     "FLY_REGION": "us,eu",
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",

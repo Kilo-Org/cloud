@@ -648,6 +648,13 @@ export class RigDO extends DurableObject<Env> {
     };
   }
 
+  // ── Heartbeat ──────────────────────────────────────────────────────────
+
+  async touchAgentHeartbeat(agentId: string): Promise<void> {
+    await this.ensureInitialized();
+    this.touchAgent(agentId);
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────
 
   private touchAgent(agentId: string): void {

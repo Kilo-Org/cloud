@@ -1,0 +1,19 @@
+{
+  "name": "gastown-container",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Town container control server for Gastown agent orchestration",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.9.3"
+  }
+}

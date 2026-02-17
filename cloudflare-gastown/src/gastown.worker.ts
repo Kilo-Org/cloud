@@ -22,14 +22,24 @@ import {
   handleAgentDone,
   handleWriteCheckpoint,
   handleCheckMail,
+  handleHeartbeat,
 } from './handlers/rig-agents.handler';
 import { handleSendMail } from './handlers/rig-mail.handler';
 import { handleSubmitToReviewQueue } from './handlers/rig-review-queue.handler';
 import { handleCreateEscalation } from './handlers/rig-escalations.handler';
+import {
+  handleContainerStartAgent,
+  handleContainerStopAgent,
+  handleContainerSendMessage,
+  handleContainerAgentStatus,
+  handleContainerStreamTicket,
+  handleContainerHealth,
+} from './handlers/town-container.handler';
 
 export { RigDO } from './dos/Rig.do';
 export { TownDO } from './dos/Town.do';
 export { AgentIdentityDO } from './dos/AgentIdentity.do';
+export { TownContainerDO } from './dos/TownContainer.do';
 
 // Extend the generated Env with secrets store bindings.
 // The generated worker-configuration.d.ts only contains DO namespace bindings;
@@ -56,6 +66,7 @@ app.get('/health', c => c.json({ status: 'ok' }));
 // Applied at /api/rigs/:rigId/* so the rigId param is in scope for JWT validation.
 
 app.use('/api/rigs/:rigId/*', authMiddleware);
+app.use('/api/towns/:townId/*', authMiddleware);
 
 // ── Beads ───────────────────────────────────────────────────────────────
 
@@ -81,6 +92,7 @@ app.post('/api/rigs/:rigId/agents/:agentId/checkpoint', c =>
   handleWriteCheckpoint(c, c.req.param())
 );
 app.get('/api/rigs/:rigId/agents/:agentId/mail', c => handleCheckMail(c, c.req.param()));
+app.post('/api/rigs/:rigId/agents/:agentId/heartbeat', c => handleHeartbeat(c, c.req.param()));
 
 // ── Mail ────────────────────────────────────────────────────────────────
 
@@ -93,6 +105,27 @@ app.post('/api/rigs/:rigId/review-queue', c => handleSubmitToReviewQueue(c, c.re
 // ── Escalations ─────────────────────────────────────────────────────────
 
 app.post('/api/rigs/:rigId/escalations', c => handleCreateEscalation(c, c.req.param()));
+
+// ── Town Container ──────────────────────────────────────────────────────
+// These routes proxy commands to the container's control server via DO.fetch().
+// Auth is internal-only (no agent JWT — these are called by the Rig DO alarm / tRPC layer).
+
+app.post('/api/towns/:townId/container/agents/start', c =>
+  handleContainerStartAgent(c, c.req.param())
+);
+app.post('/api/towns/:townId/container/agents/:agentId/stop', c =>
+  handleContainerStopAgent(c, c.req.param())
+);
+app.post('/api/towns/:townId/container/agents/:agentId/message', c =>
+  handleContainerSendMessage(c, c.req.param())
+);
+app.get('/api/towns/:townId/container/agents/:agentId/status', c =>
+  handleContainerAgentStatus(c, c.req.param())
+);
+app.post('/api/towns/:townId/container/agents/:agentId/stream-ticket', c =>
+  handleContainerStreamTicket(c, c.req.param())
+);
+app.get('/api/towns/:townId/container/health', c => handleContainerHealth(c, c.req.param()));
 
 // ── Error handling ──────────────────────────────────────────────────────
 

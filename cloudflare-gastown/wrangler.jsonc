@@ -7,15 +7,28 @@
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
 
+  "containers": [
+    {
+      "class_name": "TownContainerDO",
+      "image": "./container/Dockerfile",
+      "instance_type": "standard-4",
+      "max_instances": 50,
+    },
+  ],
+
   "durable_objects": {
     "bindings": [
       { "name": "RIG", "class_name": "RigDO" },
       { "name": "TOWN", "class_name": "TownDO" },
       { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
+      { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
     ],
   },
 
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RigDO", "TownDO", "AgentIdentityDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RigDO", "TownDO", "AgentIdentityDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["TownContainerDO"] },
+  ],
 
   // PRODUCTION Secrets Store (shared Kilo secrets store)
   "secrets_store_secrets": [

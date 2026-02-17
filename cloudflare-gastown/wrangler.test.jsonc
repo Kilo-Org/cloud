@@ -11,10 +11,14 @@
       { "name": "RIG", "class_name": "RigDO" },
       { "name": "TOWN", "class_name": "TownDO" },
       { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
+      { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
     ],
   },
 
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RigDO", "TownDO", "AgentIdentityDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RigDO", "TownDO", "AgentIdentityDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["TownContainerDO"] },
+  ],
 
   // Test secrets — plain text vars used in place of secrets_store_secrets
   "vars": {

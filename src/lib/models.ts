@@ -11,7 +11,7 @@ import {
 } from '@/lib/providers/anthropic';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
-import type { KiloFreeModel, KiloFreeModelUse } from '@/lib/providers/kilo-free-model';
+import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m25_free_model } from '@/lib/providers/minimax';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
@@ -88,15 +88,6 @@ export function extraRequiredProviders(model: string) {
 
 export function isDeadFreeModel(model: string): boolean {
   return !!kiloFreeModels.find(m => m.public_id === model && !m.is_enabled);
-}
-
-export function isFreeModelAllowedForUse(model: string, use: KiloFreeModelUse): boolean {
-  return kiloFreeModels.some(
-    m =>
-      m.public_id === model &&
-      m.is_enabled &&
-      (!m.allowed_uses?.length || m.allowed_uses.includes(use))
-  );
 }
 
 /** Returns true if the model has allowed_uses including 'review' and is within its promotion window. */

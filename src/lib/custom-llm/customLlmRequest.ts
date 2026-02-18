@@ -653,7 +653,7 @@ export async function customLlmRequest(
     async start(controller) {
       try {
         for await (const chunk of result.fullStream) {
-          if (chunk.type === 'raw' && inStreamDebugMode) {
+          if (chunk.type === 'raw') {
             debugNativeChunks.push(chunk.rawValue);
           }
 

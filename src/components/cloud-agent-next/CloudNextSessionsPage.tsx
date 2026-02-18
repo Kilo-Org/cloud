@@ -462,8 +462,8 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
 
   const titleContent = (
     <div className="flex items-center gap-3">
-      <h1 className="text-foreground text-3xl font-bold">Cloud Agent (Next)</h1>
-      <Badge variant="new">beta</Badge>
+      <h1 className="text-foreground text-3xl font-bold">Cloud Agent</h1>
+      <Badge variant="new">new</Badge>
     </div>
   );
 

@@ -6,7 +6,7 @@ import type {
 } from '@/lib/providers/openrouter/types';
 import type { ProviderId } from '@/lib/providers/provider-id';
 
-export const grok_code_fast_1_optimized_experimental_model = {
+export const grok_code_fast_1_optimized_free_model = {
   public_id: 'x-ai/grok-code-fast-1:optimized:experimental',
   display_name: 'xAI: Grok Code Fast 1 Optimized (experimental, free)',
   description:

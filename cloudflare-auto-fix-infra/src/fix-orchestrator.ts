@@ -187,6 +187,7 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
       model: config.model_slug,
       githubToken,
       autoCommit: true,
+      createdOnPlatform: 'autofix',
       // upstreamBranch is intentionally NOT set - agent will create session/{sessionId} branch
       callbackUrl,
       callbackHeaders: {

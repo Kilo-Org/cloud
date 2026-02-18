@@ -31,6 +31,7 @@ const FEATURE_VALUES = [
   'autocomplete', // FIM completions (tab autocomplete)
   'parallel-agent', // Parallel Agents running inside VS Code
   'managed-indexing', // Managed Indexing LLM calls from extension
+  'agent-manager', // Agent Manager orchestrated tasks (local extension)
 
   // CLI features (set by kilo-gateway via env var)
   'cli', // Kilo CLI direct human use
@@ -41,11 +42,11 @@ const FEATURE_VALUES = [
   'auto-triage', // Issue auto-triage (via cloud-agent)
   'autofix', // Kilo Autofix (via cloud-agent)
   'app-builder', // App Builder (via cloud-agent)
-  'agent-manager', // Agent Manager orchestrated tasks
 
   // Internal services (set by sendProxiedChatCompletion)
   'security-agent', // Security scanning
-  'slack-bot', // Kilo for Slack
+  'slack', // Kilo for Slack (both direct LLM calls and spawned sessions)
+  'webhook', // Webhook agent
 
   // Other
   'kilo-claw', // Kilo Claw conversations
@@ -103,17 +104,25 @@ Add optional `feature` field to [`ProxiedChatCompletionRequest`](src/lib/llm-pro
 Update callers:
 
 - **Security Agent** ([`extraction-service.ts`](src/lib/security-agent/services/extraction-service.ts:284), [`triage-service.ts`](src/lib/security-agent/services/triage-service.ts:237)) → `feature: 'security-agent'`
-- **Slack Bot** ([`slack-bot.ts`](src/lib/slack-bot.ts:466)) → `feature: 'slack-bot'`
+- **Slack Bot** ([`slack-bot.ts`](src/lib/slack-bot.ts:466)) → `feature: 'slack'`
 
 ### Step 6: Old Extension — `Kilo-Org/kilocode` repo
+
+The old extension makes LLM calls directly from the VS Code/JetBrains extension process via `KilocodeOpenrouterHandler`. It does NOT use the kilo CLI or kilo-gateway.
 
 1. Add `X_KILOCODE_FEATURE = "X-KiloCode-Feature"` to [`src/shared/kilocode/headers.ts`](https://github.com/Kilo-Org/kilocode/blob/main/src/shared/kilocode/headers.ts)
 2. In [`customRequestOptions()`](https://github.com/Kilo-Org/kilocode/blob/main/src/api/providers/kilocode-openrouter.ts) — determine the feature value based on context:
    - Check `getEditorNameHeader()`: if it contains "jetbrains", "intellij", "phpstorm", "webstorm", etc. → `'jetbrains-extension'`, otherwise → `'vscode-extension'`
-   - The `metadata` parameter already carries context from each feature (mode, taskId), so parallel agents and managed indexing can override the value at their call sites
+   - The `metadata` parameter already carries context from each feature (mode, taskId), so parallel agents, managed indexing, and agent-manager can override the value at their call sites
 3. In [`streamFim()`](https://github.com/Kilo-Org/kilocode/blob/main/src/api/providers/kilocode-openrouter.ts) — set to `'autocomplete'`
 
-### Step 7: CLI Gateway + New Extension — `Kilo-Org/kilo` repo
+Features covered by this step: `vscode-extension`, `jetbrains-extension`, `autocomplete`, `parallel-agent`, `managed-indexing`, `agent-manager`
+
+### Step 7: CLI + New Extension — `Kilo-Org/kilo` repo
+
+The new extension (packages/kilo-vscode + packages/opencode) uses a different architecture: it spawns a local kilo CLI process which uses kilo-gateway to make API calls. This means the feature header is set via env var on the spawned process, not via extension code.
+
+**7a. kilo-gateway constants and headers:**
 
 In [`packages/kilo-gateway/src/api/constants.ts`](https://github.com/Kilo-Org/kilo/blob/main/packages/kilo-gateway/src/api/constants.ts):
 
@@ -123,25 +132,31 @@ export const DEFAULT_FEATURE = 'cli';
 export const ENV_FEATURE = 'KILOCODE_FEATURE';
 ```
 
-In the request-building code (where `HEADER_EDITORNAME` is set), also set:
+Add `getFeatureHeader()` and include the feature header in `buildKiloHeaders()` in `packages/kilo-gateway/src/headers.ts`. Export new constants from `packages/kilo-gateway/src/index.ts`.
 
-```typescript
-headers[HEADER_FEATURE] = process.env[ENV_FEATURE] || DEFAULT_FEATURE;
-```
+**7b. FIM route fix (new extension autocomplete):**
 
-This covers both the new opencode-based extension (which uses kilo-gateway) and the CLI. Cloud features override via env var:
+The FIM route at `packages/kilo-gateway/src/server/routes.ts:214` makes a direct `fetch()` to `/api/fim/completions` bypassing `buildKiloHeaders()`. This is specific to the kilo repo (the old kilocode repo has its own `streamFim()` in Step 6). Add `...buildKiloHeaders()` to the FIM fetch headers plus a hardcoded `[HEADER_FEATURE]: 'autocomplete'` override.
 
-- **Cloud Agent** → `KILOCODE_FEATURE=cloud-agent`
-- **Code Reviews** → `KILOCODE_FEATURE=code-review`
-- **Auto-Triage** → `KILOCODE_FEATURE=auto-triage`
-- **Kilo Autofix** → `KILOCODE_FEATURE=autofix`
-- **App Builder** → `KILOCODE_FEATURE=app-builder`
+**7c. New VS Code extension spawn env:**
 
-### Step 8: Cloud Agent Environment (cloud repo)
+`packages/kilo-vscode/src/services/cli-backend/server-manager.ts:64` spawns the kilo CLI for the new VS Code extension. This is specific to the kilo repo (the old kilocode repo doesn't spawn a CLI). Add `KILOCODE_FEATURE: 'vscode-extension'` to the spawn env. Without this, all new extension requests get tagged as `cli` (the default).
 
-In [`cloud-agent-next/src/kilo/server-manager.ts`](cloud-agent-next/src/kilo/server-manager.ts), [`buildKiloServeCommand`](cloud-agent-next/src/kilo/server-manager.ts:212) needs to include `KILOCODE_FEATURE={feature}` in the command. The feature value depends on what launched the session (cloud-agent vs code-review vs auto-triage vs auto-fix vs app-builder). Pass it as a parameter through the session creation flow.
+Features covered by this step: `cli` (default), `vscode-extension` (new extension), `autocomplete` (new extension FIM). Cloud features are handled by Step 8 (cloud repo sets the env var, kilo-gateway just reads it).
 
-**Without this, all cloud feature requests get tagged as `cli`.**
+### Step 8: Cloud Feature Attribution (cloud repo)
+
+In [`cloud-agent-next/src/session-service.ts`](cloud-agent-next/src/session-service.ts:475) and [`cloud-agent/src/session-service.ts`](cloud-agent/src/session-service.ts:467), add `KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent'` to the sandbox env vars (alongside `KILO_PLATFORM`). The `createdOnPlatform` value is passed by the callers:
+
+- **App Builder** → `'app-builder'` (already set in `src/lib/app-builder/app-builder-service.ts`)
+- **Slack** → `'slack'` (already set in `src/lib/slack-bot.ts`)
+- **Cloud Agent** (direct) → `'cloud-agent'` (default)
+
+The following CF workers need `createdOnPlatform` added to their session input:
+
+- **Code Reviews** → `'code-review'` in [`cloudflare-code-review-infra/src/code-review-orchestrator.ts`](cloudflare-code-review-infra/src/code-review-orchestrator.ts)
+- **Auto-Triage** → `'auto-triage'` in [`cloudflare-auto-triage-infra/src/triage-orchestrator.ts`](cloudflare-auto-triage-infra/src/triage-orchestrator.ts)
+- **Autofix** → `'autofix'` in [`cloudflare-auto-fix-infra/src/fix-orchestrator.ts`](cloudflare-auto-fix-infra/src/fix-orchestrator.ts)
 
 ### Step 9: Kilo Claw (cloud repo)
 
@@ -171,25 +186,26 @@ No strict dependencies between repos. Backend first is recommended so the column
 
 ## Feature Coverage Matrix
 
-| Feature             | How it sends the header                                                                | Value                 |
-| ------------------- | -------------------------------------------------------------------------------------- | --------------------- |
-| VS Code Extension   | kilocode extension `customRequestOptions()`                                            | `vscode-extension`    |
-| JetBrains Extension | kilocode extension `customRequestOptions()` (branches on editor name)                  | `jetbrains-extension` |
-| Autocomplete        | kilocode extension `streamFim()`                                                       | `autocomplete`        |
-| Parallel Agents     | kilocode extension (parallel agent code path)                                          | `parallel-agent`      |
-| Managed Indexing    | kilocode extension (indexing code path)                                                | `managed-indexing`    |
-| CLI                 | kilo-gateway default                                                                   | `cli`                 |
-| Cloud Agent         | kilo-gateway + `KILOCODE_FEATURE=cloud-agent` env                                      | `cloud-agent`         |
-| Code Reviews        | kilo-gateway + `KILOCODE_FEATURE=code-review` env                                      | `code-review`         |
-| Auto-Triage         | kilo-gateway + `KILOCODE_FEATURE=auto-triage` env                                      | `auto-triage`         |
-| Kilo Autofix        | kilo-gateway + `KILOCODE_FEATURE=autofix` env                                          | `autofix`             |
-| App Builder         | kilo-gateway + `KILOCODE_FEATURE=app-builder` env                                      | `app-builder`         |
-| Agent Manager       | kilo-gateway + `KILOCODE_FEATURE=agent-manager` env                                    | `agent-manager`       |
-| Security Agent      | `sendProxiedChatCompletion` with `feature` field                                       | `security-agent`      |
-| Slack Bot           | `sendProxiedChatCompletion` with `feature` field                                       | `slack-bot`           |
-| Kilo Claw           | kilo-gateway + `KILOCODE_FEATURE=kilo-claw` env (set in `kiloclaw/src/gateway/env.ts`) | `kilo-claw`           |
-| Direct Gateway      | `/api/gateway/` route wrapper injects `direct-gateway` when no feature header present  | `direct-gateway`      |
-| Unattributed        | No header sent                                                                         | `NULL`                |
+| Feature             | How it sends the header                                                                                    | Value                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------- |
+| VS Code Extension   | kilocode extension `customRequestOptions()`                                                                | `vscode-extension`    |
+| JetBrains Extension | kilocode extension `customRequestOptions()` (branches on editor name)                                      | `jetbrains-extension` |
+| Autocomplete        | kilocode extension `streamFim()`                                                                           | `autocomplete`        |
+| Parallel Agents     | kilocode extension (parallel agent code path)                                                              | `parallel-agent`      |
+| Managed Indexing    | kilocode extension (indexing code path)                                                                    | `managed-indexing`    |
+| CLI                 | kilo-gateway default                                                                                       | `cli`                 |
+| Cloud Agent         | kilo-gateway + `KILOCODE_FEATURE=cloud-agent` env                                                          | `cloud-agent`         |
+| Code Reviews        | CF worker passes `createdOnPlatform: 'code-review'` → session-service sets env → kilo-gateway sends header | `code-review`         |
+| Auto-Triage         | CF worker passes `createdOnPlatform: 'auto-triage'` → session-service sets env → kilo-gateway sends header | `auto-triage`         |
+| Kilo Autofix        | CF worker passes `createdOnPlatform: 'autofix'` → session-service sets env → kilo-gateway sends header     | `autofix`             |
+| App Builder         | kilo-gateway + `KILOCODE_FEATURE=app-builder` env                                                          | `app-builder`         |
+| Agent Manager       | kilocode extension (agent-manager code path)                                                               | `agent-manager`       |
+| Security Agent      | `sendProxiedChatCompletion` with `feature: 'security-agent'`                                               | `security-agent`      |
+| Slack               | `sendProxiedChatCompletion` with `feature: 'slack'` + `createdOnPlatform: 'slack'` for spawned sessions    | `slack`               |
+| Webhook             | `createdOnPlatform: 'webhook'` via token minting (separate worker, rolls up into Cloud Agents for WAU)     | `webhook`             |
+| Kilo Claw           | kilo-gateway + `KILOCODE_FEATURE=kilo-claw` env (set in `kiloclaw/src/gateway/env.ts`)                     | `kilo-claw`           |
+| Direct Gateway      | `/api/gateway/` route wrapper injects `direct-gateway` when no feature header present                      | `direct-gateway`      |
+| Unattributed        | No header sent                                                                                             | `NULL`                |
 
 ## Historical Data Backfill
 

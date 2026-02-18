@@ -627,11 +627,18 @@ export class RigDO extends DurableObject<Env> {
   // ── Get or Create Agent ────────────────────────────────────────────────
   // Atomically finds an existing agent of the given role (idle preferred)
   // or creates a new one. Prevents duplicate agent creation from concurrent calls.
+  // Singleton roles (mayor, witness, refinery) always return the existing
+  // agent even if busy — only polecats scale out by creating new agents.
+
+  private static readonly SINGLETON_ROLES: ReadonlySet<string> = new Set([
+    'mayor',
+    'witness',
+    'refinery',
+  ]);
 
   async getOrCreateAgent(role: AgentRole): Promise<Agent> {
     await this.ensureInitialized();
 
-    // Prefer idle agents of the requested role
     const existing = [
       ...query(
         this.sql,
@@ -648,10 +655,11 @@ export class RigDO extends DurableObject<Env> {
 
     if (existing.length > 0) {
       const agent = AgentRecord.parse(existing[0]);
-      if (agent.status === 'idle') return agent;
+      // Singleton roles: return existing agent regardless of status
+      if (agent.status === 'idle' || RigDO.SINGLETON_ROLES.has(role)) return agent;
     }
 
-    // No idle agent found — create a new one
+    // No idle agent found (polecat) or no agent at all — create a new one
     return this.registerAgent({
       role,
       name: `${role}-${Date.now()}`,

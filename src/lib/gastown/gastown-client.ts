@@ -121,7 +121,15 @@ async function gastownFetch(path: string, init?: RequestInit): Promise<unknown> 
     headers: { ...getHeaders(), ...init?.headers },
   });
 
-  const body: unknown = await response.json();
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new GastownApiError(
+      `Gastown returned non-JSON response (${response.status})`,
+      response.status
+    );
+  }
 
   if (!response.ok) {
     const parsed = GastownErrorResponse.safeParse(body);

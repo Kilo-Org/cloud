@@ -238,12 +238,16 @@ export const gastownRouter = createTRPCRouter({
   deleteBead: baseProcedure
     .input(z.object({ rigId: z.string().uuid(), beadId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      // Verify the caller owns this rig before deleting
+      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
       await withGastownError(() => gastown.deleteBead(input.rigId, input.beadId));
     }),
 
   deleteAgent: baseProcedure
     .input(z.object({ rigId: z.string().uuid(), agentId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      // Verify the caller owns this rig before deleting
+      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
       await withGastownError(() => gastown.deleteAgent(input.rigId, input.agentId));
     }),
 });

@@ -22,7 +22,7 @@ const BASE_CODE_REVIEW_MODEL = 'anthropic/claude-sonnet-4.5';
  */
 export function getDefaultCodeReviewModel(): string {
   const promoModel = getActiveReviewPromotionModel();
-  return promoModel?.internal_id ?? BASE_CODE_REVIEW_MODEL;
+  return promoModel?.public_id ?? BASE_CODE_REVIEW_MODEL;
 }
 
 /**

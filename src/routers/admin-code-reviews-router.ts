@@ -378,7 +378,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     const promoModel = sonnet_46_free_review_model;
     const promoStart = promoModel.promotion_start ?? '2026-02-18T00:00:00Z';
     const promoEnd = promoModel.promotion_end ?? '2026-02-25T00:00:00Z';
-    const promoModelId = promoModel.internal_id;
+    // last_model stores the public_id (what the client sends), not internal_id
+    const promoModelId = promoModel.public_id;
 
     // Query code reviews that used the promotional model during the promotion window.
     // Left join with cli_sessions to check last_model (cli_session_id is nullable).

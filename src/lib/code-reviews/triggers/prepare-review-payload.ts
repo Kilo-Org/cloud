@@ -369,7 +369,7 @@ export async function prepareReviewPayload(
     // 6b. Log if a promotional model is being used for tracking
     const activePromoModel = getActiveReviewPromotionModel();
     const effectiveModel = sessionInput.model;
-    if (activePromoModel && effectiveModel === activePromoModel.internal_id) {
+    if (activePromoModel && effectiveModel === activePromoModel.public_id) {
       logExceptInTest('[prepareReviewPayload] Using promotional model for code review', {
         reviewId,
         promotionModel: activePromoModel.public_id,

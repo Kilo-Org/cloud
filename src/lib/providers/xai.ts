@@ -7,7 +7,7 @@ import type {
 import type { ProviderId } from '@/lib/providers/provider-id';
 
 export const grok_code_fast_1_optimized_free_model = {
-  public_id: 'x-ai/grok-code-fast-1:optimized:experimental',
+  public_id: 'x-ai/grok-code-fast-1:optimized:free',
   display_name: 'xAI: Grok Code Fast 1 Optimized (experimental, free)',
   description:
     'An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.',

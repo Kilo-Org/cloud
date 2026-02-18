@@ -439,8 +439,8 @@
       "default_parameters": {}
     },
     {
-      "id": "x-ai/grok-code-fast-1:optimized:experimental",
-      "canonical_slug": "x-ai/grok-code-fast-1:optimized:experimental",
+      "id": "x-ai/grok-code-fast-1:optimized:free",
+      "canonical_slug": "x-ai/grok-code-fast-1:optimized:free",
       "hugging_face_id": "",
       "name": "xAI: Grok Code Fast 1 Optimized (experimental, free)",
       "created": 1756238927,

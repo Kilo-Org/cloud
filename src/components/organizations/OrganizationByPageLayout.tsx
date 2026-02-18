@@ -15,9 +15,11 @@ export async function OrganizationByPageLayout({
   render: ({
     role,
     organization,
+    isGlobalAdmin,
   }: {
     role: OrganizationRole;
     organization: Organization;
+    isGlobalAdmin: boolean;
   }) => JSX.Element;
 }) {
   const { id } = await params;
@@ -33,7 +35,7 @@ export async function OrganizationByPageLayout({
   const role = user.is_admin ? 'owner' : user.role;
   return (
     <OrganizationTrialWrapper organizationId={organization.id}>
-      {render({ role, organization })}
+      {render({ role, organization, isGlobalAdmin: user.is_admin })}
     </OrganizationTrialWrapper>
   );
 }

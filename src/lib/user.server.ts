@@ -719,16 +719,7 @@ export async function getUserFromAuthOrRedirect(
 ): Promise<User> {
   const { user } = await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true });
   if (!user) {
-    let url = loggedOutRedirectUrl;
-    if (!url.includes('callbackPath')) {
-      const headersList = await headers();
-      const pathname = headersList.get('x-pathname');
-      if (pathname && pathname !== '/') {
-        const separator = url.includes('?') ? '&' : '?';
-        url = `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
-      }
-    }
-    redirect(url);
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
   if (user.blocked_reason) {
     redirect('/account-blocked');
@@ -737,12 +728,18 @@ export async function getUserFromAuthOrRedirect(
 }
 
 export async function signInUrlWithCallbackPath(): Promise<string> {
+  return appendCallbackPath('/users/sign_in');
+}
+
+async function appendCallbackPath(url: string): Promise<string> {
+  if (url.includes('callbackPath')) return url;
   const headersList = await headers();
   const pathname = headersList.get('x-pathname');
   if (pathname && pathname !== '/') {
-    return `/users/sign_in?callbackPath=${encodeURIComponent(pathname)}`;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
   }
-  return '/users/sign_in';
+  return url;
 }
 
 function authError(status: number, error: string, kiloUserId: string) {

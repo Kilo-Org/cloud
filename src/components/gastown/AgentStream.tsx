@@ -34,6 +34,10 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
   useEffect(() => {
     if (!ticketQuery.data?.url) return;
 
+    // Reset state when switching agents or reconnecting
+    setEvents([]);
+    eventIdRef.current = 0;
+
     const url = new URL(ticketQuery.data.url);
     if (ticketQuery.data.ticket) {
       url.searchParams.set('ticket', ticketQuery.data.ticket);
@@ -47,9 +51,10 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
       setError(null);
     };
 
+    const MAX_EVENTS = 500;
     es.onmessage = e => {
       setEvents(prev => [
-        ...prev,
+        ...prev.slice(-MAX_EVENTS + 1),
         {
           id: eventIdRef.current++,
           type: 'message',

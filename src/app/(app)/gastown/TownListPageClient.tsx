@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';

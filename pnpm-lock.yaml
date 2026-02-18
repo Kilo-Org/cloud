@@ -886,28 +886,6 @@ importers:
         specifier: ^4.61.0
         version: 4.61.1(@cloudflare/workers-types@4.20260130.0)
 
-  cloudflare-gastown/plugin:
-    dependencies:
-      '@opencode-ai/plugin':
-        specifier: ^1.1.64
-        version: 1.1.64
-      '@opencode-ai/sdk':
-        specifier: ^1.1.64
-        version: 1.1.64
-      zod:
-        specifier: ^4.3.5
-        version: 4.3.6
-    devDependencies:
-      '@types/node':
-        specifier: ^22
-        version: 22.19.1
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1)
-
   cloudflare-git-token-service:
     dependencies:
       '@octokit/auth-app':
@@ -3394,9 +3372,6 @@ packages:
 
   '@octokit/types@16.0.0':
     resolution: {integrity: sha512-sKq+9r1Mm4efXW1FCk7hFSeJo4QKreL/tTbR0rz/qx/r1Oa2VV83LTA/H/MuCOX7uCIJmQVRKBcbmWoySjAnSg==}
-
-  '@opencode-ai/plugin@1.1.64':
-    resolution: {integrity: sha512-3UAChQQf9L2uZPxGLgn9dFS7d9gtMeW1VEKPWfRV16ZgraaBT0bxjGqt4vc9Ne8mZgntAe/qpBfqY4BSpfZQbA==}
 
   '@opencode-ai/sdk@1.1.64':
     resolution: {integrity: sha512-g+bZGx/86JlRTKyPWsD1oFu1SoENIHeKK4LhzWWFToPv4tpN3MSLVGSUsoTSi2XqSd9JzkfPBHPdTeFvqcbzMA==}
@@ -12192,9 +12167,6 @@ packages:
   zod@4.1.13:
     resolution: {integrity: sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig==}
 
-  zod@4.1.8:
-    resolution: {integrity: sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ==}
-
   zod@4.3.4:
     resolution: {integrity: sha512-Zw/uYiiyF6pUT1qmKbZziChgNPRu+ZRneAsMUDU6IwmXdWt5JwcUfy2bvLOCUtz5UniaN/Zx5aFttZYbYc7O/A==}
 
@@ -15060,12 +15032,8 @@ snapshots:
     dependencies:
       '@octokit/openapi-types': 27.0.0
 
-  '@opencode-ai/plugin@1.1.64':
-    dependencies:
-      '@opencode-ai/sdk': 1.1.64
-      zod: 4.1.8
-
-  '@opencode-ai/sdk@1.1.64': {}
+  '@opencode-ai/sdk@1.1.64':
+    optional: true
 
   '@opentelemetry/api-logs@0.208.0':
     dependencies:
@@ -26269,8 +26237,6 @@ snapshots:
   zod@4.1.12: {}
 
   zod@4.1.13: {}
-
-  zod@4.1.8: {}
 
   zod@4.3.4: {}
 

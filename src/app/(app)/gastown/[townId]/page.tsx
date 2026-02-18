@@ -8,13 +8,12 @@ export default async function TownOverviewPage({
 }: {
   params: Promise<{ townId: string }>;
 }) {
-  await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/gastown');
+  const { townId } = await params;
+  await getUserFromAuthOrRedirect(`/users/sign_in?callbackPath=/gastown/${townId}`);
 
   if (!ENABLE_GASTOWN_FEATURE) {
     return notFound();
   }
-
-  const { townId } = await params;
 
   return <TownOverviewPageClient townId={townId} />;
 }

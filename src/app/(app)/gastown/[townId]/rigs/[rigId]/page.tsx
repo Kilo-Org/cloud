@@ -8,13 +8,12 @@ export default async function RigDetailPage({
 }: {
   params: Promise<{ townId: string; rigId: string }>;
 }) {
-  await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/gastown');
+  const { townId, rigId } = await params;
+  await getUserFromAuthOrRedirect(`/users/sign_in?callbackPath=/gastown/${townId}/rigs/${rigId}`);
 
   if (!ENABLE_GASTOWN_FEATURE) {
     return notFound();
   }
-
-  const { townId, rigId } = await params;
 
   return <RigDetailPageClient townId={townId} rigId={rigId} />;
 }

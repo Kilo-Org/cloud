@@ -95,9 +95,11 @@ export async function listDeployments(owner: Owner) {
     .select({
       deployment: deployments,
       latestBuild: deployment_builds,
+      appBuilderProjectId: app_builder_projects.id,
     })
     .from(deployments)
     .leftJoin(deployment_builds, eq(deployments.last_build_id, deployment_builds.id))
+    .leftJoin(app_builder_projects, eq(app_builder_projects.deployment_id, deployments.id))
     .where(ownershipCondition)
     .orderBy(desc(deployments.created_at))
     .limit(100);
@@ -107,6 +109,7 @@ export async function listDeployments(owner: Owner) {
     data: userDeployments.map(row => ({
       deployment: row.deployment,
       latestBuild: row.latestBuild,
+      appBuilderProjectId: row.appBuilderProjectId,
     })),
   };
 }
@@ -124,9 +127,11 @@ export async function getDeployment(deploymentId: string, owner: Owner) {
     .select({
       deployment: deployments,
       latestBuild: deployment_builds,
+      appBuilderProjectId: app_builder_projects.id,
     })
     .from(deployments)
     .leftJoin(deployment_builds, eq(deployments.last_build_id, deployment_builds.id))
+    .leftJoin(app_builder_projects, eq(app_builder_projects.deployment_id, deployments.id))
     .where(and(eq(deployments.id, deploymentId), ownershipCondition))
     .limit(1);
 
@@ -141,6 +146,7 @@ export async function getDeployment(deploymentId: string, owner: Owner) {
     success: true,
     deployment: result[0].deployment,
     latestBuild: result[0].latestBuild,
+    appBuilderProjectId: result[0].appBuilderProjectId,
   };
 }
 

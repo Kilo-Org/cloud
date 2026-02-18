@@ -10,10 +10,11 @@ import { EnvironmentSettings } from './EnvironmentSettings';
 import { PasswordSettings } from './PasswordSettings';
 import { SlugEditor } from './SlugEditor';
 import { Button } from '@/components/Button';
-import { Loader2, AlertCircle, Trash2, RotateCw, XCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Trash2, RotateCw, XCircle, ArrowLeft } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { isDeploymentFinished, isDeploymentInProgress } from '@/lib/user-deployments/types';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 type DeploymentDetailsProps = {
   deploymentId: string;
@@ -23,7 +24,7 @@ type DeploymentDetailsProps = {
 
 export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentDetailsProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'environment' | 'password'>('overview');
-  const { queries, mutations } = useDeploymentQueries();
+  const { queries, mutations, organizationId } = useDeploymentQueries();
 
   // Check if password features are available (org-only)
   const hasPasswordFeature = !!mutations.setPassword;
@@ -41,6 +42,7 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
 
   const deployment = deploymentData?.deployment;
   const latestBuild = deploymentData?.latestBuild;
+  const appBuilderProjectId = deploymentData?.appBuilderProjectId ?? null;
   const deploymentStatus = latestBuild?.status || 'queued';
   const showActionButtons = isDeploymentFinished(deploymentStatus);
   const showCancelButton = latestBuild && isDeploymentInProgress(deploymentStatus);
@@ -102,6 +104,19 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
+          {appBuilderProjectId && (
+            <Link
+              href={
+                organizationId
+                  ? `/organizations/${organizationId}/app-builder/${appBuilderProjectId}`
+                  : `/app-builder/${appBuilderProjectId}`
+              }
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm transition-colors"
+            >
+              <ArrowLeft className="size-4" />
+              App Builder
+            </Link>
+          )}
           <DialogTitle>Deployment Details</DialogTitle>
         </DialogHeader>
 

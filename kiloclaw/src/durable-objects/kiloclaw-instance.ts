@@ -538,8 +538,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.flyMachineId) {
       const flyConfig = this.getFlyConfig();
       try {
-        await fly.stopMachine(flyConfig, this.flyMachineId);
-        await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+        await fly.stopMachineAndWait(flyConfig, this.flyMachineId);
       } catch (err) {
         console.error('[DO] Failed to stop machine:', err);
       }
@@ -670,8 +669,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     try {
       const flyConfig = this.getFlyConfig();
-      await fly.stopMachine(flyConfig, this.flyMachineId);
-      await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+      await fly.stopMachineAndWait(flyConfig, this.flyMachineId);
 
       const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
       const guest = guestFromSize(this.machineSize);
@@ -950,8 +948,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (!this.flyMachineId) return;
 
-    await fly.stopMachine(flyConfig, this.flyMachineId);
-    await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+    await fly.stopMachineAndWait(flyConfig, this.flyMachineId);
     await fly.updateMachine(flyConfig, this.flyMachineId, {
       ...machine.config,
       mounts: [{ volume: this.flyVolumeId, path: '/root' }],

@@ -259,12 +259,14 @@ Some OAuth providers restrict `redirect_uri` to be HTTPS, and others explicitly 
 
 ### Error - Duplicate Vercel Project Causing MaxDuration Errors on PRs
 
-GitHub PRs were showing Vercel build errors referencing `MaxDuration`, despite deployments working correctly on the Enterprise Vercel account.
+If GitHub PRs show Vercel build errors referencing `MaxDuration`, but deployments are working correctly on the Enterprise Vercel account, the likely cause is a duplicate Vercel project (e.g., “cloud”) existing in a separate account that is still connected to the same GitHub repository.
 
-The issue was caused by a duplicate Vercel project (named “cloud”) existing in a separate account, which was still connected to the GitHub repository. This resulted in GitHub receiving deployment signals from both projects.
+When this happens, GitHub receives deployment signals from both projects, which can trigger misleading `MaxDuration` errors.
 
 #### Fix
 
-- Identified and deleted the duplicate “cloud” project in the secondary Vercel account.
-- Confirmed that only the intended Enterprise Vercel project remained connected to the GitHub repository.
-- Verified that new PRs no longer triggered duplicate Vercel notifications or `MaxDuration` errors.
+- Check for duplicate Vercel projects across all team member accounts.
+- Identify any secondary or hobby-tier project connected to the same GitHub repository.
+- Delete or disconnect the duplicate project.
+- Confirm that only the intended Enterprise Vercel project remains connected.
+- Verify that new PRs no longer trigger duplicate Vercel notifications or `MaxDuration` errors.

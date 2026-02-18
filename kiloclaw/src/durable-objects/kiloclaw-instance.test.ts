@@ -38,6 +38,7 @@ vi.mock('../fly/client', async () => {
     getMachine: vi.fn(),
     startMachine: vi.fn(),
     stopMachine: vi.fn(),
+    stopMachineAndWait: vi.fn(),
     destroyMachine: vi.fn(),
     waitForState: vi.fn(),
     updateMachine: vi.fn(),
@@ -439,7 +440,7 @@ describe('status guards', () => {
 
     // Status unchanged
     expect(storage._store.get('status')).toBe('destroying');
-    expect(flyClient.stopMachine).not.toHaveBeenCalled();
+    expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
   });
 });
 

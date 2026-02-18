@@ -46,6 +46,7 @@ export type PlatformStatusResponse = {
   envVarCount: number;
   secretCount: number;
   channelCount: number;
+  flyAppName: string | null;
   flyMachineId: string | null;
   flyVolumeId: string | null;
   flyRegion: string | null;

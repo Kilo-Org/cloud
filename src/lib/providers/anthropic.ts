@@ -3,7 +3,7 @@ import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter
 import { normalizeToolCallIds } from '@/lib/tool-calling';
 import type OpenAI from 'openai';
 
-export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.5';
+export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.6';
 

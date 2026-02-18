@@ -37,7 +37,7 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
     );
   }
 
-  const basePath = organizationId ? `/organizations/${organizationId}/cloud-next` : '/cloud-next';
+  const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
 
   return (
     <div className="space-y-3">

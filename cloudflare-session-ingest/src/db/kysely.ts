@@ -14,6 +14,7 @@ types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
 export type CliSessionsV2Table = {
   session_id: string;
   kilo_user_id: string;
+  cloud_agent_session_id: Generated<string | null>;
   version: ColumnType<number, number | undefined, never>;
   public_id: Generated<string | null>;
   parent_session_id: Generated<string | null>;

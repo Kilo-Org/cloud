@@ -83,15 +83,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Cloud,
       url: '/cloud',
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Cloud Next',
-            icon: Cloud,
-            url: '/cloud-next',
-          },
-        ]
-      : []),
     {
       title: 'Sessions',
       icon: List,

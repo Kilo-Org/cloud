@@ -104,9 +104,22 @@ export async function internalApiMiddleware(c: Context<AppEnv>, next: Next) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  if (apiKey !== secret) {
+  if (!timingSafeEqual(apiKey, secret)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
   return next();
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+
+  if (aBytes.length !== bBytes.length) {
+    // Compare a against itself so the timing is constant regardless of length mismatch
+    crypto.subtle.timingSafeEqual(aBytes, aBytes);
+    return false;
+  }
+  return crypto.subtle.timingSafeEqual(aBytes, bBytes);
 }

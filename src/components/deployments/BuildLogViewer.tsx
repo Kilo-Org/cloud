@@ -115,7 +115,7 @@ export function BuildLogViewer({ deploymentId, buildId, status, className }: Bui
       <pre
         ref={scrollRef}
         className={cn(
-          'max-h-96 min-w-0 overflow-auto rounded-lg bg-gray-950 p-4 font-mono text-sm break-all whitespace-pre-wrap text-gray-300',
+          'max-h-96 w-0 min-w-full overflow-auto rounded-lg bg-gray-950 p-4 font-mono text-sm whitespace-pre-wrap text-gray-300',
           className
         )}
       >

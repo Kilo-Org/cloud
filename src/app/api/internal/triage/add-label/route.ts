@@ -14,6 +14,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getTriageTicketById } from '@/lib/auto-triage/db/triage-tickets';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
@@ -22,10 +23,10 @@ import { addIssueLabel } from '@/lib/auto-triage/github/add-label';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 
-type AddLabelRequest = {
-  ticketId: string;
-  labels: string[];
-};
+const addLabelRequestSchema = z.object({
+  ticketId: z.string().uuid(),
+  labels: z.array(z.string()).min(1),
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,16 +36,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body: AddLabelRequest = await req.json();
-    const { ticketId, labels } = body;
-
-    // Validate payload
-    if (!ticketId || !labels || labels.length === 0) {
+    const parsed = addLabelRequestSchema.safeParse(await req.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: ticketId, labels (non-empty array)' },
+        { error: 'Invalid request body', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+    const { ticketId, labels } = parsed.data;
 
     logExceptInTest('[add-label] Adding labels to issue', { ticketId, labels });
 

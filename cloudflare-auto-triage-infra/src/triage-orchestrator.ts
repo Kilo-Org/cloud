@@ -80,12 +80,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
       // Step 1: Check for duplicates
       const duplicateResult = await this.checkDuplicates();
       if (duplicateResult.isDuplicate) {
-        const labels = ['kilo-triaged', 'kilo-duplicate'];
-        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
-          ticketId: this.state.ticketId,
-          labels,
-        });
-        await this.applyLabels(labels);
+        await this.buildAndApplyLabels(['kilo-triaged', 'kilo-duplicate']);
         await this.closeDuplicate(duplicateResult);
         return;
       }
@@ -95,35 +90,16 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
       // Step 3: Take action based on classification
       if (classification.classification === 'question') {
-        const labels = ['kilo-triaged', ...classification.selectedLabels];
-        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
-          ticketId: this.state.ticketId,
-          labels,
-        });
-        await this.applyLabels(labels);
+        await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
         await this.answerQuestion(classification);
       } else if (classification.classification === 'unclear') {
-        const labels = ['kilo-triaged', ...classification.selectedLabels];
-        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
-          ticketId: this.state.ticketId,
-          labels,
-        });
-        await this.applyLabels(labels);
+        await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
         await this.requestClarification(classification);
       } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
-        // Apply labels and trigger Auto Fix workflow
-        console.log('[auto-triage:labels] selectedLabels from AI classification', {
-          ticketId: this.state.ticketId,
-          selectedLabels: classification.selectedLabels,
-        });
-        const labels = [
-          ...new Set(['kilo-triaged', 'kilo-auto-fix', ...classification.selectedLabels]),
-        ];
-        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
-          ticketId: this.state.ticketId,
-          labels,
-        });
-        await this.applyLabels(labels);
+        await this.buildAndApplyLabels(
+          ['kilo-triaged', 'kilo-auto-fix'],
+          classification.selectedLabels
+        );
         await this.updateStatus('actioned', {
           classification: classification.classification,
           confidence: classification.confidence,
@@ -131,12 +107,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
           relatedFiles: classification.relatedFiles,
         });
       } else {
-        const labels = ['kilo-triaged', ...classification.selectedLabels];
-        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
-          ticketId: this.state.ticketId,
-          labels,
-        });
-        await this.applyLabels(labels);
+        await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
         await this.requestClarification(classification);
       }
     } catch (error) {
@@ -437,15 +408,26 @@ export class TriageOrchestrator extends DurableObject<Env> {
   }
 
   /**
+   * Deduplicate, log, and apply a set of labels to the issue.
+   * Fixed labels (e.g. kilo-triaged) come first; AI-selected labels are appended.
+   */
+  private async buildAndApplyLabels(
+    fixedLabels: string[],
+    selectedLabels: string[] = []
+  ): Promise<void> {
+    const labels = [...new Set([...fixedLabels, ...selectedLabels])];
+    console.log('[auto-triage:labels] Applying labels', {
+      ticketId: this.state.ticketId,
+      labels,
+    });
+    await this.applyLabels(labels);
+  }
+
+  /**
    * Apply action-tracking and content labels to the issue
    */
   private async applyLabels(labels: string[]): Promise<void> {
     try {
-      console.log('[TriageOrchestrator] Applying labels', {
-        ticketId: this.state.ticketId,
-        labels,
-      });
-
       // Call Next.js API to add labels to the issue
       const addLabelResponse = await fetch(`${this.env.API_URL}/api/internal/triage/add-label`, {
         method: 'POST',

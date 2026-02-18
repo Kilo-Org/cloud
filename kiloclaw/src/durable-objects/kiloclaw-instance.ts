@@ -570,7 +570,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     let pairing = empty;
     try {
-      const jsonMatch = result.stdout.match(/\{[\s\S]*\}/);
+      const jsonMatch = result.stdout.match(/\{"requests"[\s\S]*\}/);
       if (jsonMatch) {
         const data = JSON.parse(jsonMatch[0]);
         pairing = {
@@ -624,7 +624,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       15
     );
 
-    const success = result.exit_code === 0 || result.stdout.toLowerCase().includes('approved');
+    const success = result.exit_code === 0;
 
     if (success) {
       const cacheKey = this.pairingCacheKey();

@@ -2,7 +2,7 @@
 // List pending pairing requests across all configured channels.
 // Called via Fly exec from the worker. Outputs a single JSON blob:
 // { "requests": [{ "code": "...", "id": "...", "channel": "telegram", ... }] }
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 
 // Fly exec sets HOME=/ — hardcode to /root where openclaw config and pairing store live
@@ -25,13 +25,13 @@ if (ch.slack?.enabled && (ch.slack?.botToken || ch.slack?.appToken)) channels.pu
 const allRequests = [];
 for (const channel of channels) {
   try {
-    const output = execSync(`openclaw pairing list ${channel} --json`, {
+    const output = execFileSync('openclaw', ['pairing', 'list', channel, '--json'], {
       encoding: 'utf8',
       timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, HOME: '/root' },
     });
-    const match = output.match(/\{[\s\S]*\}/);
+    const match = output.match(/\{"requests"[\s\S]*\}/);
     if (match) {
       const data = JSON.parse(match[0]);
       for (const req of data.requests || []) {

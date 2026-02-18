@@ -4,7 +4,7 @@
  * Constants used throughout the code review system.
  */
 
-import { getActiveReviewPromotionModel } from '@/lib/models';
+import { getActiveReviewFreeModel } from '@/lib/models';
 
 // ============================================================================
 // Review Configuration
@@ -21,7 +21,7 @@ const BASE_CODE_REVIEW_MODEL = 'anthropic/claude-sonnet-4.5';
  * If a review-only promotional model is currently active, it takes precedence.
  */
 export function getDefaultCodeReviewModel(): string {
-  const promoModel = getActiveReviewPromotionModel();
+  const promoModel = getActiveReviewFreeModel();
   return promoModel?.public_id ?? BASE_CODE_REVIEW_MODEL;
 }
 

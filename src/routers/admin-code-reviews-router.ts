@@ -376,8 +376,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
   // Sonnet 4.6 free review promotion tracking
   getReviewPromotionStats: adminProcedure.query(async () => {
     const promoModel = sonnet_46_free_review_model;
-    const promoStart = promoModel.promotion_start ?? '2026-02-18T00:00:00Z';
-    const promoEnd = promoModel.promotion_end ?? '2026-02-25T00:00:00Z';
+    const promoStart = '2026-02-18T11:00:00Z';
+    const promoEnd = '2026-02-25T11:00:00Z';
     // last_model stores the public_id (what the client sends), not internal_id
     const promoModelId = promoModel.public_id;
 

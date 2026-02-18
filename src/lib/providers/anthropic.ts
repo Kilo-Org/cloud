@@ -23,20 +23,21 @@ export const opus_46_free_slackbot_model = {
 
 export const SONNET_46_REVIEW_PROMO_MODEL_ID = 'anthropic/claude-sonnet-4.6:review';
 
+// Promotion window: 2026-02-18 06:00 ET → 2026-02-25 06:00 ET
+const SONNET_46_REVIEW_PROMO_END = '2026-02-25T11:00:00Z';
+
 export const sonnet_46_free_review_model = {
   public_id: SONNET_46_REVIEW_PROMO_MODEL_ID,
   display_name: 'Anthropic: Claude Sonnet 4.6 (Free for Code Reviewer)',
-  description: 'Claude Sonnet 4.6 — free for one week in Code Reviewer (review mode)',
+  description: 'Claude Sonnet 4.6 — free for one week in Code Reviewer',
   context_length: 1_000_000,
-  max_completion_tokens: 16384,
-  is_enabled: true,
+  max_completion_tokens: 128000,
+  is_enabled: new Date() < new Date(SONNET_46_REVIEW_PROMO_END),
   flags: ['reasoning', 'prompt_cache', 'vision'],
   gateway: 'openrouter',
   internal_id: 'anthropic/claude-sonnet-4.6',
-  inference_providers: ['anthropic'],
+  inference_providers: [],
   allowed_uses: ['review'],
-  promotion_start: '2026-02-18T11:00:00Z', // 6 AM East Coast
-  promotion_end: '2026-02-25T11:00:00Z',
 } satisfies KiloFreeModel;
 
 const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;

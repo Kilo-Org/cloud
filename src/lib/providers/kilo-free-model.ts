@@ -17,10 +17,6 @@ export type KiloFreeModel = {
   internal_id: string;
   inference_providers: OpenRouterInferenceProviderId[];
   allowed_uses?: KiloFreeModelUse[];
-  /** Promotion start date (ISO 8601). If set, the model is only active after this date. */
-  promotion_start?: string;
-  /** Promotion end date (ISO 8601). If set, the model is disabled after this date. */
-  promotion_end?: string;
 };
 
 export function convertFromKiloModel(model: KiloFreeModel) {

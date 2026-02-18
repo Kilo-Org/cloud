@@ -90,26 +90,7 @@ export function isDeadFreeModel(model: string): boolean {
   return !!kiloFreeModels.find(m => m.public_id === model && !m.is_enabled);
 }
 
-/** Returns true if the model has allowed_uses including 'review' and is within its promotion window. */
-export function isReviewPromotionActive(model: string, now = new Date()): boolean {
-  const freeModel = kiloFreeModels.find(
-    m => m.public_id === model && m.allowed_uses?.includes('review') && m.is_enabled
-  );
-  if (!freeModel) return false;
-  if (freeModel.promotion_start && now < new Date(freeModel.promotion_start)) return false;
-  if (freeModel.promotion_end && now >= new Date(freeModel.promotion_end)) return false;
-  return true;
-}
-
-/** Returns the first review-use model whose promotion window is currently active, or null. */
-export function getActiveReviewPromotionModel(now = new Date()): KiloFreeModel | null {
-  return (
-    kiloFreeModels.find(
-      m =>
-        m.allowed_uses?.includes('review') &&
-        m.is_enabled &&
-        (!m.promotion_start || now >= new Date(m.promotion_start)) &&
-        (!m.promotion_end || now < new Date(m.promotion_end))
-    ) ?? null
-  );
+/** Returns the first enabled review-use free model, or null. */
+export function getActiveReviewFreeModel(): KiloFreeModel | null {
+  return kiloFreeModels.find(m => m.allowed_uses?.includes('review') && m.is_enabled) ?? null;
 }

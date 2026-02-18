@@ -14,7 +14,6 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   kiloFreeModels,
-  isReviewPromotionActive,
   isRateLimitedModel,
 } from '@/lib/models';
 import {
@@ -246,17 +245,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
-  const modelAllowedUses = kiloFreeModels.find(
-    m => m.public_id === originalModelIdLowerCased
-  )?.allowed_uses;
+  const freeModel = kiloFreeModels.find(m => m.public_id === originalModelIdLowerCased);
 
-  if (modelAllowedUses?.includes('slackbot') && !internalApiUse) {
+  if (freeModel?.allowed_uses?.includes('slackbot') && !internalApiUse) {
     return modelDoesNotExistResponse();
   }
-  if (modelAllowedUses?.includes('review')) {
-    if (!internalApiUse || !isReviewPromotionActive(originalModelIdLowerCased)) {
-      return modelDoesNotExistResponse();
-    }
+  if (freeModel?.allowed_uses?.includes('review') && !internalApiUse) {
+    return modelDoesNotExistResponse();
   }
 
   // Extract properties for usage context

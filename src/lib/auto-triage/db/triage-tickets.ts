@@ -374,12 +374,15 @@ export async function resetTriageTicketForRetry(ticketId: string): Promise<void>
 }
 
 /**
- * Interrupts a pending or analyzing triage ticket
- * Sets status to 'failed' with a manual interrupt message
+ * Interrupts a pending or analyzing triage ticket.
+ * Uses a status guard in the WHERE clause to avoid overwriting a ticket
+ * that was concurrently completed by the orchestrator (TOCTOU protection).
+ * Returns true if the ticket was actually interrupted, false if it had
+ * already moved to a terminal state.
  */
-export async function interruptTriageTicket(ticketId: string): Promise<void> {
+export async function interruptTriageTicket(ticketId: string): Promise<boolean> {
   try {
-    await db
+    const result = await db
       .update(auto_triage_tickets)
       .set({
         status: 'failed',
@@ -387,7 +390,15 @@ export async function interruptTriageTicket(ticketId: string): Promise<void> {
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .where(eq(auto_triage_tickets.id, ticketId));
+      .where(
+        and(
+          eq(auto_triage_tickets.id, ticketId),
+          or(eq(auto_triage_tickets.status, 'pending'), eq(auto_triage_tickets.status, 'analyzing'))
+        )
+      )
+      .returning({ id: auto_triage_tickets.id });
+
+    return result.length > 0;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'interruptTriageTicket' },

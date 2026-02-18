@@ -432,8 +432,16 @@ export function createAutoTriageRouter({
             });
           }
 
-          // 4. Interrupt the ticket
-          await interruptTriageTicket(input.ticketId);
+          // 4. Interrupt the ticket (status-guarded to avoid TOCTOU race)
+          const wasInterrupted = await interruptTriageTicket(input.ticketId);
+
+          if (!wasInterrupted) {
+            // Ticket moved to a terminal state between our check and the update
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'Ticket has already completed and cannot be interrupted',
+            });
+          }
 
           // 5. Dispatch pending tickets to free the concurrency slot
           await tryDispatchPendingTickets(owner);

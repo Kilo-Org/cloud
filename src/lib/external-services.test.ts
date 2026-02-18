@@ -229,7 +229,7 @@ describe('external-services', () => {
       expect(safeDeleteStripeCustomer).toHaveBeenCalled();
     });
 
-    it('should call all external services in correct order', async () => {
+    it('should call all external services concurrently', async () => {
       const { safeDeleteStripeCustomer } = await import('./stripe-client');
 
       await deleteUserFromExternalServices(testUser);

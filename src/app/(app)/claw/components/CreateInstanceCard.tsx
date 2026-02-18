@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Eye, EyeOff, Plus } from 'lucide-react';
+import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
@@ -14,6 +15,7 @@ import { Label } from '@/components/ui/label';
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 export function CreateInstanceCard({ mutations }: { mutations: ClawMutations }) {
+  const posthog = usePostHog();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
   const [selectedModel, setSelectedModel] = useState('');
   const [telegramBotToken, setTelegramBotToken] = useState('');
@@ -25,6 +27,10 @@ export function CreateInstanceCard({ mutations }: { mutations: ClawMutations }) 
   );
 
   function handleCreate() {
+    posthog?.capture('claw_create_instance_clicked', {
+      selected_model: selectedModel || null,
+    });
+
     if (isLoadingModels) {
       toast.error('Models are still loading; try again in a moment.');
       return;

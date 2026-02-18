@@ -4,13 +4,17 @@ import { Suspense } from 'react';
 import { CloudAgentProvider } from '@/components/cloud-agent-next/CloudAgentProvider';
 import { CloudChatPage } from '@/components/cloud-agent-next/CloudChatPage';
 
-export function CloudChatPageWrapper() {
+type CloudChatPageWrapperNextProps = {
+  organizationId: string;
+};
+
+export function CloudChatPageWrapperNext({ organizationId }: CloudChatPageWrapperNextProps) {
   return (
     <CloudAgentProvider>
       <Suspense
         fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}
       >
-        <CloudChatPage />
+        <CloudChatPage organizationId={organizationId} />
       </Suspense>
     </CloudAgentProvider>
   );

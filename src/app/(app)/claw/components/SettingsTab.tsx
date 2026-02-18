@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Eye, EyeOff, Save, Square, X } from 'lucide-react';
+import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -23,6 +24,7 @@ export function SettingsTab({
   status: KiloClawDashboardStatus;
   mutations: ClawMutations;
 }) {
+  const posthog = usePostHog();
   const { data: config } = useKiloClawConfig();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
   const [confirmDestroy, setConfirmDestroy] = useState(false);
@@ -82,6 +84,11 @@ export function SettingsTab({
   }
 
   function handleSave() {
+    posthog?.capture('claw_save_config_clicked', {
+      selected_model: selectedModel || null,
+      instance_status: status.status,
+    });
+
     if (isLoadingModels) {
       toast.error('Models are still loading; try again in a moment.');
       return;
@@ -232,12 +239,16 @@ export function SettingsTab({
                 variant="outline"
                 size="sm"
                 disabled={!isRunning || mutations.stop.isPending || isDestroying}
-                onClick={() =>
+                onClick={() => {
+                  posthog?.capture('claw_stop_instance_clicked', {
+                    instance_status: status.status,
+                    source: 'settings_danger_zone',
+                  });
                   mutations.stop.mutate(undefined, {
                     onSuccess: () => toast.success('Instance stopped'),
                     onError: err => toast.error(err.message),
-                  })
-                }
+                  });
+                }}
               >
                 <Square className="h-4 w-4" />
                 Stop Instance
@@ -248,7 +259,12 @@ export function SettingsTab({
                   variant="destructive"
                   size="sm"
                   disabled={isDestroying || mutations.destroy.isPending}
-                  onClick={() => setConfirmDestroy(true)}
+                  onClick={() => {
+                    posthog?.capture('claw_destroy_instance_clicked', {
+                      instance_status: status.status,
+                    });
+                    setConfirmDestroy(true);
+                  }}
                 >
                   {isDestroying ? 'Destroying...' : 'Destroy Instance'}
                 </Button>
@@ -258,19 +274,29 @@ export function SettingsTab({
                     variant="destructive"
                     size="sm"
                     disabled={isDestroying || mutations.destroy.isPending}
-                    onClick={() =>
+                    onClick={() => {
+                      posthog?.capture('claw_destroy_instance_confirmed', {
+                        instance_status: status.status,
+                      });
                       mutations.destroy.mutate(undefined, {
                         onSuccess: () => {
                           toast.success('Instance destroyed');
                           setConfirmDestroy(false);
                         },
                         onError: err => toast.error(err.message),
-                      })
-                    }
+                      });
+                    }}
                   >
                     {isDestroying ? 'Destroying...' : 'Yes, destroy'}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setConfirmDestroy(false)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      posthog?.capture('claw_destroy_instance_cancelled');
+                      setConfirmDestroy(false);
+                    }}
+                  >
                     Cancel
                   </Button>
                 </>

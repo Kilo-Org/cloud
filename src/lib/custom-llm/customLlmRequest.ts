@@ -574,6 +574,12 @@ function createModel(customLlm: CustomLlm) {
   throw new Error(`Unknown provider: ${customLlm.provider}`);
 }
 
+function debugLogChunks(chunks: unknown[], fileExtension: string) {
+  if (chunks.length > 0) {
+    debugSaveLog(chunks.map(chunk => JSON.stringify(chunk)).join('\n'), fileExtension);
+  }
+}
+
 export async function customLlmRequest(
   customLlm: CustomLlm,
   request: OpenRouterChatCompletionRequest
@@ -596,8 +602,8 @@ export async function customLlmRequest(
 
   const result = streamText({ model, ...commonParams });
 
-  debugSaveLog(JSON.stringify(request), 'request.gateway.json');
-  debugSaveLog(JSON.stringify((await result.request).body), 'request.native.json');
+  debugSaveLog(JSON.stringify(request, undefined, 2), 'request.gateway.json');
+  debugSaveLog(JSON.stringify((await result.request).body, undefined, 2), 'request.native.json');
 
   const convertStreamPartToChunk = createStreamPartConverter();
 
@@ -637,23 +643,11 @@ export async function customLlmRequest(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
       } finally {
         controller.close();
+        debugLogChunks(debugGatewayChunks, 'response.gateway.jsonl');
+        debugLogChunks(debugNativeChunks, 'response.native.jsonl');
       }
     },
   });
-
-  if (debugGatewayChunks.length > 0) {
-    debugSaveLog(
-      debugGatewayChunks.map(chunk => JSON.stringify(chunk)).join('\n'),
-      'response.gateway.jsonl'
-    );
-  }
-
-  if (debugNativeChunks.length > 0) {
-    debugSaveLog(
-      debugNativeChunks.map(chunk => JSON.stringify(chunk)).join('\n'),
-      'response.native.jsonl'
-    );
-  }
 
   return new NextResponse(stream, {
     status: 200,

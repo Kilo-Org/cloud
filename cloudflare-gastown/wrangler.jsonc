@@ -6,13 +6,20 @@
   "compatibility_flags": ["nodejs_compat"],
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
+  "routes": [
+    {
+      "pattern": "gastown.kiloapps.io/*",
+      "zone_name": "kiloapps.io",
+    },
+  ],
+  "workers_dev": false,
 
   "containers": [
     {
       "class_name": "TownContainerDO",
       "image": "./container/Dockerfile",
       "instance_type": "standard-4",
-      "max_instances": 50,
+      "max_instances": 20,
     },
   ],
 

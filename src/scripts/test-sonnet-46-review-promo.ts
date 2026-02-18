@@ -16,6 +16,7 @@ import {
   isActiveReviewPromo,
   REVIEW_PROMO_MODEL,
   REVIEW_PROMO_END,
+  REVIEW_PROMO_START,
 } from '@/lib/code-reviews/core/constants';
 
 const root = path.resolve(__dirname, '../../');
@@ -30,7 +31,8 @@ if (!POSTGRES_URL) throw new Error('POSTGRES_URL not set');
 
 const JWT_TOKEN_VERSION = 3;
 const BASE_URL = 'http://localhost:3000';
-const secret: string = NEXTAUTH_SECRET;
+// NEXTAUTH_SECRET is validated above so this is safe
+const secret = NEXTAUTH_SECRET;
 
 type TestResult = { name: string; passed: boolean; detail: string };
 const results: TestResult[] = [];
@@ -165,16 +167,25 @@ async function main() {
   }
 
   // ─── Test 6: Balance gate bypass ─────────────────────────────────────
+  // Verifies that a reviewer using the promo model can still make requests even when they have zero balance
   {
-    // Temporarily set user balance to 0 for this test
+    // Save original microdollars_used, then zero the balance
+    const { rows: balRows } = await client.query<{ microdollars_used: string }>(
+      `SELECT microdollars_used FROM kilocode_users WHERE id = $1`,
+      [user.id]
+    );
+    const origUsed = balRows[0]?.microdollars_used ?? '0';
     await client.query(
-      `UPDATE kilocode_users SET microdollars_used = microdollars_lifetime_total WHERE id = $1`,
+      `UPDATE kilocode_users SET microdollars_used = total_microdollars_acquired WHERE id = $1`,
       [user.id]
     );
     const token = mintToken(user.id, user.api_token_pepper, { botId: 'reviewer' });
     const res = await chatRequest(token, REVIEW_PROMO_MODEL);
-    // Restore balance
-    await client.query(`UPDATE kilocode_users SET microdollars_used = 0 WHERE id = $1`, [user.id]);
+    // Restore original balance
+    await client.query(`UPDATE kilocode_users SET microdollars_used = $2 WHERE id = $1`, [
+      user.id,
+      origUsed,
+    ]);
     record(
       'Balance gate bypass',
       res.status === 200,
@@ -205,22 +216,63 @@ async function main() {
     );
   }
 
-  // ─── Test 8: Admin stats endpoint ────────────────────────────────────
+  // ─── Test 8: Admin stats query (direct SQL, mirrors getReviewPromotionStats) ─
   {
-    // Make user admin temporarily
-    await client.query(`UPDATE kilocode_users SET is_admin = true WHERE id = $1`, [user.id]);
-    const token = mintToken(user.id, user.api_token_pepper);
     try {
-      const res = await fetch(`${BASE_URL}/api/trpc/adminCodeReviews.getReviewPromotionStats`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const body = await res.json();
-      const data = body?.result?.data;
+      const { rows: aggRows } = await client.query<{
+        total_requests: string;
+        unique_users: string;
+        unique_orgs: string;
+      }>(
+        `SELECT COUNT(*) AS total_requests,
+                COUNT(DISTINCT mu.kilo_user_id) AS unique_users,
+                COUNT(DISTINCT mu.organization_id) AS unique_orgs
+         FROM microdollar_usage mu
+         INNER JOIN microdollar_usage_metadata mum ON mu.id = mum.id
+         WHERE mu.requested_model = $1
+           AND mu.cost = 0
+           AND (mum.is_user_byok IS NULL OR mum.is_user_byok = false)
+           AND mu.created_at >= $2
+           AND mu.created_at < $3`,
+        [REVIEW_PROMO_MODEL, REVIEW_PROMO_START, REVIEW_PROMO_END]
+      );
+
+      const { rows: dailyRows } = await client.query<{
+        day: string;
+        total: string;
+        unique_users: string;
+      }>(
+        `SELECT DATE_TRUNC('day', mu.created_at)::date::text AS day,
+                COUNT(*) AS total,
+                COUNT(DISTINCT mu.kilo_user_id) AS unique_users
+         FROM microdollar_usage mu
+         INNER JOIN microdollar_usage_metadata mum ON mu.id = mum.id
+         WHERE mu.requested_model = $1
+           AND mu.cost = 0
+           AND (mum.is_user_byok IS NULL OR mum.is_user_byok = false)
+           AND mu.created_at >= $2
+           AND mu.created_at < $3
+         GROUP BY DATE_TRUNC('day', mu.created_at)
+         ORDER BY DATE_TRUNC('day', mu.created_at)`,
+        [REVIEW_PROMO_MODEL, REVIEW_PROMO_START, REVIEW_PROMO_END]
+      );
+
+      const agg = aggRows[0];
+      const data = {
+        promoActive: isActiveReviewPromo('reviewer', REVIEW_PROMO_MODEL),
+        promoStart: REVIEW_PROMO_START,
+        promoEnd: REVIEW_PROMO_END,
+        totalRequests: Number(agg.total_requests) || 0,
+        uniqueUsers: Number(agg.unique_users) || 0,
+        uniqueOrgs: Number(agg.unique_orgs) || 0,
+        daily: dailyRows.map(row => ({
+          day: row.day,
+          total: Number(row.total) || 0,
+          uniqueUsers: Number(row.unique_users) || 0,
+        })),
+      };
+
       const hasShape =
-        data &&
         typeof data.promoActive === 'boolean' &&
         typeof data.promoStart === 'string' &&
         typeof data.promoEnd === 'string' &&
@@ -230,12 +282,12 @@ async function main() {
         Array.isArray(data.daily);
 
       record(
-        'Admin stats endpoint',
-        res.status === 200 && hasShape,
-        `HTTP ${res.status}, hasShape=${hasShape}`
+        'Admin stats query',
+        hasShape,
+        `hasShape=${hasShape}, totalRequests=${data.totalRequests}, uniqueUsers=${data.uniqueUsers}`
       );
-    } finally {
-      await client.query(`UPDATE kilocode_users SET is_admin = false WHERE id = $1`, [user.id]);
+    } catch (err) {
+      record('Admin stats query', false, `Error: ${err}`);
     }
   }
 

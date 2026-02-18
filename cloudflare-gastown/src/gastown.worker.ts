@@ -37,6 +37,14 @@ import {
   handleContainerStreamTicket,
   handleContainerHealth,
 } from './handlers/town-container.handler';
+import {
+  handleCreateTown,
+  handleListTowns,
+  handleGetTown,
+  handleCreateRig,
+  handleGetRig,
+  handleListRigs,
+} from './handlers/towns.handler';
 
 export { RigDO } from './dos/Rig.do';
 export { TownDO } from './dos/Town.do';
@@ -117,6 +125,17 @@ app.post('/api/rigs/:rigId/review-queue', c => handleSubmitToReviewQueue(c, c.re
 // ── Escalations ─────────────────────────────────────────────────────────
 
 app.post('/api/rigs/:rigId/escalations', c => handleCreateEscalation(c, c.req.param()));
+
+// ── Towns & Rigs ────────────────────────────────────────────────────────
+// Town DO instances are keyed by owner_user_id. The userId path param routes
+// to the correct DO instance so each user's towns are isolated.
+
+app.post('/api/users/:userId/towns', c => handleCreateTown(c, c.req.param()));
+app.get('/api/users/:userId/towns', c => handleListTowns(c, c.req.param()));
+app.get('/api/users/:userId/towns/:townId', c => handleGetTown(c, c.req.param()));
+app.post('/api/users/:userId/rigs', c => handleCreateRig(c, c.req.param()));
+app.get('/api/users/:userId/rigs/:rigId', c => handleGetRig(c, c.req.param()));
+app.get('/api/users/:userId/towns/:townId/rigs', c => handleListRigs(c, c.req.param()));
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().

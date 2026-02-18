@@ -8,6 +8,7 @@ import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { withDORetry } from './util/do-retry';
 export { SessionIngestDO } from './dos/SessionIngestDO';
 export { SessionAccessCacheDO } from './dos/SessionAccessCacheDO';
+export { SessionIngestRPC } from './session-ingest-rpc';
 
 const app = new Hono<{
   Bindings: Env;

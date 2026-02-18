@@ -1,7 +1,7 @@
 'use client';
 
-import { Terminal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { AccessCodeActions } from './AccessCodeActions';
 import { CLAW_STATUS_BADGE, type ClawState } from './claw.types';
 
@@ -23,7 +23,7 @@ export function ClawHeader({
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <div className="bg-secondary flex h-10 w-10 items-center justify-center rounded-lg">
-          <Terminal className="text-muted-foreground h-5 w-5" />
+          <KiloCrabIcon className="text-muted-foreground h-5 w-5" />
         </div>
         <div>
           <div className="flex items-center gap-2.5">

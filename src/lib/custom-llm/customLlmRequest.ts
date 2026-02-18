@@ -27,13 +27,14 @@ import {
   extractFormat,
   type AiSdkReasoningPart,
 } from './reasoning-provider-metadata';
-import type { ChatCompletionChunk } from './schemas';
+import type { ChatCompletionChunk, ChatCompletionChunkChoice } from './schemas';
 import type { CustomLlm } from '@/db/schema';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
 import type { XaiLanguageModelResponsesOptions } from '@ai-sdk/xai';
 import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
+import { ReasoningFormat } from '@/lib/custom-llm/format';
 
 function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage[] {
   const toolNameByCallId = new Map<string, string>();
@@ -624,14 +625,38 @@ function debugLogChunks(chunks: unknown[], fileExtension: string) {
   }
 }
 
+function reverseLegacyExtensionHack(messages: OpenRouterChatCompletionsInput) {
+  for (const msg of messages) {
+    if (msg.role === 'assistant') {
+      for (const rd of msg.reasoning_details ?? []) {
+        if (rd.format == ReasoningFormat.OpenAIResponsesV1_Obscured) {
+          rd.format = ReasoningFormat.OpenAIResponsesV1;
+        }
+      }
+    }
+  }
+}
+
+function applyLegacyExtensionHack(choice: ChatCompletionChunkChoice | undefined) {
+  for (const rd of choice?.delta?.reasoning_details ?? []) {
+    if (rd.format === ReasoningFormat.OpenAIResponsesV1) {
+      rd.format = ReasoningFormat.OpenAIResponsesV1_Obscured;
+    }
+  }
+}
+
 export async function customLlmRequest(
   customLlm: CustomLlm,
-  request: OpenRouterChatCompletionRequest
+  request: OpenRouterChatCompletionRequest,
+  isLegacyExtension: boolean
 ) {
-  const messages = convertMessages(request.messages as OpenRouterChatCompletionsInput);
+  const messages = request.messages as OpenRouterChatCompletionsInput;
+  if (isLegacyExtension) {
+    reverseLegacyExtensionHack(messages);
+  }
 
   const model = createModel(customLlm);
-  const commonParams = buildCommonParams(customLlm, messages, request);
+  const commonParams = buildCommonParams(customLlm, convertMessages(messages), request);
 
   const modelId = customLlm.public_id;
 
@@ -677,6 +702,9 @@ export async function customLlmRequest(
 
           const converted = convertStreamPartToChunk(chunk);
           if (converted) {
+            if (isLegacyExtension) {
+              applyLegacyExtensionHack((converted.choices as ChatCompletionChunkChoice[])[0]);
+            }
             if (inStreamDebugMode) {
               debugGatewayChunks.push(converted);
             }

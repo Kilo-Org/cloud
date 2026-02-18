@@ -286,7 +286,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Skip balance/org checks for anonymous users - they can only use free models
   const bypassAccessCheckForCustomLlm =
     !!customLlm && !!organizationId && customLlm.organization_ids.includes(organizationId);
-  if (!isAnonymousContext(user) && bypassAccessCheckForCustomLlm) {
+  if (!isAnonymousContext(user) && !bypassAccessCheckForCustomLlm) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
     if (

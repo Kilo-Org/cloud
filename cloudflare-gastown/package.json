@@ -20,6 +20,7 @@
   "dependencies": {
     "@cloudflare/containers": "^0.1.0",
     "hono": "^4.11.4",
+    "itty-time": "^1.0.6",
     "jsonwebtoken": "^9.0.3",
     "zod": "^4.3.5"
   },

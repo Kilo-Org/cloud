@@ -11,6 +11,7 @@ Cloud-first rewrite of gastown's core tenets as a Kilo platform feature. See `do
 - The container is the **execution runtime**: it receives commands from the DO, spawns Kilo CLI processes, and routes tool calls back to the DO
 - LLM calls route through the Kilo gateway (`KILO_API_URL`)
 - Watchdog/health monitoring uses DO alarms — the DO can independently verify container health and re-dispatch work if the container dies
+- The container uses **`kilo serve`** (Kilo's built-in HTTP server) instead of raw stdin/stdout process management — each agent is a session within a server instance, enabling structured messaging via HTTP API, real-time observability via SSE events, and clean session abort
 
 **Architecture overview:**
 
@@ -897,6 +898,64 @@ private armAlarmIfNeeded() {
   }
 }
 ```
+
+---
+
+### PR 6.5: Container — Adopt `kilo serve` for Agent Management
+
+**Status:** Next up. See `docs/gt/opencode-server-analysis.md` for the full analysis. Tracked as #305.
+
+**Goal:** Replace the container's stdin/stdout-based agent process management with Kilo's built-in HTTP server (`kilo serve`). Currently, the container spawns `kilo code --non-interactive` as fire-and-forget child processes and communicates via raw stdin pipes. This is fragile and provides no structured observability into agent activity.
+
+#### Architecture Change
+
+```
+Current:
+  Container Control Server (port 8080)
+    └── Bun.spawn('kilo code --non-interactive') × N agents
+        └── stdin/stdout pipes
+
+Proposed:
+  Container Control Server (port 8080)
+    └── kilo serve (port 4096+N) × M server instances (one per worktree)
+        └── HTTP API for session management
+        └── SSE for real-time events
+```
+
+Each agent becomes a **session** within a `kilo serve` instance rather than its own raw process. The control server becomes a thin proxy that:
+
+- Starts `kilo serve` instances (one per worktree/repo context) using `createOpencodeServer()` from `@kilocode/sdk`
+- Creates sessions for each agent via `POST /session`
+- Sends prompts via `POST /session/:id/message` or `POST /session/:id/prompt_async`
+- Subscribes to `/event` SSE streams for real-time observability (tool calls, completions, errors)
+- Forwards structured status to the Gastown worker API heartbeat
+- Uses `POST /session/:id/abort` for clean shutdown instead of SIGTERM
+
+#### Component Changes
+
+| Component                                 | Current                                           | After                                                             |
+| ----------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- |
+| `process-manager.ts`                      | Raw `Bun.spawn` child process management          | `kilo serve` instances via SDK, session-based agent tracking      |
+| `agent-runner.ts`                         | Builds CLI args for `kilo code --non-interactive` | Creates sessions on running server, sends initial prompt via HTTP |
+| `control-server.ts` `/agents/start`       | Spawns a process                                  | Creates a session on an existing (or new) server instance         |
+| `control-server.ts` `/agents/:id/message` | Writes to stdin pipe                              | `POST /session/:id/message`                                       |
+| `control-server.ts` `/agents/:id/status`  | Process lifecycle (pid, exit code)                | Session-level status with tool/message detail                     |
+| `heartbeat.ts`                            | Reports process alive/dead                        | Reports session status + active tool calls from SSE events        |
+
+#### What Stays the Same
+
+- Git clone/worktree management (`git-manager.ts`)
+- Container control server (port 8080) — same interface for TownContainer DO
+- Agent environment variable setup for gastown plugin config
+- Dockerfile — still needs `kilo` installed globally
+
+#### Key Benefits
+
+1. **Structured messaging** — HTTP API with typed request/response instead of raw stdin text
+2. **Real-time observability** — SSE event stream gives visibility into tool calls, file edits, and errors
+3. **Clean abort** — `POST /session/:id/abort` instead of SIGTERM
+4. **Session lifecycle** — Fork, revert, diff inspection, todo tracking via server API
+5. **SDK support** — `@kilocode/sdk` provides `createOpencodeServer()` for managed server lifecycle
 
 ---
 

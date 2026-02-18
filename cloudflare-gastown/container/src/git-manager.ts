@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { CloneOptions, WorktreeOptions } from './types';
 
@@ -103,6 +103,11 @@ export async function cloneRepo(options: CloneOptions): Promise<string> {
     await exec('git', ['fetch', '--all', '--prune'], dir);
     console.log(`Fetched latest for rig ${options.rigId}`);
     return dir;
+  }
+
+  // Clean up partial clones (directory exists but no .git) from prior crashes
+  if (await pathExists(dir)) {
+    await rm(dir, { recursive: true, force: true });
   }
 
   await mkdir(dir, { recursive: true });

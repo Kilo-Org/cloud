@@ -1,11 +1,10 @@
 import { Hono } from 'hono';
 import { resError } from './util/res.util';
 import { dashboardHtml } from './ui/dashboard.ui';
+import { withCloudflareAccess } from './middleware/cf-access.middleware';
 import {
   authMiddleware,
   agentOnlyMiddleware,
-  internalOnlyMiddleware,
-  LOCAL_DEV_SECRET,
   type AuthVariables,
 } from './middleware/auth.middleware';
 import {
@@ -51,20 +50,21 @@ export type GastownEnv = {
 
 const app = new Hono<GastownEnv>();
 
+// ── Cloudflare Access ───────────────────────────────────────────────────
+// Validate Cloudflare Access JWT for all requests; skip in development.
+
+app.use('*', async (c, next) =>
+  c.env.ENVIRONMENT === 'development'
+    ? next()
+    : withCloudflareAccess({
+        team: c.env.CF_ACCESS_TEAM,
+        audience: c.env.CF_ACCESS_AUD,
+      })(c, next)
+);
+
 // ── Dashboard UI ────────────────────────────────────────────────────────
 
-app.get('/', async c => {
-  let key: string;
-  try {
-    const secret = c.env.INTERNAL_API_SECRET;
-    key = typeof secret === 'string' ? secret : await secret.get();
-  } catch {
-    // Secrets Store unavailable in local dev — use the same fallback
-    // the auth middleware uses so the dashboard can authenticate.
-    key = LOCAL_DEV_SECRET;
-  }
-  return c.html(dashboardHtml(key));
-});
+app.get('/', c => c.html(dashboardHtml()));
 
 // ── Health ──────────────────────────────────────────────────────────────
 
@@ -72,10 +72,11 @@ app.get('/health', c => c.json({ status: 'ok' }));
 
 // ── Auth ────────────────────────────────────────────────────────────────
 // Applied at /api/rigs/:rigId/* so the rigId param is in scope for JWT validation.
+// Skipped in development to allow the dashboard and local tooling to work without JWTs.
 
-app.use('/api/rigs/:rigId/*', authMiddleware);
-app.use('/api/towns/:townId/*', authMiddleware);
-app.use('/api/towns/:townId/*', internalOnlyMiddleware);
+app.use('/api/rigs/:rigId/*', async (c, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
 
 // ── Beads ───────────────────────────────────────────────────────────────
 
@@ -92,7 +93,9 @@ app.get('/api/rigs/:rigId/agents', c => handleListAgents(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
 
 // Agent-scoped routes — agentOnlyMiddleware enforces JWT agentId match
-app.use('/api/rigs/:rigId/agents/:agentId/*', agentOnlyMiddleware);
+app.use('/api/rigs/:rigId/agents/:agentId/*', async (c, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : agentOnlyMiddleware(c, next)
+);
 app.post('/api/rigs/:rigId/agents/:agentId/hook', c => handleHookBead(c, c.req.param()));
 app.delete('/api/rigs/:rigId/agents/:agentId/hook', c => handleUnhookBead(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents/:agentId/prime', c => handlePrime(c, c.req.param()));
@@ -117,7 +120,7 @@ app.post('/api/rigs/:rigId/escalations', c => handleCreateEscalation(c, c.req.pa
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().
-// Auth is internal-only (no agent JWT — these are called by the Rig DO alarm / tRPC layer).
+// Protected by Cloudflare Access at the perimeter; no additional auth required.
 
 app.post('/api/towns/:townId/container/agents/start', c =>
   handleContainerStartAgent(c, c.req.param())

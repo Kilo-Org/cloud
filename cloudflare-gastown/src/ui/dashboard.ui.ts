@@ -1,12 +1,9 @@
 /**
  * Inline HTML dashboard for exercising the Gastown API.
- * Served at GET / — no auth required (the page itself sends
- * the internal API key with every fetch to the /api/* routes).
+ * Served at GET / — protected by Cloudflare Access in production.
+ * In development, auth middleware is skipped so the dashboard works without JWTs.
  */
-export function dashboardHtml(internalApiKey: string): string {
-  // The key is injected into a JS variable so the page can authenticate.
-  // This is acceptable because the dashboard is only deployed to dev/staging
-  // and the key is already known to anyone who can hit the Worker.
+export function dashboardHtml(): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -273,8 +270,6 @@ export function dashboardHtml(internalApiKey: string): string {
 <div id="toast"></div>
 
 <script>
-const API_KEY = ${JSON.stringify(internalApiKey)};
-
 function el(id) { return document.getElementById(id); }
 function rigId() { return el('rigId').value.trim(); }
 
@@ -340,7 +335,7 @@ async function api(method, path, body) {
   const log = el('apiLog');
   const opts = {
     method,
-    headers: { 'X-Internal-API-Key': API_KEY, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
   };
   if (body !== undefined) opts.body = JSON.stringify(body);
 

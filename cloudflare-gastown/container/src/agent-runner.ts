@@ -25,12 +25,7 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
 
   // Conditionally set config vars — only when a value is available from
   // the request or the container's own environment.
-  const conditionalKeys = [
-    'GASTOWN_API_URL',
-    'GASTOWN_SESSION_TOKEN',
-    'KILO_API_URL',
-    'INTERNAL_API_SECRET',
-  ];
+  const conditionalKeys = ['GASTOWN_API_URL', 'GASTOWN_SESSION_TOKEN', 'KILO_API_URL'];
   for (const key of conditionalKeys) {
     const value = resolveEnv(request, key);
     if (value) {

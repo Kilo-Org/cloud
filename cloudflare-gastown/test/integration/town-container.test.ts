@@ -1,13 +1,8 @@
 import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
-import { signAgentJWT } from '../../src/util/jwt.util';
 
-const INTERNAL_API_KEY = 'test-internal-secret';
-const JWT_SECRET = 'test-jwt-secret-must-be-at-least-32-chars-long';
-
-function internalHeaders(extra: Record<string, string> = {}): Record<string, string> {
+function headers(extra: Record<string, string> = {}): Record<string, string> {
   return {
-    'X-Internal-API-Key': INTERNAL_API_KEY,
     'Content-Type': 'application/json',
     ...extra,
   };
@@ -20,46 +15,6 @@ function api(path: string): string {
 describe('Town Container Routes', () => {
   const townId = () => `town-${crypto.randomUUID()}`;
 
-  // ── Auth ────────────────────────────────────────────────────────────────
-
-  describe('auth', () => {
-    it('should reject container routes without auth', async () => {
-      const id = townId();
-      const res = await SELF.fetch(api(`/api/towns/${id}/container/health`), {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      expect(res.status).toBe(401);
-    });
-
-    it('should accept container routes with internal auth', async () => {
-      const id = townId();
-      // This will fail at the container level (no container running in tests),
-      // but the auth middleware should accept it (not 401).
-      // In test env, containers aren't available so we get 500.
-      const res = await SELF.fetch(api(`/api/towns/${id}/container/health`), {
-        headers: internalHeaders(),
-      });
-      expect(res.status).toBe(500);
-    });
-
-    it('should reject container routes with agent JWT auth (internal-only)', async () => {
-      const id = townId();
-      const token = signAgentJWT(
-        { agentId: 'a-1', rigId: 'r-1', townId: id, userId: 'u-1' },
-        JWT_SECRET
-      );
-      const res = await SELF.fetch(api(`/api/towns/${id}/container/health`), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      expect(res.status).toBe(403);
-      const body: { error: string } = await res.json();
-      expect(body.error).toContain('internal auth required');
-    });
-  });
-
   // ── Container start agent route ─────────────────────────────────────────
 
   describe('POST /agents/start', () => {
@@ -67,7 +22,7 @@ describe('Town Container Routes', () => {
       const id = townId();
       const res = await SELF.fetch(api(`/api/towns/${id}/container/agents/start`), {
         method: 'POST',
-        headers: internalHeaders(),
+        headers: headers(),
       });
       // Should get 400 (invalid body) rather than 401
       expect(res.status).toBe(400);
@@ -81,7 +36,7 @@ describe('Town Container Routes', () => {
       const id = townId();
       const res = await SELF.fetch(api(`/api/towns/${id}/container/agents/some-agent/message`), {
         method: 'POST',
-        headers: internalHeaders(),
+        headers: headers(),
       });
       expect(res.status).toBe(400);
     });
@@ -97,7 +52,7 @@ describe('Heartbeat Endpoint', () => {
     // Register an agent first
     const createRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
       method: 'POST',
-      headers: internalHeaders(),
+      headers: headers(),
       body: JSON.stringify({ role: 'polecat', name: 'test-polecat', identity: 'polecat-1' }),
     });
     expect(createRes.status).toBe(201);
@@ -111,7 +66,7 @@ describe('Heartbeat Endpoint', () => {
     // Send heartbeat
     const heartbeatRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agentId}/heartbeat`), {
       method: 'POST',
-      headers: internalHeaders(),
+      headers: headers(),
       body: JSON.stringify({ status: 'running' }),
     });
     expect(heartbeatRes.status).toBe(200);
@@ -122,7 +77,7 @@ describe('Heartbeat Endpoint', () => {
 
     // Verify agent's activity was updated
     const getRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agentId}`), {
-      headers: internalHeaders(),
+      headers: headers(),
     });
     const getBody: { data: { last_activity_at: string } } = await getRes.json();
     expect(getBody.data.last_activity_at).not.toBe(oldActivity);
@@ -132,7 +87,7 @@ describe('Heartbeat Endpoint', () => {
     const id = rigId();
     const res = await SELF.fetch(api(`/api/rigs/${id}/agents/non-existent/heartbeat`), {
       method: 'POST',
-      headers: internalHeaders(),
+      headers: headers(),
       body: JSON.stringify({ status: 'running' }),
     });
     // The DO's touchAgent won't throw for non-existent agent (it's a no-op UPDATE)

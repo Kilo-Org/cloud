@@ -136,9 +136,9 @@ export function startControlServer(): void {
 
   // Start heartbeat if env vars are configured
   const apiUrl = process.env.GASTOWN_API_URL;
-  const apiKey = process.env.INTERNAL_API_SECRET;
-  if (apiUrl && apiKey) {
-    startHeartbeat(apiUrl, apiKey);
+  const sessionToken = process.env.GASTOWN_SESSION_TOKEN;
+  if (apiUrl && sessionToken) {
+    startHeartbeat(apiUrl, sessionToken);
   }
 
   // Handle graceful shutdown

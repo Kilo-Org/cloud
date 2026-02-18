@@ -5,16 +5,16 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let gastownApiUrl: string | null = null;
-let internalApiKey: string | null = null;
+let sessionToken: string | null = null;
 
 /**
  * Configure and start the heartbeat reporter.
  * Periodically sends agent status updates to the Gastown worker API,
  * which forwards them to the Rig DO to update `last_activity_at`.
  */
-export function startHeartbeat(apiUrl: string, apiKey: string): void {
+export function startHeartbeat(apiUrl: string, token: string): void {
   gastownApiUrl = apiUrl;
-  internalApiKey = apiKey;
+  sessionToken = token;
 
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
@@ -39,7 +39,7 @@ export function stopHeartbeat(): void {
 }
 
 async function sendHeartbeats(): Promise<void> {
-  if (!gastownApiUrl || !internalApiKey) return;
+  if (!gastownApiUrl || !sessionToken) return;
 
   const active = listProcesses().filter(p => p.status === 'running' || p.status === 'starting');
 
@@ -59,7 +59,7 @@ async function sendHeartbeats(): Promise<void> {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Internal-API-Key': internalApiKey,
+            Authorization: `Bearer ${sessionToken}`,
           },
           body: JSON.stringify(payload),
         }

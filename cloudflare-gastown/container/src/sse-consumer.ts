@@ -8,6 +8,9 @@
 
 import { parseSSEEventData, type KiloSSEEvent } from './types';
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY_MS = 1_000;
+
 export type SSEConsumerOptions = {
   /** Port of the kilo serve instance */
   port: number;
@@ -15,7 +18,7 @@ export type SSEConsumerOptions = {
   onEvent: (event: KiloSSEEvent) => void;
   /** Called on any SSE activity (including heartbeats) — for last-activity tracking */
   onActivity?: () => void;
-  /** Called when the SSE stream ends or errors */
+  /** Called when the SSE stream ends permanently (after exhausting reconnect attempts) */
   onClose?: (reason: string) => void;
 };
 
@@ -104,6 +107,10 @@ export function isCompletionEvent(event: KiloSSEEvent): boolean {
 /**
  * Create an SSE consumer that connects to `GET /event` on a kilo serve
  * instance and forwards parsed events.
+ *
+ * Automatically reconnects with exponential back-off (up to
+ * MAX_RECONNECT_ATTEMPTS) if the stream drops unexpectedly.
+ * Only calls `onClose` after all retries are exhausted or on explicit abort.
  */
 export function createSSEConsumer(opts: SSEConsumerOptions): SSEConsumer {
   const url = `http://127.0.0.1:${opts.port}/event`;
@@ -111,66 +118,87 @@ export function createSSEConsumer(opts: SSEConsumerOptions): SSEConsumer {
   const controller = new AbortController();
 
   void (async () => {
-    try {
-      const res = await fetch(url, {
-        headers: { Accept: 'text/event-stream' },
-        signal: controller.signal,
-      });
+    let attempt = 0;
 
-      if (!res.ok) {
-        throw new Error(`SSE connection failed: ${res.status} ${res.statusText}`);
-      }
+    while (active) {
+      try {
+        const res = await fetch(url, {
+          headers: { Accept: 'text/event-stream' },
+          signal: controller.signal,
+        });
 
-      if (!res.body) {
-        throw new Error('SSE response has no body');
-      }
+        if (!res.ok) {
+          throw new Error(`SSE connection failed: ${res.status} ${res.statusText}`);
+        }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+        if (!res.body) {
+          throw new Error('SSE response has no body');
+        }
 
-      while (active) {
-        const { done, value } = await reader.read();
+        // Connected successfully — reset attempt counter
+        attempt = 0;
 
-        if (done) {
-          // Flush remaining buffer
-          if (buffer.trim()) {
-            for (const evt of parseSSEChunk(buffer, true)) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (active) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            // Flush remaining buffer
+            if (buffer.trim()) {
+              for (const evt of parseSSEChunk(buffer, true)) {
+                opts.onActivity?.();
+                if (evt.event !== 'server.connected' && evt.event !== 'server.heartbeat') {
+                  opts.onEvent(evt);
+                }
+              }
+            }
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete events (separated by blank lines)
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() ?? '';
+
+          for (const part of parts) {
+            if (!part.trim()) continue;
+            for (const evt of parseSSEChunk(part + '\n\n')) {
               opts.onActivity?.();
               if (evt.event !== 'server.connected' && evt.event !== 'server.heartbeat') {
                 opts.onEvent(evt);
               }
             }
           }
-          break;
         }
 
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete events (separated by blank lines)
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
-
-        for (const part of parts) {
-          if (!part.trim()) continue;
-          for (const evt of parseSSEChunk(part + '\n\n')) {
-            opts.onActivity?.();
-            if (evt.event !== 'server.connected' && evt.event !== 'server.heartbeat') {
-              opts.onEvent(evt);
-            }
-          }
+        // Stream ended cleanly — try to reconnect (server may have restarted)
+        if (!active) break;
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          opts.onClose?.('aborted');
+          return;
         }
-      }
-
-      opts.onClose?.('stream ended');
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        opts.onClose?.('aborted');
-      } else {
         console.error('SSE error:', err instanceof Error ? err.message : String(err));
-        opts.onClose?.(`error: ${err instanceof Error ? err.message : String(err)}`);
       }
+
+      // Reconnect with exponential back-off
+      attempt++;
+      if (attempt > MAX_RECONNECT_ATTEMPTS) {
+        opts.onClose?.(`gave up after ${MAX_RECONNECT_ATTEMPTS} reconnect attempts`);
+        active = false;
+        return;
+      }
+
+      const delay = RECONNECT_BASE_DELAY_MS * 2 ** (attempt - 1);
+      console.log(`SSE reconnecting (attempt ${attempt}/${MAX_RECONNECT_ATTEMPTS}) in ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
     }
+
+    opts.onClose?.('stopped');
   })();
 
   return {

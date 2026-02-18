@@ -19,6 +19,9 @@ const HEALTH_CHECK_TIMEOUT_MS = 60_000;
 /** workdir -> KiloServerInstance */
 const servers = new Map<string, KiloServerInstance>();
 
+/** Guards concurrent ensureServer calls for the same workdir. */
+const pending = new Map<string, Promise<number>>();
+
 let nextPort = KILO_SERVER_START_PORT;
 
 function allocatePort(): number {
@@ -55,7 +58,9 @@ async function waitForHealthy(port: number, timeoutMs = HEALTH_CHECK_TIMEOUT_MS)
  * Get or start a kilo serve instance for the given workdir.
  *
  * If a healthy server already exists for this workdir it is reused.
- * Otherwise a new `kilo serve` process is spawned.
+ * Otherwise a new `kilo serve` process is spawned. Concurrent calls
+ * for the same workdir coalesce — the second caller awaits the
+ * in-flight startup instead of racing.
  *
  * @returns The port the server is listening on.
  */
@@ -68,7 +73,18 @@ export async function ensureServer(workdir: string, env: Record<string, string>)
     return existing.port;
   }
 
+  // Coalesce concurrent startup requests for the same workdir.
+  const inflight = pending.get(workdir);
+  if (inflight) return inflight;
+
+  const p = doStartServer(workdir, env).finally(() => pending.delete(workdir));
+  pending.set(workdir, p);
+  return p;
+}
+
+async function doStartServer(workdir: string, env: Record<string, string>): Promise<number> {
   // If there's a dead/unhealthy server entry, clean it up
+  const existing = servers.get(workdir);
   if (existing) {
     try {
       existing.process.kill();

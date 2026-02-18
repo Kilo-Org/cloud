@@ -18,7 +18,7 @@ export const opus_46_free_slackbot_model = {
   gateway: 'openrouter',
   internal_id: 'anthropic/claude-opus-4.6',
   inference_providers: [],
-  slackbot_only: true,
+  allowed_uses: ['slackbot'],
 } satisfies KiloFreeModel;
 
 export const SONNET_46_REVIEW_PROMO_MODEL_ID = 'anthropic/claude-sonnet-4.6:review';
@@ -34,7 +34,7 @@ export const sonnet_46_free_review_model = {
   gateway: 'openrouter' as const,
   internal_id: 'anthropic/claude-sonnet-4.6',
   inference_providers: ['anthropic'] as KiloFreeModel['inference_providers'],
-  review_only: true,
+  allowed_uses: ['review'],
   promotion_start: '2026-02-18T00:00:00Z',
   promotion_end: '2026-02-25T00:00:00Z',
 } satisfies KiloFreeModel;

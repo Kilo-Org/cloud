@@ -3,6 +3,8 @@ import type { ProviderId } from '@/lib/providers/provider-id';
 
 export type KiloFreeModelFlag = 'reasoning' | 'prompt_cache' | 'vision';
 
+export type KiloFreeModelUse = 'slackbot' | 'review';
+
 export type KiloFreeModel = {
   public_id: string;
   display_name: string;
@@ -14,10 +16,7 @@ export type KiloFreeModel = {
   gateway: ProviderId;
   internal_id: string;
   inference_providers: OpenRouterInferenceProviderId[];
-  /** If true, this model is only available through Kilo for Slack (internalApiUse) and hidden from public model list */
-  slackbot_only?: boolean;
-  /** If true, this model is only available in Code Reviewer (review mode) and hidden from the public model list */
-  review_only?: boolean;
+  allowed_uses?: KiloFreeModelUse[];
   /** Promotion start date (ISO 8601). If set, the model is only active after this date. */
   promotion_start?: string;
   /** Promotion end date (ISO 8601). If set, the model is disabled after this date. */

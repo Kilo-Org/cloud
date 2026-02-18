@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { isSlackbotOnlyModel } from '@/lib/models';
+import { kiloFreeModels } from '@/lib/models';
 import { type DbSessionDetails, type IndexedDbSessionData } from '../store/db-session-atoms';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 import type { ResumeConfig, StreamResumeConfig } from '../types';
@@ -65,11 +65,10 @@ export function needsResumeConfigModal(params: {
 
   if (!loadedDbSession) return false;
 
-  if (
-    loadedDbSession.last_model &&
-    isSlackbotOnlyModel(loadedDbSession.last_model) &&
-    !currentIndexedDbSession?.resumeConfig
-  )
+  const lastModelRestricted = kiloFreeModels.find(m => m.public_id === loadedDbSession.last_model)
+    ?.allowed_uses?.length;
+
+  if (loadedDbSession.last_model && lastModelRestricted && !currentIndexedDbSession?.resumeConfig)
     return true;
 
   const isCliSession = !loadedDbSession.cloud_agent_session_id;

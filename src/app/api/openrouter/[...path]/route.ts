@@ -13,8 +13,7 @@ import {
   isFreeModel,
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
-  isSlackbotOnlyModel,
-  isReviewOnlyModel,
+  kiloFreeModels,
   isReviewPromotionActive,
   isRateLimitedModel,
 } from '@/lib/models';
@@ -247,14 +246,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
-  // Slackbot-only models are only available through Kilo for Slack (internalApiUse)
-  if (isSlackbotOnlyModel(originalModelIdLowerCased) && !internalApiUse) {
+  const modelAllowedUses = kiloFreeModels.find(
+    m => m.public_id === originalModelIdLowerCased
+  )?.allowed_uses;
+
+  if (modelAllowedUses?.includes('slackbot') && !internalApiUse) {
     return modelDoesNotExistResponse();
   }
-
-  // Review-only promotional models are only available through Code Reviewer (internalApiUse)
-  // and only during the active promotion window
-  if (isReviewOnlyModel(originalModelIdLowerCased)) {
+  if (modelAllowedUses?.includes('review')) {
     if (!internalApiUse || !isReviewPromotionActive(originalModelIdLowerCased)) {
       return modelDoesNotExistResponse();
     }

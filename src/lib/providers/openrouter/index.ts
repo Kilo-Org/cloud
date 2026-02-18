@@ -62,7 +62,7 @@ function enhancedModelList(models: OpenRouterModel[]) {
     )
     .concat(
       kiloFreeModels
-        .filter(m => m.is_enabled && !m.slackbot_only && !m.review_only)
+        .filter(m => m.is_enabled && !m.allowed_uses?.length)
         .map(model => convertFromKiloModel(model))
     )
     .concat([autoModel])

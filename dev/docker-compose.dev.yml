@@ -77,6 +77,13 @@ services:
     profiles: ["agents", "workers", "all"]
     ports:
       - "127.0.0.1:8788:8788"
+    # Container-backed Durable Objects: Wrangler needs access to the host
+    # Docker daemon to spawn sandbox containers. This grants the container
+    # full control over the host's Docker — acceptable for local dev, but
+    # must never be used in production.
+    volumes:
+      - ..:/app
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,6 +95,10 @@ services:
     profiles: ["agents", "all"]
     ports:
       - "127.0.0.1:8794:8794"
+    # Container-backed DOs — needs host Docker daemon (see cloud-agent comment).
+    volumes:
+      - ..:/app
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,6 +121,10 @@ services:
     profiles: ["workers", "all"]
     ports:
       - "127.0.0.1:8790:8790"
+    # Container-backed DOs — needs host Docker daemon (see cloud-agent comment).
+    volumes:
+      - ..:/app
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -171,6 +186,10 @@ services:
     profiles: ["workers", "all"]
     ports:
       - "127.0.0.1:8798:8798"
+    # Container-backed DOs — needs host Docker daemon (see cloud-agent comment).
+    volumes:
+      - ..:/app
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy

@@ -134,6 +134,28 @@ cp cloud-agent/.dev.vars.example cloud-agent/.dev.vars
 - **Inter-service networking**: Docker Compose bridge network with DNS-based service discovery. See [Networking](#networking) above.
 - **Existing `dev/docker-compose.yml`** is untouched — it continues to work standalone for PostgreSQL-only usage.
 
+## Docker Socket Mount (Container-backed Durable Objects)
+
+Four workers use Cloudflare's [container-backed Durable Objects](https://developers.cloudflare.com/durable-objects/best-practices/create-durable-object-stubs-and-send-requests/#container-durable-objects), which require Docker to spawn sandbox containers at runtime via Wrangler:
+
+- `cloud-agent`
+- `cloud-agent-next`
+- `cloudflare-app-builder`
+- `cloudflare-deploy-builder`
+
+Because these workers already run inside Docker containers, they can't use Docker natively (Docker-in-Docker). Instead, the host's Docker socket is mounted into these containers:
+
+```yaml
+volumes:
+  - /var/run/docker.sock:/var/run/docker.sock
+```
+
+This lets Wrangler inside the container talk to the host's Docker daemon to create sibling containers.
+
+### Security implications
+
+Mounting the Docker socket gives the container **full, unrestricted access to the host's Docker daemon** — equivalent to root access on the host. This is acceptable for local development but must **never** be used in production or CI environments with untrusted code. The mount is only applied to the four workers listed above; all other services use the default volume configuration from the shared base.
+
 ## Troubleshooting
 
 ### Port already in use

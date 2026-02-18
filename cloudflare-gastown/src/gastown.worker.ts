@@ -49,7 +49,7 @@ import {
 } from './handlers/towns.handler';
 
 export { RigDO } from './dos/Rig.do';
-export { TownDO } from './dos/Town.do';
+export { GastownUserDO } from './dos/GastownUser.do';
 export { AgentIdentityDO } from './dos/AgentIdentity.do';
 export { TownContainerDO } from './dos/TownContainer.do';
 

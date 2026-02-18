@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
-import { getTownDOStub } from '../dos/Town.do';
+import { getGastownUserStub } from '../dos/GastownUser.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
@@ -30,13 +30,13 @@ export async function handleCreateTown(c: Context<GastownEnv>, params: { userId:
     );
   }
 
-  const townDO = getTownDOStub(c.env, params.userId);
+  const townDO = getGastownUserStub(c.env, params.userId);
   const town = await townDO.createTown({ name: parsed.data.name, owner_user_id: params.userId });
   return c.json(resSuccess(town), 201);
 }
 
 export async function handleListTowns(c: Context<GastownEnv>, params: { userId: string }) {
-  const townDO = getTownDOStub(c.env, params.userId);
+  const townDO = getGastownUserStub(c.env, params.userId);
   const towns = await townDO.listTowns();
   return c.json(resSuccess(towns));
 }
@@ -45,7 +45,7 @@ export async function handleGetTown(
   c: Context<GastownEnv>,
   params: { userId: string; townId: string }
 ) {
-  const townDO = getTownDOStub(c.env, params.userId);
+  const townDO = getGastownUserStub(c.env, params.userId);
   const town = await townDO.getTownAsync(params.townId);
   if (!town) return c.json(resError('Town not found'), 404);
   return c.json(resSuccess(town));
@@ -60,7 +60,7 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
     );
   }
 
-  const townDO = getTownDOStub(c.env, params.userId);
+  const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.createRig(parsed.data);
   return c.json(resSuccess(rig), 201);
 }
@@ -69,7 +69,7 @@ export async function handleGetRig(
   c: Context<GastownEnv>,
   params: { userId: string; rigId: string }
 ) {
-  const townDO = getTownDOStub(c.env, params.userId);
+  const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.getRigAsync(params.rigId);
   if (!rig) return c.json(resError('Rig not found'), 404);
   return c.json(resSuccess(rig));
@@ -79,7 +79,7 @@ export async function handleListRigs(
   c: Context<GastownEnv>,
   params: { userId: string; townId: string }
 ) {
-  const townDO = getTownDOStub(c.env, params.userId);
+  const townDO = getGastownUserStub(c.env, params.userId);
   const rigs = await townDO.listRigs(params.townId);
   return c.json(resSuccess(rigs));
 }

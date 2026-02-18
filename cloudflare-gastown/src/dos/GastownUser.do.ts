@@ -12,12 +12,10 @@ function now(): string {
 }
 
 /**
- * Town DO — control-plane metadata for towns and rigs.
+ * GastownUserDO — per-user control-plane metadata for towns and rigs.
  *
  * Keying: one DO instance per user (keyed by `owner_user_id`). A single
- * instance therefore stores *all* towns a user owns plus their rigs. The
- * `towns` table can hold multiple rows because a user may create several
- * towns.
+ * instance stores all towns a user owns plus their rigs.
  *
  * This is a temporary home — towns/rigs are simple control-plane entities
  * that will move to Postgres once the replication layer lands (Phase 4,
@@ -26,7 +24,7 @@ function now(): string {
  *
  * Cross-rig coordination will be added in Phase 2 (#215).
  */
-export class TownDO extends DurableObject<Env> {
+export class GastownUserDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private initPromise: Promise<void> | null = null;
 
@@ -176,6 +174,6 @@ export class TownDO extends DurableObject<Env> {
   }
 }
 
-export function getTownDOStub(env: Env, townId: string) {
-  return env.TOWN.get(env.TOWN.idFromName(townId));
+export function getGastownUserStub(env: Env, userId: string) {
+  return env.GASTOWN_USER.get(env.GASTOWN_USER.idFromName(userId));
 }

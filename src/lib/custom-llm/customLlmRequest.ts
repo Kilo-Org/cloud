@@ -33,6 +33,7 @@ import type { CustomLlm } from '@/db/schema';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
+import type { XaiLanguageModelResponsesOptions } from '@ai-sdk/xai';
 import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
 
 type ChatCompletionChunk = z.infer<typeof OpenRouterStreamChatCompletionChunkSchema>;
@@ -518,7 +519,11 @@ function buildCommonParams(
         reasoningSummary: 'auto',
         textVerbosity: verbosity === 'max' ? 'high' : verbosity,
         reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort,
+        include: ['reasoning.encrypted_content'],
       } satisfies OpenAILanguageModelResponsesOptions,
+      xai: {
+        store: false,
+      } satisfies XaiLanguageModelResponsesOptions,
     },
   };
 }

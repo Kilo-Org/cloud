@@ -5,7 +5,7 @@ import { Writable } from 'stream';
 import { after } from 'next/server';
 
 export const inStreamDebugMode =
-  process.env.NODE_ENV === 'development' && getEnvVariable('DEV_SAVE_PROXY_STREAMS');
+  process.env.NODE_ENV === 'development' && !!getEnvVariable('DEV_SAVE_PROXY_STREAMS');
 
 const fileSafeIsoDate = () => new Date().toISOString().replace(/[:.]/g, '-');
 const debugRequestLogPath = path.join(process.cwd(), 'dev-debug-request-logs');

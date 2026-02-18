@@ -629,7 +629,7 @@ export async function customLlmRequest(
     }
   }
 
-  const result = streamText({ model, ...commonParams });
+  const result = streamText({ model, ...commonParams, includeRawChunks: inStreamDebugMode });
 
   debugSaveLog(JSON.stringify(request, undefined, 2), 'request.gateway.json');
   debugSaveLog(JSON.stringify((await result.request).body, undefined, 2), 'request.native.json');

@@ -829,7 +829,7 @@ export const custom_llm = pgTable('custom_llm', {
   provider: text().notNull().$type<'anthropic' | 'openai' | 'xai'>(),
   base_url: text().notNull(),
   api_key: text().notNull(),
-  verbosity: text().$type<'low' | 'medium' | 'high'>(),
+  verbosity: text().$type<'low' | 'medium' | 'high' | 'max'>(),
   organization_ids: jsonb().notNull().$type<string[]>(),
 });
 

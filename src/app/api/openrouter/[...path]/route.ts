@@ -284,7 +284,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   setTag('ui.ai_model', requestBodyParsed.model);
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user) && !customLlm) {
+  const bypassAccessCheckForCustomLlm =
+    !!customLlm && !!organizationId && customLlm.organization_ids.includes(organizationId);
+  if (!isAnonymousContext(user) && !bypassAccessCheckForCustomLlm) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
     if (
@@ -352,7 +354,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const response = customLlm
-    ? await customLlmRequest(customLlm, requestBodyParsed)
+    ? await customLlmRequest(
+        customLlm,
+        requestBodyParsed,
+        !!fraudHeaders.http_user_agent?.startsWith('Kilo-Code/')
+      )
     : await openRouterRequest({
         path,
         search: url.search,

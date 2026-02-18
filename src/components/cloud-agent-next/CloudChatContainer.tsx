@@ -696,7 +696,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
 
   // Handle new session
   const handleNewSession = () => {
-    const basePath = organizationId ? `/organizations/${organizationId}/cloud-next` : '/cloud-next';
+    const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
     router.push(basePath);
   };
 
@@ -873,9 +873,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   // Handle session selection
   const handleSelectSession = useCallback(
     (sessionId: string) => {
-      const basePath = organizationId
-        ? `/organizations/${organizationId}/cloud-next`
-        : '/cloud-next';
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${sessionId}`);
     },
     [organizationId, router]

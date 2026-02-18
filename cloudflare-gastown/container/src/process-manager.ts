@@ -1,16 +1,25 @@
-import type { Subprocess, FileSink } from 'bun';
-import type { AgentProcess, StartAgentRequest } from './types';
+/**
+ * Agent manager — tracks agents as kilo serve sessions.
+ *
+ * Replaces the old Bun.spawn + stdin pipe approach. Each agent is a session
+ * within a kilo serve instance (one server per worktree). Messages are sent
+ * via HTTP, not stdin.
+ */
 
-const GRACEFUL_SHUTDOWN_MS = 10_000;
+import type { ManagedAgent, StartAgentRequest, AgentStatus } from './types';
+import {
+  ensureServer,
+  registerSession,
+  unregisterSession,
+  stopAllServers,
+  activeServerCount,
+} from './kilo-server';
+import { createKiloClient } from './kilo-client';
+import { createSSEConsumer, isCompletionEvent, type SSEConsumer } from './sse-consumer';
+import type { KiloSSEEvent } from './types';
 
-type ManagedProcess = {
-  process: AgentProcess;
-  child: Subprocess | null;
-  stdin: FileSink | null;
-  stdinQueue: string[];
-};
-
-const processes = new Map<string, ManagedProcess>();
+const agents = new Map<string, ManagedAgent>();
+const sseConsumers = new Map<string, SSEConsumer>();
 
 const startTime = Date.now();
 
@@ -19,189 +28,184 @@ export function getUptime(): number {
 }
 
 /**
- * Spawn a Kilo CLI child process for an agent using Bun.spawn.
+ * Start an agent: ensure kilo serve is running for the workdir, create a
+ * session, send the initial prompt, and subscribe to SSE events.
  */
-export function startProcess(
+export async function startAgent(
   request: StartAgentRequest,
   workdir: string,
-  cliArgs: string[],
   env: Record<string, string>
-): AgentProcess {
-  const existing = processes.get(request.agentId);
-  if (
-    existing &&
-    (existing.process.status === 'running' || existing.process.status === 'starting')
-  ) {
+): Promise<ManagedAgent> {
+  const existing = agents.get(request.agentId);
+  if (existing && (existing.status === 'running' || existing.status === 'starting')) {
     throw new Error(`Agent ${request.agentId} is already running`);
   }
 
   const now = new Date().toISOString();
-  const agentProcess: AgentProcess = {
+  const agent: ManagedAgent = {
     agentId: request.agentId,
     rigId: request.rigId,
     townId: request.townId,
     role: request.role,
     name: request.name,
-    pid: null,
     status: 'starting',
-    exitCode: null,
+    serverPort: 0,
+    sessionId: '',
     workdir,
     startedAt: now,
     lastActivityAt: now,
+    activeTools: [],
+    messageCount: 0,
+    exitReason: null,
   };
+  agents.set(request.agentId, agent);
 
-  const managed: ManagedProcess = {
-    process: agentProcess,
-    child: null,
-    stdin: null,
-    stdinQueue: [],
-  };
-  processes.set(request.agentId, managed);
+  try {
+    // 1. Ensure kilo serve is running for this workdir
+    const port = await ensureServer(workdir, env);
+    agent.serverPort = port;
 
-  const mergedEnv = { ...process.env, ...env };
+    // 2. Create a session on the server
+    const client = createKiloClient(port);
+    const session = await client.createSession();
+    agent.sessionId = session.id;
+    registerSession(workdir, session.id);
 
-  const child = Bun.spawn(['kilo', ...cliArgs], {
-    cwd: workdir,
-    env: mergedEnv,
-    stdin: 'pipe',
-    stdout: 'pipe',
-    stderr: 'pipe',
-    onExit(_proc, exitCode, _signalCode, error) {
-      agentProcess.status = exitCode === 0 ? 'exited' : 'failed';
-      agentProcess.exitCode = exitCode;
-      if (error) {
-        agentProcess.status = 'failed';
-        console.error(`Agent ${request.name} (${request.agentId}) error:`, error.message);
-      }
-      console.log(`Agent ${request.name} (${request.agentId}) exited: code=${exitCode}`);
-    },
-  });
+    // 3. Subscribe to SSE events for observability
+    const consumer = createSSEConsumer({
+      port,
+      onEvent: (evt: KiloSSEEvent) => {
+        agent.lastActivityAt = new Date().toISOString();
 
-  managed.child = child;
-  managed.stdin = child.stdin as FileSink;
-  agentProcess.pid = child.pid;
-  agentProcess.status = 'running';
-
-  // Stream stdout/stderr asynchronously
-  if (child.stdout) {
-    void (async () => {
-      const reader = child.stdout.getReader();
-      const decoder = new TextDecoder();
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          agentProcess.lastActivityAt = new Date().toISOString();
-          process.stdout.write(`[${request.name}] ${decoder.decode(value)}`);
+        // Track active tool calls from event data
+        if (isRecord(evt.data)) {
+          const data = evt.data as Record<string, unknown>;
+          if (Array.isArray(data.activeTools)) {
+            agent.activeTools = data.activeTools.filter((t): t is string => typeof t === 'string');
+          }
         }
-      } catch {
-        /* stream closed */
-      }
-    })();
-  }
 
-  if (child.stderr) {
-    void (async () => {
-      const reader = child.stderr.getReader();
-      const decoder = new TextDecoder();
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          agentProcess.lastActivityAt = new Date().toISOString();
-          process.stderr.write(`[${request.name}:err] ${decoder.decode(value)}`);
+        // Detect completion
+        if (isCompletionEvent(evt)) {
+          agent.status = 'exited';
+          agent.exitReason = 'completed';
         }
-      } catch {
-        /* stream closed */
-      }
-    })();
-  }
+      },
+      onActivity: () => {
+        agent.lastActivityAt = new Date().toISOString();
+      },
+      onClose: reason => {
+        if (agent.status === 'running') {
+          agent.status = 'failed';
+          agent.exitReason = `SSE stream closed: ${reason}`;
+        }
+      },
+    });
+    sseConsumers.set(request.agentId, consumer);
 
-  // Flush any queued stdin messages
-  for (const msg of managed.stdinQueue) {
-    managed.stdin?.write(msg + '\n');
-  }
-  managed.stdinQueue = [];
+    // 4. Send the initial prompt
+    await client.sendPromptAsync(session.id, {
+      prompt: request.prompt,
+      model: request.model,
+      systemPrompt: request.systemPrompt,
+    });
 
-  console.log(
-    `Started agent ${request.name} (${request.agentId}) pid=${child.pid} role=${request.role}`
-  );
-  return agentProcess;
-}
+    agent.status = 'running';
+    agent.messageCount = 1;
 
-/**
- * Stop an agent process gracefully (SIGTERM then SIGKILL after timeout).
- */
-export async function stopProcess(
-  agentId: string,
-  signal: 'SIGTERM' | 'SIGKILL' = 'SIGTERM'
-): Promise<void> {
-  const managed = processes.get(agentId);
-  if (!managed?.child) {
-    throw new Error(`Agent ${agentId} not found or not running`);
-  }
-
-  if (managed.process.status !== 'running' && managed.process.status !== 'starting') {
-    return;
-  }
-
-  managed.process.status = 'stopping';
-
-  managed.child.kill(signal === 'SIGKILL' ? 9 : 15);
-
-  if (signal === 'SIGTERM') {
-    // Wait for graceful exit, then force-kill if still alive.
-    const exited = managed.child.exited;
-    const timeout = new Promise<'timeout'>(r =>
-      setTimeout(() => r('timeout'), GRACEFUL_SHUTDOWN_MS)
+    console.log(
+      `Started agent ${request.name} (${request.agentId}) ` +
+        `session=${session.id} port=${port} role=${request.role}`
     );
 
-    const result = await Promise.race([exited.then(() => 'exited' as const), timeout]);
-    if (result === 'timeout' && managed.process.status === 'stopping') {
-      managed.child.kill(9);
-    }
+    return agent;
+  } catch (err) {
+    agent.status = 'failed';
+    agent.exitReason = err instanceof Error ? err.message : String(err);
+    throw err;
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
- * Send a follow-up prompt to an agent's stdin.
+ * Stop an agent by aborting its session and cleaning up.
  */
-export function sendMessage(agentId: string, prompt: string): void {
-  const managed = processes.get(agentId);
-  if (!managed) {
+export async function stopAgent(agentId: string): Promise<void> {
+  const agent = agents.get(agentId);
+  if (!agent) {
     throw new Error(`Agent ${agentId} not found`);
   }
 
-  if (managed.stdin && managed.process.status === 'running') {
-    managed.stdin.write(prompt + '\n');
-  } else {
-    managed.stdinQueue.push(prompt);
+  if (agent.status !== 'running' && agent.status !== 'starting') {
+    return;
   }
 
-  managed.process.lastActivityAt = new Date().toISOString();
+  agent.status = 'stopping';
+
+  // Stop SSE consumer
+  const consumer = sseConsumers.get(agentId);
+  if (consumer) {
+    consumer.stop();
+    sseConsumers.delete(agentId);
+  }
+
+  // Abort the session via the kilo serve API
+  try {
+    const client = createKiloClient(agent.serverPort);
+    await client.abortSession(agent.sessionId);
+  } catch (err) {
+    console.warn(`Failed to abort session for agent ${agentId}:`, err);
+  }
+
+  // Unregister the session (may stop the server if last session)
+  await unregisterSession(agent.workdir, agent.sessionId);
+
+  agent.status = 'exited';
+  agent.exitReason = 'stopped';
 }
 
 /**
- * Get the status of an agent process.
+ * Send a follow-up prompt to an agent via the kilo serve HTTP API.
  */
-export function getProcessStatus(agentId: string): AgentProcess | null {
-  return processes.get(agentId)?.process ?? null;
+export async function sendMessage(agentId: string, prompt: string): Promise<void> {
+  const agent = agents.get(agentId);
+  if (!agent) {
+    throw new Error(`Agent ${agentId} not found`);
+  }
+  if (agent.status !== 'running') {
+    throw new Error(`Agent ${agentId} is not running (status: ${agent.status})`);
+  }
+
+  const client = createKiloClient(agent.serverPort);
+  await client.sendPromptAsync(agent.sessionId, { prompt });
+  agent.messageCount++;
+  agent.lastActivityAt = new Date().toISOString();
 }
 
 /**
- * List all managed agent processes.
+ * Get the status of an agent.
  */
-export function listProcesses(): AgentProcess[] {
-  return [...processes.values()].map(m => m.process);
+export function getAgentStatus(agentId: string): ManagedAgent | null {
+  return agents.get(agentId) ?? null;
 }
 
 /**
- * Get count of active (running/starting) processes.
+ * List all managed agents.
  */
-export function activeProcessCount(): number {
+export function listAgents(): ManagedAgent[] {
+  return [...agents.values()];
+}
+
+/**
+ * Count of active (running/starting) agents.
+ */
+export function activeAgentCount(): number {
   let count = 0;
-  for (const m of processes.values()) {
-    if (m.process.status === 'running' || m.process.status === 'starting') {
+  for (const a of agents.values()) {
+    if (a.status === 'running' || a.status === 'starting') {
       count++;
     }
   }
@@ -209,12 +213,33 @@ export function activeProcessCount(): number {
 }
 
 /**
- * Stop all running processes. Used during container shutdown.
+ * Stop all agents and all kilo serve instances.
  */
 export async function stopAll(): Promise<void> {
-  const running = [...processes.entries()].filter(
-    ([, m]) => m.process.status === 'running' || m.process.status === 'starting'
-  );
+  // Stop all SSE consumers
+  for (const [id, consumer] of sseConsumers) {
+    consumer.stop();
+    sseConsumers.delete(id);
+  }
 
-  await Promise.allSettled(running.map(([agentId]) => stopProcess(agentId)));
+  // Abort all running agent sessions
+  const running = [...agents.values()].filter(
+    a => a.status === 'running' || a.status === 'starting'
+  );
+  for (const agent of running) {
+    try {
+      const client = createKiloClient(agent.serverPort);
+      await client.abortSession(agent.sessionId);
+    } catch {
+      /* best-effort */
+    }
+    agent.status = 'exited';
+    agent.exitReason = 'container shutdown';
+  }
+
+  // Stop all kilo serve instances
+  await stopAllServers();
 }
+
+/** Re-export for control-server health endpoint */
+export { activeServerCount };

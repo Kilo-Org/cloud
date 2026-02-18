@@ -34,38 +34,89 @@ export const SendMessageRequest = z.object({
 });
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
 
-// ── Process lifecycle ───────────────────────────────────────────────────
+// ── Agent lifecycle ─────────────────────────────────────────────────────
 
-export const ProcessStatus = z.enum(['starting', 'running', 'stopping', 'exited', 'failed']);
-export type ProcessStatus = z.infer<typeof ProcessStatus>;
+export const AgentStatus = z.enum(['starting', 'running', 'stopping', 'exited', 'failed']);
+export type AgentStatus = z.infer<typeof AgentStatus>;
 
-export type AgentProcess = {
+// Kept for backward compat — external callers (DO, heartbeat) still reference this name.
+export const ProcessStatus = AgentStatus;
+export type ProcessStatus = AgentStatus;
+
+/**
+ * Tracks a managed agent: a kilo serve session backed by an SSE subscription.
+ * Replaces the old AgentProcess (raw child process + stdin pipe).
+ */
+export type ManagedAgent = {
   agentId: string;
   rigId: string;
   townId: string;
   role: AgentRole;
   name: string;
-  pid: number | null;
-  status: ProcessStatus;
-  exitCode: number | null;
+  status: AgentStatus;
+  /** Port of the kilo serve instance this agent's session lives on */
+  serverPort: number;
+  /** Session ID within the kilo serve instance */
+  sessionId: string;
+  /** Working directory (git worktree) */
   workdir: string;
   startedAt: string;
   lastActivityAt: string;
+  /** Last known active tool calls (populated from SSE events) */
+  activeTools: string[];
+  /** Total messages sent to this agent */
+  messageCount: number;
+  /** Exit reason if status is 'exited' or 'failed' */
+  exitReason: string | null;
 };
 
 export type AgentStatusResponse = {
   agentId: string;
-  status: ProcessStatus;
-  pid: number | null;
-  exitCode: number | null;
+  status: AgentStatus;
+  serverPort: number;
+  sessionId: string;
   startedAt: string;
   lastActivityAt: string;
+  activeTools: string[];
+  messageCount: number;
+  exitReason: string | null;
 };
 
 export type HealthResponse = {
   status: 'ok' | 'degraded';
   agents: number;
+  servers: number;
   uptime: number;
+};
+
+// ── Kilo serve instance ─────────────────────────────────────────────────
+
+export type KiloServerInstance = {
+  /** Port the kilo serve process is listening on */
+  port: number;
+  /** Working directory (project root) the server was started in */
+  workdir: string;
+  /** The Bun subprocess handle */
+  process: import('bun').Subprocess;
+  /** Agent IDs with sessions on this server */
+  sessionIds: Set<string>;
+  /** Tracks whether the server is healthy (responded to /global/health) */
+  healthy: boolean;
+};
+
+/**
+ * Session info returned by kilo serve POST /session.
+ */
+export type KiloSession = {
+  id: string;
+  title?: string;
+};
+
+// ── SSE events ──────────────────────────────────────────────────────────
+
+export type KiloSSEEvent = {
+  event: string;
+  data: unknown;
 };
 
 // ── Git manager ─────────────────────────────────────────────────────────
@@ -87,7 +138,7 @@ export type HeartbeatPayload = {
   agentId: string;
   rigId: string;
   townId: string;
-  status: ProcessStatus;
+  status: AgentStatus;
   timestamp: string;
 };
 

@@ -203,50 +203,6 @@
       }
     },
     {
-      "id": "x-ai/grok-code-fast-1:optimized:experimental",
-      "canonical_slug": "x-ai/grok-code-fast-1:optimized:experimental",
-      "hugging_face_id": "",
-      "name": "xAI: Grok Code Fast 1 Optimized (experimental)",
-      "created": 1756238927,
-      "description": "An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.",
-      "context_length": 256000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000000"
-      },
-      "top_provider": {
-        "context_length": 256000,
-        "max_completion_tokens": 10000,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "preferredIndex": 13
-    },
-    {
       "id": "anthropic/claude-sonnet-4",
       "name": "Claude Sonnet 4",
       "created": 1714000000,
@@ -479,6 +435,49 @@
         "max_tokens",
         "temperature",
         "tools"
+      ],
+      "default_parameters": {}
+    },
+    {
+      "id": "x-ai/grok-code-fast-1:optimized:experimental",
+      "canonical_slug": "x-ai/grok-code-fast-1:optimized:experimental",
+      "hugging_face_id": "",
+      "name": "xAI: Grok Code Fast 1 Optimized (experimental, free)",
+      "created": 1756238927,
+      "description": "An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.",
+      "context_length": 256000,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000000",
+        "completion": "0.0000000",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0",
+        "input_cache_read": "0.00000000"
+      },
+      "top_provider": {
+        "context_length": 256000,
+        "max_completion_tokens": 10000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
       ],
       "default_parameters": {}
     }

@@ -1,8 +1,8 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { CloudSessionsPage } from '@/components/cloud-agent/CloudSessionsPage';
+import { CloudNextSessionsPage } from '@/components/cloud-agent-next/CloudNextSessionsPage';
 
 export default async function PersonalCloudPage() {
   await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/cloud');
 
-  return <CloudSessionsPage />;
+  return <CloudNextSessionsPage />;
 }

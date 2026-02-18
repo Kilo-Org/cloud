@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { CloudSessionsPage } from '@/components/cloud-agent/CloudSessionsPage';
+import { CloudNextSessionsPage } from '@/components/cloud-agent-next/CloudNextSessionsPage';
 
 export default async function OrganizationCloudPage({
   params,
@@ -9,7 +9,7 @@ export default async function OrganizationCloudPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => <CloudSessionsPage organizationId={organization.id} />}
+      render={({ organization }) => <CloudNextSessionsPage organizationId={organization.id} />}
     />
   );
 }

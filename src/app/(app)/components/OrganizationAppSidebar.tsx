@@ -138,15 +138,6 @@ export default function OrganizationAppSidebar({
       icon: Cloud,
       url: `/organizations/${organizationId}/cloud`,
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Cloud Next',
-            icon: Cloud,
-            url: `/organizations/${organizationId}/cloud-next`,
-          },
-        ]
-      : []),
     {
       title: 'Sessions',
       icon: List,

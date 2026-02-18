@@ -429,9 +429,7 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
       });
 
       // Navigate to chat page with sessionId
-      const basePath = organizationId
-        ? `/organizations/${organizationId}/cloud-next`
-        : '/cloud-next';
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
     } catch (error) {
       console.error('Failed to prepare session:', error);

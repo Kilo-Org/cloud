@@ -58,9 +58,7 @@ export function useSessionDeletion({
         clearMessages();
         setCurrentSessionId(null);
 
-        const basePath = organizationId
-          ? `/organizations/${organizationId}/cloud-next`
-          : '/cloud-next';
+        const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
         router.push(basePath);
       }
 

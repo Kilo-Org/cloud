@@ -480,10 +480,8 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
         }),
       });
 
-      // Navigate to chat page with sessionId (use cloud-next routes)
-      const basePath = organizationId
-        ? `/organizations/${organizationId}/cloud-next`
-        : '/cloud-next';
+      // Navigate to chat page with sessionId
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
     } catch (error) {
       console.error('Failed to prepare session:', error);

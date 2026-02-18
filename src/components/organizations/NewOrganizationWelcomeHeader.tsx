@@ -7,7 +7,7 @@ import { Users, Mail, X, PartyPopperIcon } from 'lucide-react';
 import { InviteMemberDialog } from './members/InviteMemberDialog';
 import BuyOrganizationCreditsDialog from '@/components/payment/BuyOrganizationCreditsDialog';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
-import { titleCase } from '@/lib/utils';
+import { capitalize } from '@/lib/utils';
 
 type NewOrganizationWelcomeHeaderProps = {
   organizationId: string;

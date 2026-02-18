@@ -762,3 +762,71 @@ describe('metadata recovery via alarm', () => {
     expect(flyClient.listMachines).not.toHaveBeenCalled();
   });
 });
+
+// ============================================================================
+// updateChannels
+// ============================================================================
+
+describe('updateChannels', () => {
+  const fakeEnvelope = {
+    encryptedData: 'data',
+    encryptedDEK: 'dek',
+    algorithm: 'rsa-aes-256-gcm' as const,
+    version: 1 as const,
+  };
+
+  it('sets a telegram token on a provisioned instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.updateChannels({ telegramBotToken: fakeEnvelope });
+
+    expect(result.telegram).toBe(true);
+    expect(result.discord).toBe(false);
+    const channels = storage._store.get('channels') as Record<string, unknown>;
+    expect(channels.telegramBotToken).toEqual(fakeEnvelope);
+  });
+
+  it('removes a telegram token when null is passed', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { telegramBotToken: fakeEnvelope },
+    });
+
+    const result = await instance.updateChannels({ telegramBotToken: null });
+
+    expect(result.telegram).toBe(false);
+    // channels should be null when all tokens are removed
+    expect(storage._store.get('channels')).toBeNull();
+  });
+
+  it('merges with existing channels — setting telegram preserves discord', async () => {
+    const discordEnvelope = { ...fakeEnvelope, encryptedData: 'discord-data' };
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { discordBotToken: discordEnvelope },
+    });
+
+    const result = await instance.updateChannels({ telegramBotToken: fakeEnvelope });
+
+    expect(result.telegram).toBe(true);
+    expect(result.discord).toBe(true);
+    const channels = storage._store.get('channels') as Record<string, unknown>;
+    expect(channels.telegramBotToken).toEqual(fakeEnvelope);
+    expect(channels.discordBotToken).toEqual(discordEnvelope);
+  });
+
+  it('ignores undefined fields — only patches provided keys', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { telegramBotToken: fakeEnvelope },
+    });
+
+    // Pass only discord, leave telegram undefined (should be preserved)
+    const discordEnvelope = { ...fakeEnvelope, encryptedData: 'discord-data' };
+    const result = await instance.updateChannels({ discordBotToken: discordEnvelope });
+
+    expect(result.telegram).toBe(true);
+    expect(result.discord).toBe(true);
+  });
+});

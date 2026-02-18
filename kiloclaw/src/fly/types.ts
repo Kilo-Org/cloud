@@ -93,3 +93,17 @@ export type CreateVolumeRequest = {
   size_gb: number;
   snapshot_retention?: number;
 };
+
+// -- Exec types --
+
+export type MachineExecRequest = {
+  command: string[];
+  timeout?: number;
+};
+
+export type MachineExecResponse = {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+  exit_signal?: number;
+};

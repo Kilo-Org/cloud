@@ -58,6 +58,16 @@ export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
 export type EncryptedEnvelope = z.infer<typeof EncryptedEnvelopeSchema>;
 export type EncryptedChannelTokens = NonNullable<InstanceConfig['channels']>;
 
+export const ChannelsPatchSchema = z.object({
+  userId: z.string().min(1),
+  channels: z.object({
+    telegramBotToken: EncryptedEnvelopeSchema.nullable().optional(),
+    discordBotToken: EncryptedEnvelopeSchema.nullable().optional(),
+    slackBotToken: EncryptedEnvelopeSchema.nullable().optional(),
+    slackAppToken: EncryptedEnvelopeSchema.nullable().optional(),
+  }),
+});
+
 export const ProvisionRequestSchema = z.object({
   userId: z.string().min(1),
   ...InstanceConfigSchema.shape,

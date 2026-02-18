@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Save, Square } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, Save, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -9,6 +9,8 @@ import { useKiloClawConfig } from '@/hooks/useKiloClaw';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 
@@ -35,9 +37,49 @@ export function SettingsTab({
     modelOptions
   );
 
+  const [telegramBotToken, setTelegramBotToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
+  const [channelsDirty, setChannelsDirty] = useState(false);
+
   const isSaving = mutations.patchConfig.isPending;
+  const isSavingChannels = mutations.patchChannels.isPending;
   const isDestroying = status.status === 'destroying';
   const isRunning = status.status === 'running';
+
+  const telegramConfigured = config?.channels?.telegram ?? false;
+
+  function handleSaveChannels() {
+    const trimmed = telegramBotToken.trim();
+    if (!trimmed) {
+      toast.error('Enter a bot token or use Remove to clear it.');
+      return;
+    }
+    mutations.patchChannels.mutate(
+      { telegramBotToken: trimmed },
+      {
+        onSuccess: () => {
+          toast.success('Telegram token saved. Restart to apply.');
+          setTelegramBotToken('');
+          setChannelsDirty(true);
+        },
+        onError: err => toast.error(`Failed to save: ${err.message}`),
+      }
+    );
+  }
+
+  function handleRemoveTelegram() {
+    mutations.patchChannels.mutate(
+      { telegramBotToken: null },
+      {
+        onSuccess: () => {
+          toast.success('Telegram token removed. Restart to apply.');
+          setTelegramBotToken('');
+          setChannelsDirty(true);
+        },
+        onError: err => toast.error(`Failed to remove: ${err.message}`),
+      }
+    );
+  }
 
   function handleSave() {
     if (isLoadingModels) {
@@ -88,6 +130,88 @@ export function SettingsTab({
               Current default model: {config.kilocodeDefaultModel || 'not set'}
             </p>
           )}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div>
+        <h3 className="text-foreground mb-1 text-sm font-medium">Channels</h3>
+        <p className="text-muted-foreground mb-4 text-xs">
+          Connect messaging channels. Advanced settings (DM policy, allow lists, groups) can be
+          configured in the OpenClaw Control UI after connecting.
+        </p>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="settings-telegram-token" className="w-32 shrink-0">
+              Telegram
+            </Label>
+            <span className="text-muted-foreground text-xs">
+              {telegramConfigured ? 'Configured' : 'Not configured'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Input
+                id="settings-telegram-token"
+                type="text"
+                placeholder={
+                  telegramConfigured ? 'Enter new token to replace' : '123456:ABC-DEF...'
+                }
+                value={telegramBotToken}
+                onChange={e => setTelegramBotToken(e.target.value)}
+                disabled={isSavingChannels}
+                data-1p-ignore
+                autoComplete="off"
+                className="pr-9"
+                style={
+                  showToken ? undefined : ({ WebkitTextSecurity: 'disc' } as React.CSSProperties)
+                }
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken(v => !v)}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
+                tabIndex={-1}
+              >
+                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSaveChannels}
+              disabled={isSavingChannels || !telegramBotToken.trim()}
+            >
+              <Save className="h-4 w-4" />
+              {isSavingChannels ? 'Saving...' : 'Save'}
+            </Button>
+            {telegramConfigured && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRemoveTelegram}
+                disabled={isSavingChannels}
+              >
+                <X className="h-4 w-4" />
+                Remove
+              </Button>
+            )}
+          </div>
+
+          <p className="text-muted-foreground text-xs">
+            Get a token from{' '}
+            <a
+              href="https://t.me/BotFather"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              @BotFather
+            </a>
+            .{channelsDirty && ' Restart the instance for changes to take effect.'}
+          </p>
         </div>
       </div>
 

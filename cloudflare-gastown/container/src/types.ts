@@ -104,19 +104,111 @@ export type KiloServerInstance = {
   healthy: boolean;
 };
 
-/**
- * Session info returned by kilo serve POST /session.
- */
-export type KiloSession = {
-  id: string;
-  title?: string;
-};
+// ── Kilo serve API response schemas ──────────────────────────────────────
+
+/** POST /session, GET /session/:id */
+export const KiloSession = z.object({
+  id: z.string(),
+  title: z.string().optional(),
+});
+export type KiloSession = z.infer<typeof KiloSession>;
+
+/** GET /global/health */
+export const KiloHealthResponse = z.object({
+  healthy: z.boolean(),
+  version: z.string(),
+});
+export type KiloHealthResponse = z.infer<typeof KiloHealthResponse>;
 
 // ── SSE events ──────────────────────────────────────────────────────────
 
+/**
+ * Known kilo serve SSE event types as a Zod discriminated union.
+ *
+ * Each variant carries a `sessionID` so consumers can filter events by
+ * session when multiple sessions share a single kilo serve instance.
+ */
+
+const SSESessionEvent = z.object({
+  type: z.enum(['session.completed', 'session.idle', 'session.updated']),
+  properties: z
+    .object({
+      sessionID: z.string(),
+    })
+    .passthrough(),
+});
+
+const SSEMessageEvent = z.object({
+  type: z.enum(['message.created', 'message.completed', 'message.updated', 'message_part.updated']),
+  properties: z
+    .object({
+      sessionID: z.string(),
+    })
+    .passthrough(),
+});
+
+const SSEAssistantEvent = z.object({
+  type: z.enum(['assistant.completed']),
+  properties: z
+    .object({
+      sessionID: z.string(),
+    })
+    .passthrough(),
+});
+
+const SSEErrorEvent = z.object({
+  type: z.enum(['payment_required', 'insufficient_funds', 'error']),
+  properties: z
+    .object({
+      sessionID: z.string().optional(),
+      error: z.string().optional(),
+    })
+    .passthrough(),
+});
+
+const SSEServerEvent = z.object({
+  type: z.enum(['server.connected', 'server.heartbeat']),
+  properties: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** Catch-all for events we haven't explicitly modeled yet. */
+const SSEUnknownEvent = z.object({
+  type: z.string(),
+  properties: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
+ * Try to parse SSE event data against known schemas. Falls through to
+ * the unknown-event catch-all if none match.
+ */
+export function parseSSEEventData(raw: unknown): KiloSSEEventData {
+  for (const schema of [
+    SSESessionEvent,
+    SSEMessageEvent,
+    SSEAssistantEvent,
+    SSEErrorEvent,
+    SSEServerEvent,
+  ] as const) {
+    const result = schema.safeParse(raw);
+    if (result.success) return result.data;
+  }
+  return SSEUnknownEvent.parse(raw);
+}
+
+export type KiloSSEEventData =
+  | z.infer<typeof SSESessionEvent>
+  | z.infer<typeof SSEMessageEvent>
+  | z.infer<typeof SSEAssistantEvent>
+  | z.infer<typeof SSEErrorEvent>
+  | z.infer<typeof SSEServerEvent>
+  | z.infer<typeof SSEUnknownEvent>;
+
+/**
+ * Parsed SSE event: the event name plus its Zod-validated data payload.
+ */
 export type KiloSSEEvent = {
   event: string;
-  data: unknown;
+  data: KiloSSEEventData;
 };
 
 // ── Git manager ─────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
  * via HTTP, not stdin.
  */
 
-import type { ManagedAgent, StartAgentRequest, AgentStatus } from './types';
+import type { ManagedAgent, StartAgentRequest, KiloSSEEventData } from './types';
 import {
   ensureServer,
   registerSession,
@@ -16,7 +16,6 @@ import {
 } from './kilo-server';
 import { createKiloClient } from './kilo-client';
 import { createSSEConsumer, isCompletionEvent, type SSEConsumer } from './sse-consumer';
-import type { KiloSSEEvent } from './types';
 
 const agents = new Map<string, ManagedAgent>();
 const sseConsumers = new Map<string, SSEConsumer>();
@@ -71,17 +70,22 @@ export async function startAgent(
     agent.sessionId = session.id;
     registerSession(workdir, session.id);
 
-    // 3. Subscribe to SSE events for observability
+    // 3. Subscribe to SSE events for observability.
+    //    The SSE stream is server-wide, so filter by our sessionId to avoid
+    //    cross-talk when multiple agents share a kilo serve instance.
     const consumer = createSSEConsumer({
       port,
-      onEvent: (evt: KiloSSEEvent) => {
+      onEvent: evt => {
+        const sessionID = extractSessionID(evt.data);
+        if (sessionID && sessionID !== agent.sessionId) return;
+
         agent.lastActivityAt = new Date().toISOString();
 
         // Track active tool calls from event data
-        if (isRecord(evt.data)) {
-          const data = evt.data as Record<string, unknown>;
-          if (Array.isArray(data.activeTools)) {
-            agent.activeTools = data.activeTools.filter((t): t is string => typeof t === 'string');
+        if ('properties' in evt.data && evt.data.properties) {
+          const props = evt.data.properties;
+          if ('activeTools' in props && Array.isArray(props.activeTools)) {
+            agent.activeTools = props.activeTools.filter((t): t is string => typeof t === 'string');
           }
         }
 
@@ -126,8 +130,15 @@ export async function startAgent(
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+/**
+ * Extract sessionID from a parsed SSE event's properties, if present.
+ */
+function extractSessionID(data: KiloSSEEventData): string | undefined {
+  if ('properties' in data && data.properties && 'sessionID' in data.properties) {
+    const id = data.properties.sessionID;
+    return typeof id === 'string' ? id : undefined;
+  }
+  return undefined;
 }
 
 /**

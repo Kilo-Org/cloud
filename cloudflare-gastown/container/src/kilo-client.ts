@@ -3,9 +3,12 @@
  *
  * Modeled after cloud-agent-next/wrapper/src/kilo-client.ts but simplified
  * for the gastown container use-case (no sandbox indirection, direct fetch).
+ *
+ * All responses are parsed with Zod at the IO boundary — no `as` casts.
  */
 
-import type { KiloSession } from './types';
+import { z } from 'zod';
+import { KiloSession, KiloHealthResponse } from './types';
 
 type TextPart = { type: 'text'; text: string };
 
@@ -18,9 +21,9 @@ type SendPromptBody = {
 };
 
 export type KiloClient = {
-  checkHealth: () => Promise<{ healthy: boolean; version: string }>;
-  createSession: () => Promise<KiloSession>;
-  getSession: (sessionId: string) => Promise<KiloSession>;
+  checkHealth: () => Promise<z.infer<typeof KiloHealthResponse>>;
+  createSession: () => Promise<z.infer<typeof KiloSession>>;
+  getSession: (sessionId: string) => Promise<z.infer<typeof KiloSession>>;
   sendPromptAsync: (
     sessionId: string,
     opts: {
@@ -39,7 +42,7 @@ export type KiloClient = {
 export function createKiloClient(port: number): KiloClient {
   const baseUrl = `http://127.0.0.1:${port}`;
 
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function request(method: string, path: string, body?: unknown): Promise<unknown> {
     const res = await fetch(`${baseUrl}${path}`, {
       method,
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -52,17 +55,26 @@ export function createKiloClient(port: number): KiloClient {
     }
 
     // 204 No Content
-    if (res.status === 204) return undefined as T;
+    if (res.status === 204) return undefined;
 
-    return res.json() as Promise<T>;
+    return res.json();
   }
 
   return {
-    checkHealth: () => request<{ healthy: boolean; version: string }>('GET', '/global/health'),
+    checkHealth: async () => {
+      const raw = await request('GET', '/global/health');
+      return KiloHealthResponse.parse(raw);
+    },
 
-    createSession: () => request<KiloSession>('POST', '/session', {}),
+    createSession: async () => {
+      const raw = await request('POST', '/session', {});
+      return KiloSession.parse(raw);
+    },
 
-    getSession: (sessionId: string) => request<KiloSession>('GET', `/session/${sessionId}`),
+    getSession: async sessionId => {
+      const raw = await request('GET', `/session/${sessionId}`);
+      return KiloSession.parse(raw);
+    },
 
     sendPromptAsync: async (sessionId, opts) => {
       const body: SendPromptBody = {
@@ -79,11 +91,11 @@ export function createKiloClient(port: number): KiloClient {
         body.agent = opts.agent;
       }
 
-      await request<void>('POST', `/session/${sessionId}/prompt_async`, body);
+      await request('POST', `/session/${sessionId}/prompt_async`, body);
     },
 
-    abortSession: async (sessionId: string) => {
-      await request<unknown>('POST', `/session/${sessionId}/abort`);
+    abortSession: async sessionId => {
+      await request('POST', `/session/${sessionId}/abort`);
     },
   };
 }

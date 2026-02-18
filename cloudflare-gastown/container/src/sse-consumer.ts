@@ -6,11 +6,7 @@
  * WebSocket streaming to the dashboard).
  */
 
-import type { KiloSSEEvent } from './types';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import { parseSSEEventData, type KiloSSEEvent } from './types';
 
 export type SSEConsumerOptions = {
   /** Port of the kilo serve instance */
@@ -38,6 +34,8 @@ export type SSEConsumer = {
  *
  * kilo serve may also omit the `event:` line and embed the type inside the
  * data payload as `{ "type": "event.name", "properties": {...} }`.
+ *
+ * All event data is parsed through Zod at the IO boundary via `parseSSEEventData`.
  */
 function parseSSEChunk(chunk: string, flush = false): KiloSSEEvent[] {
   const events: KiloSSEEvent[] = [];
@@ -53,15 +51,18 @@ function parseSSEChunk(chunk: string, flush = false): KiloSSEEvent[] {
     }
 
     const raw = currentData.join('\n');
-    let data: unknown;
+    let jsonData: unknown;
     try {
-      data = raw ? JSON.parse(raw) : {};
+      jsonData = raw ? JSON.parse(raw) : {};
     } catch {
-      data = raw;
+      jsonData = { type: currentEvent ?? 'unknown', properties: { raw } };
     }
 
+    // Parse through Zod at IO boundary
+    const data = parseSSEEventData(jsonData);
+
     let eventName = currentEvent;
-    if (eventName === null && isRecord(data) && typeof data.type === 'string') {
+    if (eventName === null && typeof data.type === 'string') {
       eventName = data.type;
     }
 

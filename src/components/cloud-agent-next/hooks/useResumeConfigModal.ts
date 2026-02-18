@@ -65,10 +65,11 @@ export function needsResumeConfigModal(params: {
 
   if (!loadedDbSession) return false;
 
-  const lastModelRestricted = kiloFreeModels.find(m => m.public_id === loadedDbSession.last_model)
-    ?.allowed_uses?.length;
+  const hasRestrictedUses =
+    (kiloFreeModels.find(m => m.public_id === loadedDbSession.last_model)?.allowed_uses?.length ??
+      0) > 0;
 
-  if (loadedDbSession.last_model && lastModelRestricted && !currentIndexedDbSession?.resumeConfig)
+  if (loadedDbSession.last_model && hasRestrictedUses && !currentIndexedDbSession?.resumeConfig)
     return true;
 
   const isCliSession = !loadedDbSession.cloud_agent_session_id;

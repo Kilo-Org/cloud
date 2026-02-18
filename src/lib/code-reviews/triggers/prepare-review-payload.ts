@@ -341,7 +341,7 @@ export async function prepareReviewPayload(
             gitToken: gitlabToken,
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
-            mode: DEFAULT_CODE_REVIEW_MODE as 'code',
+            mode: DEFAULT_CODE_REVIEW_MODE,
             model: config.model_slug || getDefaultCodeReviewModel(),
             upstreamBranch: review.head_ref,
           }
@@ -351,7 +351,7 @@ export async function prepareReviewPayload(
             githubToken,
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
-            mode: DEFAULT_CODE_REVIEW_MODE as 'code',
+            mode: DEFAULT_CODE_REVIEW_MODE,
             model: config.model_slug || getDefaultCodeReviewModel(),
             upstreamBranch: review.head_ref,
           };

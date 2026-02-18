@@ -247,10 +247,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const freeModel = kiloFreeModels.find(m => m.public_id === originalModelIdLowerCased);
 
-  if (freeModel?.allowed_uses?.includes('slackbot') && !internalApiUse) {
-    return modelDoesNotExistResponse();
-  }
-  if (freeModel?.allowed_uses?.includes('review') && !internalApiUse) {
+  // Models with allowed_uses are restricted to internal API (e.g. slackbot, review)
+  if (freeModel?.allowed_uses?.length && !internalApiUse) {
     return modelDoesNotExistResponse();
   }
 

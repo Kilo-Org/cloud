@@ -63,7 +63,7 @@ export function InstanceControls({
           className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
           disabled={!isRunning || mutations.restartGateway.isPending || isDestroying}
           onClick={() => {
-            posthog?.capture('claw_restart_gateway_clicked', { instance_status: status.status });
+            posthog?.capture('claw_redeploy_clicked', { instance_status: status.status });
             mutations.restartGateway.mutate(undefined, {
               onSuccess: () => toast.success('Gateway restarting'),
               onError: err => toast.error(err.message),

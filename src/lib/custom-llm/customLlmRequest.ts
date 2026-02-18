@@ -532,6 +532,7 @@ function buildCommonParams(
         textVerbosity: verbosity === 'max' ? 'high' : verbosity,
         reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort,
         include: ['reasoning.encrypted_content'],
+        store: false,
       } satisfies OpenAILanguageModelResponsesOptions,
       xai: {
         store: false,

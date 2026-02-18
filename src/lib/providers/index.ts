@@ -178,7 +178,7 @@ export async function getProvider(
         context_length: kiloFreeModel.context_length,
         max_completion_tokens: kiloFreeModel.max_completion_tokens,
         verbosity: null,
-        provider: 'xai',
+        provider: 'openai',
         organization_ids: [],
         base_url: freeModelProvider.apiUrl,
         api_key: freeModelProvider.apiKey,

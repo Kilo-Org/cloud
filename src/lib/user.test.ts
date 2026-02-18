@@ -18,7 +18,7 @@ import {
   free_model_usage,
   organizations,
 } from '@/db/schema';
-import { eq, count, sql } from 'drizzle-orm';
+import { eq, count } from 'drizzle-orm';
 import { deleteUserDatabaseRecords, findUserById, findUsersByIds } from './user';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -470,7 +470,7 @@ describe('User', () => {
         name: 'Test Org',
         stripe_customer_id: `stripe-org-${orgId}`,
         created_by_kilo_user_id: user1.id,
-        plan: 'enterprise' as any,
+        plan: 'enterprise',
       });
 
       // Add both users as members
@@ -478,13 +478,13 @@ describe('User', () => {
         {
           organization_id: orgId,
           kilo_user_id: user1.id,
-          role: 'owner' as any,
+          role: 'owner',
           joined_at: new Date().toISOString(),
         },
         {
           organization_id: orgId,
           kilo_user_id: user2.id,
-          role: 'member' as any,
+          role: 'member',
           joined_at: new Date().toISOString(),
         },
       ]);

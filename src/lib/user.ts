@@ -9,8 +9,6 @@ import { WorkOS } from '@workos-inc/node';
 import type { User } from '@/db/schema';
 import {
   credit_transactions,
-  microdollar_usage,
-  microdollar_usage_metadata,
   payment_methods,
   kilocode_users,
   stytch_fingerprints,
@@ -35,7 +33,6 @@ import {
   organization_user_limits,
   organization_user_usage,
   free_model_usage,
-  api_request_log,
 } from '@/db/schema';
 import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
@@ -363,7 +360,7 @@ const BATCH_DELETE_SIZE = 5000;
  */
 async function batchDeleteHighVolumeTables(userId: string) {
   // Delete microdollar_usage_metadata first (shares PK with microdollar_usage)
-  // eslint-disable-next-line drizzle/enforce-delete-with-where
+
   let deleted: { rowCount: number | null };
   do {
     deleted = await db.execute(sql`

@@ -28,6 +28,7 @@ import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
 import { reportAbuseCost } from '@/lib/abuse-service';
+import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
 
 const posthogClient = PostHogClient();
 
@@ -173,6 +174,7 @@ export type MicrodollarUsageContext = {
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
   has_tools: boolean;
+  botId?: string;
   /** Request ID from abuse service classify response, for cost tracking correlation. 0 means skip. */
   abuse_request_id?: number;
 };
@@ -930,7 +932,11 @@ async function processTokenData(
     console.error('[Abuse] Failed to report cost:', error);
   });
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if (
+    isFreeModel(usageContext.requested_model) ||
+    usageContext.user_byok ||
+    isActiveReviewPromo(usageContext.botId, usageContext.requested_model)
+  ) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }

@@ -643,6 +643,7 @@ type GetAuthResponse =
       isNewUser?: undefined;
       organizationId?: undefined;
       internalApiUse?: undefined;
+      botId?: undefined;
     }
   | {
       user: User;
@@ -650,6 +651,7 @@ type GetAuthResponse =
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
+      botId?: string;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -675,6 +677,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
 
     const organizationId = headersList.get(ORGANIZATION_ID_HEADER) || undefined;
     const internalApiUse = authorizationValidationResult.internalApiUse;
+    const botId = authorizationValidationResult.botId;
 
     return await validateUserAuthorization(
       authorizationValidationResult.kiloUserId,
@@ -683,7 +686,8 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       false,
       organizationId,
       internalApiUse,
-      readDb
+      readDb,
+      botId
     );
   }
 
@@ -733,7 +737,8 @@ async function validateUserAuthorization(
   isNewUser?: boolean,
   organizationId?: Organization['id'],
   internalApiUse?: boolean,
-  fromDb: typeof db = db
+  fromDb: typeof db = db,
+  botId?: string
 ): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId);
@@ -756,7 +761,7 @@ async function validateUserAuthorization(
     }
   }
 
-  return { user, authFailedResponse: null, isNewUser, organizationId, internalApiUse };
+  return { user, authFailedResponse: null, isNewUser, organizationId, internalApiUse, botId };
 }
 
 export const isUserBlacklistedByDomain = (existingUser: Pick<User, 'google_user_email'>) =>

@@ -511,7 +511,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   /**
    * List pending channel pairing requests across all configured channels.
    * Uses the openclaw-pairing-list.js helper script on the machine.
-   * Results are cached in KV for 60s. Pass forceRefresh to bypass cache.
+   * Results are cached in KV for 2 minutes. Pass forceRefresh to bypass cache.
    * Requires the machine to be running.
    */
   async listPairingRequests(forceRefresh = false): Promise<{
@@ -533,17 +533,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const cacheKey = this.pairingCacheKey();
     if (cacheKey && !forceRefresh) {
       const cached = await this.env.KV_CLAW_CACHE.get(cacheKey, 'json');
-      if (cached) {
+      if (
+        cached &&
+        typeof cached === 'object' &&
+        'requests' in cached &&
+        Array.isArray(cached.requests)
+      ) {
         console.log(`[DO] pairing list served from KV cache (key=${cacheKey})`);
-        return cached as {
-          requests: Array<{
-            code: string;
-            id: string;
-            channel: string;
-            meta?: unknown;
-            createdAt?: string;
-          }>;
-        };
+        return { requests: cached.requests };
       }
     }
 
@@ -552,7 +549,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const result = await fly.execCommand(
       flyConfig,
       flyMachineId,
-      ['/bin/bash', '-c', 'HOME=/root node /usr/local/bin/openclaw-pairing-list.js'],
+      ['/usr/bin/env', 'HOME=/root', 'node', '/usr/local/bin/openclaw-pairing-list.js'],
       20
     );
 
@@ -623,7 +620,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const result = await fly.execCommand(
       flyConfig,
       flyMachineId,
-      ['/bin/bash', '-c', `HOME=/root openclaw pairing approve ${channel} ${code} --notify`],
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'pairing', 'approve', channel, code, '--notify'],
       15
     );
 

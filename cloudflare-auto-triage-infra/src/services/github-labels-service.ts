@@ -7,9 +7,8 @@
 
 export const DEFAULT_LABELS = ['bug', 'duplicate', 'question', 'needs clarification'];
 
-type GitHubLabelResponse = {
-  name: string;
-};
+const hasStringName = (item: unknown): item is { name: string } =>
+  typeof item === 'object' && item !== null && 'name' in item && typeof item.name === 'string';
 
 /**
  * Fetch all labels from a GitHub repository.
@@ -49,22 +48,30 @@ export async function fetchRepoLabels(
       return DEFAULT_LABELS;
     }
 
-    const labels: GitHubLabelResponse[] = await response.json();
+    const body: unknown = await response.json();
 
-    if (labels.length === 0) {
+    if (!Array.isArray(body)) {
+      console.warn('[auto-triage:labels] Unexpected response format, falling back to defaults', {
+        repoFullName,
+        type: typeof body,
+      });
+      return DEFAULT_LABELS;
+    }
+
+    if (body.length === 0) {
       console.warn('[auto-triage:labels] Repo has no labels, falling back to defaults', {
         repoFullName,
       });
       return DEFAULT_LABELS;
     }
 
-    if (labels.length === 100) {
+    if (body.length === 100) {
       console.warn('[auto-triage:labels] Repo may have >100 labels; only first page fetched', {
         repoFullName,
       });
     }
 
-    const labelNames = labels.map(l => l.name);
+    const labelNames = body.filter(hasStringName).map(item => item.name);
     console.log('[auto-triage:labels] Labels fetched from repo', {
       repoFullName,
       count: labelNames.length,

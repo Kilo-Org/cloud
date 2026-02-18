@@ -260,6 +260,9 @@ const FINISH_REASON_MAP: Record<string, string> = {
 function createStreamPartConverter(model: string) {
   const toolCallIndices = new Map<string, number>();
   let nextToolIndex = 0;
+  let nextReasoningIndex = 0;
+  let currentTextBlockIndex: number | null = null;
+  let inReasoningBlock = false;
   let responseId: string | undefined;
 
   return function convertStreamPartToChunk(
@@ -280,6 +283,7 @@ function createStreamPartConverter(model: string) {
         if (encData) {
           const itemId = extractItemId(part.providerMetadata);
           const format = extractFormat(part.providerMetadata);
+          const index = nextReasoningIndex++;
           return {
             ...(id !== undefined ? { id } : {}),
             model,
@@ -290,6 +294,7 @@ function createStreamPartConverter(model: string) {
                     {
                       type: ReasoningDetailType.Encrypted,
                       data: encData,
+                      index,
                       ...(itemId ? { id: itemId } : {}),
                       ...(format ? { format } : {}),
                     },
@@ -299,6 +304,7 @@ function createStreamPartConverter(model: string) {
             ],
           };
         }
+        inReasoningBlock = true;
         return null;
       }
 
@@ -308,10 +314,15 @@ function createStreamPartConverter(model: string) {
         const format = extractFormat(part.providerMetadata);
 
         if (part.text) {
+          if (inReasoningBlock) {
+            currentTextBlockIndex = nextReasoningIndex++;
+            inReasoningBlock = false;
+          }
           const itemId = extractItemId(part.providerMetadata);
           details.push({
             type: ReasoningDetailType.Text,
             text: part.text,
+            index: currentTextBlockIndex ?? 0,
             ...(signature ? { signature } : {}),
             ...(itemId ? { id: itemId } : {}),
             ...(format ? { format } : {}),
@@ -322,6 +333,7 @@ function createStreamPartConverter(model: string) {
             type: ReasoningDetailType.Text,
             text: '',
             signature,
+            index: currentTextBlockIndex ?? 0,
             ...(format ? { format } : {}),
           });
         }
@@ -354,9 +366,11 @@ function createStreamPartConverter(model: string) {
         const format = extractFormat(part.providerMetadata);
 
         if (encData) {
+          const index = nextReasoningIndex++;
           details.push({
             type: ReasoningDetailType.Encrypted,
             data: encData,
+            index,
             ...(itemId ? { id: itemId } : {}),
             ...(format ? { format } : {}),
           });
@@ -367,6 +381,7 @@ function createStreamPartConverter(model: string) {
             type: ReasoningDetailType.Text,
             text: '',
             signature,
+            index: currentTextBlockIndex ?? 0,
             ...(itemId ? { id: itemId } : {}),
             ...(format ? { format } : {}),
           });

@@ -49,7 +49,7 @@ const FEATURE_VALUES = [
   'webhook', // Webhook agent
 
   // Other
-  'kilo-claw', // Kilo Claw conversations
+  'kilo-claw', // KiloClaw conversations
 ] as const;
 // NULL = no header sent (unattributed, e.g. direct gateway consumers or pre-rollout data)
 ```
@@ -173,9 +173,9 @@ The following CF workers need `createdOnPlatform` added to their session input:
 - **Auto-Triage** → `'auto-triage'` in [`cloudflare-auto-triage-infra/src/triage-orchestrator.ts`](cloudflare-auto-triage-infra/src/triage-orchestrator.ts)
 - **Autofix** → `'autofix'` in [`cloudflare-auto-fix-infra/src/fix-orchestrator.ts`](cloudflare-auto-fix-infra/src/fix-orchestrator.ts)
 
-### Step 9: Kilo Claw (cloud repo)
+### Step 9: KiloClaw (cloud repo)
 
-In [`kiloclaw/src/gateway/env.ts`](kiloclaw/src/gateway/env.ts), add `KILOCODE_FEATURE: 'kilo-claw'` to the env vars passed to the sandbox in `buildEnvVars()`. Kilo Claw runs OpenClaw inside a Fly.io sandbox with the kilo CLI, so it goes through the same kilo-gateway path as cloud-agent.
+In [`kiloclaw/src/gateway/env.ts`](kiloclaw/src/gateway/env.ts), add `KILOCODE_FEATURE: 'kilo-claw'` to the env vars passed to the sandbox in `buildEnvVars()`. KiloClaw runs OpenClaw inside a Fly.io sandbox with the kilo CLI, so it goes through the same kilo-gateway path as cloud-agent.
 
 ### Step 10: Update Test Helpers (cloud repo)
 
@@ -197,7 +197,7 @@ No strict dependencies between repos. Backend first is recommended so the column
 | 3        | Pass `KILOCODE_FEATURE` env var in cloud-agent-next      | `cloud`    |
 | 4        | Add `X-KiloCode-Feature` header to old extension         | `kilocode` |
 | 5        | Add feature to `sendProxiedChatCompletion` callers       | `cloud`    |
-| 6        | Add `KILOCODE_FEATURE=kilo-claw` to Kilo Claw env        | `cloud`    |
+| 6        | Add `KILOCODE_FEATURE=kilo-claw` to KiloClaw env         | `cloud`    |
 
 ## Feature Coverage Matrix
 
@@ -218,7 +218,7 @@ No strict dependencies between repos. Backend first is recommended so the column
 | Security Agent      | `sendProxiedChatCompletion` with `feature: 'security-agent'`                                               | `security-agent`      |
 | Slack               | `sendProxiedChatCompletion` with `feature: 'slack'` + `createdOnPlatform: 'slack'` for spawned sessions    | `slack`               |
 | Webhook             | `createdOnPlatform: 'webhook'` via token minting (separate worker, rolls up into Cloud Agents for WAU)     | `webhook`             |
-| Kilo Claw           | kilo-gateway + `KILOCODE_FEATURE=kilo-claw` env (set in `kiloclaw/src/gateway/env.ts`)                     | `kilo-claw`           |
+| KiloClaw            | kilo-gateway + `KILOCODE_FEATURE=kilo-claw` env (set in `kiloclaw/src/gateway/env.ts`)                     | `kilo-claw`           |
 | Direct Gateway      | `/api/gateway/` route wrapper injects `direct-gateway` when no feature header present                      | `direct-gateway`      |
 | Unattributed        | No header sent                                                                                             | `NULL`                |
 

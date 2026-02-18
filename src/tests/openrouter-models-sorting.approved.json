@@ -203,10 +203,10 @@
       }
     },
     {
-      "id": "x-ai/grok-code-fast-1:optimized:free",
-      "canonical_slug": "x-ai/grok-code-fast-1:optimized:free",
+      "id": "x-ai/grok-code-fast-1:optimized:experimental",
+      "canonical_slug": "x-ai/grok-code-fast-1:optimized:experimental",
       "hugging_face_id": "",
-      "name": "xAI: Grok Code Fast 1 Optimized (free)",
+      "name": "xAI: Grok Code Fast 1 Optimized (experimental)",
       "created": 1756238927,
       "description": "An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.",
       "context_length": 256000,

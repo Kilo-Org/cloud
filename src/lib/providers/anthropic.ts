@@ -14,12 +14,12 @@ export const opus_46_free_slackbot_model = {
   context_length: 1_000_000,
   max_completion_tokens: 32000,
   is_enabled: false,
-  flags: ['reasoning', 'prompt_cache', 'vision'],
-  gateway: 'openrouter',
+  flags: ['reasoning', 'prompt_cache', 'vision'] as KiloFreeModel['flags'],
+  gateway: 'openrouter' as const,
   internal_id: 'anthropic/claude-opus-4.6',
-  inference_providers: [],
+  inference_providers: [] as KiloFreeModel['inference_providers'],
   slackbot_only: true,
-} as KiloFreeModel;
+} satisfies KiloFreeModel;
 
 export const SONNET_46_REVIEW_PROMO_MODEL_ID = 'anthropic/claude-sonnet-4-6-20250514:review';
 
@@ -30,14 +30,14 @@ export const sonnet_46_free_review_model = {
   context_length: 200_000,
   max_completion_tokens: 16384,
   is_enabled: true,
-  flags: ['reasoning', 'prompt_cache', 'vision'],
-  gateway: 'openrouter',
+  flags: ['reasoning', 'prompt_cache', 'vision'] as KiloFreeModel['flags'],
+  gateway: 'openrouter' as const,
   internal_id: 'anthropic/claude-sonnet-4-6-20250514',
-  inference_providers: ['anthropic'],
+  inference_providers: ['anthropic'] as KiloFreeModel['inference_providers'],
   review_only: true,
   promotion_start: '2026-02-18T00:00:00Z',
   promotion_end: '2026-02-25T00:00:00Z',
-} as KiloFreeModel;
+} satisfies KiloFreeModel;
 
 const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;
 

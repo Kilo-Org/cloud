@@ -380,18 +380,19 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     const promoEnd = promoModel.promotion_end ?? '2026-02-25T00:00:00Z';
     const promoModelId = promoModel.internal_id;
 
-    // Query code reviews that used the promotional model during the promotion window
-    // Join with cli_sessions to check last_model
+    // Query code reviews that used the promotional model during the promotion window.
+    // Left join with cli_sessions to check last_model (cli_session_id is nullable).
+    // Rows without a cli_session are naturally excluded by the eq() predicate on last_model.
     const result = await db
       .select({
         total_promo_reviews: sql<number>`COUNT(*)`,
         completed_promo_reviews: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
         failed_promo_reviews: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed')`,
-        unique_users: sql<number>`COUNT(DISTINCT COALESCE(${cloud_agent_code_reviews.owned_by_user_id}, ${cloud_agent_code_reviews.owned_by_organization_id}))`,
+        unique_users: sql<number>`COUNT(DISTINCT COALESCE(${cloud_agent_code_reviews.owned_by_user_id}, ${cloud_agent_code_reviews.owned_by_organization_id}::text))`,
         unique_orgs: sql<number>`COUNT(DISTINCT ${cloud_agent_code_reviews.owned_by_organization_id})`,
       })
       .from(cloud_agent_code_reviews)
-      .innerJoin(cliSessions, eq(cloud_agent_code_reviews.cli_session_id, cliSessions.session_id))
+      .leftJoin(cliSessions, eq(cloud_agent_code_reviews.cli_session_id, cliSessions.session_id))
       .where(
         and(
           gte(cloud_agent_code_reviews.created_at, promoStart),
@@ -406,10 +407,10 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         day: sql<string>`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})::date::text`,
         total: sql<number>`COUNT(*)`,
         completed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
-        unique_users: sql<number>`COUNT(DISTINCT COALESCE(${cloud_agent_code_reviews.owned_by_user_id}, ${cloud_agent_code_reviews.owned_by_organization_id}))`,
+        unique_users: sql<number>`COUNT(DISTINCT COALESCE(${cloud_agent_code_reviews.owned_by_user_id}, ${cloud_agent_code_reviews.owned_by_organization_id}::text))`,
       })
       .from(cloud_agent_code_reviews)
-      .innerJoin(cliSessions, eq(cloud_agent_code_reviews.cli_session_id, cliSessions.session_id))
+      .leftJoin(cliSessions, eq(cloud_agent_code_reviews.cli_session_id, cliSessions.session_id))
       .where(
         and(
           gte(cloud_agent_code_reviews.created_at, promoStart),
@@ -420,7 +421,13 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       .groupBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
       .orderBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`);
 
-    const stats = result[0];
+    const stats = result[0] ?? {
+      total_promo_reviews: 0,
+      completed_promo_reviews: 0,
+      failed_promo_reviews: 0,
+      unique_users: 0,
+      unique_orgs: 0,
+    };
     return {
       promotionModelId: promoModel.public_id,
       promotionInternalModelId: promoModelId,

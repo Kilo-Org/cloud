@@ -53,7 +53,9 @@ export function isFreeModel(model: string): boolean {
 }
 
 export function isRateLimitedModel(model: string): boolean {
-  return kiloFreeModels.some(m => m.public_id === model && m.is_enabled && !m.slackbot_only);
+  return kiloFreeModels.some(
+    m => m.public_id === model && m.is_enabled && !m.slackbot_only && !m.review_only
+  );
 }
 
 export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {

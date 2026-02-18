@@ -25,9 +25,6 @@ export function getDefaultCodeReviewModel(): string {
   return promoModel?.internal_id ?? BASE_CODE_REVIEW_MODEL;
 }
 
-/** @deprecated Use getDefaultCodeReviewModel() for promotion-aware model selection */
-export const DEFAULT_CODE_REVIEW_MODEL = BASE_CODE_REVIEW_MODEL;
-
 /**
  * Default mode for cloud agent sessions
  */

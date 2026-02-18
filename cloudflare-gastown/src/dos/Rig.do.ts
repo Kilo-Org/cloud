@@ -621,7 +621,12 @@ export class RigDO extends DurableObject<Env> {
     // Hook them together (also arms the alarm)
     await this.hookBead(agent.id, bead.id);
 
-    return { bead: (await this.getBeadAsync(bead.id))!, agent: this.getAgent(agent.id)! };
+    const updatedBead = await this.getBeadAsync(bead.id);
+    const updatedAgent = this.getAgent(agent.id);
+    if (!updatedBead || !updatedAgent) {
+      throw new Error(`slingBead: failed to re-fetch bead ${bead.id} or agent ${agent.id}`);
+    }
+    return { bead: updatedBead, agent: updatedAgent };
   }
 
   // ── Get or Create Agent ────────────────────────────────────────────────

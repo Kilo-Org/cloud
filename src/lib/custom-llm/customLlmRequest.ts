@@ -622,6 +622,7 @@ export async function customLlmRequest(
       const result = await generateText({ model, ...commonParams });
       return NextResponse.json(convertGenerateResultToResponse(result, modelId));
     } catch (e) {
+      console.error('Caught exception while processing non-streaming request', e);
       const status = APICallError.isInstance(e) ? (e.statusCode ?? 500) : 500;
       const msg = e instanceof Error ? e.message : 'Generation failed';
       return errorResponse(status, msg);
@@ -658,6 +659,7 @@ export async function customLlmRequest(
 
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       } catch (e) {
+        console.error('Caught exception while processing streaming request', e);
         const errorChunk = {
           error: {
             message: e instanceof Error ? e.message : 'Stream error',

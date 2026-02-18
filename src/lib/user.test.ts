@@ -1,3 +1,4 @@
+/* eslint-disable drizzle/enforce-delete-with-where */
 import { db } from '@/lib/drizzle';
 import {
   microdollar_usage,
@@ -35,39 +36,22 @@ import {
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(user_auth_provider);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(microdollar_usage_metadata);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(microdollar_usage);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(payment_methods);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(kilo_pass_issuance_items);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(kilo_pass_issuances);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(kilo_pass_subscriptions);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(credit_transactions);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(enrichment_data);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(referral_code_usages);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(referral_codes);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_user_usage);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_user_limits);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_memberships);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(free_model_usage);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(kilocode_users);
   });
 
@@ -547,7 +531,6 @@ describe('User', () => {
 
   describe('forceImmediateExpirationRecomputation', () => {
     afterEach(async () => {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where
       await db.delete(kilocode_users);
     });
 

@@ -620,7 +620,14 @@ export async function customLlmRequest(
   if (!request.stream) {
     try {
       const result = await generateText({ model, ...commonParams });
-      return NextResponse.json(convertGenerateResultToResponse(result, modelId));
+      const convertedResponse = convertGenerateResultToResponse(result, modelId);
+
+      if (inStreamDebugMode) {
+        debugSaveLog(JSON.stringify(result.response.body, undefined, 2), 'response.native.json');
+        debugSaveLog(JSON.stringify(convertedResponse, undefined, 2), 'response.gateway.json');
+      }
+
+      return NextResponse.json(convertedResponse);
     } catch (e) {
       console.error('Caught exception while processing non-streaming request', e);
       const status = APICallError.isInstance(e) ? (e.statusCode ?? 500) : 500;
@@ -631,8 +638,10 @@ export async function customLlmRequest(
 
   const result = streamText({ model, ...commonParams, includeRawChunks: inStreamDebugMode });
 
-  debugSaveLog(JSON.stringify(request, undefined, 2), 'request.gateway.json');
-  debugSaveLog(JSON.stringify((await result.request).body, undefined, 2), 'request.native.json');
+  if (inStreamDebugMode) {
+    debugSaveLog(JSON.stringify(request, undefined, 2), 'request.gateway.json');
+    debugSaveLog(JSON.stringify((await result.request).body, undefined, 2), 'request.native.json');
+  }
 
   const convertStreamPartToChunk = createStreamPartConverter(modelId);
 

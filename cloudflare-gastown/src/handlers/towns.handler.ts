@@ -17,6 +17,7 @@ const CreateRigBody = z.object({
   name: z.string().min(1).max(64),
   git_url: z.string().url(),
   default_branch: z.string().min(1).default('main'),
+  kilocode_token: z.string().min(1).optional(),
 });
 
 /**
@@ -81,6 +82,7 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
       gitUrl: parsed.data.git_url,
       defaultBranch: parsed.data.default_branch,
       userId: params.userId,
+      kilocodeToken: parsed.data.kilocode_token,
     });
     console.log(`${TOWNS_LOG} handleCreateRig: Rig DO configured successfully`);
   } catch (err) {

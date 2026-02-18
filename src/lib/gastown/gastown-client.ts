@@ -39,7 +39,7 @@ export type Rig = z.output<typeof RigSchema>;
 export const BeadSchema = z.object({
   id: z.string(),
   type: z.enum(['issue', 'message', 'escalation', 'merge_request']),
-  status: z.enum(['open', 'in_progress', 'closed']),
+  status: z.enum(['open', 'in_progress', 'closed', 'failed']),
   title: z.string(),
   body: z.string().nullable(),
   assignee_agent_id: z.string().nullable(),
@@ -73,6 +73,7 @@ export const AgentSchema = z.object({
   identity: z.string(),
   status: z.enum(['idle', 'working', 'blocked', 'dead']),
   current_hook_bead_id: z.string().nullable(),
+  dispatch_attempts: z.number().default(0),
   last_activity_at: z.string(),
   checkpoint: z.string().nullable(),
   created_at: z.string(),
@@ -188,7 +189,13 @@ export async function getTown(userId: string, townId: string): Promise<Town> {
 
 export async function createRig(
   userId: string,
-  input: { town_id: string; name: string; git_url: string; default_branch: string }
+  input: {
+    town_id: string;
+    name: string;
+    git_url: string;
+    default_branch: string;
+    kilocode_token?: string;
+  }
 ): Promise<Rig> {
   const body = await gastownFetch(`/api/users/${userId}/rigs`, {
     method: 'POST',

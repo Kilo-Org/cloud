@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import * as gastown from '@/lib/gastown/gastown-client';
 import { GastownApiError } from '@/lib/gastown/gastown-client';
+import { generateApiToken } from '@/lib/tokens';
 
 const LOG_PREFIX = '[gastown-router]';
 
@@ -77,12 +78,17 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
 
+      // Generate a user API token so agents can route LLM calls through the
+      // Kilo gateway. Stored in RigConfig and injected into agent env vars.
+      const kilocodeToken = generateApiToken(ctx.user);
+
       return withGastownError(() =>
         gastown.createRig(ctx.user.id, {
           town_id: input.townId,
           name: input.name,
           git_url: input.gitUrl,
           default_branch: input.defaultBranch,
+          kilocode_token: kilocodeToken,
         })
       );
     }),
@@ -115,7 +121,7 @@ export const gastownRouter = createTRPCRouter({
     .input(
       z.object({
         rigId: z.string().uuid(),
-        status: z.enum(['open', 'in_progress', 'closed']).optional(),
+        status: z.enum(['open', 'in_progress', 'closed', 'failed']).optional(),
       })
     )
     .query(async ({ ctx, input }) => {

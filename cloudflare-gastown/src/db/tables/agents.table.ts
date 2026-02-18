@@ -11,6 +11,7 @@ export const AgentRecord = z.object({
   identity: z.string(),
   status: AgentStatus,
   current_hook_bead_id: z.string().nullable(),
+  dispatch_attempts: z.number().default(0),
   last_activity_at: z.string().nullable(),
   checkpoint: z
     .string()
@@ -32,6 +33,7 @@ export function createTableAgents(): string {
     identity: `text not null unique`,
     status: `text not null default 'idle' check(status in ('idle', 'working', 'blocked', 'dead'))`,
     current_hook_bead_id: `text references beads(id)`,
+    dispatch_attempts: `integer not null default 0`,
     last_activity_at: `text`,
     checkpoint: `text`,
     created_at: `text not null`,

@@ -52,6 +52,9 @@ const ACTIVE_ALARM_INTERVAL_MS = 30_000;
 // Timeout for review entries stuck in 'running' state (container crashed mid-merge)
 const REVIEW_RUNNING_TIMEOUT_MS = 5 * 60 * 1000;
 
+// Max consecutive dispatch attempts before marking a bead as failed
+const MAX_DISPATCH_ATTEMPTS = 5;
+
 // KV keys for rig configuration (stored in DO KV storage, not SQL)
 const TOWN_ID_KEY = 'townId';
 const RIG_CONFIG_KEY = 'rigConfig';
@@ -62,6 +65,8 @@ type RigConfig = {
   gitUrl: string;
   defaultBranch: string;
   userId: string;
+  /** User's Kilo API token for LLM gateway access (generated via generateApiToken) */
+  kilocodeToken?: string;
 };
 
 export class RigDO extends DurableObject<Env> {
@@ -399,6 +404,7 @@ export class RigDO extends DurableObject<Env> {
       /* sql */ `
         UPDATE ${agents}
         SET ${agents.columns.current_hook_bead_id} = ?,
+            ${agents.columns.dispatch_attempts} = 0,
             ${agents.columns.last_activity_at} = ?
         WHERE ${agents.columns.id} = ?
       `,
@@ -676,6 +682,57 @@ export class RigDO extends DurableObject<Env> {
     // Unhook and set to idle
     await this.unhookBead(agentId);
 
+    await this.armAlarmIfNeeded();
+  }
+
+  // ── Agent Completed (container callback) ─────────────────────────────────
+
+  /**
+   * Called by the container when an agent session completes or fails.
+   * Closes the bead if the agent completed successfully, or marks it
+   * as failed if the agent errored. Unhooks the agent in both cases.
+   *
+   * Unlike `agentDone` (called by the agent itself via gt_done tool),
+   * this is called by the container's process manager when it detects
+   * session completion via SSE events.
+   */
+  async agentCompleted(
+    agentId: string,
+    input: { status: 'completed' | 'failed'; reason?: string }
+  ): Promise<void> {
+    await this.ensureInitialized();
+
+    const agent = this.getAgent(agentId);
+    if (!agent) {
+      console.warn(`${RIG_LOG} agentCompleted: agent ${agentId} not found, ignoring`);
+      return;
+    }
+
+    const beadId = agent.current_hook_bead_id;
+    if (beadId) {
+      const beadStatus = input.status === 'completed' ? 'closed' : 'failed';
+      console.log(
+        `${RIG_LOG} agentCompleted: agent ${agentId} ${input.status}, transitioning bead ${beadId} to '${beadStatus}'`
+      );
+      const timestamp = now();
+      const closedAt = beadStatus === 'closed' ? timestamp : null;
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.status} = ?,
+              ${beads.columns.updated_at} = ?,
+              ${beads.columns.closed_at} = COALESCE(?, ${beads.columns.closed_at})
+          WHERE ${beads.columns.id} = ?
+        `,
+        [beadStatus, timestamp, closedAt, beadId]
+      );
+    } else {
+      console.log(`${RIG_LOG} agentCompleted: agent ${agentId} ${input.status} but no hooked bead`);
+    }
+
+    // Unhook and set to idle
+    await this.unhookBead(agentId);
     await this.armAlarmIfNeeded();
   }
 
@@ -976,8 +1033,40 @@ export class RigDO extends DurableObject<Env> {
         continue;
       }
 
+      // Circuit breaker: if this agent has exceeded max dispatch attempts,
+      // mark the bead as failed and unhook the agent to stop retrying.
+      const attempts = agent.dispatch_attempts + 1;
+      if (attempts > MAX_DISPATCH_ATTEMPTS) {
+        console.error(
+          `${RIG_LOG} schedulePendingWork: agent ${agent.id} exceeded ${MAX_DISPATCH_ATTEMPTS} dispatch attempts for bead ${beadId}, marking bead as failed`
+        );
+        query(
+          this.sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.status} = 'failed',
+                ${beads.columns.updated_at} = ?
+            WHERE ${beads.columns.id} = ?
+          `,
+          [now(), beadId]
+        );
+        await this.unhookBead(agent.id);
+        continue;
+      }
+
+      // Increment dispatch_attempts before attempting
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${agents}
+          SET ${agents.columns.dispatch_attempts} = ?
+          WHERE ${agents.columns.id} = ?
+        `,
+        [attempts, agent.id]
+      );
+
       console.log(
-        `${RIG_LOG} schedulePendingWork: dispatching agent ${agent.id} (${agent.role}/${agent.name}) to container for bead "${bead.title?.slice(0, 60)}"`
+        `${RIG_LOG} schedulePendingWork: dispatching agent ${agent.id} (${agent.role}/${agent.name}) to container for bead "${bead.title?.slice(0, 60)}" (attempt ${attempts}/${MAX_DISPATCH_ATTEMPTS})`
       );
       const started = await this.startAgentInContainer(config, {
         agentId: agent.id,
@@ -994,11 +1083,13 @@ export class RigDO extends DurableObject<Env> {
         console.log(
           `${RIG_LOG} schedulePendingWork: agent ${agent.id} started in container, marking as 'working'`
         );
+        // Reset dispatch_attempts on successful start
         query(
           this.sql,
           /* sql */ `
             UPDATE ${agents}
             SET ${agents.columns.status} = 'working',
+                ${agents.columns.dispatch_attempts} = 0,
                 ${agents.columns.last_activity_at} = ?
             WHERE ${agents.columns.id} = ?
           `,
@@ -1007,7 +1098,7 @@ export class RigDO extends DurableObject<Env> {
         scheduledAgentIds.push(agent.id);
       } else {
         console.error(
-          `${RIG_LOG} schedulePendingWork: FAILED to start agent ${agent.id} in container`
+          `${RIG_LOG} schedulePendingWork: FAILED to start agent ${agent.id} in container (attempt ${attempts}/${MAX_DISPATCH_ATTEMPTS})`
         );
       }
     }
@@ -1144,6 +1235,14 @@ export class RigDO extends DurableObject<Env> {
         envVars.GASTOWN_SESSION_TOKEN = token;
       }
 
+      // Pass LLM gateway credentials so kilo serve can route inference calls
+      if (this.env.KILO_API_URL) {
+        envVars.KILO_API_URL = this.env.KILO_API_URL;
+      }
+      if (config.kilocodeToken) {
+        envVars.KILOCODE_TOKEN = config.kilocodeToken;
+      }
+
       const rigId = this.ctx.id.name ?? config.rigId ?? '';
       console.log(
         `${RIG_LOG} startAgentInContainer: rigId=${rigId} gitUrl=${config.gitUrl} branch=${RigDO.branchForAgent(params.agentName)}`
@@ -1243,6 +1342,12 @@ export class RigDO extends DurableObject<Env> {
       const envVars: Record<string, string> = {};
       if (token) {
         envVars.GASTOWN_SESSION_TOKEN = token;
+      }
+      if (this.env.KILO_API_URL) {
+        envVars.KILO_API_URL = this.env.KILO_API_URL;
+      }
+      if (config.kilocodeToken) {
+        envVars.KILOCODE_TOKEN = config.kilocodeToken;
       }
 
       const container = getTownContainerStub(this.env, config.townId);
@@ -1354,17 +1459,28 @@ export class RigDO extends DurableObject<Env> {
         `${RIG_LOG} witnessPatrol: checking ${workingAgents.length} working/blocked agents in container`
       );
       for (const working of workingAgents) {
-        const containerStatus = await this.checkAgentContainerStatus(townId, working.id);
+        const containerInfo = await this.checkAgentContainerStatus(townId, working.id);
         console.log(
-          `${RIG_LOG} witnessPatrol: agent ${working.id} container status=${containerStatus}`
+          `${RIG_LOG} witnessPatrol: agent ${working.id} container status=${containerInfo.status} exitReason=${containerInfo.exitReason ?? 'none'}`
         );
 
-        if (containerStatus === 'not_found' || containerStatus === 'exited') {
+        if (containerInfo.status === 'not_found' || containerInfo.status === 'exited') {
+          // If the agent completed successfully, close the bead instead of
+          // resetting to idle (which would cause re-dispatch).
+          if (containerInfo.exitReason === 'completed') {
+            console.log(
+              `${RIG_LOG} witnessPatrol: agent ${working.id} completed, closing bead via agentCompleted`
+            );
+            await this.agentCompleted(working.id, { status: 'completed' });
+            continue;
+          }
+
           console.log(
-            `${RIG_LOG} witnessPatrol: agent ${working.id} process gone (${containerStatus}), resetting to idle`
+            `${RIG_LOG} witnessPatrol: agent ${working.id} process gone (${containerInfo.status}), resetting to idle for re-dispatch`
           );
-          // Agent process is gone — reset to idle so schedulePendingWork()
-          // can re-dispatch on the next alarm tick
+          // Agent process is gone without completing — reset to idle so
+          // schedulePendingWork() can re-dispatch on the next alarm tick.
+          // The dispatch_attempts counter tracks retries.
           query(
             this.sql,
             /* sql */ `
@@ -1416,17 +1532,20 @@ export class RigDO extends DurableObject<Env> {
 
   /**
    * Check the container for an agent's process status.
-   * Returns the status string or 'unknown' on failure.
+   * Returns the status and exit reason, or 'unknown' on failure.
    */
-  private async checkAgentContainerStatus(townId: string, agentId: string): Promise<string> {
+  private async checkAgentContainerStatus(
+    townId: string,
+    agentId: string
+  ): Promise<{ status: string; exitReason?: string }> {
     try {
       const container = getTownContainerStub(this.env, townId);
       const response = await container.fetch(`http://container/agents/${agentId}/status`);
-      if (!response.ok) return 'unknown';
-      const data = await response.json<{ status: string }>();
-      return data.status;
+      if (!response.ok) return { status: 'unknown' };
+      const data = await response.json<{ status: string; exitReason?: string }>();
+      return { status: data.status, exitReason: data.exitReason ?? undefined };
     } catch {
-      return 'unknown';
+      return { status: 'unknown' };
     }
   }
 

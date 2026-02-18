@@ -24,6 +24,7 @@ import {
   handleUnhookBead,
   handlePrime,
   handleAgentDone,
+  handleAgentCompleted,
   handleWriteCheckpoint,
   handleCheckMail,
   handleHeartbeat,
@@ -131,6 +132,7 @@ app.post('/api/rigs/:rigId/agents/:agentId/hook', c => handleHookBead(c, c.req.p
 app.delete('/api/rigs/:rigId/agents/:agentId/hook', c => handleUnhookBead(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents/:agentId/prime', c => handlePrime(c, c.req.param()));
 app.post('/api/rigs/:rigId/agents/:agentId/done', c => handleAgentDone(c, c.req.param()));
+app.post('/api/rigs/:rigId/agents/:agentId/completed', c => handleAgentCompleted(c, c.req.param()));
 app.post('/api/rigs/:rigId/agents/:agentId/checkpoint', c =>
   handleWriteCheckpoint(c, c.req.param())
 );

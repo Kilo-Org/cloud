@@ -8,6 +8,7 @@ declare namespace Cloudflare {
   }
   interface DevEnv {
     GASTOWN_JWT_SECRET: SecretsStoreSecret;
+    KILO_API_URL: string;
     ENVIRONMENT: 'development';
     CF_ACCESS_TEAM: 'engineering-e11';
     CF_ACCESS_AUD: 'f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809';
@@ -18,6 +19,7 @@ declare namespace Cloudflare {
   }
   interface Env {
     GASTOWN_JWT_SECRET: SecretsStoreSecret;
+    KILO_API_URL: string;
     ENVIRONMENT: 'development' | 'production';
     CF_ACCESS_TEAM: 'engineering-e11';
     CF_ACCESS_AUD: 'f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809';

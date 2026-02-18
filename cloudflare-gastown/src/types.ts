@@ -7,7 +7,7 @@ import type { MoleculeRecord } from './db/tables/molecules.table';
 
 // -- Beads --
 
-export const BeadStatus = z.enum(['open', 'in_progress', 'closed']);
+export const BeadStatus = z.enum(['open', 'in_progress', 'closed', 'failed']);
 export type BeadStatus = z.infer<typeof BeadStatus>;
 
 export const BeadType = z.enum(['issue', 'message', 'escalation', 'merge_request']);

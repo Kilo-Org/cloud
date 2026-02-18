@@ -41,6 +41,7 @@
     "ENVIRONMENT": "production",
     "CF_ACCESS_TEAM": "engineering-e11",
     "CF_ACCESS_AUD": "f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809",
+    "KILO_API_URL": "https://api.kilo.ai",
   },
 
   // PRODUCTION Secrets Store (shared Kilo secrets store)
@@ -58,6 +59,7 @@
         "ENVIRONMENT": "development",
         "CF_ACCESS_TEAM": "engineering-e11",
         "CF_ACCESS_AUD": "f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809",
+        "KILO_API_URL": "https://api.kilo.ai",
       },
       "containers": [
         {

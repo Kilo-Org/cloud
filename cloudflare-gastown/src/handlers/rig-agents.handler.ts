@@ -24,6 +24,11 @@ const AgentDoneBody = z.object({
   summary: z.string().optional(),
 });
 
+const AgentCompletedBody = z.object({
+  status: z.enum(['completed', 'failed']),
+  reason: z.string().optional(),
+});
+
 const WriteCheckpointBody = z.object({
   data: z.unknown(),
 });
@@ -121,6 +126,26 @@ export async function handleAgentDone(
   const rig = getRigDOStub(c.env, params.rigId);
   await rig.agentDone(params.agentId, parsed.data);
   return c.json(resSuccess({ done: true }));
+}
+
+/**
+ * Called by the container when an agent session completes or fails.
+ * Transitions the hooked bead to closed/failed and unhooks the agent.
+ */
+export async function handleAgentCompleted(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const parsed = AgentCompletedBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const rig = getRigDOStub(c.env, params.rigId);
+  await rig.agentCompleted(params.agentId, parsed.data);
+  return c.json(resSuccess({ completed: true }));
 }
 
 export async function handleWriteCheckpoint(

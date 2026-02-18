@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
 const BeadType = z.enum(['issue', 'message', 'escalation', 'merge_request']);
-const BeadStatus = z.enum(['open', 'in_progress', 'closed']);
+const BeadStatus = z.enum(['open', 'in_progress', 'closed', 'failed']);
 const BeadPriority = z.enum(['low', 'medium', 'high', 'critical']);
 
 export const BeadRecord = z.object({
@@ -30,7 +30,7 @@ export function createTableBeads(): string {
   return getCreateTableQueryFromTable(beads, {
     id: `text primary key`,
     type: `text not null check(type in ('issue', 'message', 'escalation', 'merge_request'))`,
-    status: `text not null default 'open' check(status in ('open', 'in_progress', 'closed'))`,
+    status: `text not null default 'open' check(status in ('open', 'in_progress', 'closed', 'failed'))`,
     title: `text not null`,
     body: `text`,
     assignee_agent_id: `text`,

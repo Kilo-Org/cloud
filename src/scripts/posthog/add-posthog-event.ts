@@ -28,7 +28,7 @@ function parseEmails(csvPath: string): string[] {
 
   if (emailColIndex !== -1) {
     // Multi-column CSV with an email header — extract that column
-    emails = lines.slice(1).map(line => line.split(',')[emailColIndex].trim());
+    emails = lines.slice(1).map(line => line.split(',')[emailColIndex]?.trim() ?? '');
   } else if (lines[0].includes(',')) {
     throw new Error(
       `CSV appears to have multiple columns but no "email" header.\n  Header: ${lines[0]}`

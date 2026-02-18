@@ -10,6 +10,7 @@ import {
 import { createTableMolecules } from '../db/tables/molecules.table';
 import { getTownContainerStub } from './TownContainer.do';
 import { query } from '../util/query.util';
+import { signAgentJWT } from '../util/jwt.util';
 import type {
   Bead,
   BeadStatus,
@@ -822,6 +823,42 @@ export class RigDO extends DurableObject<Env> {
   }
 
   /**
+   * Resolve the GASTOWN_JWT_SECRET binding to a string.
+   * Returns null if the secret is not configured.
+   */
+  private async resolveJWTSecret(): Promise<string | null> {
+    const binding = this.env.GASTOWN_JWT_SECRET;
+    if (!binding) return null;
+    if (typeof binding === 'string') return binding;
+    try {
+      return await binding.get();
+    } catch {
+      console.error('Failed to resolve GASTOWN_JWT_SECRET');
+      return null;
+    }
+  }
+
+  /**
+   * Mint a short-lived agent JWT for the given agent to authenticate
+   * API calls back to the gastown worker.
+   */
+  private async mintAgentToken(agentId: string, townId: string): Promise<string | null> {
+    const secret = await this.resolveJWTSecret();
+    if (!secret) return null;
+
+    const rigId = this.ctx.id.name;
+    if (!rigId) {
+      console.error('mintAgentToken: DO has no name (rigId)');
+      return null;
+    }
+
+    // 8h expiry — long enough for typical agent sessions, short enough to
+    // limit blast radius. The alarm re-dispatches work every 30s so a new
+    // token is minted on each dispatch.
+    return signAgentJWT({ agentId, rigId, townId, userId: '' }, secret, 8 * 3600);
+  }
+
+  /**
    * Signal the container to start an agent process.
    * Returns true if the container accepted the request.
    */
@@ -838,6 +875,13 @@ export class RigDO extends DurableObject<Env> {
     }
   ): Promise<boolean> {
     try {
+      const token = await this.mintAgentToken(params.agentId, townId);
+
+      const envVars: Record<string, string> = {};
+      if (token) {
+        envVars.GASTOWN_SESSION_TOKEN = token;
+      }
+
       const container = getTownContainerStub(this.env, townId);
       const response = await container.fetch('http://container/agents/start', {
         method: 'POST',
@@ -850,6 +894,7 @@ export class RigDO extends DurableObject<Env> {
           bead_id: params.beadId,
           bead_title: params.beadTitle,
           checkpoint: params.checkpoint,
+          env_vars: envVars,
         }),
       });
       return response.ok;
@@ -903,6 +948,13 @@ export class RigDO extends DurableObject<Env> {
    */
   private async startMergeInContainer(townId: string, entry: ReviewQueueEntry): Promise<void> {
     try {
+      const token = await this.mintAgentToken(entry.agent_id, townId);
+
+      const envVars: Record<string, string> = {};
+      if (token) {
+        envVars.GASTOWN_SESSION_TOKEN = token;
+      }
+
       const container = getTownContainerStub(this.env, townId);
       const response = await container.fetch('http://container/merge', {
         method: 'POST',
@@ -913,6 +965,7 @@ export class RigDO extends DurableObject<Env> {
           bead_id: entry.bead_id,
           agent_id: entry.agent_id,
           pr_url: entry.pr_url,
+          env_vars: envVars,
         }),
       });
 

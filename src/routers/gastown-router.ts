@@ -83,6 +83,17 @@ export const gastownRouter = createTRPCRouter({
       );
     }),
 
+  listRigs: baseProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Verify ownership
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      return withGastownError(() => gastown.listRigs(ctx.user.id, input.townId));
+    }),
+
   getRig: baseProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {

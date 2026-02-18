@@ -1,6 +1,6 @@
 import { SecurityAgentPageClient } from '@/components/security-agent';
 import { PageContainer } from '@/components/layouts/PageContainer';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 
 export const metadata = {
   title: 'Security Agent | Kilo Code',
@@ -12,12 +12,14 @@ type PageProps = {
 };
 
 export default async function OrganizationSecurityAgentPage({ params }: PageProps) {
-  const { id: organizationId } = await params;
-  const user = await getUserFromAuthOrRedirect('/users/sign_in');
-
   return (
-    <PageContainer>
-      <SecurityAgentPageClient organizationId={organizationId} isAdmin={user.is_admin} />
-    </PageContainer>
+    <OrganizationByPageLayout
+      params={params}
+      render={({ role, organization }) => (
+        <PageContainer>
+          <SecurityAgentPageClient organizationId={organization.id} isAdmin={role === 'owner'} />
+        </PageContainer>
+      )}
+    />
   );
 }

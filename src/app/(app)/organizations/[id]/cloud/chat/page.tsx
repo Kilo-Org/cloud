@@ -3,6 +3,7 @@ import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { CloudChatPageWrapper } from './CloudChatPageWrapper';
 import { CloudChatPageWrapperNext } from './CloudChatPageWrapperNext';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { signInUrlWithCallbackPath } from '@/lib/user.server';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -13,8 +14,11 @@ export default async function OrganizationCloudChatPage({ params, searchParams }
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
 
-  const { success } = await getAuthorizedOrgContext(organizationId);
-  if (!success) {
+  const result = await getAuthorizedOrgContext(organizationId);
+  if (!result.success) {
+    if (result.nextResponse.status === 401) {
+      redirect(await signInUrlWithCallbackPath());
+    }
     redirect('/profile');
   }
 

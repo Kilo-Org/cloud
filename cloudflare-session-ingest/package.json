@@ -19,7 +19,7 @@
     "@cloudflare/workers-types": "^4.20260120.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22",
-    "vitest": "^2.1.8",
+    "vitest": "^3.2.4",
     "wrangler": "^4.61.0"
   }
 }

@@ -199,10 +199,6 @@ export function applyAnthropicModelSettings(
     addCacheBreakpoints(requestToMutate.messages);
   }
 
-  if (isOpusModel(requestedModel) && !requestToMutate.verbosity) {
-    requestToMutate.verbosity = 'medium';
-  }
-
   // anthropic doesn't allow '.' in tool call ids
   normalizeToolCallIds(requestToMutate, toolCallId => toolCallId.includes('.'), undefined);
 }

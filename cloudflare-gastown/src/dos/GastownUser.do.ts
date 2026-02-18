@@ -169,6 +169,22 @@ export class GastownUserDO extends DurableObject<Env> {
     return RigRecord.array().parse(rows);
   }
 
+  async deleteRig(rigId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    if (!this.getRig(rigId)) return false;
+    query(this.sql, /* sql */ `DELETE FROM ${rigs} WHERE ${rigs.columns.id} = ?`, [rigId]);
+    return true;
+  }
+
+  async deleteTown(townId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    if (!this.getTown(townId)) return false;
+    // Cascade: delete all rigs belonging to this town first
+    query(this.sql, /* sql */ `DELETE FROM ${rigs} WHERE ${rigs.columns.town_id} = ?`, [townId]);
+    query(this.sql, /* sql */ `DELETE FROM ${towns} WHERE ${towns.columns.id} = ?`, [townId]);
+    return true;
+  }
+
   async ping(): Promise<string> {
     return 'pong';
   }

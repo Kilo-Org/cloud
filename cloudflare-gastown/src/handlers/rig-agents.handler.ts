@@ -174,3 +174,13 @@ export async function handleGetOrCreateAgent(c: Context<GastownEnv>, params: { r
   const agent = await rig.getOrCreateAgent(parsed.data.role);
   return c.json(resSuccess(agent));
 }
+
+export async function handleDeleteAgent(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const rig = getRigDOStub(c.env, params.rigId);
+  const deleted = await rig.deleteAgent(params.agentId);
+  if (!deleted) return c.json(resError('Agent not found'), 404);
+  return c.json(resSuccess({ deleted: true }));
+}

@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import { getGastownUserStub } from '../dos/GastownUser.do';
+import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
@@ -62,6 +63,23 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
 
   const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.createRig(parsed.data);
+
+  // Configure the Rig DO with its metadata so it can dispatch work to the container.
+  // If this fails, roll back the rig creation to avoid an orphaned record.
+  try {
+    const rigDO = getRigDOStub(c.env, rig.id);
+    await rigDO.configureRig({
+      townId: parsed.data.town_id,
+      gitUrl: parsed.data.git_url,
+      defaultBranch: parsed.data.default_branch,
+      userId: params.userId,
+    });
+  } catch (err) {
+    console.error(`configureRig failed for rig ${rig.id}, rolling back:`, err);
+    await townDO.deleteRig(rig.id);
+    return c.json(resError('Failed to configure rig'), 500);
+  }
+
   return c.json(resSuccess(rig), 201);
 }
 
@@ -82,4 +100,24 @@ export async function handleListRigs(
   const townDO = getGastownUserStub(c.env, params.userId);
   const rigs = await townDO.listRigs(params.townId);
   return c.json(resSuccess(rigs));
+}
+
+export async function handleDeleteTown(
+  c: Context<GastownEnv>,
+  params: { userId: string; townId: string }
+) {
+  const townDO = getGastownUserStub(c.env, params.userId);
+  const deleted = await townDO.deleteTown(params.townId);
+  if (!deleted) return c.json(resError('Town not found'), 404);
+  return c.json(resSuccess({ deleted: true }));
+}
+
+export async function handleDeleteRig(
+  c: Context<GastownEnv>,
+  params: { userId: string; rigId: string }
+) {
+  const townDO = getGastownUserStub(c.env, params.userId);
+  const deleted = await townDO.deleteRig(params.rigId);
+  if (!deleted) return c.json(resError('Rig not found'), 404);
+  return c.json(resSuccess({ deleted: true }));
 }

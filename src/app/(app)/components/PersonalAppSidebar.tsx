@@ -24,12 +24,13 @@ import {
   Wrench,
   Webhook,
   Shell,
+  Factory,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
-import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
+import { ENABLE_DEPLOY_FEATURE, ENABLE_GASTOWN_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 
@@ -136,6 +137,15 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
             title: 'Deploy',
             icon: Rocket,
             url: '/deploy',
+          },
+        ]
+      : []),
+    ...(ENABLE_GASTOWN_FEATURE
+      ? [
+          {
+            title: 'Gastown',
+            icon: Factory,
+            url: '/gastown',
           },
         ]
       : []),

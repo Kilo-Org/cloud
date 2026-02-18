@@ -83,6 +83,17 @@ export const gastownRouter = createTRPCRouter({
       );
     }),
 
+  listRigs: baseProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Verify ownership
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      return withGastownError(() => gastown.listRigs(ctx.user.id, input.townId));
+    }),
+
   getRig: baseProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
@@ -204,5 +215,39 @@ export const gastownRouter = createTRPCRouter({
       }
 
       return withGastownError(() => gastown.getStreamTicket(input.townId, input.agentId));
+    }),
+
+  // ── Deletes ────────────────────────────────────────────────────────────
+
+  deleteTown: baseProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      await withGastownError(() => gastown.deleteTown(ctx.user.id, input.townId));
+    }),
+
+  deleteRig: baseProcedure
+    .input(z.object({ rigId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await withGastownError(() => gastown.deleteRig(ctx.user.id, input.rigId));
+    }),
+
+  deleteBead: baseProcedure
+    .input(z.object({ rigId: z.string().uuid(), beadId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify the caller owns this rig before deleting
+      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      await withGastownError(() => gastown.deleteBead(input.rigId, input.beadId));
+    }),
+
+  deleteAgent: baseProcedure
+    .input(z.object({ rigId: z.string().uuid(), agentId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify the caller owns this rig before deleting
+      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      await withGastownError(() => gastown.deleteAgent(input.rigId, input.agentId));
     }),
 });

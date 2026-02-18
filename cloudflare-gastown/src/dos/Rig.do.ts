@@ -10,6 +10,7 @@ import {
 import { createTableMolecules } from '../db/tables/molecules.table';
 import { getTownContainerStub } from './TownContainer.do';
 import { query } from '../util/query.util';
+import { signAgentJWT } from '../util/jwt.util';
 import type {
   Bead,
   BeadStatus,
@@ -49,8 +50,16 @@ const ACTIVE_ALARM_INTERVAL_MS = 30_000;
 // Timeout for review entries stuck in 'running' state (container crashed mid-merge)
 const REVIEW_RUNNING_TIMEOUT_MS = 5 * 60 * 1000;
 
-// KV key for storing the town ID associated with this rig
+// KV keys for rig configuration (stored in DO KV storage, not SQL)
 const TOWN_ID_KEY = 'townId';
+const RIG_CONFIG_KEY = 'rigConfig';
+
+type RigConfig = {
+  townId: string;
+  gitUrl: string;
+  defaultBranch: string;
+  userId: string;
+};
 
 export class RigDO extends DurableObject<Env> {
   private sql: SqlStorage;
@@ -211,6 +220,25 @@ export class RigDO extends DurableObject<Env> {
     return this.updateBeadStatus(beadId, 'closed', agentId);
   }
 
+  async deleteBead(beadId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const bead = this.getBead(beadId);
+    if (!bead) return false;
+    // Unhook any agent assigned to this bead
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agents}
+        SET ${agents.columns.current_hook_bead_id} = NULL,
+            ${agents.columns.status} = 'idle'
+        WHERE ${agents.columns.current_hook_bead_id} = ?
+      `,
+      [beadId]
+    );
+    query(this.sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.columns.id} = ?`, [beadId]);
+    return true;
+  }
+
   // ── Agents ─────────────────────────────────────────────────────────────
 
   async registerAgent(input: RegisterAgentInput): Promise<Agent> {
@@ -294,6 +322,33 @@ export class RigDO extends DurableObject<Env> {
       `,
       [status, now(), agentId]
     );
+  }
+
+  async deleteAgent(agentId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const agent = this.getAgent(agentId);
+    if (!agent) return false;
+    // Unassign any beads assigned to this agent
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.assignee_agent_id} = NULL
+        WHERE ${beads.columns.assignee_agent_id} = ?
+      `,
+      [agentId]
+    );
+    // Delete mail for this agent
+    query(
+      this.sql,
+      /* sql */ `
+        DELETE FROM ${mail}
+        WHERE ${mail.columns.to_agent_id} = ? OR ${mail.columns.from_agent_id} = ?
+      `,
+      [agentId, agentId]
+    );
+    query(this.sql, /* sql */ `DELETE FROM ${agents} WHERE ${agents.columns.id} = ?`, [agentId]);
+    return true;
   }
 
   // ── Hooks (GUPP) ──────────────────────────────────────────────────────
@@ -672,9 +727,35 @@ export class RigDO extends DurableObject<Env> {
     });
   }
 
-  // ── Town ID (links this rig to its town container) ─────────────────────
+  // ── Rig configuration (links this rig to its town + git repo) ────────
 
+  async configureRig(config: RigConfig): Promise<void> {
+    await this.ctx.storage.put(RIG_CONFIG_KEY, config);
+    // Also store townId under the legacy key for backward compat
+    await this.ctx.storage.put(TOWN_ID_KEY, config.townId);
+    await this.armAlarmIfNeeded();
+  }
+
+  async getRigConfig(): Promise<RigConfig | null> {
+    return (await this.ctx.storage.get<RigConfig>(RIG_CONFIG_KEY)) ?? null;
+  }
+
+  /** @deprecated Use configureRig() instead. Kept for test compat. */
   async setTownId(townId: string): Promise<void> {
+    // Minimal fallback: store only townId (other fields remain empty).
+    // Production code should always use configureRig().
+    const existing = await this.getRigConfig();
+    if (existing) {
+      existing.townId = townId;
+      await this.ctx.storage.put(RIG_CONFIG_KEY, existing);
+    } else {
+      await this.ctx.storage.put(RIG_CONFIG_KEY, {
+        townId,
+        gitUrl: '',
+        defaultBranch: 'main',
+        userId: '',
+      } satisfies RigConfig);
+    }
     await this.ctx.storage.put(TOWN_ID_KEY, townId);
     await this.armAlarmIfNeeded();
   }
@@ -779,9 +860,9 @@ export class RigDO extends DurableObject<Env> {
 
     if (pendingAgents.length === 0) return [];
 
-    const townId = await this.getTownId();
-    if (!townId) {
-      console.warn('schedulePendingWork: no townId configured, skipping container dispatch');
+    const config = await this.getRigConfig();
+    if (!config?.townId) {
+      console.warn('schedulePendingWork: rig not configured, skipping container dispatch');
       return [];
     }
 
@@ -793,13 +874,14 @@ export class RigDO extends DurableObject<Env> {
       const bead = this.getBead(beadId);
       if (!bead) continue;
 
-      const started = await this.startAgentInContainer(townId, {
+      const started = await this.startAgentInContainer(config, {
         agentId: agent.id,
         agentName: agent.name,
         role: agent.role,
         identity: agent.identity,
         beadId,
         beadTitle: bead.title,
+        beadBody: bead.body ?? '',
         checkpoint: agent.checkpoint ?? null,
       });
 
@@ -821,12 +903,112 @@ export class RigDO extends DurableObject<Env> {
     return scheduledAgentIds;
   }
 
+  // ── Container dispatch helpers ──────────────────────────────────────
+
+  /**
+   * Resolve the GASTOWN_JWT_SECRET binding to a string.
+   * Returns null if the secret is not configured.
+   */
+  private async resolveJWTSecret(): Promise<string | null> {
+    const binding = this.env.GASTOWN_JWT_SECRET;
+    if (!binding) return null;
+    if (typeof binding === 'string') return binding;
+    try {
+      return await binding.get();
+    } catch {
+      console.error('Failed to resolve GASTOWN_JWT_SECRET');
+      return null;
+    }
+  }
+
+  /**
+   * Mint a short-lived agent JWT for the given agent to authenticate
+   * API calls back to the gastown worker.
+   */
+  private async mintAgentToken(agentId: string, config: RigConfig): Promise<string | null> {
+    const secret = await this.resolveJWTSecret();
+    if (!secret) return null;
+
+    const rigId = this.ctx.id.name;
+    if (!rigId) {
+      console.error('mintAgentToken: DO has no name (rigId)');
+      return null;
+    }
+
+    // 8h expiry — long enough for typical agent sessions, short enough to
+    // limit blast radius. The alarm re-dispatches work every 30s so a new
+    // token is minted on each dispatch.
+    return signAgentJWT(
+      { agentId, rigId, townId: config.townId, userId: config.userId },
+      secret,
+      8 * 3600
+    );
+  }
+
+  /** Build the initial prompt for an agent from its bead. */
+  private static buildPrompt(params: {
+    beadTitle: string;
+    beadBody: string;
+    checkpoint: unknown;
+  }): string {
+    const parts: string[] = [params.beadTitle];
+    if (params.beadBody) parts.push(params.beadBody);
+    if (params.checkpoint) {
+      parts.push(
+        `Resume from checkpoint:\n${typeof params.checkpoint === 'string' ? params.checkpoint : JSON.stringify(params.checkpoint)}`
+      );
+    }
+    return parts.join('\n\n');
+  }
+
+  /** Default system prompt per agent role. */
+  private static systemPromptForRole(role: string, identity: string): string {
+    const base = `You are ${identity}, a Gastown ${role} agent. Follow all instructions in the GASTOWN CONTEXT injected into this session.`;
+    switch (role) {
+      case 'polecat':
+        return `${base} Your job is to implement the assigned task on a feature branch, write clean code, and call gt_done when finished.`;
+      case 'mayor':
+        return `${base} You coordinate work across the town. Respond to messages and delegate tasks via gt_mail_send.`;
+      case 'refinery':
+        return `${base} You review code quality and merge PRs. Check for correctness, style, and test coverage.`;
+      case 'witness':
+        return `${base} You monitor agent health and report anomalies.`;
+      default:
+        return base;
+    }
+  }
+
+  /** Default model for agent roles. */
+  private static modelForRole(role: string): string {
+    switch (role) {
+      case 'polecat':
+        return 'kilo/claude-sonnet-4-20250514';
+      case 'refinery':
+        return 'kilo/claude-sonnet-4-20250514';
+      case 'mayor':
+        return 'kilo/claude-sonnet-4-20250514';
+      default:
+        return 'kilo/claude-sonnet-4-20250514';
+    }
+  }
+
+  /** Generate a branch name for an agent. */
+  private static branchForAgent(name: string): string {
+    // Sanitize agent name → branch-safe slug
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-');
+    return `gt/${slug}`;
+  }
+
   /**
    * Signal the container to start an agent process.
+   * Sends the full StartAgentRequest shape expected by the container.
    * Returns true if the container accepted the request.
    */
   private async startAgentInContainer(
-    townId: string,
+    config: RigConfig,
     params: {
       agentId: string;
       agentName: string;
@@ -834,22 +1016,42 @@ export class RigDO extends DurableObject<Env> {
       identity: string;
       beadId: string;
       beadTitle: string;
+      beadBody: string;
       checkpoint: unknown;
     }
   ): Promise<boolean> {
     try {
-      const container = getTownContainerStub(this.env, townId);
+      const token = await this.mintAgentToken(params.agentId, config);
+
+      const envVars: Record<string, string> = {};
+      if (token) {
+        envVars.GASTOWN_SESSION_TOKEN = token;
+      }
+
+      const rigId = this.ctx.id.name ?? '';
+
+      const container = getTownContainerStub(this.env, config.townId);
       const response = await container.fetch('http://container/agents/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agent_id: params.agentId,
-          agent_name: params.agentName,
+          agentId: params.agentId,
+          rigId,
+          townId: config.townId,
           role: params.role,
+          name: params.agentName,
           identity: params.identity,
-          bead_id: params.beadId,
-          bead_title: params.beadTitle,
-          checkpoint: params.checkpoint,
+          prompt: RigDO.buildPrompt({
+            beadTitle: params.beadTitle,
+            beadBody: params.beadBody,
+            checkpoint: params.checkpoint,
+          }),
+          model: RigDO.modelForRole(params.role),
+          systemPrompt: RigDO.systemPromptForRole(params.role, params.identity),
+          gitUrl: config.gitUrl,
+          branch: RigDO.branchForAgent(params.agentName),
+          defaultBranch: config.defaultBranch,
+          envVars,
         }),
       });
       return response.ok;
@@ -869,13 +1071,13 @@ export class RigDO extends DurableObject<Env> {
   private async processReviewQueue(): Promise<boolean> {
     this.recoverStuckReviews();
 
-    const townId = await this.getTownId();
-    if (!townId) return false;
+    const config = await this.getRigConfig();
+    if (!config?.townId) return false;
 
     const entry = await this.popReviewQueue();
     if (!entry) return false;
 
-    await this.startMergeInContainer(townId, entry);
+    await this.startMergeInContainer(config, entry);
     return true;
   }
 
@@ -901,9 +1103,16 @@ export class RigDO extends DurableObject<Env> {
   /**
    * Signal the container to run a deterministic merge for a review queue entry.
    */
-  private async startMergeInContainer(townId: string, entry: ReviewQueueEntry): Promise<void> {
+  private async startMergeInContainer(config: RigConfig, entry: ReviewQueueEntry): Promise<void> {
     try {
-      const container = getTownContainerStub(this.env, townId);
+      const token = await this.mintAgentToken(entry.agent_id, config);
+
+      const envVars: Record<string, string> = {};
+      if (token) {
+        envVars.GASTOWN_SESSION_TOKEN = token;
+      }
+
+      const container = getTownContainerStub(this.env, config.townId);
       const response = await container.fetch('http://container/merge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -913,6 +1122,7 @@ export class RigDO extends DurableObject<Env> {
           bead_id: entry.bead_id,
           agent_id: entry.agent_id,
           pr_url: entry.pr_url,
+          envVars,
         }),
       });
 

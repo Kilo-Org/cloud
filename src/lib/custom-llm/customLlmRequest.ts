@@ -629,7 +629,7 @@ function reverseLegacyExtensionHack(messages: OpenRouterChatCompletionsInput) {
   for (const msg of messages) {
     if (msg.role === 'assistant') {
       for (const rd of msg.reasoning_details ?? []) {
-        if (rd.format == ReasoningFormat.OpenAIResponsesV1_Obscured) {
+        if (rd.format === ReasoningFormat.OpenAIResponsesV1_Obscured) {
           rd.format = ReasoningFormat.OpenAIResponsesV1;
         }
       }

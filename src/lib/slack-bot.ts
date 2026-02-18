@@ -474,6 +474,7 @@ export async function processKiloBotMessage(
         tool_choice: 'auto',
       },
       organizationId: owner.type === 'org' ? owner.id : undefined,
+      feature: 'slack',
     });
 
     if (!result.ok) {

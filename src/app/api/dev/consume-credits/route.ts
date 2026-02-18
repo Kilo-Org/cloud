@@ -90,6 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       machine_id: null,
       user_byok: false,
       has_tools: false,
+      feature: null,
     };
 
     // Use the existing countAndStoreUsage function

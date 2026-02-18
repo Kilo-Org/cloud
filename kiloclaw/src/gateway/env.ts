@@ -72,6 +72,7 @@ export async function buildEnvVars(
 
   if (env.DEV_MODE) plainEnv.OPENCLAW_DEV_MODE = env.DEV_MODE;
   if (env.KILOCODE_API_BASE_URL) plainEnv.KILOCODE_API_BASE_URL = env.KILOCODE_API_BASE_URL;
+  plainEnv.KILOCODE_FEATURE = 'kilo-claw';
 
   // Collect all sensitive values
   const sensitive: Record<string, string> = {};

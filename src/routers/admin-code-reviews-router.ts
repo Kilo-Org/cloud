@@ -1,8 +1,20 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews, kilocode_users, organizations } from '@/db/schema';
+import {
+  cloud_agent_code_reviews,
+  kilocode_users,
+  microdollar_usage,
+  microdollar_usage_metadata,
+  organizations,
+} from '@/db/schema';
 import * as z from 'zod';
 import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, type SQL } from 'drizzle-orm';
+import {
+  REVIEW_PROMO_MODEL,
+  REVIEW_PROMO_START,
+  REVIEW_PROMO_END,
+  isActiveReviewPromo,
+} from '@/lib/code-reviews/core/constants';
 
 /**
  * SQL condition to exclude "Insufficient credits" errors from failure metrics.
@@ -371,4 +383,67 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
       return result;
     }),
+
+  getReviewPromotionStats: adminProcedure.query(async () => {
+    // Aggregates: total requests, unique users, unique orgs
+    const aggregates = await db
+      .select({
+        total_requests: sql<number>`COUNT(*)`,
+        unique_users: sql<number>`COUNT(DISTINCT ${microdollar_usage.kilo_user_id})`,
+        unique_orgs: sql<number>`COUNT(DISTINCT ${microdollar_usage.organization_id})`,
+      })
+      .from(microdollar_usage)
+      .innerJoin(
+        microdollar_usage_metadata,
+        eq(microdollar_usage.id, microdollar_usage_metadata.id)
+      )
+      .where(
+        and(
+          eq(microdollar_usage.requested_model, REVIEW_PROMO_MODEL),
+          eq(microdollar_usage.cost, 0),
+          sql`(${microdollar_usage_metadata.is_user_byok} IS NULL OR ${microdollar_usage_metadata.is_user_byok} = false)`,
+          gte(microdollar_usage.created_at, REVIEW_PROMO_START),
+          lt(microdollar_usage.created_at, REVIEW_PROMO_END)
+        )
+      );
+
+    // Daily breakdown
+    const daily = await db
+      .select({
+        day: sql<string>`DATE_TRUNC('day', ${microdollar_usage.created_at})::date::text`,
+        total: sql<number>`COUNT(*)`,
+        unique_users: sql<number>`COUNT(DISTINCT ${microdollar_usage.kilo_user_id})`,
+      })
+      .from(microdollar_usage)
+      .innerJoin(
+        microdollar_usage_metadata,
+        eq(microdollar_usage.id, microdollar_usage_metadata.id)
+      )
+      .where(
+        and(
+          eq(microdollar_usage.requested_model, REVIEW_PROMO_MODEL),
+          eq(microdollar_usage.cost, 0),
+          sql`(${microdollar_usage_metadata.is_user_byok} IS NULL OR ${microdollar_usage_metadata.is_user_byok} = false)`,
+          gte(microdollar_usage.created_at, REVIEW_PROMO_START),
+          lt(microdollar_usage.created_at, REVIEW_PROMO_END)
+        )
+      )
+      .groupBy(sql`DATE_TRUNC('day', ${microdollar_usage.created_at})`)
+      .orderBy(sql`DATE_TRUNC('day', ${microdollar_usage.created_at})`);
+
+    const agg = aggregates[0];
+    return {
+      promoActive: isActiveReviewPromo('reviewer', REVIEW_PROMO_MODEL),
+      promoStart: REVIEW_PROMO_START,
+      promoEnd: REVIEW_PROMO_END,
+      totalRequests: Number(agg.total_requests) || 0,
+      uniqueUsers: Number(agg.unique_users) || 0,
+      uniqueOrgs: Number(agg.unique_orgs) || 0,
+      daily: daily.map(row => ({
+        day: row.day,
+        total: Number(row.total) || 0,
+        uniqueUsers: Number(row.unique_users) || 0,
+      })),
+    };
+  }),
 });

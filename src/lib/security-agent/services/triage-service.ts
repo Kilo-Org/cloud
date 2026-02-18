@@ -248,6 +248,7 @@ export async function triageSecurityFinding(options: {
             },
           },
           organizationId,
+          feature: 'security-agent',
         });
 
         const durationMs = Math.round(performance.now() - llmStart);

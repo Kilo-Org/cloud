@@ -37,7 +37,13 @@ import type {
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { getCodeReviewById } from '../db/code-reviews';
-import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
+import {
+  DEFAULT_CODE_REVIEW_MODEL,
+  DEFAULT_CODE_REVIEW_MODE,
+  isActiveReviewPromo,
+  REVIEW_PROMO_START,
+  REVIEW_PROMO_END,
+} from '../core/constants';
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
@@ -355,11 +361,28 @@ export async function prepareReviewPayload(
             upstreamBranch: review.head_ref,
           };
 
+    if (isActiveReviewPromo('reviewer', sessionInput.model)) {
+      logExceptInTest('[prepareReviewPayload] Promotional model selected for code review', {
+        reviewId,
+        owner,
+        model: sessionInput.model,
+        promoStart: REVIEW_PROMO_START,
+        promoEnd: REVIEW_PROMO_END,
+      });
+    }
+
     // Log the session input for GitLab
     if (platform === PLATFORM.GITLAB) {
       logExceptInTest('[prepareReviewPayload] GitLab session input prepared', {
         gitUrl: sessionInput.gitUrl,
         hasGitToken: !!sessionInput.gitToken,
+        upstreamBranch: sessionInput.upstreamBranch,
+        model: sessionInput.model,
+      });
+    } else {
+      logExceptInTest('[prepareReviewPayload] GitHub session input prepared', {
+        githubRepo: sessionInput.githubRepo,
+        hasGithubToken: !!sessionInput.githubToken,
         upstreamBranch: sessionInput.upstreamBranch,
         model: sessionInput.model,
       });

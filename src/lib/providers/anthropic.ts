@@ -35,8 +35,8 @@ export const sonnet_46_free_review_model = {
   internal_id: 'anthropic/claude-sonnet-4.6',
   inference_providers: ['anthropic'],
   allowed_uses: ['review'],
-  promotion_start: '2026-02-18T00:00:00Z',
-  promotion_end: '2026-02-25T00:00:00Z',
+  promotion_start: '2026-02-18T11:00:00Z', // 6 AM East Coast
+  promotion_end: '2026-02-25T11:00:00Z',
 } satisfies KiloFreeModel;
 
 const ENABLE_ANTHROPIC_STRICT_TOOL_USE = false;

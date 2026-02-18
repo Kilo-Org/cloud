@@ -16,6 +16,7 @@ import type {
   CreateBeadInput,
   BeadFilter,
   Agent,
+  AgentRole,
   AgentStatus,
   RegisterAgentInput,
   AgentFilter,
@@ -593,6 +594,82 @@ export class RigDO extends DurableObject<Env> {
     await this.unhookBead(agentId);
 
     await this.armAlarmIfNeeded();
+  }
+
+  // ── Atomic Sling ────────────────────────────────────────────────────────
+  // Creates bead, assigns or reuses an idle polecat, hooks them together,
+  // and arms the alarm — all within a single DO call to avoid TOCTOU races.
+
+  async slingBead(input: {
+    title: string;
+    body?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ bead: Bead; agent: Agent }> {
+    await this.ensureInitialized();
+
+    // Create the bead
+    const bead = await this.createBead({
+      type: 'issue',
+      title: input.title,
+      body: input.body,
+      metadata: input.metadata,
+    });
+
+    // Find an idle polecat or create one
+    const agent = await this.getOrCreateAgent('polecat');
+
+    // Hook them together (also arms the alarm)
+    await this.hookBead(agent.id, bead.id);
+
+    const updatedBead = await this.getBeadAsync(bead.id);
+    const updatedAgent = this.getAgent(agent.id);
+    if (!updatedBead || !updatedAgent) {
+      throw new Error(`slingBead: failed to re-fetch bead ${bead.id} or agent ${agent.id}`);
+    }
+    return { bead: updatedBead, agent: updatedAgent };
+  }
+
+  // ── Get or Create Agent ────────────────────────────────────────────────
+  // Atomically finds an existing agent of the given role (idle preferred)
+  // or creates a new one. Prevents duplicate agent creation from concurrent calls.
+  // Singleton roles (mayor, witness, refinery) always return the existing
+  // agent even if busy — only polecats scale out by creating new agents.
+
+  private static readonly SINGLETON_ROLES: ReadonlySet<string> = new Set([
+    'mayor',
+    'witness',
+    'refinery',
+  ]);
+
+  async getOrCreateAgent(role: AgentRole): Promise<Agent> {
+    await this.ensureInitialized();
+
+    const existing = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${agents}
+          WHERE ${agents.columns.role} = ?
+          ORDER BY CASE WHEN ${agents.columns.status} = 'idle' THEN 0 ELSE 1 END,
+                   ${agents.columns.last_activity_at} ASC
+          LIMIT ?
+        `,
+        [role, 1]
+      ),
+    ];
+
+    if (existing.length > 0) {
+      const agent = AgentRecord.parse(existing[0]);
+      // Singleton roles: return existing agent regardless of status
+      if (agent.status === 'idle' || RigDO.SINGLETON_ROLES.has(role)) return agent;
+    }
+
+    // No idle agent found (polecat) or no agent at all — create a new one
+    return this.registerAgent({
+      role,
+      name: `${role}-${Date.now()}`,
+      identity: `${role}-${generateId()}`,
+    });
   }
 
   // ── Town ID (links this rig to its town container) ─────────────────────

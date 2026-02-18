@@ -30,6 +30,7 @@ import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
 import { appBuilderFeedbackRouter } from '@/routers/app-builder-feedback-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
+import { gastownRouter } from '@/routers/gastown-router';
 
 export const rootRouter = createTRPCRouter({
   test: testRouter,
@@ -62,6 +63,7 @@ export const rootRouter = createTRPCRouter({
   userFeedback: userFeedbackRouter,
   appBuilderFeedback: appBuilderFeedbackRouter,
   kiloclaw: kiloclawRouter,
+  gastown: gastownRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

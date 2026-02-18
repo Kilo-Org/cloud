@@ -530,10 +530,10 @@ describe('RigDO', () => {
 
   // ── DO stubs ───────────────────────────────────────────────────────────
 
-  describe('TownDO stub', () => {
+  describe('GastownUserDO stub', () => {
     it('should respond to ping', async () => {
-      const id = env.TOWN.idFromName('test-town');
-      const stub = env.TOWN.get(id);
+      const id = env.GASTOWN_USER.idFromName('test-user');
+      const stub = env.GASTOWN_USER.get(id);
       const result = await stub.ping();
       expect(result).toBe('pong');
     });

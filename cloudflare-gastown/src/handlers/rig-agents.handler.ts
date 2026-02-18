@@ -153,3 +153,24 @@ export async function handleHeartbeat(
   await rig.touchAgentHeartbeat(params.agentId);
   return c.json(resSuccess({ heartbeat: true }));
 }
+
+const GetOrCreateAgentBody = z.object({
+  role: AgentRole,
+});
+
+/**
+ * Atomically get an existing agent of the given role (idle preferred) or create one.
+ * Prevents duplicate agent creation from concurrent calls.
+ */
+export async function handleGetOrCreateAgent(c: Context<GastownEnv>, params: { rigId: string }) {
+  const parsed = GetOrCreateAgentBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const rig = getRigDOStub(c.env, params.rigId);
+  const agent = await rig.getOrCreateAgent(parsed.data.role);
+  return c.json(resSuccess(agent));
+}

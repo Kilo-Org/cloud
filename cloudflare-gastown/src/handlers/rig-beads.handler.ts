@@ -120,3 +120,22 @@ export async function handleCloseBead(
   const bead = await rig.closeBead(params.beadId, parsed.data.agent_id);
   return c.json(resSuccess(bead));
 }
+
+const SlingBeadBody = z.object({
+  title: z.string().min(1),
+  body: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export async function handleSlingBead(c: Context<GastownEnv>, params: { rigId: string }) {
+  const parsed = SlingBeadBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const rig = getRigDOStub(c.env, params.rigId);
+  const result = await rig.slingBead(parsed.data);
+  return c.json(resSuccess(result), 201);
+}

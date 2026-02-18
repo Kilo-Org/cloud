@@ -19,14 +19,14 @@
   "durable_objects": {
     "bindings": [
       { "name": "RIG", "class_name": "RigDO" },
-      { "name": "TOWN", "class_name": "TownDO" },
+      { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
       { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
       { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
     ],
   },
 
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["RigDO", "TownDO", "AgentIdentityDO"] },
+    { "tag": "v1", "new_sqlite_classes": ["RigDO", "GastownUserDO", "AgentIdentityDO"] },
     { "tag": "v2", "new_sqlite_classes": ["TownContainerDO"] },
   ],
 
@@ -64,7 +64,7 @@
       "durable_objects": {
         "bindings": [
           { "name": "RIG", "class_name": "RigDO" },
-          { "name": "TOWN", "class_name": "TownDO" },
+          { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
           { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
           { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
         ],

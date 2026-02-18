@@ -52,20 +52,22 @@ export interface CodeReview {
   owner: Owner;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
-  cliSessionId?: string; // CLI session UUID (from session_created event)
+  cliSessionId?: string; // CLI session UUID (from session_created event or prepareSession)
   errorMessage?: string;
   startedAt?: string;
   completedAt?: string;
   updatedAt: string;
   events?: CodeReviewEvent[];
   skipBalanceCheck?: boolean; // Skip balance validation in cloud agent (for OSS sponsorship)
+  /** When true, use cloud-agent-next instead of cloud-agent (feature flag) */
+  useCloudAgentNext?: boolean;
 }
 
 export interface CodeReviewStatusResponse {
   reviewId: string;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
-  cliSessionId?: string; // CLI session UUID (from session_created event)
+  cliSessionId?: string; // CLI session UUID
   startedAt?: string;
   completedAt?: string;
   errorMessage?: string;
@@ -77,6 +79,8 @@ export interface CodeReviewRequest {
   sessionInput: SessionInput;
   owner: Owner;
   skipBalanceCheck?: boolean;
+  /** When true, use cloud-agent-next instead of cloud-agent (feature flag) */
+  useCloudAgentNext?: boolean;
 }
 
 export interface CodeReviewResponse {
@@ -95,6 +99,8 @@ export interface Env {
   API_URL: string;
   INTERNAL_API_SECRET: string;
   CLOUD_AGENT_URL: string;
+  /** cloud-agent-next URL (used when useCloudAgentNext feature flag is enabled) */
+  CLOUD_AGENT_NEXT_URL: string;
   BACKEND_AUTH_TOKEN: string;
 
   // Optional Sentry

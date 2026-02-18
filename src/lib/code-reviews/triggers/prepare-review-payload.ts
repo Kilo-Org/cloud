@@ -85,6 +85,8 @@ export type CodeReviewPayload = {
   sessionInput: SessionInput;
   owner: Owner;
   skipBalanceCheck?: boolean;
+  /** When true, use cloud-agent-next instead of cloud-agent (feature flag) */
+  useCloudAgentNext?: boolean;
 };
 
 /**

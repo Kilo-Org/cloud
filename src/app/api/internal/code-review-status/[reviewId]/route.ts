@@ -3,7 +3,12 @@
  *
  * Called by:
  * - Code Review Orchestrator (for 'running' status and sessionId updates)
- * - Cloud Agent callback (for 'completed' or 'failed' status)
+ * - Cloud-agent-next callback (for 'completed', 'failed', or 'interrupted' status)
+ *
+ * Accepts both legacy format (from orchestrator) and cloud-agent-next callback format:
+ * - Legacy: { status, sessionId?, cliSessionId?, errorMessage? }
+ * - cloud-agent-next: { status, sessionId?, cloudAgentSessionId?, executionId?,
+ *     kiloSessionId?, errorMessage?, lastSeenBranch? }
  *
  * The reviewId is passed in the URL path.
  *
@@ -27,11 +32,58 @@ import {
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-interface StatusUpdatePayload {
-  sessionId?: string; // Cloud agent session ID (agent_xxx) - may not be available yet for 'running' status
-  cliSessionId?: string; // CLI session UUID (from session_created event)
+/**
+ * Payload from the orchestrator DO (legacy format).
+ */
+type OrchestratorPayload = {
+  sessionId?: string;
+  cliSessionId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
   errorMessage?: string;
+};
+
+/**
+ * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
+ */
+type CloudAgentNextCallbackPayload = {
+  sessionId?: string;
+  cloudAgentSessionId?: string;
+  executionId?: string;
+  kiloSessionId?: string;
+  status: 'completed' | 'failed' | 'interrupted';
+  errorMessage?: string;
+  lastSeenBranch?: string;
+};
+
+type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
+
+/**
+ * Normalize a payload from either the orchestrator or cloud-agent-next callback
+ * into the common format expected by the update logic.
+ */
+function normalizePayload(raw: StatusUpdatePayload): {
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  sessionId?: string;
+  cliSessionId?: string;
+  errorMessage?: string;
+} {
+  // Map cloud-agent-next 'interrupted' → 'cancelled'
+  const status = raw.status === 'interrupted' ? 'cancelled' : raw.status;
+
+  // Map cloud-agent-next 'kiloSessionId' → 'cliSessionId'
+  const cliSessionId =
+    'cliSessionId' in raw
+      ? raw.cliSessionId
+      : 'kiloSessionId' in raw
+        ? raw.kiloSessionId
+        : undefined;
+
+  return {
+    status,
+    sessionId: raw.sessionId,
+    cliSessionId,
+    errorMessage: raw.errorMessage,
+  };
 }
 
 export async function POST(
@@ -46,8 +98,8 @@ export async function POST(
     }
 
     const { reviewId } = await params;
-    const payload: StatusUpdatePayload = await req.json();
-    const { sessionId, cliSessionId, status, errorMessage } = payload;
+    const rawPayload: StatusUpdatePayload = await req.json();
+    const { status, sessionId, cliSessionId, errorMessage } = normalizePayload(rawPayload);
 
     // Validate payload
     if (!status) {
@@ -100,7 +152,10 @@ export async function POST(
       cliSessionId,
       errorMessage,
       startedAt: status === 'running' ? new Date() : undefined,
-      completedAt: status === 'completed' || status === 'failed' ? new Date() : undefined,
+      completedAt:
+        status === 'completed' || status === 'failed' || status === 'cancelled'
+          ? new Date()
+          : undefined,
     });
 
     logExceptInTest('[code-review-status] Updated review status', {

@@ -18,6 +18,7 @@ import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { updateCodeReviewStatus } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
 
@@ -167,7 +168,20 @@ async function dispatchReview(review: CloudAgentCodeReview, owner: Owner): Promi
     );
   }
 
-  // 2. Prepare complete payload for cloud agent
+  // 2. Evaluate feature flag: use cloud-agent-next?
+  const flagDistinctId = owner.type === 'org' ? owner.id : owner.userId;
+  const useCloudAgentNext = await isFeatureFlagEnabled(
+    'code-review-cloud-agent-next',
+    flagDistinctId
+  );
+
+  logExceptInTest('[dispatchReview] Feature flag evaluated', {
+    reviewId: review.id,
+    flagDistinctId,
+    useCloudAgentNext,
+  });
+
+  // 3. Prepare complete payload for cloud agent
   const payload = await prepareReviewPayload({
     reviewId: review.id,
     owner,
@@ -175,13 +189,14 @@ async function dispatchReview(review: CloudAgentCodeReview, owner: Owner): Promi
     platform,
   });
 
-  // 3. Update status to "queued" (no longer pending)
-  await updateCodeReviewStatus(review.id, 'queued');
+  // 4. Update status to "queued" (no longer pending) and record which agent to use
+  await updateCodeReviewStatus(review.id, 'queued', { useCloudAgentNext });
 
-  // 4. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO
+  // 5. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO
   await codeReviewWorkerClient.dispatchReview({
     ...payload,
     skipBalanceCheck: true,
+    useCloudAgentNext,
   });
 
   logExceptInTest('[dispatchReview] Review dispatched successfully', {

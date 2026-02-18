@@ -35,32 +35,32 @@ async function fetchWithTimeout(
 }
 
 // Types for API responses
-export interface DispatchReviewResponse {
+export type DispatchReviewResponse = {
   success: boolean;
   reviewId: string;
-}
+};
 
 /**
- * Code review event structure
+ * Code review event structure (used by SSE/cloud-agent flow)
  * Matches the CodeReviewEvent type from Cloudflare Worker
  */
-export interface ReviewEvent {
+export type ReviewEvent = {
   timestamp: string;
   eventType: string;
   message?: string;
   content?: string;
   sessionId?: string;
-}
+};
 
-export interface ReviewEventsResponse {
+export type ReviewEventsResponse = {
   reviewId: string;
   events: ReviewEvent[];
-}
+};
 
-export interface CancelReviewResponse {
+export type CancelReviewResponse = {
   success: boolean;
   reviewId: string;
-}
+};
 
 /**
  * Code Review Worker API Client
@@ -112,7 +112,7 @@ class CodeReviewWorkerClient {
   }
 
   /**
-   * Get events for a code review (for streaming)
+   * Get events for a code review (used by SSE/cloud-agent flow for polling)
    */
   async getReviewEvents(reviewId: string): Promise<ReviewEvent[]> {
     const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/events`, {

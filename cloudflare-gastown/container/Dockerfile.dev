@@ -1,4 +1,4 @@
-FROM oven/bun:1-slim
+FROM --platform=linux/arm64 oven/bun:1-slim
 
 # Install git, gh CLI, and Node.js (required by @kilocode/cli which uses #!/usr/bin/env node)
 RUN apt-get update && \
@@ -17,7 +17,7 @@ RUN apt-get update && \
 # Install Kilo CLI globally via npm (needs real Node.js runtime).
 # npm's global install does not resolve optionalDependencies, so we must
 # explicitly install the platform-specific binary package alongside the CLI.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64
+RUN npm install -g @kilocode/cli @kilocode/cli-linux-arm64
 
 # Create workspace directories
 RUN mkdir -p /workspace/rigs /app

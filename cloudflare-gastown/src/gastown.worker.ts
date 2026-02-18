@@ -64,6 +64,19 @@ export type GastownEnv = {
 
 const app = new Hono<GastownEnv>();
 
+const WORKER_LOG = '[gastown-worker]';
+
+// ── Request logging ─────────────────────────────────────────────────────
+app.use('*', async (c, next) => {
+  const method = c.req.method;
+  const path = c.req.path;
+  const startTime = Date.now();
+  console.log(`${WORKER_LOG} --> ${method} ${path}`);
+  await next();
+  const elapsed = Date.now() - startTime;
+  console.log(`${WORKER_LOG} <-- ${method} ${path} ${c.res.status} (${elapsed}ms)`);
+});
+
 // ── Cloudflare Access ───────────────────────────────────────────────────
 // Validate Cloudflare Access JWT for all requests; skip in development.
 

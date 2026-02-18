@@ -6,6 +6,8 @@ import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
 
+const TOWNS_LOG = '[towns.handler]';
+
 const CreateTownBody = z.object({
   name: z.string().min(1).max(64),
 });
@@ -55,27 +57,37 @@ export async function handleGetTown(
 export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: string }) {
   const parsed = CreateRigBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
+    console.error(`${TOWNS_LOG} handleCreateRig: invalid body`, parsed.error.issues);
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
       400
     );
   }
+  console.log(
+    `${TOWNS_LOG} handleCreateRig: userId=${params.userId} town_id=${parsed.data.town_id} name=${parsed.data.name} git_url=${parsed.data.git_url}`
+  );
 
   const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.createRig(parsed.data);
+  console.log(`${TOWNS_LOG} handleCreateRig: rig created id=${rig.id}, now configuring Rig DO`);
 
   // Configure the Rig DO with its metadata so it can dispatch work to the container.
   // If this fails, roll back the rig creation to avoid an orphaned record.
   try {
     const rigDO = getRigDOStub(c.env, rig.id);
     await rigDO.configureRig({
+      rigId: rig.id,
       townId: parsed.data.town_id,
       gitUrl: parsed.data.git_url,
       defaultBranch: parsed.data.default_branch,
       userId: params.userId,
     });
+    console.log(`${TOWNS_LOG} handleCreateRig: Rig DO configured successfully`);
   } catch (err) {
-    console.error(`configureRig failed for rig ${rig.id}, rolling back:`, err);
+    console.error(
+      `${TOWNS_LOG} handleCreateRig: configureRig FAILED for rig ${rig.id}, rolling back:`,
+      err
+    );
     await townDO.deleteRig(rig.id);
     return c.json(resError('Failed to configure rig'), 500);
   }
@@ -107,6 +119,18 @@ export async function handleDeleteTown(
   params: { userId: string; townId: string }
 ) {
   const townDO = getGastownUserStub(c.env, params.userId);
+
+  // Destroy all Rig DOs before deleting the town to cancel orphaned alarms
+  const rigs = await townDO.listRigs(params.townId);
+  for (const rig of rigs) {
+    try {
+      const rigDO = getRigDOStub(c.env, rig.id);
+      await rigDO.destroy();
+    } catch (err) {
+      console.error(`${TOWNS_LOG} handleDeleteTown: failed to destroy Rig DO ${rig.id}:`, err);
+    }
+  }
+
   const deleted = await townDO.deleteTown(params.townId);
   if (!deleted) return c.json(resError('Town not found'), 404);
   return c.json(resSuccess({ deleted: true }));
@@ -119,5 +143,14 @@ export async function handleDeleteRig(
   const townDO = getGastownUserStub(c.env, params.userId);
   const deleted = await townDO.deleteRig(params.rigId);
   if (!deleted) return c.json(resError('Rig not found'), 404);
+
+  // Clean up the Rig DO (cancel alarms, delete storage)
+  try {
+    const rigDO = getRigDOStub(c.env, params.rigId);
+    await rigDO.destroy();
+  } catch (err) {
+    console.error(`${TOWNS_LOG} handleDeleteRig: failed to destroy Rig DO ${params.rigId}:`, err);
+  }
+
   return c.json(resSuccess({ deleted: true }));
 }

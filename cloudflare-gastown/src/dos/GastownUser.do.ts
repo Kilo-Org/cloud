@@ -3,6 +3,8 @@ import { createTableTowns, towns, TownRecord } from '../db/tables/towns.table';
 import { createTableRigs, rigs, RigRecord } from '../db/tables/rigs.table';
 import { query } from '../util/query.util';
 
+const USER_LOG = '[GastownUser.do]';
+
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -55,6 +57,7 @@ export class GastownUserDO extends DurableObject<Env> {
     await this.ensureInitialized();
     const id = generateId();
     const timestamp = now();
+    console.log(`${USER_LOG} createTown: id=${id} name=${input.name} owner=${input.owner_user_id}`);
 
     query(
       this.sql,
@@ -72,6 +75,7 @@ export class GastownUserDO extends DurableObject<Env> {
 
     const town = this.getTown(id);
     if (!town) throw new Error('Failed to create town');
+    console.log(`${USER_LOG} createTown: created town id=${town.id}`);
     return town;
   }
 
@@ -111,10 +115,16 @@ export class GastownUserDO extends DurableObject<Env> {
     default_branch: string;
   }): Promise<RigRecord> {
     await this.ensureInitialized();
+    console.log(
+      `${USER_LOG} createRig: town_id=${input.town_id} name=${input.name} git_url=${input.git_url} default_branch=${input.default_branch}`
+    );
 
     // Verify town exists
     const town = this.getTown(input.town_id);
-    if (!town) throw new Error(`Town ${input.town_id} not found`);
+    if (!town) {
+      console.error(`${USER_LOG} createRig: town ${input.town_id} not found`);
+      throw new Error(`Town ${input.town_id} not found`);
+    }
 
     const id = generateId();
     const timestamp = now();
@@ -137,6 +147,7 @@ export class GastownUserDO extends DurableObject<Env> {
 
     const rig = this.getRig(id);
     if (!rig) throw new Error('Failed to create rig');
+    console.log(`${USER_LOG} createRig: created rig id=${rig.id}`);
     return rig;
   }
 

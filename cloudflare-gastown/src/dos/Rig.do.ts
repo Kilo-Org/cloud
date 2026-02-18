@@ -30,6 +30,8 @@ import type {
   PatrolResult,
 } from '../types';
 
+const RIG_LOG = '[Rig.do]';
+
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -55,6 +57,7 @@ const TOWN_ID_KEY = 'townId';
 const RIG_CONFIG_KEY = 'rigConfig';
 
 type RigConfig = {
+  rigId?: string;
   townId: string;
   gitUrl: string;
   defaultBranch: string;
@@ -107,6 +110,10 @@ export class RigDO extends DurableObject<Env> {
     const labelsJson = JSON.stringify(input.labels ?? []);
     const metadataJson = JSON.stringify(input.metadata ?? {});
 
+    console.log(
+      `${RIG_LOG} createBead: id=${id} type=${input.type} title="${input.title?.slice(0, 80)}" assignee_agent_id=${input.assignee_agent_id ?? 'none'}`
+    );
+
     query(
       this.sql,
       /* sql */ `
@@ -142,6 +149,7 @@ export class RigDO extends DurableObject<Env> {
 
     const result = this.getBead(id);
     if (!result) throw new Error('Failed to create bead');
+    console.log(`${RIG_LOG} createBead: created bead id=${result.id} status=${result.status}`);
     return result;
   }
 
@@ -246,6 +254,10 @@ export class RigDO extends DurableObject<Env> {
     const id = generateId();
     const timestamp = now();
 
+    console.log(
+      `${RIG_LOG} registerAgent: id=${id} role=${input.role} name=${input.name} identity=${input.identity}`
+    );
+
     query(
       this.sql,
       /* sql */ `
@@ -264,6 +276,9 @@ export class RigDO extends DurableObject<Env> {
 
     const agent = this.getAgent(id);
     if (!agent) throw new Error('Failed to register agent');
+    console.log(
+      `${RIG_LOG} registerAgent: created agent id=${agent.id} role=${agent.role} name=${agent.name} status=${agent.status}`
+    );
     return agent;
   }
 
@@ -355,17 +370,27 @@ export class RigDO extends DurableObject<Env> {
 
   async hookBead(agentId: string, beadId: string): Promise<void> {
     await this.ensureInitialized();
+    console.log(`${RIG_LOG} hookBead: agentId=${agentId} beadId=${beadId}`);
 
     // Verify bead exists
     const bead = this.getBead(beadId);
     if (!bead) throw new Error(`Bead ${beadId} not found`);
+    console.log(
+      `${RIG_LOG} hookBead: bead exists, type=${bead.type} status=${bead.status} assignee=${bead.assignee_agent_id}`
+    );
 
     // Verify agent exists
     const agent = this.getAgent(agentId);
     if (!agent) throw new Error(`Agent ${agentId} not found`);
+    console.log(
+      `${RIG_LOG} hookBead: agent exists, role=${agent.role} status=${agent.status} current_hook=${agent.current_hook_bead_id}`
+    );
 
     // Check agent isn't already hooked to another bead
     if (agent.current_hook_bead_id && agent.current_hook_bead_id !== beadId) {
+      console.error(
+        `${RIG_LOG} hookBead: CONFLICT - agent ${agentId} already hooked to ${agent.current_hook_bead_id}`
+      );
       throw new Error(`Agent ${agentId} is already hooked to bead ${agent.current_hook_bead_id}`);
     }
 
@@ -392,6 +417,9 @@ export class RigDO extends DurableObject<Env> {
       [agentId, now(), beadId]
     );
 
+    console.log(
+      `${RIG_LOG} hookBead: bead ${beadId} now in_progress, agent ${agentId} hooked. Arming alarm.`
+    );
     await this.armAlarmIfNeeded();
   }
 
@@ -661,6 +689,9 @@ export class RigDO extends DurableObject<Env> {
     metadata?: Record<string, unknown>;
   }): Promise<{ bead: Bead; agent: Agent }> {
     await this.ensureInitialized();
+    console.log(
+      `${RIG_LOG} slingBead: title="${input.title?.slice(0, 80)}" metadata=${JSON.stringify(input.metadata)}`
+    );
 
     // Create the bead
     const bead = await this.createBead({
@@ -669,18 +700,24 @@ export class RigDO extends DurableObject<Env> {
       body: input.body,
       metadata: input.metadata,
     });
+    console.log(`${RIG_LOG} slingBead: bead created id=${bead.id}`);
 
     // Find an idle polecat or create one
     const agent = await this.getOrCreateAgent('polecat');
+    console.log(`${RIG_LOG} slingBead: agent=${agent.id} role=${agent.role} name=${agent.name}`);
 
     // Hook them together (also arms the alarm)
     await this.hookBead(agent.id, bead.id);
+    console.log(`${RIG_LOG} slingBead: hooked agent ${agent.id} to bead ${bead.id}`);
 
     const updatedBead = await this.getBeadAsync(bead.id);
     const updatedAgent = this.getAgent(agent.id);
     if (!updatedBead || !updatedAgent) {
       throw new Error(`slingBead: failed to re-fetch bead ${bead.id} or agent ${agent.id}`);
     }
+    console.log(
+      `${RIG_LOG} slingBead: complete bead.status=${updatedBead.status} agent.status=${updatedAgent.status} agent.current_hook=${updatedAgent.current_hook_bead_id}`
+    );
     return { bead: updatedBead, agent: updatedAgent };
   }
 
@@ -698,6 +735,7 @@ export class RigDO extends DurableObject<Env> {
 
   async getOrCreateAgent(role: AgentRole): Promise<Agent> {
     await this.ensureInitialized();
+    console.log(`${RIG_LOG} getOrCreateAgent: role=${role}`);
 
     const existing = [
       ...query(
@@ -715,11 +753,22 @@ export class RigDO extends DurableObject<Env> {
 
     if (existing.length > 0) {
       const agent = AgentRecord.parse(existing[0]);
+      console.log(
+        `${RIG_LOG} getOrCreateAgent: found existing agent id=${agent.id} name=${agent.name} role=${agent.role} status=${agent.status} current_hook=${agent.current_hook_bead_id}`
+      );
       // Singleton roles: return existing agent regardless of status
-      if (agent.status === 'idle' || RigDO.SINGLETON_ROLES.has(role)) return agent;
+      if (agent.status === 'idle' || RigDO.SINGLETON_ROLES.has(role)) {
+        console.log(
+          `${RIG_LOG} getOrCreateAgent: returning existing agent (idle=${agent.status === 'idle'}, singleton=${RigDO.SINGLETON_ROLES.has(role)})`
+        );
+        return agent;
+      }
+    } else {
+      console.log(`${RIG_LOG} getOrCreateAgent: no existing agent found for role=${role}`);
     }
 
     // No idle agent found (polecat) or no agent at all — create a new one
+    console.log(`${RIG_LOG} getOrCreateAgent: creating new agent for role=${role}`);
     return this.registerAgent({
       role,
       name: `${role}-${Date.now()}`,
@@ -730,7 +779,13 @@ export class RigDO extends DurableObject<Env> {
   // ── Rig configuration (links this rig to its town + git repo) ────────
 
   async configureRig(config: RigConfig): Promise<void> {
-    await this.ctx.storage.put(RIG_CONFIG_KEY, config);
+    // Auto-populate rigId from the DO name if not provided by the caller
+    const rigId = config.rigId ?? this.ctx.id.name ?? undefined;
+    const enriched = { ...config, rigId };
+    console.log(
+      `${RIG_LOG} configureRig: rigId=${rigId} townId=${config.townId} gitUrl=${config.gitUrl} defaultBranch=${config.defaultBranch} userId=${config.userId}`
+    );
+    await this.ctx.storage.put(RIG_CONFIG_KEY, enriched);
     // Also store townId under the legacy key for backward compat
     await this.ctx.storage.put(TOWN_ID_KEY, config.townId);
     await this.armAlarmIfNeeded();
@@ -768,17 +823,35 @@ export class RigDO extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.ensureInitialized();
+    console.log(`${RIG_LOG} alarm: fired at ${now()}`);
 
     // witnessPatrol first: resets dead-container agents to idle so
     // schedulePendingWork can re-dispatch them in the same tick
-    await this.witnessPatrol();
-    await this.schedulePendingWork();
-    await this.processReviewQueue();
+    console.log(`${RIG_LOG} alarm: running witnessPatrol`);
+    const patrolResult = await this.witnessPatrol();
+    console.log(
+      `${RIG_LOG} alarm: witnessPatrol done dead=${patrolResult.dead_agents.length} stale=${patrolResult.stale_agents.length} orphaned=${patrolResult.orphaned_beads.length}`
+    );
+
+    console.log(`${RIG_LOG} alarm: running schedulePendingWork`);
+    const scheduled = await this.schedulePendingWork();
+    console.log(
+      `${RIG_LOG} alarm: schedulePendingWork done, scheduled ${scheduled.length} agents: [${scheduled.join(', ')}]`
+    );
+
+    console.log(`${RIG_LOG} alarm: running processReviewQueue`);
+    const reviewProcessed = await this.processReviewQueue();
+    console.log(`${RIG_LOG} alarm: processReviewQueue done, processed=${reviewProcessed}`);
 
     // Only re-arm if there's active work; armAlarmIfNeeded() restarts
     // the loop when new work arrives
-    if (this.hasActiveWork()) {
+    const active = this.hasActiveWork();
+    console.log(`${RIG_LOG} alarm: hasActiveWork=${active}`);
+    if (active) {
+      console.log(`${RIG_LOG} alarm: re-arming alarm for ${ACTIVE_ALARM_INTERVAL_MS}ms`);
       await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
+    } else {
+      console.log(`${RIG_LOG} alarm: no active work, NOT re-arming`);
     }
   }
 
@@ -788,8 +861,15 @@ export class RigDO extends DurableObject<Env> {
    */
   private async armAlarmIfNeeded(): Promise<void> {
     const currentAlarm = await this.ctx.storage.getAlarm();
-    if (!currentAlarm) {
+    if (!currentAlarm || currentAlarm < Date.now()) {
+      console.log(
+        `${RIG_LOG} armAlarmIfNeeded: ${currentAlarm ? `stale alarm at ${new Date(currentAlarm).toISOString()}, re-arming` : 'no current alarm, arming'} for 5s from now`
+      );
       await this.ctx.storage.setAlarm(Date.now() + 5_000);
+    } else {
+      console.log(
+        `${RIG_LOG} armAlarmIfNeeded: alarm already set for ${new Date(currentAlarm).toISOString()}`
+      );
     }
   }
 
@@ -834,6 +914,9 @@ export class RigDO extends DurableObject<Env> {
     const pendingBeads = Number(pendingBeadRows[0]?.cnt ?? 0);
     const pendingReviews = Number(pendingReviewRows[0]?.cnt ?? 0);
 
+    console.log(
+      `${RIG_LOG} hasActiveWork: activeAgents=${activeAgents} pendingBeads=${pendingBeads} pendingReviews=${pendingReviews}`
+    );
     return activeAgents > 0 || pendingBeads > 0 || pendingReviews > 0;
   }
 
@@ -857,14 +940,28 @@ export class RigDO extends DurableObject<Env> {
       ),
     ];
     const pendingAgents = AgentRecord.array().parse(rows);
+    console.log(
+      `${RIG_LOG} schedulePendingWork: found ${pendingAgents.length} idle agents with hooked beads`
+    );
 
     if (pendingAgents.length === 0) return [];
 
+    for (const agent of pendingAgents) {
+      console.log(
+        `${RIG_LOG} schedulePendingWork: agent id=${agent.id} role=${agent.role} name=${agent.name} status=${agent.status} hook=${agent.current_hook_bead_id}`
+      );
+    }
+
     const config = await this.getRigConfig();
     if (!config?.townId) {
-      console.warn('schedulePendingWork: rig not configured, skipping container dispatch');
+      console.warn(
+        `${RIG_LOG} schedulePendingWork: rig not configured (no townId), skipping container dispatch`
+      );
       return [];
     }
+    console.log(
+      `${RIG_LOG} schedulePendingWork: rig config townId=${config.townId} gitUrl=${config.gitUrl} defaultBranch=${config.defaultBranch}`
+    );
 
     const scheduledAgentIds: string[] = [];
 
@@ -872,8 +969,16 @@ export class RigDO extends DurableObject<Env> {
       const beadId = agent.current_hook_bead_id;
       if (!beadId) continue;
       const bead = this.getBead(beadId);
-      if (!bead) continue;
+      if (!bead) {
+        console.warn(
+          `${RIG_LOG} schedulePendingWork: bead ${beadId} not found for agent ${agent.id}, skipping`
+        );
+        continue;
+      }
 
+      console.log(
+        `${RIG_LOG} schedulePendingWork: dispatching agent ${agent.id} (${agent.role}/${agent.name}) to container for bead "${bead.title?.slice(0, 60)}"`
+      );
       const started = await this.startAgentInContainer(config, {
         agentId: agent.id,
         agentName: agent.name,
@@ -886,6 +991,9 @@ export class RigDO extends DurableObject<Env> {
       });
 
       if (started) {
+        console.log(
+          `${RIG_LOG} schedulePendingWork: agent ${agent.id} started in container, marking as 'working'`
+        );
         query(
           this.sql,
           /* sql */ `
@@ -897,6 +1005,10 @@ export class RigDO extends DurableObject<Env> {
           [now(), agent.id]
         );
         scheduledAgentIds.push(agent.id);
+      } else {
+        console.error(
+          `${RIG_LOG} schedulePendingWork: FAILED to start agent ${agent.id} in container`
+        );
       }
     }
 
@@ -929,9 +1041,9 @@ export class RigDO extends DurableObject<Env> {
     const secret = await this.resolveJWTSecret();
     if (!secret) return null;
 
-    const rigId = this.ctx.id.name;
+    const rigId = this.ctx.id.name ?? config.rigId;
     if (!rigId) {
-      console.error('mintAgentToken: DO has no name (rigId)');
+      console.error('mintAgentToken: DO has no name (rigId) and config has no rigId');
       return null;
     }
 
@@ -1020,17 +1132,32 @@ export class RigDO extends DurableObject<Env> {
       checkpoint: unknown;
     }
   ): Promise<boolean> {
+    console.log(
+      `${RIG_LOG} startAgentInContainer: agentId=${params.agentId} role=${params.role} name=${params.agentName} beadId=${params.beadId} townId=${config.townId}`
+    );
     try {
       const token = await this.mintAgentToken(params.agentId, config);
+      console.log(`${RIG_LOG} startAgentInContainer: JWT minted=${!!token}`);
 
       const envVars: Record<string, string> = {};
       if (token) {
         envVars.GASTOWN_SESSION_TOKEN = token;
       }
 
-      const rigId = this.ctx.id.name ?? '';
+      const rigId = this.ctx.id.name ?? config.rigId ?? '';
+      console.log(
+        `${RIG_LOG} startAgentInContainer: rigId=${rigId} gitUrl=${config.gitUrl} branch=${RigDO.branchForAgent(params.agentName)}`
+      );
+
+      const prompt = RigDO.buildPrompt({
+        beadTitle: params.beadTitle,
+        beadBody: params.beadBody,
+        checkpoint: params.checkpoint,
+      });
+      console.log(`${RIG_LOG} startAgentInContainer: prompt="${prompt.slice(0, 200)}"`);
 
       const container = getTownContainerStub(this.env, config.townId);
+      console.log(`${RIG_LOG} startAgentInContainer: sending POST to container /agents/start`);
       const response = await container.fetch('http://container/agents/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1041,11 +1168,7 @@ export class RigDO extends DurableObject<Env> {
           role: params.role,
           name: params.agentName,
           identity: params.identity,
-          prompt: RigDO.buildPrompt({
-            beadTitle: params.beadTitle,
-            beadBody: params.beadBody,
-            checkpoint: params.checkpoint,
-          }),
+          prompt,
           model: RigDO.modelForRole(params.role),
           systemPrompt: RigDO.systemPromptForRole(params.role, params.identity),
           gitUrl: config.gitUrl,
@@ -1054,9 +1177,19 @@ export class RigDO extends DurableObject<Env> {
           envVars,
         }),
       });
+      console.log(
+        `${RIG_LOG} startAgentInContainer: response status=${response.status} ok=${response.ok}`
+      );
+      if (!response.ok) {
+        const text = await response.text().catch(() => '(unreadable)');
+        console.error(`${RIG_LOG} startAgentInContainer: error response: ${text.slice(0, 500)}`);
+      }
       return response.ok;
     } catch (err) {
-      console.error(`Failed to start agent ${params.agentId} in container:`, err);
+      console.error(
+        `${RIG_LOG} startAgentInContainer: EXCEPTION for agent ${params.agentId}:`,
+        err
+      );
       return false;
     }
   }
@@ -1141,6 +1274,7 @@ export class RigDO extends DurableObject<Env> {
 
   async witnessPatrol(): Promise<PatrolResult> {
     await this.ensureInitialized();
+    console.log(`${RIG_LOG} witnessPatrol: starting`);
 
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
     const guppThreshold = new Date(Date.now() - GUPP_THRESHOLD_MS).toISOString();
@@ -1216,10 +1350,19 @@ export class RigDO extends DurableObject<Env> {
 
       const MailId = MailRecord.pick({ id: true });
 
+      console.log(
+        `${RIG_LOG} witnessPatrol: checking ${workingAgents.length} working/blocked agents in container`
+      );
       for (const working of workingAgents) {
         const containerStatus = await this.checkAgentContainerStatus(townId, working.id);
+        console.log(
+          `${RIG_LOG} witnessPatrol: agent ${working.id} container status=${containerStatus}`
+        );
 
         if (containerStatus === 'not_found' || containerStatus === 'exited') {
+          console.log(
+            `${RIG_LOG} witnessPatrol: agent ${working.id} process gone (${containerStatus}), resetting to idle`
+          );
           // Agent process is gone — reset to idle so schedulePendingWork()
           // can re-dispatch on the next alarm tick
           query(
@@ -1293,6 +1436,18 @@ export class RigDO extends DurableObject<Env> {
     await this.ensureInitialized();
     this.touchAgent(agentId);
     await this.armAlarmIfNeeded();
+  }
+
+  // ── Cleanup ────────────────────────────────────────────────────────────
+
+  /**
+   * Delete all storage and cancel alarms. Called when the rig is deleted
+   * to prevent orphaned alarms from firing indefinitely.
+   */
+  async destroy(): Promise<void> {
+    console.log(`${RIG_LOG} destroy: clearing all storage and alarms`);
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
   }
 
   // ── Private helpers ────────────────────────────────────────────────────

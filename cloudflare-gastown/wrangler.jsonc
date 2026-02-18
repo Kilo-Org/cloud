@@ -63,7 +63,7 @@
         {
           "name": "gastown-dev-TownContainerDO",
           "class_name": "TownContainerDO",
-          "image": "./container/Dockerfile",
+          "image": "./container/Dockerfile.dev",
           "instance_type": "standard-4",
           "max_instances": 50,
         },

@@ -5,6 +5,8 @@ import { z } from 'zod';
 import * as gastown from '@/lib/gastown/gastown-client';
 import { GastownApiError } from '@/lib/gastown/gastown-client';
 
+const LOG_PREFIX = '[gastown-router]';
+
 /**
  * Wraps a gastown client call and converts GastownApiError into TRPCError
  * with an appropriate code.
@@ -14,6 +16,7 @@ async function withGastownError<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } catch (err) {
     if (err instanceof GastownApiError) {
+      console.error(`${LOG_PREFIX} GastownApiError: status=${err.status} message="${err.message}"`);
       const code =
         err.status === 404
           ? 'NOT_FOUND'
@@ -24,6 +27,7 @@ async function withGastownError<T>(fn: () => Promise<T>): Promise<T> {
               : 'INTERNAL_SERVER_ERROR';
       throw new TRPCError({ code, message: err.message });
     }
+    console.error(`${LOG_PREFIX} Unexpected error:`, err);
     throw err;
   }
 }
@@ -141,18 +145,26 @@ export const gastownRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      console.log(
+        `${LOG_PREFIX} sling: rigId=${input.rigId} title="${input.title}" model=${input.model} userId=${ctx.user.id}`
+      );
       // Verify ownership
       const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      console.log(`${LOG_PREFIX} sling: rig verified, name=${rig.name}`);
 
       // Atomic sling: creates bead, assigns/creates polecat, hooks them,
       // and arms the alarm — all in a single Rig DO call to avoid TOCTOU races.
-      return withGastownError(() =>
+      const result = await withGastownError(() =>
         gastown.slingBead(rig.id, {
           title: input.title,
           body: input.body,
           metadata: { model: input.model, slung_by: ctx.user.id },
         })
       );
+      console.log(
+        `${LOG_PREFIX} sling: completed beadId=${result.bead.id} agentId=${result.agent.id} agentRole=${result.agent.role} agentStatus=${result.agent.status}`
+      );
+      return result;
     }),
 
   // ── Mayor Communication ─────────────────────────────────────────────────
@@ -167,22 +179,43 @@ export const gastownRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      console.log(
+        `${LOG_PREFIX} sendMessage: townId=${input.townId} rigId=${input.rigId} message="${input.message.slice(0, 80)}" model=${input.model} userId=${ctx.user.id}`
+      );
+
       // Verify ownership
       const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      console.log(
+        `${LOG_PREFIX} sendMessage: town verified, name=${town.name} owner=${town.owner_user_id}`
+      );
       if (town.owner_user_id !== ctx.user.id) {
+        console.error(`${LOG_PREFIX} sendMessage: FORBIDDEN - town owner mismatch`);
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
 
       // Verify rig belongs to this town
       const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      console.log(
+        `${LOG_PREFIX} sendMessage: rig verified, name=${rig.name} town_id=${rig.town_id}`
+      );
       if (rig.town_id !== input.townId) {
+        console.error(
+          `${LOG_PREFIX} sendMessage: BAD_REQUEST - rig.town_id=${rig.town_id} !== input.townId=${input.townId}`
+        );
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Rig does not belong to this town' });
       }
 
       // Atomically get or create the Mayor agent in the Rig DO to avoid
       // duplicate mayor creation from concurrent calls.
+      console.log(
+        `${LOG_PREFIX} sendMessage: calling getOrCreateAgent(rigId=${input.rigId}, role=mayor)`
+      );
       const mayor = await withGastownError(() => gastown.getOrCreateAgent(input.rigId, 'mayor'));
+      console.log(
+        `${LOG_PREFIX} sendMessage: mayor agent id=${mayor.id} name=${mayor.name} status=${mayor.status} current_hook_bead_id=${mayor.current_hook_bead_id}`
+      );
 
+      console.log(`${LOG_PREFIX} sendMessage: creating message bead assigned to mayor ${mayor.id}`);
       const bead = await withGastownError(() =>
         gastown.createBead(input.rigId, {
           type: 'message',
@@ -191,9 +224,14 @@ export const gastownRouter = createTRPCRouter({
           metadata: { model: input.model, sent_by: ctx.user.id },
         })
       );
+      console.log(
+        `${LOG_PREFIX} sendMessage: bead created id=${bead.id} type=${bead.type} status=${bead.status}`
+      );
 
       // Hook bead to mayor → arms alarm → alarm dispatches to container
+      console.log(`${LOG_PREFIX} sendMessage: hooking bead ${bead.id} to mayor ${mayor.id}`);
       await withGastownError(() => gastown.hookBead(input.rigId, mayor.id, bead.id));
+      console.log(`${LOG_PREFIX} sendMessage: hook completed successfully`);
 
       return { bead, agent: mayor };
     }),

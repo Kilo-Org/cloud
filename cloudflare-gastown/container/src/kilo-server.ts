@@ -62,6 +62,9 @@ async function waitForHealthy(port: number, timeoutMs = HEALTH_CHECK_TIMEOUT_MS)
 export async function ensureServer(workdir: string, env: Record<string, string>): Promise<number> {
   const existing = servers.get(workdir);
   if (existing?.healthy) {
+    // The server was started with the env from the first agent in this workdir.
+    // Subsequent agents share the same server process — their env vars only
+    // affect the kilo serve session (via prompt/system-prompt), not the server.
     return existing.port;
   }
 

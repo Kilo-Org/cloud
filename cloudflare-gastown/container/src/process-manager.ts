@@ -114,7 +114,12 @@ export async function startAgent(
       systemPrompt: request.systemPrompt,
     });
 
-    agent.status = 'running';
+    // Only transition to 'running' if the SSE consumer hasn't already
+    // moved us to a terminal state (e.g. a fast completion event arrived
+    // between subscription and here).
+    if (agent.status === 'starting') {
+      agent.status = 'running';
+    }
     agent.messageCount = 1;
 
     console.log(

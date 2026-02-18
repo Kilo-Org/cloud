@@ -27,16 +27,13 @@ import {
   extractFormat,
   type AiSdkReasoningPart,
 } from './reasoning-provider-metadata';
-import type { OpenRouterStreamChatCompletionChunkSchema } from './schemas';
-import type * as z from 'zod';
+import type { ChatCompletionChunk } from './schemas';
 import type { CustomLlm } from '@/db/schema';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
 import type { XaiLanguageModelResponsesOptions } from '@ai-sdk/xai';
 import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
-
-type ChatCompletionChunk = z.infer<typeof OpenRouterStreamChatCompletionChunkSchema>;
 
 function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage[] {
   const toolNameByCallId = new Map<string, string>();

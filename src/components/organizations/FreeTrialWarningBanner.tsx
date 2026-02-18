@@ -34,7 +34,7 @@ function getStylesForState(state: OrgTrialStatus, planName: string) {
         border: 'border-orange-500/50',
         text: 'text-orange-100',
         icon: 'text-orange-400',
-        title: 'Trial Ending Soon',
+        title: `Free Kilo ${planName} Trial Ending Soon`,
       };
     case 'trial_ending_very_soon':
       return {
@@ -42,7 +42,7 @@ function getStylesForState(state: OrgTrialStatus, planName: string) {
         border: 'border-red-500/50',
         text: 'text-red-100',
         icon: 'text-red-400',
-        title: 'Trial Ending Very Soon',
+        title: `Free Kilo ${planName} Trial Ending Very Soon`,
       };
     case 'trial_expires_today':
       return {
@@ -50,7 +50,7 @@ function getStylesForState(state: OrgTrialStatus, planName: string) {
         border: 'border-red-600',
         text: 'text-red-100',
         icon: 'text-red-400',
-        title: 'Trial Ends Today',
+        title: `Free Kilo ${planName} Trial Ends Today`,
       };
     case 'trial_expired_soft':
     case 'trial_expired_hard':
@@ -59,7 +59,7 @@ function getStylesForState(state: OrgTrialStatus, planName: string) {
         border: 'border-red-600',
         text: 'text-red-100',
         icon: 'text-red-400',
-        title: 'Trial Has Ended',
+        title: `Free Kilo ${planName} Trial Has Ended`,
       };
     case 'subscribed':
       return {

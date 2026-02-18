@@ -88,9 +88,7 @@ export const parseClassification = (
     hasClassificationKey: /"classification"/.test(text),
   });
 
-  throw new Error(
-    `Failed to parse classification from Cloud Agent response (${text.length} chars). Strategies: ${failures.join('; ')}`
-  );
+  throw new Error('Classification failed — could not parse the agent response. Please retry.');
 };
 
 /**

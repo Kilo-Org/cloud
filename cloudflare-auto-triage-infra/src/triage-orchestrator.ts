@@ -96,15 +96,21 @@ export class TriageOrchestrator extends DurableObject<Env> {
         await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
         await this.requestClarification(classification);
       } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
-        await this.buildAndApplyLabels(
+        const labelsApplied = await this.buildAndApplyLabels(
           ['kilo-triaged', 'kilo-auto-fix'],
           classification.selectedLabels
         );
+        if (!labelsApplied) {
+          console.error('[TriageOrchestrator] kilo-auto-fix label may not have been applied', {
+            ticketId: this.state.ticketId,
+          });
+        }
         await this.updateStatus('actioned', {
           classification: classification.classification,
           confidence: classification.confidence,
           intentSummary: classification.intentSummary,
           relatedFiles: classification.relatedFiles,
+          actionMetadata: labelsApplied ? undefined : { labelWarning: 'Failed to apply labels' },
         });
       } else {
         await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
@@ -250,9 +256,11 @@ export class TriageOrchestrator extends DurableObject<Env> {
         model_slug: string;
         custom_instructions?: string | null;
       };
+      excluded_labels?: string[];
     } = await configResponse.json();
     const githubToken = configData.githubToken;
     const config = configData.config;
+    const excludedLabels = new Set(configData.excluded_labels ?? []);
 
     if (!githubToken) {
       console.log(
@@ -264,9 +272,12 @@ export class TriageOrchestrator extends DurableObject<Env> {
     }
 
     // Fetch available labels from the repository (falls back to defaults on error or no token)
-    const availableLabels = githubToken
+    // Then exclude skip/required labels so the AI won't select them for auto-labeling
+    const repoLabels = githubToken
       ? await fetchRepoLabels(this.state.sessionInput.repoFullName, githubToken)
       : DEFAULT_LABELS;
+    const availableLabels =
+      excludedLabels.size > 0 ? repoLabels.filter(label => !excludedLabels.has(label)) : repoLabels;
 
     console.log('[auto-triage:labels] Available labels for prompt', {
       ticketId: this.state.ticketId,
@@ -303,19 +314,24 @@ export class TriageOrchestrator extends DurableObject<Env> {
     // Add timeout protection for classification
     const timeoutMs = this.getClassificationTimeout();
     const timeoutMinutes = Math.floor(timeoutMs / 60000);
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
         () =>
           reject(new Error(`Classification timed out - exceeded ${timeoutMinutes} minute limit`)),
         timeoutMs
-      )
-    );
+      );
+    });
 
-    // Process SSE stream with timeout
-    return await Promise.race([
-      this.processClassificationStream(response, availableLabels),
-      timeoutPromise,
-    ]);
+    // Process SSE stream with timeout, ensuring the timer is always cleaned up
+    try {
+      return await Promise.race([
+        this.processClassificationStream(response, availableLabels),
+        timeoutPromise,
+      ]);
+    } finally {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+    }
   }
 
   /**
@@ -411,23 +427,25 @@ export class TriageOrchestrator extends DurableObject<Env> {
   /**
    * Deduplicate, log, and apply a set of labels to the issue.
    * Fixed labels (e.g. kilo-triaged) come first; AI-selected labels are appended.
+   * Returns true if all labels were applied successfully.
    */
   private async buildAndApplyLabels(
     fixedLabels: string[],
     selectedLabels: string[] = []
-  ): Promise<void> {
+  ): Promise<boolean> {
     const labels = [...new Set([...fixedLabels, ...selectedLabels])];
     console.log('[auto-triage:labels] Applying labels', {
       ticketId: this.state.ticketId,
       labels,
     });
-    await this.applyLabels(labels);
+    return this.applyLabels(labels);
   }
 
   /**
-   * Apply action-tracking and content labels to the issue
+   * Apply action-tracking and content labels to the issue.
+   * Best-effort: never throws. Returns false if any labels failed.
    */
-  private async applyLabels(labels: string[]): Promise<void> {
+  private async applyLabels(labels: string[]): Promise<boolean> {
     try {
       // Call Next.js API to add labels to the issue
       const addLabelResponse = await fetch(`${this.env.API_URL}/api/internal/triage/add-label`, {
@@ -449,12 +467,16 @@ export class TriageOrchestrator extends DurableObject<Env> {
           status: addLabelResponse.status,
           error: errorText,
         });
+        return false;
       }
+
+      return true;
     } catch (error) {
       console.error('[TriageOrchestrator] Error applying labels:', {
         ticketId: this.state.ticketId,
         error: error instanceof Error ? error.message : String(error),
       });
+      return false;
     }
   }
 
@@ -507,8 +529,13 @@ export class TriageOrchestrator extends DurableObject<Env> {
   }
 
   /**
-   * Process Cloud Agent classification stream
-   * Extracts classification result from stream events
+   * Process Cloud Agent classification stream.
+   *
+   * Collects two text buffers:
+   * - sayText: only LLM "say" events (text + completion_result) — the actual model output.
+   * - fullText: all text content from the stream (superset of sayText, includes tool output etc.).
+   *
+   * Parsing tries sayText first (cleaner, less noise), falling back to fullText.
    */
   private async processClassificationStream(
     response: Response,
@@ -560,6 +587,12 @@ export class TriageOrchestrator extends DurableObject<Env> {
       sayTextLength: sayText.length,
       fullTextLength: fullText.length,
     });
+
+    if (sayText.length === 0 && fullText.length === 0) {
+      throw new Error(
+        'Classification failed — the agent session produced no output. Please retry.'
+      );
+    }
 
     // Parse classification from accumulated text
     return this.parseClassificationFromText(sayText, fullText, availableLabels);

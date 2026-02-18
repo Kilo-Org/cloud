@@ -68,34 +68,43 @@ export async function POST(req: NextRequest) {
 
     const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
 
-    // Add each label to the GitHub issue (best-effort: partial failures don't abort the batch)
-    const failures: Array<{ label: string; error: string }> = [];
-    for (const label of labels) {
-      try {
-        logExceptInTest('[auto-triage:labels] Applying label to GitHub issue', {
-          ticketId,
-          label,
-          repoFullName: ticket.repo_full_name,
-          issueNumber: ticket.issue_number,
-        });
-        await addIssueLabel({
+    // Add labels to the GitHub issue in parallel (best-effort: partial failures don't abort the batch)
+    logExceptInTest('[auto-triage:labels] Applying labels to GitHub issue', {
+      ticketId,
+      labels,
+      repoFullName: ticket.repo_full_name,
+      issueNumber: ticket.issue_number,
+    });
+
+    const results = await Promise.allSettled(
+      labels.map(label =>
+        addIssueLabel({
           repoFullName: ticket.repo_full_name,
           issueNumber: ticket.issue_number,
           label,
           githubToken: tokenData.token,
-        });
+        })
+      )
+    );
+
+    const failures: Array<{ label: string; error: string }> = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const label = labels[i];
+      if (result.status === 'fulfilled') {
         logExceptInTest('[auto-triage:labels] Label applied successfully', {
           ticketId,
           label,
         });
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
+      } else {
+        const message =
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
         errorExceptInTest('[auto-triage:labels] Failed to apply label', {
           ticketId,
           label,
           error: message,
         });
-        captureException(e, {
+        captureException(result.reason, {
           tags: { source: 'add-label-api', label },
           extra: { ticketId },
         });

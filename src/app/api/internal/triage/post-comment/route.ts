@@ -24,7 +24,7 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 import { z } from 'zod';
 
 const postCommentRequestSchema = z.object({
-  ticketId: z.string().min(1),
+  ticketId: z.string().uuid(),
   body: z.string().min(1),
 });
 

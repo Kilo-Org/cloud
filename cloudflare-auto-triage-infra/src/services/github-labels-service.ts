@@ -58,6 +58,12 @@ export async function fetchRepoLabels(
       return DEFAULT_LABELS;
     }
 
+    if (labels.length === 100) {
+      console.warn('[auto-triage:labels] Repo may have >100 labels; only first page fetched', {
+        repoFullName,
+      });
+    }
+
     const labelNames = labels.map(l => l.name);
     console.log('[auto-triage:labels] Labels fetched from repo', {
       repoFullName,

@@ -11,28 +11,9 @@ import { classificationResultSchema, type ClassificationResult } from '../types'
  * Filter a list of raw label values to only those present in availableLabels
  */
 const filterValidLabels = (rawLabels: unknown, availableLabels: string[]): string[] => {
-  console.log('[auto-triage:labels] Filtering selectedLabels from AI output', {
-    rawLabels,
-    availableLabels,
-  });
+  if (!Array.isArray(rawLabels)) return [];
 
-  if (!Array.isArray(rawLabels)) {
-    console.log('[auto-triage:labels] selectedLabels is not an array, returning empty', {
-      rawLabels,
-    });
-    return [];
-  }
-
-  const filtered = rawLabels.filter(
-    (l): l is string => typeof l === 'string' && availableLabels.includes(l)
-  );
-
-  console.log('[auto-triage:labels] Filtered selectedLabels result', {
-    before: rawLabels,
-    after: filtered,
-  });
-
-  return filtered;
+  return rawLabels.filter((l): l is string => typeof l === 'string' && availableLabels.includes(l));
 };
 
 /**
@@ -45,13 +26,8 @@ const tryParseCandidate = (
   availableLabels: string[]
 ): ClassificationResult | null => {
   if (typeof parsed !== 'object' || parsed === null) return null;
-  const candidate = {
-    ...(parsed as Record<string, unknown>),
-    selectedLabels: filterValidLabels(
-      (parsed as Record<string, unknown>).selectedLabels,
-      availableLabels
-    ),
-  };
+  const rawLabels = 'selectedLabels' in parsed ? parsed.selectedLabels : undefined;
+  const candidate = { ...parsed, selectedLabels: filterValidLabels(rawLabels, availableLabels) };
   const result = classificationResultSchema.safeParse(candidate);
   return result.success ? result.data : null;
 };

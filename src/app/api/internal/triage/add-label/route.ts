@@ -68,24 +68,48 @@ export async function POST(req: NextRequest) {
 
     const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
 
-    // Add each label to the GitHub issue
+    // Add each label to the GitHub issue (best-effort: partial failures don't abort the batch)
+    const failures: Array<{ label: string; error: string }> = [];
     for (const label of labels) {
-      logExceptInTest('[auto-triage:labels] Applying label to GitHub issue', {
+      try {
+        logExceptInTest('[auto-triage:labels] Applying label to GitHub issue', {
+          ticketId,
+          label,
+          repoFullName: ticket.repo_full_name,
+          issueNumber: ticket.issue_number,
+        });
+        await addIssueLabel({
+          repoFullName: ticket.repo_full_name,
+          issueNumber: ticket.issue_number,
+          label,
+          githubToken: tokenData.token,
+        });
+        logExceptInTest('[auto-triage:labels] Label applied successfully', {
+          ticketId,
+          label,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        errorExceptInTest('[auto-triage:labels] Failed to apply label', {
+          ticketId,
+          label,
+          error: message,
+        });
+        captureException(e, {
+          tags: { source: 'add-label-api', label },
+          extra: { ticketId },
+        });
+        failures.push({ label, error: message });
+      }
+    }
+
+    if (failures.length > 0) {
+      logExceptInTest('[add-label] Some labels failed to apply', {
         ticketId,
-        label,
-        repoFullName: ticket.repo_full_name,
+        failures,
         issueNumber: ticket.issue_number,
       });
-      await addIssueLabel({
-        repoFullName: ticket.repo_full_name,
-        issueNumber: ticket.issue_number,
-        label,
-        githubToken: tokenData.token,
-      });
-      logExceptInTest('[auto-triage:labels] Label applied successfully', {
-        ticketId,
-        label,
-      });
+      return NextResponse.json({ success: false, failures }, { status: 207 });
     }
 
     logExceptInTest('[add-label] Labels added to GitHub issue', {

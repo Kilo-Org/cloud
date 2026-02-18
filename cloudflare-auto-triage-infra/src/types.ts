@@ -15,12 +15,6 @@ export type TriageAction =
   | 'closed_duplicate'
   | 'needs_clarification';
 
-export type GitHubLabel = {
-  name: string;
-  color: string;
-  description: string | null;
-};
-
 export interface Owner {
   type: 'user' | 'org';
   id: string;

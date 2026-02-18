@@ -330,10 +330,11 @@ export class TriageOrchestrator extends DurableObject<Env> {
     const duplicateTicket = result.similarTickets?.[0];
     if (duplicateTicket) {
       const issueUrl = `https://github.com/${duplicateTicket.repoFullName}/issues/${duplicateTicket.issueNumber}`;
+      const escapedTitle = duplicateTicket.issueTitle.replace(/([\\*_~`[\]()#>!|])/g, '\\$1');
       const commentBody = [
         `This issue appears to be a duplicate of ${issueUrl}.`,
         '',
-        `> **${duplicateTicket.issueTitle}** (#${duplicateTicket.issueNumber})`,
+        `> **${escapedTitle}** (#${duplicateTicket.issueNumber})`,
         '',
         `Similarity score: ${Math.round(duplicateTicket.similarity * 100)}%`,
         '',

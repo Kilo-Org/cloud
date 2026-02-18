@@ -102,7 +102,6 @@ export class TriageOrchestrator extends DurableObject<Env> {
         });
         await this.applyLabels(labels);
         await this.answerQuestion(classification);
-        await this.updateStatus('actioned');
       } else if (classification.classification === 'unclear') {
         const labels = ['kilo-triaged', ...classification.selectedLabels];
         console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
@@ -111,7 +110,6 @@ export class TriageOrchestrator extends DurableObject<Env> {
         });
         await this.applyLabels(labels);
         await this.requestClarification(classification);
-        await this.updateStatus('actioned');
       } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
         // Apply labels and trigger Auto Fix workflow
         console.log('[auto-triage:labels] selectedLabels from AI classification', {
@@ -140,7 +138,6 @@ export class TriageOrchestrator extends DurableObject<Env> {
         });
         await this.applyLabels(labels);
         await this.requestClarification(classification);
-        await this.updateStatus('actioned');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -337,7 +334,8 @@ export class TriageOrchestrator extends DurableObject<Env> {
     const timeoutMinutes = Math.floor(timeoutMs / 60000);
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(
-        () => reject(new Error(`Classification timeout - exceeded ${timeoutMinutes} minute limit`)),
+        () =>
+          reject(new Error(`Classification timed out - exceeded ${timeoutMinutes} minute limit`)),
         timeoutMs
       )
     );
@@ -541,13 +539,20 @@ export class TriageOrchestrator extends DurableObject<Env> {
         fullText += text;
       },
       onKilocodeEvent: payload => {
-        // Capture only the LLM's direct text responses (type: 'say', say: 'text')
+        // Capture LLM text responses: both streaming 'text' and final 'completion_result'
         if (
           payload.type === 'say' &&
-          payload.say === 'text' &&
-          typeof payload.content === 'string'
+          (payload.say === 'text' || payload.say === 'completion_result')
         ) {
-          sayText += payload.content;
+          const text =
+            typeof payload.content === 'string'
+              ? payload.content
+              : typeof payload.text === 'string'
+                ? payload.text
+                : '';
+          if (text) {
+            sayText += text;
+          }
         }
       },
       onComplete: () => {

@@ -84,6 +84,7 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
   const [classificationFilter, setClassificationFilter] = useState<
     TriageClassification | undefined
   >(undefined);
+  const [interruptingTicketId, setInterruptingTicketId] = useState<string | null>(null);
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -220,10 +221,12 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
   );
 
   const handleInterrupt = (ticketId: string) => {
+    setInterruptingTicketId(ticketId);
+    const onSettled = () => setInterruptingTicketId(null);
     if (organizationId) {
-      interruptOrgMutation.mutate({ organizationId, ticketId });
+      interruptOrgMutation.mutate({ organizationId, ticketId }, { onSettled });
     } else {
-      interruptPersonalMutation.mutate({ ticketId });
+      interruptPersonalMutation.mutate({ ticketId }, { onSettled });
     }
   };
 
@@ -506,15 +509,11 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
                           variant="outline"
                           size="sm"
                           onClick={() => handleInterrupt(ticket.id)}
-                          disabled={
-                            interruptOrgMutation.isPending || interruptPersonalMutation.isPending
-                          }
+                          disabled={interruptingTicketId === ticket.id}
                           className="gap-2 text-red-500 hover:text-red-600"
                         >
                           <StopCircle className="h-3 w-3" />
-                          {interruptOrgMutation.isPending || interruptPersonalMutation.isPending
-                            ? 'Interrupting...'
-                            : 'Interrupt'}
+                          {interruptingTicketId === ticket.id ? 'Interrupting...' : 'Interrupt'}
                         </Button>
                       </div>
                     )}

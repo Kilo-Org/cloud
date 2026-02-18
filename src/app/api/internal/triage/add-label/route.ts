@@ -7,7 +7,6 @@
  * Process:
  * 1. Get ticket and integration
  * 2. Add labels to GitHub issue
- * 3. Update triage ticket with classification data
  *
  * URL: POST /api/internal/triage/add-label
  * Protected by internal API secret
@@ -15,7 +14,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getTriageTicketById, updateTriageTicketStatus } from '@/lib/auto-triage/db/triage-tickets';
+import { getTriageTicketById } from '@/lib/auto-triage/db/triage-tickets';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
@@ -26,10 +25,6 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 type AddLabelRequest = {
   ticketId: string;
   labels: string[];
-  classification?: 'bug' | 'feature' | 'question' | 'unclear';
-  confidence?: number;
-  intentSummary?: string;
-  relatedFiles?: string[];
 };
 
 export async function POST(req: NextRequest) {
@@ -41,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: AddLabelRequest = await req.json();
-    const { ticketId, labels, classification, confidence, intentSummary, relatedFiles } = body;
+    const { ticketId, labels } = body;
 
     // Validate payload
     if (!ticketId || !labels || labels.length === 0) {
@@ -98,20 +93,6 @@ export async function POST(req: NextRequest) {
       ticketId,
       labels,
       issueNumber: ticket.issue_number,
-    });
-
-    // Update triage ticket with classification data
-    await updateTriageTicketStatus(ticketId, 'actioned', {
-      classification,
-      confidence,
-      intentSummary,
-      relatedFiles,
-      actionTaken: 'comment_posted', // Label addition is a form of action
-      completedAt: new Date(),
-    });
-
-    logExceptInTest('[add-label] Updated triage ticket', {
-      ticketId,
     });
 
     return NextResponse.json({ success: true });

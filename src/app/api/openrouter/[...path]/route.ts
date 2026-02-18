@@ -32,6 +32,7 @@ import {
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
+  wrapInZeroCostResponse,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
@@ -463,6 +464,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (provider.requiresResponseRewrite) {
     return rewriteModelResponse(response, originalModelIdLowerCased);
+  }
+
+  // When the review promo is active, zero out the cost in the response stream
+  // so the client displays $0.00 instead of the upstream provider's cost.
+  if (isActiveReviewPromo(botId, originalModelIdLowerCased)) {
+    return await wrapInZeroCostResponse(response);
   }
 
   return wrapInSafeNextResponse(response);

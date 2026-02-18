@@ -1,5 +1,9 @@
 import { describe, it, expect } from '@jest/globals';
-import { checkOrganizationModelRestrictions, estimateChatTokens } from './llm-proxy-helpers';
+import {
+  checkOrganizationModelRestrictions,
+  estimateChatTokens,
+  wrapInZeroCostResponse,
+} from './llm-proxy-helpers';
 import type { OpenRouterChatCompletionRequest } from './providers/openrouter/types';
 
 describe('checkOrganizationModelRestrictions', () => {
@@ -303,6 +307,236 @@ describe('estimateChatTokens', () => {
     expect(estimateChatTokens(nullMessages)).toEqual({
       estimatedInputTokens: 0,
       estimatedOutputTokens: 0,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// wrapInZeroCostResponse
+// ---------------------------------------------------------------------------
+
+/** Helper: build a minimal SSE stream from an array of `data: ...` lines. */
+function makeSSEStream(lines: string[]): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  const payload = lines.map(l => l + '\n\n').join('');
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(payload));
+      controller.close();
+    },
+  });
+}
+
+/** Helper: consume a ReadableStream into a string. */
+async function streamToText(stream: ReadableStream<Uint8Array> | null): Promise<string> {
+  if (!stream) return '';
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let result = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    result += decoder.decode(value, { stream: true });
+  }
+  return result;
+}
+
+describe('wrapInZeroCostResponse', () => {
+  describe('streaming SSE responses', () => {
+    it('should zero out cost and upstream_inference_cost in usage chunk', async () => {
+      const contentChunk = JSON.stringify({
+        id: 'gen-abc',
+        model: 'anthropic/claude-sonnet-4.6',
+        choices: [{ delta: { content: 'Hello' }, index: 0 }],
+      });
+      const usageChunk = JSON.stringify({
+        id: 'gen-abc',
+        model: 'anthropic/claude-sonnet-4.6',
+        choices: [],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 50,
+          cost: 0.00312,
+          is_byok: false,
+          cost_details: { upstream_inference_cost: 0.0028 },
+        },
+      });
+
+      const response = new Response(
+        makeSSEStream([`data: ${contentChunk}`, `data: ${usageChunk}`, 'data: [DONE]']),
+        {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        }
+      );
+
+      const result = await wrapInZeroCostResponse(response);
+      const text = await streamToText(result.body);
+
+      // Parse the usage line from the output
+      const dataLines = text
+        .split('\n')
+        .filter(l => l.startsWith('data: ') && l !== 'data: [DONE]');
+
+      // Content chunk should be present
+      expect(dataLines.length).toBe(2);
+
+      // The usage chunk (last data line) should have zeroed cost
+      const usageOutput = JSON.parse(dataLines[1].replace('data: ', ''));
+      expect(usageOutput.usage.cost).toBe(0);
+      expect(usageOutput.usage.cost_details.upstream_inference_cost).toBe(0);
+
+      // Token counts should be preserved
+      expect(usageOutput.usage.prompt_tokens).toBe(100);
+      expect(usageOutput.usage.completion_tokens).toBe(50);
+    });
+
+    it('should pass non-usage content chunks through unchanged', async () => {
+      const contentChunk = {
+        id: 'gen-abc',
+        model: 'anthropic/claude-sonnet-4.6',
+        choices: [{ delta: { content: 'Hello world' }, index: 0 }],
+      };
+
+      const response = new Response(
+        makeSSEStream([`data: ${JSON.stringify(contentChunk)}`, 'data: [DONE]']),
+        {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        }
+      );
+
+      const result = await wrapInZeroCostResponse(response);
+      const text = await streamToText(result.body);
+
+      // The content chunk should pass through (no "usage" key in chunk, so fast path)
+      expect(text).toContain('Hello world');
+      expect(text).toContain('[DONE]');
+    });
+
+    it('should handle [DONE] sentinel correctly', async () => {
+      const response = new Response(makeSSEStream(['data: [DONE]']), {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+
+      const result = await wrapInZeroCostResponse(response);
+      const text = await streamToText(result.body);
+
+      expect(text).toContain('data: [DONE]');
+    });
+
+    it('should handle usage chunk without cost_details', async () => {
+      const usageChunk = JSON.stringify({
+        id: 'gen-abc',
+        choices: [],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 50,
+          cost: 0.005,
+        },
+      });
+
+      const response = new Response(makeSSEStream([`data: ${usageChunk}`, 'data: [DONE]']), {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+
+      const result = await wrapInZeroCostResponse(response);
+      const text = await streamToText(result.body);
+      const dataLines = text
+        .split('\n')
+        .filter(l => l.startsWith('data: ') && l !== 'data: [DONE]');
+
+      const usageOutput = JSON.parse(dataLines[0].replace('data: ', ''));
+      expect(usageOutput.usage.cost).toBe(0);
+      expect(usageOutput.usage.cost_details).toBeUndefined();
+    });
+
+    it('should preserve response status and status text', async () => {
+      const response = new Response(makeSSEStream(['data: [DONE]']), {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'text/event-stream' },
+      });
+
+      const result = await wrapInZeroCostResponse(response);
+      expect(result.status).toBe(200);
+    });
+  });
+
+  describe('JSON (non-streaming) responses', () => {
+    it('should zero out cost in usage object', async () => {
+      const body = {
+        id: 'gen-abc',
+        model: 'anthropic/claude-sonnet-4.6',
+        choices: [{ message: { role: 'assistant', content: 'Hello' } }],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 50,
+          cost: 0.00312,
+          is_byok: false,
+          cost_details: { upstream_inference_cost: 0.0028 },
+        },
+      };
+
+      const response = new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+
+      const result = await wrapInZeroCostResponse(response);
+      const json = await result.json();
+
+      expect(json.usage.cost).toBe(0);
+      expect(json.usage.cost_details.upstream_inference_cost).toBe(0);
+      expect(json.usage.prompt_tokens).toBe(100);
+      expect(json.usage.completion_tokens).toBe(50);
+    });
+
+    it('should pass through response without usage field unchanged', async () => {
+      const body = {
+        id: 'gen-abc',
+        model: 'anthropic/claude-sonnet-4.6',
+        choices: [{ message: { role: 'assistant', content: 'Hello' } }],
+      };
+
+      const response = new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+
+      const result = await wrapInZeroCostResponse(response);
+      const json = await result.json();
+
+      expect(json.id).toBe('gen-abc');
+      expect(json.usage).toBeUndefined();
+    });
+
+    it('should handle malformed JSON gracefully', async () => {
+      const response = new Response('not valid json{{{', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+
+      const result = await wrapInZeroCostResponse(response);
+      const text = await result.text();
+
+      expect(text).toBe('not valid json{{{');
+      expect(result.status).toBe(200);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle response with no body', async () => {
+      const response = new Response(null, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+
+      const result = await wrapInZeroCostResponse(response);
+      expect(result.status).toBe(200);
+      expect(result.body).toBeNull();
     });
   });
 });

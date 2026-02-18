@@ -55,7 +55,7 @@ function mintToken(
   );
 }
 
-async function chatRequest(token: string, model: string) {
+async function chatRequest(token: string, model: string, stream = false) {
   return fetch(`${BASE_URL}/api/openrouter/chat/completions`, {
     method: 'POST',
     headers: {
@@ -66,10 +66,36 @@ async function chatRequest(token: string, model: string) {
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: 'Say "ok" and nothing else.' }],
-      stream: false,
+      stream,
+      stream_options: stream ? { include_usage: true } : undefined,
       max_tokens: 10,
     }),
   });
+}
+
+/**
+ * Parse the final SSE usage chunk from a streaming response.
+ * Returns the `usage` object from the last chunk that contains one, or null.
+ */
+async function parseUsageFromSSEStream(
+  response: Response
+): Promise<{
+  cost?: number;
+  cost_details?: { upstream_inference_cost?: number };
+  [k: string]: unknown;
+} | null> {
+  const text = await response.text();
+  let lastUsage: Record<string, unknown> | null = null;
+  for (const line of text.split('\n')) {
+    if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+    try {
+      const json = JSON.parse(line.slice(6));
+      if (json?.usage) lastUsage = json.usage;
+    } catch {
+      // ignore parse errors
+    }
+  }
+  return lastUsage;
 }
 
 function record(name: string, passed: boolean, detail: string) {
@@ -288,6 +314,54 @@ async function main() {
       );
     } catch (err) {
       record('Admin stats query', false, `Error: ${err}`);
+    }
+  }
+
+  // ─── Test 9: Streaming response has cost zeroed in SSE stream ───────
+  {
+    const token = mintToken(user.id, user.api_token_pepper, { botId: 'reviewer' });
+    const res = await chatRequest(token, REVIEW_PROMO_MODEL, true);
+    if (res.status !== 200) {
+      record('Stream cost zeroed (SSE)', false, `HTTP ${res.status} (expected 200)`);
+    } else {
+      const usage = await parseUsageFromSSEStream(res);
+      if (!usage) {
+        record('Stream cost zeroed (SSE)', false, 'No usage chunk found in stream');
+      } else {
+        const costZeroed = usage.cost === 0;
+        const upstreamZeroed =
+          !usage.cost_details || usage.cost_details.upstream_inference_cost === 0;
+        record(
+          'Stream cost zeroed (SSE)',
+          costZeroed && upstreamZeroed,
+          `cost=${usage.cost} (expected 0), upstream=${usage.cost_details?.upstream_inference_cost ?? 'n/a'} (expected 0)`
+        );
+      }
+    }
+  }
+
+  // ─── Test 10: Non-streaming JSON response has cost zeroed ─────────
+  {
+    const token = mintToken(user.id, user.api_token_pepper, { botId: 'reviewer' });
+    const res = await chatRequest(token, REVIEW_PROMO_MODEL, false);
+    if (res.status !== 200) {
+      record('JSON cost zeroed', false, `HTTP ${res.status} (expected 200)`);
+    } else {
+      const json = (await res.json()) as {
+        usage?: { cost?: number; cost_details?: { upstream_inference_cost?: number } };
+      };
+      if (!json?.usage) {
+        record('JSON cost zeroed', false, 'No usage in JSON response');
+      } else {
+        const costZeroed = json.usage.cost === 0;
+        const upstreamZeroed =
+          !json.usage.cost_details || json.usage.cost_details.upstream_inference_cost === 0;
+        record(
+          'JSON cost zeroed',
+          costZeroed && upstreamZeroed,
+          `cost=${json.usage.cost} (expected 0), upstream=${json.usage.cost_details?.upstream_inference_cost ?? 'n/a'} (expected 0)`
+        );
+      }
     }
   }
 

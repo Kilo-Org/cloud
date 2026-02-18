@@ -213,6 +213,102 @@ export function wrapInSafeNextResponse(response: Response) {
   });
 }
 
+/**
+ * Wraps a streaming SSE response so the `cost` field inside the final usage
+ * chunk is zeroed out before reaching the client.  Non-streaming (JSON)
+ * responses are handled by parsing the full body.
+ *
+ * Used when the server has determined that the request should be free (e.g.
+ * promotional period) but the upstream provider still reports a non-zero cost.
+ */
+export async function wrapInZeroCostResponse(response: Response) {
+  const headers = getOutputHeaders(response);
+  const contentType = headers.get('content-type') ?? '';
+
+  // Non-streaming JSON response
+  if (contentType.includes('application/json')) {
+    const text = await response.text();
+    try {
+      const json = JSON.parse(text);
+      if (json?.usage) {
+        json.usage.cost = 0;
+        if (json.usage.cost_details) {
+          json.usage.cost_details.upstream_inference_cost = 0;
+        }
+      }
+      return NextResponse.json(json, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    } catch {
+      // If JSON parsing fails, pass through as-is
+      return new NextResponse(text, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+  }
+
+  // Streaming SSE response — rewrite usage chunks on the fly
+  if (!response.body) {
+    return new NextResponse(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
+        return;
+      }
+
+      const text = decoder.decode(value, { stream: true });
+
+      // Fast path: if there's no usage in this chunk, pass through unchanged
+      if (!text.includes('"usage"')) {
+        controller.enqueue(value);
+        return;
+      }
+
+      // This chunk may contain the usage data — rewrite cost fields.
+      // SSE chunks are `data: {...}\n\n` lines, possibly multiple per read.
+      const rewritten = text.replace(/^data: (.+)$/gm, (_line, jsonStr) => {
+        if (jsonStr === '[DONE]') return _line;
+        try {
+          const json = JSON.parse(jsonStr);
+          if (json?.usage) {
+            json.usage.cost = 0;
+            if (json.usage.cost_details) {
+              json.usage.cost_details.upstream_inference_cost = 0;
+            }
+          }
+          return 'data: ' + JSON.stringify(json);
+        } catch {
+          return _line;
+        }
+      });
+
+      controller.enqueue(encoder.encode(rewritten));
+    },
+  });
+
+  return new NextResponse(stream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,

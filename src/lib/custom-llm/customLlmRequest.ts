@@ -33,6 +33,7 @@ import type { CustomLlm } from '@/db/schema';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
+import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
 
 type ChatCompletionChunk = z.infer<typeof OpenRouterStreamChatCompletionChunkSchema>;
 
@@ -595,15 +596,28 @@ export async function customLlmRequest(
 
   const result = streamText({ model, ...commonParams });
 
+  debugSaveLog(JSON.stringify(request), 'request.gateway.json');
+  debugSaveLog(JSON.stringify((await result.request).body), 'request.native.json');
+
   const convertStreamPartToChunk = createStreamPartConverter();
+
+  const debugGatewayChunks = new Array<unknown>();
+  const debugNativeChunks = new Array<unknown>();
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of result.fullStream) {
+          if (chunk.type === 'raw' && inStreamDebugMode) {
+            debugNativeChunks.push(chunk.rawValue);
+          }
+
           const converted = convertStreamPartToChunk(chunk);
           if (converted) {
+            if (inStreamDebugMode) {
+              debugGatewayChunks.push(converted);
+            }
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(converted)}\n\n`));
           }
         }
@@ -626,6 +640,20 @@ export async function customLlmRequest(
       }
     },
   });
+
+  if (debugGatewayChunks.length > 0) {
+    debugSaveLog(
+      debugGatewayChunks.map(chunk => JSON.stringify(chunk)).join('\n'),
+      'response.gateway.jsonl'
+    );
+  }
+
+  if (debugNativeChunks.length > 0) {
+    debugSaveLog(
+      debugNativeChunks.map(chunk => JSON.stringify(chunk)).join('\n'),
+      'response.native.jsonl'
+    );
+  }
 
   return new NextResponse(stream, {
     status: 200,

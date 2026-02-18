@@ -22,7 +22,7 @@ export function useKiloClawPairing(enabled = true) {
   return useQuery(
     trpc.kiloclaw.listPairingRequests.queryOptions(undefined, {
       enabled,
-      refetchInterval: enabled ? 60_000 : false,
+      refetchInterval: enabled ? 120_000 : false,
     })
   );
 }

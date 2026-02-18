@@ -506,7 +506,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return `pairing:${flyAppName}:${flyMachineId}`;
   }
 
-  private static PAIRING_CACHE_TTL_SECONDS = 60;
+  private static PAIRING_CACHE_TTL_SECONDS = 120;
 
   /**
    * List pending channel pairing requests across all configured channels.

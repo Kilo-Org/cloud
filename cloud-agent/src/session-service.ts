@@ -465,6 +465,8 @@ export class SessionService {
       KILOCODE_TOKEN: kilocodeToken,
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
+      // Feature attribution for microdollar usage tracking
+      KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
 
     // Set GH_TOKEN for GitHub repos only, respecting user overrides

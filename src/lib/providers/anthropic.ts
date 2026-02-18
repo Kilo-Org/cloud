@@ -14,10 +14,10 @@ export const opus_46_free_slackbot_model = {
   context_length: 1_000_000,
   max_completion_tokens: 32000,
   is_enabled: false,
-  flags: ['reasoning', 'prompt_cache', 'vision'] as KiloFreeModel['flags'],
-  gateway: 'openrouter' as const,
+  flags: ['reasoning', 'prompt_cache', 'vision'],
+  gateway: 'openrouter',
   internal_id: 'anthropic/claude-opus-4.6',
-  inference_providers: [] as KiloFreeModel['inference_providers'],
+  inference_providers: [],
   slackbot_only: true,
 } satisfies KiloFreeModel;
 

@@ -50,7 +50,7 @@ export async function checkFreeModelRateLimit(ipAddress: string): Promise<RateLi
  * Check if an IP address is within the promotion limit.
  * Applies to free model requests without authentication.
  */
-export async function promotionLimitReached(ipAddress: string): Promise<RateLimitResult> {
+export async function checkPromotionLimit(ipAddress: string): Promise<RateLimitResult> {
   const windowStart = new Date(
     Date.now() - TIME_WINDOW_PROMOTION_MODELS_USAGE_WITHOUT_ACCOUNT_HOURS * 60 * 60 * 1000
   );

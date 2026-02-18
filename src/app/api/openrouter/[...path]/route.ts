@@ -45,7 +45,7 @@ import {
 import {
   checkFreeModelRateLimit,
   logFreeModelRequest,
-  promotionLimitReached,
+  checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { classifyAbuse } from '@/lib/abuse-service';
 import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
@@ -209,12 +209,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       );
     }
 
-    const limitReached = await promotionLimitReached(ipAddress);
+    const promotionLimit = await checkPromotionLimit(ipAddress);
 
-    if (!limitReached.allowed) {
+    if (!promotionLimit.allowed) {
       console.warn(
-        `Promotion model limit exceeded, ip address: ${ipAddress},` +
-          `model: ${originalModelIdLowerCased}, request count: ${limitReached.requestCount}`
+        `Promotion model limit exceeded, ip address: ${ipAddress}, ` +
+          `model: ${originalModelIdLowerCased}, request count: ${promotionLimit.requestCount}`
       );
 
       return NextResponse.json(

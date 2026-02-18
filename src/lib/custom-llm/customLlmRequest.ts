@@ -256,16 +256,22 @@ const FINISH_REASON_MAP: Record<string, string> = {
   other: 'stop',
 };
 
-function createStreamPartConverter() {
+function createStreamPartConverter(model: string) {
   const toolCallIndices = new Map<string, number>();
   let nextToolIndex = 0;
+  let responseId: string | undefined;
 
   return function convertStreamPartToChunk(
     part: TextStreamPart<ToolSet>
   ): ChatCompletionChunk | null {
+    const id = responseId;
     switch (part.type) {
       case 'text-delta':
-        return { choices: [{ delta: { content: part.text } }] };
+        return {
+          ...(id !== undefined ? { id } : {}),
+          model,
+          choices: [{ delta: { content: part.text } }],
+        };
 
       case 'reasoning-start': {
         // Anthropic redacted_thinking: reasoning-start carries redactedData
@@ -274,6 +280,8 @@ function createStreamPartConverter() {
           const itemId = extractItemId(part.providerMetadata);
           const format = extractFormat(part.providerMetadata);
           return {
+            ...(id !== undefined ? { id } : {}),
+            model,
             choices: [
               {
                 delta: {
@@ -320,6 +328,8 @@ function createStreamPartConverter() {
         if (details.length === 0) return null;
 
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [
             {
               delta: {
@@ -362,6 +372,8 @@ function createStreamPartConverter() {
         }
 
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [{ delta: { reasoning_details: details } }],
         };
       }
@@ -370,6 +382,8 @@ function createStreamPartConverter() {
         const index = nextToolIndex++;
         toolCallIndices.set(part.id, index);
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [
             {
               delta: {
@@ -390,6 +404,8 @@ function createStreamPartConverter() {
       case 'tool-input-delta': {
         const index = toolCallIndices.get(part.id) ?? 0;
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [
             {
               delta: {
@@ -405,6 +421,8 @@ function createStreamPartConverter() {
         if (toolCallIndices.has(part.toolCallId)) return null;
         const index = nextToolIndex++;
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [
             {
               delta: {
@@ -426,9 +444,12 @@ function createStreamPartConverter() {
       }
 
       case 'finish-step': {
+        responseId = part.response.id;
         const cacheReadTokens = part.usage.inputTokenDetails.cacheReadTokens;
         const cacheWriteTokens = part.usage.inputTokenDetails.cacheWriteTokens;
         return {
+          id: responseId,
+          model,
           choices: [
             {
               delta: {},
@@ -502,7 +523,10 @@ function buildCommonParams(
   };
 }
 
-function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof generateText>>) {
+function convertGenerateResultToResponse(
+  result: Awaited<ReturnType<typeof generateText>>,
+  model: string
+) {
   const toolCalls = result.toolCalls.map((tc, i) => ({
     id: tc.toolCallId,
     type: 'function' as const,
@@ -517,6 +541,8 @@ function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof gener
     result.reasoning.length > 0 ? reasoningOutputToDetails(result.reasoning) : undefined;
 
   return {
+    id: result.response.id,
+    model,
     choices: [
       {
         message: {
@@ -589,10 +615,12 @@ export async function customLlmRequest(
   const model = createModel(customLlm);
   const commonParams = buildCommonParams(customLlm, messages, request);
 
+  const modelId = customLlm.public_id;
+
   if (!request.stream) {
     try {
       const result = await generateText({ model, ...commonParams });
-      return NextResponse.json(convertGenerateResultToResponse(result));
+      return NextResponse.json(convertGenerateResultToResponse(result, modelId));
     } catch (e) {
       const status = APICallError.isInstance(e) ? (e.statusCode ?? 500) : 500;
       const msg = e instanceof Error ? e.message : 'Generation failed';
@@ -605,7 +633,7 @@ export async function customLlmRequest(
   debugSaveLog(JSON.stringify(request, undefined, 2), 'request.gateway.json');
   debugSaveLog(JSON.stringify((await result.request).body, undefined, 2), 'request.native.json');
 
-  const convertStreamPartToChunk = createStreamPartConverter();
+  const convertStreamPartToChunk = createStreamPartConverter(modelId);
 
   const debugGatewayChunks = new Array<unknown>();
   const debugNativeChunks = new Array<unknown>();

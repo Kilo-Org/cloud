@@ -1,7 +1,6 @@
 'use client';
 
 import { Check, Copy, ExternalLink, KeyRound } from 'lucide-react';
-import { usePostHog } from 'posthog-js/react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAccessCode } from '../hooks/useAccessCode';
@@ -16,7 +15,6 @@ export function AccessCodeActions({
   canShow: boolean;
   gatewayUrl: string;
 }) {
-  const posthog = usePostHog();
   const { accessCode, isGenerating, isCopied, generateAccessCode, copyAccessCode } =
     useAccessCode();
 
@@ -26,14 +24,7 @@ export function AccessCodeActions({
     <>
       <Popover>
         <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            onClick={() => {
-              posthog?.capture('claw_access_code_clicked');
-              generateAccessCode();
-            }}
-            disabled={isGenerating}
-          >
+          <Button variant="outline" onClick={generateAccessCode} disabled={isGenerating}>
             <KeyRound className="mr-2 h-4 w-4" />
             {isGenerating ? 'Generating...' : 'Access Code'}
           </Button>
@@ -46,14 +37,7 @@ export function AccessCodeActions({
                 <code className="bg-muted rounded px-3 py-2 font-mono text-lg tracking-widest">
                   {accessCode}
                 </code>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    posthog?.capture('claw_access_code_copied');
-                    copyAccessCode();
-                  }}
-                >
+                <Button variant="ghost" size="icon" onClick={copyAccessCode}>
                   {isCopied ? (
                     <Check className="h-4 w-4 text-green-500" />
                   ) : (
@@ -65,12 +49,7 @@ export function AccessCodeActions({
           </PopoverContent>
         )}
       </Popover>
-      <Button
-        variant="primary"
-        asChild
-        className={OPEN_BUTTON_ACCENT_CLASS}
-        onClick={() => posthog?.capture('claw_open_clicked', { gateway_url: gatewayUrl })}
-      >
+      <Button variant="primary" asChild className={OPEN_BUTTON_ACCENT_CLASS}>
         <a href={gatewayUrl} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="mr-2 h-4 w-4" />
           Open

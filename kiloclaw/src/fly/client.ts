@@ -15,6 +15,8 @@ import type {
   CreateVolumeRequest,
   CreateMachineRequest,
   FlyWaitableState,
+  MachineExecRequest,
+  MachineExecResponse,
 } from './types';
 
 const FLY_API_BASE = 'https://api.machines.dev';
@@ -237,5 +239,26 @@ export async function listMachines(
 export async function getVolume(config: FlyClientConfig, volumeId: string): Promise<FlyVolume> {
   const resp = await flyFetch(config, `/volumes/${volumeId}`);
   await assertOk(resp, 'getVolume');
+  return resp.json();
+}
+
+// -- Exec --
+
+/**
+ * Execute a command on a running machine and return the output.
+ * Uses the Fly Machines exec endpoint: POST /apps/{app}/machines/{id}/exec
+ */
+export async function execCommand(
+  config: FlyClientConfig,
+  machineId: string,
+  command: string[],
+  timeout = 10
+): Promise<MachineExecResponse> {
+  const body: MachineExecRequest = { command, timeout };
+  const resp = await flyFetch(config, `/machines/${machineId}/exec`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  await assertOk(resp, 'execCommand');
   return resp.json();
 }

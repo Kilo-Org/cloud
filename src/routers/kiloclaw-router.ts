@@ -61,6 +61,13 @@ const updateKiloCodeConfigSchema = z.object({
   kilocodeModels: z.array(modelEntrySchema).nullable().optional(),
 });
 
+const patchChannelsSchema = z.object({
+  telegramBotToken: z.string().nullable().optional(),
+  discordBotToken: z.string().nullable().optional(),
+  slackBotToken: z.string().nullable().optional(),
+  slackAppToken: z.string().nullable().optional(),
+});
+
 /**
  * Build the worker provision payload from plaintext channel tokens.
  * The worker expects the flat encrypted envelope shape for channels.
@@ -81,6 +88,20 @@ function buildWorkerChannels(channels: z.infer<typeof updateConfigSchema>['chann
       ? encryptKiloClawSecret(channels.slackAppToken)
       : undefined,
   };
+}
+
+/**
+ * Encrypt channel tokens for a PATCH (supports null for removal).
+ */
+function buildWorkerChannelsPatch(channels: z.infer<typeof patchChannelsSchema>) {
+  const result: Record<string, ReturnType<typeof encryptKiloClawSecret> | null | undefined> = {};
+
+  for (const [key, value] of Object.entries(channels)) {
+    if (value === undefined) continue;
+    result[key] = value === null ? null : encryptKiloClawSecret(value);
+  }
+
+  return result;
 }
 
 type KiloCodeConfigPublicResponse = Pick<
@@ -216,6 +237,13 @@ export const kiloclawRouter = createTRPCRouter({
       return patchConfig(ctx.user, input);
     }),
 
+  patchChannels: kiloclawProcedure.input(patchChannelsSchema).mutation(async ({ ctx, input }) => {
+    const client = new KiloClawInternalClient();
+    return client.patchChannels(ctx.user.id, {
+      channels: buildWorkerChannelsPatch(input),
+    });
+  }),
+
   // User-facing (user client -- forwards user's short-lived JWT)
   getConfig: kiloclawProcedure.query(async ({ ctx }) => {
     const client = new KiloClawUserClient(
@@ -230,4 +258,18 @@ export const kiloclawRouter = createTRPCRouter({
     );
     return client.restartGateway();
   }),
+
+  listPairingRequests: kiloclawProcedure
+    .input(z.object({ refresh: z.boolean().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      return client.listPairingRequests(ctx.user.id, input?.refresh);
+    }),
+
+  approvePairingRequest: kiloclawProcedure
+    .input(z.object({ channel: z.string().min(1), code: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      return client.approvePairingRequest(ctx.user.id, input.channel, input.code);
+    }),
 });

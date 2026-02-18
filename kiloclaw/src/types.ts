@@ -8,6 +8,7 @@ export type KiloClawEnv = {
   KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
   HYPERDRIVE: Hyperdrive;
+  KV_CLAW_CACHE: KVNamespace;
 
   // Auth secrets
   NEXTAUTH_SECRET?: string;

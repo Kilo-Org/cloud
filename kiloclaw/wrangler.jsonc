@@ -50,6 +50,12 @@
       "tag": "v5",
     },
   ],
+  "kv_namespaces": [
+    {
+      "binding": "KV_CLAW_CACHE",
+      "id": "1f406d747ead4a5896b750c1000973e0",
+    },
+  ],
   // Hyperdrive binding for Postgres (pepper validation, instance registry)
   "hyperdrive": [
     {

@@ -18,7 +18,11 @@ type FreeTrialWarningBannerProps = {
   onUpgradeClick: () => void;
 };
 
-function getStylesForState(state: OrgTrialStatus) {
+function titleCase(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function getStylesForState(state: OrgTrialStatus, planName: string) {
   switch (state) {
     case 'trial_active':
       return {
@@ -26,7 +30,7 @@ function getStylesForState(state: OrgTrialStatus) {
         border: 'border-blue-500/50',
         text: 'text-blue-100',
         icon: 'text-blue-400',
-        title: 'Free Trial Active',
+        title: `Free Kilo ${planName} Trial Active`,
       };
     case 'trial_ending_soon':
       return {
@@ -116,13 +120,14 @@ function getTrialMessage(daysRemaining: number, isOwner: boolean): string {
 }
 
 export function FreeTrialWarningBanner({
-  organization: _organization,
+  organization,
   daysRemaining,
   userRole,
   onUpgradeClick,
 }: FreeTrialWarningBannerProps) {
   const state = getOrgTrialStatusFromDays(daysRemaining);
-  const styles = getStylesForState(state);
+  const planName = titleCase(organization.plan);
+  const styles = getStylesForState(state, planName);
   const isOwner = userRole === 'owner';
   const buttonVariant = getButtonVariantForState(state);
   const message = getTrialMessage(daysRemaining, isOwner);

@@ -570,12 +570,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     let pairing = empty;
     try {
-      const jsonMatch = result.stdout.match(/\{"requests"[\s\S]*\}/);
-      if (jsonMatch) {
-        const data = JSON.parse(jsonMatch[0]);
-        pairing = {
-          requests: Array.isArray(data.requests) ? data.requests : [],
-        };
+      const data = JSON.parse(result.stdout.trim());
+      if (Array.isArray(data.requests)) {
+        pairing = { requests: data.requests };
       }
     } catch {
       console.error('[DO] pairing list parse error:', result.stdout);

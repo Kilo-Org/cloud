@@ -7,6 +7,7 @@ import { Users, Mail, X, PartyPopperIcon } from 'lucide-react';
 import { InviteMemberDialog } from './members/InviteMemberDialog';
 import BuyOrganizationCreditsDialog from '@/components/payment/BuyOrganizationCreditsDialog';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import { titleCase } from '@/lib/utils';
 
 type NewOrganizationWelcomeHeaderProps = {
   organizationId: string;
@@ -33,7 +34,7 @@ export function NewOrganizationWelcomeHeader({
           </div>
           <div className="flex-1">
             <h3 className="mb-2 text-xl font-semibold text-green-100">
-              Welcome to Kilo {plan.charAt(0).toUpperCase() + plan.slice(1)}!
+              Welcome to Kilo {titleCase(plan)}!
             </h3>
             <div className="mb-4 space-y-2 text-green-200">
               <p>Invite your team members to start coding together today!</p>

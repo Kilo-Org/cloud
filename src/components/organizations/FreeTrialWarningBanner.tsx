@@ -9,7 +9,7 @@ import type {
   OrganizationRole,
   OrganizationWithMembers,
 } from '@/lib/organizations/organization-types';
-import { cn } from '@/lib/utils';
+import { cn, titleCase } from '@/lib/utils';
 
 type FreeTrialWarningBannerProps = {
   organization: OrganizationWithMembers;
@@ -17,10 +17,6 @@ type FreeTrialWarningBannerProps = {
   userRole: OrganizationRole;
   onUpgradeClick: () => void;
 };
-
-function titleCase(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 function getStylesForState(state: OrgTrialStatus, planName: string) {
   switch (state) {

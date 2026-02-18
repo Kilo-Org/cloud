@@ -19,6 +19,7 @@ import {
   FileX,
   HelpCircle,
   RotateCw,
+  StopCircle,
 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -166,6 +167,65 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
       },
     })
   );
+
+  // Interrupt mutation for pending/analyzing tickets (organization)
+  const interruptOrgMutation = useMutation(
+    trpc.organizations.autoTriage.interruptTicket.mutationOptions({
+      onSuccess: async () => {
+        toast.success('Ticket interrupted', {
+          description: 'The ticket has been marked as failed.',
+        });
+        if (organizationId) {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.organizations.autoTriage.listTickets.queryKey({
+              organizationId,
+              limit: PAGE_SIZE,
+              offset,
+              status: statusFilter,
+              classification: classificationFilter,
+            }),
+          });
+        }
+      },
+      onError: error => {
+        toast.error('Failed to interrupt ticket', {
+          description: error.message,
+        });
+      },
+    })
+  );
+
+  // Interrupt mutation for pending/analyzing tickets (personal)
+  const interruptPersonalMutation = useMutation(
+    trpc.personalAutoTriage.interruptTicket.mutationOptions({
+      onSuccess: async () => {
+        toast.success('Ticket interrupted', {
+          description: 'The ticket has been marked as failed.',
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.personalAutoTriage.listTickets.queryKey({
+            limit: PAGE_SIZE,
+            offset,
+            status: statusFilter,
+            classification: classificationFilter,
+          }),
+        });
+      },
+      onError: error => {
+        toast.error('Failed to interrupt ticket', {
+          description: error.message,
+        });
+      },
+    })
+  );
+
+  const handleInterrupt = (ticketId: string) => {
+    if (organizationId) {
+      interruptOrgMutation.mutate({ organizationId, ticketId });
+    } else {
+      interruptPersonalMutation.mutate({ ticketId });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -436,6 +496,26 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
                     {ticket.error_message && (
                       <div className="text-destructive mt-1 text-xs">
                         Error: {ticket.error_message}
+                      </div>
+                    )}
+
+                    {/* Interrupt Button for Pending/Analyzing Tickets */}
+                    {(ticket.status === 'pending' || ticket.status === 'analyzing') && (
+                      <div className="mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleInterrupt(ticket.id)}
+                          disabled={
+                            interruptOrgMutation.isPending || interruptPersonalMutation.isPending
+                          }
+                          className="gap-2 text-red-500 hover:text-red-600"
+                        >
+                          <StopCircle className="h-3 w-3" />
+                          {interruptOrgMutation.isPending || interruptPersonalMutation.isPending
+                            ? 'Interrupting...'
+                            : 'Interrupt'}
+                        </Button>
                       </div>
                     )}
 

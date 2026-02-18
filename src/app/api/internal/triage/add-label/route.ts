@@ -1,13 +1,13 @@
 /**
- * Internal API Endpoint: Add Label to Issue
+ * Internal API Endpoint: Add Labels to Issue
  *
  * Called by:
- * - Triage Orchestrator (to add kilo-auto-fix label when confidence threshold is met)
+ * - Triage Orchestrator (to add AI-selected labels when confidence threshold is met)
  *
  * Process:
  * 1. Get ticket and integration
- * 2. Add label to GitHub issue
- * 3. Update triage ticket with should_auto_fix = true
+ * 2. Add labels to GitHub issue
+ * 3. Update triage ticket with classification data
  *
  * URL: POST /api/internal/triage/add-label
  * Protected by internal API secret
@@ -23,14 +23,14 @@ import { addIssueLabel } from '@/lib/auto-triage/github/add-label';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 
-interface AddLabelRequest {
+type AddLabelRequest = {
   ticketId: string;
-  label: string;
+  labels: string[];
   classification?: 'bug' | 'feature' | 'question' | 'unclear';
   confidence?: number;
   intentSummary?: string;
   relatedFiles?: string[];
-}
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,17 +41,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body: AddLabelRequest = await req.json();
-    const { ticketId, label, classification, confidence, intentSummary, relatedFiles } = body;
+    const { ticketId, labels, classification, confidence, intentSummary, relatedFiles } = body;
 
     // Validate payload
-    if (!ticketId || !label) {
+    if (!ticketId || !labels || labels.length === 0) {
       return NextResponse.json(
-        { error: 'Missing required fields: ticketId, label' },
+        { error: 'Missing required fields: ticketId, labels (non-empty array)' },
         { status: 400 }
       );
     }
 
-    logExceptInTest('[add-label] Adding label to issue', { ticketId, label });
+    logExceptInTest('[add-label] Adding labels to issue', { ticketId, labels });
 
     // Get ticket from database
     const ticket = await getTriageTicketById(ticketId);
@@ -74,17 +74,29 @@ export async function POST(req: NextRequest) {
 
     const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
 
-    // Add label to GitHub issue
-    await addIssueLabel({
-      repoFullName: ticket.repo_full_name,
-      issueNumber: ticket.issue_number,
-      label,
-      githubToken: tokenData.token,
-    });
+    // Add each label to the GitHub issue
+    for (const label of labels) {
+      logExceptInTest('[auto-triage:labels] Applying label to GitHub issue', {
+        ticketId,
+        label,
+        repoFullName: ticket.repo_full_name,
+        issueNumber: ticket.issue_number,
+      });
+      await addIssueLabel({
+        repoFullName: ticket.repo_full_name,
+        issueNumber: ticket.issue_number,
+        label,
+        githubToken: tokenData.token,
+      });
+      logExceptInTest('[auto-triage:labels] Label applied successfully', {
+        ticketId,
+        label,
+      });
+    }
 
-    logExceptInTest('[add-label] Label added to GitHub issue', {
+    logExceptInTest('[add-label] Labels added to GitHub issue', {
       ticketId,
-      label,
+      labels,
       issueNumber: ticket.issue_number,
     });
 
@@ -104,14 +116,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    errorExceptInTest('[add-label] Error adding label:', error);
+    errorExceptInTest('[add-label] Error adding labels:', error);
     captureException(error, {
       tags: { source: 'add-label-api' },
     });
 
     return NextResponse.json(
       {
-        error: 'Failed to add label',
+        error: 'Failed to add labels',
         message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }

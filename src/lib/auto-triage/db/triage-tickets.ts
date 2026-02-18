@@ -374,6 +374,30 @@ export async function resetTriageTicketForRetry(ticketId: string): Promise<void>
 }
 
 /**
+ * Interrupts a pending or analyzing triage ticket
+ * Sets status to 'failed' with a manual interrupt message
+ */
+export async function interruptTriageTicket(ticketId: string): Promise<void> {
+  try {
+    await db
+      .update(auto_triage_tickets)
+      .set({
+        status: 'failed',
+        error_message: 'Manually interrupted by user',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(auto_triage_tickets.id, ticketId));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'interruptTriageTicket' },
+      extra: { ticketId },
+    });
+    throw error;
+  }
+}
+
+/**
  * Gets count of active triage tickets for an owner (for concurrency control)
  * Active tickets are those with status 'analyzing'
  */

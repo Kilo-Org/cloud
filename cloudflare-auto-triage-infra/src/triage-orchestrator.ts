@@ -4,7 +4,7 @@
  * Manages the lifecycle of a single triage ticket:
  * - Duplicate detection
  * - Issue classification
- * - Tagging with kilo-auto-fix label
+ * - Applying AI-selected labels
  * - Status updates back to Next.js
  */
 
@@ -20,6 +20,7 @@ import { parseClassification } from './parsers/classification-parser';
 import { SSEStreamProcessor } from './services/sse-stream-processor';
 import { CloudAgentClient } from './services/cloud-agent-client';
 import { buildClassificationPrompt } from './services/prompt-builder';
+import { fetchRepoLabels, DEFAULT_LABELS } from './services/github-labels-service';
 
 export class TriageOrchestrator extends DurableObject<Env> {
   private state!: TriageTicket;
@@ -71,10 +72,20 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
     await this.updateStatus('analyzing');
 
+    // Set alarm as safety net for stuck tickets
+    const alarmTimeout = this.getClassificationTimeout() + 120_000; // classification timeout + 2 min buffer
+    await this.ctx.storage.setAlarm(Date.now() + alarmTimeout);
+
     try {
       // Step 1: Check for duplicates
       const duplicateResult = await this.checkDuplicates();
       if (duplicateResult.isDuplicate) {
+        const labels = ['kilo-triaged', 'kilo-duplicate'];
+        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
+          ticketId: this.state.ticketId,
+          labels,
+        });
+        await this.applyLabels(labels);
         await this.closeDuplicate(duplicateResult);
         return;
       }
@@ -84,14 +95,37 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
       // Step 3: Take action based on classification
       if (classification.classification === 'question') {
+        const labels = ['kilo-triaged', ...classification.selectedLabels];
+        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
+          ticketId: this.state.ticketId,
+          labels,
+        });
+        await this.applyLabels(labels);
         await this.answerQuestion(classification);
         await this.updateStatus('actioned');
       } else if (classification.classification === 'unclear') {
+        const labels = ['kilo-triaged', ...classification.selectedLabels];
+        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
+          ticketId: this.state.ticketId,
+          labels,
+        });
+        await this.applyLabels(labels);
         await this.requestClarification(classification);
         await this.updateStatus('actioned');
       } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
-        // Add kilo-auto-fix label to trigger Auto Fix workflow
-        await this.addAutoFixLabel(classification);
+        // Apply labels and trigger Auto Fix workflow
+        console.log('[auto-triage:labels] selectedLabels from AI classification', {
+          ticketId: this.state.ticketId,
+          selectedLabels: classification.selectedLabels,
+        });
+        const labels = [
+          ...new Set(['kilo-triaged', 'kilo-auto-fix', ...classification.selectedLabels]),
+        ];
+        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
+          ticketId: this.state.ticketId,
+          labels,
+        });
+        await this.applyLabels(labels);
         await this.updateStatus('actioned', {
           classification: classification.classification,
           confidence: classification.confidence,
@@ -99,16 +133,21 @@ export class TriageOrchestrator extends DurableObject<Env> {
           relatedFiles: classification.relatedFiles,
         });
       } else {
+        const labels = ['kilo-triaged', ...classification.selectedLabels];
+        console.log('[auto-triage:labels] Calling applyLabels { labels[] }', {
+          ticketId: this.state.ticketId,
+          labels,
+        });
+        await this.applyLabels(labels);
         await this.requestClarification(classification);
         await this.updateStatus('actioned');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Distinguish between timeout and other errors
-      const isTimeout = errorMessage.includes('timeout');
-      const isClassificationTimeout = errorMessage.includes('Classification timeout');
-      const isPRTimeout = errorMessage.includes('PR creation timeout');
+      const isTimeout = error instanceof Error && error.message.includes('timed out');
+      const isClassificationTimeout =
+        error instanceof Error && error.message.includes('Classification timed out');
+      const isPRTimeout = error instanceof Error && error.message.includes('PR creation timed out');
 
       console.error('[TriageOrchestrator] Error:', {
         ticketId: this.state.ticketId,
@@ -118,9 +157,21 @@ export class TriageOrchestrator extends DurableObject<Env> {
         isPRTimeout,
       });
 
-      await this.updateStatus('failed', {
-        errorMessage: errorMessage,
-      });
+      try {
+        await this.updateStatus('failed', {
+          errorMessage: errorMessage,
+        });
+      } catch (statusError) {
+        console.error('[TriageOrchestrator] Failed to update status to failed via API:', {
+          ticketId: this.state.ticketId,
+          statusError: statusError instanceof Error ? statusError.message : String(statusError),
+        });
+        this.state.status = 'failed';
+        this.state.errorMessage = errorMessage;
+        this.state.completedAt = new Date().toISOString();
+        this.state.updatedAt = new Date().toISOString();
+        await this.ctx.storage.put('state', this.state);
+      }
     }
   }
 
@@ -130,6 +181,39 @@ export class TriageOrchestrator extends DurableObject<Env> {
   async getEvents(): Promise<{ events: unknown[] }> {
     await this.loadState();
     return { events: this.state.events || [] };
+  }
+
+  /**
+   * Alarm handler - recovers tickets stuck in "analyzing" status
+   * Fires if the DO is evicted/restarted or triage takes too long
+   */
+  async alarm(): Promise<void> {
+    await this.loadState();
+
+    if (this.state.status !== 'analyzing') {
+      return;
+    }
+
+    console.error('[TriageOrchestrator] Alarm fired - ticket stuck in analyzing', {
+      ticketId: this.state.ticketId,
+      startedAt: this.state.startedAt,
+    });
+
+    try {
+      await this.updateStatus('failed', {
+        errorMessage: 'Triage timed out (alarm recovery)',
+      });
+    } catch (e) {
+      console.error('[TriageOrchestrator] Alarm recovery: failed to update status via API', {
+        ticketId: this.state.ticketId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      this.state.status = 'failed';
+      this.state.errorMessage = 'Triage timed out (alarm recovery, status update failed)';
+      this.state.completedAt = new Date().toISOString();
+      this.state.updatedAt = new Date().toISOString();
+      await this.ctx.storage.put('state', this.state);
+    }
   }
 
   /**
@@ -202,7 +286,27 @@ export class TriageOrchestrator extends DurableObject<Env> {
     const githubToken = configData.githubToken;
     const config = configData.config;
 
-    // Build classification prompt
+    if (!githubToken) {
+      console.log(
+        '[auto-triage:labels] No githubToken in classify-config response, will use default labels',
+        {
+          ticketId: this.state.ticketId,
+        }
+      );
+    }
+
+    // Fetch available labels from the repository (falls back to defaults on error or no token)
+    const availableLabels = githubToken
+      ? await fetchRepoLabels(this.state.sessionInput.repoFullName, githubToken)
+      : DEFAULT_LABELS;
+
+    console.log('[auto-triage:labels] Available labels for prompt', {
+      ticketId: this.state.ticketId,
+      count: availableLabels.length,
+      availableLabels,
+    });
+
+    // Build classification prompt with available labels
     const prompt = buildClassificationPrompt(
       {
         repoFullName: this.state.sessionInput.repoFullName,
@@ -210,7 +314,8 @@ export class TriageOrchestrator extends DurableObject<Env> {
         issueTitle: this.state.sessionInput.issueTitle,
         issueBody: this.state.sessionInput.issueBody,
       },
-      config
+      config,
+      availableLabels
     );
 
     // Build session input
@@ -238,7 +343,10 @@ export class TriageOrchestrator extends DurableObject<Env> {
     );
 
     // Process SSE stream with timeout
-    return await Promise.race([this.processClassificationStream(response), timeoutPromise]);
+    return await Promise.race([
+      this.processClassificationStream(response, availableLabels),
+      timeoutPromise,
+    ]);
   }
 
   /**
@@ -249,6 +357,22 @@ export class TriageOrchestrator extends DurableObject<Env> {
       ticketId: this.state.ticketId,
       duplicateOf: result.duplicateOfTicketId,
     });
+
+    const duplicateTicket = result.similarTickets?.[0];
+    if (duplicateTicket) {
+      const issueUrl = `https://github.com/${duplicateTicket.repoFullName}/issues/${duplicateTicket.issueNumber}`;
+      const commentBody = [
+        `This issue appears to be a duplicate of ${issueUrl}.`,
+        '',
+        `> **${duplicateTicket.issueTitle}** (#${duplicateTicket.issueNumber})`,
+        '',
+        `Similarity score: ${Math.round(duplicateTicket.similarity * 100)}%`,
+        '',
+        '*This comment was generated by Kilo Auto-Triage.*',
+      ].join('\n');
+
+      await this.postComment(commentBody);
+    }
 
     await this.updateStatus('actioned', {
       isDuplicate: true,
@@ -293,35 +417,64 @@ export class TriageOrchestrator extends DurableObject<Env> {
   }
 
   /**
-   * Add kilo-auto-fix label to trigger Auto Fix workflow
+   * Post a comment on the GitHub issue (best-effort, does not throw on failure)
    */
-  private async addAutoFixLabel(classification: ClassificationResult): Promise<void> {
-    console.log('[TriageOrchestrator] Adding kilo-auto-fix label', {
-      ticketId: this.state.ticketId,
-      classification: classification.classification,
-      confidence: classification.confidence,
-    });
-
-    // Call Next.js API to add 'kilo-auto-fix' label to issue
-    await fetch(`${this.env.API_URL}/api/internal/triage/add-label`, {
+  private async postComment(body: string): Promise<void> {
+    const response = await fetch(`${this.env.API_URL}/api/internal/triage/post-comment`, {
       method: 'POST',
       headers: {
-        'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
         'Content-Type': 'application/json',
+        'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
       },
       body: JSON.stringify({
         ticketId: this.state.ticketId,
-        label: 'kilo-auto-fix',
-        classification: classification.classification,
-        confidence: classification.confidence,
-        intentSummary: classification.intentSummary,
-        relatedFiles: classification.relatedFiles,
+        body,
       }),
     });
 
-    console.log('[TriageOrchestrator] kilo-auto-fix label added', {
-      ticketId: this.state.ticketId,
-    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Failed to post comment: ${response.status} ${errorText}`);
+    }
+  }
+
+  /**
+   * Apply action-tracking and content labels to the issue
+   */
+  private async applyLabels(labels: string[]): Promise<void> {
+    try {
+      console.log('[TriageOrchestrator] Applying labels', {
+        ticketId: this.state.ticketId,
+        labels,
+      });
+
+      // Call Next.js API to add labels to the issue
+      const addLabelResponse = await fetch(`${this.env.API_URL}/api/internal/triage/add-label`, {
+        method: 'POST',
+        headers: {
+          'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ticketId: this.state.ticketId,
+          labels,
+        }),
+      });
+
+      if (!addLabelResponse.ok) {
+        const errorText = await addLabelResponse.text();
+        console.error('[TriageOrchestrator] Failed to apply labels:', {
+          ticketId: this.state.ticketId,
+          status: addLabelResponse.status,
+          error: errorText,
+        });
+      }
+    } catch (error) {
+      console.error('[TriageOrchestrator] Error applying labels:', {
+        ticketId: this.state.ticketId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   /**
@@ -346,34 +499,62 @@ export class TriageOrchestrator extends DurableObject<Env> {
     await this.ctx.storage.put('state', this.state);
 
     // Update Next.js database
-    await fetch(`${this.env.API_URL}/api/internal/triage-status/${this.state.ticketId}`, {
-      method: 'POST',
-      headers: {
-        'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        status,
-        ...updates,
-      }),
-    });
+    const response = await fetch(
+      `${this.env.API_URL}/api/internal/triage-status/${this.state.ticketId}`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status,
+          ...updates,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Status update API returned ${response.status}: ${errorText}`);
+    }
+
+    // Cancel alarm when reaching terminal state
+    if (status === 'actioned' || status === 'failed' || status === 'skipped') {
+      await this.ctx.storage.deleteAlarm();
+    }
   }
 
   /**
    * Process Cloud Agent classification stream
    * Extracts classification result from stream events
    */
-  private async processClassificationStream(response: Response): Promise<ClassificationResult> {
+  private async processClassificationStream(
+    response: Response,
+    availableLabels: string[]
+  ): Promise<ClassificationResult> {
     let fullText = '';
+    let sayText = '';
 
     await this.sseProcessor.processStream(response, {
       onTextContent: (text: string) => {
         fullText += text;
       },
+      onKilocodeEvent: payload => {
+        // Capture only the LLM's direct text responses (type: 'say', say: 'text')
+        if (
+          payload.type === 'say' &&
+          payload.say === 'text' &&
+          typeof payload.content === 'string'
+        ) {
+          sayText += payload.content;
+        }
+      },
       onComplete: () => {
         console.log('[TriageOrchestrator] Classification stream completed', {
           ticketId: this.state.ticketId,
-          textLength: fullText.length,
+          sayTextLength: sayText.length,
+          fullTextLength: fullText.length,
         });
       },
       onError: (error: Error) => {
@@ -388,17 +569,43 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
     console.log('[TriageOrchestrator] Classification stream ended', {
       ticketId: this.state.ticketId,
-      textLength: fullText.length,
+      sayTextLength: sayText.length,
+      fullTextLength: fullText.length,
     });
 
     // Parse classification from accumulated text
-    return this.parseClassificationFromText(fullText);
+    return this.parseClassificationFromText(sayText, fullText, availableLabels);
   }
 
   /**
-   * Parse classification result from text
+   * Parse classification result from text.
+   * Tries sayText (LLM "say" events only) first, falls back to fullText (all events).
    */
-  private parseClassificationFromText(fullText: string): ClassificationResult {
-    return parseClassification(fullText);
+  private parseClassificationFromText(
+    sayText: string,
+    fullText: string,
+    availableLabels: string[]
+  ): ClassificationResult {
+    console.log('[TriageOrchestrator] Parsing classification', {
+      ticketId: this.state.ticketId,
+      sayTextLength: sayText.length,
+      fullTextLength: fullText.length,
+    });
+
+    // Try sayText first if available
+    if (sayText.length > 0) {
+      try {
+        return parseClassification(sayText, availableLabels);
+      } catch (e) {
+        console.warn('[TriageOrchestrator] Failed to parse from sayText, trying fullText', {
+          ticketId: this.state.ticketId,
+          sayTextLength: sayText.length,
+          fullTextLength: fullText.length,
+        });
+      }
+    }
+
+    // Fall back to fullText
+    return parseClassification(fullText, availableLabels);
   }
 }

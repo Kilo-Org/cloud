@@ -20,46 +20,52 @@ type ClassificationConfig = {
  */
 export const buildClassificationPrompt = (
   issueInfo: IssueInfo,
-  config: ClassificationConfig
+  config: ClassificationConfig,
+  availableLabels: string[]
 ): string => {
   const { repoFullName, issueNumber, issueTitle, issueBody } = issueInfo;
 
-  const basePrompt = `Analyze this GitHub issue and classify it:
+  const labelList = availableLabels.map(l => `- "${l}"`).join('\n');
 
-Repository: ${repoFullName}
-Issue #${issueNumber}: ${issueTitle}
+  const basePrompt = `Classify the following GitHub issue.
+                    Repository: ${repoFullName}
+                    Issue #${issueNumber}: ${issueTitle}
+                    ${issueBody || 'No description provided.'}
+                    ---
+                    ## Classification rules
+                    Assign exactly one classification:
+                    - bug      — Describes incorrect behavior, includes an error, stack trace, or reproduction steps.
+                    - feature  — Requests new functionality or an enhancement to existing behavior.
+                    - question — Asks for help, clarification, or points to missing documentation.
+                    - unclear  — The issue lacks enough detail to determine intent.
 
-${issueBody || 'No description provided'}
-
-Classify as one of:
-- **bug**: Clear bug report with reproduction steps or error description
-- **feature**: Feature request or enhancement proposal
-- **question**: User asking for help, clarification, or documentation
-- **unclear**: Insufficient information to determine the intent
-
-IMPORTANT: You MUST respond with ONLY a JSON object in a markdown code block. Do not include any other text before or after the JSON.
-
-Provide your analysis in the following JSON format:
-
-\`\`\`json
-{
-  "classification": "bug",
-  "confidence": 0.85,
-  "intentSummary": "1-2 sentence summary of what the user wants",
-  "relatedFiles": ["optional/path/to/file.ts"],
-  "reasoning": "Brief explanation of your classification",
-  "suggestedAction": "What should be done with this issue"
-}
-\`\`\`
-
-Guidelines:
-- Be conservative with confidence scores
-- Only classify as "bug" if there's clear evidence of incorrect behavior
-- Only classify as "feature" if there's a clear enhancement request
-- Use "question" for support requests or documentation needs
-- Use "unclear" if the issue lacks sufficient detail
-- The classification field must be exactly one of: "bug", "feature", "question", or "unclear"
-- The confidence field must be a number between 0.0 and 1.0`;
+                    When an issue reports a gap between actual and expected behavior but the "expected"
+                    behavior was never documented or implemented, prefer "feature" over "bug".
+                    Reserve "bug" for cases where existing, documented functionality is broken.
+                    
+                    ## Confidence calibration
+                    - 0.9-1.0: Classification is unambiguous (e.g., stack trace + "this crashes").
+                    - 0.7-0.9: Strong signal but some ambiguity.
+                    - 0.5-0.7: Reasonable guess; the issue could plausibly fit another category.
+                    - Below 0.5: Prefer classifying as "unclear" instead.
+                    ## Labels
+                    Select zero or more labels from this exact list (do not invent labels):
+                    ${labelList}
+                    ## Output format
+                    CRITICAL: Your FINAL response MUST be ONLY the JSON classification below. After analyzing the issue, output the JSON block as your last message with no additional text after it.
+                    Respond with a single JSON object inside a \`\`\`json fenced code block. No other text.
+                    \`\`\`json
+                    {
+                    "classification": "bug" | "feature" | "question" | "unclear",
+                    "confidence": 0.85,
+                    "intentSummary": "1-2 sentence summary of what the user wants.",
+                    "reasoning": "Brief explanation of why you chose this classification.",
+                    "suggestedAction": "Recommended next step for a maintainer.",
+                    "selectedLabels": ["label1", "label2"],
+                     "relatedFiles": ["optional/path/to/file.ts"]
+                    }
+                    \`\`\`
+                    `;
 
   if (config.custom_instructions) {
     return `${basePrompt}\n\nCustom Instructions:\n${config.custom_instructions}`;

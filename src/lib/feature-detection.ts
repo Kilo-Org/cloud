@@ -2,12 +2,13 @@
  * Feature attribution for microdollar usage.
  *
  * Every caller sends `X-KILOCODE-FEATURE` with a value from FEATURE_VALUES.
- * The gateway validates the header and stores it via the `feature` lookup table
- * (referenced by `microdollar_usage_metadata.feature_id`).
+ * The gateway validates the header and stores it in `microdollar_usage_metadata.feature_id`.
  * No header = NULL (unattributed).
  *
  * To add a new feature: add it to FEATURE_VALUES, then have the caller send the header.
  */
+
+import { z } from 'zod';
 
 export const FEATURE_VALUES = [
   'vscode-extension',
@@ -29,18 +30,14 @@ export const FEATURE_VALUES = [
   'direct-gateway',
 ] as const;
 
-export type FeatureValue = (typeof FEATURE_VALUES)[number];
+const featureSchema = z.enum(FEATURE_VALUES);
 
-const featureSet = new Set<string>(FEATURE_VALUES);
-
-function isFeatureValue(value: string): value is FeatureValue {
-  return featureSet.has(value);
-}
+export type FeatureValue = z.infer<typeof featureSchema>;
 
 export const FEATURE_HEADER = 'x-kilocode-feature';
 
 export function validateFeatureHeader(headerValue: string | null): FeatureValue | null {
   if (!headerValue) return null;
-  const normalized = headerValue.trim().toLowerCase();
-  return isFeatureValue(normalized) ? normalized : null;
+  const result = featureSchema.safeParse(headerValue.trim().toLowerCase());
+  return result.success ? result.data : null;
 }

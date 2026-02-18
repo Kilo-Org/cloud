@@ -128,11 +128,26 @@ In [`packages/kilo-gateway/src/api/constants.ts`](https://github.com/Kilo-Org/ki
 
 ```typescript
 export const HEADER_FEATURE = 'X-KILOCODE-FEATURE';
-export const DEFAULT_FEATURE = 'cli';
 export const ENV_FEATURE = 'KILOCODE_FEATURE';
+// No DEFAULT_FEATURE constant — avoids silent misattribution when callers forget the env var
 ```
 
-Add `getFeatureHeader()` and include the feature header in `buildKiloHeaders()` in `packages/kilo-gateway/src/headers.ts`. Export new constants from `packages/kilo-gateway/src/index.ts`.
+Add `getFeatureHeader()` (returns `undefined` when env var not set) and conditionally include the feature header in `buildKiloHeaders()`. Export from `packages/kilo-gateway/src/index.ts`.
+
+**7d. CLI entry point default (`packages/opencode/src/index.ts`):**
+
+The CLI entry point detects whether it's running as `kilo serve` (spawned by another service) or direct CLI use:
+
+```typescript
+if (!process.env[ENV_FEATURE]) {
+  const isServe = process.argv.includes('serve');
+  process.env[ENV_FEATURE] = isServe ? 'unknown' : 'cli';
+}
+```
+
+- Direct CLI (`kilo`, `kilo run`) → `cli`
+- Spawned `kilo serve` without env var → `unknown` (misconfiguration visible in data)
+- Spawned `kilo serve` with env var → whatever the caller set
 
 **7b. FIM route fix (new extension autocomplete):**
 
@@ -142,7 +157,7 @@ The FIM route at `packages/kilo-gateway/src/server/routes.ts:214` makes a direct
 
 `packages/kilo-vscode/src/services/cli-backend/server-manager.ts:64` spawns the kilo CLI for the new VS Code extension. This is specific to the kilo repo (the old kilocode repo doesn't spawn a CLI). Add `KILOCODE_FEATURE: 'vscode-extension'` to the spawn env. Without this, all new extension requests get tagged as `cli` (the default).
 
-Features covered by this step: `cli` (default), `vscode-extension` (new extension), `autocomplete` (new extension FIM). Cloud features are handled by Step 8 (cloud repo sets the env var, kilo-gateway just reads it).
+Features covered by this step: `cli` (direct CLI use), `vscode-extension` (new extension), `autocomplete` (new extension FIM), `unknown` (misconfigured `kilo serve` spawner). Cloud features are handled by Step 8 (cloud repo sets the env var before spawning, kilo-gateway just reads it).
 
 ### Step 8: Cloud Feature Attribution (cloud repo)
 
@@ -193,7 +208,7 @@ No strict dependencies between repos. Backend first is recommended so the column
 | Autocomplete        | kilocode extension `streamFim()`                                                                           | `autocomplete`        |
 | Parallel Agents     | kilocode extension (parallel agent code path)                                                              | `parallel-agent`      |
 | Managed Indexing    | kilocode extension (indexing code path)                                                                    | `managed-indexing`    |
-| CLI                 | kilo-gateway default                                                                                       | `cli`                 |
+| CLI                 | CLI entry point sets `cli` for non-serve commands; `unknown` for `kilo serve` without env var              | `cli`                 |
 | Cloud Agent         | kilo-gateway + `KILOCODE_FEATURE=cloud-agent` env                                                          | `cloud-agent`         |
 | Code Reviews        | CF worker passes `createdOnPlatform: 'code-review'` → session-service sets env → kilo-gateway sends header | `code-review`         |
 | Auto-Triage         | CF worker passes `createdOnPlatform: 'auto-triage'` → session-service sets env → kilo-gateway sends header | `auto-triage`         |

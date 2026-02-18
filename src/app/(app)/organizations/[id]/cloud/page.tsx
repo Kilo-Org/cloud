@@ -9,7 +9,11 @@ export default async function OrganizationCloudPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/cloud');
+  const { id } = await params;
+  const organizationId = decodeURIComponent(id);
+  const user = await getUserFromAuthOrRedirect(
+    `/users/sign_in?callbackPath=${encodeURIComponent(`/organizations/${organizationId}/cloud`)}`
+  );
   const isDevelopment = process.env.NODE_ENV === 'development';
   const useNextAgent = isDevelopment || (await isFeatureFlagEnabled('cloud-agent-next', user.id));
 

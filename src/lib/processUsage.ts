@@ -215,7 +215,7 @@ export function toInsertableDbUsageRecord(
   const id = randomUUID();
   const created_at = new Date().toISOString();
 
-  const { kilo_user_id, organization_id, project_id, provider, feature, ...metadataFromContext } =
+  const { kilo_user_id, organization_id, project_id, provider, ...metadataFromContext } =
     usageContextInfo;
 
   const core: MicrodollarUsage = {
@@ -236,7 +236,6 @@ export function toInsertableDbUsageRecord(
     abuse_classification: 0,
     inference_provider: usageStats.inference_provider,
     project_id,
-    feature,
   };
 
   const metadata: UsageMetaData = {
@@ -433,6 +432,7 @@ export type UsageMetaData = {
   editor_name: string | null;
   has_tools: boolean | null;
   machine_id: string | null;
+  feature: string | null;
 };
 
 export async function insertUsageRecord(
@@ -489,7 +489,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               id, kilo_user_id, organization_id, provider, cost,
               input_tokens, output_tokens, cache_write_tokens, cache_hit_tokens,
               created_at, model, requested_model, cache_discount, has_error, abuse_classification,
-              inference_provider, project_id, feature
+              inference_provider, project_id
             ) VALUES (
               ${coreUsageFields.id},
               ${coreUsageFields.kilo_user_id},
@@ -507,8 +507,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${coreUsageFields.has_error},
               ${coreUsageFields.abuse_classification},
               ${coreUsageFields.inference_provider},
-              ${coreUsageFields.project_id},
-              ${coreUsageFields.feature}
+              ${coreUsageFields.project_id}
             )
           )
           , ${createUpsertCTE(sql`http_user_agent`, metadataFields.http_user_agent)}
@@ -519,6 +518,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`system_prompt_prefix`, metadataFields.system_prompt_prefix)}
           , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
           , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
+          , ${createUpsertCTE(sql`feature`, metadataFields.feature)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -549,7 +549,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ja4_digest_id,
               system_prompt_prefix_id,
               finish_reason_id,
-              editor_name_id
+              editor_name_id,
+              feature_id
             )
             SELECT
               ${metadataFields.id},
@@ -580,7 +581,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT ja4_digest_id FROM ja4_digest_cte),
               (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
               (SELECT finish_reason_id FROM finish_reason_cte),
-              (SELECT editor_name_id FROM editor_name_cte)
+              (SELECT editor_name_id FROM editor_name_cte),
+              (SELECT feature_id FROM feature_cte)
           )
           UPDATE kilocode_users
           SET microdollars_used = microdollars_used + ${coreUsageFields.cost}

@@ -58,7 +58,6 @@ export async function POST(
     abuse_classification: 0,
     inference_provider: 'dev-tools',
     project_id: null,
-    feature: null,
   };
 
   const metadataFields: UsageMetaData = {
@@ -90,6 +89,7 @@ export async function POST(
     editor_name: null,
     has_tools: false,
     machine_id: null,
+    feature: null,
   };
 
   await insertUsageRecord(coreUsageFields, metadataFields);

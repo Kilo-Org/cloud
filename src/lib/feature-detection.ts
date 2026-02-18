@@ -2,7 +2,8 @@
  * Feature attribution for microdollar usage.
  *
  * Every caller sends `X-KILOCODE-FEATURE` with a value from FEATURE_VALUES.
- * The gateway validates the header and stores it in `microdollar_usage.feature`.
+ * The gateway validates the header and stores it via the `feature` lookup table
+ * (referenced by `microdollar_usage_metadata.feature_id`).
  * No header = NULL (unattributed).
  *
  * To add a new feature: add it to FEATURE_VALUES, then have the caller send the header.

@@ -1,5 +1,5 @@
 {
-  "id": "ac61afaf-2e7c-45fc-99f7-52da660676d4",
+  "id": "19015516-0d7b-4ec9-b630-c584fe4902a8",
   "prevId": "38432603-0c60-42d1-9a4a-be66673dc056",
   "version": "7",
   "dialect": "postgresql",
@@ -5090,6 +5090,47 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.feature": {
+      "name": "feature",
+      "schema": "",
+      "columns": {
+        "feature_id": {
+          "name": "feature_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "feature": {
+          "name": "feature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "UQ_feature": {
+          "name": "UQ_feature",
+          "columns": [
+            {
+              "expression": "feature",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.finish_reason": {
       "name": "finish_reason",
       "schema": "",
@@ -6933,12 +6974,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "feature": {
-          "name": "feature",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -7005,22 +7040,6 @@
           ],
           "isUnique": false,
           "where": "\"microdollar_usage\".\"organization_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_microdollar_usage_feature": {
-          "name": "idx_microdollar_usage_feature",
-          "columns": [
-            {
-              "expression": "feature",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"microdollar_usage\".\"feature\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -7202,6 +7221,12 @@
         "machine_id": {
           "name": "machine_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "feature_id": {
+          "name": "feature_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         }
@@ -12023,7 +12048,7 @@
           "notNull": false
         }
       },
-      "definition": "\n  SELECT\n    mu.id,\n    mu.kilo_user_id,\n    meta.message_id,\n    mu.cost,\n    mu.input_tokens,\n    mu.output_tokens,\n    mu.cache_write_tokens,\n    mu.cache_hit_tokens,\n    mu.created_at,\n    ip.http_ip AS http_x_forwarded_for,\n    city.vercel_ip_city AS http_x_vercel_ip_city,\n    country.vercel_ip_country AS http_x_vercel_ip_country,\n    meta.vercel_ip_latitude AS http_x_vercel_ip_latitude,\n    meta.vercel_ip_longitude AS http_x_vercel_ip_longitude,\n    ja4.ja4_digest AS http_x_vercel_ja4_digest,\n    mu.provider,\n    mu.model,\n    mu.requested_model,\n    meta.user_prompt_prefix,\n    spp.system_prompt_prefix,\n    meta.system_prompt_length,\n    ua.http_user_agent,\n    mu.cache_discount,\n    meta.max_tokens,\n    meta.has_middle_out_transform,\n    mu.has_error,\n    mu.abuse_classification,\n    mu.organization_id,\n    mu.inference_provider,\n    mu.project_id,\n    meta.status_code,\n    meta.upstream_id,\n    frfr.finish_reason,\n    meta.latency,\n    meta.moderation_latency,\n    meta.generation_time,\n    meta.is_byok,\n    meta.is_user_byok,\n    meta.streamed,\n    meta.cancelled,\n    edit.editor_name,\n    meta.has_tools,\n    meta.machine_id,\n    mu.feature\n  FROM \"microdollar_usage\" mu\n  LEFT JOIN \"microdollar_usage_metadata\" meta ON mu.id = meta.id\n  LEFT JOIN \"http_ip\" ip ON meta.http_ip_id = ip.http_ip_id\n  LEFT JOIN \"vercel_ip_city\" city ON meta.vercel_ip_city_id = city.vercel_ip_city_id\n  LEFT JOIN \"vercel_ip_country\" country ON meta.vercel_ip_country_id = country.vercel_ip_country_id\n  LEFT JOIN \"ja4_digest\" ja4 ON meta.ja4_digest_id = ja4.ja4_digest_id\n  LEFT JOIN \"system_prompt_prefix\" spp ON meta.system_prompt_prefix_id = spp.system_prompt_prefix_id\n  LEFT JOIN \"http_user_agent\" ua ON meta.http_user_agent_id = ua.http_user_agent_id\n  LEFT JOIN \"finish_reason\" frfr ON meta.finish_reason_id = frfr.finish_reason_id\n  LEFT JOIN \"editor_name\" edit ON meta.editor_name_id = edit.editor_name_id\n",
+      "definition": "\n  SELECT\n    mu.id,\n    mu.kilo_user_id,\n    meta.message_id,\n    mu.cost,\n    mu.input_tokens,\n    mu.output_tokens,\n    mu.cache_write_tokens,\n    mu.cache_hit_tokens,\n    mu.created_at,\n    ip.http_ip AS http_x_forwarded_for,\n    city.vercel_ip_city AS http_x_vercel_ip_city,\n    country.vercel_ip_country AS http_x_vercel_ip_country,\n    meta.vercel_ip_latitude AS http_x_vercel_ip_latitude,\n    meta.vercel_ip_longitude AS http_x_vercel_ip_longitude,\n    ja4.ja4_digest AS http_x_vercel_ja4_digest,\n    mu.provider,\n    mu.model,\n    mu.requested_model,\n    meta.user_prompt_prefix,\n    spp.system_prompt_prefix,\n    meta.system_prompt_length,\n    ua.http_user_agent,\n    mu.cache_discount,\n    meta.max_tokens,\n    meta.has_middle_out_transform,\n    mu.has_error,\n    mu.abuse_classification,\n    mu.organization_id,\n    mu.inference_provider,\n    mu.project_id,\n    meta.status_code,\n    meta.upstream_id,\n    frfr.finish_reason,\n    meta.latency,\n    meta.moderation_latency,\n    meta.generation_time,\n    meta.is_byok,\n    meta.is_user_byok,\n    meta.streamed,\n    meta.cancelled,\n    edit.editor_name,\n    meta.has_tools,\n    meta.machine_id,\n    feat.feature\n  FROM \"microdollar_usage\" mu\n  LEFT JOIN \"microdollar_usage_metadata\" meta ON mu.id = meta.id\n  LEFT JOIN \"http_ip\" ip ON meta.http_ip_id = ip.http_ip_id\n  LEFT JOIN \"vercel_ip_city\" city ON meta.vercel_ip_city_id = city.vercel_ip_city_id\n  LEFT JOIN \"vercel_ip_country\" country ON meta.vercel_ip_country_id = country.vercel_ip_country_id\n  LEFT JOIN \"ja4_digest\" ja4 ON meta.ja4_digest_id = ja4.ja4_digest_id\n  LEFT JOIN \"system_prompt_prefix\" spp ON meta.system_prompt_prefix_id = spp.system_prompt_prefix_id\n  LEFT JOIN \"http_user_agent\" ua ON meta.http_user_agent_id = ua.http_user_agent_id\n  LEFT JOIN \"finish_reason\" frfr ON meta.finish_reason_id = frfr.finish_reason_id\n  LEFT JOIN \"editor_name\" edit ON meta.editor_name_id = edit.editor_name_id\n  LEFT JOIN \"feature\" feat ON meta.feature_id = feat.feature_id\n",
       "name": "microdollar_usage_view",
       "schema": "public",
       "isExisting": false,

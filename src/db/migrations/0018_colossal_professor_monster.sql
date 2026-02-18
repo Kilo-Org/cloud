@@ -1,6 +1,11 @@
+CREATE TABLE "feature" (
+	"feature_id" serial PRIMARY KEY NOT NULL,
+	"feature" text NOT NULL
+);
+--> statement-breakpoint
 DROP VIEW "public"."microdollar_usage_view";--> statement-breakpoint
-ALTER TABLE "microdollar_usage" ADD COLUMN "feature" text;--> statement-breakpoint
-CREATE INDEX "idx_microdollar_usage_feature" ON "microdollar_usage" USING btree ("feature") WHERE "microdollar_usage"."feature" is not null;--> statement-breakpoint
+ALTER TABLE "microdollar_usage_metadata" ADD COLUMN "feature_id" integer;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_feature" ON "feature" USING btree ("feature");--> statement-breakpoint
 CREATE VIEW "public"."microdollar_usage_view" AS (
   SELECT
     mu.id,
@@ -46,7 +51,7 @@ CREATE VIEW "public"."microdollar_usage_view" AS (
     edit.editor_name,
     meta.has_tools,
     meta.machine_id,
-    mu.feature
+    feat.feature
   FROM "microdollar_usage" mu
   LEFT JOIN "microdollar_usage_metadata" meta ON mu.id = meta.id
   LEFT JOIN "http_ip" ip ON meta.http_ip_id = ip.http_ip_id
@@ -57,4 +62,5 @@ CREATE VIEW "public"."microdollar_usage_view" AS (
   LEFT JOIN "http_user_agent" ua ON meta.http_user_agent_id = ua.http_user_agent_id
   LEFT JOIN "finish_reason" frfr ON meta.finish_reason_id = frfr.finish_reason_id
   LEFT JOIN "editor_name" edit ON meta.editor_name_id = edit.editor_name_id
+  LEFT JOIN "feature" feat ON meta.feature_id = feat.feature_id
 );

@@ -268,6 +268,24 @@ export async function hookBead(rigId: string, agentId: string, beadId: string): 
   });
 }
 
+// ── Delete operations ──────────────────────────────────────────────────────
+
+export async function deleteTown(userId: string, townId: string): Promise<void> {
+  await gastownFetch(`/api/users/${userId}/towns/${townId}`, { method: 'DELETE' });
+}
+
+export async function deleteRig(userId: string, rigId: string): Promise<void> {
+  await gastownFetch(`/api/users/${userId}/rigs/${rigId}`, { method: 'DELETE' });
+}
+
+export async function deleteBead(rigId: string, beadId: string): Promise<void> {
+  await gastownFetch(`/api/rigs/${rigId}/beads/${beadId}`, { method: 'DELETE' });
+}
+
+export async function deleteAgent(rigId: string, agentId: string): Promise<void> {
+  await gastownFetch(`/api/rigs/${rigId}/agents/${agentId}`, { method: 'DELETE' });
+}
+
 // ── Container operations (via Town Container DO) ──────────────────────────
 
 export async function getStreamTicket(townId: string, agentId: string): Promise<StreamTicket> {

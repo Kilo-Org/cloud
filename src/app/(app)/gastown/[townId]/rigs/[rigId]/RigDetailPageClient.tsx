@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,11 +26,33 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
   const [isSlingOpen, setIsSlingOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
+  const queryClient = useQueryClient();
   const rigQuery = useQuery(trpc.gastown.getRig.queryOptions({ rigId }));
   const beadsQuery = useQuery(trpc.gastown.listBeads.queryOptions({ rigId }));
   const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));
 
   const rig = rigQuery.data;
+
+  const deleteBead = useMutation(
+    trpc.gastown.deleteBead.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey() });
+        toast.success('Bead deleted');
+      },
+      onError: err => toast.error(err.message),
+    })
+  );
+
+  const deleteAgent = useMutation(
+    trpc.gastown.deleteAgent.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: trpc.gastown.listAgents.queryKey() });
+        setSelectedAgentId(null);
+        toast.success('Agent deleted');
+      },
+      onError: err => toast.error(err.message),
+    })
+  );
 
   return (
     <PageContainer>
@@ -80,7 +103,15 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
         {/* Bead Board — takes 2 columns */}
         <div className="lg:col-span-2">
           <h2 className="mb-4 text-lg font-semibold text-gray-200">Beads</h2>
-          <BeadBoard beads={beadsQuery.data ?? []} isLoading={beadsQuery.isLoading} />
+          <BeadBoard
+            beads={beadsQuery.data ?? []}
+            isLoading={beadsQuery.isLoading}
+            onDeleteBead={beadId => {
+              if (confirm('Delete this bead?')) {
+                deleteBead.mutate({ rigId, beadId });
+              }
+            }}
+          />
         </div>
 
         {/* Agents sidebar */}
@@ -104,6 +135,11 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
                   agent={agent}
                   isSelected={selectedAgentId === agent.id}
                   onSelect={() => setSelectedAgentId(prev => (prev === agent.id ? null : agent.id))}
+                  onDelete={() => {
+                    if (confirm(`Delete agent "${agent.name}"?`)) {
+                      deleteAgent.mutate({ rigId, agentId: agent.id });
+                    }
+                  }}
                 />
               ))}
             </div>

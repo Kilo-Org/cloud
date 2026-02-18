@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 type Bead = {
@@ -22,6 +23,7 @@ type Bead = {
 type BeadBoardProps = {
   beads: Bead[];
   isLoading: boolean;
+  onDeleteBead?: (beadId: string) => void;
 };
 
 const statusColumns = ['open', 'in_progress', 'closed'] as const;
@@ -45,15 +47,25 @@ const priorityColors: Record<string, string> = {
   critical: 'text-red-400',
 };
 
-function BeadCard({ bead }: { bead: Bead }) {
+function BeadCard({ bead, onDelete }: { bead: Bead; onDelete?: () => void }) {
   return (
     <Card className="border-gray-700 bg-gray-800/50">
       <CardContent className="p-3">
         <div className="mb-2 flex items-start justify-between gap-2">
           <h4 className="line-clamp-2 text-sm font-medium text-gray-200">{bead.title}</h4>
-          <span className={cn('shrink-0 text-xs font-medium', priorityColors[bead.priority])}>
-            {bead.priority}
-          </span>
+          <div className="flex shrink-0 items-center gap-1">
+            <span className={cn('text-xs font-medium', priorityColors[bead.priority])}>
+              {bead.priority}
+            </span>
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="rounded p-0.5 text-gray-600 hover:bg-red-500/10 hover:text-red-400"
+              >
+                <Trash2 className="size-3" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs">
@@ -77,7 +89,7 @@ function BeadCard({ bead }: { bead: Bead }) {
   );
 }
 
-export function BeadBoard({ beads, isLoading }: BeadBoardProps) {
+export function BeadBoard({ beads, isLoading, onDeleteBead }: BeadBoardProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-3 gap-4">
@@ -116,7 +128,11 @@ export function BeadBoard({ beads, isLoading }: BeadBoardProps) {
                 <p className="py-4 text-center text-xs text-gray-600">No beads</p>
               )}
               {columnBeads.map(bead => (
-                <BeadCard key={bead.id} bead={bead} />
+                <BeadCard
+                  key={bead.id}
+                  bead={bead}
+                  onDelete={onDeleteBead ? () => onDeleteBead(bead.id) : undefined}
+                />
               ))}
             </div>
           </div>

@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Bot, Crown, Shield, Eye } from 'lucide-react';
+import { Bot, Crown, Shield, Eye, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 type Agent = {
@@ -22,6 +22,7 @@ type AgentCardProps = {
   agent: Agent;
   isSelected: boolean;
   onSelect: () => void;
+  onDelete?: () => void;
 };
 
 const roleIcons: Record<string, React.ElementType> = {
@@ -38,7 +39,7 @@ const statusColors: Record<string, string> = {
   dead: 'bg-red-500',
 };
 
-export function AgentCard({ agent, isSelected, onSelect }: AgentCardProps) {
+export function AgentCard({ agent, isSelected, onSelect, onDelete }: AgentCardProps) {
   const Icon = roleIcons[agent.role] ?? Bot;
 
   return (
@@ -72,9 +73,22 @@ export function AgentCard({ agent, isSelected, onSelect }: AgentCardProps) {
             Hooked: {agent.current_hook_bead_id.slice(0, 8)}...
           </p>
         )}
-        <p className="mt-1 text-xs text-gray-600">
-          Active {formatDistanceToNow(new Date(agent.last_activity_at), { addSuffix: true })}
-        </p>
+        <div className="mt-1 flex items-center justify-between">
+          <p className="text-xs text-gray-600">
+            Active {formatDistanceToNow(new Date(agent.last_activity_at), { addSuffix: true })}
+          </p>
+          {onDelete && (
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="rounded p-1 text-gray-600 hover:bg-red-500/10 hover:text-red-400"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

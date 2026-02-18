@@ -94,3 +94,23 @@ export async function handleListRigs(
   const rigs = await townDO.listRigs(params.townId);
   return c.json(resSuccess(rigs));
 }
+
+export async function handleDeleteTown(
+  c: Context<GastownEnv>,
+  params: { userId: string; townId: string }
+) {
+  const townDO = getGastownUserStub(c.env, params.userId);
+  const deleted = await townDO.deleteTown(params.townId);
+  if (!deleted) return c.json(resError('Town not found'), 404);
+  return c.json(resSuccess({ deleted: true }));
+}
+
+export async function handleDeleteRig(
+  c: Context<GastownEnv>,
+  params: { userId: string; rigId: string }
+) {
+  const townDO = getGastownUserStub(c.env, params.userId);
+  const deleted = await townDO.deleteRig(params.rigId);
+  if (!deleted) return c.json(resError('Rig not found'), 404);
+  return c.json(resSuccess({ deleted: true }));
+}

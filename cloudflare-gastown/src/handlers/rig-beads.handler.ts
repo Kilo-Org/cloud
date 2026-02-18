@@ -139,3 +139,13 @@ export async function handleSlingBead(c: Context<GastownEnv>, params: { rigId: s
   const result = await rig.slingBead(parsed.data);
   return c.json(resSuccess(result), 201);
 }
+
+export async function handleDeleteBead(
+  c: Context<GastownEnv>,
+  params: { rigId: string; beadId: string }
+) {
+  const rig = getRigDOStub(c.env, params.rigId);
+  const deleted = await rig.deleteBead(params.beadId);
+  if (!deleted) return c.json(resError('Bead not found'), 404);
+  return c.json(resSuccess({ deleted: true }));
+}

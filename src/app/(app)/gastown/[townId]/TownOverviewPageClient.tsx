@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateRigDialog } from '@/components/gastown/CreateRigDialog';
-import { ArrowLeft, Plus, GitBranch } from 'lucide-react';
+import { ArrowLeft, Plus, GitBranch, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
 type TownOverviewPageClientProps = {
@@ -21,8 +22,21 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
   const trpc = useTRPC();
   const [isCreateRigOpen, setIsCreateRigOpen] = useState(false);
 
+  const queryClient = useQueryClient();
   const townQuery = useQuery(trpc.gastown.getTown.queryOptions({ townId }));
   const rigsQuery = useQuery(trpc.gastown.listRigs.queryOptions({ townId }));
+
+  const deleteRig = useMutation(
+    trpc.gastown.deleteRig.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: trpc.gastown.listRigs.queryKey() });
+        toast.success('Rig deleted');
+      },
+      onError: err => {
+        toast.error(err.message);
+      },
+    })
+  );
 
   return (
     <PageContainer>
@@ -110,8 +124,21 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
                     <span className="max-w-xs truncate">{rig.git_url}</span>
                   </div>
                 </div>
-                <div className="text-sm text-gray-500">
-                  {formatDistanceToNow(new Date(rig.created_at), { addSuffix: true })}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-500">
+                    {formatDistanceToNow(new Date(rig.created_at), { addSuffix: true })}
+                  </span>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (confirm(`Delete rig "${rig.name}"?`)) {
+                        deleteRig.mutate({ rigId: rig.id });
+                      }
+                    }}
+                    className="rounded p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
                 </div>
               </CardContent>
             </Card>

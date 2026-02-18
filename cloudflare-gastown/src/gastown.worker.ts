@@ -14,6 +14,7 @@ import {
   handleUpdateBeadStatus,
   handleCloseBead,
   handleSlingBead,
+  handleDeleteBead,
 } from './handlers/rig-beads.handler';
 import {
   handleRegisterAgent,
@@ -27,6 +28,7 @@ import {
   handleCheckMail,
   handleHeartbeat,
   handleGetOrCreateAgent,
+  handleDeleteAgent,
 } from './handlers/rig-agents.handler';
 import { handleSendMail } from './handlers/rig-mail.handler';
 import { handleSubmitToReviewQueue } from './handlers/rig-review-queue.handler';
@@ -46,6 +48,8 @@ import {
   handleCreateRig,
   handleGetRig,
   handleListRigs,
+  handleDeleteTown,
+  handleDeleteRig,
 } from './handlers/towns.handler';
 
 export { RigDO } from './dos/Rig.do';
@@ -96,6 +100,7 @@ app.get('/api/rigs/:rigId/beads/:beadId', c => handleGetBead(c, c.req.param()));
 app.patch('/api/rigs/:rigId/beads/:beadId/status', c => handleUpdateBeadStatus(c, c.req.param()));
 app.post('/api/rigs/:rigId/beads/:beadId/close', c => handleCloseBead(c, c.req.param()));
 app.post('/api/rigs/:rigId/sling', c => handleSlingBead(c, c.req.param()));
+app.delete('/api/rigs/:rigId/beads/:beadId', c => handleDeleteBead(c, c.req.param()));
 
 // ── Agents ──────────────────────────────────────────────────────────────
 
@@ -103,6 +108,7 @@ app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents', c => handleListAgents(c, c.req.param()));
 app.post('/api/rigs/:rigId/agents/get-or-create', c => handleGetOrCreateAgent(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
+app.delete('/api/rigs/:rigId/agents/:agentId', c => handleDeleteAgent(c, c.req.param()));
 
 // Agent-scoped routes — agentOnlyMiddleware enforces JWT agentId match
 app.use('/api/rigs/:rigId/agents/:agentId/*', async (c, next) =>
@@ -140,6 +146,8 @@ app.get('/api/users/:userId/towns/:townId', c => handleGetTown(c, c.req.param())
 app.post('/api/users/:userId/rigs', c => handleCreateRig(c, c.req.param()));
 app.get('/api/users/:userId/rigs/:rigId', c => handleGetRig(c, c.req.param()));
 app.get('/api/users/:userId/towns/:townId/rigs', c => handleListRigs(c, c.req.param()));
+app.delete('/api/users/:userId/towns/:townId', c => handleDeleteTown(c, c.req.param()));
+app.delete('/api/users/:userId/rigs/:rigId', c => handleDeleteRig(c, c.req.param()));
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().

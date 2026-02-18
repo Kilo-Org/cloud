@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateTownDialog } from '@/components/gastown/CreateTownDialog';
-import { Plus, Factory } from 'lucide-react';
+import { Plus, Factory, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
 export function TownListPageClient() {
@@ -18,7 +19,20 @@ export function TownListPageClient() {
   const trpc = useTRPC();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
+  const queryClient = useQueryClient();
   const townsQuery = useQuery(trpc.gastown.listTowns.queryOptions());
+
+  const deleteTown = useMutation(
+    trpc.gastown.deleteTown.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: trpc.gastown.listTowns.queryKey() });
+        toast.success('Town deleted');
+      },
+      onError: err => {
+        toast.error(err.message);
+      },
+    })
+  );
 
   return (
     <PageContainer>
@@ -88,9 +102,19 @@ export function TownListPageClient() {
                     Created {formatDistanceToNow(new Date(town.created_at), { addSuffix: true })}
                   </p>
                 </div>
-                <div className="text-sm text-gray-400">
-                  <span className="text-gray-500">{town.id.slice(0, 8)}</span>
-                </div>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (
+                      confirm(`Delete town "${town.name}"? This will also delete all its rigs.`)
+                    ) {
+                      deleteTown.mutate({ townId: town.id });
+                    }
+                  }}
+                  className="rounded p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
+                >
+                  <Trash2 className="size-4" />
+                </button>
               </CardContent>
             </Card>
           ))}

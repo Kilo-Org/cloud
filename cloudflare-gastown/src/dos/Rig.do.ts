@@ -220,6 +220,25 @@ export class RigDO extends DurableObject<Env> {
     return this.updateBeadStatus(beadId, 'closed', agentId);
   }
 
+  async deleteBead(beadId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const bead = this.getBead(beadId);
+    if (!bead) return false;
+    // Unhook any agent assigned to this bead
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agents}
+        SET ${agents.columns.current_hook_bead_id} = NULL,
+            ${agents.columns.status} = 'idle'
+        WHERE ${agents.columns.current_hook_bead_id} = ?
+      `,
+      [beadId]
+    );
+    query(this.sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.columns.id} = ?`, [beadId]);
+    return true;
+  }
+
   // ── Agents ─────────────────────────────────────────────────────────────
 
   async registerAgent(input: RegisterAgentInput): Promise<Agent> {
@@ -303,6 +322,33 @@ export class RigDO extends DurableObject<Env> {
       `,
       [status, now(), agentId]
     );
+  }
+
+  async deleteAgent(agentId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const agent = this.getAgent(agentId);
+    if (!agent) return false;
+    // Unassign any beads assigned to this agent
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.assignee_agent_id} = NULL
+        WHERE ${beads.columns.assignee_agent_id} = ?
+      `,
+      [agentId]
+    );
+    // Delete mail for this agent
+    query(
+      this.sql,
+      /* sql */ `
+        DELETE FROM ${mail}
+        WHERE ${mail.columns.to_agent_id} = ? OR ${mail.columns.from_agent_id} = ?
+      `,
+      [agentId, agentId]
+    );
+    query(this.sql, /* sql */ `DELETE FROM ${agents} WHERE ${agents.columns.id} = ?`, [agentId]);
+    return true;
   }
 
   // ── Hooks (GUPP) ──────────────────────────────────────────────────────

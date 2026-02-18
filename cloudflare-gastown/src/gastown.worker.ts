@@ -13,6 +13,7 @@ import {
   handleGetBead,
   handleUpdateBeadStatus,
   handleCloseBead,
+  handleSlingBead,
 } from './handlers/rig-beads.handler';
 import {
   handleRegisterAgent,
@@ -25,6 +26,7 @@ import {
   handleWriteCheckpoint,
   handleCheckMail,
   handleHeartbeat,
+  handleGetOrCreateAgent,
 } from './handlers/rig-agents.handler';
 import { handleSendMail } from './handlers/rig-mail.handler';
 import { handleSubmitToReviewQueue } from './handlers/rig-review-queue.handler';
@@ -93,11 +95,13 @@ app.get('/api/rigs/:rigId/beads', c => handleListBeads(c, c.req.param()));
 app.get('/api/rigs/:rigId/beads/:beadId', c => handleGetBead(c, c.req.param()));
 app.patch('/api/rigs/:rigId/beads/:beadId/status', c => handleUpdateBeadStatus(c, c.req.param()));
 app.post('/api/rigs/:rigId/beads/:beadId/close', c => handleCloseBead(c, c.req.param()));
+app.post('/api/rigs/:rigId/sling', c => handleSlingBead(c, c.req.param()));
 
 // ── Agents ──────────────────────────────────────────────────────────────
 
 app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents', c => handleListAgents(c, c.req.param()));
+app.post('/api/rigs/:rigId/agents/get-or-create', c => handleGetOrCreateAgent(c, c.req.param()));
 app.get('/api/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
 
 // Agent-scoped routes — agentOnlyMiddleware enforces JWT agentId match

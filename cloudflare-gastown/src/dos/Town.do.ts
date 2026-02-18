@@ -12,8 +12,18 @@ function now(): string {
 }
 
 /**
- * Town DO — stores town metadata and its list of rigs.
- * One Town DO instance per user (keyed by owner_user_id).
+ * Town DO — control-plane metadata for towns and rigs.
+ *
+ * Keying: one DO instance per user (keyed by `owner_user_id`). A single
+ * instance therefore stores *all* towns a user owns plus their rigs. The
+ * `towns` table can hold multiple rows because a user may create several
+ * towns.
+ *
+ * This is a temporary home — towns/rigs are simple control-plane entities
+ * that will move to Postgres once the replication layer lands (Phase 4,
+ * #230). The DO is used now so reads don't require Postgres and the
+ * worker stays self-contained.
+ *
  * Cross-rig coordination will be added in Phase 2 (#215).
  */
 export class TownDO extends DurableObject<Env> {

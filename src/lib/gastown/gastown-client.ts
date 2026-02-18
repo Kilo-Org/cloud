@@ -201,6 +201,23 @@ export async function createBead(
   return parseSuccessData(body, BeadSchema);
 }
 
+const SlingResultSchema = z.object({
+  bead: BeadSchema,
+  agent: AgentSchema,
+});
+export type SlingResult = z.output<typeof SlingResultSchema>;
+
+export async function slingBead(
+  rigId: string,
+  input: { title: string; body?: string; metadata?: Record<string, unknown> }
+): Promise<SlingResult> {
+  const body = await gastownFetch(`/api/rigs/${rigId}/sling`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return parseSuccessData(body, SlingResultSchema);
+}
+
 export async function listBeads(rigId: string, filter?: { status?: string }): Promise<Bead[]> {
   const params = new URLSearchParams();
   if (filter?.status) params.set('status', filter.status);
@@ -226,6 +243,14 @@ export async function registerAgent(
 export async function listAgents(rigId: string): Promise<Agent[]> {
   const body = await gastownFetch(`/api/rigs/${rigId}/agents`);
   return parseSuccessData(body, AgentSchema.array());
+}
+
+export async function getOrCreateAgent(rigId: string, role: string): Promise<Agent> {
+  const body = await gastownFetch(`/api/rigs/${rigId}/agents/get-or-create`, {
+    method: 'POST',
+    body: JSON.stringify({ role }),
+  });
+  return parseSuccessData(body, AgentSchema);
 }
 
 export async function hookBead(rigId: string, agentId: string, beadId: string): Promise<void> {

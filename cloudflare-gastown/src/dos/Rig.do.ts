@@ -16,6 +16,7 @@ import type {
   CreateBeadInput,
   BeadFilter,
   Agent,
+  AgentRole,
   AgentStatus,
   RegisterAgentInput,
   AgentFilter,
@@ -593,6 +594,69 @@ export class RigDO extends DurableObject<Env> {
     await this.unhookBead(agentId);
 
     await this.armAlarmIfNeeded();
+  }
+
+  // ── Atomic Sling ────────────────────────────────────────────────────────
+  // Creates bead, assigns or reuses an idle polecat, hooks them together,
+  // and arms the alarm — all within a single DO call to avoid TOCTOU races.
+
+  async slingBead(input: {
+    title: string;
+    body?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ bead: Bead; agent: Agent }> {
+    await this.ensureInitialized();
+
+    // Create the bead
+    const bead = await this.createBead({
+      type: 'issue',
+      title: input.title,
+      body: input.body,
+      metadata: input.metadata,
+    });
+
+    // Find an idle polecat or create one
+    const agent = await this.getOrCreateAgent('polecat');
+
+    // Hook them together (also arms the alarm)
+    await this.hookBead(agent.id, bead.id);
+
+    return { bead: (await this.getBeadAsync(bead.id))!, agent: this.getAgent(agent.id)! };
+  }
+
+  // ── Get or Create Agent ────────────────────────────────────────────────
+  // Atomically finds an existing agent of the given role (idle preferred)
+  // or creates a new one. Prevents duplicate agent creation from concurrent calls.
+
+  async getOrCreateAgent(role: AgentRole): Promise<Agent> {
+    await this.ensureInitialized();
+
+    // Prefer idle agents of the requested role
+    const existing = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${agents}
+          WHERE ${agents.columns.role} = ?
+          ORDER BY CASE WHEN ${agents.columns.status} = 'idle' THEN 0 ELSE 1 END,
+                   ${agents.columns.last_activity_at} ASC
+          LIMIT ?
+        `,
+        [role, 1]
+      ),
+    ];
+
+    if (existing.length > 0) {
+      const agent = AgentRecord.parse(existing[0]);
+      if (agent.status === 'idle') return agent;
+    }
+
+    // No idle agent found — create a new one
+    return this.registerAgent({
+      role,
+      name: `${role}-${Date.now()}`,
+      identity: `${role}-${generateId()}`,
+    });
   }
 
   // ── Town ID (links this rig to its town container) ─────────────────────

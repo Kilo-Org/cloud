@@ -87,11 +87,11 @@ export const gastownRouter = createTRPCRouter({
     .input(z.object({ rigId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
-      return {
-        ...rig,
-        agents: await withGastownError(() => gastown.listAgents(rig.id)),
-        beads: await withGastownError(() => gastown.listBeads(rig.id, { status: 'in_progress' })),
-      };
+      const [agents, beads] = await Promise.all([
+        withGastownError(() => gastown.listAgents(rig.id)),
+        withGastownError(() => gastown.listBeads(rig.id, { status: 'in_progress' })),
+      ]);
+      return { ...rig, agents, beads };
     }),
 
   // ── Beads ───────────────────────────────────────────────────────────────
@@ -133,34 +133,15 @@ export const gastownRouter = createTRPCRouter({
       // Verify ownership
       const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
 
-      // 1. Create an issue bead in the Rig DO
-      const bead = await withGastownError(() =>
-        gastown.createBead(rig.id, {
-          type: 'issue',
+      // Atomic sling: creates bead, assigns/creates polecat, hooks them,
+      // and arms the alarm — all in a single Rig DO call to avoid TOCTOU races.
+      return withGastownError(() =>
+        gastown.slingBead(rig.id, {
           title: input.title,
           body: input.body,
           metadata: { model: input.model, slung_by: ctx.user.id },
         })
       );
-
-      // 2. Register a polecat agent (or reuse an idle one)
-      const agents = await withGastownError(() => gastown.listAgents(rig.id));
-      const idleAgent = agents.find(a => a.role === 'polecat' && a.status === 'idle');
-
-      const agent = idleAgent
-        ? idleAgent
-        : await withGastownError(() =>
-            gastown.registerAgent(rig.id, {
-              role: 'polecat',
-              name: `polecat-${Date.now()}`,
-              identity: `polecat-${crypto.randomUUID()}`,
-            })
-          );
-
-      // 3. Hook the bead to the agent (also arms the alarm in the Rig DO)
-      await withGastownError(() => gastown.hookBead(rig.id, agent.id, bead.id));
-
-      return { bead, agent };
     }),
 
   // ── Mayor Communication ─────────────────────────────────────────────────
@@ -187,19 +168,9 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Rig does not belong to this town' });
       }
 
-      // Create a message bead assigned to the Mayor
-      const agents = await withGastownError(() => gastown.listAgents(input.rigId));
-      let mayor = agents.find(a => a.role === 'mayor');
-
-      if (!mayor) {
-        mayor = await withGastownError(() =>
-          gastown.registerAgent(input.rigId, {
-            role: 'mayor',
-            name: 'mayor',
-            identity: `mayor-${input.townId}`,
-          })
-        );
-      }
+      // Atomically get or create the Mayor agent in the Rig DO to avoid
+      // duplicate mayor creation from concurrent calls.
+      const mayor = await withGastownError(() => gastown.getOrCreateAgent(input.rigId, 'mayor'));
 
       const bead = await withGastownError(() =>
         gastown.createBead(input.rigId, {

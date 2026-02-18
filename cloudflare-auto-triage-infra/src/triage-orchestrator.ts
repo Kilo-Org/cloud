@@ -72,8 +72,10 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
     await this.updateStatus('analyzing');
 
-    // Set alarm as safety net for stuck tickets
-    const alarmTimeout = this.getClassificationTimeout() + 120_000; // classification timeout + 2 min buffer
+    // Set alarm as safety net for stuck tickets. Budget covers the full runTriage
+    // lifecycle: duplicate check + classification + label/comment API calls, plus a
+    // 2-minute buffer on top of the classification timeout for that overhead.
+    const alarmTimeout = this.getClassificationTimeout() + 120_000;
     await this.ctx.storage.setAlarm(Date.now() + alarmTimeout);
 
     try {
@@ -343,7 +345,11 @@ export class TriageOrchestrator extends DurableObject<Env> {
       duplicateOf: result.duplicateOfTicketId,
     });
 
-    const duplicateTicket = result.similarTickets?.[0];
+    // Prefer the ticket that matches the canonical duplicateOfTicketId; fall back to the
+    // first similar ticket if no match is found (defensive: shouldn't happen in practice).
+    const duplicateTicket =
+      result.similarTickets?.find(t => t.ticketId === result.duplicateOfTicketId) ??
+      result.similarTickets?.[0];
     if (duplicateTicket) {
       const issueUrl = `https://github.com/${duplicateTicket.repoFullName}/issues/${duplicateTicket.issueNumber}`;
       const escapedTitle = duplicateTicket.issueTitle.replace(/([\\*_~`[\]()#>!|])/g, '\\$1');
@@ -466,6 +472,16 @@ export class TriageOrchestrator extends DurableObject<Env> {
           ticketId: this.state.ticketId,
           status: addLabelResponse.status,
           error: errorText,
+        });
+        return false;
+      }
+
+      // HTTP 207 Multi-Status means partial failure (some labels applied, some not).
+      // response.ok is true for all 2xx, so we must check the body explicitly.
+      const body: { success: boolean } = await addLabelResponse.json();
+      if (!body.success) {
+        console.error('[TriageOrchestrator] Partial label failure (207):', {
+          ticketId: this.state.ticketId,
         });
         return false;
       }
@@ -617,7 +633,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
     if (sayText.length > 0) {
       try {
         return parseClassification(sayText, availableLabels);
-      } catch (e) {
+      } catch (_e) {
         console.warn('[TriageOrchestrator] Failed to parse from sayText, trying fullText', {
           ticketId: this.state.ticketId,
           sayTextLength: sayText.length,

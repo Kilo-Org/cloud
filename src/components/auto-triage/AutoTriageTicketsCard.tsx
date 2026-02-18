@@ -194,6 +194,7 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
           description: error.message,
         });
       },
+      onSettled: () => setInterruptingTicketId(null),
     })
   );
 
@@ -218,16 +219,16 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
           description: error.message,
         });
       },
+      onSettled: () => setInterruptingTicketId(null),
     })
   );
 
   const handleInterrupt = (ticketId: string) => {
     setInterruptingTicketId(ticketId);
-    const onSettled = () => setInterruptingTicketId(null);
     if (organizationId) {
-      interruptOrgMutation.mutate({ organizationId, ticketId }, { onSettled });
+      interruptOrgMutation.mutate({ organizationId, ticketId });
     } else {
-      interruptPersonalMutation.mutate({ ticketId }, { onSettled });
+      interruptPersonalMutation.mutate({ ticketId });
     }
   };
 

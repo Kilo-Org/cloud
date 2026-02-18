@@ -209,10 +209,11 @@ export async function findAvailablePort(
  * @param port - The port to listen on
  * @returns The full command string
  */
-export function buildKiloServeCommand(sessionId: string, port: number): string {
+export function buildKiloServeCommand(sessionId: string, port: number, feature?: string): string {
   // Using env var prefix to mark the session, then kilo serve command
   // The cwd is set via startProcess options, so no cd needed here
-  return `${KILO_CLOUD_SESSION_MARKER}=${sessionId} kilo serve --port ${port} --hostname 127.0.0.1`;
+  const featureEnv = feature ? ` KILOCODE_FEATURE=${feature}` : '';
+  return `${KILO_CLOUD_SESSION_MARKER}=${sessionId}${featureEnv} kilo serve --port ${port} --hostname 127.0.0.1`;
 }
 
 /**
@@ -235,7 +236,8 @@ export async function ensureKiloServer(
   sandbox: SandboxInstance,
   session: ExecutionSession,
   sessionId: string,
-  workspacePath: string
+  workspacePath: string,
+  feature?: string
 ): Promise<number> {
   logger.withFields({ sessionId, workspacePath }).info('Ensuring kilo server is running');
 
@@ -278,7 +280,7 @@ export async function ensureKiloServer(
 
   for (let attempt = 0; attempt < MAX_PORT_RETRY_ATTEMPTS; attempt++) {
     const port = await findAvailablePort(sandbox, sessionId);
-    const command = buildKiloServeCommand(sessionId, port);
+    const command = buildKiloServeCommand(sessionId, port, feature);
     let proc: Process | undefined;
 
     logger

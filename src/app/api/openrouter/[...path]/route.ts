@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { stripRequiredPrefix } from '@/lib/utils';
 import { generateProviderSpecificHash } from '@/lib/providerHash';
 import { extractPromptInfo, type MicrodollarUsageContext } from '@/lib/processUsage';
+import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import { applyProviderSpecificLogic, getProvider, openRouterRequest } from '@/lib/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
@@ -279,6 +280,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
     botId,
+    feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@/lib/processUsage';
+import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { isFreeModel } from '@/lib/models';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -147,6 +148,7 @@ export async function POST(request: NextRequest) {
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
+    feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
   };
 
   setTag('ui.ai_model', fimModel_withOpenRouterStyleProviderPrefix);

@@ -58,6 +58,7 @@ export async function POST(
     abuse_classification: 0,
     inference_provider: 'dev-tools',
     project_id: null,
+    feature: null,
   };
 
   const metadataFields: UsageMetaData = {

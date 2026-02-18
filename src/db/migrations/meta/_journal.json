@@ -127,6 +127,13 @@
       "when": 1771344463915,
       "tag": "0017_dear_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1771371551198,
+      "tag": "0018_mighty_cloak",
+      "breakpoints": true
     }
   ]
 }

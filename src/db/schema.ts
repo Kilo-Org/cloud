@@ -571,6 +571,7 @@ export const microdollar_usage = pgTable(
     organization_id: uuid(),
     inference_provider: text(),
     project_id: text(),
+    feature: text(),
   },
   table => [
     index('idx_created_at').on(table.created_at),
@@ -579,6 +580,7 @@ export const microdollar_usage = pgTable(
     index('idx_microdollar_usage_organization_id')
       .on(table.organization_id)
       .where(isNotNull(table.organization_id)),
+    index('idx_microdollar_usage_feature').on(table.feature).where(isNotNull(table.feature)),
   ]
 );
 
@@ -761,6 +763,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   editor_name: text(),
   has_tools: boolean(),
   machine_id: text(),
+  feature: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -805,7 +808,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.cancelled,
     edit.editor_name,
     meta.has_tools,
-    meta.machine_id
+    meta.machine_id,
+    mu.feature
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { db } from './drizzle';
 import type { MicrodollarUsage, Organization } from '@/db/schema';
 import { microdollar_usage } from '@/db/schema';
+import type { FeatureValue } from '@/lib/feature-detection';
 import { createTimer } from '@/lib/timer';
 import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
@@ -177,6 +178,8 @@ export type MicrodollarUsageContext = {
   botId?: string;
   /** Request ID from abuse service classify response, for cost tracking correlation. 0 means skip. */
   abuse_request_id?: number;
+  /** Which product feature generated this API call. NULL if header not sent. */
+  feature: FeatureValue | null;
 };
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
@@ -196,6 +199,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     machine_id: usageContext.machine_id,
     is_user_byok: usageContext.user_byok,
     has_tools: usageContext.has_tools,
+    feature: usageContext.feature,
   };
 }
 
@@ -211,7 +215,7 @@ export function toInsertableDbUsageRecord(
   const id = randomUUID();
   const created_at = new Date().toISOString();
 
-  const { kilo_user_id, organization_id, project_id, provider, ...metadataFromContext } =
+  const { kilo_user_id, organization_id, project_id, provider, feature, ...metadataFromContext } =
     usageContextInfo;
 
   const core: MicrodollarUsage = {
@@ -232,6 +236,7 @@ export function toInsertableDbUsageRecord(
     abuse_classification: 0,
     inference_provider: usageStats.inference_provider,
     project_id,
+    feature,
   };
 
   const metadata: UsageMetaData = {
@@ -484,7 +489,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               id, kilo_user_id, organization_id, provider, cost,
               input_tokens, output_tokens, cache_write_tokens, cache_hit_tokens,
               created_at, model, requested_model, cache_discount, has_error, abuse_classification,
-              inference_provider, project_id
+              inference_provider, project_id, feature
             ) VALUES (
               ${coreUsageFields.id},
               ${coreUsageFields.kilo_user_id},
@@ -502,7 +507,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${coreUsageFields.has_error},
               ${coreUsageFields.abuse_classification},
               ${coreUsageFields.inference_provider},
-              ${coreUsageFields.project_id}
+              ${coreUsageFields.project_id},
+              ${coreUsageFields.feature}
             )
           )
           , ${createUpsertCTE(sql`http_user_agent`, metadataFields.http_user_agent)}

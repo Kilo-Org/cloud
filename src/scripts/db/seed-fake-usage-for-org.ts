@@ -64,6 +64,7 @@ function generateRandomUsage(
     has_error: false,
     inference_provider: 'anthropic',
     project_id: null,
+    feature: null,
   };
 
   // For seed data, we keep metadata minimal (no foreign key lookups)

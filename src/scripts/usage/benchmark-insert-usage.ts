@@ -110,6 +110,7 @@ function generateRandomRecord(
       ),
       usageStats.project_id_null_pct
     ),
+    feature: null,
   };
 
   const metadata: UsageMetaData = {

@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import { getGastownUserStub } from '../dos/GastownUser.do';
+import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
@@ -62,6 +63,16 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
 
   const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.createRig(parsed.data);
+
+  // Configure the Rig DO with its metadata so it can dispatch work to the container
+  const rigDO = getRigDOStub(c.env, rig.id);
+  await rigDO.configureRig({
+    townId: parsed.data.town_id,
+    gitUrl: parsed.data.git_url,
+    defaultBranch: parsed.data.default_branch,
+    userId: params.userId,
+  });
+
   return c.json(resSuccess(rig), 201);
 }
 

@@ -9,6 +9,11 @@
 
 - Each DO module must export a `get{ClassName}Stub` helper function (e.g. `getRigDOStub`) that centralizes how that DO namespace creates instances. Callers should use this helper instead of accessing the namespace binding directly.
 
+## IO boundaries
+
+- Always validate data at IO boundaries (HTTP responses, JSON.parse results, SSE event payloads, subprocess output) with Zod schemas. Return `unknown` from raw fetch/parse helpers and `.parse()` in the caller.
+- Never use `as` to cast IO data. If the shape is known, define a Zod schema; if not, use `.passthrough()` or a catch-all schema.
+
 ## SQL queries
 
 - Use the type-safe `query()` helper from `util/query.util.ts` for all SQL queries.

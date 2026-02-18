@@ -1,4 +1,4 @@
-import { listProcesses } from './process-manager';
+import { listAgents } from './process-manager';
 import type { HeartbeatPayload } from './types';
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -41,7 +41,7 @@ export function stopHeartbeat(): void {
 async function sendHeartbeats(): Promise<void> {
   if (!gastownApiUrl || !sessionToken) return;
 
-  const active = listProcesses().filter(p => p.status === 'running' || p.status === 'starting');
+  const active = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
 
   for (const agent of active) {
     const payload: HeartbeatPayload = {

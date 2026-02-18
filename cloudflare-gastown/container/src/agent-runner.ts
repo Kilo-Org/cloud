@@ -1,6 +1,6 @@
 import { cloneRepo, createWorktree } from './git-manager';
-import { startProcess } from './process-manager';
-import type { AgentProcess, StartAgentRequest } from './types';
+import { startAgent } from './process-manager';
+import type { ManagedAgent, StartAgentRequest } from './types';
 
 /**
  * Resolve an env var: prefer the request-provided value, then the container's
@@ -44,26 +44,14 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   return env;
 }
 
-function buildCliArgs(request: StartAgentRequest): string[] {
-  return [
-    'code',
-    '--model',
-    request.model,
-    '--system-prompt',
-    request.systemPrompt,
-    '--prompt',
-    request.prompt,
-    '--non-interactive',
-  ];
-}
-
 /**
  * Run the full agent startup sequence:
  * 1. Clone/fetch the rig's git repo
  * 2. Create an isolated worktree for the agent's branch
- * 3. Spawn the Kilo CLI process in that worktree
+ * 3. Start a kilo serve instance for the worktree (or reuse existing)
+ * 4. Create a session and send the initial prompt via HTTP API
  */
-export async function runAgent(request: StartAgentRequest): Promise<AgentProcess> {
+export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent> {
   await cloneRepo({
     rigId: request.rigId,
     gitUrl: request.gitUrl,
@@ -76,7 +64,6 @@ export async function runAgent(request: StartAgentRequest): Promise<AgentProcess
   });
 
   const env = buildAgentEnv(request);
-  const cliArgs = buildCliArgs(request);
 
-  return startProcess(request, workdir, cliArgs, env);
+  return startAgent(request, workdir, env);
 }

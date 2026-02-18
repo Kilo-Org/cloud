@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { runAgent } from './agent-runner';
 import {
-  stopProcess,
+  stopAgent,
   sendMessage,
-  getProcessStatus,
-  activeProcessCount,
+  getAgentStatus,
+  activeAgentCount,
+  activeServerCount,
   getUptime,
   stopAll,
 } from './process-manager';
@@ -24,7 +25,8 @@ export const app = new Hono();
 app.get('/health', c => {
   const response: HealthResponse = {
     status: 'ok',
-    agents: activeProcessCount(),
+    agents: activeAgentCount(),
+    servers: activeServerCount(),
     uptime: getUptime(),
   };
   return c.json(response);
@@ -38,28 +40,28 @@ app.post('/agents/start', async c => {
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
 
-  const agentProcess = await runAgent(parsed.data);
-  return c.json(agentProcess, 201);
+  const agent = await runAgent(parsed.data);
+  return c.json(agent, 201);
 });
 
 // POST /agents/:agentId/stop
 app.post('/agents/:agentId/stop', async c => {
   const { agentId } = c.req.param();
-  if (!getProcessStatus(agentId)) {
+  if (!getAgentStatus(agentId)) {
     return c.json({ error: `Agent ${agentId} not found` }, 404);
   }
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = StopAgentRequest.safeParse(body);
-  const signal = parsed.success ? parsed.data.signal : undefined;
+  // StopAgentRequest.signal is no longer used — abort is always clean via API.
+  // We still parse the body to avoid breaking callers that send it.
+  await c.req.json().catch(() => ({}));
 
-  await stopProcess(agentId, signal ?? 'SIGTERM');
+  await stopAgent(agentId);
   return c.json({ stopped: true });
 });
 
 // POST /agents/:agentId/message
 app.post('/agents/:agentId/message', async c => {
   const { agentId } = c.req.param();
-  if (!getProcessStatus(agentId)) {
+  if (!getAgentStatus(agentId)) {
     return c.json({ error: `Agent ${agentId} not found` }, 404);
   }
   const body = await c.req.json().catch(() => null);
@@ -68,25 +70,28 @@ app.post('/agents/:agentId/message', async c => {
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
 
-  sendMessage(agentId, parsed.data.prompt);
+  await sendMessage(agentId, parsed.data.prompt);
   return c.json({ sent: true });
 });
 
 // GET /agents/:agentId/status
 app.get('/agents/:agentId/status', c => {
   const { agentId } = c.req.param();
-  const proc = getProcessStatus(agentId);
-  if (!proc) {
+  const agent = getAgentStatus(agentId);
+  if (!agent) {
     return c.json({ error: `Agent ${agentId} not found` }, 404);
   }
 
   const response: AgentStatusResponse = {
-    agentId: proc.agentId,
-    status: proc.status,
-    pid: proc.pid,
-    exitCode: proc.exitCode,
-    startedAt: proc.startedAt,
-    lastActivityAt: proc.lastActivityAt,
+    agentId: agent.agentId,
+    status: agent.status,
+    serverPort: agent.serverPort,
+    sessionId: agent.sessionId,
+    startedAt: agent.startedAt,
+    lastActivityAt: agent.lastActivityAt,
+    activeTools: agent.activeTools,
+    messageCount: agent.messageCount,
+    exitReason: agent.exitReason,
   };
   return c.json(response);
 });
@@ -94,8 +99,7 @@ app.get('/agents/:agentId/status', c => {
 // POST /agents/:agentId/stream-ticket
 app.post('/agents/:agentId/stream-ticket', c => {
   const { agentId } = c.req.param();
-  const proc = getProcessStatus(agentId);
-  if (!proc) {
+  if (!getAgentStatus(agentId)) {
     return c.json({ error: `Agent ${agentId} not found` }, 404);
   }
 

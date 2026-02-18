@@ -253,6 +253,8 @@ config.tools.exec.security = 'deny';
 config.tools.exec.ask = 'on-miss';
 
 // Telegram configuration
+// Overwrite entire channel object to drop stale keys that would fail
+// OpenClaw's strict config validation (matches moltworker behavior)
 if (process.env.TELEGRAM_BOT_TOKEN) {
     const dmPolicy = process.env.TELEGRAM_DM_POLICY || 'pairing';
     config.channels.telegram = {
@@ -265,6 +267,12 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     } else if (dmPolicy === 'open') {
         config.channels.telegram.allowFrom = ['*'];
     }
+    // openclaw onboard --skip-channels writes plugins.entries.telegram: { enabled: false }
+    // which blocks the plugin from loading. Set it to true when we configure the channel.
+    config.plugins = config.plugins || {};
+    config.plugins.entries = config.plugins.entries || {};
+    config.plugins.entries.telegram = config.plugins.entries.telegram || {};
+    config.plugins.entries.telegram.enabled = true;
 }
 
 // Discord configuration

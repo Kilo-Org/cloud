@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { db } from './drizzle';
 import type { MicrodollarUsage, Organization } from '@/db/schema';
 import { microdollar_usage } from '@/db/schema';
+import type { FeatureValue } from '@/lib/feature-detection';
 import { createTimer } from '@/lib/timer';
 import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
@@ -177,6 +178,8 @@ export type MicrodollarUsageContext = {
   botId?: string;
   /** Request ID from abuse service classify response, for cost tracking correlation. 0 means skip. */
   abuse_request_id?: number;
+  /** Which product feature generated this API call. NULL if header not sent. */
+  feature: FeatureValue | null;
 };
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
@@ -196,6 +199,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     machine_id: usageContext.machine_id,
     is_user_byok: usageContext.user_byok,
     has_tools: usageContext.has_tools,
+    feature: usageContext.feature,
   };
 }
 
@@ -428,6 +432,7 @@ export type UsageMetaData = {
   editor_name: string | null;
   has_tools: boolean | null;
   machine_id: string | null;
+  feature: string | null;
 };
 
 export async function insertUsageRecord(
@@ -513,6 +518,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`system_prompt_prefix`, metadataFields.system_prompt_prefix)}
           , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
           , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
+          , ${createUpsertCTE(sql`feature`, metadataFields.feature)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -543,7 +549,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ja4_digest_id,
               system_prompt_prefix_id,
               finish_reason_id,
-              editor_name_id
+              editor_name_id,
+              feature_id
             )
             SELECT
               ${metadataFields.id},
@@ -574,7 +581,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT ja4_digest_id FROM ja4_digest_cte),
               (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
               (SELECT finish_reason_id FROM finish_reason_cte),
-              (SELECT editor_name_id FROM editor_name_cte)
+              (SELECT editor_name_id FROM editor_name_cte),
+              (SELECT feature_id FROM feature_cte)
           )
           UPDATE kilocode_users
           SET microdollars_used = microdollars_used + ${coreUsageFields.cost}

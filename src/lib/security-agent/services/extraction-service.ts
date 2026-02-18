@@ -295,6 +295,7 @@ export async function extractSandboxAnalysis(options: {
             },
           },
           organizationId,
+          feature: 'security-agent',
         });
 
         const durationMs = Math.round(performance.now() - llmStart);

@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { stripRequiredPrefix } from '@/lib/utils';
 import { generateProviderSpecificHash } from '@/lib/providerHash';
 import { extractPromptInfo, type MicrodollarUsageContext } from '@/lib/processUsage';
+import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import { applyProviderSpecificLogic, getProvider, openRouterRequest } from '@/lib/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
@@ -279,12 +280,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
     botId,
+    feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user) && !customLlm) {
+  const bypassAccessCheckForCustomLlm =
+    !!customLlm && !!organizationId && customLlm.organization_ids.includes(organizationId);
+  if (!isAnonymousContext(user) && !bypassAccessCheckForCustomLlm) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
     if (
@@ -352,7 +356,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const response = customLlm
-    ? await customLlmRequest(customLlm, requestBodyParsed)
+    ? await customLlmRequest(
+        customLlm,
+        requestBodyParsed,
+        !!fraudHeaders.http_user_agent?.startsWith('Kilo-Code/')
+      )
     : await openRouterRequest({
         path,
         search: url.search,

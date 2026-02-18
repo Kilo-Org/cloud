@@ -10,6 +10,8 @@ import { CreateInstanceCard } from './CreateInstanceCard';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
 import { SettingsTab } from './SettingsTab';
+import { ChangelogCard } from './ChangelogCard';
+import { DevicePairingCard } from './DevicePairingCard';
 
 type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -74,6 +76,10 @@ export function ClawDashboard({ status }: { status: KiloClawDashboardStatus | un
           </>
         )}
       </Card>
+
+      {instanceStatus?.status === 'running' && <DevicePairingCard mutations={mutations} />}
+
+      <ChangelogCard />
     </div>
   );
 }

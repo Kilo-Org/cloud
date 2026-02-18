@@ -439,6 +439,204 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
+   * Update channel tokens (e.g. Telegram bot token).
+   * Merges incoming channels with existing ones — pass null for a token to remove it.
+   * Does NOT restart the machine; the caller should prompt the user to restart.
+   */
+  async updateChannels(patch: {
+    telegramBotToken?: EncryptedEnvelope | null;
+    discordBotToken?: EncryptedEnvelope | null;
+    slackBotToken?: EncryptedEnvelope | null;
+    slackAppToken?: EncryptedEnvelope | null;
+  }): Promise<{
+    telegram: boolean;
+    discord: boolean;
+    slackBot: boolean;
+    slackApp: boolean;
+  }> {
+    await this.loadState();
+
+    const merged = this.channels ? { ...this.channels } : {};
+
+    if (patch.telegramBotToken !== undefined) {
+      if (patch.telegramBotToken === null) {
+        delete merged.telegramBotToken;
+      } else {
+        merged.telegramBotToken = patch.telegramBotToken;
+      }
+    }
+    if (patch.discordBotToken !== undefined) {
+      if (patch.discordBotToken === null) {
+        delete merged.discordBotToken;
+      } else {
+        merged.discordBotToken = patch.discordBotToken;
+      }
+    }
+    if (patch.slackBotToken !== undefined) {
+      if (patch.slackBotToken === null) {
+        delete merged.slackBotToken;
+      } else {
+        merged.slackBotToken = patch.slackBotToken;
+      }
+    }
+    if (patch.slackAppToken !== undefined) {
+      if (patch.slackAppToken === null) {
+        delete merged.slackAppToken;
+      } else {
+        merged.slackAppToken = patch.slackAppToken;
+      }
+    }
+
+    const hasAny = Object.values(merged).some(Boolean);
+    this.channels = hasAny ? merged : null;
+    await this.ctx.storage.put({ channels: this.channels });
+
+    return {
+      telegram: !!this.channels?.telegramBotToken,
+      discord: !!this.channels?.discordBotToken,
+      slackBot: !!this.channels?.slackBotToken,
+      slackApp: !!this.channels?.slackAppToken,
+    };
+  }
+
+  /** KV cache key for pairing requests, scoped to the specific machine. */
+  private pairingCacheKey(): string | null {
+    const { flyAppName, flyMachineId } = this;
+    if (!flyAppName || !flyMachineId) return null;
+    return `pairing:${flyAppName}:${flyMachineId}`;
+  }
+
+  private static PAIRING_CACHE_TTL_SECONDS = 120;
+
+  /**
+   * List pending channel pairing requests across all configured channels.
+   * Uses the openclaw-pairing-list.js helper script on the machine.
+   * Results are cached in KV for 2 minutes. Pass forceRefresh to bypass cache.
+   * Requires the machine to be running.
+   */
+  async listPairingRequests(forceRefresh = false): Promise<{
+    requests: Array<{
+      code: string;
+      id: string;
+      channel: string;
+      meta?: unknown;
+      createdAt?: string;
+    }>;
+  }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { requests: [] };
+    }
+
+    const cacheKey = this.pairingCacheKey();
+    if (cacheKey && !forceRefresh) {
+      const cached = await this.env.KV_CLAW_CACHE.get(cacheKey, 'json');
+      if (
+        cached &&
+        typeof cached === 'object' &&
+        'requests' in cached &&
+        Array.isArray(cached.requests)
+      ) {
+        console.log(`[DO] pairing list served from KV cache (key=${cacheKey})`);
+        return { requests: cached.requests };
+      }
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'node', '/usr/local/bin/openclaw-pairing-list.js'],
+      20
+    );
+
+    const empty = {
+      requests: [] as Array<{
+        code: string;
+        id: string;
+        channel: string;
+        meta?: unknown;
+        createdAt?: string;
+      }>,
+    };
+
+    if (result.exit_code !== 0) {
+      console.error('[DO] pairing list failed:', result.stderr);
+      return empty;
+    }
+
+    let pairing = empty;
+    try {
+      const data = JSON.parse(result.stdout.trim());
+      if (Array.isArray(data.requests)) {
+        pairing = { requests: data.requests };
+      }
+    } catch {
+      console.error('[DO] pairing list parse error:', result.stdout);
+    }
+
+    if (cacheKey) {
+      await this.env.KV_CLAW_CACHE.put(cacheKey, JSON.stringify(pairing), {
+        expirationTtl: KiloClawInstance.PAIRING_CACHE_TTL_SECONDS,
+      });
+    }
+
+    return pairing;
+  }
+
+  /**
+   * Approve a pending channel pairing request via `openclaw pairing approve` on the machine.
+   * Busts the pairing KV cache on success.
+   * Requires the machine to be running.
+   */
+  async approvePairingRequest(
+    channel: string,
+    code: string
+  ): Promise<{ success: boolean; message: string }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { success: false, message: 'Instance is not running' };
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    // Validate inputs to prevent command injection — channel and code
+    // come from user input and are interpolated into a shell command.
+    if (!/^[a-z][a-z0-9_-]{0,63}$/.test(channel)) {
+      return { success: false, message: 'Invalid channel name' };
+    }
+    if (!/^[A-Za-z0-9]{1,32}$/.test(code)) {
+      return { success: false, message: 'Invalid pairing code' };
+    }
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'pairing', 'approve', channel, code, '--notify'],
+      15
+    );
+
+    const success = result.exit_code === 0;
+
+    if (success) {
+      const cacheKey = this.pairingCacheKey();
+      if (cacheKey) {
+        await this.env.KV_CLAW_CACHE.delete(cacheKey);
+      }
+    }
+
+    return {
+      success,
+      message: success ? 'Pairing approved' : result.stderr || result.stdout || 'Approval failed',
+    };
+  }
+
+  /**
    * Start the Fly Machine.
    */
   async start(userId?: string): Promise<void> {

@@ -186,6 +186,10 @@ function generateRandomRecord(
     editor_name: maybeNull(pickRandom(['vscode', 'cursor', 'windsurf', 'vim'], Math.random()), 30),
     has_tools: maybeNull(Math.random() < 0.3, 20),
     machine_id: maybeNull(`machine-${Math.random().toString(36).substring(2, 10)}`, 40),
+    feature: maybeNull(
+      pickRandom(['vscode-extension', 'cloud-agent', 'autocomplete', 'cli'], Math.random()),
+      50
+    ),
   };
 
   return { core, metadata };

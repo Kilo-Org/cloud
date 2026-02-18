@@ -1,4 +1,5 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
+import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
 import {
   type MicrodollarUsageContext,
   type PromptInfo,
@@ -625,6 +626,8 @@ export type ProxiedChatCompletionRequest = {
   userAgent: string;
   body: OpenRouterChatCompletionRequest;
   organizationId?: string;
+  /** Feature attribution value for microdollar usage tracking. */
+  feature?: FeatureValue;
 };
 
 export type ProxiedChatCompletionResult<T> =
@@ -647,6 +650,10 @@ export async function sendProxiedChatCompletion<T>(
 
   if (request.organizationId) {
     headers.set('X-KiloCode-OrganizationId', request.organizationId);
+  }
+
+  if (request.feature) {
+    headers.set(FEATURE_HEADER, request.feature);
   }
 
   const response = await fetch(`${APP_URL}/api/openrouter/chat/completions`, {

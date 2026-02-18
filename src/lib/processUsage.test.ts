@@ -336,6 +336,7 @@ describe('logMicrodollarUsage', () => {
       machine_id: null,
       user_byok: false,
       has_tools: false,
+      feature: 'vscode-extension',
     }) satisfies MicrodollarUsageContext;
 
   test('stores usage data and increments user microdollars for positive cost', async () => {

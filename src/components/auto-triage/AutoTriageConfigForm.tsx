@@ -7,7 +7,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
 import { Settings, Save } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -16,7 +15,6 @@ import { useState, useEffect } from 'react';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
-import { IS_DEVELOPMENT } from '@/lib/constants';
 import {
   RepositoryMultiSelect,
   type Repository,
@@ -358,67 +356,6 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
                 Comma-separated list of labels that must be present for auto triage to proceed
               </p>
             </div>
-
-            {/* Thresholds & Timeout — dev-only, not yet ready for end users */}
-            {IS_DEVELOPMENT && (
-              <>
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="duplicate-threshold">
-                      Duplicate Detection Threshold: {duplicateThreshold}
-                    </Label>
-                    <Input
-                      id="duplicate-threshold"
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={duplicateThreshold}
-                      onChange={e => setDuplicateThreshold(e.target.value)}
-                    />
-                    <p className="text-muted-foreground text-sm">
-                      Similarity threshold for duplicate detection (0-1, higher = more strict)
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label htmlFor="auto-fix-threshold">
-                      Auto-Fix Confidence Threshold: {autoFixThreshold}
-                    </Label>
-                    <Input
-                      id="auto-fix-threshold"
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={autoFixThreshold}
-                      onChange={e => setAutoFixThreshold(e.target.value)}
-                    />
-                    <p className="text-muted-foreground text-sm">
-                      Detect Bug or Feature Requests and apply kilo-auto-fix label (0-1, higher =
-                      more strict)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <Label>Maximum Classification Time: {maxClassificationTime[0]} minutes</Label>
-                    <Slider
-                      value={maxClassificationTime}
-                      onValueChange={setMaxClassificationTime}
-                      min={1}
-                      max={15}
-                      step={1}
-                      className="w-full"
-                    />
-                    <p className="text-muted-foreground text-sm">
-                      Timeout for issue classification (1-15 minutes)
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
 
             {/* Custom Instructions */}
             <div className="space-y-3">

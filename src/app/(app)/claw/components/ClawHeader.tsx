@@ -27,7 +27,7 @@ export function ClawHeader({
         </div>
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-foreground text-lg font-semibold tracking-tight">Kilo Claw</h1>
+            <h1 className="text-foreground text-lg font-semibold tracking-tight">KiloClaw</h1>
             {statusInfo && (
               <Badge variant="outline" className={statusInfo.className}>
                 {statusInfo.label}

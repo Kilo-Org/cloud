@@ -64,14 +64,21 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
   const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.createRig(parsed.data);
 
-  // Configure the Rig DO with its metadata so it can dispatch work to the container
-  const rigDO = getRigDOStub(c.env, rig.id);
-  await rigDO.configureRig({
-    townId: parsed.data.town_id,
-    gitUrl: parsed.data.git_url,
-    defaultBranch: parsed.data.default_branch,
-    userId: params.userId,
-  });
+  // Configure the Rig DO with its metadata so it can dispatch work to the container.
+  // If this fails, roll back the rig creation to avoid an orphaned record.
+  try {
+    const rigDO = getRigDOStub(c.env, rig.id);
+    await rigDO.configureRig({
+      townId: parsed.data.town_id,
+      gitUrl: parsed.data.git_url,
+      defaultBranch: parsed.data.default_branch,
+      userId: params.userId,
+    });
+  } catch (err) {
+    console.error(`configureRig failed for rig ${rig.id}, rolling back:`, err);
+    await townDO.deleteRig(rig.id);
+    return c.json(resError('Failed to configure rig'), 500);
+  }
 
   return c.json(resSuccess(rig), 201);
 }

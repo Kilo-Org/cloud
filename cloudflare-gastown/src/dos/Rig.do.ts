@@ -993,7 +993,7 @@ export class RigDO extends DurableObject<Env> {
   }
 
   /** Generate a branch name for an agent. */
-  private static branchForAgent(name: string, defaultBranch: string): string {
+  private static branchForAgent(name: string): string {
     // Sanitize agent name → branch-safe slug
     const slug = name
       .toLowerCase()
@@ -1049,7 +1049,7 @@ export class RigDO extends DurableObject<Env> {
           model: RigDO.modelForRole(params.role),
           systemPrompt: RigDO.systemPromptForRole(params.role, params.identity),
           gitUrl: config.gitUrl,
-          branch: RigDO.branchForAgent(params.agentName, config.defaultBranch),
+          branch: RigDO.branchForAgent(params.agentName),
           defaultBranch: config.defaultBranch,
           envVars,
         }),

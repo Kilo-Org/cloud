@@ -169,7 +169,7 @@ export async function getProvider(
 
   if (kiloFreeModel && freeModelProvider?.id === 'martian') {
     return {
-      provider: freeModelProvider,
+      provider: { ...freeModelProvider, id: 'custom', requiresResponseRewrite: false },
       userByok: null,
       customLlm: {
         public_id: kiloFreeModel.public_id,
@@ -277,7 +277,7 @@ export function applyProviderSpecificLogic(
   applyPreferredProvider(requestedModel, requestToMutate);
 
   if (isXaiModel(requestedModel)) {
-    applyXaiModelSettings(provider.id, requestToMutate, extraHeaders);
+    applyXaiModelSettings(requestToMutate, extraHeaders);
   }
 
   if (isGeminiModel(requestedModel)) {

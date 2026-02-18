@@ -357,22 +357,6 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
               </p>
             </div>
 
-            {/* Custom Instructions */}
-            <div className="space-y-3">
-              <Label htmlFor="custom-instructions">Custom Instructions (Optional)</Label>
-              <Textarea
-                id="custom-instructions"
-                placeholder="e.g., 'Always check for security vulnerabilities' or 'Focus on user-facing issues'"
-                value={customInstructions}
-                onChange={e => setCustomInstructions(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-              <p className="text-muted-foreground text-sm">
-                Add specific guidelines for your team's triage standards
-              </p>
-            </div>
-
             {/* Save Button */}
             <div className="flex justify-end pt-2">
               <Button

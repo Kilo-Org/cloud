@@ -12,6 +12,12 @@ export type ChangelogEntry = {
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-02-18',
+    description: 'Fixed an issue where pending pair requests were not displayed',
+    category: 'bugfix',
+    deployHint: null,
+  },
+  {
+    date: '2026-02-18',
     description: 'Initial support for Telegram Channel pairing',
     category: 'feature',
     deployHint: 'redeploy_suggested',

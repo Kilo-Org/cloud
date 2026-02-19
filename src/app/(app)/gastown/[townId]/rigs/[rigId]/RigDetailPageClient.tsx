@@ -162,7 +162,7 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
       {/* Mayor Chat */}
       <div className="mt-6">
         <h2 className="mb-4 text-lg font-semibold text-gray-200">Mayor Chat</h2>
-        <MayorChat townId={townId} rigId={rigId} />
+        <MayorChat townId={townId} onMayorAgentId={agentId => setSelectedAgentId(agentId)} />
       </div>
 
       <SlingDialog rigId={rigId} isOpen={isSlingOpen} onClose={() => setIsSlingOpen(false)} />

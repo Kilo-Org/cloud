@@ -29,12 +29,14 @@
       { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
       { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
       { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
+      { "name": "MAYOR", "class_name": "MayorDO" },
     ],
   },
 
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["RigDO", "GastownUserDO", "AgentIdentityDO"] },
     { "tag": "v2", "new_sqlite_classes": ["TownContainerDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["MayorDO"] },
   ],
 
   "vars": {
@@ -42,6 +44,7 @@
     "CF_ACCESS_TEAM": "engineering-e11",
     "CF_ACCESS_AUD": "f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809",
     "KILO_API_URL": "https://api.kilo.ai",
+    "GASTOWN_API_URL": "https://gastown.kiloapps.io",
   },
 
   // PRODUCTION Secrets Store (shared Kilo secrets store)
@@ -60,6 +63,7 @@
         "CF_ACCESS_TEAM": "engineering-e11",
         "CF_ACCESS_AUD": "f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809",
         "KILO_API_URL": "https://api.kilo.ai",
+        "GASTOWN_API_URL": "http://host.docker.internal:8787",
       },
       "containers": [
         {
@@ -76,6 +80,7 @@
           { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
           { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
           { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
+          { "name": "MAYOR", "class_name": "MayorDO" },
         ],
       },
       "secrets_store_secrets": [

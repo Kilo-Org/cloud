@@ -1,29 +1,60 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/Button';
 import { toast } from 'sonner';
-import { Send } from 'lucide-react';
+import { Send, Radio } from 'lucide-react';
 
 type MayorChatProps = {
   townId: string;
-  rigId: string;
 };
 
-export function MayorChat({ townId, rigId }: MayorChatProps) {
+const STATUS_LABELS: Record<string, string> = {
+  active: 'Working',
+  starting: 'Starting',
+  idle: 'Idle',
+};
+
+function SessionStatusBadge({ status }: { status: string }) {
+  const isActive = status === 'active' || status === 'starting';
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+        isActive ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-400'
+      }`}
+    >
+      <Radio className={`size-2.5 ${isActive ? 'animate-pulse' : ''}`} />
+      {STATUS_LABELS[status] ?? status}
+    </span>
+  );
+}
+
+export function MayorChat({ townId }: MayorChatProps) {
   const [message, setMessage] = useState('');
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
+  // Poll mayor status every 3s when there's an active session
+  const statusQuery = useQuery({
+    ...trpc.gastown.getMayorStatus.queryOptions({ townId }),
+    refetchInterval: query => {
+      const session = query.state.data?.session;
+      return session && (session.status === 'active' || session.status === 'starting')
+        ? 3_000
+        : false;
+    },
+  });
+
   const sendMessage = useMutation(
     trpc.gastown.sendMessage.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.listAgents.queryKey() });
+        queryClient.invalidateQueries({
+          queryKey: trpc.gastown.getMayorStatus.queryKey(),
+        });
         toast.success('Message sent to Mayor');
         setMessage('');
       },
@@ -38,14 +69,26 @@ export function MayorChat({ townId, rigId }: MayorChatProps) {
     if (!message.trim()) return;
     sendMessage.mutate({
       townId,
-      rigId,
       message: message.trim(),
     });
   };
 
+  const session = statusQuery.data?.session;
+
   return (
     <Card className="border-gray-700">
       <CardContent className="p-4">
+        {/* Status indicator */}
+        {session && (
+          <div className="mb-3 flex items-center justify-between text-sm">
+            <SessionStatusBadge status={session.status} />
+            <span className="text-xs text-gray-500">
+              Last activity: {new Date(session.lastActivityAt).toLocaleTimeString()}
+            </span>
+          </div>
+        )}
+
+        {/* Message input */}
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={message}

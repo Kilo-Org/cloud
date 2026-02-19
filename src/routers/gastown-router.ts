@@ -177,19 +177,22 @@ export const gastownRouter = createTRPCRouter({
     }),
 
   // ── Mayor Communication ─────────────────────────────────────────────────
+  // Routes messages to MayorDO (town-level persistent conversational agent).
+  // No beads are created — the mayor decides when to delegate work via tools.
 
   sendMessage: baseProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
-        rigId: z.string().uuid(),
         message: z.string().min(1),
         model: z.string().default('kilo/auto'),
+        // rigId kept for backward compat but no longer used for routing
+        rigId: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       console.log(
-        `${LOG_PREFIX} sendMessage: townId=${input.townId} rigId=${input.rigId} message="${input.message.slice(0, 80)}" model=${input.model} userId=${ctx.user.id}`
+        `${LOG_PREFIX} sendMessage: townId=${input.townId} message="${input.message.slice(0, 80)}" model=${input.model} userId=${ctx.user.id}`
       );
 
       // Verify ownership
@@ -202,47 +205,29 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
 
-      // Verify rig belongs to this town
-      const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
-      console.log(
-        `${LOG_PREFIX} sendMessage: rig verified, name=${rig.name} town_id=${rig.town_id}`
+      // Send message directly to MayorDO — single DO call, no beads
+      console.log(`${LOG_PREFIX} sendMessage: routing to MayorDO for townId=${input.townId}`);
+      const result = await withGastownError(() =>
+        gastown.sendMayorMessage(input.townId, input.message, input.model)
       );
-      if (rig.town_id !== input.townId) {
-        console.error(
-          `${LOG_PREFIX} sendMessage: BAD_REQUEST - rig.town_id=${rig.town_id} !== input.townId=${input.townId}`
-        );
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Rig does not belong to this town' });
+      console.log(
+        `${LOG_PREFIX} sendMessage: MayorDO responded agentId=${result.agentId} sessionStatus=${result.sessionStatus}`
+      );
+
+      return result;
+    }),
+
+  // ── Mayor Status ──────────────────────────────────────────────────────
+
+  getMayorStatus: baseProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Verify ownership
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
-
-      // Atomically get or create the Mayor agent in the Rig DO to avoid
-      // duplicate mayor creation from concurrent calls.
-      console.log(
-        `${LOG_PREFIX} sendMessage: calling getOrCreateAgent(rigId=${input.rigId}, role=mayor)`
-      );
-      const mayor = await withGastownError(() => gastown.getOrCreateAgent(input.rigId, 'mayor'));
-      console.log(
-        `${LOG_PREFIX} sendMessage: mayor agent id=${mayor.id} name=${mayor.name} status=${mayor.status} current_hook_bead_id=${mayor.current_hook_bead_id}`
-      );
-
-      console.log(`${LOG_PREFIX} sendMessage: creating message bead assigned to mayor ${mayor.id}`);
-      const bead = await withGastownError(() =>
-        gastown.createBead(input.rigId, {
-          type: 'message',
-          title: input.message,
-          assignee_agent_id: mayor.id,
-          metadata: { model: input.model, sent_by: ctx.user.id },
-        })
-      );
-      console.log(
-        `${LOG_PREFIX} sendMessage: bead created id=${bead.id} type=${bead.type} status=${bead.status}`
-      );
-
-      // Hook bead to mayor → arms alarm → alarm dispatches to container
-      console.log(`${LOG_PREFIX} sendMessage: hooking bead ${bead.id} to mayor ${mayor.id}`);
-      await withGastownError(() => gastown.hookBead(input.rigId, mayor.id, bead.id));
-      console.log(`${LOG_PREFIX} sendMessage: hook completed successfully`);
-
-      return { bead, agent: mayor };
+      return withGastownError(() => gastown.getMayorStatus(input.townId));
     }),
 
   // ── Agent Streams ───────────────────────────────────────────────────────

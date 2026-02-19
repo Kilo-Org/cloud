@@ -72,6 +72,8 @@ export type ManagedAgent = {
   gastownApiUrl: string | null;
   /** Agent-scoped JWT for authenticating callbacks to the Gastown worker */
   gastownSessionToken: string | null;
+  /** Override the default completion callback URL (for agents not backed by a Rig DO) */
+  completionCallbackUrl: string | null;
 };
 
 export type AgentStatusResponse = {

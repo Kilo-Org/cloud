@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { getGastownUserStub } from '../dos/GastownUser.do';
 import { getRigDOStub } from '../dos/Rig.do';
+import { getMayorDOStub } from '../dos/Mayor.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
@@ -94,6 +95,23 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
     return c.json(resError('Failed to configure rig'), 500);
   }
 
+  // Configure the MayorDO for this town (idempotent — updates config if already set).
+  // The mayor needs the rig's git config to start a container agent.
+  try {
+    const mayorDO = getMayorDOStub(c.env, parsed.data.town_id);
+    await mayorDO.configureMayor({
+      townId: parsed.data.town_id,
+      userId: params.userId,
+      kilocodeToken: parsed.data.kilocode_token,
+      gitUrl: parsed.data.git_url,
+      defaultBranch: parsed.data.default_branch,
+    });
+    console.log(`${TOWNS_LOG} handleCreateRig: MayorDO configured for town ${parsed.data.town_id}`);
+  } catch (err) {
+    // Non-fatal: the mayor can be configured later via the API
+    console.error(`${TOWNS_LOG} handleCreateRig: MayorDO configure failed (non-fatal):`, err);
+  }
+
   return c.json(resSuccess(rig), 201);
 }
 
@@ -131,6 +149,15 @@ export async function handleDeleteTown(
     } catch (err) {
       console.error(`${TOWNS_LOG} handleDeleteTown: failed to destroy Rig DO ${rig.id}:`, err);
     }
+  }
+
+  // Destroy the MayorDO for this town (stops session, clears state)
+  try {
+    const mayorDO = getMayorDOStub(c.env, params.townId);
+    await mayorDO.destroy();
+    console.log(`${TOWNS_LOG} handleDeleteTown: MayorDO destroyed for town ${params.townId}`);
+  } catch (err) {
+    console.error(`${TOWNS_LOG} handleDeleteTown: failed to destroy MayorDO:`, err);
   }
 
   const deleted = await townDO.deleteTown(params.townId);

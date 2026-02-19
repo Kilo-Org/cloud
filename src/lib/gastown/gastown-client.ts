@@ -325,3 +325,61 @@ export async function getStreamTicket(townId: string, agentId: string): Promise<
   );
   return parseSuccessData(body, StreamTicketSchema);
 }
+
+// ── Mayor operations (via MayorDO) ────────────────────────────────────────
+
+const MayorSendResultSchema = z.object({
+  agentId: z.string(),
+  sessionStatus: z.enum(['idle', 'active', 'starting']),
+});
+export type MayorSendResult = z.output<typeof MayorSendResultSchema>;
+
+const MayorStatusSchema = z.object({
+  configured: z.boolean(),
+  session: z
+    .object({
+      agentId: z.string(),
+      sessionId: z.string(),
+      status: z.enum(['idle', 'active', 'starting']),
+      lastActivityAt: z.string(),
+    })
+    .nullable(),
+  townId: z.string().nullable(),
+});
+export type MayorStatus = z.output<typeof MayorStatusSchema>;
+
+export async function configureMayor(
+  townId: string,
+  config: {
+    userId: string;
+    kilocodeToken?: string;
+    gitUrl: string;
+    defaultBranch: string;
+  }
+): Promise<void> {
+  await gastownFetch(`/api/towns/${townId}/mayor/configure`, {
+    method: 'POST',
+    body: JSON.stringify({ ...config, townId }),
+  });
+}
+
+export async function sendMayorMessage(
+  townId: string,
+  message: string,
+  model?: string
+): Promise<MayorSendResult> {
+  const body = await gastownFetch(`/api/towns/${townId}/mayor/message`, {
+    method: 'POST',
+    body: JSON.stringify({ message, model }),
+  });
+  return parseSuccessData(body, MayorSendResultSchema);
+}
+
+export async function getMayorStatus(townId: string): Promise<MayorStatus> {
+  const body = await gastownFetch(`/api/towns/${townId}/mayor/status`);
+  return parseSuccessData(body, MayorStatusSchema);
+}
+
+export async function destroyMayor(townId: string): Promise<void> {
+  await gastownFetch(`/api/towns/${townId}/mayor/destroy`, { method: 'POST' });
+}

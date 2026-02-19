@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage } from '@/db/schema';
+import { microdollar_usage, microdollar_usage_metadata, feature } from '@/db/schema';
 import { eq, sql, desc, isNull, and } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
   const selectFields = {
     date: sql<string>`DATE(${microdollar_usage.created_at})`,
     ...(groupByModel && { model: microdollar_usage.model }),
+    feature: sql<string>`${feature.feature}`.as('feature'),
     total_cost: sql<number>`SUM(${microdollar_usage.cost})::float`,
     request_count: sql<number>`COUNT(*)::float`,
     total_input_tokens: sql<number>`SUM(${microdollar_usage.input_tokens})::float`,
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
   const groupByClause = [
     sql`DATE(${microdollar_usage.created_at})`,
     ...(groupByModel ? [microdollar_usage.model] : []),
+    feature.feature,
   ];
   const orderByClause = [
     desc(sql`DATE(${microdollar_usage.created_at})`),
@@ -63,6 +65,8 @@ export async function GET(request: NextRequest) {
   const usage = await db
     .select(selectFields)
     .from(microdollar_usage)
+    .leftJoin(microdollar_usage_metadata, eq(microdollar_usage.id, microdollar_usage_metadata.id))
+    .leftJoin(feature, eq(microdollar_usage_metadata.feature_id, feature.feature_id))
     .where(whereClause)
     .groupBy(...groupByClause)
     .orderBy(...orderByClause);

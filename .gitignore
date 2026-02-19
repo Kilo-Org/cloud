@@ -80,3 +80,6 @@ run-milvus-test.sh
 # Cloudflare
 .wrangler/
 .env*.local
+
+# Kilo Telemetry
+telemetry-id

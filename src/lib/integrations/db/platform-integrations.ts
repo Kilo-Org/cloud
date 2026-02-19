@@ -526,6 +526,26 @@ export async function unsuspendIntegrationForOwner(owner: Owner, platform: strin
 }
 
 /**
+ * Finds an active GitHub integration by account login (username or org name)
+ * Uses case-insensitive comparison since GitHub usernames/org names are case-insensitive
+ */
+export async function findGitHubIntegrationByAccountLogin(accountLogin: string) {
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        sql`LOWER(${platform_integrations.platform_account_login}) = LOWER(${accountLogin})`,
+        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
+      )
+    )
+    .limit(1);
+
+  return integration || null;
+}
+
+/**
  * Owner-aware upsert for platform integrations
  * Supports both user and organization ownership
  * Uses atomic INSERT ... ON CONFLICT DO UPDATE to prevent race conditions

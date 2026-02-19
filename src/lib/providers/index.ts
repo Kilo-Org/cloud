@@ -183,6 +183,10 @@ export async function getProvider(
         organization_ids: [],
         base_url: freeModelProvider.apiUrl,
         api_key: freeModelProvider.apiKey,
+        reasoning_effort: null,
+        included_tools: null,
+        excluded_tools: null,
+        supports_image_input: kiloFreeModel.flags.includes('vision'),
       },
     };
   }

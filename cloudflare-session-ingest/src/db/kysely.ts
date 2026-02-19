@@ -21,6 +21,8 @@ export type CliSessionsV2Table = {
   title: Generated<string | null>;
   created_on_platform: Generated<string | null>;
   organization_id: Generated<string | null>;
+  git_url: Generated<string | null>;
+  git_branch: Generated<string | null>;
   created_at: Generated<string>;
   updated_at: Generated<string>;
 };

@@ -19,8 +19,9 @@ import { z } from 'zod';
 import { getTriageTicketById } from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
-import { captureException } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { Owner } from '@/lib/auto-triage/db/types';
 import { AutoTriageAgentConfigSchema } from '@/lib/auto-triage/core/schemas';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
@@ -95,17 +96,33 @@ export async function POST(req: NextRequest) {
     }
 
     // Build owner object
-    const owner: Owner = ticket.owned_by_organization_id
-      ? {
-          type: 'org',
-          id: ticket.owned_by_organization_id,
-          userId: ticket.owned_by_organization_id,
-        }
-      : {
-          type: 'user',
-          id: ticket.owned_by_user_id || '',
-          userId: ticket.owned_by_user_id || '',
-        };
+    let owner: Owner;
+    if (ticket.owned_by_organization_id) {
+      const botUserId = await getBotUserId(ticket.owned_by_organization_id, 'auto-triage');
+      if (!botUserId) {
+        errorExceptInTest('[classify-config] Bot user not found for organization', {
+          organizationId: ticket.owned_by_organization_id,
+          ticketId,
+        });
+        captureMessage('Bot user missing for organization auto triage', {
+          level: 'error',
+          tags: { source: 'classify-config' },
+          extra: { organizationId: ticket.owned_by_organization_id, ticketId },
+        });
+        return NextResponse.json({ error: 'Bot user not found for organization' }, { status: 500 });
+      }
+      owner = {
+        type: 'org',
+        id: ticket.owned_by_organization_id,
+        userId: botUserId,
+      };
+    } else {
+      owner = {
+        type: 'user',
+        id: ticket.owned_by_user_id || '',
+        userId: ticket.owned_by_user_id || '',
+      };
+    }
 
     // Get agent config
     const agentConfig = await getAgentConfigForOwner(owner, 'auto_triage', 'github');

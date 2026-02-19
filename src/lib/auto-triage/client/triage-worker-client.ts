@@ -34,11 +34,11 @@ async function fetchWithTimeout(
 }
 
 // Types for API responses
-export interface DispatchTriageResponse {
+export type DispatchTriageResponse = {
   success: boolean;
   ticketId: string;
   status: string;
-}
+};
 
 /**
  * Auto Triage Worker API Client
@@ -90,5 +90,10 @@ class TriageWorkerClient {
   }
 }
 
-// Export a singleton instance
-export const triageWorkerClient = new TriageWorkerClient();
+let _instance: TriageWorkerClient | null = null;
+export function getTriageWorkerClient(): TriageWorkerClient {
+  if (!_instance) {
+    _instance = new TriageWorkerClient();
+  }
+  return _instance;
+}

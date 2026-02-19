@@ -59,8 +59,9 @@ export class SSEStreamProcessor {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let streamError: Error | null = null;
+    let accumulatedTextLength = 0;
 
-    // Initialize metrics
     const metrics: StreamMetrics = {
       totalEvents: 0,
       errorEvents: 0,
@@ -122,11 +123,13 @@ export class SSEStreamProcessor {
 
                 if (handlers.onTextContent) {
                   if (typeof event.payload.content === 'string') {
+                    accumulatedTextLength += event.payload.content.length;
                     handlers.onTextContent(event.payload.content);
                   } else if (
                     event.payload.type === 'text' &&
                     typeof event.payload.text === 'string'
                   ) {
+                    accumulatedTextLength += event.payload.text.length;
                     handlers.onTextContent(event.payload.text);
                   }
                 }
@@ -137,6 +140,7 @@ export class SSEStreamProcessor {
                 event.streamEventType === 'output' &&
                 event.content
               ) {
+                accumulatedTextLength += String(event.content).length;
                 handlers.onTextContent(event.content);
               }
 
@@ -151,26 +155,23 @@ export class SSEStreamProcessor {
                 break;
               }
 
-              // Handle error event
               if (event.streamEventType === 'error') {
                 metrics.errorEvents++;
-                const error = new Error(`Stream error: ${event.message || 'Unknown error'}`);
+                streamError = new Error(`Stream error: ${event.message || 'Unknown error'}`);
 
-                // Log the error event details for debugging
-                console.warn('[SSEStreamProcessor] Error event received', {
+                console.warn('[SSEStreamProcessor] Error event received, stopping stream', {
                   message: event.message,
                   errorDetails: event.error,
                   eventNumber: metrics.totalEvents,
                   totalErrorEvents: metrics.errorEvents,
+                  accumulatedTextLength,
                 });
 
                 if (handlers.onError) {
-                  handlers.onError(error);
+                  handlers.onError(streamError);
                 }
 
-                // Don't throw - error events are informational
-                // The stream should continue processing unless explicitly terminated
-                continue;
+                break;
               }
             } catch (parseError) {
               metrics.parseErrors++;
@@ -188,6 +189,21 @@ export class SSEStreamProcessor {
             }
           }
         }
+
+        if (streamError) {
+          break;
+        }
+      }
+
+      const MIN_USABLE_TEXT_LENGTH = 50;
+      if (streamError && accumulatedTextLength < MIN_USABLE_TEXT_LENGTH) {
+        throw streamError;
+      }
+      if (streamError) {
+        console.warn('[SSEStreamProcessor] Stream error occurred but sufficient text accumulated', {
+          accumulatedTextLength,
+          error: streamError.message,
+        });
       }
     } finally {
       reader.releaseLock();

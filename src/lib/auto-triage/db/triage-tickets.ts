@@ -7,7 +7,7 @@
 
 import { db } from '@/lib/drizzle';
 import { auto_triage_tickets } from '@/db/schema';
-import { eq, and, desc, count, or } from 'drizzle-orm';
+import { eq, and, desc, count, or, notInArray } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { AUTO_TRIAGE_CONSTANTS } from '../core/constants';
 import type {
@@ -161,21 +161,21 @@ export async function getTriageTicketByRepoAndIssue(
 }
 
 /**
- * Updates triage ticket status and optional fields
- * Can update session_id, classification, confidence, and other fields
+ * Updates triage ticket status and optional fields atomically.
+ * The WHERE clause guards against overwriting terminal states ('actioned', 'failed').
+ * Returns the number of rows updated (0 means the ticket was already terminal or doesn't exist).
  */
 export async function updateTriageTicketStatus(
   ticketId: string,
   status: TriageStatus,
   updates: UpdateTicketParams = {}
-): Promise<void> {
+): Promise<number> {
   try {
     const updateData: Partial<typeof auto_triage_tickets.$inferInsert> = {
       status,
       updated_at: new Date().toISOString(),
     };
 
-    // Add optional updates
     if (updates.sessionId !== undefined) {
       updateData.session_id = updates.sessionId;
     }
@@ -218,8 +218,10 @@ export async function updateTriageTicketStatus(
     if (updates.completedAt !== undefined) {
       updateData.completed_at = updates.completedAt.toISOString();
     }
+    if (updates.shouldAutoFix !== undefined) {
+      updateData.should_auto_fix = updates.shouldAutoFix;
+    }
 
-    // Auto-set timestamps based on status
     if (status === 'analyzing' && !updates.startedAt) {
       updateData.started_at = new Date().toISOString();
     }
@@ -230,10 +232,18 @@ export async function updateTriageTicketStatus(
       updateData.completed_at = new Date().toISOString();
     }
 
-    await db
+    const result = await db
       .update(auto_triage_tickets)
       .set(updateData)
-      .where(eq(auto_triage_tickets.id, ticketId));
+      .where(
+        and(
+          eq(auto_triage_tickets.id, ticketId),
+          notInArray(auto_triage_tickets.status, ['actioned', 'failed'])
+        )
+      )
+      .returning({ id: auto_triage_tickets.id });
+
+    return result.length;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateTriageTicketStatus' },

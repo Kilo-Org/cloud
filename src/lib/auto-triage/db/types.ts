@@ -76,6 +76,7 @@ export type UpdateTicketParams = {
   errorMessage?: string;
   startedAt?: Date;
   completedAt?: Date;
+  shouldAutoFix?: boolean;
 };
 
 /**

@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@/db/schema';
 import { logExceptInTest } from '@/lib/utils.server';
-import { createTriageTicket, findExistingTicket } from '@/lib/auto-triage/db/triage-tickets';
+import {
+  createTriageTicket,
+  findExistingTicket,
+  resetTriageTicketForRetry,
+} from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/auto-triage/core';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
@@ -97,6 +101,18 @@ export class IssueWebhookProcessor {
       // 5. Check for duplicate ticket
       const existingTicket = await findExistingTicket(repository.full_name, issue.number);
       if (existingTicket) {
+        const terminalStates: ReadonlyArray<string> = ['actioned', 'failed', 'skipped'];
+        const isTerminal = terminalStates.includes(existingTicket.status);
+
+        if (payload.action === 'reopened' && isTerminal) {
+          logExceptInTest(
+            `Reopened issue with terminal ticket (${existingTicket.status}), re-triaging ${repository.full_name}#${issue.number}`
+          );
+          await resetTriageTicketForRetry(existingTicket.id);
+          await this.tryDispatch(owner, existingTicket.id, repository.full_name, issue.number);
+          return this.acceptedResponse(existingTicket.id);
+        }
+
         logExceptInTest(
           `Duplicate triage ticket detected for ${repository.full_name}#${issue.number}`
         );

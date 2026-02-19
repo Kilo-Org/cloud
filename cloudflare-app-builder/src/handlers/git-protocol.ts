@@ -6,6 +6,7 @@
 
 import { GitCloneService } from '../git/git-clone-service';
 import { GitReceivePackService } from '../git/git-receive-pack-service';
+import { formatPacketLine } from '../git/git-protocol-utils';
 import { MAX_OBJECT_SIZE } from '../git/constants';
 import { logger, formatError } from '../utils/logger';
 import { verifyGitAuth } from '../utils/auth';
@@ -152,15 +153,6 @@ async function handleInfoRefs(
     logger.error('Git info/refs error', formatError(error));
     return new Response('Internal server error', { status: 500 });
   }
-}
-
-/**
- * Format git packet line (4-byte hex length + data)
- */
-function formatPacketLine(data: string): string {
-  const length = data.length + 4;
-  const hexLength = length.toString(16).padStart(4, '0');
-  return hexLength + data;
 }
 
 /**

@@ -30,7 +30,7 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
   const createRig = useMutation(
     trpc.gastown.createRig.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.listRigs.queryKey() });
+        void queryClient.invalidateQueries({ queryKey: trpc.gastown.listRigs.queryKey() });
         toast.success('Rig created');
         setName('');
         setGitUrl('');
@@ -56,35 +56,38 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
         <DialogHeader>
           <DialogTitle>Create Rig</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-300">Rig Name</label>
+              <label className="mb-2 block text-sm font-medium text-white/70">Rig Name</label>
               <Input
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="my-project"
                 autoFocus
+                className="border-white/10 bg-black/25"
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-300">Git URL</label>
+              <label className="mb-2 block text-sm font-medium text-white/70">Git URL</label>
               <Input
                 value={gitUrl}
                 onChange={e => setGitUrl(e.target.value)}
                 placeholder="https://github.com/org/repo.git"
+                className="border-white/10 bg-black/25"
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-300">Default Branch</label>
+              <label className="mb-2 block text-sm font-medium text-white/70">Default Branch</label>
               <Input
                 value={defaultBranch}
                 onChange={e => setDefaultBranch(e.target.value)}
                 placeholder="main"
+                className="border-white/10 bg-black/25"
               />
             </div>
           </div>
@@ -97,6 +100,7 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
               size="md"
               type="submit"
               disabled={!name.trim() || !gitUrl.trim() || createRig.isPending}
+              className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
             >
               {createRig.isPending ? 'Creating...' : 'Create'}
             </Button>

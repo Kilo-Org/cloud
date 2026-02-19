@@ -232,13 +232,13 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
   }, [entries]);
 
   return (
-    <Card className="border-gray-700">
+    <Card className="border-white/10 bg-white/[0.02]">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <div className="flex items-center gap-2">
           <CardTitle className="text-sm">Agent Stream</CardTitle>
           <div className="flex items-center gap-1">
-            <Radio className={`size-3 ${connected ? 'text-green-400' : 'text-gray-500'}`} />
-            <span className="text-xs text-gray-500">{status}</span>
+            <Radio className={`size-3 ${connected ? 'text-emerald-300' : 'text-white/35'}`} />
+            <span className="text-xs text-white/45">{status}</span>
           </div>
         </div>
         <Button variant="secondary" size="icon" onClick={onClose}>
@@ -248,9 +248,9 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
       <CardContent>
         <div
           ref={scrollRef}
-          className="h-80 overflow-y-auto rounded-md bg-gray-900 p-3 text-sm leading-relaxed"
+          className="h-80 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-3 text-sm leading-relaxed"
         >
-          {entries.length === 0 && <p className="text-xs text-gray-600">Waiting for events...</p>}
+          {entries.length === 0 && <p className="text-xs text-white/35">Waiting for events...</p>}
           {entries.map(entry => (
             <EntryLine key={entry.id} entry={entry} />
           ))}
@@ -268,7 +268,7 @@ function EntryLine({ entry }: { entry: StreamEntry }) {
           {entry.meta === 'thinking' && (
             <span className="text-xs text-purple-400 italic">thinking: </span>
           )}
-          <span className="whitespace-pre-wrap text-gray-200">{entry.content}</span>
+          <span className="whitespace-pre-wrap text-white/85">{entry.content}</span>
         </div>
       );
 
@@ -278,12 +278,12 @@ function EntryLine({ entry }: { entry: StreamEntry }) {
           <span className="rounded bg-blue-900/50 px-1.5 py-0.5 text-blue-300">
             {entry.content}
           </span>
-          <span className="text-gray-500">{entry.meta}</span>
+          <span className="text-white/45">{entry.meta}</span>
         </div>
       );
 
     case 'status':
-      return <div className="my-2 text-center text-xs text-gray-600">— {entry.content} —</div>;
+      return <div className="my-2 text-center text-xs text-white/35">— {entry.content} —</div>;
 
     case 'error':
       return <div className="mb-1 text-xs text-red-400">Error: {entry.content}</div>;

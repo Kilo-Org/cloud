@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { type DbSessionDetails, type IndexedDbSessionData } from '../store/db-session-atoms';
-import { extractRepoFromGitUrl } from '../utils/git-utils';
 import type { ResumeConfig, StreamResumeConfig } from '../types';
 
 // Re-export StreamResumeConfig for backwards compatibility
@@ -20,14 +19,14 @@ export function buildStreamResumeConfig(params: {
   const { resumeConfig, pendingResumeSession, currentIndexedDbSession } = params;
 
   // Local state takes priority (just configured in modal)
-  if (resumeConfig && pendingResumeSession) {
-    const repository = extractRepoFromGitUrl(pendingResumeSession.git_url) || '';
+  if (resumeConfig) {
     return {
       mode: resumeConfig.mode,
       model: resumeConfig.model,
       envVars: resumeConfig.envVars,
       setupCommands: resumeConfig.setupCommands,
-      githubRepo: repository,
+      githubRepo: resumeConfig.githubRepo,
+      upstreamBranch: resumeConfig.branch,
     };
   }
 
@@ -38,7 +37,9 @@ export function buildStreamResumeConfig(params: {
       model: currentIndexedDbSession.resumeConfig.model,
       envVars: currentIndexedDbSession.resumeConfig.envVars,
       setupCommands: currentIndexedDbSession.resumeConfig.setupCommands,
-      githubRepo: currentIndexedDbSession.repository,
+      githubRepo:
+        currentIndexedDbSession.resumeConfig.githubRepo || currentIndexedDbSession.repository,
+      upstreamBranch: currentIndexedDbSession.resumeConfig.branch,
     };
   }
 
@@ -97,8 +98,6 @@ type UseResumeConfigModalReturn = {
   showResumeModal: boolean;
   /** The session being configured (null if modal closed) */
   pendingResumeSession: DbSessionDetails | null;
-  /** Git state for the pending session */
-  pendingGitState: { branch?: string } | null;
   /** Config for useCloudAgentStream (from modal or IndexedDB) */
   streamResumeConfig: StreamResumeConfig | null;
   /** The confirmed config from modal (for needsResumeConfig check) */
@@ -140,9 +139,6 @@ export function useResumeConfigModal({
   // Track if user has explicitly re-opened the modal (from "Configure now" banner)
   const [forceShowModal, setForceShowModal] = useState(false);
 
-  // Pending git state for the modal (not currently used but kept for API compatibility)
-  const [pendingGitState, setPendingGitState] = useState<{ branch?: string } | null>(null);
-
   // Confirmed config from modal
   const [resumeConfig, setResumeConfig] = useState<ResumeConfig | null>(null);
 
@@ -158,7 +154,6 @@ export function useResumeConfigModal({
       setDismissedSessionId(null);
       setForceShowModal(false);
       setResumeConfig(null);
-      setPendingGitState(null);
     }
 
     prevDbSessionIdRef.current = currentDbSessionId;
@@ -222,7 +217,6 @@ export function useResumeConfigModal({
   return {
     showResumeModal,
     pendingResumeSession,
-    pendingGitState,
     streamResumeConfig,
     resumeConfig,
     reopenResumeModal,

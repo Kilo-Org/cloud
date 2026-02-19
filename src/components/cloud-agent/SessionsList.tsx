@@ -8,18 +8,14 @@ import Link from 'next/link';
 
 export type SessionsListItem = Pick<
   StoredSession,
-  'sessionId' | 'createdAt' | 'createdOnPlatform' | 'prompt' | 'repository' | 'mode'
->;
+  'sessionId' | 'createdAt' | 'createdOnPlatform' | 'prompt' | 'mode'
+> & { repository: string | null };
 
 export type SessionsListProps = {
   sessions: SessionsListItem[];
   organizationId?: string;
   onSessionClick?: (session: SessionsListItem) => void;
 };
-
-function truncateId(id: string, length: number = 8): string {
-  return id.length > length ? `${id.slice(0, length)}...` : id;
-}
 
 export function SessionsList({ sessions, organizationId, onSessionClick }: SessionsListProps) {
   if (sessions.length === 0) {
@@ -43,7 +39,8 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
     <div className="space-y-3">
       {sessions.map(session => {
         const chatUrl = `${basePath}/chat?sessionId=${session.sessionId}`;
-        const timeAgo = formatDistanceToNow(new Date(session.createdAt), { addSuffix: true });
+        const createdDate = new Date(session.createdAt);
+        const timeAgo = formatDistanceToNow(createdDate, { addSuffix: true });
 
         // Determine badge based on created_on_platform field
         const platform = session.createdOnPlatform;
@@ -99,20 +96,22 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
                     </CardTitle>
                     {badge}
                   </div>
-                  <CardDescription className="mt-1 flex items-center gap-2">
-                    <GitBranch className="h-3 w-3" />
-                    <span className="truncate">{session.repository}</span>
-                  </CardDescription>
+                  {session.repository && (
+                    <CardDescription className="mt-1 flex items-center gap-2">
+                      <GitBranch className="h-3 w-3" />
+                      <span className="truncate">{session.repository}</span>
+                    </CardDescription>
+                  )}
                 </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1" title={createdDate.toLocaleString()}>
                   <Clock className="h-3 w-3" />
                   <span>{timeAgo}</span>
                 </div>
-                <div className="font-mono">ID: {truncateId(session.sessionId)}</div>
+                <div className="truncate font-mono">ID: {session.sessionId}</div>
                 {session.mode && (
                   <div>
                     Mode: <span className="font-medium">{session.mode}</span>

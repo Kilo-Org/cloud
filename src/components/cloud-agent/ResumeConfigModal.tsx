@@ -109,7 +109,7 @@ export function ResumeConfigModal({
 
   // Parse repository from git URL
   const repository = useMemo(
-    () => extractRepoFromGitUrl(session.git_url) || 'Unknown repository',
+    () => extractRepoFromGitUrl(session.git_url) ?? null,
     [session.git_url]
   );
 
@@ -153,10 +153,12 @@ export function ResumeConfigModal({
           {/* Read-only session info */}
           <div className="rounded-md border border-gray-700 bg-gray-800/50 p-3">
             <div className="space-y-2 text-sm">
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-muted-foreground">Repository:</span>
-                <span className="text-right font-medium">{repository}</span>
-              </div>
+              {repository && (
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-muted-foreground">Repository:</span>
+                  <span className="text-right font-medium">{repository}</span>
+                </div>
+              )}
               <div className="flex items-start justify-between gap-2">
                 <span className="text-muted-foreground flex items-center gap-1">
                   <GitBranch className="h-3 w-3" />

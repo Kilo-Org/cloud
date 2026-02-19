@@ -80,3 +80,4 @@ run-milvus-test.sh
 # Cloudflare
 .wrangler/
 .env*.local
+/.superset

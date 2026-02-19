@@ -23,6 +23,7 @@ import type { AgentMode, SessionConfig, StoredSession, StoredMessage } from './t
 import { isMessageStreaming } from './types';
 import type { DbSessionDetails, IndexedDbSessionData } from './store/db-session-atoms';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
+import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 
 // V2: No conversion needed - StoredMessage format is used directly by MessageBubble
@@ -114,7 +115,12 @@ export type CloudChatPresentationProps = {
   showResumeModal: boolean;
   pendingSessionForOrgContext: IndexedDbSessionData | null;
   pendingResumeSession: DbSessionDetails | null;
-  pendingGitState: { branch?: string } | null;
+  /** Available repositories for resume config modal */
+  repositories: RepositoryOption[];
+  /** Whether repositories are loading */
+  isLoadingRepos: boolean;
+  /** Default repo for resume config modal */
+  defaultResumeRepo?: string;
 
   // Config state
   needsResumeConfig: boolean;
@@ -199,7 +205,9 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
   showResumeModal,
   pendingSessionForOrgContext,
   pendingResumeSession,
-  pendingGitState,
+  repositories,
+  isLoadingRepos,
+  defaultResumeRepo,
   needsResumeConfig,
   resumeConfigPersisting,
   resumeConfigFailed,
@@ -257,12 +265,10 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
           isOpen={showResumeModal}
           onClose={onResumeClose}
           onConfirm={onResumeConfirm}
-          session={{
-            session_id: pendingResumeSession.session_id,
-            git_url: pendingResumeSession.git_url ?? null,
-            title: pendingResumeSession.title,
-          }}
-          gitState={pendingGitState}
+          repositories={repositories}
+          isLoadingRepos={isLoadingRepos}
+          defaultRepo={defaultResumeRepo}
+          sessionTitle={pendingResumeSession.title}
           modelOptions={modelOptions}
           isLoadingModels={isLoadingModels}
           defaultMode={

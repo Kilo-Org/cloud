@@ -154,10 +154,6 @@ describe('buildStreamResumeConfig', () => {
   });
 
   it('prioritizes local resumeConfig over IndexedDB stored config', () => {
-    const dbSession = createDbSession({
-      git_url: 'https://github.com/local/repo',
-    });
-
     const indexedDbSession = createIndexedDbSession({
       repository: 'indexed/db-repo',
       resumeConfig: {
@@ -170,9 +166,11 @@ describe('buildStreamResumeConfig', () => {
       resumeConfig: {
         mode: 'build',
         model: 'local-model',
+        githubRepo: 'local/repo',
+        branch: 'feature-branch',
         envVars: { API_KEY: 'secret' },
       },
-      pendingResumeSession: dbSession,
+      pendingResumeSession: null,
       currentIndexedDbSession: indexedDbSession,
     });
 
@@ -182,6 +180,7 @@ describe('buildStreamResumeConfig', () => {
       envVars: { API_KEY: 'secret' },
       setupCommands: undefined,
       githubRepo: 'local/repo',
+      upstreamBranch: 'feature-branch',
     });
   });
 
@@ -193,6 +192,7 @@ describe('buildStreamResumeConfig', () => {
         model: 'stored-model',
         envVars: { DB_KEY: 'value' },
         setupCommands: ['npm install'],
+        branch: 'develop',
       },
     });
 
@@ -208,6 +208,7 @@ describe('buildStreamResumeConfig', () => {
       envVars: { DB_KEY: 'value' },
       setupCommands: ['npm install'],
       githubRepo: 'indexed/db-repo',
+      upstreamBranch: 'develop',
     });
   });
 });

@@ -18,6 +18,7 @@ describe('needsResumeConfiguration', () => {
     const resumeConfig: ResumeConfig = {
       mode: 'build',
       model: 'anthropic/claude-3-5-sonnet',
+      githubRepo: 'owner/repo',
     };
 
     expect(
@@ -134,6 +135,7 @@ describe('needsResumeConfiguration', () => {
     const resumeConfig: ResumeConfig = {
       mode: 'build',
       model: 'anthropic/claude-3-5-sonnet',
+      githubRepo: 'owner/repo',
     };
 
     const invalidConfig: SessionConfig = {

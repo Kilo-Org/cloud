@@ -53,6 +53,8 @@ export type OrgContext = {
 export type StoredResumeConfig = {
   mode: string;
   model: string;
+  githubRepo?: string;
+  branch?: string;
   envVars?: Record<string, string>;
   setupCommands?: string[];
 };

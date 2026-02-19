@@ -54,15 +54,22 @@ function toStreamEntry(
 
       if (partType === 'tool') {
         const toolName = (part.tool ?? part.name ?? 'unknown') as string;
-        const state = (part.state ?? '') as string;
+        // part.state can be a string enum OR an object like {status, input, raw}
+        const rawState = part.state;
+        const stateStr =
+          typeof rawState === 'string'
+            ? rawState
+            : typeof rawState === 'object' && rawState !== null && 'status' in rawState
+              ? String((rawState as Record<string, unknown>).status)
+              : '';
         const stateLabel =
-          state === 'running'
+          stateStr === 'running'
             ? 'running...'
-            : state === 'completed'
+            : stateStr === 'completed'
               ? 'done'
-              : state === 'error'
+              : stateStr === 'error'
                 ? 'failed'
-                : state || 'pending';
+                : stateStr || 'pending';
         return {
           id: nextId(),
           kind: 'tool',

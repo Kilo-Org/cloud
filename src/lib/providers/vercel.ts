@@ -1,5 +1,6 @@
 import type { BYOKResult } from '@/lib/byok';
 import { isAnthropicModel, isOpusModel } from '@/lib/providers/anthropic';
+import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import { minimax_m21_free_model, minimax_m25_free_model } from '@/lib/providers/minimax';
 import {
   AutocompleteUserByokProviderIdSchema,
@@ -15,8 +16,6 @@ import type {
 } from '@/lib/providers/openrouter/types';
 import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
-
-const VERCEL_ROUTING_PERCENTAGE = 10;
 
 const VERCEL_ROUTING_ALLOW_LIST = [
   'arcee-ai/trinity-large-preview:free',
@@ -35,8 +34,22 @@ const VERCEL_ROUTING_ALLOW_LIST = [
   'z-ai/glm-5',
 ];
 
+const ERROR_RATE_THRESHOLD = 0.5;
+
 function getRandomNumberLessThan100(randomSeed: string) {
   return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
+}
+
+async function getVercelRoutingPercentage() {
+  const errorRate = await getGatewayErrorRate();
+  const isOpenRouterErrorRateHigh =
+    errorRate.openrouter > ERROR_RATE_THRESHOLD && errorRate.vercel < ERROR_RATE_THRESHOLD;
+  if (isOpenRouterErrorRateHigh) {
+    console.error(
+      `[getVercelRoutingPercentage] OpenRouter error rate is high: ${errorRate.openrouter}`
+    );
+  }
+  return isOpenRouterErrorRateHigh ? 90 : 10;
 }
 
 export async function shouldRouteToVercel(
@@ -57,7 +70,10 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  return getRandomNumberLessThan100('vercel_routing_' + randomSeed) < VERCEL_ROUTING_PERCENTAGE;
+  return (
+    getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
+    (await getVercelRoutingPercentage())
+  );
 }
 
 function convertProviderOptions(

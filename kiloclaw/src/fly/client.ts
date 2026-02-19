@@ -228,10 +228,10 @@ const CAPACITY_MARKERS = ['insufficient resources'];
  * issue (host where a volume is pinned has no room for a machine).
  *
  * Fly overloads 412 for both capacity issues AND precondition/version mismatches
- * (e.g. min_secrets_version, machine_version). We only want to trigger
- * destructive recovery (volume replacement) for genuine capacity problems.
+ * (e.g. min_secrets_version, machine_version). We only trigger volume
+ * replacement recovery for genuine capacity problems — version/precondition
+ * 412s should surface to the caller as-is.
  *
- * Returns false for version/precondition 412s to avoid accidental data loss.
  * Logs a warning for unclassified 412s so we can tune matching.
  */
 export function isFlyInsufficientResources(err: unknown): boolean {

@@ -617,6 +617,125 @@ describe('RigDO', () => {
     });
   });
 
+  // ── Bead Events ──────────────────────────────────────────────────────────
+
+  describe('bead events', () => {
+    it('should write events on createBead', async () => {
+      const bead = await rig.createBead({ type: 'issue', title: 'Event test' });
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      expect(events).toHaveLength(1);
+      expect(events[0].event_type).toBe('created');
+      expect(events[0].bead_id).toBe(bead.id);
+      expect(events[0].metadata).toMatchObject({ title: 'Event test' });
+    });
+
+    it('should write events on hookBead', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-hook-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Hook event test' });
+      await rig.hookBead(agent.id, bead.id);
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      // created + hooked
+      expect(events).toHaveLength(2);
+      expect(events[0].event_type).toBe('created');
+      expect(events[1].event_type).toBe('hooked');
+      expect(events[1].agent_id).toBe(agent.id);
+      expect(events[1].new_value).toBe(agent.id);
+    });
+
+    it('should write events on unhookBead', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-unhook-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Unhook event test' });
+      await rig.hookBead(agent.id, bead.id);
+      await rig.unhookBead(agent.id);
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      // created + hooked + unhooked
+      expect(events).toHaveLength(3);
+      expect(events[2].event_type).toBe('unhooked');
+    });
+
+    it('should write events on updateBeadStatus', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-status-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Status event test' });
+      await rig.updateBeadStatus(bead.id, 'in_progress', agent.id);
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      // created + status_changed
+      expect(events).toHaveLength(2);
+      expect(events[1].event_type).toBe('status_changed');
+      expect(events[1].old_value).toBe('open');
+      expect(events[1].new_value).toBe('in_progress');
+    });
+
+    it('should write closed event on closeBead', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-close-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Close event test' });
+      await rig.closeBead(bead.id, agent.id);
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      // created + closed
+      expect(events).toHaveLength(2);
+      expect(events[1].event_type).toBe('closed');
+    });
+
+    it('should filter events by since timestamp', async () => {
+      const bead = await rig.createBead({ type: 'issue', title: 'Since filter test' });
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      expect(events).toHaveLength(1);
+
+      // Query with a future timestamp should return nothing
+      const futureEvents = await rig.listBeadEvents({
+        beadId: bead.id,
+        since: '2099-01-01T00:00:00.000Z',
+      });
+      expect(futureEvents).toHaveLength(0);
+    });
+
+    it('should list all events across beads', async () => {
+      await rig.createBead({ type: 'issue', title: 'Multi 1' });
+      await rig.createBead({ type: 'issue', title: 'Multi 2' });
+
+      const allEvents = await rig.listBeadEvents({});
+      expect(allEvents.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should write review_submitted event on submitToReviewQueue', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-review-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Review event test' });
+      await rig.submitToReviewQueue({
+        agent_id: agent.id,
+        bead_id: bead.id,
+        branch: 'feature/test',
+      });
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      const reviewEvents = events.filter(e => e.event_type === 'review_submitted');
+      expect(reviewEvents).toHaveLength(1);
+      expect(reviewEvents[0].new_value).toBe('feature/test');
+    });
+  });
+
   describe('AgentIdentityDO stub', () => {
     it('should respond to ping', async () => {
       const id = env.AGENT_IDENTITY.idFromName('test-identity');

@@ -39,6 +39,8 @@ import {
   handleCompleteReview,
 } from './handlers/rig-review-queue.handler';
 import { handleCreateEscalation } from './handlers/rig-escalations.handler';
+import { handleListBeadEvents } from './handlers/rig-bead-events.handler';
+import { handleListTownEvents } from './handlers/town-events.handler';
 import {
   handleContainerStartAgent,
   handleContainerStopAgent,
@@ -179,6 +181,10 @@ app.post('/api/rigs/:rigId/review-queue/:entryId/complete', c =>
   handleCompleteReview(c, c.req.param())
 );
 
+// ── Bead Events ─────────────────────────────────────────────────────────
+
+app.get('/api/rigs/:rigId/events', c => handleListBeadEvents(c, c.req.param()));
+
 // ── Escalations ─────────────────────────────────────────────────────────
 
 app.post('/api/rigs/:rigId/escalations', c => handleCreateEscalation(c, c.req.param()));
@@ -195,6 +201,10 @@ app.get('/api/users/:userId/rigs/:rigId', c => handleGetRig(c, c.req.param()));
 app.get('/api/users/:userId/towns/:townId/rigs', c => handleListRigs(c, c.req.param()));
 app.delete('/api/users/:userId/towns/:townId', c => handleDeleteTown(c, c.req.param()));
 app.delete('/api/users/:userId/rigs/:rigId', c => handleDeleteRig(c, c.req.param()));
+
+// ── Town Events ─────────────────────────────────────────────────────────
+
+app.get('/api/users/:userId/towns/:townId/events', c => handleListTownEvents(c, c.req.param()));
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().

@@ -9,6 +9,13 @@ import {
 } from '../db/tables/review-queue.table';
 import { createTableMolecules } from '../db/tables/molecules.table';
 import {
+  createTableBeadEvents,
+  getIndexesBeadEvents,
+  beadEvents,
+  BeadEventRecord,
+} from '../db/tables/bead-events.table';
+import type { BeadEventType } from '../db/tables/bead-events.table';
+import {
   createTableAgentEvents,
   getIndexesAgentEvents,
   agentEvents,
@@ -117,6 +124,78 @@ export class RigDO extends DurableObject<Env> {
     for (const idx of getIndexesAgentEvents()) {
       query(this.sql, idx, []);
     }
+
+    query(this.sql, createTableBeadEvents(), []);
+    for (const idx of getIndexesBeadEvents()) {
+      query(this.sql, idx, []);
+    }
+  }
+
+  // ── Bead Event Log ───────────────────────────────────────────────────
+
+  private writeBeadEvent(params: {
+    beadId: string;
+    agentId?: string | null;
+    eventType: BeadEventType;
+    oldValue?: string | null;
+    newValue?: string | null;
+    metadata?: Record<string, unknown>;
+  }): void {
+    const id = generateId();
+    const timestamp = now();
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${beadEvents} (
+          ${beadEvents.columns.id},
+          ${beadEvents.columns.bead_id},
+          ${beadEvents.columns.agent_id},
+          ${beadEvents.columns.event_type},
+          ${beadEvents.columns.old_value},
+          ${beadEvents.columns.new_value},
+          ${beadEvents.columns.metadata},
+          ${beadEvents.columns.created_at}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        id,
+        params.beadId,
+        params.agentId ?? null,
+        params.eventType,
+        params.oldValue ?? null,
+        params.newValue ?? null,
+        JSON.stringify(params.metadata ?? {}),
+        timestamp,
+      ]
+    );
+  }
+
+  async listBeadEvents(options: {
+    beadId?: string;
+    since?: string;
+    limit?: number;
+  }): Promise<BeadEventRecord[]> {
+    await this.ensureInitialized();
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${beadEvents}
+          WHERE (? IS NULL OR ${beadEvents.bead_id} = ?)
+            AND (? IS NULL OR ${beadEvents.created_at} > ?)
+          ORDER BY ${beadEvents.created_at} ASC
+          LIMIT ?
+        `,
+        [
+          options.beadId ?? null,
+          options.beadId ?? null,
+          options.since ?? null,
+          options.since ?? null,
+          options.limit ?? 100,
+        ]
+      ),
+    ];
+    return BeadEventRecord.array().parse(rows);
   }
 
   // ── Beads ──────────────────────────────────────────────────────────────
@@ -167,6 +246,15 @@ export class RigDO extends DurableObject<Env> {
 
     const result = this.getBead(id);
     if (!result) throw new Error('Failed to create bead');
+
+    this.writeBeadEvent({
+      beadId: id,
+      agentId: input.assignee_agent_id,
+      eventType: 'created',
+      newValue: input.type,
+      metadata: { title: input.title, priority: input.priority ?? 'medium' },
+    });
+
     console.log(`${RIG_LOG} createBead: created bead id=${result.id} status=${result.status}`);
     return result;
   }
@@ -220,6 +308,8 @@ export class RigDO extends DurableObject<Env> {
 
   async updateBeadStatus(beadId: string, status: BeadStatus, agentId: string): Promise<Bead> {
     await this.ensureInitialized();
+    const oldBead = this.getBead(beadId);
+    const oldStatus = oldBead?.status ?? null;
     const timestamp = now();
     const closedAt = status === 'closed' ? timestamp : null;
 
@@ -236,6 +326,15 @@ export class RigDO extends DurableObject<Env> {
     );
 
     this.touchAgent(agentId);
+
+    const eventType: BeadEventType = status === 'closed' ? 'closed' : 'status_changed';
+    this.writeBeadEvent({
+      beadId,
+      agentId,
+      eventType,
+      oldValue: oldStatus,
+      newValue: status,
+    });
 
     const bead = this.getBead(beadId);
     if (!bead) throw new Error(`Bead ${beadId} not found`);
@@ -436,6 +535,14 @@ export class RigDO extends DurableObject<Env> {
       [agentId, now(), beadId]
     );
 
+    this.writeBeadEvent({
+      beadId,
+      agentId,
+      eventType: 'hooked',
+      newValue: agentId,
+      metadata: { agent_name: agent.name, agent_role: agent.role },
+    });
+
     console.log(
       `${RIG_LOG} hookBead: bead ${beadId} now in_progress, agent ${agentId} hooked. Arming alarm.`
     );
@@ -444,6 +551,10 @@ export class RigDO extends DurableObject<Env> {
 
   async unhookBead(agentId: string): Promise<void> {
     await this.ensureInitialized();
+    // Read agent to get bead_id before unhooking
+    const agent = this.getAgent(agentId);
+    const beadId = agent?.current_hook_bead_id;
+
     query(
       this.sql,
       /* sql */ `
@@ -455,6 +566,15 @@ export class RigDO extends DurableObject<Env> {
       `,
       [now(), agentId]
     );
+
+    if (beadId) {
+      this.writeBeadEvent({
+        beadId,
+        agentId,
+        eventType: 'unhooked',
+        oldValue: agentId,
+      });
+    }
   }
 
   async getHookedBead(agentId: string): Promise<Bead | null> {
@@ -623,6 +743,14 @@ export class RigDO extends DurableObject<Env> {
         timestamp,
       ]
     );
+
+    this.writeBeadEvent({
+      beadId: input.bead_id,
+      agentId: input.agent_id,
+      eventType: 'review_submitted',
+      newValue: input.branch,
+      metadata: { pr_url: input.pr_url, summary: input.summary },
+    });
   }
 
   async popReviewQueue(): Promise<ReviewQueueEntry | null> {
@@ -721,11 +849,21 @@ export class RigDO extends DurableObject<Env> {
         `,
         [timestamp, timestamp, entry.bead_id]
       );
+
+      this.writeBeadEvent({
+        beadId: entry.bead_id,
+        agentId: entry.agent_id,
+        eventType: 'review_completed',
+        oldValue: 'running',
+        newValue: 'merged',
+        metadata: { commit_sha: input.commit_sha, branch: entry.branch },
+      });
+
       console.log(
         `${RIG_LOG} completeReviewWithResult: bead ${entry.bead_id} closed after merge (commit ${input.commit_sha ?? 'unknown'})`
       );
     } else {
-      // Conflict — create an escalation bead
+      // Conflict — create an escalation bead (createBead writes its own 'created' event)
       await this.createBead({
         type: 'escalation',
         title: `Merge conflict: ${entry.branch}`,
@@ -737,6 +875,15 @@ export class RigDO extends DurableObject<Env> {
           agent_id: entry.agent_id,
         },
       });
+
+      this.writeBeadEvent({
+        beadId: entry.bead_id,
+        agentId: entry.agent_id,
+        eventType: 'escalated',
+        newValue: input.message,
+        metadata: { branch: entry.branch },
+      });
+
       console.log(
         `${RIG_LOG} completeReviewWithResult: merge conflict for bead ${entry.bead_id}, escalation bead created`
       );
@@ -881,6 +1028,13 @@ export class RigDO extends DurableObject<Env> {
         `,
         [beadStatus, timestamp, closedAt, beadId]
       );
+      this.writeBeadEvent({
+        beadId,
+        agentId,
+        eventType: input.status === 'completed' ? 'closed' : 'status_changed',
+        newValue: beadStatus,
+        metadata: { reason: input.reason },
+      });
     } else {
       console.log(`${RIG_LOG} agentCompleted: agent ${agentId} ${input.status} but no hooked bead`);
     }

@@ -127,6 +127,20 @@ export function UpgradeTrialDialog({
             />
           </div>
 
+          {/* Purchase Button */}
+          <div className="flex flex-col items-center gap-3">
+            <Button
+              onClick={handlePurchase}
+              disabled={isPurchasing || !orgData}
+              className="w-full max-w-md bg-blue-600 py-4 text-lg font-semibold text-white hover:bg-blue-700"
+            >
+              {isPurchasing ? 'Processing...' : `Purchase ${planName} Plan`}
+            </Button>
+            <p className="text-center text-xs text-gray-400">
+              You'll be redirected to Stripe to complete your purchase
+            </p>
+          </div>
+
           {/* Credit Options */}
           <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
             <h3 className="mb-3 text-center text-sm font-semibold text-white">
@@ -168,18 +182,13 @@ export function UpgradeTrialDialog({
             </div>
           </div>
 
-          {/* Purchase Button */}
-          <div className="flex flex-col items-center gap-3">
-            <Button
-              onClick={handlePurchase}
-              disabled={isPurchasing || !orgData}
-              className="w-full max-w-md bg-blue-600 py-4 text-lg font-semibold text-white hover:bg-blue-700"
+          <div className="text-center">
+            <a
+              href="mailto:sales@kilocode.ai"
+              className="text-sm text-gray-400 hover:text-blue-400"
             >
-              {isPurchasing ? 'Processing...' : `Purchase ${planName} Plan`}
-            </Button>
-            <p className="text-center text-xs text-gray-400">
-              You'll be redirected to Stripe to complete your purchase
-            </p>
+              Questions? Contact Support.
+            </a>
           </div>
         </div>
       </DialogContent>

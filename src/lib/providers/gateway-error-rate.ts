@@ -8,7 +8,7 @@ const getGatewayErrorRate_cached = unstable_cache(
     const { rows } = await db.execute(sql`
         select
             provider as "gateway",
-            1.0 * count(*) filter(where mu.has_error = true) / count(*) as "errorRate"
+            1.0 * count(*) filter(where has_error = true) / count(*) as "errorRate"
         from microdollar_usage_view
         where true
             and created_at >= now() - interval '10 minutes'

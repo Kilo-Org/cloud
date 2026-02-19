@@ -20,8 +20,8 @@ import * as crypto from 'crypto';
 
 // EMERGENCY SWITCH
 // This routes all models that normally would be routed to OpenRouter to Vercel instead.
-// Many of these models are not availble, named differently or not tested on Vercel.
-// Only use when OpenRouter is down and automatic failover is not working adequatly.
+// Many of these models are not available, named differently or not tested on Vercel.
+// Only use when OpenRouter is down and automatic failover is not working adequately.
 const ENABLE_UNIVERSAL_VERCEL_ROUTING = false;
 
 const VERCEL_ROUTING_ALLOW_LIST = [

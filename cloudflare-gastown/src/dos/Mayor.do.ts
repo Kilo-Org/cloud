@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getTownContainerStub } from './TownContainer.do';
 import { signAgentJWT } from '../util/jwt.util';
+import { buildMayorSystemPrompt } from '../prompts/mayor-system.prompt';
 
 const MAYOR_LOG = '[Mayor.do]';
 
@@ -290,14 +291,8 @@ export class MayorDO extends DurableObject<Env> {
   }
 
   /** System prompt for the mayor agent. */
-  private static mayorSystemPrompt(identity: string): string {
-    return [
-      `You are ${identity}, the Mayor of this Gastown town.`,
-      'You are a persistent conversational agent that coordinates work across all rigs in your town.',
-      'Users send you messages and you respond conversationally.',
-      'When you need to delegate work, use your tools (gt_sling, gt_list_rigs, gt_list_beads, gt_list_agents, gt_mail_send).',
-      'You maintain context across messages — this is a continuous conversation, not one-shot requests.',
-    ].join(' ');
+  private static mayorSystemPrompt(identity: string, townId: string): string {
+    return buildMayorSystemPrompt({ identity, townId });
   }
 
   /**
@@ -319,9 +314,17 @@ export class MayorDO extends DurableObject<Env> {
 
     const token = await this.mintMayorToken(agentId, config);
 
-    const envVars: Record<string, string> = {};
+    const envVars: Record<string, string> = {
+      // Mayor-specific: tells the plugin to load mayor tools instead of rig tools
+      GASTOWN_AGENT_ROLE: 'mayor',
+      GASTOWN_TOWN_ID: config.townId,
+      GASTOWN_AGENT_ID: agentId,
+    };
     if (token) {
       envVars.GASTOWN_SESSION_TOKEN = token;
+    }
+    if (this.env.GASTOWN_API_URL) {
+      envVars.GASTOWN_API_URL = this.env.GASTOWN_API_URL;
     }
     if (this.env.KILO_API_URL) {
       envVars.KILO_API_URL = this.env.KILO_API_URL;
@@ -349,7 +352,7 @@ export class MayorDO extends DurableObject<Env> {
         identity,
         prompt: initialMessage,
         model: model ?? 'kilo/claude-sonnet-4-20250514',
-        systemPrompt: MayorDO.mayorSystemPrompt(identity),
+        systemPrompt: MayorDO.mayorSystemPrompt(identity, config.townId),
         gitUrl: config.gitUrl,
         branch: `gt/mayor`,
         defaultBranch: config.defaultBranch,

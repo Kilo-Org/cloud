@@ -59,6 +59,14 @@ import {
   handleMayorCompleted,
   handleDestroyMayor,
 } from './handlers/mayor.handler';
+import {
+  handleMayorSling,
+  handleMayorListRigs,
+  handleMayorListBeads,
+  handleMayorListAgents,
+  handleMayorSendMail,
+} from './handlers/mayor-tools.handler';
+import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 
 export { RigDO } from './dos/Rig.do';
 export { GastownUserDO } from './dos/GastownUser.do';
@@ -201,6 +209,22 @@ app.post('/api/towns/:townId/mayor/message', c => handleSendMayorMessage(c, c.re
 app.get('/api/towns/:townId/mayor/status', c => handleGetMayorStatus(c, c.req.param()));
 app.post('/api/towns/:townId/mayor/completed', c => handleMayorCompleted(c, c.req.param()));
 app.post('/api/towns/:townId/mayor/destroy', c => handleDestroyMayor(c, c.req.param()));
+
+// ── Mayor Tools ──────────────────────────────────────────────────────────
+// Tool endpoints called by the mayor's kilo serve session via the Gastown plugin.
+// Authenticated via mayor JWT (townId-scoped, no rigId restriction).
+
+app.use('/api/mayor/:townId/tools/*', async (c, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : mayorAuthMiddleware(c, next)
+);
+
+app.post('/api/mayor/:townId/tools/sling', c => handleMayorSling(c, c.req.param()));
+app.get('/api/mayor/:townId/tools/rigs', c => handleMayorListRigs(c, c.req.param()));
+app.get('/api/mayor/:townId/tools/rigs/:rigId/beads', c => handleMayorListBeads(c, c.req.param()));
+app.get('/api/mayor/:townId/tools/rigs/:rigId/agents', c =>
+  handleMayorListAgents(c, c.req.param())
+);
+app.post('/api/mayor/:townId/tools/mail', c => handleMayorSendMail(c, c.req.param()));
 
 // ── Error handling ──────────────────────────────────────────────────────
 

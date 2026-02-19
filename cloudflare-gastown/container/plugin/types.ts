@@ -1,7 +1,7 @@
 // Types mirroring the Rig DO domain model.
 // These are the API response shapes — the plugin never touches SQLite directly.
 
-export type BeadStatus = 'open' | 'in_progress' | 'closed';
+export type BeadStatus = 'open' | 'in_progress' | 'closed' | 'failed';
 export type BeadType = 'issue' | 'message' | 'escalation' | 'merge_request';
 export type BeadPriority = 'low' | 'medium' | 'high' | 'critical';
 
@@ -60,10 +60,35 @@ export type ApiSuccess<T> = { success: true; data: T };
 export type ApiError = { success: false; error: string };
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;
 
-// Environment variable config for the plugin
+// Rig metadata (from GastownUserDO)
+export type Rig = {
+  id: string;
+  town_id: string;
+  name: string;
+  git_url: string;
+  default_branch: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// Sling result (bead + assigned agent)
+export type SlingResult = {
+  bead: Bead;
+  agent: Agent;
+};
+
+// Environment variable config for the plugin (rig-scoped agents)
 export type GastownEnv = {
   apiUrl: string;
   sessionToken: string;
   agentId: string;
   rigId: string;
+};
+
+// Environment variable config for the mayor (town-scoped)
+export type MayorGastownEnv = {
+  apiUrl: string;
+  sessionToken: string;
+  agentId: string;
+  townId: string;
 };

@@ -1,6 +1,5 @@
 import { custom_llm, type CustomLlm } from '@/db/schema';
 import { readDb } from '@/lib/drizzle';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 
 export function convert(model: CustomLlm) {
   return {
@@ -36,10 +35,10 @@ export function convert(model: CustomLlm) {
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
     settings: {
-      included_tools: model.included_tools,
-      excluded_tools: model.excluded_tools,
+      included_tools: model.included_tools ?? [],
+      excluded_tools: model.excluded_tools ?? [],
     },
-  } as OpenRouterModel;
+  };
 }
 
 export async function listAvailableCustomLlms(organizationId: string) {

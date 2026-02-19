@@ -19,23 +19,28 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { z } from 'zod';
 import type { TriageStatus, TriageClassification, TriageAction } from '@/lib/auto-triage/db/types';
 
-interface StatusUpdatePayload {
-  sessionId?: string;
-  status: TriageStatus;
-  classification?: TriageClassification;
-  confidence?: number;
-  intentSummary?: string;
-  relatedFiles?: string[];
-  isDuplicate?: boolean;
-  duplicateOfTicketId?: string;
-  similarityScore?: number;
-  qdrantPointId?: string;
-  actionTaken?: TriageAction;
-  actionMetadata?: Record<string, unknown>;
-  errorMessage?: string;
-}
+const statusUpdatePayloadSchema = z.object({
+  sessionId: z.string().optional(),
+  status: z.enum(['pending', 'analyzing', 'actioned', 'failed', 'skipped']),
+  classification: z.enum(['bug', 'feature', 'question', 'duplicate', 'unclear']).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  intentSummary: z.string().optional(),
+  relatedFiles: z.array(z.string()).optional(),
+  isDuplicate: z.boolean().optional(),
+  duplicateOfTicketId: z.string().uuid().optional(),
+  similarityScore: z.number().min(0).max(1).optional(),
+  qdrantPointId: z.string().optional(),
+  actionTaken: z
+    .enum(['pr_created', 'comment_posted', 'closed_duplicate', 'needs_clarification'])
+    .optional(),
+  actionMetadata: z.record(z.string(), z.unknown()).optional(),
+  errorMessage: z.string().optional(),
+});
+
+const ticketIdSchema = z.string().uuid();
 
 export async function POST(
   req: NextRequest,
@@ -48,14 +53,21 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { ticketId } = await params;
-    const payload: StatusUpdatePayload = await req.json();
-    const { sessionId, status, errorMessage, ...updates } = payload;
-
-    // Validate payload
-    if (!status) {
-      return NextResponse.json({ error: 'Missing required field: status' }, { status: 400 });
+    const { ticketId: rawTicketId } = await params;
+    const ticketIdResult = ticketIdSchema.safeParse(rawTicketId);
+    if (!ticketIdResult.success) {
+      return NextResponse.json({ error: 'Invalid ticketId format' }, { status: 400 });
     }
+    const ticketId = ticketIdResult.data;
+
+    const parseResult = statusUpdatePayloadSchema.safeParse(await req.json());
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: parseResult.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+    const { sessionId, status, errorMessage, ...updates } = parseResult.data;
 
     logExceptInTest('[triage-status] Received status update', {
       ticketId,

@@ -15,19 +15,20 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getTriageTicketById } from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import type { Owner } from '@/lib/auto-triage/db/types';
-import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
+import { AutoTriageAgentConfigSchema } from '@/lib/auto-triage/core/schemas';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 
-interface ClassifyConfigRequest {
-  ticketId: string;
-}
+const classifyConfigRequestSchema = z.object({
+  ticketId: z.string().uuid(),
+});
 
 interface ClassifyConfigResponse {
   githubToken?: string;
@@ -46,13 +47,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body: ClassifyConfigRequest = await req.json();
-    const { ticketId } = body;
-
-    // Validate payload
-    if (!ticketId) {
-      return NextResponse.json({ error: 'Missing required field: ticketId' }, { status: 400 });
+    const parseResult = classifyConfigRequestSchema.safeParse(await req.json());
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: parseResult.error.flatten().fieldErrors },
+        { status: 400 }
+      );
     }
+    const { ticketId } = parseResult.data;
 
     logExceptInTest('[classify-config] Getting classification config for ticket', { ticketId });
 
@@ -112,7 +114,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Agent config not found' }, { status: 404 });
     }
 
-    const config = agentConfig.config as AutoTriageAgentConfig;
+    const config = AutoTriageAgentConfigSchema.parse(agentConfig.config);
 
     // Labels used for gating (skip/required) should not be offered to the AI for auto-labeling
     const excluded_labels = [...(config.skip_labels ?? []), ...(config.required_labels ?? [])];

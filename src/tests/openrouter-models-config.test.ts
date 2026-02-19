@@ -21,7 +21,7 @@ describe('OpenRouter Models Config', () => {
 
   test('preferred models should contain expected models', () => {
     const expectedModels = [
-      'google/gemini-3-pro-preview',
+      'google/gemini-3.1-pro-preview',
       'google/gemini-3.1-pro-preview',
       'anthropic/claude-sonnet-4.6',
       'openai/gpt-5.2',

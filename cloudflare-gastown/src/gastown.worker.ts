@@ -32,6 +32,7 @@ import {
   handleDeleteAgent,
 } from './handlers/rig-agents.handler';
 import { handleSendMail } from './handlers/rig-mail.handler';
+import { handleAppendAgentEvent, handleGetAgentEvents } from './handlers/rig-agent-events.handler';
 import { handleSubmitToReviewQueue } from './handlers/rig-review-queue.handler';
 import { handleCreateEscalation } from './handlers/rig-escalations.handler';
 import {
@@ -40,6 +41,7 @@ import {
   handleContainerSendMessage,
   handleContainerAgentStatus,
   handleContainerStreamTicket,
+  handleContainerAgentStream,
   handleContainerHealth,
 } from './handlers/town-container.handler';
 import {
@@ -155,6 +157,11 @@ app.post('/api/rigs/:rigId/agents/:agentId/checkpoint', c =>
 app.get('/api/rigs/:rigId/agents/:agentId/mail', c => handleCheckMail(c, c.req.param()));
 app.post('/api/rigs/:rigId/agents/:agentId/heartbeat', c => handleHeartbeat(c, c.req.param()));
 
+// ── Agent Events ─────────────────────────────────────────────────────────
+
+app.post('/api/rigs/:rigId/agent-events', c => handleAppendAgentEvent(c, c.req.param()));
+app.get('/api/rigs/:rigId/agents/:agentId/events', c => handleGetAgentEvents(c, c.req.param()));
+
 // ── Mail ────────────────────────────────────────────────────────────────
 
 app.post('/api/rigs/:rigId/mail', c => handleSendMail(c, c.req.param()));
@@ -198,6 +205,9 @@ app.get('/api/towns/:townId/container/agents/:agentId/status', c =>
 );
 app.post('/api/towns/:townId/container/agents/:agentId/stream-ticket', c =>
   handleContainerStreamTicket(c, c.req.param())
+);
+app.get('/api/towns/:townId/container/agents/:agentId/stream', c =>
+  handleContainerAgentStream(c, c.req.param())
 );
 app.get('/api/towns/:townId/container/health', c => handleContainerHealth(c, c.req.param()));
 

@@ -6,7 +6,7 @@
  * via HTTP, not stdin.
  */
 
-import type { ManagedAgent, StartAgentRequest, KiloSSEEventData } from './types';
+import type { ManagedAgent, StartAgentRequest, KiloSSEEventData, KiloSSEEvent } from './types';
 import {
   ensureServer,
   registerSession,
@@ -20,6 +20,47 @@ import { reportAgentCompleted } from './completion-reporter';
 
 const agents = new Map<string, ManagedAgent>();
 const sseConsumers = new Map<string, SSEConsumer>();
+
+// ── Event fan-out for external stream consumers ──────────────────────────
+// Each agent can have multiple external listeners (WebSocket clients watching
+// the agent work). The internal SSE consumer already receives all kilo serve
+// events; we fan out filtered events to registered listeners here.
+
+type AgentEventListener = (event: KiloSSEEvent) => void;
+const agentListeners = new Map<string, Set<AgentEventListener>>();
+
+/**
+ * Subscribe to an agent's event stream. Returns an unsubscribe function.
+ * The listener receives every KiloSSEEvent that the internal SSE consumer
+ * sees for this agent (already filtered by sessionId, excludes heartbeats).
+ */
+export function subscribeToAgent(agentId: string, listener: AgentEventListener): () => void {
+  let listeners = agentListeners.get(agentId);
+  if (!listeners) {
+    listeners = new Set();
+    agentListeners.set(agentId, listeners);
+  }
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) {
+      agentListeners.delete(agentId);
+    }
+  };
+}
+
+/** Notify all external listeners for an agent. */
+function emitAgentEvent(agentId: string, event: KiloSSEEvent): void {
+  const listeners = agentListeners.get(agentId);
+  if (!listeners) return;
+  for (const listener of listeners) {
+    try {
+      listener(event);
+    } catch (err) {
+      console.error(`Error in agent event listener for ${agentId}:`, err);
+    }
+  }
+}
 
 const startTime = Date.now();
 
@@ -93,10 +134,17 @@ export async function startAgent(
           }
         }
 
+        // Fan out to external listeners (WebSocket clients)
+        emitAgentEvent(request.agentId, evt);
+
         // Detect completion
         if (isCompletionEvent(evt)) {
           agent.status = 'exited';
           agent.exitReason = 'completed';
+          emitAgentEvent(request.agentId, {
+            event: 'agent.exited',
+            data: { type: 'agent.exited', properties: { reason: 'completed' } },
+          });
           void reportAgentCompleted(agent, 'completed');
         }
       },
@@ -107,6 +155,10 @@ export async function startAgent(
         if (agent.status === 'running') {
           agent.status = 'failed';
           agent.exitReason = `SSE stream closed: ${reason}`;
+          emitAgentEvent(request.agentId, {
+            event: 'agent.exited',
+            data: { type: 'agent.exited', properties: { reason: `stream closed: ${reason}` } },
+          });
           void reportAgentCompleted(agent, 'failed', reason);
         }
       },
@@ -187,6 +239,13 @@ export async function stopAgent(agentId: string): Promise<void> {
 
   agent.status = 'exited';
   agent.exitReason = 'stopped';
+
+  // Notify external listeners and clean up
+  emitAgentEvent(agentId, {
+    event: 'agent.exited',
+    data: { type: 'agent.exited', properties: { reason: 'stopped' } },
+  });
+  agentListeners.delete(agentId);
 }
 
 /**

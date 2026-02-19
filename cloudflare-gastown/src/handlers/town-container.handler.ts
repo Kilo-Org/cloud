@@ -143,12 +143,46 @@ export async function handleContainerStreamTicket(
     return c.json(resError('Unexpected container response'), 502);
   }
 
-  // Construct the stream URL. The frontend connects to this URL via EventSource.
-  // Use the request's origin so it works in both dev and production.
-  const origin = new URL(c.req.url).origin;
-  const streamUrl = `${origin}/api/towns/${params.townId}/container/agents/${params.agentId}/stream`;
+  // Construct the WebSocket stream URL. The frontend connects via WebSocket.
+  // Use the request's origin and swap the protocol to ws:// or wss://.
+  const reqUrl = new URL(c.req.url);
+  const wsProtocol = reqUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+  const streamUrl = `${wsProtocol}//${reqUrl.host}/api/towns/${params.townId}/container/agents/${params.agentId}/stream`;
 
   return c.json(resSuccess({ url: streamUrl, ticket: parsed.data.ticket }), 200);
+}
+
+/**
+ * Proxy a WebSocket upgrade for agent streaming directly through the
+ * Container DO. We create a new Request with the container URL but
+ * preserve the original headers (including Upgrade: websocket) so the
+ * Container base class's fetch() method detects and proxies the WS.
+ */
+export async function handleContainerAgentStream(
+  c: Context<GastownEnv>,
+  params: { townId: string; agentId: string }
+) {
+  const ticket = c.req.query('ticket');
+  if (!ticket) {
+    return c.json(resError('Missing ticket query parameter'), 400);
+  }
+
+  const container = getTownContainerStub(c.env, params.townId);
+  const containerUrl = `http://container/agents/${params.agentId}/stream?ticket=${encodeURIComponent(ticket)}`;
+
+  console.log(
+    `${CONTAINER_LOG} handleContainerAgentStream: proxying WS upgrade to ${containerUrl}`
+  );
+
+  // Build a new request targeting the container URL but preserving the
+  // original headers (Upgrade, Sec-WebSocket-*, etc.) so the Container
+  // base class proxies the WebSocket connection correctly.
+  const proxyReq = new Request(containerUrl, {
+    method: c.req.method,
+    headers: c.req.raw.headers,
+  });
+
+  return container.fetch(proxyReq);
 }
 
 /**

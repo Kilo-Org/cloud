@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { ServerWebSocket } from 'bun';
 import { runAgent } from './agent-runner';
 import {
   stopAgent,
@@ -8,16 +9,58 @@ import {
   activeServerCount,
   getUptime,
   stopAll,
+  subscribeToAgent,
 } from './process-manager';
 import { startHeartbeat, stopHeartbeat } from './heartbeat';
 import { StartAgentRequest, StopAgentRequest, SendMessageRequest } from './types';
 import type { AgentStatusResponse, HealthResponse, StreamTicketResponse } from './types';
 
-// TODO: Add a WebSocket consumer endpoint (GET /agents/:agentId/stream) that
-// validates and consumes tickets. Until then, tickets are only used as a
-// placeholder for the upcoming streaming implementation.
 const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
+
+// ── WebSocket data attached to each connection ──────────────────────────
+type WSData = {
+  agentId: string;
+  unsubscribe: (() => void) | null;
+};
+
+// Bun WebSocket handlers — registered once in Bun.serve({ websocket: ... })
+export const websocketHandlers = {
+  open(ws: ServerWebSocket<WSData>) {
+    const { agentId } = ws.data;
+    const agent = getAgentStatus(agentId);
+
+    // Send current agent status as the first message
+    ws.send(
+      JSON.stringify({
+        event: 'agent.status',
+        data: {
+          agentId,
+          status: agent?.status ?? 'unknown',
+          activeTools: agent?.activeTools ?? [],
+          startedAt: agent?.startedAt ?? null,
+        },
+      })
+    );
+
+    // Subscribe to the agent's event fan-out
+    const unsubscribe = subscribeToAgent(agentId, evt => {
+      if (ws.readyState === 1) {
+        ws.send(JSON.stringify({ event: evt.event, data: evt.data }));
+      }
+    });
+    ws.data.unsubscribe = unsubscribe;
+  },
+
+  message(_ws: ServerWebSocket<WSData>, _message: string | Buffer) {
+    // Clients don't send meaningful messages; ignore.
+  },
+
+  close(ws: ServerWebSocket<WSData>, _code: number, _reason: string) {
+    ws.data.unsubscribe?.();
+    ws.data.unsubscribe = null;
+  },
+};
 
 export const app = new Hono();
 
@@ -133,7 +176,23 @@ app.onError((err, c) => {
 });
 
 /**
+ * Validate a stream ticket and return the associated agentId, consuming it.
+ * Returns null if the ticket is invalid or expired.
+ */
+function consumeStreamTicket(ticket: string): string | null {
+  const entry = streamTickets.get(ticket);
+  if (!entry) return null;
+  streamTickets.delete(ticket);
+  if (entry.expiresAt < Date.now()) return null;
+  return entry.agentId;
+}
+
+/**
  * Start the control server using Bun.serve + Hono.
+ *
+ * WebSocket upgrade for /agents/:agentId/stream is handled in the fetch
+ * function before falling through to Hono, because Bun requires
+ * server.upgrade() to be called before returning a Response.
  */
 export function startControlServer(): void {
   const PORT = 8080;
@@ -156,9 +215,65 @@ export function startControlServer(): void {
   process.on('SIGTERM', () => void shutdown());
   process.on('SIGINT', () => void shutdown());
 
-  Bun.serve({
+  // Keepalive: ping all open WebSocket connections every 30s
+  const KEEPALIVE_INTERVAL_MS = 30_000;
+  setInterval(() => {
+    // Bun automatically handles ping/pong frames for ServerWebSocket,
+    // but we send an application-level keepalive so the browser knows
+    // the connection is alive even through Cloudflare's proxy.
+    server.publish('__keepalive__', '');
+  }, KEEPALIVE_INTERVAL_MS);
+
+  const server = Bun.serve<WSData>({
     port: PORT,
-    fetch: app.fetch,
+    fetch(req, server) {
+      const url = new URL(req.url);
+
+      // WebSocket upgrade: GET /agents/:agentId/stream?ticket=<uuid>
+      const wsMatch = url.pathname.match(/^\/agents\/([^/]+)\/stream$/);
+      if (wsMatch && req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+        const agentId = wsMatch[1];
+        const ticket = url.searchParams.get('ticket');
+
+        if (!ticket) {
+          return new Response(JSON.stringify({ error: 'Missing ticket' }), { status: 400 });
+        }
+
+        const ticketAgentId = consumeStreamTicket(ticket);
+        if (!ticketAgentId) {
+          return new Response(JSON.stringify({ error: 'Invalid or expired ticket' }), {
+            status: 403,
+          });
+        }
+
+        if (ticketAgentId !== agentId) {
+          return new Response(JSON.stringify({ error: 'Ticket does not match agent' }), {
+            status: 403,
+          });
+        }
+
+        if (!getAgentStatus(agentId)) {
+          return new Response(JSON.stringify({ error: `Agent ${agentId} not found` }), {
+            status: 404,
+          });
+        }
+
+        const upgraded = server.upgrade(req, {
+          data: { agentId, unsubscribe: null },
+        });
+        if (!upgraded) {
+          return new Response(JSON.stringify({ error: 'WebSocket upgrade failed' }), {
+            status: 500,
+          });
+        }
+        // Bun returns undefined on successful upgrade
+        return undefined as unknown as Response;
+      }
+
+      // All other requests go through Hono
+      return app.fetch(req);
+    },
+    websocket: websocketHandlers,
   });
 
   console.log(`Town container control server listening on port ${PORT}`);

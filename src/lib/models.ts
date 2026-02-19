@@ -31,7 +31,6 @@ export const preferredModels = [
   'openai/gpt-5.2',
   'openai/gpt-5.2-codex',
   'google/gemini-3.1-pro-preview',
-  'google/gemini-3-pro-preview',
   'google/gemini-3-flash-preview',
   'moonshotai/kimi-k2.5',
   'x-ai/grok-code-fast-1',

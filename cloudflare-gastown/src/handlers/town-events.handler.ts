@@ -3,7 +3,9 @@ import { getGastownUserStub } from '../dos/GastownUser.do';
 import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
+import { BeadEventRecord as BeadEventRecordSchema } from '../db/tables/bead-events.table';
 import type { BeadEventRecord } from '../db/tables/bead-events.table';
+import { RigRecord } from '../db/tables/rigs.table';
 
 type TaggedBeadEvent = BeadEventRecord & { rig_id: string; rig_name: string };
 
@@ -21,13 +23,15 @@ export async function handleListTownEvents(
 
   // Look up all rigs in the town
   const townDO = getGastownUserStub(c.env, params.userId);
-  const rigs = await townDO.listRigs(params.townId);
+  const rigsUnknown: unknown = await townDO.listRigs(params.townId);
+  const rigs = RigRecord.array().parse(rigsUnknown);
 
   // Fan out to each Rig DO in parallel
   const eventPromises = rigs.map(async (rig): Promise<TaggedBeadEvent[]> => {
     const rigDO = getRigDOStub(c.env, rig.id);
-    const events = await rigDO.listBeadEvents({ since, limit });
-    return events.map(e => ({ ...e, rig_id: rig.id, rig_name: rig.name }));
+    const eventsUnknown: unknown = await rigDO.listBeadEvents({ since, limit });
+    const events = BeadEventRecordSchema.array().parse(eventsUnknown);
+    return events.map((e: BeadEventRecord) => ({ ...e, rig_id: rig.id, rig_name: rig.name }));
   });
 
   const results = await Promise.allSettled(eventPromises);

@@ -8,6 +8,7 @@ declare namespace Cloudflare {
       | 'RigDO'
       | 'GastownUserDO'
       | 'AgentIdentityDO'
+      | 'TownDO'
       | 'TownContainerDO'
       | 'MayorDO';
   }
@@ -21,6 +22,7 @@ declare namespace Cloudflare {
     RIG: DurableObjectNamespace<import('./src/gastown.worker').RigDO>;
     GASTOWN_USER: DurableObjectNamespace<import('./src/gastown.worker').GastownUserDO>;
     AGENT_IDENTITY: DurableObjectNamespace<import('./src/gastown.worker').AgentIdentityDO>;
+    TOWN: DurableObjectNamespace<import('./src/gastown.worker').TownDO>;
     TOWN_CONTAINER: DurableObjectNamespace<import('./src/gastown.worker').TownContainerDO>;
     MAYOR: DurableObjectNamespace<import('./src/gastown.worker').MayorDO>;
   }
@@ -34,6 +36,7 @@ declare namespace Cloudflare {
     RIG: DurableObjectNamespace<import('./src/gastown.worker').RigDO>;
     GASTOWN_USER: DurableObjectNamespace<import('./src/gastown.worker').GastownUserDO>;
     AGENT_IDENTITY: DurableObjectNamespace<import('./src/gastown.worker').AgentIdentityDO>;
+    TOWN: DurableObjectNamespace<import('./src/gastown.worker').TownDO>;
     TOWN_CONTAINER: DurableObjectNamespace<import('./src/gastown.worker').TownContainerDO>;
     MAYOR: DurableObjectNamespace<import('./src/gastown.worker').MayorDO>;
   }

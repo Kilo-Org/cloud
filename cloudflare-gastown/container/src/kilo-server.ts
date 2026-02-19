@@ -99,7 +99,7 @@ async function doStartServer(workdir: string, env: Record<string, string>): Prom
   const mergedEnv = { ...process.env, ...env };
 
   const child: Subprocess = Bun.spawn(
-    ['kilo', 'serve', '--port', String(port), '--hostname', '127.0.0.1'],
+    ['kilo', 'serve', '--port', String(port), '--hostname', '127.0.0.1', '--print-logs'],
     {
       cwd: workdir,
       env: mergedEnv,

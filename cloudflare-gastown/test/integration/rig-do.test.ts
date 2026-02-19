@@ -381,6 +381,84 @@ describe('RigDO', () => {
       const empty = await rig.popReviewQueue();
       expect(empty).toBeNull();
     });
+
+    it('should close bead on successful merge via completeReviewWithResult', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `merge-success-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Merge me' });
+
+      await rig.submitToReviewQueue({
+        agent_id: agent.id,
+        bead_id: bead.id,
+        branch: 'feature/merge-test',
+      });
+
+      const entry = await rig.popReviewQueue();
+      expect(entry).toBeDefined();
+
+      await rig.completeReviewWithResult({
+        entry_id: entry!.id,
+        status: 'merged',
+        message: 'Merge successful',
+        commit_sha: 'abc123',
+      });
+
+      // Bead should be closed
+      const updatedBead = await rig.getBeadAsync(bead.id);
+      expect(updatedBead?.status).toBe('closed');
+      expect(updatedBead?.closed_at).toBeDefined();
+
+      // Review queue should be empty
+      const empty = await rig.popReviewQueue();
+      expect(empty).toBeNull();
+    });
+
+    it('should create escalation bead on merge conflict via completeReviewWithResult', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `merge-conflict-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Conflict me' });
+
+      await rig.submitToReviewQueue({
+        agent_id: agent.id,
+        bead_id: bead.id,
+        branch: 'feature/conflict-test',
+      });
+
+      const entry = await rig.popReviewQueue();
+      expect(entry).toBeDefined();
+
+      await rig.completeReviewWithResult({
+        entry_id: entry!.id,
+        status: 'conflict',
+        message: 'CONFLICT (content): Merge conflict in src/index.ts',
+      });
+
+      // Original bead should NOT be closed (conflict means it stays as-is)
+      const updatedBead = await rig.getBeadAsync(bead.id);
+      expect(updatedBead?.status).not.toBe('closed');
+
+      // An escalation bead should have been created
+      const escalations = await rig.listBeads({ type: 'escalation' });
+      expect(escalations).toHaveLength(1);
+      expect(escalations[0].title).toBe('Merge conflict: feature/conflict-test');
+      expect(escalations[0].priority).toBe('high');
+      expect(escalations[0].body).toContain('CONFLICT (content)');
+      expect(escalations[0].metadata).toMatchObject({
+        source_bead_id: bead.id,
+        source_branch: 'feature/conflict-test',
+        agent_id: agent.id,
+      });
+
+      // Review queue entry should be marked as failed
+      const empty = await rig.popReviewQueue();
+      expect(empty).toBeNull();
+    });
   });
 
   // ── Prime ──────────────────────────────────────────────────────────────
@@ -536,6 +614,125 @@ describe('RigDO', () => {
       const stub = env.GASTOWN_USER.get(id);
       const result = await stub.ping();
       expect(result).toBe('pong');
+    });
+  });
+
+  // ── Bead Events ──────────────────────────────────────────────────────────
+
+  describe('bead events', () => {
+    it('should write events on createBead', async () => {
+      const bead = await rig.createBead({ type: 'issue', title: 'Event test' });
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      expect(events).toHaveLength(1);
+      expect(events[0].event_type).toBe('created');
+      expect(events[0].bead_id).toBe(bead.id);
+      expect(events[0].metadata).toMatchObject({ title: 'Event test' });
+    });
+
+    it('should write events on hookBead', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-hook-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Hook event test' });
+      await rig.hookBead(agent.id, bead.id);
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      // created + hooked
+      expect(events).toHaveLength(2);
+      expect(events[0].event_type).toBe('created');
+      expect(events[1].event_type).toBe('hooked');
+      expect(events[1].agent_id).toBe(agent.id);
+      expect(events[1].new_value).toBe(agent.id);
+    });
+
+    it('should write events on unhookBead', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-unhook-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Unhook event test' });
+      await rig.hookBead(agent.id, bead.id);
+      await rig.unhookBead(agent.id);
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      // created + hooked + unhooked
+      expect(events).toHaveLength(3);
+      expect(events[2].event_type).toBe('unhooked');
+    });
+
+    it('should write events on updateBeadStatus', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-status-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Status event test' });
+      await rig.updateBeadStatus(bead.id, 'in_progress', agent.id);
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      // created + status_changed
+      expect(events).toHaveLength(2);
+      expect(events[1].event_type).toBe('status_changed');
+      expect(events[1].old_value).toBe('open');
+      expect(events[1].new_value).toBe('in_progress');
+    });
+
+    it('should write closed event on closeBead', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-close-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Close event test' });
+      await rig.closeBead(bead.id, agent.id);
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      // created + closed
+      expect(events).toHaveLength(2);
+      expect(events[1].event_type).toBe('closed');
+    });
+
+    it('should filter events by since timestamp', async () => {
+      const bead = await rig.createBead({ type: 'issue', title: 'Since filter test' });
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      expect(events).toHaveLength(1);
+
+      // Query with a future timestamp should return nothing
+      const futureEvents = await rig.listBeadEvents({
+        beadId: bead.id,
+        since: '2099-01-01T00:00:00.000Z',
+      });
+      expect(futureEvents).toHaveLength(0);
+    });
+
+    it('should list all events across beads', async () => {
+      await rig.createBead({ type: 'issue', title: 'Multi 1' });
+      await rig.createBead({ type: 'issue', title: 'Multi 2' });
+
+      const allEvents = await rig.listBeadEvents({});
+      expect(allEvents.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should write review_submitted event on submitToReviewQueue', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `evt-review-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Review event test' });
+      await rig.submitToReviewQueue({
+        agent_id: agent.id,
+        bead_id: bead.id,
+        branch: 'feature/test',
+      });
+
+      const events = await rig.listBeadEvents({ beadId: bead.id });
+      const reviewEvents = events.filter(e => e.event_type === 'review_submitted');
+      expect(reviewEvents).toHaveLength(1);
+      expect(reviewEvents[0].new_value).toBe('feature/test');
     });
   });
 

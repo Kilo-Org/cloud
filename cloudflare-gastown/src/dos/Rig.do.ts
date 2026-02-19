@@ -9,6 +9,13 @@ import {
 } from '../db/tables/review-queue.table';
 import { createTableMolecules } from '../db/tables/molecules.table';
 import {
+  createTableBeadEvents,
+  getIndexesBeadEvents,
+  beadEvents,
+  BeadEventRecord,
+} from '../db/tables/bead-events.table';
+import type { BeadEventType } from '../db/tables/bead-events.table';
+import {
   createTableAgentEvents,
   getIndexesAgentEvents,
   agentEvents,
@@ -17,6 +24,8 @@ import {
 import { getTownContainerStub } from './TownContainer.do';
 import { query } from '../util/query.util';
 import { signAgentJWT } from '../util/jwt.util';
+import { buildPolecatSystemPrompt } from '../prompts/polecat-system.prompt';
+import { buildMayorSystemPrompt } from '../prompts/mayor-system.prompt';
 import type {
   Bead,
   BeadStatus,
@@ -115,6 +124,78 @@ export class RigDO extends DurableObject<Env> {
     for (const idx of getIndexesAgentEvents()) {
       query(this.sql, idx, []);
     }
+
+    query(this.sql, createTableBeadEvents(), []);
+    for (const idx of getIndexesBeadEvents()) {
+      query(this.sql, idx, []);
+    }
+  }
+
+  // ── Bead Event Log ───────────────────────────────────────────────────
+
+  private writeBeadEvent(params: {
+    beadId: string;
+    agentId?: string | null;
+    eventType: BeadEventType;
+    oldValue?: string | null;
+    newValue?: string | null;
+    metadata?: Record<string, unknown>;
+  }): void {
+    const id = generateId();
+    const timestamp = now();
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${beadEvents} (
+          ${beadEvents.columns.id},
+          ${beadEvents.columns.bead_id},
+          ${beadEvents.columns.agent_id},
+          ${beadEvents.columns.event_type},
+          ${beadEvents.columns.old_value},
+          ${beadEvents.columns.new_value},
+          ${beadEvents.columns.metadata},
+          ${beadEvents.columns.created_at}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        id,
+        params.beadId,
+        params.agentId ?? null,
+        params.eventType,
+        params.oldValue ?? null,
+        params.newValue ?? null,
+        JSON.stringify(params.metadata ?? {}),
+        timestamp,
+      ]
+    );
+  }
+
+  async listBeadEvents(options: {
+    beadId?: string;
+    since?: string;
+    limit?: number;
+  }): Promise<BeadEventRecord[]> {
+    await this.ensureInitialized();
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${beadEvents}
+          WHERE (? IS NULL OR ${beadEvents.bead_id} = ?)
+            AND (? IS NULL OR ${beadEvents.created_at} > ?)
+          ORDER BY ${beadEvents.created_at} ASC
+          LIMIT ?
+        `,
+        [
+          options.beadId ?? null,
+          options.beadId ?? null,
+          options.since ?? null,
+          options.since ?? null,
+          options.limit ?? 100,
+        ]
+      ),
+    ];
+    return BeadEventRecord.array().parse(rows);
   }
 
   // ── Beads ──────────────────────────────────────────────────────────────
@@ -165,6 +246,15 @@ export class RigDO extends DurableObject<Env> {
 
     const result = this.getBead(id);
     if (!result) throw new Error('Failed to create bead');
+
+    this.writeBeadEvent({
+      beadId: id,
+      agentId: input.assignee_agent_id,
+      eventType: 'created',
+      newValue: input.type,
+      metadata: { title: input.title, priority: input.priority ?? 'medium' },
+    });
+
     console.log(`${RIG_LOG} createBead: created bead id=${result.id} status=${result.status}`);
     return result;
   }
@@ -218,6 +308,8 @@ export class RigDO extends DurableObject<Env> {
 
   async updateBeadStatus(beadId: string, status: BeadStatus, agentId: string): Promise<Bead> {
     await this.ensureInitialized();
+    const oldBead = this.getBead(beadId);
+    const oldStatus = oldBead?.status ?? null;
     const timestamp = now();
     const closedAt = status === 'closed' ? timestamp : null;
 
@@ -234,6 +326,15 @@ export class RigDO extends DurableObject<Env> {
     );
 
     this.touchAgent(agentId);
+
+    const eventType: BeadEventType = status === 'closed' ? 'closed' : 'status_changed';
+    this.writeBeadEvent({
+      beadId,
+      agentId,
+      eventType,
+      oldValue: oldStatus,
+      newValue: status,
+    });
 
     const bead = this.getBead(beadId);
     if (!bead) throw new Error(`Bead ${beadId} not found`);
@@ -434,6 +535,14 @@ export class RigDO extends DurableObject<Env> {
       [agentId, now(), beadId]
     );
 
+    this.writeBeadEvent({
+      beadId,
+      agentId,
+      eventType: 'hooked',
+      newValue: agentId,
+      metadata: { agent_name: agent.name, agent_role: agent.role },
+    });
+
     console.log(
       `${RIG_LOG} hookBead: bead ${beadId} now in_progress, agent ${agentId} hooked. Arming alarm.`
     );
@@ -442,6 +551,10 @@ export class RigDO extends DurableObject<Env> {
 
   async unhookBead(agentId: string): Promise<void> {
     await this.ensureInitialized();
+    // Read agent to get bead_id before unhooking
+    const agent = this.getAgent(agentId);
+    const beadId = agent?.current_hook_bead_id;
+
     query(
       this.sql,
       /* sql */ `
@@ -453,6 +566,15 @@ export class RigDO extends DurableObject<Env> {
       `,
       [now(), agentId]
     );
+
+    if (beadId) {
+      this.writeBeadEvent({
+        beadId,
+        agentId,
+        eventType: 'unhooked',
+        oldValue: agentId,
+      });
+    }
   }
 
   async getHookedBead(agentId: string): Promise<Bead | null> {
@@ -621,6 +743,14 @@ export class RigDO extends DurableObject<Env> {
         timestamp,
       ]
     );
+
+    this.writeBeadEvent({
+      beadId: input.bead_id,
+      agentId: input.agent_id,
+      eventType: 'review_submitted',
+      newValue: input.branch,
+      metadata: { pr_url: input.pr_url, summary: input.summary },
+    });
   }
 
   async popReviewQueue(): Promise<ReviewQueueEntry | null> {
@@ -668,6 +798,100 @@ export class RigDO extends DurableObject<Env> {
       `,
       [status, now(), entryId]
     );
+  }
+
+  /**
+   * Called by the container's merge callback to report the result of a merge.
+   * On 'merged': marks the review entry as merged and closes the associated bead.
+   * On 'conflict': marks as failed and creates an escalation bead with conflict details.
+   */
+  async completeReviewWithResult(input: {
+    entry_id: string;
+    status: 'merged' | 'conflict';
+    message: string;
+    commit_sha?: string;
+  }): Promise<void> {
+    await this.ensureInitialized();
+
+    const reviewStatus = input.status === 'merged' ? 'merged' : 'failed';
+    await this.completeReview(input.entry_id, reviewStatus);
+
+    // Look up the review entry to get the bead_id
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${reviewQueue}
+          WHERE ${reviewQueue.columns.id} = ?
+        `,
+        [input.entry_id]
+      ),
+    ];
+
+    if (rows.length === 0) {
+      console.warn(`${RIG_LOG} completeReviewWithResult: entry ${input.entry_id} not found`);
+      return;
+    }
+
+    const entry = ReviewQueueRecord.parse(rows[0]);
+
+    if (input.status === 'merged') {
+      // Read the bead's current status before closing it
+      const beadBefore = this.getBead(entry.bead_id);
+      const oldStatus = beadBefore?.status ?? null;
+
+      // Close the bead
+      const timestamp = now();
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.status} = 'closed',
+              ${beads.columns.updated_at} = ?,
+              ${beads.columns.closed_at} = ?
+          WHERE ${beads.columns.id} = ?
+        `,
+        [timestamp, timestamp, entry.bead_id]
+      );
+
+      this.writeBeadEvent({
+        beadId: entry.bead_id,
+        agentId: entry.agent_id,
+        eventType: 'review_completed',
+        oldValue: oldStatus,
+        newValue: 'merged',
+        metadata: { commit_sha: input.commit_sha, branch: entry.branch },
+      });
+
+      console.log(
+        `${RIG_LOG} completeReviewWithResult: bead ${entry.bead_id} closed after merge (commit ${input.commit_sha ?? 'unknown'})`
+      );
+    } else {
+      // Conflict — create an escalation bead (createBead writes its own 'created' event)
+      await this.createBead({
+        type: 'escalation',
+        title: `Merge conflict: ${entry.branch}`,
+        body: `Automatic merge of branch \`${entry.branch}\` failed.\n\n${input.message}`,
+        priority: 'high',
+        metadata: {
+          source_bead_id: entry.bead_id,
+          source_branch: entry.branch,
+          agent_id: entry.agent_id,
+        },
+      });
+
+      this.writeBeadEvent({
+        beadId: entry.bead_id,
+        agentId: entry.agent_id,
+        eventType: 'escalated',
+        newValue: input.message,
+        metadata: { branch: entry.branch },
+      });
+
+      console.log(
+        `${RIG_LOG} completeReviewWithResult: merge conflict for bead ${entry.bead_id}, escalation bead created`
+      );
+    }
   }
 
   // ── Prime (context assembly) ───────────────────────────────────────────
@@ -791,6 +1015,10 @@ export class RigDO extends DurableObject<Env> {
 
     const beadId = agent.current_hook_bead_id;
     if (beadId) {
+      // Read previous status before mutating
+      const beadBefore = this.getBead(beadId);
+      const oldStatus = beadBefore?.status ?? null;
+
       const beadStatus = input.status === 'completed' ? 'closed' : 'failed';
       console.log(
         `${RIG_LOG} agentCompleted: agent ${agentId} ${input.status}, transitioning bead ${beadId} to '${beadStatus}'`
@@ -808,6 +1036,14 @@ export class RigDO extends DurableObject<Env> {
         `,
         [beadStatus, timestamp, closedAt, beadId]
       );
+      this.writeBeadEvent({
+        beadId,
+        agentId,
+        eventType: input.status === 'completed' ? 'closed' : 'status_changed',
+        oldValue: oldStatus,
+        newValue: beadStatus,
+        metadata: { reason: input.reason },
+      });
     } else {
       console.log(`${RIG_LOG} agentCompleted: agent ${agentId} ${input.status} but no hooked bead`);
     }
@@ -1240,20 +1476,39 @@ export class RigDO extends DurableObject<Env> {
     return parts.join('\n\n');
   }
 
-  /** Default system prompt per agent role. */
-  private static systemPromptForRole(role: string, identity: string): string {
-    const base = `You are ${identity}, a Gastown ${role} agent. Follow all instructions in the GASTOWN CONTEXT injected into this session.`;
-    switch (role) {
+  /** Build the system prompt for an agent given its role and context. */
+  private static systemPromptForRole(params: {
+    role: string;
+    identity: string;
+    agentName: string;
+    rigId: string;
+    townId: string;
+  }): string {
+    switch (params.role) {
       case 'polecat':
-        return `${base} Your job is to implement the assigned task on a feature branch, write clean code, and call gt_done when finished.`;
+        return buildPolecatSystemPrompt({
+          agentName: params.agentName,
+          rigId: params.rigId,
+          townId: params.townId,
+          identity: params.identity,
+        });
       case 'mayor':
-        return `${base} You coordinate work across the town. Respond to messages and delegate tasks via gt_mail_send.`;
-      case 'refinery':
-        return `${base} You review code quality and merge PRs. Check for correctness, style, and test coverage.`;
-      case 'witness':
-        return `${base} You monitor agent health and report anomalies.`;
-      default:
-        return base;
+        return buildMayorSystemPrompt({
+          identity: params.identity,
+          townId: params.townId,
+        });
+      default: {
+        // Fallback for roles without a dedicated prompt builder
+        const base = `You are ${params.identity}, a Gastown ${params.role} agent. Follow all instructions in the GASTOWN CONTEXT injected into this session.`;
+        switch (params.role) {
+          case 'refinery':
+            return `${base} You review code quality and merge PRs. Check for correctness, style, and test coverage.`;
+          case 'witness':
+            return `${base} You monitor agent health and report anomalies.`;
+          default:
+            return base;
+        }
+      }
     }
   }
 
@@ -1261,13 +1516,13 @@ export class RigDO extends DurableObject<Env> {
   private static modelForRole(role: string): string {
     switch (role) {
       case 'polecat':
-        return 'kilo/claude-sonnet-4-20250514';
+        return 'anthropic/claude-sonnet-4.6';
       case 'refinery':
-        return 'kilo/claude-sonnet-4-20250514';
+        return 'anthropic/claude-sonnet-4.6';
       case 'mayor':
-        return 'kilo/claude-sonnet-4-20250514';
+        return 'anthropic/claude-sonnet-4.6';
       default:
-        return 'kilo/claude-sonnet-4-20250514';
+        return 'anthropic/claude-sonnet-4.6';
     }
   }
 
@@ -1345,7 +1600,13 @@ export class RigDO extends DurableObject<Env> {
           identity: params.identity,
           prompt,
           model: RigDO.modelForRole(params.role),
-          systemPrompt: RigDO.systemPromptForRole(params.role, params.identity),
+          systemPrompt: RigDO.systemPromptForRole({
+            role: params.role,
+            identity: params.identity,
+            agentName: params.agentName,
+            rigId,
+            townId: config.townId,
+          }),
           gitUrl: config.gitUrl,
           branch: RigDO.branchForAgent(params.agentName),
           defaultBranch: config.defaultBranch,
@@ -1410,14 +1671,27 @@ export class RigDO extends DurableObject<Env> {
 
   /**
    * Signal the container to run a deterministic merge for a review queue entry.
+   * The container runs the merge asynchronously and calls back to
+   * `completeReview` when done.
    */
   private async startMergeInContainer(config: RigConfig, entry: ReviewQueueEntry): Promise<void> {
     try {
       const token = await this.mintAgentToken(entry.agent_id, config);
+      const rigId = this.ctx.id.name ?? config.rigId;
+      if (!rigId) {
+        console.error(
+          `${RIG_LOG} startMergeInContainer: no rigId available, cannot dispatch merge for entry ${entry.id}`
+        );
+        await this.completeReview(entry.id, 'failed');
+        return;
+      }
 
       const envVars: Record<string, string> = {};
       if (token) {
         envVars.GASTOWN_SESSION_TOKEN = token;
+      }
+      if (this.env.GASTOWN_API_URL) {
+        envVars.GASTOWN_API_URL = this.env.GASTOWN_API_URL;
       }
       if (this.env.KILO_API_URL) {
         envVars.KILO_API_URL = this.env.KILO_API_URL;
@@ -1427,26 +1701,33 @@ export class RigDO extends DurableObject<Env> {
       }
 
       const container = getTownContainerStub(this.env, config.townId);
-      const response = await container.fetch('http://container/merge', {
+      const response = await container.fetch('http://container/git/merge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          entry_id: entry.id,
+          rigId,
           branch: entry.branch,
-          bead_id: entry.bead_id,
-          agent_id: entry.agent_id,
-          pr_url: entry.pr_url,
+          targetBranch: config.defaultBranch,
+          gitUrl: config.gitUrl,
+          entryId: entry.id,
+          beadId: entry.bead_id,
+          agentId: entry.agent_id,
           envVars,
         }),
       });
 
       if (!response.ok) {
-        console.error(`Merge request failed for entry ${entry.id}: ${response.status}`);
+        console.error(
+          `${RIG_LOG} startMergeInContainer: merge request failed for entry ${entry.id}: ${response.status}`
+        );
         await this.completeReview(entry.id, 'failed');
       }
       // On success, the container will call back to completeReview when merge finishes
     } catch (err) {
-      console.error(`Failed to start merge for entry ${entry.id}:`, err);
+      console.error(
+        `${RIG_LOG} startMergeInContainer: failed to start merge for entry ${entry.id}:`,
+        err
+      );
       await this.completeReview(entry.id, 'failed');
     }
   }

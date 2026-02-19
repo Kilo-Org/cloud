@@ -26,6 +26,25 @@ function buildKiloConfigContent(kilocodeToken: string): string {
         },
       },
     },
+    // Override the small model (used for title generation) to a valid
+    // kilo-provider model. Without this, kilo serve defaults to
+    // openai/gpt-5-nano which doesn't exist in the kilo provider,
+    // causing ProviderModelNotFoundError that kills the entire prompt loop.
+    small_model: 'anthropic/claude-haiku-4.5',
+    model: 'anthropic/claude-sonnet-4.6',
+    // Override the title agent to use a valid model (same as small_model).
+    // kilo serve v1.0.23 resolves title model independently and the
+    // small_model fallback doesn't prevent ProviderModelNotFoundError.
+    agents: {
+      title: {
+        model: 'anthropic/claude-haiku-4.5',
+      },
+    },
+    // Auto-approve everything — agents run headless in a container,
+    // there's no human to answer permission prompts.
+    permission: {
+      '*': 'allow',
+    },
   });
 }
 

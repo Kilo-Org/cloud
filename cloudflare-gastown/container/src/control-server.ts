@@ -11,8 +11,14 @@ import {
   getAgentEvents,
 } from './process-manager';
 import { startHeartbeat, stopHeartbeat } from './heartbeat';
-import { StartAgentRequest, StopAgentRequest, SendMessageRequest } from './types';
-import type { AgentStatusResponse, HealthResponse, StreamTicketResponse } from './types';
+import { mergeBranch } from './git-manager';
+import { StartAgentRequest, StopAgentRequest, SendMessageRequest, MergeRequest } from './types';
+import type {
+  AgentStatusResponse,
+  HealthResponse,
+  StreamTicketResponse,
+  MergeResult,
+} from './types';
 
 const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
@@ -145,6 +151,77 @@ export function consumeStreamTicket(ticket: string): string | null {
   if (entry.expiresAt < Date.now()) return null;
   return entry.agentId;
 }
+
+// POST /git/merge
+// Deterministic merge of a polecat branch into the target branch.
+// Called by the Rig DO's processReviewQueue → startMergeInContainer.
+// Runs the merge synchronously and reports the result back to the Rig DO
+// via a callback to the completeReview endpoint.
+app.post('/git/merge', async c => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = MergeRequest.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
+  }
+
+  const req = parsed.data;
+
+  // Run the merge in the background so we can return 202 immediately.
+  // The Rig DO will be notified via callback when the merge completes.
+  const apiUrl = req.envVars?.GASTOWN_API_URL ?? process.env.GASTOWN_API_URL;
+  const token = req.envVars?.GASTOWN_SESSION_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
+
+  const doMerge = async () => {
+    const outcome = await mergeBranch({
+      rigId: req.rigId,
+      branch: req.branch,
+      targetBranch: req.targetBranch,
+      gitUrl: req.gitUrl,
+    });
+
+    // Report result back to the Rig DO
+    const callbackUrl =
+      req.callbackUrl ??
+      (apiUrl ? `${apiUrl}/api/rigs/${req.rigId}/review-queue/${req.entryId}/complete` : null);
+
+    if (callbackUrl && token) {
+      try {
+        const resp = await fetch(callbackUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            entry_id: req.entryId,
+            status: outcome.status,
+            message: outcome.message,
+            commit_sha: outcome.commitSha,
+          }),
+        });
+        if (!resp.ok) {
+          console.warn(
+            `Merge callback failed for entry ${req.entryId}: ${resp.status} ${resp.statusText}`
+          );
+        }
+      } catch (err) {
+        console.warn(`Merge callback error for entry ${req.entryId}:`, err);
+      }
+    } else {
+      console.warn(
+        `No callback URL or token for merge entry ${req.entryId}, result: ${outcome.status}`
+      );
+    }
+  };
+
+  // Fire and forget — the Rig DO will time out stuck entries via recoverStuckReviews
+  doMerge().catch(err => {
+    console.error(`Merge failed for entry ${req.entryId}:`, err);
+  });
+
+  const result: MergeResult = { status: 'accepted', message: 'Merge started' };
+  return c.json(result, 202);
+});
 
 // Catch-all
 app.notFound(c => c.json({ error: 'Not found' }, 404));

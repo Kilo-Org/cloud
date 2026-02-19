@@ -182,3 +182,96 @@ export async function listWorktrees(rigId: string): Promise<string[]> {
     .filter(line => line.startsWith('worktree '))
     .map(line => line.replace('worktree ', ''));
 }
+
+export type MergeOutcome = {
+  status: 'merged' | 'conflict';
+  message: string;
+  commitSha?: string;
+};
+
+/**
+ * Deterministic merge of a feature branch into the target branch.
+ * Uses a temporary worktree so the bare repo and agent worktrees are unaffected.
+ *
+ * 1. Ensure the repo is cloned/fetched
+ * 2. Create a temporary worktree on the target branch
+ * 3. git merge --no-ff <branch>
+ * 4. If success: push, clean up, return 'merged'
+ * 5. If conflict: abort, clean up, return 'conflict'
+ */
+export async function mergeBranch(options: {
+  rigId: string;
+  branch: string;
+  targetBranch: string;
+  gitUrl: string;
+}): Promise<MergeOutcome> {
+  validatePathSegment(options.rigId, 'rigId');
+  validateBranchName(options.branch, 'branch');
+  validateBranchName(options.targetBranch, 'targetBranch');
+  validateGitUrl(options.gitUrl);
+
+  const repo = repoDir(options.rigId);
+
+  // Ensure repo exists and is up to date
+  if (!(await pathExists(join(repo, '.git')))) {
+    await cloneRepo({
+      rigId: options.rigId,
+      gitUrl: options.gitUrl,
+      defaultBranch: options.targetBranch,
+    });
+  } else {
+    await exec('git', ['fetch', '--all', '--prune'], repo);
+  }
+
+  // Create a temporary worktree for the merge on the target branch
+  const mergeDir = resolve(WORKSPACE_ROOT, options.rigId, 'merge-tmp', `merge-${Date.now()}`);
+  assertInsideWorkspace(mergeDir);
+  // Only create the parent — git worktree add creates the leaf directory itself
+  await mkdir(resolve(WORKSPACE_ROOT, options.rigId, 'merge-tmp'), { recursive: true });
+
+  try {
+    // Add worktree tracking the target branch
+    await exec('git', ['worktree', 'add', mergeDir, options.targetBranch], repo);
+
+    // Pull latest on the target branch
+    await exec('git', ['pull', '--ff-only'], mergeDir).catch(() => {
+      // Pull may fail if target has no upstream; that's fine for local-only branches
+    });
+
+    // Attempt the merge
+    try {
+      await exec(
+        'git',
+        [
+          'merge',
+          '--no-ff',
+          '-m',
+          `Merge ${options.branch} into ${options.targetBranch}`,
+          `origin/${options.branch}`,
+        ],
+        mergeDir
+      );
+    } catch (mergeErr) {
+      // Merge failed — likely a conflict
+      const message = mergeErr instanceof Error ? mergeErr.message : 'Unknown merge error';
+
+      // Abort the merge so the worktree is clean for removal
+      await exec('git', ['merge', '--abort'], mergeDir).catch(() => {});
+      return { status: 'conflict', message };
+    }
+
+    // Get the commit SHA of the merge commit
+    const commitSha = await exec('git', ['rev-parse', 'HEAD'], mergeDir);
+
+    // Push the merged target branch
+    await exec('git', ['push', 'origin', options.targetBranch], mergeDir);
+
+    return { status: 'merged', message: 'Merge successful', commitSha };
+  } finally {
+    // Always clean up the temporary worktree
+    await exec('git', ['worktree', 'remove', '--force', mergeDir], repo).catch(err => {
+      console.warn(`Failed to remove merge worktree at ${mergeDir}:`, err);
+    });
+    await rm(mergeDir, { recursive: true, force: true }).catch(() => {});
+  }
+}

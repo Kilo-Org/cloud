@@ -512,7 +512,8 @@ function errorResponse(status: number, message: string) {
 function buildCommonParams(
   customLlm: CustomLlm,
   messages: ModelMessage[],
-  request: OpenRouterChatCompletionRequest
+  request: OpenRouterChatCompletionRequest,
+  isLegacyExtension: boolean
 ) {
   const verbosity = customLlm.verbosity ?? request.verbosity ?? undefined;
   return {
@@ -527,12 +528,15 @@ function buildCommonParams(
       anthropic: {
         thinking: { type: 'adaptive' },
         effort: verbosity,
+        disableParallelToolUse: request.parallel_tool_calls === false || isLegacyExtension,
       } satisfies AnthropicProviderOptions,
       openai: {
         reasoningSummary: 'auto',
         textVerbosity: verbosity === 'max' ? 'high' : verbosity,
-        reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort,
+        reasoningEffort:
+          customLlm.reasoning_effort ?? request.reasoning?.effort ?? request.reasoning_effort,
         include: ['reasoning.encrypted_content'],
+        parallelToolCalls: (request.parallel_tool_calls ?? true) && !isLegacyExtension,
         store: false,
       } satisfies OpenAILanguageModelResponsesOptions,
       xai: {
@@ -656,7 +660,12 @@ export async function customLlmRequest(
   }
 
   const model = createModel(customLlm);
-  const commonParams = buildCommonParams(customLlm, convertMessages(messages), request);
+  const commonParams = buildCommonParams(
+    customLlm,
+    convertMessages(messages),
+    request,
+    isLegacyExtension
+  );
 
   const modelId = customLlm.public_id;
 

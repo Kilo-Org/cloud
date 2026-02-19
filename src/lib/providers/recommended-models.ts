@@ -1,4 +1,4 @@
-import type { ModelSettings, VersionedSettings } from '@/lib/organizations/organization-types';
+import type { ModelSettings, VersionedSettings } from '@/lib/organizations/model-settings';
 import { giga_potato_model } from '@/lib/providers/gigapotato';
 import { isOpenAiModel } from '@/lib/providers/openai';
 

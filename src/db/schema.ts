@@ -56,6 +56,7 @@ import {
 } from '@/lib/kilo-pass/enums';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
+import type { Tool } from '@/lib/organizations/model-settings';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -844,6 +845,10 @@ export const custom_llm = pgTable('custom_llm', {
   api_key: text().notNull(),
   verbosity: text().$type<'low' | 'medium' | 'high' | 'max'>(),
   organization_ids: jsonb().notNull().$type<string[]>(),
+  reasoning_effort: text().$type<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'>(),
+  included_tools: jsonb().$type<Tool[]>(),
+  excluded_tools: jsonb().$type<Tool[]>(),
+  supports_image_input: boolean(),
 });
 
 export type CustomLlm = typeof custom_llm.$inferSelect;

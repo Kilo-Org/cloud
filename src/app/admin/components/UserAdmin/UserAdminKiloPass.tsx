@@ -85,8 +85,9 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
   const latestBase = issuances.find(r => r.itemKind === KiloPassIssuanceItemKind.Base);
   const latestBonus = issuances.find(
     r =>
-      r.itemKind === KiloPassIssuanceItemKind.Bonus ||
-      r.itemKind === KiloPassIssuanceItemKind.PromoFirstMonth50Pct
+      r.issueMonth === latestBase?.issueMonth &&
+      (r.itemKind === KiloPassIssuanceItemKind.Bonus ||
+        r.itemKind === KiloPassIssuanceItemKind.PromoFirstMonth50Pct)
   );
   const baseUsd = latestBase ? parseFloat(String(latestBase.itemAmountUsd)) : null;
   const bonusUsd = latestBonus ? parseFloat(String(latestBonus.itemAmountUsd)) : null;

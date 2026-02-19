@@ -20,7 +20,7 @@ const getGatewayErrorRate_cached = unstable_cache(
       .array(
         z.object({
           gateway: z.string(),
-          errorRate: z.number(),
+          errorRate: z.coerce.number(),
         })
       )
       .parse(rows);

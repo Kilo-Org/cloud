@@ -1454,32 +1454,24 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       await this.ctx.storage.put(storageUpdate({ flyMachineId: null }));
     }
 
-    // Try to fork the volume if it has user data
-    let forked = false;
     if (hasUserData) {
-      try {
-        const forkedVolume = await fly.createVolume(flyConfig, {
-          name: volumeNameFromSandboxId(this.sandboxId),
-          region: reversedRegion,
-          size_gb: DEFAULT_VOLUME_SIZE_GB,
-          source_volume_id: oldVolumeId,
-        });
-        this.flyVolumeId = forkedVolume.id;
-        this.flyRegion = forkedVolume.region;
-        forked = true;
-        reconcileLog(reason, 'fork_stranded_volume', {
-          old_volume_id: oldVolumeId,
-          old_region: oldRegion,
-          new_volume_id: forkedVolume.id,
-          new_region: forkedVolume.region,
-        });
-      } catch (err) {
-        console.warn('[DO] Volume fork failed, falling back to fresh volume:', err);
-      }
-    }
-
-    // Fresh volume: either because this is a first-time provision or fork failed
-    if (!forked) {
+      // Fork the volume to preserve user data (workspace, config)
+      const forkedVolume = await fly.createVolume(flyConfig, {
+        name: volumeNameFromSandboxId(this.sandboxId),
+        region: reversedRegion,
+        size_gb: DEFAULT_VOLUME_SIZE_GB,
+        source_volume_id: oldVolumeId,
+      });
+      this.flyVolumeId = forkedVolume.id;
+      this.flyRegion = forkedVolume.region;
+      reconcileLog(reason, 'fork_stranded_volume', {
+        old_volume_id: oldVolumeId,
+        old_region: oldRegion,
+        new_volume_id: forkedVolume.id,
+        new_region: forkedVolume.region,
+      });
+    } else {
+      // Fresh provision (never started) — no user data to preserve
       this.flyVolumeId = null;
       this.flyRegion = null;
       await this.ctx.storage.put(storageUpdate({ flyVolumeId: null, flyRegion: null }));
@@ -1496,7 +1488,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         old_region: oldRegion,
         new_volume_id: freshVolume.id,
         new_region: freshVolume.region,
-        data_loss: hasUserData,
       });
     }
 

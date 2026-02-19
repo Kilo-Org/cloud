@@ -993,7 +993,7 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(storage._store.get('flyVolumeId')).toBe('vol-forked');
   });
 
-  it('existing instance: falls back to fresh volume when fork fails', async () => {
+  it('existing instance: propagates error when fork fails (no silent data loss)', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       flyMachineId: null,
@@ -1001,29 +1001,21 @@ describe('start: 412 insufficient resources recovery', () => {
     });
 
     // First createMachine fails with 412
-    (flyClient.createMachine as Mock)
-      .mockRejectedValueOnce(
-        new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
-      )
-      .mockResolvedValueOnce({ id: 'machine-retry', region: 'yyz' });
-    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.createMachine as Mock).mockRejectedValueOnce(
+      new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+    );
     (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
-    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
-    // Fork fails, then fresh create succeeds
-    (flyClient.createVolume as Mock)
-      .mockRejectedValueOnce(new FlyApiError('fork failed', 500, 'fail'))
-      .mockResolvedValueOnce({ id: 'vol-fresh', region: 'yyz' });
+    // Fork fails
+    (flyClient.createVolume as Mock).mockRejectedValueOnce(
+      new FlyApiError('fork failed', 500, 'fail')
+    );
 
-    await instance.start('user-1');
+    await expect(instance.start('user-1')).rejects.toThrow('fork failed');
 
-    // createVolume called twice: fork attempt + fresh
-    expect(flyClient.createVolume).toHaveBeenCalledTimes(2);
-    // Second call should NOT have source_volume_id
-    const secondCall = (flyClient.createVolume as Mock).mock.calls[1][1];
-    expect(secondCall.source_volume_id).toBeUndefined();
-
-    expect(storage._store.get('flyMachineId')).toBe('machine-retry');
-    expect(storage._store.get('flyVolumeId')).toBe('vol-fresh');
+    // Volume should NOT have been replaced with a fresh one
+    expect(storage._store.get('flyVolumeId')).toBe('vol-1');
+    // No machine created
+    expect(storage._store.get('flyMachineId')).toBeNull();
   });
 
   it('destroys existing machine when 412 hits on updateMachine in startExistingMachine', async () => {

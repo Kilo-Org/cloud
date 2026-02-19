@@ -781,10 +781,8 @@ export class RigDO extends DurableObject<Env> {
   // ── Get or Create Agent ────────────────────────────────────────────────
   // Atomically finds an existing agent of the given role (idle preferred)
   // or creates a new one. Prevents duplicate agent creation from concurrent calls.
-  // Singleton roles (mayor, witness, refinery) always return the existing
+  // Singleton roles (witness, refinery) always return the existing
   // agent even if busy — only polecats scale out by creating new agents.
-
-  // Mayor removed: now handled by MayorDO (town-level, not per-rig)
   private static readonly SINGLETON_ROLES: ReadonlySet<string> = new Set(['witness', 'refinery']);
 
   async getOrCreateAgent(role: AgentRole): Promise<Agent> {

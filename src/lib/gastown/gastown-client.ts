@@ -351,7 +351,6 @@ export type MayorStatus = z.output<typeof MayorStatusSchema>;
 export async function configureMayor(
   townId: string,
   config: {
-    townId: string;
     userId: string;
     kilocodeToken?: string;
     gitUrl: string;
@@ -360,7 +359,7 @@ export async function configureMayor(
 ): Promise<void> {
   await gastownFetch(`/api/towns/${townId}/mayor/configure`, {
     method: 'POST',
-    body: JSON.stringify(config),
+    body: JSON.stringify({ ...config, townId }),
   });
 }
 

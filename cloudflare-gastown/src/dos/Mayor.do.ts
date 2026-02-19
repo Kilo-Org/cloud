@@ -228,8 +228,9 @@ export class MayorDO extends DurableObject<Env> {
     const lastActivity = new Date(session.lastActivityAt).getTime();
     if (Date.now() - lastActivity > SESSION_STALE_MS) {
       console.log(
-        `${MAYOR_LOG} alarm: session ${session.sessionId} is stale (last activity: ${session.lastActivityAt}), clearing`
+        `${MAYOR_LOG} alarm: session ${session.sessionId} is stale (last activity: ${session.lastActivityAt}), stopping agent and clearing`
       );
+      await this.bestEffortStopAgent(config.townId, session.agentId);
       await this.clearSession();
       return;
     }
@@ -367,7 +368,7 @@ export class MayorDO extends DurableObject<Env> {
     return {
       agentId,
       sessionId: agentId, // kilo serve session ID matches agentId from the container
-      status: 'active',
+      status: 'starting',
       lastActivityAt: now(),
     };
   }
@@ -389,6 +390,24 @@ export class MayorDO extends DurableObject<Env> {
         `${MAYOR_LOG} sendFollowUp: container rejected message for agent ${agentId}: ${text.slice(0, 500)}`
       );
       throw new Error(`Failed to send message to mayor: ${response.status}`);
+    }
+  }
+
+  /**
+   * Best-effort stop of an agent in the container. Errors are logged
+   * but do not propagate — used during cleanup paths where we don't
+   * want a container failure to block session clearing.
+   */
+  private async bestEffortStopAgent(townId: string, agentId: string): Promise<void> {
+    try {
+      const container = getTownContainerStub(this.env, townId);
+      await container.fetch(`http://container/agents/${agentId}/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+    } catch (err) {
+      console.warn(`${MAYOR_LOG} bestEffortStopAgent: failed to stop agent ${agentId}:`, err);
     }
   }
 

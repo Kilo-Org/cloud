@@ -45,7 +45,7 @@ export async function handleConfigureMayor(c: Context<GastownEnv>, params: { tow
   );
 
   const mayor = getMayorDOStub(c.env, params.townId);
-  await mayor.configureMayor(parsed.data);
+  await mayor.configureMayor({ ...parsed.data, townId: params.townId });
   return c.json(resSuccess({ configured: true }), 200);
 }
 

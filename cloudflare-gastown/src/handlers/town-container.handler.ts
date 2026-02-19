@@ -129,7 +129,8 @@ export async function handleContainerStreamTicket(
     console.error(
       `${CONTAINER_LOG} handleContainerStreamTicket: container error ${response.status}: ${text.slice(0, 300)}`
     );
-    return c.json(resError(`Container error: ${response.status}`), response.status as 404 | 500);
+    const statusCode = response.status >= 500 ? 502 : response.status === 404 ? 404 : 400;
+    return c.json(resError(`Container error: ${response.status}`), statusCode);
   }
 
   const raw = await response.json();

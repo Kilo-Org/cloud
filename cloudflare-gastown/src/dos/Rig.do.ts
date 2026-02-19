@@ -2112,6 +2112,9 @@ export class RigDO extends DurableObject<Env> {
       if (townConfig?.git_auth?.gitlab_token) {
         envVars.GITLAB_TOKEN = townConfig.git_auth.gitlab_token;
       }
+      if (townConfig?.git_auth?.gitlab_instance_url) {
+        envVars.GITLAB_INSTANCE_URL = townConfig.git_auth.gitlab_instance_url;
+      }
 
       if (token) {
         envVars.GASTOWN_SESSION_TOKEN = token;

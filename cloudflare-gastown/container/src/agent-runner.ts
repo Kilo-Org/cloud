@@ -1,3 +1,4 @@
+import { chmod, writeFile } from 'node:fs/promises';
 import { cloneRepo, createWorktree } from './git-manager';
 import { startAgent } from './process-manager';
 import type { ManagedAgent, StartAgentRequest } from './types';
@@ -122,7 +123,7 @@ async function configureGitCredentials(
     // accidentally committed by `git add .` or `git add -A`.
     const uniqueSuffix = workdir.replace(/[^a-zA-Z0-9]/g, '-');
     const credFile = `/tmp/.git-credentials${uniqueSuffix}`;
-    await Bun.write(credFile, credentialLine + '\n');
+    await writeFile(credFile, credentialLine + '\n', { mode: 0o600 });
 
     // Configure the worktree to use credential-store pointing at this file
     const proc = Bun.spawn(['git', 'config', 'credential.helper', `store --file=${credFile}`], {

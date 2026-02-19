@@ -106,7 +106,8 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
     if (mode === 'manual') return gitUrl.trim();
     if (!selectedRepo) return '';
     if (selectedPlatform === 'gitlab') {
-      return `https://gitlab.com/${selectedRepo}.git`;
+      const instanceUrl = gitlabReposQuery.data?.instanceUrl ?? 'https://gitlab.com';
+      return `${instanceUrl.replace(/\/+$/, '')}/${selectedRepo}.git`;
     }
     return `https://github.com/${selectedRepo}.git`;
   }

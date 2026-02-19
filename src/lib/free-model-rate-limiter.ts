@@ -4,8 +4,8 @@ import { and, count, gte, sql } from 'drizzle-orm';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
-  TIME_WINDOW_PROMOTION_MODELS_USAGE_WITHOUT_ACCOUNT_HOURS,
-  MAX_PROMPTS_ON_PROMOTION_MODELS_WITHOUT_ACCOUNT,
+  PROMOTION_WINDOW_HOURS,
+  PROMOTION_MAX_REQUESTS,
 } from '@/lib/constants';
 
 export type RateLimitResult = {
@@ -52,13 +52,13 @@ export async function checkFreeModelRateLimit(ipAddress: string): Promise<RateLi
  */
 export async function checkPromotionLimit(ipAddress: string): Promise<RateLimitResult> {
   const windowStart = new Date(
-    Date.now() - TIME_WINDOW_PROMOTION_MODELS_USAGE_WITHOUT_ACCOUNT_HOURS * 60 * 60 * 1000
+    Date.now() - PROMOTION_WINDOW_HOURS * 60 * 60 * 1000
   );
 
   const requestCount = await getModelUsageSinceTime(windowStart, ipAddress);
 
   return {
-    allowed: requestCount < MAX_PROMPTS_ON_PROMOTION_MODELS_WITHOUT_ACCOUNT,
+    allowed: requestCount < PROMOTION_MAX_REQUESTS,
     requestCount,
   };
 }

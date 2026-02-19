@@ -17,7 +17,9 @@ RUN apt-get update && \
 # Install Kilo CLI globally via npm (needs real Node.js runtime).
 # npm's global install does not resolve optionalDependencies, so we must
 # explicitly install the platform-specific binary package alongside the CLI.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64
+# Also install @kilocode/plugin globally so repo-local tools (e.g.
+# .opencode/tool/*.ts) can resolve it without a local node_modules.
+RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64 @kilocode/plugin
 
 # Create workspace directories
 RUN mkdir -p /workspace/rigs /app

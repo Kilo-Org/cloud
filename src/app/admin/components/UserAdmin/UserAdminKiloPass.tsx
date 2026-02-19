@@ -7,6 +7,7 @@ import { Coins } from 'lucide-react';
 import { formatMicrodollars, formatDate } from '@/lib/admin-utils';
 import { useTRPC } from '@/lib/trpc/utils';
 import CheckKiloPassButton from './CheckKiloPassButton';
+import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 
 function formatUsd(value: number | string | null | undefined): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -81,9 +82,11 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
   }
 
   // Latest month's base credits for the progress display
-  const latestBase = issuances.find(r => r.itemKind === 'base');
+  const latestBase = issuances.find(r => r.itemKind === KiloPassIssuanceItemKind.Base);
   const latestBonus = issuances.find(
-    r => r.itemKind === 'bonus' || r.itemKind === 'promo_first_month_50pct'
+    r =>
+      r.itemKind === KiloPassIssuanceItemKind.Bonus ||
+      r.itemKind === KiloPassIssuanceItemKind.PromoFirstMonth50Pct
   );
   const baseUsd = latestBase ? parseFloat(String(latestBase.itemAmountUsd)) : null;
   const bonusUsd = latestBonus ? parseFloat(String(latestBonus.itemAmountUsd)) : null;
@@ -218,7 +221,7 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
                         <Badge
                           variant="outline"
                           className={
-                            item.itemKind === 'base'
+                            item.itemKind === KiloPassIssuanceItemKind.Base
                               ? 'border-amber-500/30 text-amber-400'
                               : 'border-emerald-500/30 text-emerald-400'
                           }

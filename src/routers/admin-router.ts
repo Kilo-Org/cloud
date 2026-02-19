@@ -379,7 +379,8 @@ export const adminRouter = createTRPCRouter({
               and(
                 eq(microdollar_usage.kilo_user_id, input.userId),
                 isNull(microdollar_usage.organization_id),
-                sql`${microdollar_usage.created_at} >= ${latestBaseIssuance.itemCreatedAt}`
+                sql`${microdollar_usage.created_at} >= ${latestBaseIssuance.itemCreatedAt}`,
+                sql`${microdollar_usage.created_at} < now()`
               )
             );
           const raw = Number(result[0]?.totalCost_mUsd);
@@ -394,7 +395,6 @@ export const adminRouter = createTRPCRouter({
         return {
           subscription: {
             ...subscription,
-            currentStreakMonths: subscription.currentStreakMonths,
           },
           issuances: issuanceRows.map(r => ({
             issueMonth: r.issueMonth,

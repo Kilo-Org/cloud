@@ -251,7 +251,12 @@ function applyPreferredProvider(
     `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProvider}`
   );
   if (!requestToMutate.provider) {
-    requestToMutate.provider = { order: [preferredProvider] };
+    // For z-ai models, add novita as fallback
+    if (requestedModel.startsWith('z-ai/')) {
+      requestToMutate.provider = { order: [preferredProvider, 'novita'] };
+    } else {
+      requestToMutate.provider = { order: [preferredProvider] };
+    }
   } else if (!requestToMutate.provider.order) {
     requestToMutate.provider.order = [preferredProvider];
   }

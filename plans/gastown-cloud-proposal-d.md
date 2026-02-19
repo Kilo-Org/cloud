@@ -2,6 +2,516 @@
 
 Cloud-first rewrite of gastown's core tenets as a Kilo platform feature. See `docs/gt/hosted-gastown-proposals.md` — Proposal D for the full architecture rationale.
 
+---
+
+## What Is Gastown? A Comprehensive Reference
+
+> This section documents the full scope of the Gastown system — its concepts, architecture, information model, agent taxonomy, communication protocols, and operational design — as described in the [official Gastown documentation](https://docs.gastownhall.ai/). It exists to serve as the ground truth against which this cloud rewrite proposal should be evaluated. If a concept from Gastown doesn't appear in this section, it may be missing from the cloud proposal.
+
+### 1. Overview and Purpose
+
+**Gastown** (also styled "Gas Town") is an agent orchestration system for managing multiple AI coding agents working concurrently across multiple git repositories. It is implemented as a local command-line tool — two Go binaries (`gt` for orchestration and `bd` for the Beads work-tracking database) — coordinated with tmux in git-managed directories on the user's machine.
+
+Gastown solves four problems that arise when deploying AI agents at engineering scale:
+
+1. **Accountability** — Which agent introduced this bug? All work is attributed to a specific agent identity.
+2. **Quality** — Which agents are reliable? Structured work history enables objective comparison.
+3. **Efficiency** — How do you route work to the right agent? Capability-based routing derived from work history.
+4. **Scale** — How do you coordinate agents across repos and teams? Multi-rig, multi-agent, cross-project orchestration.
+
+### 2. Core Principles
+
+Gastown's design is governed by three foundational principles:
+
+| Principle                                   | Acronym | Meaning                                                                                                                                                                                                                                                     |
+| ------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Molecular Expression of Work**            | MEOW    | Breaking large goals into detailed, trackable, atomic instructions for agents. Supported by Beads, Formulas, and Molecules.                                                                                                                                 |
+| **Gas Town Universal Propulsion Principle** | GUPP    | "If there is work on your Hook, YOU MUST RUN IT." Agents autonomously proceed with available work without waiting for external input. The hook is your assignment — execute immediately.                                                                    |
+| **Nondeterministic Idempotence**            | NDI     | Useful outcomes are achieved through orchestration of potentially unreliable processes. Persistent Beads and oversight agents (Witness, Deacon) guarantee eventual workflow completion even when individual operations may fail or produce varying results. |
+
+Additionally:
+
+- **ZFC (Zero Framework Cognition)**: Agents decide; Go code transports. The Go binaries (`gt`/`bd`) never reason about other agents — they provide mechanical transport. Intelligence lives in the AI agent sessions.
+- **Discover, Don't Track**: Reality is truth; state is derived from observable facts (tmux sessions, git state) rather than stored state that can diverge.
+
+### 3. Information Architecture: The Two-Level Beads System
+
+The fundamental data model is **Beads** — git-backed atomic work units stored in JSONL format. Beads are the universal unit of work tracking. They can represent issues, tasks, epics, escalations, messages, agent identity records, or any trackable work item.
+
+Gastown uses a **two-level Beads architecture**:
+
+| Level    | Location                  | Prefix                             | Purpose                                                                                                            |
+| -------- | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Town** | `~/gt/.beads/`            | `hq-*`                             | Cross-rig coordination: Mayor mail, convoy tracking, strategic decisions, town-level agent beads, role definitions |
+| **Rig**  | `<rig>/mayor/rig/.beads/` | project prefix (e.g. `gt-`, `bd-`) | Implementation work: bugs, features, tasks, merge requests, project-specific molecules, rig-level agent beads      |
+
+**Beads routing** is prefix-based. The file `~/gt/.beads/routes.jsonl` maps issue ID prefixes to rig locations. When you run `bd show gt-xyz`, the prefix `gt-` routes to the gastown rig's beads database. This is transparent — agents don't need to know which database to use.
+
+### 4. Environments: Towns and Rigs
+
+| Concept  | Description                                                                                                                                                                                                                                                                                                             |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Town** | The management headquarters (e.g., `~/gt/`). A town coordinates all workers across multiple rigs. It houses town-level agents (Mayor, Deacon) and the town-level Beads database.                                                                                                                                        |
+| **Rig**  | A project-specific git repository under Gastown management. Each rig has its own Polecats, Refinery, Witness, and Crew members. Rigs are where actual development work happens. The rig root is a _container directory_, not a git clone itself — it holds a bare repo (`.repo.git/`) from which worktrees are created. |
+
+#### Directory Structure
+
+```
+~/gt/                           Town root
+├── .beads/                     Town-level beads (hq-* prefix, routes)
+├── mayor/                      Mayor config
+│   ├── town.json               Town configuration
+│   ├── CLAUDE.md               Mayor context (on disk)
+│   └── .claude/settings.json   Mayor Claude settings
+├── deacon/                     Deacon daemon
+│   ├── heartbeat.json          Freshness indicator
+│   └── dogs/                   Deacon helpers
+│       └── boot/               Health triage dog
+└── <rig>/                      Project container (NOT a git clone)
+    ├── config.json             Rig identity + beads prefix
+    ├── .beads/ → mayor/rig/.beads  (redirect)
+    ├── .repo.git/              Bare repo (shared by worktrees)
+    ├── mayor/rig/              Mayor's clone (canonical beads)
+    ├── refinery/rig/           Worktree on main branch
+    ├── witness/                No clone (monitors only)
+    ├── crew/                   Persistent human workspaces
+    │   ├── .claude/settings.json  (shared by all crew)
+    │   └── <name>/rig/        Individual crew clones
+    └── polecats/               Ephemeral worker worktrees
+        ├── .claude/settings.json  (shared by all polecats)
+        └── <name>/rig/        Individual polecat worktrees
+```
+
+**Worktree architecture**: Polecats and the Refinery are git worktrees from the bare `.repo.git/`, not full clones. This enables fast spawning and shared git object storage. Crew members get full clones for independent long-lived work.
+
+### 5. Agent Taxonomy
+
+Gastown has seven distinct agent roles organized into two tiers:
+
+#### Town-Level Agents (Cross-Rig)
+
+| Role       | Description                                                                                                                                                                            | Lifecycle                 | Location            |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------- |
+| **Mayor**  | Global coordinator. Initiates convoys, distributes work across rigs, handles escalations, coordinates cross-rig communication.                                                         | Singleton, persistent     | `~/gt/mayor/`       |
+| **Deacon** | Daemon beacon. Background supervisor running continuous patrol cycles. Monitors system health, ensures worker activity, triggers recovery.                                             | Singleton, persistent     | `~/gt/deacon/`      |
+| **Dogs**   | The Deacon's helper agents for infrastructure tasks (NOT project work). Example: Boot (health triage dog). Dogs are lightweight Go routines or ephemeral AI sessions for narrow tasks. | Ephemeral, Deacon-managed | `~/gt/deacon/dogs/` |
+
+#### Rig-Level Agents (Per-Project)
+
+| Role         | Description                                                                                                                                                                                                                                                                   | Lifecycle                  | Location                     |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------- |
+| **Witness**  | Per-rig polecat lifecycle manager. Monitors polecat health, nudges stuck workers, handles cleanup, triggers escalations.                                                                                                                                                      | One per rig, persistent    | `<rig>/witness/`             |
+| **Refinery** | Per-rig merge queue processor. Intelligently merges changes from polecats, handles conflicts, runs quality gates, ensures code quality before changes reach main.                                                                                                             | One per rig, persistent    | `<rig>/refinery/rig/`        |
+| **Polecat**  | Ephemeral worker agents that produce merge requests. Spawned for specific tasks, work in isolated git worktrees, submit to merge queue when done, then self-clean. There is **no idle state** — polecats are either working, stalled (crashed), or zombie (`gt done` failed). | Transient, Witness-managed | `<rig>/polecats/<name>/rig/` |
+| **Crew**     | Persistent worker agents for long-lived collaboration. Human-managed, no automatic monitoring. Push to main directly (no merge queue).                                                                                                                                        | Long-lived, user-managed   | `<rig>/crew/<name>/rig/`     |
+
+#### Key Distinctions
+
+- **Crew vs Polecats**: Crew is persistent, human-directed, pushes to main. Polecats are transient, Witness-managed, work on branches, go through the Refinery merge queue.
+- **Dogs vs Crew**: Dogs are NOT workers. They handle infrastructure tasks for the Deacon (health checks, shutdown dances). Project work uses Crew or Polecats.
+
+### 6. The Polecat Lifecycle (Three-Layer Architecture)
+
+Polecats have three distinct lifecycle layers that operate independently:
+
+| Layer       | Component                                    | Lifecycle  | Persistence             |
+| ----------- | -------------------------------------------- | ---------- | ----------------------- |
+| **Session** | AI agent instance (e.g., Claude in tmux)     | Ephemeral  | Cycles per step/handoff |
+| **Sandbox** | Git worktree (the working directory)         | Persistent | Until nuke              |
+| **Slot**    | Name from pool (Toast, Shadow, Copper, etc.) | Persistent | Until nuke              |
+
+**Session cycling is normal operation**, not failure. A polecat may cycle through many sessions while working on a single task (via `gt handoff` between molecule steps, compaction triggers, or crash recovery). The sandbox and slot persist across all session cycles.
+
+**Polecat states** (there are exactly three — no idle state):
+
+| State       | Description                                                         |
+| ----------- | ------------------------------------------------------------------- |
+| **Working** | Actively doing assigned work                                        |
+| **Stalled** | Session stopped mid-work (crashed/interrupted without being nudged) |
+| **Zombie**  | Completed work but failed to die (`gt done` failed during cleanup)  |
+
+**Lifecycle flow**: `gt sling` → allocate slot → create worktree → start session → hook molecule → work happens (with session cycling) → `gt done` → push branch → submit to merge queue → request self-nuke → polecat is gone.
+
+**Self-cleaning model**: Polecats are responsible for their own cleanup. When work completes, the polecat calls `gt done`, exits, and requests its own nuke. There is no dependency on the Witness for normal cleanup.
+
+### 7. Work Units and Workflow
+
+#### Work Units
+
+| Concept           | Description                                                                                                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bead**          | Git-backed atomic work unit (JSONL). The fundamental tracking primitive. Can represent issues, tasks, messages, escalations, MRs, agent identity records.                         |
+| **Hook**          | A special pinned Bead for each agent — their current assignment. GUPP: if work is on your hook, you run it immediately.                                                           |
+| **Formula**       | TOML-based workflow source template. Defines reusable patterns for multi-step operations (e.g., polecat work, patrol cycles, code review).                                        |
+| **Protomolecule** | A frozen template created from a formula via `bd cook`. Ready for instantiation.                                                                                                  |
+| **Molecule**      | A durable, active workflow instance with trackable steps. Each step is a Bead. Molecules survive agent restarts and ensure complex workflows complete. Created via `bd mol pour`. |
+| **Wisp**          | An ephemeral molecule for patrol cycles and operational loops. Never synced to persistent storage. Created via `bd mol wisp`. Used by patrol agents to avoid accumulating data.   |
+| **Convoy**        | A persistent tracking unit that monitors related beads across multiple rigs. Convoys group related tasks and track progress to "landing" (all tracked issues closed).             |
+
+#### Molecule Lifecycle
+
+```
+Formula (source TOML) ─── "Ice-9"
+    │
+    ▼ bd cook
+Protomolecule (frozen template) ─── Solid
+    │
+    ├─▶ bd mol pour ──▶ Mol (persistent) ─── Liquid ──▶ bd squash ──▶ Digest
+    │
+    └─▶ bd mol wisp ──▶ Wisp (ephemeral) ─── Vapor ──┬▶ bd squash ──▶ Digest
+                                                       └▶ bd burn ──▶ (gone)
+```
+
+Agents navigate molecules with `bd mol current` (where am I?), `bd close <step> --continue` (close step and auto-advance), and `gt done` (signal completion).
+
+#### The Sling → Work → Done → Merge Flow
+
+1. **Sling**: `gt sling <bead> <rig>` assigns work to a polecat. Auto-creates a convoy for tracking.
+2. **Work**: Polecat finds work on hook via `gt hook`, navigates molecule steps, executes code changes.
+3. **Done**: Polecat calls `gt done` → pushes branch → submits to merge queue → self-nukes.
+4. **Merge**: Refinery picks up from merge queue → runs quality gates → merges to main (or sends rework request back through the Witness).
+
+### 8. Communication Systems
+
+#### Mail Protocol
+
+Agents coordinate via typed mail messages routed through the Beads system. Key message types:
+
+| Type             | Route                        | Purpose                                          |
+| ---------------- | ---------------------------- | ------------------------------------------------ |
+| `POLECAT_DONE`   | Polecat → Witness            | Signal work completion, trigger cleanup          |
+| `MERGE_READY`    | Witness → Refinery           | Branch ready for merge queue processing          |
+| `MERGED`         | Refinery → Witness           | Branch merged successfully, safe to nuke polecat |
+| `MERGE_FAILED`   | Refinery → Witness           | Merge failed (tests/build), needs rework         |
+| `REWORK_REQUEST` | Refinery → Witness → Polecat | Rebase needed due to merge conflicts             |
+| `WITNESS_PING`   | Witness → Deacon             | Second-order monitoring (ensure Deacon is alive) |
+| `HELP`           | Any → Mayor                  | Request intervention for stuck/blocked work      |
+| `HANDOFF`        | Agent → self                 | Session continuity data across context limits    |
+
+Mail addresses use slash-separated path format: `gastown/witness`, `gastown/polecats/toast`, `mayor/`, `deacon/`.
+
+#### Nudging
+
+Real-time messaging between agents via `gt nudge <agent> "message"`. Delivered via tmux, not mail. Used for urgent communication (health checks, unsticking agents).
+
+#### Beads-Native Messaging Extensions
+
+Advanced messaging primitives:
+
+- **Groups** (`gt:group`): Named distribution lists for multi-recipient mail
+- **Queues** (`gt:queue`): Work queues where messages are claimed by single workers (FIFO or priority)
+- **Channels** (`gt:channel`): Pub/sub broadcast streams with retention policies
+
+### 9. Identity and Attribution
+
+All work is attributed to the agent who performed it via the `BD_ACTOR` environment variable:
+
+| Role     | BD_ACTOR Format         | Example                  |
+| -------- | ----------------------- | ------------------------ |
+| Mayor    | `mayor`                 | `mayor`                  |
+| Deacon   | `deacon`                | `deacon`                 |
+| Witness  | `{rig}/witness`         | `gastown/witness`        |
+| Refinery | `{rig}/refinery`        | `gastown/refinery`       |
+| Crew     | `{rig}/crew/{name}`     | `gastown/crew/joe`       |
+| Polecat  | `{rig}/polecats/{name}` | `gastown/polecats/toast` |
+
+Attribution flows through:
+
+- **Git commits**: `GIT_AUTHOR_NAME="gastown/polecats/toast"`, `GIT_AUTHOR_EMAIL="<owner>@example.com"`
+- **Beads records**: `created_by`, `updated_by` fields
+- **Event logs**: `actor` field on all events
+
+**Agents execute. Humans own.** The polecat name is executor attribution; the CV credits the human owner. Identity is preserved even when working cross-rig (a crew member from rig A working in rig B's worktree still has their original identity).
+
+**Polecat identity is persistent; sessions are ephemeral.** Polecats accumulate work history (CV) across sessions, enabling performance tracking, capability-based routing, and model comparison.
+
+### 10. The Watchdog Chain: Daemon → Boot → Deacon
+
+Gastown uses a three-tier watchdog chain for autonomous health monitoring:
+
+```
+Daemon (Go process)           ← Dumb transport, 3-min heartbeat tick
+    │
+    └─► Boot (AI agent)       ← Intelligent triage, fresh each tick
+            │
+            └─► Deacon (AI agent)  ← Continuous patrol, long-running
+                    │
+                    └─► Witnesses & Refineries  ← Per-rig agents
+```
+
+- **Daemon**: A Go process running a 3-minute heartbeat. Cannot reason (ZFC principle). Ensures Boot runs, checks tmux sessions, spawns agents.
+- **Boot**: An ephemeral AI agent spawned fresh each daemon tick. Makes a single intelligent decision: should the Deacon wake? Exits immediately. This provides intelligent triage without constant AI cost.
+- **Deacon**: A long-running AI agent doing continuous patrol cycles. Monitors all agents, runs plugins, handles escalations. Writes `heartbeat.json` each cycle.
+
+**Boot decision matrix**:
+
+| Condition                         | Action                                             |
+| --------------------------------- | -------------------------------------------------- |
+| Deacon session dead               | START (exit; daemon calls `ensureDeaconRunning()`) |
+| Heartbeat > 15 min                | WAKE (nudge Deacon)                                |
+| Heartbeat 5–15 min + pending mail | NUDGE (send check-in)                              |
+| Heartbeat fresh                   | NOTHING (exit silently)                            |
+
+**Why two AI agents?** The Deacon can't observe itself (a hung Deacon can't detect it's hung). Boot provides an external observer with fresh context each tick.
+
+**Degraded mode**: When tmux is unavailable, Boot falls back to mechanical Go code (purely threshold-based, no reasoning).
+
+### 11. The Convoy System
+
+Convoys are the primary unit for tracking batched work across rigs. Even a single slung bead auto-creates a convoy for dashboard visibility.
+
+**Lifecycle**: `OPEN → (all tracked issues close) → CLOSED/LANDED`. Adding issues to a closed convoy auto-reopens it.
+
+**Convoy vs Swarm**: A convoy is persistent (tracking unit with ID `hq-cv-*`). A "swarm" is ephemeral — just the workers currently assigned to a convoy's issues. When issues close, the convoy lands and the swarm dissolves.
+
+**Active Convoy Convergence**: Convoy completion should be event-driven (triggered by issue close, not polling), redundantly observed (Daemon, Witness, and Deacon all check), and manually overridable (`gt convoy close`).
+
+### 12. The Escalation System
+
+Severity-routed escalation with tiered routing and auto-re-escalation:
+
+| Severity   | Default Route                         |
+| ---------- | ------------------------------------- |
+| `low`      | Bead only (record)                    |
+| `medium`   | Bead + mail Mayor                     |
+| `high`     | Bead + mail Mayor + email human       |
+| `critical` | Bead + mail Mayor + email + SMS human |
+
+**Escalation categories**: `decision`, `help`, `blocked`, `failed`, `emergency`, `gate_timeout`, `lifecycle`.
+
+**Tiered escalation flow**: Worker → Deacon → Mayor → Overseer (human). Each tier can resolve or forward.
+
+**Stale escalation patrol**: Unacknowledged escalations are checked every patrol cycle. If older than `stale_threshold` (default 4h), severity is bumped and re-routed. Respects `max_reescalations` limit.
+
+**Decision pattern**: When `--type decision` is used, the escalation bead includes structured options (A/B/C), context, and resolution instructions. The bead itself becomes the async communication channel.
+
+### 13. The Merge Queue and Refinery
+
+When a polecat completes work:
+
+1. Polecat calls `gt done` → sends `POLECAT_DONE` mail to Witness
+2. Witness verifies clean state → sends `MERGE_READY` to Refinery
+3. Refinery adds to merge queue → attempts merge (rebase, quality gates, tests)
+4. On success: `MERGED` mail → Witness nukes polecat worktree
+5. On conflict: `REWORK_REQUEST` mail → Witness notifies polecat to rebase
+6. On failure (tests/build): `MERGE_FAILED` → rework request with failure details
+
+The Refinery runs continuous patrol (using wisps) to process the merge queue.
+
+### 14. The Plugin System
+
+Gastown has an extensible plugin system for periodic maintenance tasks. Plugins are molecule definitions in `plugin.md` files with TOML frontmatter.
+
+**Plugin locations**: Town-level (`~/gt/plugins/`) for universal plugins; rig-level (`<rig>/plugins/`) for project-specific.
+
+**Gate types** control when plugins run: `cooldown` (time-based), `cron`, `condition` (check command exit code), `event` (e.g., startup), `manual`.
+
+**Execution model**: Plugins are dispatched to Dogs (lightweight executors) by the Deacon during patrol. Non-blocking — multiple plugins can run concurrently.
+
+**State tracking**: Plugin runs create wisps on the ledger (not state files). Gate evaluation queries wisps. Daily digest squashes wisps for clean audit history.
+
+### 15. Configuration: Property Layers
+
+Four-layer configuration with most-specific-wins precedence:
+
+1. **Wisp layer** (transient, local) — `<rig>/.beads-wisp/config/`. Temporary overrides. Never synced.
+2. **Rig bead layer** (persistent, global) — Rig identity bead labels. Syncs via git.
+3. **Town defaults** — `~/gt/config.json` or `~/gt/.beads/`.
+4. **System defaults** — Compiled-in fallbacks.
+
+Most properties use override semantics (first non-nil wins). Integer properties (like `priority_adjustment`) use stacking semantics (values add). Properties can be explicitly blocked from inheritance.
+
+**Rig lifecycle controls**:
+
+- `gt rig park` (local, ephemeral): Stop services, daemon won't restart. For local maintenance.
+- `gt rig dock` (global, persistent): Set `status:docked` label on rig bead. Syncs to all clones.
+
+### 16. Operational State
+
+State transitions are recorded as event beads (immutable audit trail) and cached as labels on role beads (fast current-state queries).
+
+Event types include: `patrol.muted`, `patrol.unmuted`, `agent.started`, `agent.stopped`, `mode.degraded`, `mode.normal`.
+
+**Events are the source of truth. Labels are the cache.** This follows the "Discover, Don't Track" principle — the ledger of events is the ground truth, and labels are a performance optimization.
+
+### 17. Agent Context Delivery
+
+Agent context (role instructions, environment) is delivered via two mechanisms:
+
+| Method                                 | Roles                           | How                                                                                     |
+| -------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
+| **On-disk CLAUDE.md**                  | Mayor, Refinery                 | Written to the agent's working directory inside the git worktree                        |
+| **Ephemeral injection via `gt prime`** | Deacon, Witness, Crew, Polecats | Injected at `SessionStart` hook. Not persisted to disk to avoid polluting source repos. |
+
+**Sparse checkout** is used to exclude context files (`.claude/`, `CLAUDE.md`, `.mcp.json`) from source repos, ensuring agents use Gastown's context rather than the project's.
+
+**Settings templates** differ by agent type:
+
+- **Interactive** (Mayor, Crew): Mail injected on `UserPromptSubmit` hook
+- **Autonomous** (Polecat, Witness, Refinery, Deacon): Mail injected on `SessionStart` hook
+
+### 18. Formula Resolution Architecture
+
+Formulas are resolved through a three-tier hierarchy:
+
+1. **Project (rig-level)**: `<project>/.beads/formulas/` — committed to project repo, project-specific workflows
+2. **Town (user-level)**: `~/gt/.beads/formulas/` — Mol Mall installs, user customizations
+3. **System (embedded)**: Compiled into the `gt` binary — factory defaults, blessed patterns
+
+Most-specific wins. Version pinning is supported (`bd cook mol-polecat-work@4.0.0`).
+
+### 19. Federation (Design Spec — Not Yet Implemented)
+
+Federation enables multiple Gastown instances to reference each other's work across organizations. It introduces:
+
+- **HOP (Highway Operations Protocol) URIs**: `hop://entity/chain/rig/issue-id` for cross-workspace references
+- **Employment relationships**: Track which entities belong to organizations
+- **Cross-references**: Depend on work in another workspace
+- **Delegation**: Distribute work across workspaces with terms
+- **Discovery**: Workspace metadata (`.town.json`), remote registration, cross-workspace queries
+
+### 20. The Seance System
+
+`gt seance` allows agents to communicate with previous sessions. Each session has a startup nudge that becomes searchable. Agents can query predecessors for context and decisions from earlier work: `gt seance --talk <id> -p "Where is X?"`. This provides session-to-session continuity beyond the handoff mail system.
+
+### 21. What the Cloud Proposal Must Faithfully Reproduce
+
+Based on this analysis, the following Gastown concepts are load-bearing and must have clear cloud equivalents:
+
+1. **Beads as the universal work unit** — git-backed JSONL in local Gastown; needs a cloud-native equivalent (currently: DO SQLite + Postgres read replica)
+2. **Two-level architecture** (town vs rig) — distinct scoping for coordination vs implementation work
+3. **All seven agent roles** with their distinct lifecycles and responsibilities
+4. **The Hook + GUPP** — immediate autonomous execution when work is assigned
+5. **Molecules** — durable multi-step workflows with crash recovery
+6. **Convoys** — cross-rig batch work tracking with landing detection
+7. **The mail protocol** — typed inter-agent messages with defined flows (POLECAT_DONE → MERGE_READY → MERGED)
+8. **Identity and attribution** — every action attributed to a specific agent
+9. **The watchdog chain** — multi-tier health monitoring (Daemon/Boot → Deacon → Witness)
+10. **The escalation system** — severity-routed, tiered, auto-re-escalating
+11. **The Refinery merge queue** — AI-powered quality gates with rework requests
+12. **Property layers** — multi-level configuration with override/stack semantics
+13. **Context delivery** — `gt prime` ephemeral injection vs on-disk CLAUDE.md
+14. **Session cycling and handoff** — polecats cycle sessions freely; work survives
+15. **Self-cleaning polecat model** — no idle state, polecats clean up after themselves
+16. **Formula/Protomolecule/Molecule/Wisp lifecycle** — the full MEOW stack
+17. **The plugin system** — extensible periodic maintenance with gate-based execution
+18. **Beads-native messaging** — groups, queues, channels beyond simple mail
+
+---
+
+## Product Vision: The Browser-Based Gastown Experience
+
+The end goal is a product that's **absurdly simple to use**. You create a town, connect your repos through Kilo's existing integrations system, and talk to the Mayor in a chat interface. Behind the scenes, the full Gastown machine operates — agents spawn, communicate, merge code — and the UI shows you everything that's happening in real time. Every object on screen is clickable. Every connection is traceable. The system is transparent.
+
+This is not a "dashboard" bolted onto the backend. The UI _is_ the product. Everything about the architecture should be designed to serve this experience.
+
+### Design Principles
+
+1. **Chat-first interaction model.** The primary way you interact with Gastown is by talking to the Mayor in a conversational chat interface — the same quality as our existing Cloud Agent chat. You describe what you want. The Mayor delegates. You watch the machine work.
+
+2. **Radical transparency.** The UI shows the living state of the system: agents spawning, beads flowing between states, mail being sent, molecules progressing through steps, convoys converging on landing. This isn't a status page. It's a real-time visualization of an agent orchestration system in motion.
+
+3. **Everything is clickable.** Every bead, agent, convoy, mail message, molecule step, escalation, and log entry is a first-class interactive object. Click an agent to see its conversation stream, its current hook, its work history. Click a bead to see who created it, who's working on it, its event timeline, and its connections to other beads. Click a convoy to see all tracked beads across all rigs with progress.
+
+4. **Progressive disclosure.** The top-level view is simple: your town, your rigs, the Mayor chat. But you can drill into any layer of detail — raw agent conversation logs, DO state, tool call traces, git diffs, mail messages, escalation history. The UI serves both the casual user ("just get this done") and the power user ("why did this agent stall at 14:32?").
+
+5. **Zero configuration for the common case.** Creating a town and connecting a repo should take under 60 seconds. Kilo's existing GitHub/GitLab integrations handle auth. The Mayor is pre-configured. You type a message, and work starts. Advanced configuration (model selection, quality gates, polecat count, branch naming) is available but never required.
+
+### The Core Screens
+
+#### Town Home (`/gastown/[townId]`)
+
+The town home is the **command center**. It has two halves:
+
+**Left: The Mayor Chat** — A full-featured conversational chat interface (same quality and architecture as the existing Cloud Agent chat: Jotai atom store, WebSocket streaming, tool execution cards, message bubbles with markdown rendering). This is the primary interaction surface. You talk to the Mayor here. The Mayor responds conversationally, and when it decides to delegate work, you see it happen — tool calls like `gt_sling` appear in the chat as expandable cards, and the right side of the screen updates in real time.
+
+**Right: The Town Dashboard** — A real-time overview showing:
+
+- **Active Convoys** — Progress bars with bead counts (`3/5 closed`), linked bead list, time elapsed, notification subscribers. Click to drill into convoy detail.
+- **Rig Cards** — One card per rig showing: name, repo, agent count, active bead count, Refinery merge queue depth. Click to drill into rig detail.
+- **Activity Feed** — A live-streaming timeline of events across all rigs: beads created, agents spawned, mail sent, molecules advancing, escalations raised, merges completed. Each event is clickable to navigate to the relevant object.
+- **Escalation Banner** — If any escalations are pending, they surface at the top with severity badges and one-click acknowledge.
+
+This layout means you can chat with the Mayor and simultaneously see the effects of the conversation ripple through the system.
+
+#### Rig Detail (`/gastown/[townId]/rigs/[rigId]`)
+
+The rig detail is the **workbench** for a single project:
+
+- **Bead Board** — A kanban-style board with columns: `Open`, `In Progress`, `In Review`, `Closed`. Each bead card shows title, assignee (agent avatar + name), priority badge, labels, time in status. Drag is not needed; the board is read-only but every card is clickable. Click a bead to open its detail panel.
+- **Agent Roster** — Live agent cards arranged horizontally. Each card shows: agent name (e.g., "Toast"), role badge (polecat/witness/refinery), status indicator (working/idle/stalled), current hook (bead title), last activity timestamp, and a "Watch" button to open the agent's live stream.
+- **Merge Queue** — A compact list showing pending reviews: branch name, polecat name, status (pending/running/merged/failed), submitted time. Click to see the full diff or review details.
+- **Agent Stream Panel** — When you click "Watch" on an agent, a streaming panel opens showing the real-time conversation: user prompt (from the system), assistant responses, tool calls (file edits, git commands, test runs) with expandable input/output. This reuses the same streaming infrastructure as the Cloud Agent chat (WebSocket manager, event normalizer, message atoms) but in a read-only observer mode.
+
+#### Bead Detail (slide-over panel)
+
+Click any bead anywhere in the UI and a detail panel slides in:
+
+- **Header**: Bead ID, type badge, status badge, priority, title
+- **Body**: Full description/body text with markdown rendering
+- **Connections**: Assignee agent (clickable), convoy membership (clickable), molecule attachment (clickable), parent/child beads
+- **Event Timeline**: Append-only ledger — created, assigned, hooked, status changes, closed. Each event shows actor, timestamp, and old/new values.
+- **Agent Activity**: If the bead is currently hooked by an agent, a compact live stream of that agent's recent activity
+- **Raw Data**: Expandable section showing the raw bead JSON for debugging
+
+#### Agent Detail (slide-over panel or full page)
+
+Click any agent:
+
+- **Identity**: Name, role, rig, full identity string, BD_ACTOR equivalent
+- **Current State**: Status, current hook (bead), last activity, session info
+- **Conversation Stream**: Full real-time or historical conversation log
+- **Work History (CV)**: List of completed beads with completion time, quality signal, model used
+- **Mail**: Recent sent/received mail messages
+- **Performance**: Beads closed, average completion time, escalation rate, model comparison
+
+#### Convoy Detail (slide-over or full page)
+
+Click any convoy:
+
+- **Progress**: Visual progress bar (`4/7 beads closed`), estimated completion
+- **Tracked Beads**: List of all beads across all rigs, each with status badge and assignee. Beads are grouped by rig.
+- **Timeline**: Event history — created, beads added, beads closed, landed
+- **Notification Subscribers**: Who gets notified on landing
+
+### Real-Time Streaming Architecture
+
+The UI must feel alive. Three real-time channels:
+
+1. **Agent conversation streams** — WebSocket per agent. Uses the existing `createWebSocketManager` infrastructure with ticket-based auth. The container's control server (`/agents/:agentId/stream-ticket`) provides tickets, and the dashboard connects directly. Events are normalized via `event-normalizer.ts` into the standard Cloud Agent message format, so the agent stream viewer can reuse the same `MessageBubble`, `MessageContent`, and `ToolExecutionCard` components.
+
+2. **Town-wide event stream** — SSE or WebSocket from the Gastown Worker (backed by DO state changes). When any bead changes status, any agent spawns/dies, any mail is sent, any convoy updates — the event is pushed to all connected town dashboards. This drives the Activity Feed and all real-time badge/count updates. Implementation: DO writes to a durable event log; the worker exposes an SSE endpoint (`/api/towns/:townId/events`) that tails the log. Alternatively, use Cloudflare's WebSocket hibernation API on a dedicated DO for fan-out.
+
+3. **Mayor conversation stream** — WebSocket to the MayorDO's kilo serve session. Same architecture as agent streams but persistent (the session doesn't die between messages). The Mayor chat component maintains a single long-lived WebSocket connection, reusing the existing `useCloudAgentStreamV2` hook pattern.
+
+### Integrations: Connecting Repos to Rigs
+
+Rig creation should leverage Kilo's existing integrations system rather than requiring raw git URLs:
+
+- **Existing pattern**: The user has already installed the Kilo GitHub App (or connected GitLab) via `/integrations`. The platform knows their repositories.
+- **Rig creation flow**: When creating a rig, the dialog shows a searchable list of connected repositories (from the existing `PlatformRepository` type). Selecting a repo auto-fills `gitUrl`, `defaultBranch`, and stores the integration reference for token management.
+- **Token management**: The container needs git auth tokens to clone private repos. Since the user's GitHub App installation is already tracked, the backend can mint installation tokens on demand — the same `getGithubTokenForIntegration()` path used by Cloud Agent sessions. These tokens are short-lived and refreshed by the DO when arming agent dispatch.
+- **Webhook integration**: Optionally, GitHub webhooks (already handled by the existing `webhook-handler.ts` infrastructure) can create beads automatically — e.g., new GitHub issues become Gastown beads, PRs merged externally update bead status. This is a natural extension of the existing webhook routing.
+
+### The Local CLI Bridge (Future)
+
+A stretch goal that makes the system dramatically more powerful: connecting your local Kilo CLI to your cloud Gastown instance.
+
+**Concept**: You run `kilo` locally on your laptop. Instead of operating as a standalone agent, your local Kilo instance authenticates against your cloud Gastown town and becomes a **Crew member**. You get all the coordination benefits (beads, mail, identity, attribution, convoy tracking) while running locally with full filesystem access and your own dev environment.
+
+**How it would work**:
+
+- `kilo gastown connect <town-url>` authenticates and registers your local instance as a crew agent
+- The gastown tool plugin loads with your cloud credentials (`GASTOWN_API_URL`, `GASTOWN_SESSION_TOKEN`)
+- Your local Kilo session appears in the cloud dashboard as an active agent
+- You can check mail, hook beads, send mail to cloud agents, participate in convoys
+- Your work is attributed via `BD_ACTOR` through the cloud system
+- The Witness can see your activity; you appear in the town's health monitoring
+
+This bridges the gap between "fully cloud-hosted" and "I want to work locally but with cloud coordination." It's not required for the MVP but should inform the API design — the tool plugin's HTTP API surface is the same whether the agent runs in a Cloudflare Container or on someone's laptop.
+
+---
+
 **Key design decisions:**
 
 - All orchestration state lives in Durable Objects (SQLite) + Postgres (read replica for dashboard)
@@ -1072,27 +1582,81 @@ export const gastownRouter = router({
 
 ---
 
-### PR 8: Basic Dashboard UI
+### PR 8: Dashboard UI — Town Home, Rig Detail, and Mayor Chat
 
-**Goal:** Minimal UI to create a rig, sling work, and watch an agent work.
-
-This is a thin first pass. Follow existing dashboard patterns.
+**Goal:** The primary user-facing surface. This is not a "basic" dashboard — it's the product. See the "Product Vision" section above for the full design rationale. Phase 1 implements the core screens with real-time streaming.
 
 #### Pages
 
-| Route                            | Component     | Purpose                              |
-| -------------------------------- | ------------- | ------------------------------------ |
-| `/gastown`                       | Town list     | List user's towns, create new        |
-| `/gastown/[townId]`              | Town overview | List rigs, active convoys            |
-| `/gastown/[townId]/rigs/[rigId]` | Rig detail    | Bead board, agent list, agent stream |
+| Route                            | Component  | Purpose                                                   |
+| -------------------------------- | ---------- | --------------------------------------------------------- |
+| `/gastown`                       | Town list  | List user's towns, create new town                        |
+| `/gastown/[townId]`              | Town home  | Split view: Mayor chat (left) + town dashboard (right)    |
+| `/gastown/[townId]/rigs/[rigId]` | Rig detail | Bead board, agent roster, merge queue, agent stream panel |
 
-#### Key Components
+#### Town Home — Mayor Chat + Dashboard
 
-- **Bead board**: Simple list/kanban of beads by status (open → in_progress → closed). Read from Postgres via tRPC.
-- **Agent card**: Shows agent identity, status, current hook. Links to conversation stream.
-- **Agent stream**: WebSocket connection to the container's stream endpoint (via `getAgentStreamUrl` tRPC query). The container proxies Kilo CLI output events.
-- **Sling dialog**: Form to create a bead and assign it. Inputs: title, body, model selector.
-- **Mayor chat**: Direct message input that sends to the Mayor agent. Uses `sendMessage` tRPC mutation.
+The town home is a split-pane layout:
+
+**Left pane: Mayor Chat** — A full-featured conversational chat interface. Reuses the existing Cloud Agent chat architecture:
+
+- Jotai atom store for message state (`CloudAgentProvider` pattern)
+- WebSocket streaming via `createWebSocketManager` with ticket-based auth
+- `MessageBubble` components with user/assistant layouts, markdown rendering
+- `ToolExecutionCard` for mayor tool calls (`gt_sling`, `gt_list_rigs`, etc.) — these expand to show what the Mayor delegated and to which rig/agent
+- Status indicator showing mayor session state (idle/active/starting)
+- `sendMessage` tRPC mutation routes to `MayorDO.sendMessage()`, no bead created
+
+**Right pane: Town Dashboard** — Real-time overview:
+
+- **Rig cards**: One card per rig (name, repo link, agent count badge, active bead count, refinery queue depth). Click navigates to rig detail.
+- **Active convoys**: Progress bars with `closed/total` counts, time elapsed. Click opens convoy detail panel.
+- **Activity feed**: Live-streaming event timeline (SSE from gastown worker). Events: bead state changes, agent spawns/exits, mail sent, molecules advancing, merges, escalations. Each event is clickable → navigates to the relevant object.
+- **Escalation banner**: Surfaces unacknowledged escalations at the top with severity badges.
+
+#### Rig Detail
+
+- **Bead board**: Kanban columns (`Open` → `In Progress` → `In Review` → `Closed`). Each bead card: title, assignee avatar + name, priority badge, labels, time-in-status. Click opens bead detail slide-over.
+- **Agent roster**: Horizontal agent cards. Each: name, role badge, status indicator (animated for working), current hook bead title, last activity time, "Watch" button.
+- **Merge queue**: Compact list of pending reviews (branch, polecat, status, time).
+- **Agent stream panel**: Opens when "Watch" is clicked. Read-only real-time conversation stream — reuses `MessageBubble`, `MessageContent`, `ToolExecutionCard` components from Cloud Agent chat in observer mode. WebSocket via `getAgentStreamUrl` → container stream ticket.
+
+#### Slide-Over Detail Panels
+
+Click any object in the UI to open a detail panel (sheet component from existing shadcn/ui):
+
+- **Bead detail**: ID, type/status/priority badges, body (markdown), connections (assignee, convoy, molecule), event timeline (append-only ledger), raw JSON toggle.
+- **Agent detail**: Identity, current state, conversation stream (live or historical), work history (CV — completed beads with time/quality), recent mail, performance stats.
+- **Convoy detail**: Progress bar, tracked beads grouped by rig with status badges, timeline, notification subscribers.
+
+#### Rig Creation via Integrations
+
+The "Create Rig" dialog uses Kilo's existing integrations to browse connected repos:
+
+- If user has GitHub App installed: show searchable repo list from `PlatformRepository`
+- Selecting a repo auto-fills `gitUrl`, `defaultBranch`
+- Stores integration reference for container token management (reuse `getGithubTokenForIntegration()`)
+- Falls back to manual git URL entry if no integration connected
+
+#### Real-Time Event Stream (Town-Wide)
+
+New tRPC subscription or SSE endpoint: `GET /api/towns/:townId/events`
+
+- Backed by DO state changes — when any bead/agent/mail/convoy updates, event is pushed
+- Drives the activity feed, all badge/count updates, and bead board auto-refresh
+- Implementation options: (a) SSE from gastown worker tailing a DO event log, (b) WebSocket hibernation API on a dedicated fan-out DO. Option (a) for Phase 1.
+
+#### New tRPC Procedures Needed
+
+| Procedure               | Type             | Purpose                                    |
+| ----------------------- | ---------------- | ------------------------------------------ |
+| `getConvoys`            | query            | List convoys for a town (with bead counts) |
+| `getConvoy`             | query            | Single convoy with all tracked beads       |
+| `getBeadEvents`         | query            | Append-only event history for a bead       |
+| `getAgentHistory`       | query            | Completed beads for an agent (CV)          |
+| `getAgentMail`          | query            | Recent mail for an agent                   |
+| `getTownEvents`         | subscription/SSE | Real-time event stream for the town        |
+| `acknowledgeEscalation` | mutation         | Mark escalation as acknowledged            |
 
 ---
 
@@ -1403,12 +1967,38 @@ Cloudflare Containers have **ephemeral disk** — when a container sleeps or res
 
 ---
 
-### PR 20: Dashboard Polish
+### PR 20: Dashboard — Deep Drill-Down and Visualization
 
-- Convoy progress visualization (progress bar, timeline)
-- Real-time updates via WebSocket (container streams agent events → dashboard)
-- Agent conversation history (stored in DO or R2)
-- Cost tracking per town/rig/convoy/agent
+**Goal:** Elevate the dashboard from functional to genuinely great. Every Gastown concept should be visually represented and interactively explorable.
+
+#### Convoy Visualization
+
+- **Convoy timeline view**: A horizontal timeline showing bead completion events over time, with agent avatars at each completion point. Shows velocity and parallelism.
+- **Convoy dependency graph**: If beads have dependencies, render them as a DAG. Completed nodes are green, in-progress yellow, blocked red.
+- **Stranded convoy detection**: Surface convoys where beads are open but no agents are assigned. Prompt user to sling.
+
+#### Agent Conversation History
+
+- **Full conversation replay**: Store agent conversation events in R2 (keyed by `townId/rigId/agentId/sessionId`). The agent detail panel can load and replay any past session.
+- **Search across conversations**: Full-text search over agent conversations within a rig. "What did Toast do about the auth module?"
+- **Session timeline**: Show all sessions for a polecat identity (Toast session 1, 2, 3...) with handoff points marked.
+
+#### System Topology View
+
+- **Town map**: A visual graph showing the town's topology — Mayor at the center, rigs radiating outward, agents within each rig, with animated connections showing active mail/communication flows. This is the "see the machine working" view.
+- **Mail flow visualization**: Arrows between agents showing recent mail. Click an arrow to see the message. POLECAT_DONE → MERGE_READY → MERGED flow becomes visually obvious.
+
+#### Cost and Performance
+
+- **Cost dashboard**: LLM cost per town/rig/agent/bead. Breakdown by model. Comparison over time.
+- **Performance cards**: Agent performance (beads closed, avg time, quality rate), model comparison (same work type, different models → which performs better).
+- **Cost per bead**: LLM usage from gateway, attributed to specific agents and beads.
+- **Container cost**: Cloudflare container uptime cost attributed to the town.
+
+#### Molecule Visualization
+
+- **Molecule progress stepper**: When a bead has an attached molecule, show a step-by-step progress indicator (like a checkout flow) in the bead detail panel. Completed steps show summary, current step pulses, future steps are dimmed.
+- **Formula library browser**: Browse available formulas with descriptions and step previews.
 
 ---
 
@@ -1442,11 +2032,25 @@ Cloudflare Containers have **ephemeral disk** — when a container sleeps or res
 
 ### PR 24: Onboarding Flow
 
-- "Create your first Town" wizard
-- Connect git repo (GitHub App integration — reuse existing)
-- Select model
-- Sling first bead
-- Watch the polecat work
+**Goal:** A user with zero Gastown knowledge should go from sign-in to watching an agent write code in under 2 minutes.
+
+#### "Create Your First Town" Wizard
+
+1. **Name your town** — Single text input with sensible default (e.g., user's name + "-town"). One click.
+2. **Connect a repo** — If GitHub App already installed: show repo picker (existing `PlatformRepository` search). If not: "Install GitHub App" button → OAuth flow → return to picker. GitLab path identical. Manual git URL as escape hatch.
+3. **First task** — Pre-populated prompt: "Describe something you'd like done in this repo." Large textarea, feels like the start of a conversation. Submit button says "Tell the Mayor".
+4. **Watch it work** — Redirect to town home. Mayor chat shows the message being processed. Right pane shows the activity feed lighting up: agent spawning, bead created, work starting. The "aha moment" happens here — the user sees the machine come alive.
+
+#### Progressive Feature Discovery
+
+After the first task completes:
+
+- **Tooltip on convoy**: "This tracked your task. Create convoys to batch related work."
+- **Tooltip on agent card**: "This polecat worked on your task. Click to see its full conversation."
+- **Tooltip on merge queue**: "Your code changes are reviewed here before merging."
+- **Prompt in Mayor chat**: "You can also ask me to work on multiple things at once, check on progress, or coordinate across repos."
+
+The goal is not documentation. It's in-context discovery as the user naturally explores.
 
 ### PR 25: Documentation & API Reference
 
@@ -1459,17 +2063,17 @@ Cloudflare Containers have **ephemeral disk** — when a container sleeps or res
 
 1. **Container sizing**: A `standard-4` (4 vCPU, 12 GiB, 20 GB disk) may not be enough for towns with many concurrent agents. Custom instance types now support up to 4 vCPU max. For large towns, we may need to shard across multiple containers (container-per-rig instead of container-per-town). This should be measured in stress testing (PR 21) before over-engineering.
 
-2. **Agent event streaming**: How do we stream Kilo CLI output from the container to the dashboard? Options:
-   - Container exposes a WebSocket per agent, dashboard connects directly
-   - Container forwards events to the DO, DO streams to dashboard via WebSocket hibernation API
-   - Container writes events to a queue/R2, dashboard polls
-   - The first option is simplest for Phase 1. The second gives better durability (events survive container restart).
+2. **Agent event streaming architecture**: How do we stream Kilo CLI output from the container to the dashboard? Options:
+   - **(a) Container WebSocket per agent, dashboard connects directly** — Simplest for Phase 1. Each agent has a stream ticket. Dashboard opens one WebSocket per watched agent. Uses existing `createWebSocketManager` infrastructure. Downside: events lost if container restarts mid-stream.
+   - **(b) Container → DO → Dashboard via WebSocket hibernation API** — More durable. Container forwards all events to the DO. DO persists to event log and fans out to connected dashboard clients via hibernatable WebSocket. Events survive container restart. More complex but enables conversation replay.
+   - **(c) Hybrid** — Phase 1 uses (a) for live streaming. R2 persists events for replay. Town-wide event stream uses SSE from the worker (not per-agent WebSocket). Phase 3 migrates to (b) for full durability.
+   - **Recommendation**: Option (c). Live agent streams connect directly to container (fast, simple). Town-wide activity feed uses SSE from the worker. R2 stores conversation history for replay.
 
 3. **Git auth in the container**: The container needs to clone private repos. Options:
    - Pass GitHub App installation tokens via env vars (short-lived, minted by the Next.js backend when arming the alarm)
    - Store encrypted tokens in DO, container fetches on startup
    - Use a service binding to the existing GitHub token infrastructure
-   - The token refresh problem is real — long-running containers will need tokens refreshed periodically.
+   - **Recommendation**: Reuse the existing `getGithubTokenForIntegration()` path from Cloud Agent. The rig stores its integration reference (GitHub App installation ID). The DO mints tokens on demand when dispatching agents. Tokens are passed as env vars to kilo serve processes. For long-running containers, the control server refreshes tokens periodically via the gastown worker API.
 
 4. **Container cold start impact**: When a container sleeps and wakes, all repos need to be re-cloned. For large repos this could take minutes. Mitigations:
    - Aggressive `sleepAfter` (30+ min) so active towns don't sleep
@@ -1482,3 +2086,137 @@ Cloudflare Containers have **ephemeral disk** — when a container sleeps or res
 6. **Billing model**: Per-agent-session LLM costs are already tracked via the gateway. Container costs are per-town (metered by Cloudflare). Do we add gastown-specific billing (per-bead, per-convoy, per-town monthly fee) or just pass through LLM + container costs?
 
 7. **Refinery quality gates**: Should quality gates run inside the refinery agent's Kilo CLI session (agent runs `npm test`)? Or should they be a separate deterministic step (container runs tests directly, only invokes AI if tests fail)? The latter is cheaper and faster for the common case (tests pass). The AI agent is only needed for reasoning about failures.
+
+8. **Local CLI bridge API surface**: The tool plugin's HTTP API (`GASTOWN_API_URL` + JWT) is the same whether the agent runs in a Cloudflare Container or on someone's laptop. Should we design the API with the local bridge in mind from day one? This means: (a) the gastown worker needs a public-facing auth mode (not just internal + container JWT), (b) agent registration needs to support "external" agents that don't run in the container, (c) the Witness needs to tolerate agents it can't directly observe via the container. Recommendation: design the API for it now, implement the local bridge later.
+
+9. **Mayor chat UX for long-running delegation**: When the Mayor decides to delegate (calls `gt_sling`), the polecat may take 10+ minutes. The Mayor should respond immediately ("I've assigned Toast to work on that. You can watch progress in the dashboard.") rather than blocking the chat. This means the Mayor's tool calls must be non-blocking from the user's perspective — the Mayor responds conversationally about what it did, and the dashboard shows the async result. This is a system prompt / tool design concern, not just a UI concern.
+
+---
+
+## Architecture Assessment: Will This Work?
+
+> This section is a critical assessment of the current implementation and proposed architecture, measured against the full scope of what Gastown actually is (as documented in the "What Is Gastown?" section) and the UI vision (as documented in the "Product Vision" section). The question: does the current architecture get us where we need to go, or are there structural problems?
+
+### What's Built and Working Well
+
+The core loop is solid. The Rig DO is a well-implemented state machine (~1,585 lines) with alarm-based scheduling, witness patrol, circuit breaker for dispatch failures, and the full beads/agents/mail/review-queue data model in SQLite. The container implementation is genuinely impressive — it has fully adopted `kilo serve` with proper session management, SSE event consumption, per-worktree server instances, and a clean agent runner that handles git clone → worktree → start. The tool plugin (8 tools) is production-quality with comprehensive tests, JWT auth, and prompt injection security. The Mayor DO has a working persistent conversational session model. The integration tests cover the critical paths.
+
+**In short**: the plumbing works. A user can sling a bead, the alarm fires, a polecat spawns in the container, works on the code via kilo serve, and reports back. This is a functional MVP core loop.
+
+### Structural Issues That Need Addressing
+
+#### 1. The Witness is Not an Agent — It's Hardcoded in the Alarm
+
+In real Gastown, the Witness is a **per-rig persistent AI agent** that monitors polecats, nudges stuck workers, handles cleanup, and triggers escalations. It runs in its own tmux session, receives `POLECAT_DONE` mail, verifies work, sends `MERGE_READY` to the Refinery, and can be nudged/communicated with.
+
+In the cloud implementation, the Witness is **not an agent at all**. It's a Go-style function (`witnessPatrol()`) hardcoded into the Rig DO's alarm handler. It checks for dead/stale agents, resets them to idle, and sends GUPP_CHECK mail. This is the "ZFC" pattern from Gastown's daemon — mechanical transport, not intelligent triage.
+
+**Why this matters**: The Witness's value in Gastown is its ability to _reason about why an agent is stuck_ — is it thinking deeply, waiting on a long tool call, or actually hung? A Go-style function can only check thresholds. For the cloud product, where users are watching the dashboard, a visible Witness agent that can be observed making decisions ("I noticed Toast hasn't made progress in 20 minutes, sending a nudge") is dramatically more transparent than a silent alarm handler.
+
+**Recommendation**: For Phase 1, the alarm-based witness is fine. For Phase 2+, the Witness should become an actual agent session in the container — a kilo serve session with a witness system prompt and patrol molecule. It receives mail, checks polecats, sends mail. Its conversation stream is visible in the dashboard.
+
+#### 2. The Refinery Has No Implementation
+
+The review queue exists in the Rig DO (5 methods: submit, pop, complete). The alarm handler calls `processReviewQueue()` which calls `startMergeInContainer()`. But the container's control server has **no `/merge` endpoint** — the call will 404. There is no refinery agent, no quality gate logic, no merge execution.
+
+This is acknowledged as Phase 2 work, but it means the full polecat→done→merge→closed loop is broken. Polecats can call `gt_done`, work gets submitted to the review queue, and then it sits there forever. The bead never reaches `closed` status through the merge path.
+
+**Recommendation**: PR 9 (Manual Merge Flow) needs to be prioritized before the product is usable. At minimum: a `/merge` endpoint on the control server that does a deterministic `git merge --no-ff`, and the alarm handler that calls it. The AI refinery agent can come later.
+
+#### 3. No Town DO Means No Cross-Rig Coordination
+
+The proposal lists a Town DO for convoy lifecycle, escalation routing, and cross-rig coordination. In the current implementation, there is no Town DO — `GastownUserDO` handles town/rig CRUD but has zero coordination logic. Convoys don't exist in the system at all (the `convoy_id` column exists on beads but nothing populates it).
+
+For a single-rig town, this is fine. For the "talk to the Mayor and it coordinates across multiple repos" vision, this is a structural gap.
+
+**Recommendation**: The Town DO should be implemented before multi-rig support. The convoy system is core to the Gastown experience and the dashboard (convoy progress bars, landing detection, cross-rig tracking). Without convoys, work is tracked per-rig with no cross-rig visibility.
+
+#### 4. The Mayor Has No Tools
+
+The MayorDO has a working persistent conversational session. The `sendMessage` flow works: user types → MayorDO → container → kilo serve → Mayor responds. But the Mayor has no tools to actually do anything. It's a chatbot, not a coordinator.
+
+PR 8.5 (Mayor Tools — `gt_sling`, `gt_list_rigs`, `gt_list_beads`, `gt_list_agents`, `gt_mail_send`) is listed as the next uncompleted issue (#339). Without these tools, the Mayor cannot delegate work, which is the entire point of the chat-first interaction model in the product vision.
+
+**Recommendation**: Mayor tools are the highest-priority remaining work for the product vision. The Mayor chat is the primary interaction surface — if it can't delegate, the product doesn't function.
+
+#### 5. No Postgres Read Replica — Dashboard Reads Hit DOs Directly
+
+The proposal describes Postgres as a read replica for the dashboard. In reality, there are **zero Gastown tables in Postgres**. All dashboard reads go: `tRPC → gastown-client → worker → DO RPC`. This means every dashboard page load sends HTTP requests to the Cloudflare worker, which does DO RPCs to get data.
+
+For a single user with one town, this is fine. But:
+
+- DO RPCs are billed per-request. Heavy dashboard polling multiplies cost.
+- There's no way to do cross-town queries (e.g., "show all my beads across all rigs") without fanning out to every DO.
+- The activity feed (real-time event stream) has nowhere to read from — there's no event log in the DOs, and no SSE endpoint on the worker.
+
+**Recommendation**: For Phase 1, direct DO reads are acceptable. But the town-wide event stream needed for the activity feed requires either: (a) the Rig DO writing events to a log table that the worker can tail via SSE, or (b) a dedicated event fan-out DO. This should be designed now, not deferred to Phase 4.
+
+#### 6. Agent Streaming Is Incomplete
+
+The container creates stream tickets (UUIDs with 60s TTL), and the worker handler constructs stream URLs. But the actual WebSocket endpoint that would consume these tickets and stream SSE events to the browser **does not exist** in the container. The `AgentStream.tsx` component connects via EventSource to a URL that returns nothing.
+
+This is the most visible gap for the product vision. The "watch an agent work" experience requires working streaming.
+
+**Recommendation**: This needs to be unblocked. The container already consumes SSE from kilo serve and tracks events per-session. The missing piece is a `GET /agents/:agentId/stream` endpoint on the control server that validates a stream ticket and proxies the relevant kilo serve SSE events. This is a moderate implementation effort with a high product impact.
+
+#### 7. The Polecat System Prompt Is Not Used
+
+There is a detailed polecat system prompt (`prompts/polecat-system.prompt.ts`) that includes GUPP instructions, tool documentation, and workflow guidance. But the Rig DO's `systemPromptForRole('polecat')` returns a different, much simpler prompt. The detailed prompt is unused.
+
+**Recommendation**: Wire the detailed prompt into the dispatch path. The polecat's effectiveness depends heavily on its system prompt — the GUPP principle, molecule navigation, and tool usage instructions are critical.
+
+#### 8. Molecules Exist in Schema Only
+
+The `molecules` table is created in every Rig DO, and `MoleculeStatus` exists in types, and `molecule_id` exists on beads. But no RPC methods create, query, or advance molecules. The `gt_mol_current` and `gt_mol_advance` tools don't exist in the plugin.
+
+Molecules are how Gastown breaks complex work into trackable multi-step workflows. Without them, polecats get a single bead with a title and body, and have no structured way to navigate complex tasks.
+
+**Recommendation**: Molecules are Phase 2 (PR 14) in the proposal. This is reasonable — single-step beads work for the MVP. But the molecule system is core to Gastown's "MEOW" principle and should be designed to work with the UI (molecule progress stepper, step-by-step visualization).
+
+#### 9. The `kilo serve` Server-Sharing Problem
+
+Multiple agents in the same worktree share a single `kilo serve` process. The plugin reads `GASTOWN_AGENT_ID` from `process.env`, which is set once when the server starts. If two polecats share a server, the second agent's sessions will see the first agent's ID in the plugin.
+
+In practice, each polecat gets its own branch and worktree, so server sharing shouldn't occur for polecats. But the Witness and Refinery, if implemented as agent sessions, would share the rig's main branch worktree. If they're both sessions on the same kilo serve instance, their plugins will read the wrong agent ID.
+
+**Recommendation**: Either ensure each agent role gets its own worktree (even if Witness and Refinery use main), or pass `GASTOWN_AGENT_ID` per-session rather than per-server. The latter requires a plugin change to read from session config instead of process.env.
+
+#### 10. No Event Log for the Dashboard
+
+The product vision requires a live activity feed showing "beads created, agents spawned, mail sent, molecules advancing, merges completed." But there is no event log anywhere in the system. The Rig DO mutates state (creates beads, updates statuses, sends mail) but doesn't write an append-only event stream. The `gastown_bead_events` table exists in the Postgres schema in the _proposal_ but not in the actual DO SQLite or anywhere in the implementation.
+
+**Recommendation**: Add a `bead_events` table to the Rig DO SQLite (append-only: `{id, bead_id, agent_id, event_type, old_value, new_value, metadata, created_at}`). Every state mutation writes an event. The worker exposes a `/api/rigs/:rigId/events?since=<timestamp>` endpoint. The town-wide feed fans out across all rig DOs. This is the backbone of the real-time dashboard.
+
+### Assessment Summary
+
+| Aspect                                                    | Status         | Verdict                                                        |
+| --------------------------------------------------------- | -------------- | -------------------------------------------------------------- |
+| Core loop (sling → alarm → dispatch → agent works → done) | ✅ Implemented | Works, needs Refinery endpoint to close the loop               |
+| Rig DO state machine                                      | ✅ Solid       | Production-quality, well-tested                                |
+| Container + kilo serve                                    | ✅ Solid       | Fully adopted, clean architecture                              |
+| Tool plugin                                               | ✅ Complete    | 8 tools, good tests, security boundaries                       |
+| Mayor persistent session                                  | ✅ Working     | Session lifecycle, health monitoring                           |
+| Mayor tools (delegation)                                  | ❌ Missing     | #339 — highest priority for product vision                     |
+| Agent streaming to browser                                | ❌ Incomplete  | Stream tickets exist but no WebSocket/SSE endpoint serves them |
+| Refinery / merge flow                                     | ❌ Missing     | Container has no `/merge` endpoint; review queue is a dead end |
+| Witness as agent                                          | ⚠️ Alarm-only  | Works mechanically but not transparent/observable              |
+| Town DO / convoys                                         | ❌ Missing     | No cross-rig coordination, no convoy tracking                  |
+| Event log for dashboard                                   | ❌ Missing     | No append-only event stream for real-time feed                 |
+| Postgres read replica                                     | ❌ Not started | All reads go through DO RPCs                                   |
+| Molecules                                                 | ⚠️ Schema only | Table exists, no business logic                                |
+| Polecat system prompt                                     | ⚠️ Not wired   | Detailed prompt exists but isn't used                          |
+| Identity / attribution                                    | ⚠️ Partial     | `GIT_AUTHOR_NAME` is set but no CV / AgentIdentity tracking    |
+
+### Recommended Priority Adjustments
+
+The current phase ordering puts UI (PR 8), merge flow (PR 9), and multi-agent (Phase 2) in sequence. Given the product vision, the priorities should shift:
+
+1. **Mayor tools (#339)** — Without tools, the chat-first experience doesn't work.
+2. **Agent streaming endpoint** — Without streaming, "watch an agent work" doesn't work.
+3. **Merge endpoint on container** — Without this, the polecat→merge→closed loop is broken.
+4. **Event log in Rig DO** — Required for the real-time activity feed.
+5. **Wire the detailed polecat system prompt** — Low effort, high impact on agent quality.
+6. **Dashboard UI (PR 8)** — Now viable because the above unblocks the core experience.
+7. **Town DO + convoys** — Required for multi-rig coordination and convoy dashboard.
+
+The architecture is fundamentally sound. The DO-as-scheduler, container-as-runtime split is correct. The kilo serve adoption was the right call. The gaps are mostly about completing the implementation rather than rearchitecting — with two notable exceptions: the event log (needed for the dashboard vision) and the Witness-as-agent question (which affects how transparent the system feels to users).

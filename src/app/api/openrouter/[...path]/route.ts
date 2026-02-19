@@ -47,6 +47,7 @@ import {
   logFreeModelRequest,
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
+import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import { classifyAbuse } from '@/lib/abuse-service';
 import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import {
@@ -213,8 +214,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     if (!promotionLimit.allowed) {
       console.warn(
-        `Promotion model limit exceeded, ip address: ${ipAddress}, ` +
-          `model: ${originalModelIdLowerCased}, request count: ${promotionLimit.requestCount}`
+        `Promotion model limit exceeded, ip: ${ipAddress}, ` +
+          `model: ${originalModelIdLowerCased}, ` +
+          `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
+          `in ${PROMOTION_WINDOW_HOURS}h window`
       );
 
       return NextResponse.json(

@@ -313,6 +313,11 @@ export class MayorDO extends DurableObject<Env> {
     );
 
     const token = await this.mintMayorToken(agentId, config);
+    if (!token) {
+      console.error(
+        `${MAYOR_LOG} createSession: mintMayorToken returned null — GASTOWN_SESSION_TOKEN will be missing from the container env. The gastown plugin will fail to load mayor tools.`
+      );
+    }
 
     const envVars: Record<string, string> = {
       // Mayor-specific: tells the plugin to load mayor tools instead of rig tools

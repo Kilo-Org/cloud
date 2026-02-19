@@ -22,8 +22,31 @@ export const GastownPlugin: Plugin = async ({ client }) => {
 
   // Mayor gets town-scoped tools; rig agents get rig-scoped tools.
   // The mayor doesn't have a rigId — it operates across rigs.
-  const gastownClient = isMayor ? null : createClientFromEnv();
-  const mayorClient = isMayor ? createMayorClientFromEnv() : null;
+  let gastownClient: ReturnType<typeof createClientFromEnv> | null = null;
+  let mayorClient: ReturnType<typeof createMayorClientFromEnv> | null = null;
+
+  if (isMayor) {
+    try {
+      mayorClient = createMayorClientFromEnv();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[${SERVICE}] Failed to create mayor client — mayor tools will NOT be registered: ${message}`
+      );
+      console.error(
+        `[${SERVICE}] Mayor env check: GASTOWN_API_URL=${process.env.GASTOWN_API_URL ? 'set' : 'MISSING'} GASTOWN_SESSION_TOKEN=${process.env.GASTOWN_SESSION_TOKEN ? 'set' : 'MISSING'} GASTOWN_AGENT_ID=${process.env.GASTOWN_AGENT_ID ? 'set' : 'MISSING'} GASTOWN_TOWN_ID=${process.env.GASTOWN_TOWN_ID ? 'set' : 'MISSING'}`
+      );
+    }
+  } else {
+    try {
+      gastownClient = createClientFromEnv();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[${SERVICE}] Failed to create rig client — rig tools will NOT be registered: ${message}`
+      );
+    }
+  }
 
   const rigTools = gastownClient ? createTools(gastownClient) : {};
   const mayorTools = mayorClient ? createMayorTools(mayorClient) : {};

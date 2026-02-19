@@ -259,7 +259,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     originalModelIdLowerCased,
     requestBodyParsed,
     user,
-    organizationId
+    organizationId,
+    taskId
   );
 
   console.debug(`Routing request to ${provider.id}`);

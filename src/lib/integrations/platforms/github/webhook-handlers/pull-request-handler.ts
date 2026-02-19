@@ -16,6 +16,7 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { addReactionToPR } from '../adapter';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
+import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
 
 /**
  * GitHub Pull Request Event Handler
@@ -33,12 +34,21 @@ export async function handlePullRequestCodeReview(
   const { pull_request, repository } = payload;
 
   try {
+    const checkoutRef = resolvePullRequestCheckoutRef(payload);
+
     logExceptInTest('Pull request event received:', {
       action: payload.action,
       pr_number: pull_request.number,
       repo: repository.full_name,
       title: pull_request.title,
       author: pull_request.user?.login,
+    });
+    logExceptInTest('Resolved pull request checkout ref:', {
+      pr_number: pull_request.number,
+      repo: repository.full_name,
+      isForkPr: checkoutRef.isForkPr,
+      headRepoFullName: checkoutRef.headRepoFullName,
+      checkoutRef: checkoutRef.checkoutRef,
     });
 
     // Skip draft PRs - only trigger code review for ready PRs
@@ -184,7 +194,7 @@ export async function handlePullRequestCodeReview(
       prAuthor: pull_request.user.login,
       prAuthorGithubId: String(pull_request.user.id),
       baseRef: pull_request.base.ref,
-      headRef: pull_request.head.ref,
+      headRef: checkoutRef.checkoutRef,
       headSha: pull_request.head.sha,
       platform: 'github',
     });

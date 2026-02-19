@@ -485,6 +485,34 @@ async function createNewBranch(
   }
 }
 
+const GITHUB_PULL_REF_PATTERN = /^refs\/pull\/\d+\/head$/;
+
+async function fetchPullRefAndCheckout(
+  session: ExecutionSession,
+  workspacePath: string,
+  pullRef: string
+): Promise<void> {
+  if (!GITHUB_PULL_REF_PATTERN.test(pullRef)) {
+    throw new Error(`Invalid pull ref format: ${pullRef}`);
+  }
+
+  const fetchResult = await session.exec(`cd ${workspacePath} && git fetch origin '${pullRef}'`);
+  if (fetchResult.exitCode !== 0) {
+    throw new Error(
+      `Failed to fetch pull ref ${pullRef}: ${fetchResult.stderr || fetchResult.stdout}`
+    );
+  }
+
+  const checkoutResult = await session.exec(
+    `cd ${workspacePath} && git checkout -B '${pullRef}' FETCH_HEAD`
+  );
+  if (checkoutResult.exitCode !== 0) {
+    throw new Error(
+      `Failed to checkout pull ref ${pullRef}: ${checkoutResult.stderr || checkoutResult.stdout}`
+    );
+  }
+}
+
 /**
  * Manage branch checkout/creation.
  *
@@ -542,6 +570,13 @@ export async function manageBranch(
   } else {
     // Case 4: Doesn't exist anywhere
     if (isUpstreamBranch) {
+      if (GITHUB_PULL_REF_PATTERN.test(branchName)) {
+        await fetchPullRefAndCheckout(session, workspacePath, branchName);
+        logger.withTags({ pullRef: branchName }).info('Checked out GitHub pull ref');
+        logger.debug('Successfully on branch');
+        return branchName;
+      }
+
       throw new Error(
         `Branch "${branchName}" not found in repository. Please ensure the branch exists remotely.`
       );

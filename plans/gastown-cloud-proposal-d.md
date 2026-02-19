@@ -1971,6 +1971,24 @@ Cloudflare Containers have **ephemeral disk** — when a container sleeps or res
 
 **Goal:** Elevate the dashboard from functional to genuinely great. Every Gastown concept should be visually represented and interactively explorable.
 
+#### Sidebar
+
+When you launch a Town's UI, our main app's sidebar nav should smoothly animate its contents to reveal the new Gastown Town sidebar UI (with a back to towns link which will slide the normal kilo nav back in).
+
+Inside of this sidebar will be all of the important items for your town:
+
+- Overview
+- Mail
+- Beads
+- Merge Queue
+- Agents
+- Observability (this would be logs, metrics, analytics, etc)
+- ... And anything else you think is important or top-level interaction
+
+#### Fullscreen App
+
+Unlike other sections of the kilo dash, Gastown should behavior like an information-dense, full screen application. With information flowing autonomously and smoothly animating throughout. The user should see the objects of the system, know how to manipulate them, and intuitively be able to flow from one object to another through a graph/pane interface that allows for seamless navigation.
+
 #### Convoy Visualization
 
 - **Convoy timeline view**: A horizontal timeline showing bead completion events over time, with agent avatars at each completion point. Shows velocity and parallelism.

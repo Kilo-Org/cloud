@@ -35,14 +35,14 @@ const VERCEL_ROUTING_ALLOW_LIST = [
   'z-ai/glm-5',
 ];
 
-function getRandomNumberLessThan100(userId: string) {
-  return crypto.createHash('sha256').update(userId).digest().readUInt32BE(0) % 100;
+function getRandomNumberLessThan100(randomSeed: string) {
+  return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
 }
 
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest,
-  userId: string
+  randomSeed: string
 ) {
   if (!VERCEL_ROUTING_ALLOW_LIST.includes(requestedModel)) {
     console.debug(`[shouldRouteToVercel] model not on the allow list for Vercel routing`);
@@ -57,7 +57,7 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  return getRandomNumberLessThan100('vercel_routing_' + userId) < VERCEL_ROUTING_PERCENTAGE;
+  return getRandomNumberLessThan100('vercel_routing_' + randomSeed) < VERCEL_ROUTING_PERCENTAGE;
 }
 
 function convertProviderOptions(

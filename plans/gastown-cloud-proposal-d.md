@@ -9,7 +9,9 @@ Cloud-first rewrite of gastown's core tenets as a Kilo platform feature. See `do
 - Each town gets a **Cloudflare Container** that runs all agent processes (Kilo CLI instances) — one container per town, not one per agent
 - The DO is the **scheduler**: alarms scan for pending work and signal the container to start/stop agent processes
 - The container is the **execution runtime**: it receives commands from the DO, spawns Kilo CLI processes, and routes tool calls back to the DO
-- LLM calls route through the Kilo gateway (`KILO_API_URL`)
+- LLM calls route through the Kilo gateway (`KILO_API_URL`) using the owner's `kilocodeToken` (user JWT generated at rig creation)
+- **Mayor is a town-level singleton** with a persistent conversational session in a dedicated `MayorDO` (keyed by `townId`). Messages to the mayor do NOT create beads — the mayor decides when to delegate work via tools (`gt_sling`, `gt_list_rigs`, etc.)
+- **Rig-level agents** (Witness, Refinery, Polecats) are bead-driven and managed by the Rig DO alarm cycle
 - Watchdog/health monitoring uses DO alarms — the DO can independently verify container health and re-dispatch work if the container dies
 - The container uses **`kilo serve`** (Kilo's built-in HTTP server) instead of raw stdin/stdout process management — each agent is a session within a server instance, enabling structured messaging via HTTP API, real-time observability via SSE events, and clean session abort
 
@@ -18,7 +20,7 @@ Cloud-first rewrite of gastown's core tenets as a Kilo platform feature. See `do
 ```
 ┌──────────────┐     tRPC      ┌──────────────────┐
 │   Dashboard  │◄─────────────►│   Next.js Backend │
-│   (Next.js)  │               │   (Postgres r/w)  │
+│   (Next.js)  │               │                   │
 └──────────────┘               └────────┬─────────┘
                                         │ internal auth
                                         ▼
@@ -27,31 +29,31 @@ Cloud-first rewrite of gastown's core tenets as a Kilo platform feature. See `do
                                │  (Hono router)    │
                                └────────┬─────────┘
                                         │ DO RPC
-                          ┌─────────────┼─────────────┐
-                          ▼             ▼             ▼
-                    ┌──────────┐  ┌──────────┐  ┌──────────┐
-                    │  Rig DO  │  │ Town DO  │  │ Agent ID │
-                    │ (SQLite) │  │ (SQLite) │  │   DO     │
-                    └─────┬────┘  └──────────┘  └──────────┘
-                          │
-                          │ alarm fires → fetch()
-                          ▼
-                    ┌──────────────────────┐
-                    │   Town Container     │
-                    │  ┌────────────────┐  │
-                    │  │ Control Server │  │  ◄── receives start/stop/health commands
-                    │  └───────┬────────┘  │
-                    │          │            │
-                    │  ┌───────┴────────┐  │
-                    │  │ Agent Processes │  │  ◄── Kilo CLI instances (Mayor, Polecats, Refinery)
-                    │  │  ┌──────────┐  │  │
-                    │  │  │ Polecat1 │  │  │  ──► tool calls ──► DO RPCs
-                    │  │  │ Polecat2 │  │  │
-                    │  │  │ Mayor    │  │  │
-                    │  │  │ Refinery │  │  │
-                    │  │  └──────────┘  │  │
-                    │  └────────────────┘  │
-                    └──────────────────────┘
+                   ┌────────────────────┼────────────────────┐
+                   ▼                    ▼                    ▼
+             ┌──────────┐        ┌──────────┐         ┌──────────┐
+             │  Rig DO  │        │ Mayor DO │         │ Town DO  │
+             │ (SQLite) │        │(per town)│         │(convoys) │
+             └─────┬────┘        └─────┬────┘         └──────────┘
+                   │                   │
+                   │ alarm fires → fetch()
+                   ▼                   ▼
+             ┌──────────────────────────────┐
+             │       Town Container         │
+             │  ┌────────────────────────┐  │
+             │  │    Control Server      │  │
+             │  └───────────┬────────────┘  │
+             │              │               │
+             │  ┌───────────┴────────────┐  │
+             │  │    Agent Processes     │  │
+             │  │  ┌──────────────────┐  │  │
+             │  │  │ Mayor (session)  │  │  │  ◄── persistent, conversational
+             │  │  │ Polecat1         │  │  │  ◄── bead-driven, ephemeral
+             │  │  │ Polecat2         │  │  │
+             │  │  │ Refinery         │  │  │
+             │  │  └──────────────────┘  │  │
+             │  └────────────────────────┘  │
+             └──────────────────────────────┘
 ```
 
 ---
@@ -1041,7 +1043,7 @@ export const gastownRouter = router({
       // 5. Return agent info (no stream URL yet — that comes from container)
     }),
 
-  // -- Send message to Mayor --
+  // -- Send message to Mayor (routes to MayorDO, no bead created) --
   sendMessage: protectedProcedure
     .input(
       z.object({
@@ -1051,8 +1053,9 @@ export const gastownRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // 1. Create a message bead assigned to the Mayor agent
-      // 2. Arm alarm → dispatches to container
+      // Routes to MayorDO.sendMessage() — NO bead created.
+      // The mayor's persistent session receives the message as a follow-up.
+      // The mayor decides whether to delegate work via tools (gt_sling, etc.)
     }),
 
   // -- Agent Streams --
@@ -1193,37 +1196,60 @@ The shared container model makes this natural — adding a polecat is just spawn
 
 ---
 
-### PR 12: Mayor Agent
+### PR 8: MayorDO — Town-Level Conversational Agent (#338)
 
-**Goal:** The Mayor is an agent process inside the town container that coordinates work across rigs.
+> **Revised (Feb 2026):** The Mayor was previously designed as a per-rig, demand-spawned ephemeral agent (old #222). This has been superseded. The Mayor is now a **town-level singleton** with a **persistent conversational session** in a dedicated `MayorDO`, matching the [Gastown architecture spec](https://docs.gastownhall.ai/design/architecture/).
 
-The Mayor:
+**Goal:** Extract the Mayor to a dedicated `MayorDO` keyed by `townId`. The mayor maintains a persistent kilo serve session across messages. User messages route directly to the session — no bead is created. The mayor uses tools to delegate work when it decides to.
 
-- Receives work requests from the user (via dashboard `sendMessage` → message bead → alarm → container)
-- Breaks down work into beads, creates convoys (via `gt_sling`, `gt_convoy_create` tools)
-- Handles escalations routed to it (via mail)
-- Has cross-rig visibility via Town DO tools
+#### MayorDO Design
 
-#### New Tools for Mayor Role
+```typescript
+type MayorConfig = {
+  townId: string;
+  userId: string;
+  kilocodeToken?: string;
+};
 
-| Tool               | Description                                                |
-| ------------------ | ---------------------------------------------------------- |
-| `gt_sling`         | Create bead and assign to a polecat in a rig               |
-| `gt_convoy_create` | Create a convoy with multiple beads                        |
-| `gt_convoy_status` | Check convoy progress                                      |
-| `gt_rig_status`    | Get summary of a rig's state (agents, beads, review queue) |
+type MayorSession = {
+  agentId: string; // mayor agent ID in the container
+  sessionId: string; // kilo serve session ID
+  status: 'idle' | 'active' | 'starting';
+  lastActivityAt: string;
+};
+```
 
-#### Mayor Lifecycle
+Key RPC methods: `configureMayor`, `sendMessage`, `getMayorStatus`, `destroy`.
 
-The Mayor is **demand-spawned** — the Town DO alarm starts a Mayor process in the container when:
+#### Message Flow (Before → After)
 
-- A user sends a message (message bead created)
-- An escalation is routed to the Mayor (mail delivered)
-- A convoy needs coordination
+**Before:** `sendMessage` → create bead → hook to mayor → alarm → dispatch → new session → complete → destroy
+**After:** `sendMessage` → `MayorDO.sendMessage()` → follow-up to existing session → mayor responds conversationally
 
-The Mayor process runs until its work is complete, then calls `gt_done` and exits. There is no persistent Mayor session — the DO state provides continuity between Mayor invocations. The Mayor's `gt_prime` context includes full town state so it can resume from where it left off.
+The mayor session is created on first message and reused for all subsequent messages. No bead is created. The mayor decides when to delegate work via tools.
 
-This avoids the "Mayor session persistence" problem from the original proposal entirely. The DO is the persistent memory; the Mayor agent is an ephemeral reasoning process.
+#### Wrangler Changes
+
+New DO binding `MAYOR` for `MayorDO`, new migration tag `v3`.
+
+---
+
+### PR 8.5: Mayor Tools — Cross-Rig Delegation (#339)
+
+**Goal:** Give the Mayor tools to delegate work across rigs. Without tools, the mayor is just a chatbot. With tools, it becomes the town coordinator.
+
+#### Tools
+
+| Tool               | Description                                 | Proxies to                    |
+| ------------------ | ------------------------------------------- | ----------------------------- |
+| `gt_sling`         | Sling a task to a polecat in a specific rig | `RigDO.slingBead(rigId, ...)` |
+| `gt_list_rigs`     | List all rigs in the town                   | `GastownUserDO.listRigs()`    |
+| `gt_list_beads`    | List beads in a rig (filterable by status)  | `RigDO.listBeads(filter)`     |
+| `gt_list_agents`   | List agents in a rig                        | `RigDO.listAgents(filter)`    |
+| `gt_mail_send`     | Send mail to an agent in any rig            | `RigDO.sendMail(...)`         |
+| `gt_convoy_create` | Create a convoy tracking multiple beads     | Future — convoy system        |
+
+Tools are HTTP endpoints on the Gastown worker, called by the mayor's kilo serve process using `GASTOWN_SESSION_TOKEN` for auth. The mayor's system prompt describes available tools and when to use them.
 
 ---
 

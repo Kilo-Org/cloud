@@ -15,6 +15,12 @@ export class TownContainerDO extends Container<Env> {
   defaultPort = 8080;
   sleepAfter = '30m';
 
+  // Inject the gastown worker URL so the container's completion reporter
+  // and plugin can call back to the worker API.
+  envVars: Record<string, string> = this.env.GASTOWN_API_URL
+    ? { GASTOWN_API_URL: this.env.GASTOWN_API_URL }
+    : {};
+
   override onStart(): void {
     console.log(`Town container started for DO id=${this.ctx.id.toString()}`);
   }

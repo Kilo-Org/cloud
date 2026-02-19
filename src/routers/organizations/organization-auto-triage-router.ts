@@ -96,6 +96,9 @@ export const organizationAutoTriageRouter = createTRPCRouter({
   retryTicket: organizationMemberProcedure
     .input(sharedHandlers.retryTicket.inputSchema)
     .mutation(sharedHandlers.retryTicket.handler),
+  interruptTicket: organizationMemberProcedure
+    .input(sharedHandlers.interruptTicket.inputSchema)
+    .mutation(sharedHandlers.interruptTicket.handler),
   listTickets: organizationMemberProcedure
     .input(sharedHandlers.listTickets.inputSchema)
     .query(sharedHandlers.listTickets.handler),

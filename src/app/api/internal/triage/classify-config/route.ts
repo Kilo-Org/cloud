@@ -35,6 +35,7 @@ interface ClassifyConfigResponse {
     model_slug: string;
     custom_instructions?: string | null;
   };
+  excluded_labels: string[];
 }
 
 export async function POST(req: NextRequest) {
@@ -113,6 +114,9 @@ export async function POST(req: NextRequest) {
 
     const config = agentConfig.config as AutoTriageAgentConfig;
 
+    // Labels used for gating (skip/required) should not be offered to the AI for auto-labeling
+    const excluded_labels = [...(config.skip_labels ?? []), ...(config.required_labels ?? [])];
+
     // Return configuration for DO to use
     const response: ClassifyConfigResponse = {
       githubToken,
@@ -120,6 +124,7 @@ export async function POST(req: NextRequest) {
         model_slug: config.model_slug,
         custom_instructions: config.custom_instructions,
       },
+      excluded_labels,
     };
 
     logExceptInTest('[classify-config] Returning classification config', {

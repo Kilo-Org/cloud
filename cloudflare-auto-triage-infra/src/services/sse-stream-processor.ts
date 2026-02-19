@@ -8,6 +8,7 @@
 type StreamEventHandler = {
   onSessionId?: (sessionId: string) => void;
   onTextContent?: (text: string) => void;
+  onKilocodeEvent?: (payload: Record<string, unknown>) => void;
   onComplete?: () => void;
   onError?: (error: Error) => void;
 };
@@ -113,14 +114,21 @@ export class SSEStreamProcessor {
               }
 
               // Extract text content from kilocode events
-              if (handlers.onTextContent && event.streamEventType === 'kilocode' && event.payload) {
-                if (typeof event.payload.content === 'string') {
-                  handlers.onTextContent(event.payload.content);
-                } else if (
-                  event.payload.type === 'text' &&
-                  typeof event.payload.text === 'string'
-                ) {
-                  handlers.onTextContent(event.payload.text);
+              if (event.streamEventType === 'kilocode' && event.payload) {
+                // Call raw event handler if provided
+                if (handlers.onKilocodeEvent) {
+                  handlers.onKilocodeEvent(event.payload as Record<string, unknown>);
+                }
+
+                if (handlers.onTextContent) {
+                  if (typeof event.payload.content === 'string') {
+                    handlers.onTextContent(event.payload.content);
+                  } else if (
+                    event.payload.type === 'text' &&
+                    typeof event.payload.text === 'string'
+                  ) {
+                    handlers.onTextContent(event.payload.text);
+                  }
                 }
               }
               // Also check for output events

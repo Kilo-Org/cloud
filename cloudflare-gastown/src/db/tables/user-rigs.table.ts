@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
-export const RigRecord = z.object({
+export const UserRigRecord = z.object({
   id: z.string(),
   town_id: z.string(),
   name: z.string(),
@@ -11,12 +11,12 @@ export const RigRecord = z.object({
   updated_at: z.string(),
 });
 
-export type RigRecord = z.output<typeof RigRecord>;
+export type UserRigRecord = z.output<typeof UserRigRecord>;
 
-export const rigs = getTableFromZodSchema('rigs', RigRecord);
+export const user_rigs = getTableFromZodSchema('user_rigs', UserRigRecord);
 
-export function createTableRigs(): string {
-  return getCreateTableQueryFromTable(rigs, {
+export function createTableUserRigs(): string {
+  return getCreateTableQueryFromTable(user_rigs, {
     id: `text primary key`,
     town_id: `text not null`,
     name: `text not null`,

@@ -3,7 +3,7 @@ import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/
 
 export const EscalationSeverity = z.enum(['low', 'medium', 'high']);
 
-export const EscalationRecord = z.object({
+export const TownEscalationRecord = z.object({
   id: z.string(),
   source_rig_id: z.string(),
   source_agent_id: z.string().nullable(),
@@ -16,12 +16,12 @@ export const EscalationRecord = z.object({
   acknowledged_at: z.string().nullable(),
 });
 
-export type EscalationRecord = z.output<typeof EscalationRecord>;
+export type TownEscalationRecord = z.output<typeof TownEscalationRecord>;
 
-export const escalations = getTableFromZodSchema('escalations', EscalationRecord);
+export const town_escalations = getTableFromZodSchema('town_escalations', TownEscalationRecord);
 
-export function createTableEscalations(): string {
-  return getCreateTableQueryFromTable(escalations, {
+export function createTableTownEscalations(): string {
+  return getCreateTableQueryFromTable(town_escalations, {
     id: `text primary key`,
     source_rig_id: `text not null`,
     source_agent_id: `text`,

@@ -22,12 +22,12 @@ export const BeadRecord = z.object({
   closed_at: z.string().nullable(),
 });
 
-export type BeadRecord = z.output<typeof BeadRecord>;
+export type RigBeadRecord = z.output<typeof BeadRecord>;
 
-export const beads = getTableFromZodSchema('beads', BeadRecord);
+export const rig_beads = getTableFromZodSchema('rig_beads', BeadRecord);
 
-export function createTableBeads(): string {
-  return getCreateTableQueryFromTable(beads, {
+export function createTableRigBeads(): string {
+  return getCreateTableQueryFromTable(rig_beads, {
     id: `text primary key`,
     type: `text not null check(type in ('issue', 'message', 'escalation', 'merge_request'))`,
     status: `text not null default 'open' check(status in ('open', 'in_progress', 'closed', 'failed'))`,
@@ -45,11 +45,11 @@ export function createTableBeads(): string {
   });
 }
 
-export function getIndexesBeads(): string[] {
+export function getIndexesRigBeads(): string[] {
   return [
-    `CREATE INDEX IF NOT EXISTS idx_beads_status ON ${beads}(${beads.columns.status})`,
-    `CREATE INDEX IF NOT EXISTS idx_beads_type ON ${beads}(${beads.columns.type})`,
-    `CREATE INDEX IF NOT EXISTS idx_beads_assignee ON ${beads}(${beads.columns.assignee_agent_id})`,
-    `CREATE INDEX IF NOT EXISTS idx_beads_convoy ON ${beads}(${beads.columns.convoy_id})`,
+    `CREATE INDEX IF NOT EXISTS idx_rig_beads_status ON ${rig_beads}(${rig_beads.columns.status})`,
+    `CREATE INDEX IF NOT EXISTS idx_rig_beads_type ON ${rig_beads}(${rig_beads.columns.type})`,
+    `CREATE INDEX IF NOT EXISTS idx_rig_beads_assignee ON ${rig_beads}(${rig_beads.columns.assignee_agent_id})`,
+    `CREATE INDEX IF NOT EXISTS idx_rig_beads_convoy ON ${rig_beads}(${rig_beads.columns.convoy_id})`,
   ];
 }

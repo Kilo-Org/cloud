@@ -18,7 +18,7 @@ export const BeadEventType = z.enum([
 
 export type BeadEventType = z.infer<typeof BeadEventType>;
 
-export const BeadEventRecord = z.object({
+export const RigBeadEventRecord = z.object({
   id: z.string(),
   bead_id: z.string(),
   agent_id: z.string().nullable(),
@@ -36,12 +36,12 @@ export const BeadEventRecord = z.object({
   created_at: z.string(),
 });
 
-export type BeadEventRecord = z.output<typeof BeadEventRecord>;
+export type RigBeadEventRecord = z.output<typeof RigBeadEventRecord>;
 
-export const beadEvents = getTableFromZodSchema('bead_events', BeadEventRecord);
+export const rig_bead_events = getTableFromZodSchema('rig_bead_events', RigBeadEventRecord);
 
-export function createTableBeadEvents(): string {
-  return getCreateTableQueryFromTable(beadEvents, {
+export function createTableRigBeadEvents(): string {
+  return getCreateTableQueryFromTable(rig_bead_events, {
     id: `text primary key`,
     bead_id: `text not null`,
     agent_id: `text`,
@@ -53,10 +53,10 @@ export function createTableBeadEvents(): string {
   });
 }
 
-export function getIndexesBeadEvents(): string[] {
+export function getIndexesRigBeadEvents(): string[] {
   return [
-    `CREATE INDEX IF NOT EXISTS idx_bead_events_bead ON ${beadEvents}(${beadEvents.columns.bead_id})`,
-    `CREATE INDEX IF NOT EXISTS idx_bead_events_created ON ${beadEvents}(${beadEvents.columns.created_at})`,
-    `CREATE INDEX IF NOT EXISTS idx_bead_events_type ON ${beadEvents}(${beadEvents.columns.event_type})`,
+    `CREATE INDEX IF NOT EXISTS idx_rig_bead_events_bead ON ${rig_bead_events}(${rig_bead_events.columns.bead_id})`,
+    `CREATE INDEX IF NOT EXISTS idx_rig_bead_events_created ON ${rig_bead_events}(${rig_bead_events.columns.created_at})`,
+    `CREATE INDEX IF NOT EXISTS idx_rig_bead_events_type ON ${rig_bead_events}(${rig_bead_events.columns.event_type})`,
   ];
 }

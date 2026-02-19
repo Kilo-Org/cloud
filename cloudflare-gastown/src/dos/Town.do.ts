@@ -1,20 +1,20 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
-  convoys,
-  ConvoyRecord,
+  town_convoys,
+  TownConvoyRecord,
   ConvoyStatus,
-  createTableConvoys,
-} from '../db/tables/convoys.table';
+  createTableTownConvoys,
+} from '../db/tables/town-convoys.table';
 import {
-  convoyBeads,
+  town_convoy_beads,
   ConvoyBeadStatus,
-  createTableConvoyBeads,
-} from '../db/tables/convoy-beads.table';
+  createTableTownConvoyBeads,
+} from '../db/tables/town-convoy-beads.table';
 import {
-  createTableEscalations,
-  escalations,
-  EscalationRecord,
-} from '../db/tables/escalations.table';
+  createTableTownEscalations,
+  town_escalations,
+  TownEscalationRecord,
+} from '../db/tables/town-escalations.table';
 import { query } from '../util/query.util';
 import { getTownContainerStub } from './TownContainer.do';
 import { getMayorDOStub } from './Mayor.do';
@@ -53,15 +53,15 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async initializeDatabase(): Promise<void> {
-    query(this.sql, createTableConvoys(), []);
-    query(this.sql, createTableConvoyBeads(), []);
-    query(this.sql, createTableEscalations(), []);
+    query(this.sql, createTableTownConvoys(), []);
+    query(this.sql, createTableTownConvoyBeads(), []);
+    query(this.sql, createTableTownEscalations(), []);
 
     // Composite primary keys are not supported by getCreateTableQueryFromTable.
     // Enforce uniqueness via a unique index.
     query(
       this.sql,
-      /* sql */ `CREATE UNIQUE INDEX IF NOT EXISTS idx_convoy_beads_pk ON ${convoyBeads}(${convoyBeads.columns.convoy_id}, ${convoyBeads.columns.bead_id})`,
+      /* sql */ `CREATE UNIQUE INDEX IF NOT EXISTS idx_town_convoy_beads_pk ON ${town_convoy_beads}(${town_convoy_beads.columns.convoy_id}, ${town_convoy_beads.columns.bead_id})`,
       []
     );
   }
@@ -123,7 +123,7 @@ export class TownDO extends DurableObject<Env> {
     title: string;
     beads: Array<{ bead_id: string; rig_id: string }>;
     created_by?: string;
-  }): Promise<ConvoyRecord> {
+  }): Promise<TownConvoyRecord> {
     await this.ensureInitialized();
     const parsed = z
       .object({
@@ -139,15 +139,15 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${convoys} (
-          ${convoys.columns.id},
-          ${convoys.columns.title},
-          ${convoys.columns.status},
-          ${convoys.columns.total_beads},
-          ${convoys.columns.closed_beads},
-          ${convoys.columns.created_by},
-          ${convoys.columns.created_at},
-          ${convoys.columns.landed_at}
+        INSERT INTO ${town_convoys} (
+          ${town_convoys.columns.id},
+          ${town_convoys.columns.title},
+          ${town_convoys.columns.status},
+          ${town_convoys.columns.total_beads},
+          ${town_convoys.columns.closed_beads},
+          ${town_convoys.columns.created_by},
+          ${town_convoys.columns.created_at},
+          ${town_convoys.columns.landed_at}
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
@@ -166,11 +166,11 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          INSERT INTO ${convoyBeads} (
-            ${convoyBeads.columns.convoy_id},
-            ${convoyBeads.columns.bead_id},
-            ${convoyBeads.columns.rig_id},
-            ${convoyBeads.columns.status}
+          INSERT INTO ${town_convoy_beads} (
+            ${town_convoy_beads.columns.convoy_id},
+            ${town_convoy_beads.columns.bead_id},
+            ${town_convoy_beads.columns.rig_id},
+            ${town_convoy_beads.columns.status}
           ) VALUES (?, ?, ?, ?)
         `,
         [convoyId, bead.bead_id, bead.rig_id, 'open']
@@ -186,7 +186,10 @@ export class TownDO extends DurableObject<Env> {
     return convoy;
   }
 
-  async onBeadClosed(input: { convoyId: string; beadId: string }): Promise<ConvoyRecord | null> {
+  async onBeadClosed(input: {
+    convoyId: string;
+    beadId: string;
+  }): Promise<TownConvoyRecord | null> {
     await this.ensureInitialized();
     const parsed = z
       .object({ convoyId: z.string().min(1), beadId: z.string().min(1) })
@@ -196,11 +199,11 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${convoyBeads}
-        SET ${convoyBeads.columns.status} = ?
-        WHERE ${convoyBeads.columns.convoy_id} = ?
-          AND ${convoyBeads.columns.bead_id} = ?
-          AND ${convoyBeads.columns.status} != ?
+        UPDATE ${town_convoy_beads}
+        SET ${town_convoy_beads.columns.status} = ?
+        WHERE ${town_convoy_beads.columns.convoy_id} = ?
+          AND ${town_convoy_beads.columns.bead_id} = ?
+          AND ${town_convoy_beads.columns.status} != ?
       `,
       ['closed', parsed.convoyId, parsed.beadId, 'closed']
     );
@@ -211,9 +214,9 @@ export class TownDO extends DurableObject<Env> {
         this.sql,
         /* sql */ `
           SELECT COUNT(1) AS count
-          FROM ${convoyBeads}
-          WHERE ${convoyBeads.columns.convoy_id} = ?
-            AND ${convoyBeads.columns.status} = ?
+          FROM ${town_convoy_beads}
+          WHERE ${town_convoy_beads.columns.convoy_id} = ?
+            AND ${town_convoy_beads.columns.status} = ?
         `,
         [parsed.convoyId, 'closed']
       ),
@@ -226,9 +229,9 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${convoys}
-        SET ${convoys.columns.closed_beads} = ?
-        WHERE ${convoys.columns.id} = ?
+        UPDATE ${town_convoys}
+        SET ${town_convoys.columns.closed_beads} = ?
+        WHERE ${town_convoys.columns.id} = ?
       `,
       [closedCount, parsed.convoyId]
     );
@@ -240,10 +243,10 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${convoys}
-          SET ${convoys.columns.status} = ?,
-              ${convoys.columns.landed_at} = ?
-          WHERE ${convoys.columns.id} = ?
+          UPDATE ${town_convoys}
+          SET ${town_convoys.columns.status} = ?,
+              ${town_convoys.columns.landed_at} = ?
+          WHERE ${town_convoys.columns.id} = ?
         `,
         ['landed', now(), parsed.convoyId]
       );
@@ -252,14 +255,16 @@ export class TownDO extends DurableObject<Env> {
     return this.getConvoy(parsed.convoyId);
   }
 
-  private getConvoy(convoyId: string): ConvoyRecord | null {
+  private getConvoy(convoyId: string): TownConvoyRecord | null {
     const rows = [
-      ...query(this.sql, /* sql */ `SELECT * FROM ${convoys} WHERE ${convoys.columns.id} = ?`, [
-        convoyId,
-      ]),
+      ...query(
+        this.sql,
+        /* sql */ `SELECT * FROM ${town_convoys} WHERE ${town_convoys.columns.id} = ?`,
+        [convoyId]
+      ),
     ];
     if (rows.length === 0) return null;
-    return ConvoyRecord.parse(rows[0]);
+    return TownConvoyRecord.parse(rows[0]);
   }
 
   // ── Escalations ───────────────────────────────────────────────────────
@@ -271,7 +276,7 @@ export class TownDO extends DurableObject<Env> {
     severity: 'low' | 'medium' | 'high';
     category?: string;
     message: string;
-  }): Promise<EscalationRecord> {
+  }): Promise<TownEscalationRecord> {
     await this.ensureInitialized();
     const parsed = z
       .object({
@@ -290,17 +295,17 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${escalations} (
-          ${escalations.columns.id},
-          ${escalations.columns.source_rig_id},
-          ${escalations.columns.source_agent_id},
-          ${escalations.columns.severity},
-          ${escalations.columns.category},
-          ${escalations.columns.message},
-          ${escalations.columns.acknowledged},
-          ${escalations.columns.re_escalation_count},
-          ${escalations.columns.created_at},
-          ${escalations.columns.acknowledged_at}
+        INSERT INTO ${town_escalations} (
+          ${town_escalations.columns.id},
+          ${town_escalations.columns.source_rig_id},
+          ${town_escalations.columns.source_agent_id},
+          ${town_escalations.columns.severity},
+          ${town_escalations.columns.category},
+          ${town_escalations.columns.message},
+          ${town_escalations.columns.acknowledged},
+          ${town_escalations.columns.re_escalation_count},
+          ${town_escalations.columns.created_at},
+          ${town_escalations.columns.acknowledged_at}
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
@@ -337,16 +342,16 @@ export class TownDO extends DurableObject<Env> {
     return escalation;
   }
 
-  private getEscalation(escalationId: string): EscalationRecord | null {
+  private getEscalation(escalationId: string): TownEscalationRecord | null {
     const rows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT * FROM ${escalations} WHERE ${escalations.columns.id} = ?`,
+        /* sql */ `SELECT * FROM ${town_escalations} WHERE ${town_escalations.columns.id} = ?`,
         [escalationId]
       ),
     ];
     if (rows.length === 0) return null;
-    return EscalationRecord.parse(rows[0]);
+    return TownEscalationRecord.parse(rows[0]);
   }
 
   // ── Watchdog heartbeat alarm ───────────────────────────────────────────

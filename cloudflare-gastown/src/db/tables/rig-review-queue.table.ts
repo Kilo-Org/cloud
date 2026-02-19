@@ -3,7 +3,7 @@ import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/
 
 const ReviewStatus = z.enum(['pending', 'running', 'merged', 'failed']);
 
-export const ReviewQueueRecord = z.object({
+export const RigReviewQueueRecord = z.object({
   id: z.string(),
   agent_id: z.string(),
   bead_id: z.string(),
@@ -15,15 +15,15 @@ export const ReviewQueueRecord = z.object({
   processed_at: z.string().nullable(),
 });
 
-export type ReviewQueueRecord = z.output<typeof ReviewQueueRecord>;
+export type RigReviewQueueRecord = z.output<typeof RigReviewQueueRecord>;
 
-export const reviewQueue = getTableFromZodSchema('review_queue', ReviewQueueRecord);
+export const rig_review_queue = getTableFromZodSchema('rig_review_queue', RigReviewQueueRecord);
 
-export function createTableReviewQueue(): string {
-  return getCreateTableQueryFromTable(reviewQueue, {
+export function createTableRigReviewQueue(): string {
+  return getCreateTableQueryFromTable(rig_review_queue, {
     id: `text primary key`,
-    agent_id: `text not null references agents(id)`,
-    bead_id: `text not null references beads(id)`,
+    agent_id: `text not null references rig_agents(id)`,
+    bead_id: `text not null references rig_beads(id)`,
     branch: `text not null`,
     pr_url: `text`,
     status: `text not null default 'pending' check(status in ('pending', 'running', 'merged', 'failed'))`,

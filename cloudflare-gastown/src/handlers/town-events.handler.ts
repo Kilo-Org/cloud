@@ -3,11 +3,11 @@ import { getGastownUserStub } from '../dos/GastownUser.do';
 import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
-import { BeadEventRecord as BeadEventRecordSchema } from '../db/tables/bead-events.table';
-import type { BeadEventRecord } from '../db/tables/bead-events.table';
-import { RigRecord } from '../db/tables/rigs.table';
+import { RigBeadEventRecord as RigBeadEventRecordSchema } from '../db/tables/rig-bead-events.table';
+import type { RigBeadEventRecord } from '../db/tables/rig-bead-events.table';
+import { UserRigRecord } from '../db/tables/user-rigs.table';
 
-type TaggedBeadEvent = BeadEventRecord & { rig_id: string; rig_name: string };
+type TaggedBeadEvent = RigBeadEventRecord & { rig_id: string; rig_name: string };
 
 /**
  * Fan out to all Rig DOs in a town and return a merged, sorted event stream.
@@ -24,14 +24,14 @@ export async function handleListTownEvents(
   // Look up all rigs in the town
   const townDO = getGastownUserStub(c.env, params.userId);
   const rigsUnknown: unknown = await townDO.listRigs(params.townId);
-  const rigs = RigRecord.array().parse(rigsUnknown);
+  const rigs = UserRigRecord.array().parse(rigsUnknown);
 
   // Fan out to each Rig DO in parallel
   const eventPromises = rigs.map(async (rig): Promise<TaggedBeadEvent[]> => {
     const rigDO = getRigDOStub(c.env, rig.id);
     const eventsUnknown: unknown = await rigDO.listBeadEvents({ since, limit });
-    const events = BeadEventRecordSchema.array().parse(eventsUnknown);
-    return events.map((e: BeadEventRecord) => ({ ...e, rig_id: rig.id, rig_name: rig.name }));
+    const events = RigBeadEventRecordSchema.array().parse(eventsUnknown);
+    return events.map((e: RigBeadEventRecord) => ({ ...e, rig_id: rig.id, rig_name: rig.name }));
   });
 
   const results = await Promise.allSettled(eventPromises);

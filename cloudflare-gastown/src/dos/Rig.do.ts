@@ -1,26 +1,36 @@
 import { DurableObject } from 'cloudflare:workers';
-import { createTableBeads, getIndexesBeads, beads, BeadRecord } from '../db/tables/beads.table';
-import { createTableAgents, agents, AgentRecord } from '../db/tables/agents.table';
-import { createTableMail, getIndexesMail, mail, MailRecord } from '../db/tables/mail.table';
 import {
-  createTableReviewQueue,
-  reviewQueue,
-  ReviewQueueRecord,
-} from '../db/tables/review-queue.table';
-import { createTableMolecules } from '../db/tables/molecules.table';
+  createTableRigBeads,
+  getIndexesRigBeads,
+  rig_beads,
+  BeadRecord,
+} from '../db/tables/rig-beads.table';
+import { createTableRigAgents, rig_agents, RigAgentRecord } from '../db/tables/rig-agents.table';
 import {
-  createTableBeadEvents,
-  getIndexesBeadEvents,
-  beadEvents,
-  BeadEventRecord,
-} from '../db/tables/bead-events.table';
-import type { BeadEventType } from '../db/tables/bead-events.table';
+  createTableRigMail,
+  getIndexesRigMail,
+  rig_mail,
+  RigMailRecord,
+} from '../db/tables/rig-mail.table';
 import {
-  createTableAgentEvents,
-  getIndexesAgentEvents,
-  agentEvents,
-  AgentEventRecord,
-} from '../db/tables/agent-events.table';
+  createTableRigReviewQueue,
+  rig_review_queue,
+  RigReviewQueueRecord,
+} from '../db/tables/rig-review-queue.table';
+import { createTableRigMolecules } from '../db/tables/rig-molecules.table';
+import {
+  createTableRigBeadEvents,
+  getIndexesRigBeadEvents,
+  rig_bead_events,
+  RigBeadEventRecord,
+} from '../db/tables/rig-bead-events.table';
+import type { BeadEventType } from '../db/tables/rig-bead-events.table';
+import {
+  createTableRigAgentEvents,
+  getIndexesRigAgentEvents,
+  rig_agent_events,
+  RigAgentEventRecord,
+} from '../db/tables/rig-agent-events.table';
 import { getTownContainerStub } from './TownContainer.do';
 import { query } from '../util/query.util';
 import { signAgentJWT } from '../util/jwt.util';
@@ -106,27 +116,27 @@ export class RigDO extends DurableObject<Env> {
 
   private async initializeDatabase(): Promise<void> {
     // Tables must be created in dependency order (beads first, then agents, etc.)
-    query(this.sql, createTableBeads(), []);
-    for (const idx of getIndexesBeads()) {
+    query(this.sql, createTableRigBeads(), []);
+    for (const idx of getIndexesRigBeads()) {
       query(this.sql, idx, []);
     }
 
-    query(this.sql, createTableAgents(), []);
-    query(this.sql, createTableMail(), []);
-    for (const idx of getIndexesMail()) {
+    query(this.sql, createTableRigAgents(), []);
+    query(this.sql, createTableRigMail(), []);
+    for (const idx of getIndexesRigMail()) {
       query(this.sql, idx, []);
     }
 
-    query(this.sql, createTableReviewQueue(), []);
-    query(this.sql, createTableMolecules(), []);
+    query(this.sql, createTableRigReviewQueue(), []);
+    query(this.sql, createTableRigMolecules(), []);
 
-    query(this.sql, createTableAgentEvents(), []);
-    for (const idx of getIndexesAgentEvents()) {
+    query(this.sql, createTableRigAgentEvents(), []);
+    for (const idx of getIndexesRigAgentEvents()) {
       query(this.sql, idx, []);
     }
 
-    query(this.sql, createTableBeadEvents(), []);
-    for (const idx of getIndexesBeadEvents()) {
+    query(this.sql, createTableRigBeadEvents(), []);
+    for (const idx of getIndexesRigBeadEvents()) {
       query(this.sql, idx, []);
     }
   }
@@ -146,15 +156,15 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${beadEvents} (
-          ${beadEvents.columns.id},
-          ${beadEvents.columns.bead_id},
-          ${beadEvents.columns.agent_id},
-          ${beadEvents.columns.event_type},
-          ${beadEvents.columns.old_value},
-          ${beadEvents.columns.new_value},
-          ${beadEvents.columns.metadata},
-          ${beadEvents.columns.created_at}
+        INSERT INTO ${rig_bead_events} (
+          ${rig_bead_events.columns.id},
+          ${rig_bead_events.columns.bead_id},
+          ${rig_bead_events.columns.agent_id},
+          ${rig_bead_events.columns.event_type},
+          ${rig_bead_events.columns.old_value},
+          ${rig_bead_events.columns.new_value},
+          ${rig_bead_events.columns.metadata},
+          ${rig_bead_events.columns.created_at}
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
@@ -174,16 +184,16 @@ export class RigDO extends DurableObject<Env> {
     beadId?: string;
     since?: string;
     limit?: number;
-  }): Promise<BeadEventRecord[]> {
+  }): Promise<RigBeadEventRecord[]> {
     await this.ensureInitialized();
     const rows = [
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${beadEvents}
-          WHERE (? IS NULL OR ${beadEvents.bead_id} = ?)
-            AND (? IS NULL OR ${beadEvents.created_at} > ?)
-          ORDER BY ${beadEvents.created_at} ASC
+          SELECT * FROM ${rig_bead_events}
+          WHERE (? IS NULL OR ${rig_bead_events.bead_id} = ?)
+            AND (? IS NULL OR ${rig_bead_events.created_at} > ?)
+          ORDER BY ${rig_bead_events.created_at} ASC
           LIMIT ?
         `,
         [
@@ -195,7 +205,7 @@ export class RigDO extends DurableObject<Env> {
         ]
       ),
     ];
-    return BeadEventRecord.array().parse(rows);
+    return RigBeadEventRecord.array().parse(rows);
   }
 
   // ── Beads ──────────────────────────────────────────────────────────────
@@ -214,19 +224,19 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${beads} (
-          ${beads.columns.id},
-          ${beads.columns.type},
-          ${beads.columns.status},
-          ${beads.columns.title},
-          ${beads.columns.body},
-          ${beads.columns.assignee_agent_id},
-          ${beads.columns.convoy_id},
-          ${beads.columns.priority},
-          ${beads.columns.labels},
-          ${beads.columns.metadata},
-          ${beads.columns.created_at},
-          ${beads.columns.updated_at}
+        INSERT INTO ${rig_beads} (
+          ${rig_beads.columns.id},
+          ${rig_beads.columns.type},
+          ${rig_beads.columns.status},
+          ${rig_beads.columns.title},
+          ${rig_beads.columns.body},
+          ${rig_beads.columns.assignee_agent_id},
+          ${rig_beads.columns.convoy_id},
+          ${rig_beads.columns.priority},
+          ${rig_beads.columns.labels},
+          ${rig_beads.columns.metadata},
+          ${rig_beads.columns.created_at},
+          ${rig_beads.columns.updated_at}
         ) VALUES (?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
@@ -266,7 +276,7 @@ export class RigDO extends DurableObject<Env> {
 
   private getBead(beadId: string): Bead | null {
     const rows = [
-      ...query(this.sql, /* sql */ `SELECT * FROM ${beads} WHERE ${beads.columns.id} = ?`, [
+      ...query(this.sql, /* sql */ `SELECT * FROM ${rig_beads} WHERE ${rig_beads.columns.id} = ?`, [
         beadId,
       ]),
     ];
@@ -281,12 +291,12 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${beads}
-          WHERE (? IS NULL OR ${beads.columns.status} = ?)
-            AND (? IS NULL OR ${beads.columns.type} = ?)
-            AND (? IS NULL OR ${beads.columns.assignee_agent_id} = ?)
-            AND (? IS NULL OR ${beads.columns.convoy_id} = ?)
-          ORDER BY ${beads.columns.created_at} DESC
+          SELECT * FROM ${rig_beads}
+          WHERE (? IS NULL OR ${rig_beads.columns.status} = ?)
+            AND (? IS NULL OR ${rig_beads.columns.type} = ?)
+            AND (? IS NULL OR ${rig_beads.columns.assignee_agent_id} = ?)
+            AND (? IS NULL OR ${rig_beads.columns.convoy_id} = ?)
+          ORDER BY ${rig_beads.columns.created_at} DESC
           LIMIT ? OFFSET ?
         `,
         [
@@ -316,11 +326,11 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${beads}
-        SET ${beads.columns.status} = ?,
-            ${beads.columns.updated_at} = ?,
-            ${beads.columns.closed_at} = COALESCE(?, ${beads.columns.closed_at})
-        WHERE ${beads.columns.id} = ?
+        UPDATE ${rig_beads}
+        SET ${rig_beads.columns.status} = ?,
+            ${rig_beads.columns.updated_at} = ?,
+            ${rig_beads.columns.closed_at} = COALESCE(?, ${rig_beads.columns.closed_at})
+        WHERE ${rig_beads.columns.id} = ?
       `,
       [status, timestamp, closedAt, beadId]
     );
@@ -353,14 +363,16 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agents}
-        SET ${agents.columns.current_hook_bead_id} = NULL,
-            ${agents.columns.status} = 'idle'
-        WHERE ${agents.columns.current_hook_bead_id} = ?
+        UPDATE ${rig_agents}
+        SET ${rig_agents.columns.current_hook_bead_id} = NULL,
+            ${rig_agents.columns.status} = 'idle'
+        WHERE ${rig_agents.columns.current_hook_bead_id} = ?
       `,
       [beadId]
     );
-    query(this.sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.columns.id} = ?`, [beadId]);
+    query(this.sql, /* sql */ `DELETE FROM ${rig_beads} WHERE ${rig_beads.columns.id} = ?`, [
+      beadId,
+    ]);
     return true;
   }
 
@@ -378,14 +390,14 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${agents} (
-          ${agents.columns.id},
-          ${agents.columns.role},
-          ${agents.columns.name},
-          ${agents.columns.identity},
-          ${agents.columns.status},
-          ${agents.columns.created_at},
-          ${agents.columns.last_activity_at}
+        INSERT INTO ${rig_agents} (
+          ${rig_agents.columns.id},
+          ${rig_agents.columns.role},
+          ${rig_agents.columns.name},
+          ${rig_agents.columns.identity},
+          ${rig_agents.columns.status},
+          ${rig_agents.columns.created_at},
+          ${rig_agents.columns.last_activity_at}
         ) VALUES (?, ?, ?, ?, 'idle', ?, ?)
       `,
       [id, input.role, input.name, input.identity, timestamp, timestamp]
@@ -406,23 +418,27 @@ export class RigDO extends DurableObject<Env> {
 
   private getAgent(agentId: string): Agent | null {
     const rows = [
-      ...query(this.sql, /* sql */ `SELECT * FROM ${agents} WHERE ${agents.columns.id} = ?`, [
-        agentId,
-      ]),
+      ...query(
+        this.sql,
+        /* sql */ `SELECT * FROM ${rig_agents} WHERE ${rig_agents.columns.id} = ?`,
+        [agentId]
+      ),
     ];
     if (rows.length === 0) return null;
-    return AgentRecord.parse(rows[0]);
+    return RigAgentRecord.parse(rows[0]);
   }
 
   async getAgentByIdentity(identity: string): Promise<Agent | null> {
     await this.ensureInitialized();
     const rows = [
-      ...query(this.sql, /* sql */ `SELECT * FROM ${agents} WHERE ${agents.columns.identity} = ?`, [
-        identity,
-      ]),
+      ...query(
+        this.sql,
+        /* sql */ `SELECT * FROM ${rig_agents} WHERE ${rig_agents.columns.identity} = ?`,
+        [identity]
+      ),
     ];
     if (rows.length === 0) return null;
-    return AgentRecord.parse(rows[0]);
+    return RigAgentRecord.parse(rows[0]);
   }
 
   async listAgents(filter?: AgentFilter): Promise<Agent[]> {
@@ -432,14 +448,14 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${agents}
-          WHERE (? IS NULL OR ${agents.columns.role} = ?)
-            AND (? IS NULL OR ${agents.columns.status} = ?)
+          SELECT * FROM ${rig_agents}
+          WHERE (? IS NULL OR ${rig_agents.columns.role} = ?)
+            AND (? IS NULL OR ${rig_agents.columns.status} = ?)
         `,
         [filter?.role ?? null, filter?.role ?? null, filter?.status ?? null, filter?.status ?? null]
       ),
     ];
-    return AgentRecord.array().parse(rows);
+    return RigAgentRecord.array().parse(rows);
   }
 
   async updateAgentStatus(agentId: string, status: AgentStatus): Promise<void> {
@@ -447,10 +463,10 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agents}
-        SET ${agents.columns.status} = ?,
-            ${agents.columns.last_activity_at} = ?
-        WHERE ${agents.columns.id} = ?
+        UPDATE ${rig_agents}
+        SET ${rig_agents.columns.status} = ?,
+            ${rig_agents.columns.last_activity_at} = ?
+        WHERE ${rig_agents.columns.id} = ?
       `,
       [status, now(), agentId]
     );
@@ -464,9 +480,9 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${beads}
-        SET ${beads.columns.assignee_agent_id} = NULL
-        WHERE ${beads.columns.assignee_agent_id} = ?
+        UPDATE ${rig_beads}
+        SET ${rig_beads.columns.assignee_agent_id} = NULL
+        WHERE ${rig_beads.columns.assignee_agent_id} = ?
       `,
       [agentId]
     );
@@ -474,12 +490,14 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        DELETE FROM ${mail}
-        WHERE ${mail.columns.to_agent_id} = ? OR ${mail.columns.from_agent_id} = ?
+        DELETE FROM ${rig_mail}
+        WHERE ${rig_mail.columns.to_agent_id} = ? OR ${rig_mail.columns.from_agent_id} = ?
       `,
       [agentId, agentId]
     );
-    query(this.sql, /* sql */ `DELETE FROM ${agents} WHERE ${agents.columns.id} = ?`, [agentId]);
+    query(this.sql, /* sql */ `DELETE FROM ${rig_agents} WHERE ${rig_agents.columns.id} = ?`, [
+      agentId,
+    ]);
     return true;
   }
 
@@ -514,11 +532,11 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agents}
-        SET ${agents.columns.current_hook_bead_id} = ?,
-            ${agents.columns.dispatch_attempts} = 0,
-            ${agents.columns.last_activity_at} = ?
-        WHERE ${agents.columns.id} = ?
+        UPDATE ${rig_agents}
+        SET ${rig_agents.columns.current_hook_bead_id} = ?,
+            ${rig_agents.columns.dispatch_attempts} = 0,
+            ${rig_agents.columns.last_activity_at} = ?
+        WHERE ${rig_agents.columns.id} = ?
       `,
       [beadId, now(), agentId]
     );
@@ -526,11 +544,11 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${beads}
-        SET ${beads.columns.status} = 'in_progress',
-            ${beads.columns.assignee_agent_id} = ?,
-            ${beads.columns.updated_at} = ?
-        WHERE ${beads.columns.id} = ?
+        UPDATE ${rig_beads}
+        SET ${rig_beads.columns.status} = 'in_progress',
+            ${rig_beads.columns.assignee_agent_id} = ?,
+            ${rig_beads.columns.updated_at} = ?
+        WHERE ${rig_beads.columns.id} = ?
       `,
       [agentId, now(), beadId]
     );
@@ -558,11 +576,11 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agents}
-        SET ${agents.columns.current_hook_bead_id} = NULL,
-            ${agents.columns.status} = 'idle',
-            ${agents.columns.last_activity_at} = ?
-        WHERE ${agents.columns.id} = ?
+        UPDATE ${rig_agents}
+        SET ${rig_agents.columns.current_hook_bead_id} = NULL,
+            ${rig_agents.columns.status} = 'idle',
+            ${rig_agents.columns.last_activity_at} = ?
+        WHERE ${rig_agents.columns.id} = ?
       `,
       [now(), agentId]
     );
@@ -602,11 +620,11 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${agentEvents} (
-          ${agentEvents.columns.agent_id},
-          ${agentEvents.columns.event_type},
-          ${agentEvents.columns.data},
-          ${agentEvents.columns.created_at}
+        INSERT INTO ${rig_agent_events} (
+          ${rig_agent_events.columns.agent_id},
+          ${rig_agent_events.columns.event_type},
+          ${rig_agent_events.columns.data},
+          ${rig_agent_events.columns.created_at}
         ) VALUES (?, ?, ?, ?)`,
       [agentId, eventType, dataJson, timestamp]
     );
@@ -615,12 +633,12 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        DELETE FROM ${agentEvents}
-        WHERE ${agentEvents.agent_id} = ?
-          AND ${agentEvents.id} NOT IN (
-            SELECT ${agentEvents.id} FROM ${agentEvents}
-            WHERE ${agentEvents.agent_id} = ?
-            ORDER BY ${agentEvents.id} DESC
+        DELETE FROM ${rig_agent_events}
+        WHERE ${rig_agent_events.agent_id} = ?
+          AND ${rig_agent_events.id} NOT IN (
+            SELECT ${rig_agent_events.id} FROM ${rig_agent_events}
+            WHERE ${rig_agent_events.agent_id} = ?
+            ORDER BY ${rig_agent_events.id} DESC
             LIMIT ?
           )`,
       [agentId, agentId, RigDO.MAX_EVENTS_PER_AGENT]
@@ -635,23 +653,23 @@ export class RigDO extends DurableObject<Env> {
     agentId: string,
     afterId?: number,
     limit = 200
-  ): Promise<AgentEventRecord[]> {
+  ): Promise<RigAgentEventRecord[]> {
     await this.ensureInitialized();
 
     const rows = query(
       this.sql,
       /* sql */ `
-        SELECT ${agentEvents.id}, ${agentEvents.agent_id}, ${agentEvents.event_type},
-               ${agentEvents.data}, ${agentEvents.created_at}
-        FROM ${agentEvents}
-        WHERE ${agentEvents.agent_id} = ?
-          AND (? IS NULL OR ${agentEvents.id} > ?)
-        ORDER BY ${agentEvents.id} ASC
+        SELECT ${rig_agent_events.id}, ${rig_agent_events.agent_id}, ${rig_agent_events.event_type},
+               ${rig_agent_events.data}, ${rig_agent_events.created_at}
+        FROM ${rig_agent_events}
+        WHERE ${rig_agent_events.agent_id} = ?
+          AND (? IS NULL OR ${rig_agent_events.id} > ?)
+        ORDER BY ${rig_agent_events.id} ASC
         LIMIT ?`,
       [agentId, afterId ?? null, afterId ?? null, limit]
     );
 
-    return AgentEventRecord.array().parse(rows);
+    return RigAgentEventRecord.array().parse(rows);
   }
 
   // ── Mail ───────────────────────────────────────────────────────────────
@@ -664,13 +682,13 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${mail} (
-          ${mail.columns.id},
-          ${mail.columns.from_agent_id},
-          ${mail.columns.to_agent_id},
-          ${mail.columns.subject},
-          ${mail.columns.body},
-          ${mail.columns.created_at}
+        INSERT INTO ${rig_mail} (
+          ${rig_mail.columns.id},
+          ${rig_mail.columns.from_agent_id},
+          ${rig_mail.columns.to_agent_id},
+          ${rig_mail.columns.subject},
+          ${rig_mail.columns.body},
+          ${rig_mail.columns.created_at}
         ) VALUES (?, ?, ?, ?, ?, ?)
       `,
       [id, input.from_agent_id, input.to_agent_id, input.subject, input.body, timestamp]
@@ -685,10 +703,10 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${mail}
-          WHERE ${mail.columns.to_agent_id} = ?
-            AND ${mail.columns.delivered} = 0
-          ORDER BY ${mail.columns.created_at} ASC
+          SELECT * FROM ${rig_mail}
+          WHERE ${rig_mail.columns.to_agent_id} = ?
+            AND ${rig_mail.columns.delivered} = 0
+          ORDER BY ${rig_mail.columns.created_at} ASC
         `,
         [agentId]
       ),
@@ -699,18 +717,18 @@ export class RigDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${mail}
-          SET ${mail.columns.delivered} = 1,
-              ${mail.columns.delivered_at} = ?
-          WHERE ${mail.columns.to_agent_id} = ?
-            AND ${mail.columns.delivered} = 0
+          UPDATE ${rig_mail}
+          SET ${rig_mail.columns.delivered} = 1,
+              ${rig_mail.columns.delivered_at} = ?
+          WHERE ${rig_mail.columns.to_agent_id} = ?
+            AND ${rig_mail.columns.delivered} = 0
         `,
         [timestamp, agentId]
       );
     }
 
     this.touchAgent(agentId);
-    return MailRecord.array().parse(rows);
+    return RigMailRecord.array().parse(rows);
   }
 
   // ── Review Queue ───────────────────────────────────────────────────────
@@ -723,14 +741,14 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${reviewQueue} (
-          ${reviewQueue.columns.id},
-          ${reviewQueue.columns.agent_id},
-          ${reviewQueue.columns.bead_id},
-          ${reviewQueue.columns.branch},
-          ${reviewQueue.columns.pr_url},
-          ${reviewQueue.columns.summary},
-          ${reviewQueue.columns.created_at}
+        INSERT INTO ${rig_review_queue} (
+          ${rig_review_queue.columns.id},
+          ${rig_review_queue.columns.agent_id},
+          ${rig_review_queue.columns.bead_id},
+          ${rig_review_queue.columns.branch},
+          ${rig_review_queue.columns.pr_url},
+          ${rig_review_queue.columns.summary},
+          ${rig_review_queue.columns.created_at}
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       [
@@ -760,9 +778,9 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${reviewQueue}
-          WHERE ${reviewQueue.columns.status} = 'pending'
-          ORDER BY ${reviewQueue.columns.created_at} ASC
+          SELECT * FROM ${rig_review_queue}
+          WHERE ${rig_review_queue.columns.status} = 'pending'
+          ORDER BY ${rig_review_queue.columns.created_at} ASC
           LIMIT 1
         `,
         []
@@ -770,15 +788,15 @@ export class RigDO extends DurableObject<Env> {
     ];
     if (rows.length === 0) return null;
 
-    const entry = ReviewQueueRecord.parse(rows[0]);
+    const entry = RigReviewQueueRecord.parse(rows[0]);
 
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${reviewQueue}
-        SET ${reviewQueue.columns.status} = 'running',
-            ${reviewQueue.columns.processed_at} = ?
-        WHERE ${reviewQueue.columns.id} = ?
+        UPDATE ${rig_review_queue}
+        SET ${rig_review_queue.columns.status} = 'running',
+            ${rig_review_queue.columns.processed_at} = ?
+        WHERE ${rig_review_queue.columns.id} = ?
       `,
       [now(), entry.id]
     );
@@ -791,10 +809,10 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${reviewQueue}
-        SET ${reviewQueue.columns.status} = ?,
-            ${reviewQueue.columns.processed_at} = ?
-        WHERE ${reviewQueue.columns.id} = ?
+        UPDATE ${rig_review_queue}
+        SET ${rig_review_queue.columns.status} = ?,
+            ${rig_review_queue.columns.processed_at} = ?
+        WHERE ${rig_review_queue.columns.id} = ?
       `,
       [status, now(), entryId]
     );
@@ -821,8 +839,8 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${reviewQueue}
-          WHERE ${reviewQueue.columns.id} = ?
+          SELECT * FROM ${rig_review_queue}
+          WHERE ${rig_review_queue.columns.id} = ?
         `,
         [input.entry_id]
       ),
@@ -833,7 +851,7 @@ export class RigDO extends DurableObject<Env> {
       return;
     }
 
-    const entry = ReviewQueueRecord.parse(rows[0]);
+    const entry = RigReviewQueueRecord.parse(rows[0]);
 
     if (input.status === 'merged') {
       // Read the bead's current status before closing it
@@ -845,11 +863,11 @@ export class RigDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.status} = 'closed',
-              ${beads.columns.updated_at} = ?,
-              ${beads.columns.closed_at} = ?
-          WHERE ${beads.columns.id} = ?
+          UPDATE ${rig_beads}
+          SET ${rig_beads.columns.status} = 'closed',
+              ${rig_beads.columns.updated_at} = ?,
+              ${rig_beads.columns.closed_at} = ?
+          WHERE ${rig_beads.columns.id} = ?
         `,
         [timestamp, timestamp, entry.bead_id]
       );
@@ -910,10 +928,10 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${mail}
-          WHERE ${mail.columns.to_agent_id} = ?
-            AND ${mail.columns.delivered} = 0
-          ORDER BY ${mail.columns.created_at} ASC
+          SELECT * FROM ${rig_mail}
+          WHERE ${rig_mail.columns.to_agent_id} = ?
+            AND ${rig_mail.columns.delivered} = 0
+          ORDER BY ${rig_mail.columns.created_at} ASC
         `,
         [agentId]
       ),
@@ -923,10 +941,10 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${beads}
-          WHERE ${beads.columns.assignee_agent_id} = ?
-            AND ${beads.columns.status} != 'closed'
-          ORDER BY ${beads.columns.created_at} DESC
+          SELECT * FROM ${rig_beads}
+          WHERE ${rig_beads.columns.assignee_agent_id} = ?
+            AND ${rig_beads.columns.status} != 'closed'
+          ORDER BY ${rig_beads.columns.created_at} DESC
         `,
         [agentId]
       ),
@@ -937,7 +955,7 @@ export class RigDO extends DurableObject<Env> {
     return {
       agent,
       hooked_bead,
-      undelivered_mail: MailRecord.array().parse(undeliveredRows),
+      undelivered_mail: RigMailRecord.array().parse(undeliveredRows),
       open_beads: BeadRecord.array().parse(openBeadRows),
     };
   }
@@ -949,10 +967,10 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agents}
-        SET ${agents.columns.checkpoint} = ?,
-            ${agents.columns.last_activity_at} = ?
-        WHERE ${agents.columns.id} = ?
+        UPDATE ${rig_agents}
+        SET ${rig_agents.columns.checkpoint} = ?,
+            ${rig_agents.columns.last_activity_at} = ?
+        WHERE ${rig_agents.columns.id} = ?
       `,
       [JSON.stringify(data), now(), agentId]
     );
@@ -1028,11 +1046,11 @@ export class RigDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.status} = ?,
-              ${beads.columns.updated_at} = ?,
-              ${beads.columns.closed_at} = COALESCE(?, ${beads.columns.closed_at})
-          WHERE ${beads.columns.id} = ?
+          UPDATE ${rig_beads}
+          SET ${rig_beads.columns.status} = ?,
+              ${rig_beads.columns.updated_at} = ?,
+              ${rig_beads.columns.closed_at} = COALESCE(?, ${rig_beads.columns.closed_at})
+          WHERE ${rig_beads.columns.id} = ?
         `,
         [beadStatus, timestamp, closedAt, beadId]
       );
@@ -1110,10 +1128,10 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${agents}
-          WHERE ${agents.columns.role} = ?
-          ORDER BY CASE WHEN ${agents.columns.status} = 'idle' THEN 0 ELSE 1 END,
-                   ${agents.columns.last_activity_at} ASC
+          SELECT * FROM ${rig_agents}
+          WHERE ${rig_agents.columns.role} = ?
+          ORDER BY CASE WHEN ${rig_agents.columns.status} = 'idle' THEN 0 ELSE 1 END,
+                   ${rig_agents.columns.last_activity_at} ASC
           LIMIT ?
         `,
         [role, 1]
@@ -1121,7 +1139,7 @@ export class RigDO extends DurableObject<Env> {
     ];
 
     if (existing.length > 0) {
-      const agent = AgentRecord.parse(existing[0]);
+      const agent = RigAgentRecord.parse(existing[0]);
       console.log(
         `${RIG_LOG} getOrCreateAgent: found existing agent id=${agent.id} name=${agent.name} role=${agent.role} status=${agent.status} current_hook=${agent.current_hook_bead_id}`
       );
@@ -1250,8 +1268,8 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT COUNT(*) as cnt FROM ${agents}
-          WHERE ${agents.columns.status} IN ('working', 'blocked')
+          SELECT COUNT(*) as cnt FROM ${rig_agents}
+          WHERE ${rig_agents.columns.status} IN ('working', 'blocked')
         `,
         []
       ),
@@ -1261,8 +1279,8 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT COUNT(*) as cnt FROM ${beads}
-          WHERE ${beads.columns.status} = 'in_progress'
+          SELECT COUNT(*) as cnt FROM ${rig_beads}
+          WHERE ${rig_beads.columns.status} = 'in_progress'
         `,
         []
       ),
@@ -1272,8 +1290,8 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT COUNT(*) as cnt FROM ${reviewQueue}
-          WHERE ${reviewQueue.columns.status} IN ('pending', 'running')
+          SELECT COUNT(*) as cnt FROM ${rig_review_queue}
+          WHERE ${rig_review_queue.columns.status} IN ('pending', 'running')
         `,
         []
       ),
@@ -1301,14 +1319,14 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${agents}
-          WHERE ${agents.columns.status} = 'idle'
-            AND ${agents.columns.current_hook_bead_id} IS NOT NULL
+          SELECT * FROM ${rig_agents}
+          WHERE ${rig_agents.columns.status} = 'idle'
+            AND ${rig_agents.columns.current_hook_bead_id} IS NOT NULL
         `,
         []
       ),
     ];
-    const pendingAgents = AgentRecord.array().parse(rows);
+    const pendingAgents = RigAgentRecord.array().parse(rows);
     console.log(
       `${RIG_LOG} schedulePendingWork: found ${pendingAgents.length} idle agents with hooked beads`
     );
@@ -1355,10 +1373,10 @@ export class RigDO extends DurableObject<Env> {
         query(
           this.sql,
           /* sql */ `
-            UPDATE ${beads}
-            SET ${beads.columns.status} = 'failed',
-                ${beads.columns.updated_at} = ?
-            WHERE ${beads.columns.id} = ?
+            UPDATE ${rig_beads}
+            SET ${rig_beads.columns.status} = 'failed',
+                ${rig_beads.columns.updated_at} = ?
+            WHERE ${rig_beads.columns.id} = ?
           `,
           [now(), beadId]
         );
@@ -1370,9 +1388,9 @@ export class RigDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${agents}
-          SET ${agents.columns.dispatch_attempts} = ?
-          WHERE ${agents.columns.id} = ?
+          UPDATE ${rig_agents}
+          SET ${rig_agents.columns.dispatch_attempts} = ?
+          WHERE ${rig_agents.columns.id} = ?
         `,
         [attempts, agent.id]
       );
@@ -1399,11 +1417,11 @@ export class RigDO extends DurableObject<Env> {
         query(
           this.sql,
           /* sql */ `
-            UPDATE ${agents}
-            SET ${agents.columns.status} = 'working',
-                ${agents.columns.dispatch_attempts} = 0,
-                ${agents.columns.last_activity_at} = ?
-            WHERE ${agents.columns.id} = ?
+            UPDATE ${rig_agents}
+            SET ${rig_agents.columns.status} = 'working',
+                ${rig_agents.columns.dispatch_attempts} = 0,
+                ${rig_agents.columns.last_activity_at} = ?
+            WHERE ${rig_agents.columns.id} = ?
           `,
           [now(), agent.id]
         );
@@ -1659,11 +1677,11 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${reviewQueue}
-        SET ${reviewQueue.columns.status} = 'pending',
-            ${reviewQueue.columns.processed_at} = NULL
-        WHERE ${reviewQueue.columns.status} = 'running'
-          AND ${reviewQueue.columns.processed_at} < ?
+        UPDATE ${rig_review_queue}
+        SET ${rig_review_queue.columns.status} = 'pending',
+            ${rig_review_queue.columns.processed_at} = NULL
+        WHERE ${rig_review_queue.columns.status} = 'running'
+          AND ${rig_review_queue.columns.processed_at} < ?
       `,
       [timeout]
     );
@@ -1741,7 +1759,7 @@ export class RigDO extends DurableObject<Env> {
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
     const guppThreshold = new Date(Date.now() - GUPP_THRESHOLD_MS).toISOString();
 
-    const AgentId = AgentRecord.pick({ id: true });
+    const AgentId = RigAgentRecord.pick({ id: true });
     const BeadId = BeadRecord.pick({ id: true });
 
     // Detect dead agents
@@ -1749,8 +1767,8 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${agents.columns.id} FROM ${agents}
-          WHERE ${agents.columns.status} = 'dead'
+          SELECT ${rig_agents.columns.id} FROM ${rig_agents}
+          WHERE ${rig_agents.columns.status} = 'dead'
         `,
         []
       ),
@@ -1761,9 +1779,9 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${agents.columns.id} FROM ${agents}
-          WHERE ${agents.columns.status} = 'working'
-            AND ${agents.columns.last_activity_at} < ?
+          SELECT ${rig_agents.columns.id} FROM ${rig_agents}
+          WHERE ${rig_agents.columns.status} = 'working'
+            AND ${rig_agents.columns.last_activity_at} < ?
         `,
         [staleThreshold]
       ),
@@ -1774,13 +1792,13 @@ export class RigDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${beads.columns.id} FROM ${beads}
-          WHERE ${beads.columns.status} = 'in_progress'
+          SELECT ${rig_beads.columns.id} FROM ${rig_beads}
+          WHERE ${rig_beads.columns.status} = 'in_progress'
             AND (
-              ${beads.columns.assignee_agent_id} IS NULL
-              OR ${beads.columns.assignee_agent_id} NOT IN (
-                SELECT ${agents.columns.id} FROM ${agents}
-                WHERE ${agents.columns.status} != 'dead'
+              ${rig_beads.columns.assignee_agent_id} IS NULL
+              OR ${rig_beads.columns.assignee_agent_id} NOT IN (
+                SELECT ${rig_agents.columns.id} FROM ${rig_agents}
+                WHERE ${rig_agents.columns.status} != 'dead'
               )
             )
         `,
@@ -1791,7 +1809,7 @@ export class RigDO extends DurableObject<Env> {
     // Check container process health for working/blocked agents
     const townId = await this.getTownId();
     if (townId) {
-      const WorkingAgent = AgentRecord.pick({
+      const WorkingAgent = RigAgentRecord.pick({
         id: true,
         current_hook_bead_id: true,
         last_activity_at: true,
@@ -1800,17 +1818,17 @@ export class RigDO extends DurableObject<Env> {
         ...query(
           this.sql,
           /* sql */ `
-            SELECT ${agents.columns.id},
-                   ${agents.columns.current_hook_bead_id},
-                   ${agents.columns.last_activity_at}
-            FROM ${agents}
-            WHERE ${agents.columns.status} IN ('working', 'blocked')
-          `,
+             SELECT ${rig_agents.columns.id},
+                    ${rig_agents.columns.current_hook_bead_id},
+                    ${rig_agents.columns.last_activity_at}
+             FROM ${rig_agents}
+             WHERE ${rig_agents.columns.status} IN ('working', 'blocked')
+           `,
           []
         ),
       ]);
 
-      const MailId = MailRecord.pick({ id: true });
+      const MailId = RigMailRecord.pick({ id: true });
 
       console.log(
         `${RIG_LOG} witnessPatrol: checking ${workingAgents.length} working/blocked agents in container`
@@ -1841,10 +1859,10 @@ export class RigDO extends DurableObject<Env> {
           query(
             this.sql,
             /* sql */ `
-              UPDATE ${agents}
-              SET ${agents.columns.status} = 'idle',
-                  ${agents.columns.last_activity_at} = ?
-              WHERE ${agents.columns.id} = ?
+              UPDATE ${rig_agents}
+              SET ${rig_agents.columns.status} = 'idle',
+                  ${rig_agents.columns.last_activity_at} = ?
+              WHERE ${rig_agents.columns.id} = ?
             `,
             [now(), working.id]
           );
@@ -1858,10 +1876,10 @@ export class RigDO extends DurableObject<Env> {
             ...query(
               this.sql,
               /* sql */ `
-                SELECT ${mail.columns.id} FROM ${mail}
-                WHERE ${mail.columns.to_agent_id} = ?
-                  AND ${mail.columns.subject} = 'GUPP_CHECK'
-                  AND ${mail.columns.delivered} = 0
+                SELECT ${rig_mail.columns.id} FROM ${rig_mail}
+                WHERE ${rig_mail.columns.to_agent_id} = ?
+                  AND ${rig_mail.columns.subject} = 'GUPP_CHECK'
+                  AND ${rig_mail.columns.delivered} = 0
                 LIMIT 1
               `,
               [working.id]
@@ -1932,9 +1950,9 @@ export class RigDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agents}
-        SET ${agents.columns.last_activity_at} = ?
-        WHERE ${agents.columns.id} = ?
+        UPDATE ${rig_agents}
+        SET ${rig_agents.columns.last_activity_at} = ?
+        WHERE ${rig_agents.columns.id} = ?
       `,
       [now(), agentId]
     );

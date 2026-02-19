@@ -3,7 +3,7 @@ import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/
 
 const MoleculeStatus = z.enum(['active', 'completed', 'failed']);
 
-export const MoleculeRecord = z.object({
+export const RigMoleculeRecord = z.object({
   id: z.string(),
   bead_id: z.string(),
   formula: z.string().transform(v => JSON.parse(v) as unknown),
@@ -13,14 +13,14 @@ export const MoleculeRecord = z.object({
   updated_at: z.string(),
 });
 
-export type MoleculeRecord = z.output<typeof MoleculeRecord>;
+export type RigMoleculeRecord = z.output<typeof RigMoleculeRecord>;
 
-export const molecules = getTableFromZodSchema('molecules', MoleculeRecord);
+export const rig_molecules = getTableFromZodSchema('rig_molecules', RigMoleculeRecord);
 
-export function createTableMolecules(): string {
-  return getCreateTableQueryFromTable(molecules, {
+export function createTableRigMolecules(): string {
+  return getCreateTableQueryFromTable(rig_molecules, {
     id: `text primary key`,
-    bead_id: `text not null references beads(id)`,
+    bead_id: `text not null references rig_beads(id)`,
     formula: `text not null`,
     current_step: `integer not null default 0`,
     status: `text not null default 'active' check(status in ('active', 'completed', 'failed'))`,

@@ -3,19 +3,19 @@ import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/
 
 export const ConvoyBeadStatus = z.enum(['open', 'closed']);
 
-export const ConvoyBeadRecord = z.object({
+export const TownConvoyBeadRecord = z.object({
   convoy_id: z.string(),
   bead_id: z.string(),
   rig_id: z.string(),
   status: ConvoyBeadStatus,
 });
 
-export type ConvoyBeadRecord = z.output<typeof ConvoyBeadRecord>;
+export type TownConvoyBeadRecord = z.output<typeof TownConvoyBeadRecord>;
 
-export const convoyBeads = getTableFromZodSchema('convoy_beads', ConvoyBeadRecord);
+export const town_convoy_beads = getTableFromZodSchema('town_convoy_beads', TownConvoyBeadRecord);
 
-export function createTableConvoyBeads(): string {
-  return getCreateTableQueryFromTable(convoyBeads, {
+export function createTableTownConvoyBeads(): string {
+  return getCreateTableQueryFromTable(town_convoy_beads, {
     convoy_id: `text not null`,
     bead_id: `text not null`,
     rig_id: `text not null`,

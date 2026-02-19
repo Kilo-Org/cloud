@@ -3,7 +3,7 @@ import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/
 
 export const ConvoyStatus = z.enum(['active', 'landed']);
 
-export const ConvoyRecord = z.object({
+export const TownConvoyRecord = z.object({
   id: z.string(),
   title: z.string(),
   status: ConvoyStatus,
@@ -14,12 +14,12 @@ export const ConvoyRecord = z.object({
   landed_at: z.string().nullable(),
 });
 
-export type ConvoyRecord = z.output<typeof ConvoyRecord>;
+export type TownConvoyRecord = z.output<typeof TownConvoyRecord>;
 
-export const convoys = getTableFromZodSchema('convoys', ConvoyRecord);
+export const town_convoys = getTableFromZodSchema('town_convoys', TownConvoyRecord);
 
-export function createTableConvoys(): string {
-  return getCreateTableQueryFromTable(convoys, {
+export function createTableTownConvoys(): string {
+  return getCreateTableQueryFromTable(town_convoys, {
     id: `text primary key`,
     title: `text not null`,
     status: `text not null check(status in ('active', 'landed')) default 'active'`,

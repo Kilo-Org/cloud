@@ -538,6 +538,9 @@ function buildCommonParams(
         include: ['reasoning.encrypted_content'],
         parallelToolCalls: (request.parallel_tool_calls ?? true) && !isLegacyExtension,
         store: false,
+        promptCacheKey: request.prompt_cache_key,
+        safetyIdentifier: request.safety_identifier,
+        user: request.user,
       } satisfies OpenAILanguageModelResponsesOptions,
       xai: {
         store: false,

@@ -100,7 +100,18 @@ const COMPLETION_EVENTS = new Set([
   'assistant.completed',
 ]);
 
-export function isCompletionEvent(event: KiloSSEEvent): boolean {
+/**
+ * Events that complete a single turn but NOT the entire session.
+ * Mayor agents are persistent — session.idle just means "done with this
+ * turn, waiting for the next message." Only rig agents (polecat, etc.)
+ * should treat idle as terminal.
+ */
+const TURN_COMPLETE_EVENTS = new Set(['session.idle']);
+
+export function isCompletionEvent(event: KiloSSEEvent, opts?: { persistent?: boolean }): boolean {
+  if (opts?.persistent && TURN_COMPLETE_EVENTS.has(event.event)) {
+    return false;
+  }
   return COMPLETION_EVENTS.has(event.event);
 }
 

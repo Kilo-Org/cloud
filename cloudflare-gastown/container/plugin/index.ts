@@ -52,6 +52,11 @@ export const GastownPlugin: Plugin = async ({ client }) => {
   const mayorTools = mayorClient ? createMayorTools(mayorClient) : {};
   const tools = { ...rigTools, ...mayorTools };
 
+  const toolNames = Object.keys(tools);
+  console.log(
+    `[${SERVICE}] Loaded: role=${isMayor ? 'mayor' : 'rig'} tools=[${toolNames.join(', ')}] (${toolNames.length} total)`
+  );
+
   // Best-effort logging — never let telemetry failures break tool execution
   async function log(level: 'info' | 'error', message: string) {
     try {

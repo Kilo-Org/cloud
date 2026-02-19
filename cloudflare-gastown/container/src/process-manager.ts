@@ -148,8 +148,10 @@ export async function startAgent(
         // Buffer for HTTP polling by the DO
         bufferAgentEvent(request.agentId, evt);
 
-        // Detect completion
-        if (isCompletionEvent(evt)) {
+        // Detect completion. Mayor agents are persistent sessions — session.idle
+        // just means "done with this turn," not "task finished." Only rig agents
+        // (polecat, etc.) should exit on idle.
+        if (isCompletionEvent(evt, { persistent: request.role === 'mayor' })) {
           agent.status = 'exited';
           agent.exitReason = 'completed';
           bufferAgentEvent(request.agentId, {

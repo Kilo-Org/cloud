@@ -1744,6 +1744,193 @@ CREATE TABLE escalations (
 
 ---
 
+### PR 10.5: Town Configuration — Environment Variables & Settings
+
+**Goal:** A configuration screen that lets users set environment variables and settings at the town level and per-agent, enabling manual token configuration (e.g., GitHub/GitLab API tokens for git operations) and other runtime configuration before the full integrations-based flow exists.
+
+This is the **highest priority item in Phase 2** because it unblocks manual configuration of git auth tokens that the container's `git-manager.ts` needs for clones and pushes to private repos. Until the integrations-based repo connection (PR 10.6) is complete, users need a way to manually provide a GitHub PAT or GitLab token.
+
+#### Configuration Model
+
+Town configuration lives in two places:
+
+1. **Town-level config** — Stored in the Town DO (and mirrored to Postgres `gastown_towns.config`). Applies to all agents in all rigs unless overridden.
+2. **Agent-level overrides** — Stored per-agent in the Rig DO. Overrides town-level values for a specific agent.
+
+```typescript
+type TownConfig = {
+  // Environment variables injected into all agent processes
+  env_vars: Record<string, string>;
+
+  // Git authentication (used by git-manager.ts for clone/push)
+  git_auth?: {
+    github_token?: string; // GitHub PAT or installation token
+    gitlab_token?: string; // GitLab PAT or OAuth token
+    gitlab_instance_url?: string; // For self-hosted GitLab
+  };
+
+  // Default model for new agent sessions
+  default_model?: string;
+
+  // Polecat limits
+  max_polecats_per_rig?: number;
+
+  // Refinery configuration
+  refinery?: {
+    gates: string[]; // e.g., ["npm test", "npm run build"]
+    auto_merge: boolean;
+    require_clean_merge: boolean;
+  };
+
+  // Alarm intervals (seconds)
+  alarm_interval_active?: number; // Default: 30
+  alarm_interval_idle?: number; // Default: 300
+
+  // Container settings
+  container?: {
+    sleep_after_minutes?: number; // Default: 30
+  };
+};
+
+type AgentConfigOverrides = {
+  env_vars?: Record<string, string>; // Merged with town-level (agent wins)
+  model?: string; // Override default model
+};
+```
+
+#### Configuration Inheritance
+
+When the container starts an agent process, environment variables are resolved in order (last wins):
+
+1. System defaults (GASTOWN_API_URL, GASTOWN_SESSION_TOKEN, etc.)
+2. Town-level `env_vars`
+3. Town-level `git_auth` (mapped to GIT_TOKEN, GITLAB_TOKEN, etc.)
+4. Agent-level `env_vars` overrides
+
+This means a user can set `GITHUB_TOKEN` at the town level and all polecats/refinery agents will use it for git operations. Or they can override it per-agent if different repos need different tokens.
+
+#### Container Integration
+
+The `git-manager.ts` currently calls `git clone` without auth. With town config:
+
+1. The Rig DO reads town config (via Town DO RPC or cached) when dispatching an agent
+2. `git_auth.github_token` is passed as an env var to the container's agent process
+3. `git-manager.ts` uses the token to construct authenticated git URLs:
+   - GitHub: `https://x-access-token:{token}@github.com/{owner}/{repo}.git`
+   - GitLab: `https://oauth2:{token}@gitlab.com/{owner}/{repo}.git`
+
+#### Dashboard UI
+
+A new **Settings** page in the town sidebar (`/gastown/[townId]/settings`):
+
+- **Environment Variables** — Key-value editor with add/remove. Sensitive values (tokens) are masked after save. Supports both town-level and per-rig/per-agent overrides.
+- **Git Authentication** — Dedicated section with labeled inputs for GitHub token, GitLab token, GitLab instance URL. Helper text explaining what each token is used for and how to generate one.
+- **Agent Defaults** — Default model selector, max polecats per rig slider, alarm intervals.
+- **Refinery Gates** — List editor for quality gate commands.
+- **Container** — Sleep timeout configuration.
+
+#### tRPC Procedures
+
+| Procedure           | Type     | Purpose                                  |
+| ------------------- | -------- | ---------------------------------------- |
+| `getTownConfig`     | query    | Read town configuration                  |
+| `updateTownConfig`  | mutation | Update town-level config (partial merge) |
+| `getAgentConfig`    | query    | Read agent-level overrides               |
+| `updateAgentConfig` | mutation | Update per-agent overrides               |
+
+#### Security
+
+- Sensitive values (tokens, secrets) are stored encrypted in the DO and Postgres.
+- The dashboard masks sensitive values after save (show last 4 chars only).
+- Agent-level overrides are restricted to the town owner.
+- Environment variable keys are validated (alphanumeric + underscore, no reserved prefixes like `GASTOWN_`).
+
+---
+
+### PR 10.6: Integrations-Based Repo Connection
+
+**Goal:** Allow users to connect rigs to repositories via Kilo's existing integrations system (GitHub App, GitLab OAuth) instead of raw git URLs, enabling automatic token management and repo discovery.
+
+This builds on the manual token configuration from PR 10.5 — once integrations are wired, the git auth tokens are managed automatically and the manual `git_auth` config becomes a fallback for repos not covered by an integration.
+
+#### How It Works
+
+Kilo already has a mature integrations system:
+
+- **GitHub**: Users install the KiloConnect GitHub App (standard or lite). The platform stores the `platform_installation_id`. Tokens are generated on-demand via `generateGitHubInstallationToken()` using the App's private key — no tokens stored in the database.
+- **GitLab**: Users connect via OAuth. Access/refresh tokens are stored in `platform_integrations.metadata`. Tokens are auto-refreshed when expired via `getValidGitLabToken()`.
+
+The integration system is already used by Cloud Agent sessions for git auth. Gastown rigs should use the same path.
+
+#### Rig Creation Flow (Updated)
+
+When creating a rig, the dialog offers two paths:
+
+1. **Integration-based** (preferred): If the user has a GitHub App or GitLab OAuth integration active, show a searchable repo picker populated from `PlatformRepository[]` cached on the integration. Selecting a repo auto-fills:
+   - `git_url` (constructed from the platform + repo full_name)
+   - `default_branch` (fetched from the platform API)
+   - `platform_integration_id` (FK to `platform_integrations.id`)
+
+2. **Manual** (fallback): Raw git URL input + manual branch. Requires a token in town config (PR 10.5) for private repos.
+
+#### Token Lifecycle for Rigs
+
+When the Rig DO needs to dispatch an agent:
+
+1. Check if the rig has a `platform_integration_id`
+2. If yes:
+   - **GitHub**: Call `generateGitHubInstallationToken(installationId, appType)` to mint a short-lived token. Pass to the container as `GIT_TOKEN` env var.
+   - **GitLab**: Call `getValidGitLabToken(integration)` to get/refresh the OAuth token. Pass to the container as `GIT_TOKEN` env var.
+3. If no: Fall back to town-level `git_auth` config from PR 10.5.
+
+Token refresh for long-running containers: The control server periodically requests fresh tokens from the gastown worker API (which proxies to the integration helpers). This is needed because GitHub installation tokens expire after 1 hour and GitLab OAuth tokens have configurable expiry.
+
+#### Schema Changes
+
+Add to `gastown_rigs` (both Postgres and Rig DO SQLite):
+
+```sql
+ALTER TABLE gastown_rigs ADD COLUMN platform_integration_id UUID
+  REFERENCES platform_integrations(id);
+```
+
+The rig stores which integration was used to connect it. This is used at dispatch time to determine how to mint git tokens.
+
+#### Worker Changes
+
+New internal endpoint on the gastown worker:
+
+```
+POST /api/internal/rigs/:rigId/git-token
+```
+
+Called by the control server inside the container when it needs a fresh git token. The worker:
+
+1. Reads the rig's `platform_integration_id` from the Rig DO
+2. Loads the integration from Postgres
+3. Mints/refreshes a token using the existing helpers
+4. Returns `{ token, expires_at }`
+
+The control server caches tokens and refreshes 5 minutes before expiry.
+
+#### Dashboard Changes
+
+- **Create Rig dialog**: Integration-aware repo picker (reuse existing `RepositorySelector` component pattern from Cloud Agent). Falls back to manual URL input.
+- **Rig settings**: Show which integration is connected, with a "Reconnect" option if the integration is suspended/removed.
+- **Town settings**: "Connect Integration" link that navigates to `/integrations` if no integration exists.
+
+#### Webhook Integration (Future Enhancement)
+
+Once rigs are connected via integrations, GitHub/GitLab webhooks can automatically create beads:
+
+- New GitHub issue → create Gastown bead
+- PR merged externally → update bead status
+- Push to default branch → trigger refinery check
+
+This reuses the existing `webhook-handler.ts` infrastructure. Not in scope for this PR but the `platform_integration_id` FK enables it.
+
+---
+
 ### PR 11: Multiple Polecats per Rig
 
 **Goal:** Support N concurrent polecats working on different beads in the same rig.

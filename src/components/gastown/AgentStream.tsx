@@ -36,8 +36,10 @@ function toStreamEntry(
   const props = data.properties as Record<string, unknown> | undefined;
   const ts = new Date();
 
-  // Text / reasoning parts — the main LLM output
-  if (event === 'message_part.updated' && props) {
+  // Text / reasoning / tool parts — the main LLM output.
+  // kilo serve uses dots: "message.part.updated"; the container Zod schema
+  // also accepts "message_part.updated" (underscore). Match both.
+  if ((event === 'message.part.updated' || event === 'message_part.updated') && props) {
     const part = props.part as Record<string, unknown> | undefined;
     if (part) {
       const partType = part.type as string | undefined;
@@ -69,6 +71,27 @@ function toStreamEntry(
           timestamp: ts,
         };
       }
+    }
+  }
+
+  // File diffs — the mayor (or any agent) edited files
+  if (event === 'session.diff' && props) {
+    const diff = props.diff;
+    if (Array.isArray(diff) && diff.length > 0) {
+      const files = diff
+        .map((d: Record<string, unknown>) => {
+          const file = d.file as string;
+          const adds = d.additions as number | undefined;
+          const dels = d.deletions as number | undefined;
+          const status = d.status as string | undefined;
+          const parts = [file];
+          if (status === 'added') parts.push('(new)');
+          else if (status === 'deleted') parts.push('(deleted)');
+          else if (adds || dels) parts.push(`(+${adds ?? 0}/-${dels ?? 0})`);
+          return parts.join(' ');
+        })
+        .join(', ');
+      return { id: nextId(), kind: 'tool', content: 'file changes', meta: files, timestamp: ts };
     }
   }
 

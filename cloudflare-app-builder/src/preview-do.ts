@@ -9,6 +9,7 @@ import {
   type PreviewPersistedState,
   type GitHubSourceConfig,
   type GetTokenForRepoResult,
+  type AppBuilderEvent,
   DEFAULT_SANDBOX_PORT,
 } from './types';
 import { logger, withLogTags, formatError } from './utils/logger';
@@ -22,6 +23,15 @@ export class PreviewDO extends DurableObject<Env> {
   private persistedState: PreviewPersistedState;
   /** Guard to prevent re-entry of _executeBuild while a build is in progress */
   private isBuildInProgress = false;
+  /** Connected SSE writers for event fan-out */
+  private eventWriters = new Set<WritableStreamDefaultWriter<Uint8Array>>();
+  /** Chains writes per writer to avoid violating the WritableStream contract */
+  private writerQueues = new Map<WritableStreamDefaultWriter<Uint8Array>, Promise<void>>();
+  /** Keepalive interval IDs per writer */
+  private keepaliveIntervals = new Map<
+    WritableStreamDefaultWriter<Uint8Array>,
+    ReturnType<typeof setInterval>
+  >();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -32,6 +42,8 @@ export class PreviewDO extends DurableObject<Env> {
       lastError: null,
       dbCredentials: null,
       githubSource: null,
+      containerStopped: false,
+      pendingBuild: false,
     };
 
     // Restore persisted state from storage if available
@@ -239,6 +251,12 @@ export class PreviewDO extends DurableObject<Env> {
       // Log output for debugging (verbose, use debug level)
       if (data) {
         logger.debug('Sandbox output', { data });
+        this.broadcastEvent({
+          type: 'log',
+          source: 'build',
+          message: data,
+          timestamp: new Date().toISOString(),
+        });
       }
 
       if (event.type === 'error') {
@@ -262,6 +280,92 @@ export class PreviewDO extends DurableObject<Env> {
     const isOpen = portCheck.exitCode === 0;
 
     return isOpen;
+  }
+
+  // ============================================
+  // SSE Event Fan-Out
+  // ============================================
+
+  private sseEncode(event: AppBuilderEvent): Uint8Array {
+    const data = JSON.stringify(event);
+    return new TextEncoder().encode(`event: ${event.type}\ndata: ${data}\n\n`);
+  }
+
+  /** Enqueue a write for a specific writer, chaining after any pending write. */
+  private enqueueWrite(writer: WritableStreamDefaultWriter<Uint8Array>, data: Uint8Array): void {
+    const prev = this.writerQueues.get(writer) ?? Promise.resolve();
+    const next = prev
+      .then(() => writer.ready)
+      .then(() => writer.write(data))
+      .catch(() => {
+        this.removeWriter(writer);
+      });
+    this.writerQueues.set(writer, next);
+  }
+
+  private broadcastEvent(event: AppBuilderEvent): void {
+    const encoded = this.sseEncode(event);
+    for (const writer of this.eventWriters) {
+      this.enqueueWrite(writer, encoded);
+    }
+  }
+
+  private removeWriter(writer: WritableStreamDefaultWriter<Uint8Array>): void {
+    this.eventWriters.delete(writer);
+    this.writerQueues.delete(writer);
+    const interval = this.keepaliveIntervals.get(writer);
+    if (interval) {
+      clearInterval(interval);
+      this.keepaliveIntervals.delete(writer);
+    }
+    try {
+      writer.close().catch(() => {});
+    } catch {
+      // Already closed
+    }
+  }
+
+  /**
+   * Subscribe to SSE events. Returns a ReadableStream that emits SSE-formatted events.
+   * Sends current state immediately, then broadcasts future events.
+   * Keeps connection alive with periodic comments.
+   */
+  async subscribeEvents(): Promise<ReadableStream<Uint8Array>> {
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+    const writer = writable.getWriter();
+    this.eventWriters.add(writer);
+
+    // Send current state immediately
+    const { state, error } = await this.getStatus();
+    const previewUrl =
+      state === 'running' && this.persistedState.appId
+        ? `https://${this.persistedState.appId}.${this.env.BUILDER_HOSTNAME}`
+        : undefined;
+
+    const initialEvent: AppBuilderEvent = { type: 'status', state, previewUrl };
+    this.enqueueWrite(writer, this.sseEncode(initialEvent));
+
+    if (error) {
+      const errorEvent: AppBuilderEvent = { type: 'error', message: error };
+      this.enqueueWrite(writer, this.sseEncode(errorEvent));
+    }
+
+    // Start keepalive interval (30s)
+    const keepaliveComment = new TextEncoder().encode(': keepalive\n\n');
+    const interval = setInterval(() => {
+      this.enqueueWrite(writer, keepaliveComment);
+    }, 30_000);
+    this.keepaliveIntervals.set(writer, interval);
+
+    // If a build was deferred while no clients were connected, trigger it now
+    if (this.persistedState.pendingBuild) {
+      this.persistedState.pendingBuild = false;
+      await this.savePersistedState();
+      logger.info('Pending build triggered on SSE reconnect');
+      this.ctx.waitUntil(this._executeBuild());
+    }
+
+    return readable;
   }
 
   // ============================================
@@ -324,11 +428,64 @@ export class PreviewDO extends DurableObject<Env> {
     return withLogTags(
       { source: 'PreviewDO', tags: { appId: this.persistedState.appId ?? undefined } },
       async () => {
+        // Fast path: if the container stopped, return 'sleeping' without waking it
+        if (this.persistedState.containerStopped) {
+          return { state: 'sleeping', error: this.persistedState.lastError };
+        }
+
         const state = await this.getSandboxState();
         return {
           state,
           error: this.persistedState.lastError,
         };
+      }
+    );
+  }
+
+  /**
+   * Called by AppBuilderSandbox.onStop() when the container goes to sleep.
+   * Sets the containerStopped flag so getStatus() can return 'sleeping'
+   * without waking the container.
+   */
+  async handleContainerStopped(): Promise<void> {
+    return withLogTags(
+      { source: 'PreviewDO', tags: { appId: this.persistedState.appId ?? undefined } },
+      async () => {
+        logger.info('Container stopped, marking as sleeping');
+        this.persistedState.containerStopped = true;
+        await this.savePersistedState();
+
+        this.broadcastEvent({ type: 'container-stopped' });
+        this.broadcastEvent({ type: 'status', state: 'sleeping' });
+
+        // Close all writers — clients will reconnect when needed
+        for (const writer of this.eventWriters) {
+          this.removeWriter(writer);
+        }
+      }
+    );
+  }
+
+  /**
+   * Handle a git push event. Builds immediately if SSE clients are connected,
+   * otherwise defers by setting pendingBuild flag (cleared on next subscribeEvents).
+   */
+  async onGitPush(): Promise<void> {
+    return withLogTags(
+      { source: 'PreviewDO', tags: { appId: this.persistedState.appId ?? undefined } },
+      async () => {
+        if (!this.persistedState.appId) {
+          throw new Error('App ID not set');
+        }
+
+        if (this.eventWriters.size > 0) {
+          logger.info('Git push — active connections, building immediately');
+          this.ctx.waitUntil(this._executeBuild());
+        } else {
+          logger.info('Build deferred — no active connections');
+          this.persistedState.pendingBuild = true;
+          await this.savePersistedState();
+        }
       }
     );
   }
@@ -369,8 +526,13 @@ export class PreviewDO extends DurableObject<Env> {
             throw new Error('App ID not set');
           }
 
-          // Clear any previous error state
+          // Clear any previous error state, container stopped flag, and pending build flag
           await this.clearErrorState();
+          this.persistedState.containerStopped = false;
+          this.persistedState.pendingBuild = false;
+          await this.savePersistedState();
+
+          this.broadcastEvent({ type: 'status', state: 'building' });
 
           const sandbox = getSandbox(this.env.SANDBOX, appId);
 
@@ -469,46 +631,22 @@ export class PreviewDO extends DurableObject<Env> {
           });
 
           logger.info('Dev server started', { processId });
+          this.broadcastEvent({
+            type: 'status',
+            state: 'running',
+            previewUrl: `https://${appId}.${this.env.BUILDER_HOSTNAME}`,
+          });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown error occurred';
           this.persistedState.lastError = message;
           await this.savePersistedState();
 
+          this.broadcastEvent({ type: 'error', message });
+          this.broadcastEvent({ type: 'status', state: 'error' });
           logger.error('Build execution failed', formatError(error));
           throw error;
         } finally {
           this.isBuildInProgress = false;
-        }
-      }
-    );
-  }
-
-  /**
-   * Stream build logs from the dev server process
-   * Returns a ReadableStream that emits SSE log events
-   */
-  async streamBuildLogs(): Promise<ReadableStream | null> {
-    return withLogTags(
-      { source: 'PreviewDO', tags: { appId: this.persistedState.appId ?? undefined } },
-      async () => {
-        if (!this.persistedState.appId) {
-          return null;
-        }
-
-        try {
-          const sandbox = getSandbox(this.env.SANDBOX, this.persistedState.appId);
-
-          // Find the active dev server process
-          const process = await this.getDevProcess(sandbox);
-          if (!process) {
-            return null;
-          }
-
-          const logStream = (await sandbox.streamProcessLogs(process.id)) as ReadableStream;
-          return logStream;
-        } catch (error) {
-          logger.error('Failed to stream build logs', formatError(error));
-          return null;
         }
       }
     );
@@ -546,6 +684,11 @@ export class PreviewDO extends DurableObject<Env> {
       async () => {
         logger.info('Deleting all preview data');
 
+        // Close all SSE event writers
+        for (const writer of this.eventWriters) {
+          this.removeWriter(writer);
+        }
+
         // First destroy the sandbox container if it exists
         await this.destroy();
 
@@ -558,6 +701,8 @@ export class PreviewDO extends DurableObject<Env> {
           lastError: null,
           dbCredentials: null,
           githubSource: null,
+          containerStopped: false,
+          pendingBuild: false,
         };
 
         logger.info('Preview deleted successfully');

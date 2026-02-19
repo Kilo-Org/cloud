@@ -9,6 +9,8 @@ declare namespace Cloudflare {
   interface Env {
     BACKEND_PUSH_NOTIFICATION_URL: 'https://app.kilo.ai/api/app-builder/push-notification';
     GIT_TOKEN_EXPIRY_SECONDS: '21600';
+    ALLOWED_ORIGINS: string;
+    APP_BUILDER_TICKET_SECRET: string;
     AUTH_TOKEN: string;
     BUILDER_HOSTNAME: string;
     GIT_JWT_SECRET: string;
@@ -32,6 +34,8 @@ declare namespace NodeJS {
         Cloudflare.Env,
         | 'BACKEND_PUSH_NOTIFICATION_URL'
         | 'GIT_TOKEN_EXPIRY_SECONDS'
+        | 'ALLOWED_ORIGINS'
+        | 'APP_BUILDER_TICKET_SECRET'
         | 'AUTH_TOKEN'
         | 'BUILDER_HOSTNAME'
         | 'GIT_JWT_SECRET'

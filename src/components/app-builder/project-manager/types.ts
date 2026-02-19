@@ -19,7 +19,7 @@ export type AppTRPCClient = TRPCClient<RootRouter>;
 // State Types
 // =============================================================================
 
-export type PreviewStatus = 'idle' | 'building' | 'running' | 'error';
+export type PreviewStatus = 'idle' | 'building' | 'running' | 'error' | 'sleeping';
 
 export type ProjectState = {
   messages: CloudMessage[];
@@ -60,19 +60,10 @@ export type ProjectManagerConfig = {
 };
 
 // =============================================================================
-// Preview Polling Types
+// Preview Events (SSE) Types
 // =============================================================================
 
-export type PreviewPollingConfig = {
-  projectId: string;
-  organizationId: string | null;
-  trpcClient: AppTRPCClient;
-  store: ProjectStore;
-  isDestroyed: () => boolean;
-};
-
-export type PreviewPollingState = {
-  isPolling: boolean;
+export type PreviewEventsHandle = {
   stop: () => void;
 };
 

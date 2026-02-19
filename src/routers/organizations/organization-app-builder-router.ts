@@ -15,6 +15,7 @@ import {
 import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
 import { MIN_BALANCE_FOR_APP_BUILDER } from '@/lib/app-builder/constants';
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
+import { signEventTicket } from '@/lib/app-builder/events-ticket';
 
 // Input schemas with required organizationId
 const createProjectSchema = createProjectBaseSchema.merge(organizationIdSchema);
@@ -47,6 +48,18 @@ export const organizationAppBuilderRouter = createTRPCRouter({
         template: input.template,
         mode: input.mode,
       });
+    }),
+
+  /**
+   * Get a short-lived JWT ticket for connecting to the SSE events stream.
+   */
+  getEventsTicket: organizationMemberProcedure
+    .input(projectWithOrgIdSchema)
+    .query(async ({ ctx, input }) => {
+      const owner = { type: 'org' as const, id: input.organizationId };
+      await appBuilderService.getPreviewUrl(input.projectId, owner);
+
+      return signEventTicket(input.projectId, ctx.user.id);
     }),
 
   /**

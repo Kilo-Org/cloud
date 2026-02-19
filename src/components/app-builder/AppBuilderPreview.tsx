@@ -22,6 +22,8 @@ import {
   Copy,
   Check,
   Github,
+  Moon,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -88,6 +90,43 @@ function ErrorState({ onRetry }: { onRetry?: () => void }) {
           Retry
         </Button>
       )}
+    </div>
+  );
+}
+
+function SleepingState({ onResume }: { onResume: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center text-center">
+      <div className="bg-muted mb-4 rounded-full p-6">
+        <Moon className="text-muted-foreground h-8 w-8" />
+      </div>
+      <h3 className="text-lg font-medium">Preview paused</h3>
+      <p className="text-muted-foreground mt-2 max-w-sm text-sm">
+        The preview went to sleep after being idle. Click Resume to restart it.
+      </p>
+      <Button variant="outline" className="mt-4" onClick={onResume}>
+        <RefreshCw className="mr-2 h-4 w-4" />
+        Resume
+      </Button>
+    </div>
+  );
+}
+
+function GeneratingState() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center text-center">
+      <div className="bg-muted mb-4 rounded-full p-6">
+        <Sparkles className="text-primary h-8 w-8 animate-pulse" />
+      </div>
+      <h3 className="text-lg font-medium">Generating your app</h3>
+      <p className="text-muted-foreground mt-2 max-w-sm text-sm">
+        The AI is writing code for your project. The preview will appear once it&apos;s ready.
+      </p>
+      <div className="mt-4 flex items-center gap-2">
+        <div className="bg-primary h-2 w-2 animate-pulse rounded-full" />
+        <div className="bg-primary h-2 w-2 animate-pulse rounded-full [animation-delay:0.2s]" />
+        <div className="bg-primary h-2 w-2 animate-pulse rounded-full [animation-delay:0.4s]" />
+      </div>
     </div>
   );
 }
@@ -386,7 +425,14 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
 }: AppBuilderPreviewProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
-  const { previewUrl, previewStatus, deploymentId, currentIframeUrl, gitRepoFullName } = state;
+  const {
+    previewUrl,
+    previewStatus,
+    isStreaming,
+    deploymentId,
+    currentIframeUrl,
+    gitRepoFullName,
+  } = state;
   const projectId = manager.projectId;
   const isMigrated = Boolean(gitRepoFullName);
 
@@ -470,35 +516,6 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
   const buildStatus = deploymentData?.latestBuild?.status;
   const deploymentUrl = deploymentData?.deployment?.deployment_url;
 
-  // Periodic ping to keep sandbox alive (pauses when tab is hidden)
-  useEffect(() => {
-    if (previewStatus !== 'running' || !previewUrl) return;
-
-    const ping = () => void fetch(previewUrl, { method: 'HEAD' }).catch(() => {});
-
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        if (!intervalId) {
-          ping();
-          intervalId = setInterval(ping, 20000);
-        }
-      } else if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
-    handleVisibilityChange();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [previewUrl, previewStatus]);
-
   const handleRefresh = useCallback(() => {
     manager.setCurrentIframeUrl(null);
     setIframeKey(prev => prev + 1);
@@ -544,6 +561,11 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
     }
     return false;
   }, [currentIframeUrl, previewUrl]);
+
+  // Handle resuming from sleeping state
+  const handleResume = useCallback(() => {
+    manager.resumeFromSleep();
+  }, [manager]);
 
   // Handle deploy using ProjectManager
   const handleDeploy = useCallback(async () => {
@@ -609,13 +631,13 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content — exactly one state renders at a time */}
       <div className="flex-1">
-        {previewStatus === 'idle' && <IdleState />}
-        {previewStatus === 'building' && <BuildingState />}
-        {previewStatus === 'error' && <ErrorState />}
-        {previewStatus === 'running' && !previewUrl && <ErrorState />}
-        {previewStatus === 'running' && previewUrl && (
+        {previewStatus === 'error' ? (
+          <ErrorState />
+        ) : previewStatus === 'sleeping' ? (
+          <SleepingState onResume={handleResume} />
+        ) : previewStatus === 'running' && previewUrl ? (
           <PreviewFrame
             key={iframeKey}
             url={previewUrl}
@@ -629,7 +651,15 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
             onToggleFullscreen={handleToggleFullscreen}
             onOpenExternal={handleOpenExternal}
           />
-        )}
+        ) : previewStatus === 'running' && !previewUrl ? (
+          <ErrorState />
+        ) : isStreaming && !previewUrl ? (
+          <GeneratingState />
+        ) : previewStatus === 'building' ? (
+          <BuildingState />
+        ) : previewStatus === 'idle' ? (
+          <IdleState />
+        ) : null}
       </div>
     </div>
   );

@@ -4,6 +4,9 @@
 // Environment Types
 // ============================================
 import type { Sandbox } from '@cloudflare/sandbox';
+import type { PreviewState } from './api-schemas';
+
+export type { PreviewState };
 
 export const DEFAULT_SANDBOX_PORT = 8080;
 
@@ -146,15 +149,7 @@ export interface ErrnoException extends Error {
 // Preview Types
 // ============================================
 
-/**
- * Possible states for a preview sandbox
- * - uninitialized: DO not configured with appId yet
- * - idle: appId set, no dev server process running
- * - building: dev server process exists, port not yet open
- * - running: dev server process exists AND port is open
- * - error: process failed/killed (auto-clears on next build)
- */
-export type PreviewState = 'uninitialized' | 'idle' | 'building' | 'running' | 'error';
+// PreviewState is re-exported from api-schemas.ts (single source of truth via zod enum)
 
 /**
  * Database credentials - both fields are always present together
@@ -183,6 +178,12 @@ export type PreviewPersistedState = {
   dbCredentials: DbCredentials | null;
   // GitHub migration state - when set, clone from GitHub instead of internal repo
   githubSource: GitHubSourceConfig | null;
+  // Set to true by onStop() lifecycle hook when the container goes to sleep.
+  // Allows getStatus() to return 'sleeping' without waking the container.
+  containerStopped: boolean;
+  // Set to true by onGitPush() when no SSE clients are connected.
+  // Cleared and build triggered when a client connects via subscribeEvents().
+  pendingBuild: boolean;
 };
 
 /**
@@ -195,3 +196,37 @@ export interface PreviewStatusResponse {
   error: string | null;
   appId: string;
 }
+
+// ============================================
+// SSE Event Types
+// ============================================
+
+type StatusEvent = {
+  type: 'status';
+  state: PreviewState;
+  previewUrl?: string;
+};
+
+type LogEvent = {
+  type: 'log';
+  source: 'build' | 'dev-server';
+  message: string;
+  timestamp: string;
+};
+
+type ErrorEvent = {
+  type: 'error';
+  message: string;
+};
+
+type ContainerStoppedEvent = {
+  type: 'container-stopped';
+};
+
+export type AppBuilderEvent = StatusEvent | LogEvent | ErrorEvent | ContainerStoppedEvent;
+
+export type EventTicketPayload = {
+  type: 'app_builder_event';
+  userId: string;
+  projectId: string;
+};

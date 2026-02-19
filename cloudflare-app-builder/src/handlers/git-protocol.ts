@@ -344,9 +344,9 @@ async function handleReceivePack(
           const previewStub = env.PREVIEW.get(previewId);
 
           ctx.waitUntil(
-            previewStub.triggerBuild().catch(error => {
+            previewStub.onGitPush().catch(error => {
               // Log error but don't fail the push
-              logger.error('Failed to trigger preview build', formatError(error));
+              logger.error('Failed to notify preview of git push', formatError(error));
             })
           );
         }

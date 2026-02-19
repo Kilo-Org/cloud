@@ -1,6 +1,6 @@
 import { GitRepositoryDO } from './git-repository-do';
 import { PreviewDO } from './preview-do';
-import { Sandbox } from '@cloudflare/sandbox';
+import { AppBuilderSandbox } from './app-builder-sandbox';
 import type { Env } from './types';
 import { handleGitProtocolRequest, isGitProtocolRequest } from './handlers/git-protocol';
 import { handleInit } from './handlers/init';
@@ -10,14 +10,15 @@ import { handleGetCommit } from './handlers/commit';
 import { handleMigrateToGithub } from './handlers/migrate-to-github';
 import {
   handleGetPreviewStatus,
+  handleGitPush,
   handlePreviewProxy,
-  handleStreamBuildLogs,
   handleTriggerBuild,
 } from './handlers/preview';
+import { handleEvents } from './handlers/events';
 import { logger, withLogTags } from './utils/logger';
 
 // Export Durable Objects
-export { GitRepositoryDO, PreviewDO, Sandbox };
+export { GitRepositoryDO, PreviewDO, AppBuilderSandbox };
 
 // Route patterns
 const APP_ID_PATTERN_STR = '[a-z0-9_-]{20,}';
@@ -27,7 +28,8 @@ const TOKEN_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/token$`);
 const COMMIT_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/commit$`);
 const PREVIEW_STATUS_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/preview$`);
 const BUILD_TRIGGER_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/build$`);
-const BUILD_LOGS_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/build/logs$`);
+const EVENTS_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/events$`);
+const GIT_PUSH_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/push$`);
 const MIGRATE_TO_GITHUB_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})/migrate-to-github$`);
 const DELETE_PATTERN = new RegExp(`^/apps/(${APP_ID_PATTERN_STR})$`);
 
@@ -63,6 +65,28 @@ function extractAppIdFromPath(pathname: string): string | null {
 }
 
 /**
+ * Return the origin if it's in the allow-list, otherwise null.
+ */
+function getAllowedOrigin(request: Request, env: Env): string | null {
+  const origin = request.headers.get('Origin');
+  if (!origin || !env.ALLOWED_ORIGINS) return null;
+  const allowed = env.ALLOWED_ORIGINS.split(',');
+  return allowed.includes(origin) ? origin : null;
+}
+
+/**
+ * Append CORS headers to an existing response for an allowed origin.
+ */
+function withCorsHeaders(response: Response, origin: string): Response {
+  const newResponse = new Response(response.body, response);
+  newResponse.headers.set('Access-Control-Allow-Origin', origin);
+  newResponse.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, OPTIONS');
+  newResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  newResponse.headers.set('Vary', 'Origin');
+  return newResponse;
+}
+
+/**
  * Main worker fetch handler
  */
 export default {
@@ -86,8 +110,16 @@ export default {
       });
 
       if (subdomainAppId) {
+        const allowedOrigin = getAllowedOrigin(request, env);
+
+        // Handle CORS preflight for cross-origin requests from app.kilo.ai
+        if (allowedOrigin && request.method === 'OPTIONS') {
+          return withCorsHeaders(new Response(null, { status: 204 }), allowedOrigin);
+        }
+
         // All requests to app-id.* subdomain are proxied to the preview sandbox
-        return handlePreviewProxy(request, env, subdomainAppId);
+        const response = await handlePreviewProxy(request, env, subdomainAppId);
+        return allowedOrigin ? withCorsHeaders(response, allowedOrigin) : response;
       }
 
       // Handle init requests
@@ -124,10 +156,24 @@ export default {
         return handleTriggerBuild(request, env, buildTriggerMatch[1]);
       }
 
-      // Handle build logs streaming requests (GET /apps/{app_id}/build/logs)
-      const buildLogsMatch = pathname.match(BUILD_LOGS_PATTERN);
-      if (buildLogsMatch && request.method === 'GET') {
-        return handleStreamBuildLogs(request, env, buildLogsMatch[1]);
+      // Handle git push notifications (POST /apps/{app_id}/push)
+      const gitPushMatch = pathname.match(GIT_PUSH_PATTERN);
+      if (gitPushMatch && request.method === 'POST') {
+        return handleGitPush(request, env, gitPushMatch[1]);
+      }
+
+      // Handle SSE event stream (GET /apps/{app_id}/events)
+      // This is fetched cross-origin from app.kilo.ai, so needs CORS headers.
+      const eventsMatch = pathname.match(EVENTS_PATTERN);
+      if (eventsMatch) {
+        const allowedOrigin = getAllowedOrigin(request, env);
+        if (allowedOrigin && request.method === 'OPTIONS') {
+          return withCorsHeaders(new Response(null, { status: 204 }), allowedOrigin);
+        }
+        if (request.method === 'GET') {
+          const response = await handleEvents(request, env, eventsMatch[1]);
+          return allowedOrigin ? withCorsHeaders(response, allowedOrigin) : response;
+        }
       }
 
       // Handle migrate to GitHub requests (POST /apps/{app_id}/migrate-to-github)

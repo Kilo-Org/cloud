@@ -1,5 +1,7 @@
 import type { Env } from '../types';
 import { verifyGitToken, type GitTokenPermission } from './jwt';
+import * as jwt from 'jsonwebtoken';
+import { z } from 'zod';
 
 export type AuthResult = {
   isAuthenticated: boolean;
@@ -204,4 +206,34 @@ export async function verifyGitAuth(
       headers: { 'WWW-Authenticate': 'Basic realm="Git"' },
     }),
   };
+}
+
+// =============================================================================
+// Event Ticket Verification
+// =============================================================================
+
+const eventTicketPayloadSchema = z.object({
+  type: z.literal('app_builder_event'),
+  userId: z.string(),
+  projectId: z.string(),
+});
+
+export type EventTicketResult =
+  | { valid: true; userId: string; projectId: string }
+  | { valid: false; error: string };
+
+export function verifyEventTicket(ticket: string, secret: string): EventTicketResult {
+  try {
+    const payload = jwt.verify(ticket, secret, { algorithms: ['HS256'] });
+    const parsed = eventTicketPayloadSchema.parse(payload);
+    return { valid: true, userId: parsed.userId, projectId: parsed.projectId };
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return { valid: false, error: 'Ticket expired' };
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      return { valid: false, error: 'Invalid ticket' };
+    }
+    return { valid: false, error: 'Invalid ticket format' };
+  }
 }

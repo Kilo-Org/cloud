@@ -2,12 +2,10 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   town_convoys,
   TownConvoyRecord,
-  ConvoyStatus,
   createTableTownConvoys,
 } from '../db/tables/town-convoys.table';
 import {
   town_convoy_beads,
-  ConvoyBeadStatus,
   createTableTownConvoyBeads,
 } from '../db/tables/town-convoy-beads.table';
 import {
@@ -102,7 +100,7 @@ export class TownDO extends DurableObject<Env> {
     const existing = (await this.ctx.storage.get<Record<string, unknown>>(key)) ?? {};
     if (!(parsed.rigId in existing)) return;
     const next = { ...existing };
-    delete (next as Record<string, unknown>)[parsed.rigId];
+    delete next[parsed.rigId];
     await this.ctx.storage.put(key, next);
   }
 

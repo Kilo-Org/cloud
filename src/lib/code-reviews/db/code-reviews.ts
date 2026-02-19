@@ -112,7 +112,6 @@ export async function updateCodeReviewStatus(
     if (updates.useCloudAgentNext !== undefined) {
       updateData.use_cloud_agent_next = updates.useCloudAgentNext;
     }
-
     // Auto-set timestamps based on status
     if (status === 'running' && !updates.startedAt) {
       updateData.started_at = new Date().toISOString();

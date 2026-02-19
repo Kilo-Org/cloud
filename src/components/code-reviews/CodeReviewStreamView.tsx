@@ -379,14 +379,22 @@ export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamV
             <CardTitle className="text-sm font-medium">Code Review Progress</CardTitle>
           </div>
           {isComplete ? (
-            <Badge variant="default" className="gap-1.5 bg-emerald-500 hover:bg-emerald-600">
-              <CheckCircle2 className="h-3 w-3" />
-              {reviewStatus === 'failed'
-                ? 'Failed'
-                : reviewStatus === 'cancelled'
-                  ? 'Cancelled'
-                  : 'Complete'}
-            </Badge>
+            reviewStatus === 'failed' ? (
+              <Badge variant="destructive" className="gap-1.5">
+                <XCircle className="h-3 w-3" />
+                Failed
+              </Badge>
+            ) : reviewStatus === 'cancelled' ? (
+              <Badge variant="secondary" className="gap-1.5">
+                <XCircle className="h-3 w-3" />
+                Cancelled
+              </Badge>
+            ) : (
+              <Badge variant="default" className="gap-1.5 bg-emerald-500 hover:bg-emerald-600">
+                <CheckCircle2 className="h-3 w-3" />
+                Complete
+              </Badge>
+            )
           ) : (
             <Badge variant="secondary" className="gap-1.5">
               <Loader2 className="h-3 w-3 animate-spin" />

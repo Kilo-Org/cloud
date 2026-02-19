@@ -78,9 +78,13 @@ function normalizePayload(raw: StatusUpdatePayload): {
         ? raw.kiloSessionId
         : undefined;
 
+  // Map cloud-agent-next 'cloudAgentSessionId' → 'sessionId' as fallback
+  const sessionId =
+    raw.sessionId ?? ('cloudAgentSessionId' in raw ? raw.cloudAgentSessionId : undefined);
+
   return {
     status,
-    sessionId: raw.sessionId,
+    sessionId,
     cliSessionId,
     errorMessage: raw.errorMessage,
   };

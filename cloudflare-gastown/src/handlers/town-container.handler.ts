@@ -153,39 +153,6 @@ export async function handleContainerStreamTicket(
 }
 
 /**
- * Proxy a WebSocket upgrade for agent streaming directly through the
- * Container DO. We create a new Request with the container URL but
- * preserve the original headers (including Upgrade: websocket) so the
- * Container base class's fetch() method detects and proxies the WS.
- */
-export async function handleContainerAgentStream(
-  c: Context<GastownEnv>,
-  params: { townId: string; agentId: string }
-) {
-  const ticket = c.req.query('ticket');
-  if (!ticket) {
-    return c.json(resError('Missing ticket query parameter'), 400);
-  }
-
-  const container = getTownContainerStub(c.env, params.townId);
-  const containerUrl = `http://container/agents/${params.agentId}/stream?ticket=${encodeURIComponent(ticket)}`;
-
-  console.log(
-    `${CONTAINER_LOG} handleContainerAgentStream: proxying WS upgrade to ${containerUrl}`
-  );
-
-  // Build a new request targeting the container URL but preserving the
-  // original headers (Upgrade, Sec-WebSocket-*, etc.) so the Container
-  // base class proxies the WebSocket connection correctly.
-  const proxyReq = new Request(containerUrl, {
-    method: c.req.method,
-    headers: c.req.raw.headers,
-  });
-
-  return container.fetch(proxyReq);
-}
-
-/**
  * Container health check.
  */
 export async function handleContainerHealth(c: Context<GastownEnv>, params: { townId: string }) {

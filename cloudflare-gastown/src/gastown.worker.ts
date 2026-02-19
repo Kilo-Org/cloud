@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { getTownContainerStub } from './dos/TownContainer.do';
 import { resError } from './util/res.util';
 import { dashboardHtml } from './ui/dashboard.ui';
 import { withCloudflareAccess } from './middleware/cf-access.middleware';
@@ -41,7 +42,6 @@ import {
   handleContainerSendMessage,
   handleContainerAgentStatus,
   handleContainerStreamTicket,
-  handleContainerAgentStream,
   handleContainerHealth,
 } from './handlers/town-container.handler';
 import {
@@ -206,9 +206,10 @@ app.get('/api/towns/:townId/container/agents/:agentId/status', c =>
 app.post('/api/towns/:townId/container/agents/:agentId/stream-ticket', c =>
   handleContainerStreamTicket(c, c.req.param())
 );
-app.get('/api/towns/:townId/container/agents/:agentId/stream', c =>
-  handleContainerAgentStream(c, c.req.param())
-);
+// Note: GET /api/towns/:townId/container/agents/:agentId/stream (WebSocket)
+// is handled outside Hono in the default export's fetch handler, which
+// routes the upgrade directly to TownContainerDO.fetch().
+
 app.get('/api/towns/:townId/container/health', c => handleContainerHealth(c, c.req.param()));
 
 // ── Mayor ────────────────────────────────────────────────────────────────
@@ -245,4 +246,40 @@ app.onError((err, c) => {
   return c.json(resError('Internal server error'), 500);
 });
 
-export default app;
+// ── Export with WebSocket interception ───────────────────────────────────
+// WebSocket upgrade requests for agent streaming must bypass Hono and go
+// directly to the TownContainerDO.fetch(). Hono cannot relay a 101
+// WebSocket response — the DO must return the WebSocketPair client end
+// directly to the runtime.
+
+const WS_STREAM_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/stream$/;
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Intercept WebSocket upgrade requests for agent streaming
+    if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      const url = new URL(request.url);
+      const match = url.pathname.match(WS_STREAM_PATTERN);
+      if (match) {
+        const townId = match[1];
+        const agentId = match[2];
+        const ticket = url.searchParams.get('ticket');
+
+        // Build a container-internal URL for the DO's fetch handler
+        const containerUrl = new URL(
+          `/agents/${agentId}/stream${ticket ? `?ticket=${encodeURIComponent(ticket)}` : ''}`,
+          'http://container'
+        );
+        const doRequest = new Request(containerUrl.toString(), {
+          headers: request.headers,
+        });
+
+        const stub = getTownContainerStub(env, townId);
+        return stub.fetch(doRequest);
+      }
+    }
+
+    // All other requests go through Hono
+    return app.fetch(request, env, ctx);
+  },
+};

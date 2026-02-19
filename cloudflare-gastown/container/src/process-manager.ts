@@ -21,45 +21,47 @@ import { reportAgentCompleted } from './completion-reporter';
 const agents = new Map<string, ManagedAgent>();
 const sseConsumers = new Map<string, SSEConsumer>();
 
-// ── Event fan-out for external stream consumers ──────────────────────────
-// Each agent can have multiple external listeners (WebSocket clients watching
-// the agent work). The internal SSE consumer already receives all kilo serve
-// events; we fan out filtered events to registered listeners here.
+// ── Event buffer for HTTP polling ─────────────────────────────────────────
+// Each agent keeps a ring buffer of recent events. The DO polls
+// GET /agents/:agentId/events?after=N to retrieve them.
 
-type AgentEventListener = (event: KiloSSEEvent) => void;
-const agentListeners = new Map<string, Set<AgentEventListener>>();
+type BufferedEvent = {
+  id: number;
+  event: string;
+  data: KiloSSEEventData;
+  timestamp: string;
+};
 
-/**
- * Subscribe to an agent's event stream. Returns an unsubscribe function.
- * The listener receives every KiloSSEEvent that the internal SSE consumer
- * sees for this agent (already filtered by sessionId, excludes heartbeats).
- */
-export function subscribeToAgent(agentId: string, listener: AgentEventListener): () => void {
-  let listeners = agentListeners.get(agentId);
-  if (!listeners) {
-    listeners = new Set();
-    agentListeners.set(agentId, listeners);
+const MAX_BUFFERED_EVENTS = 500;
+const agentEventBuffers = new Map<string, BufferedEvent[]>();
+let nextEventId = 1;
+
+function bufferAgentEvent(agentId: string, event: KiloSSEEvent): void {
+  let buf = agentEventBuffers.get(agentId);
+  if (!buf) {
+    buf = [];
+    agentEventBuffers.set(agentId, buf);
   }
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-    if (listeners.size === 0) {
-      agentListeners.delete(agentId);
-    }
-  };
+  buf.push({
+    id: nextEventId++,
+    event: event.event,
+    data: event.data,
+    timestamp: new Date().toISOString(),
+  });
+  // Trim to cap
+  if (buf.length > MAX_BUFFERED_EVENTS) {
+    buf.splice(0, buf.length - MAX_BUFFERED_EVENTS);
+  }
 }
 
-/** Notify all external listeners for an agent. */
-function emitAgentEvent(agentId: string, event: KiloSSEEvent): void {
-  const listeners = agentListeners.get(agentId);
-  if (!listeners) return;
-  for (const listener of listeners) {
-    try {
-      listener(event);
-    } catch (err) {
-      console.error(`Error in agent event listener for ${agentId}:`, err);
-    }
-  }
+/**
+ * Get buffered events for an agent, optionally after a given event id.
+ * Returns events ordered by id ascending.
+ */
+export function getAgentEvents(agentId: string, afterId = 0): BufferedEvent[] {
+  const buf = agentEventBuffers.get(agentId);
+  if (!buf) return [];
+  return buf.filter(e => e.id > afterId);
 }
 
 const startTime = Date.now();
@@ -134,14 +136,14 @@ export async function startAgent(
           }
         }
 
-        // Fan out to external listeners (WebSocket clients)
-        emitAgentEvent(request.agentId, evt);
+        // Buffer for HTTP polling by the DO
+        bufferAgentEvent(request.agentId, evt);
 
         // Detect completion
         if (isCompletionEvent(evt)) {
           agent.status = 'exited';
           agent.exitReason = 'completed';
-          emitAgentEvent(request.agentId, {
+          bufferAgentEvent(request.agentId, {
             event: 'agent.exited',
             data: { type: 'agent.exited', properties: { reason: 'completed' } },
           });
@@ -155,7 +157,7 @@ export async function startAgent(
         if (agent.status === 'running') {
           agent.status = 'failed';
           agent.exitReason = `SSE stream closed: ${reason}`;
-          emitAgentEvent(request.agentId, {
+          bufferAgentEvent(request.agentId, {
             event: 'agent.exited',
             data: { type: 'agent.exited', properties: { reason: `stream closed: ${reason}` } },
           });
@@ -240,12 +242,11 @@ export async function stopAgent(agentId: string): Promise<void> {
   agent.status = 'exited';
   agent.exitReason = 'stopped';
 
-  // Notify external listeners and clean up
-  emitAgentEvent(agentId, {
+  // Buffer exit event for polling
+  bufferAgentEvent(agentId, {
     event: 'agent.exited',
     data: { type: 'agent.exited', properties: { reason: 'stopped' } },
   });
-  agentListeners.delete(agentId);
 }
 
 /**

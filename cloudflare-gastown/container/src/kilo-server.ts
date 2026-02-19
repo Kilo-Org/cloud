@@ -97,18 +97,34 @@ async function doStartServer(workdir: string, env: Record<string, string>): Prom
 
   const port = allocatePort();
 
-  // Write KILO_CONFIG_CONTENT to the filesystem config file so kilo serve
-  // reads it as the primary config. kilo serve loads config.json from
-  // $XDG_CONFIG_HOME/kilo/ (defaults to ~/.config/kilo/) at startup and
-  // may ignore or deprioritize the KILO_CONFIG_CONTENT env var, causing
-  // the model to fall back to 'kilo/auto' which doesn't exist.
+  // Write config to a per-workdir config directory. Each kilo serve instance
+  // gets its own config file to avoid races when multiple servers start
+  // concurrently (e.g., mayor + polecat). We set XDG_CONFIG_HOME in the
+  // child env so kilo serve reads from this isolated directory.
+  const configDir = `/tmp/kilo-config-${port}`;
   if (env.KILO_CONFIG_CONTENT) {
-    const configDir = `${env.HOME ?? '/root'}/.config/kilo`;
-    await mkdir(configDir, { recursive: true });
-    await writeFile(`${configDir}/config.json`, env.KILO_CONFIG_CONTENT);
+    await mkdir(`${configDir}/kilo`, { recursive: true });
+    await writeFile(`${configDir}/kilo/config.json`, env.KILO_CONFIG_CONTENT, { mode: 0o600 });
+    console.log(`[kilo-server] Wrote config.json to ${configDir}/kilo/ for port ${port}`);
   }
 
-  const mergedEnv = { ...process.env, ...env };
+  // Also ensure the global config dir has the gastown plugin symlink visible
+  // to this instance. Copy the plugin symlink into the per-instance config.
+  try {
+    const { symlink } = await import('node:fs/promises');
+    await mkdir(`${configDir}/kilo/plugins`, { recursive: true });
+    await symlink('/opt/gastown-plugin/index.ts', `${configDir}/kilo/plugins/gastown.ts`).catch(
+      () => {}
+    );
+  } catch {
+    // Plugin symlink already exists or /opt/gastown-plugin not available
+  }
+
+  const mergedEnv = {
+    ...process.env,
+    ...env,
+    XDG_CONFIG_HOME: configDir,
+  };
 
   const child: Subprocess = Bun.spawn(
     ['kilo', 'serve', '--port', String(port), '--hostname', '127.0.0.1', '--print-logs'],

@@ -314,6 +314,57 @@ describe('api routes', () => {
     });
   });
 
+  it('POST /session/:sessionId/ingest updates git_url and git_branch when changed', async () => {
+    const { db, fns } = makeDbFakes();
+    const { updateSet } = fns;
+    vi.mocked(getDb).mockReturnValue(db);
+
+    const sessionCache = {
+      has: vi.fn(async () => true),
+      add: vi.fn(async () => undefined),
+    };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+
+    const ingestStub = {
+      ingest: vi.fn(async () => ({
+        changes: [
+          { name: 'gitUrl', value: 'https://github.com/user/repo' },
+          { name: 'gitBranch', value: 'main' },
+        ],
+      })),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/ingest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          data: [
+            {
+              type: 'kilo_meta',
+              data: {
+                platform: 'cli',
+                gitUrl: 'https://github.com/user/repo',
+                gitBranch: 'main',
+              },
+            },
+          ],
+        }),
+      }),
+      { HYPERDRIVE: { connectionString: 'postgres://test' } }
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSet).toHaveBeenCalledWith({ git_url: 'https://github.com/user/repo' });
+    expect(updateSet).toHaveBeenCalledWith({ git_branch: 'main' });
+  });
+
   it('POST /session/:sessionId/ingest updates parent_session_id when changed', async () => {
     const { db, fns } = makeDbFakes();
     const { selectExecuteTakeFirst, updateSet } = fns;

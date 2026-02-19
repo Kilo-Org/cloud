@@ -141,6 +141,13 @@
       "when": 1771493736215,
       "tag": "0019_hot_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1771507192123,
+      "tag": "0020_lucky_gateway",
+      "breakpoints": true
     }
   ]
 }

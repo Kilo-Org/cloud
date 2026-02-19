@@ -2112,6 +2112,8 @@ export const cli_sessions_v2 = pgTable(
     organization_id: uuid().references(() => organizations.id, { onDelete: 'set null' }),
     cloud_agent_session_id: text(),
     created_on_platform: text().notNull().default('unknown'),
+    git_url: text(),
+    git_branch: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

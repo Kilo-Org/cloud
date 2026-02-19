@@ -6,6 +6,8 @@ import type { SessionDataItem } from '../types/session-sync';
 import { getItemIdentity } from '../util/compaction';
 import { buildSharedSessionSnapshot } from '../util/share-output';
 import {
+  extractNormalizedGitBranchFromItem,
+  extractNormalizedGitUrlFromItem,
   extractNormalizedOrgIdFromItem,
   extractNormalizedParentIdFromItem,
   extractNormalizedPlatformFromItem,
@@ -26,7 +28,7 @@ type IngestMetaKey =
   | 'closeReason'
   | 'metricsEmitted';
 
-type ExtractableMetaKey = 'title' | 'parentId' | 'platform' | 'orgId';
+type ExtractableMetaKey = 'title' | 'parentId' | 'platform' | 'orgId' | 'gitUrl' | 'gitBranch';
 
 function writeIngestMetaIfChanged(
   sql: SqlStorage,
@@ -64,6 +66,8 @@ const INGEST_META_EXTRACTORS: Array<{
   { key: 'parentId', extract: extractNormalizedParentIdFromItem },
   { key: 'platform', extract: extractNormalizedPlatformFromItem },
   { key: 'orgId', extract: extractNormalizedOrgIdFromItem },
+  { key: 'gitUrl', extract: extractNormalizedGitUrlFromItem },
+  { key: 'gitBranch', extract: extractNormalizedGitBranchFromItem },
 ];
 
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
@@ -128,6 +132,8 @@ export class SessionIngestDO extends DurableObject<Env> {
       parentId: undefined,
       platform: undefined,
       orgId: undefined,
+      gitUrl: undefined,
+      gitBranch: undefined,
     };
 
     let hasSessionOpen = false;

@@ -381,6 +381,84 @@ describe('RigDO', () => {
       const empty = await rig.popReviewQueue();
       expect(empty).toBeNull();
     });
+
+    it('should close bead on successful merge via completeReviewWithResult', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `merge-success-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Merge me' });
+
+      await rig.submitToReviewQueue({
+        agent_id: agent.id,
+        bead_id: bead.id,
+        branch: 'feature/merge-test',
+      });
+
+      const entry = await rig.popReviewQueue();
+      expect(entry).toBeDefined();
+
+      await rig.completeReviewWithResult({
+        entry_id: entry!.id,
+        status: 'merged',
+        message: 'Merge successful',
+        commit_sha: 'abc123',
+      });
+
+      // Bead should be closed
+      const updatedBead = await rig.getBeadAsync(bead.id);
+      expect(updatedBead?.status).toBe('closed');
+      expect(updatedBead?.closed_at).toBeDefined();
+
+      // Review queue should be empty
+      const empty = await rig.popReviewQueue();
+      expect(empty).toBeNull();
+    });
+
+    it('should create escalation bead on merge conflict via completeReviewWithResult', async () => {
+      const agent = await rig.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `merge-conflict-${rigName}`,
+      });
+      const bead = await rig.createBead({ type: 'issue', title: 'Conflict me' });
+
+      await rig.submitToReviewQueue({
+        agent_id: agent.id,
+        bead_id: bead.id,
+        branch: 'feature/conflict-test',
+      });
+
+      const entry = await rig.popReviewQueue();
+      expect(entry).toBeDefined();
+
+      await rig.completeReviewWithResult({
+        entry_id: entry!.id,
+        status: 'conflict',
+        message: 'CONFLICT (content): Merge conflict in src/index.ts',
+      });
+
+      // Original bead should NOT be closed (conflict means it stays as-is)
+      const updatedBead = await rig.getBeadAsync(bead.id);
+      expect(updatedBead?.status).not.toBe('closed');
+
+      // An escalation bead should have been created
+      const escalations = await rig.listBeads({ type: 'escalation' });
+      expect(escalations).toHaveLength(1);
+      expect(escalations[0].title).toBe('Merge conflict: feature/conflict-test');
+      expect(escalations[0].priority).toBe('high');
+      expect(escalations[0].body).toContain('CONFLICT (content)');
+      expect(escalations[0].metadata).toMatchObject({
+        source_bead_id: bead.id,
+        source_branch: 'feature/conflict-test',
+        agent_id: agent.id,
+      });
+
+      // Review queue entry should be marked as failed
+      const empty = await rig.popReviewQueue();
+      expect(empty).toBeNull();
+    });
   });
 
   // ── Prime ──────────────────────────────────────────────────────────────

@@ -24,6 +24,25 @@ export const StartAgentRequest = z.object({
 });
 export type StartAgentRequest = z.infer<typeof StartAgentRequest>;
 
+export const MergeRequest = z.object({
+  rigId: z.string(),
+  branch: z.string(),
+  targetBranch: z.string(),
+  gitUrl: z.string(),
+  entryId: z.string(),
+  beadId: z.string(),
+  agentId: z.string(),
+  callbackUrl: z.string().optional(),
+  envVars: z.record(z.string(), z.string()).optional(),
+});
+export type MergeRequest = z.infer<typeof MergeRequest>;
+
+export type MergeResult = {
+  status: 'merged' | 'conflict';
+  message: string;
+  commitSha?: string;
+};
+
 export const StopAgentRequest = z.object({
   signal: z.enum(['SIGTERM', 'SIGKILL']).optional(),
 });

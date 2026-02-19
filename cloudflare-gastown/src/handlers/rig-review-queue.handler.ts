@@ -30,3 +30,26 @@ export async function handleSubmitToReviewQueue(c: Context<GastownEnv>, params: 
   await rig.submitToReviewQueue(parsed.data);
   return c.json(resSuccess({ submitted: true }), 201);
 }
+
+const CompleteReviewBody = z.object({
+  entry_id: z.string().min(1),
+  status: z.enum(['merged', 'conflict']),
+  message: z.string(),
+  commit_sha: z.string().optional(),
+});
+
+export async function handleCompleteReview(
+  c: Context<GastownEnv>,
+  params: { rigId: string; entryId: string }
+) {
+  const parsed = CompleteReviewBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const rig = getRigDOStub(c.env, params.rigId);
+  await rig.completeReviewWithResult(parsed.data);
+  return c.json(resSuccess({ completed: true }));
+}

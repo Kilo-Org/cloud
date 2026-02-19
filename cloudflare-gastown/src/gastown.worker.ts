@@ -34,7 +34,10 @@ import {
 } from './handlers/rig-agents.handler';
 import { handleSendMail } from './handlers/rig-mail.handler';
 import { handleAppendAgentEvent, handleGetAgentEvents } from './handlers/rig-agent-events.handler';
-import { handleSubmitToReviewQueue } from './handlers/rig-review-queue.handler';
+import {
+  handleSubmitToReviewQueue,
+  handleCompleteReview,
+} from './handlers/rig-review-queue.handler';
 import { handleCreateEscalation } from './handlers/rig-escalations.handler';
 import {
   handleContainerStartAgent,
@@ -172,6 +175,9 @@ app.post('/api/rigs/:rigId/mail', c => handleSendMail(c, c.req.param()));
 // ── Review Queue ────────────────────────────────────────────────────────
 
 app.post('/api/rigs/:rigId/review-queue', c => handleSubmitToReviewQueue(c, c.req.param()));
+app.post('/api/rigs/:rigId/review-queue/:entryId/complete', c =>
+  handleCompleteReview(c, c.req.param())
+);
 
 // ── Escalations ─────────────────────────────────────────────────────────
 

@@ -670,6 +670,77 @@ export class RigDO extends DurableObject<Env> {
     );
   }
 
+  /**
+   * Called by the container's merge callback to report the result of a merge.
+   * On 'merged': marks the review entry as merged and closes the associated bead.
+   * On 'conflict': marks as failed and creates an escalation bead with conflict details.
+   */
+  async completeReviewWithResult(input: {
+    entry_id: string;
+    status: 'merged' | 'conflict';
+    message: string;
+    commit_sha?: string;
+  }): Promise<void> {
+    await this.ensureInitialized();
+
+    const reviewStatus = input.status === 'merged' ? 'merged' : 'failed';
+    await this.completeReview(input.entry_id, reviewStatus);
+
+    // Look up the review entry to get the bead_id
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${reviewQueue}
+          WHERE ${reviewQueue.columns.id} = ?
+        `,
+        [input.entry_id]
+      ),
+    ];
+
+    if (rows.length === 0) {
+      console.warn(`${RIG_LOG} completeReviewWithResult: entry ${input.entry_id} not found`);
+      return;
+    }
+
+    const entry = ReviewQueueRecord.parse(rows[0]);
+
+    if (input.status === 'merged') {
+      // Close the bead
+      const timestamp = now();
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.status} = 'closed',
+              ${beads.columns.updated_at} = ?,
+              ${beads.columns.closed_at} = ?
+          WHERE ${beads.columns.id} = ?
+        `,
+        [timestamp, timestamp, entry.bead_id]
+      );
+      console.log(
+        `${RIG_LOG} completeReviewWithResult: bead ${entry.bead_id} closed after merge (commit ${input.commit_sha ?? 'unknown'})`
+      );
+    } else {
+      // Conflict — create an escalation bead
+      await this.createBead({
+        type: 'escalation',
+        title: `Merge conflict: ${entry.branch}`,
+        body: `Automatic merge of branch \`${entry.branch}\` failed.\n\n${input.message}`,
+        priority: 'high',
+        metadata: {
+          source_bead_id: entry.bead_id,
+          source_branch: entry.branch,
+          agent_id: entry.agent_id,
+        },
+      });
+      console.log(
+        `${RIG_LOG} completeReviewWithResult: merge conflict for bead ${entry.bead_id}, escalation bead created`
+      );
+    }
+  }
+
   // ── Prime (context assembly) ───────────────────────────────────────────
 
   async prime(agentId: string): Promise<PrimeContext> {
@@ -1410,14 +1481,20 @@ export class RigDO extends DurableObject<Env> {
 
   /**
    * Signal the container to run a deterministic merge for a review queue entry.
+   * The container runs the merge asynchronously and calls back to
+   * `completeReview` when done.
    */
   private async startMergeInContainer(config: RigConfig, entry: ReviewQueueEntry): Promise<void> {
     try {
       const token = await this.mintAgentToken(entry.agent_id, config);
+      const rigId = this.ctx.id.name ?? config.rigId ?? '';
 
       const envVars: Record<string, string> = {};
       if (token) {
         envVars.GASTOWN_SESSION_TOKEN = token;
+      }
+      if (this.env.GASTOWN_API_URL) {
+        envVars.GASTOWN_API_URL = this.env.GASTOWN_API_URL;
       }
       if (this.env.KILO_API_URL) {
         envVars.KILO_API_URL = this.env.KILO_API_URL;
@@ -1427,26 +1504,33 @@ export class RigDO extends DurableObject<Env> {
       }
 
       const container = getTownContainerStub(this.env, config.townId);
-      const response = await container.fetch('http://container/merge', {
+      const response = await container.fetch('http://container/git/merge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          entry_id: entry.id,
+          rigId,
           branch: entry.branch,
-          bead_id: entry.bead_id,
-          agent_id: entry.agent_id,
-          pr_url: entry.pr_url,
+          targetBranch: config.defaultBranch,
+          gitUrl: config.gitUrl,
+          entryId: entry.id,
+          beadId: entry.bead_id,
+          agentId: entry.agent_id,
           envVars,
         }),
       });
 
       if (!response.ok) {
-        console.error(`Merge request failed for entry ${entry.id}: ${response.status}`);
+        console.error(
+          `${RIG_LOG} startMergeInContainer: merge request failed for entry ${entry.id}: ${response.status}`
+        );
         await this.completeReview(entry.id, 'failed');
       }
       // On success, the container will call back to completeReview when merge finishes
     } catch (err) {
-      console.error(`Failed to start merge for entry ${entry.id}:`, err);
+      console.error(
+        `${RIG_LOG} startMergeInContainer: failed to start merge for entry ${entry.id}:`,
+        err
+      );
       await this.completeReview(entry.id, 'failed');
     }
   }

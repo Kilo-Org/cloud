@@ -1426,7 +1426,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Replace a stranded volume whose host has no capacity (Fly 412).
    *
    * For existing instances (lastStartedAt set): forks the volume to preserve
-   * user data, falling back to a fresh volume if the fork fails.
+   * user data. If the fork fails, the error propagates to the caller.
    * For fresh provisions (never started): deletes and creates a new empty volume.
    *
    * Uses reversed FLY_REGION priority so we prefer different regions.

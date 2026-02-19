@@ -122,7 +122,7 @@ export function FreeTrialWarningBanner({
   onUpgradeClick,
 }: FreeTrialWarningBannerProps) {
   const state = getOrgTrialStatusFromDays(daysRemaining);
-  const planName = titleCase(organization.plan);
+  const planName = capitalize(organization.plan);
   const styles = getStylesForState(state, planName);
   const isOwner = userRole === 'owner';
   const buttonVariant = getButtonVariantForState(state);

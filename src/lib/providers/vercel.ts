@@ -1,4 +1,5 @@
 import type { BYOKResult } from '@/lib/byok';
+import { kiloFreeModels } from '@/lib/models';
 import { isAnthropicModel, isOpusModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import { minimax_m21_free_model, minimax_m25_free_model } from '@/lib/providers/minimax';
@@ -16,6 +17,12 @@ import type {
 } from '@/lib/providers/openrouter/types';
 import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
+
+// EMERGENCY SWITCH
+// This routes all models that normally would be routed to OpenRouter to Vercel instead.
+// Many of these models are not availble, named differently or not tested on Vercel.
+// Only use when OpenRouter is down and automatic failover is not working adequatly.
+const ENABLE_UNIVERSAL_VERCEL_ROUTING = false;
 
 const VERCEL_ROUTING_ALLOW_LIST = [
   'arcee-ai/trinity-large-preview:free',
@@ -52,6 +59,13 @@ async function getVercelRoutingPercentage() {
   return isOpenRouterErrorRateHigh ? 90 : 10;
 }
 
+function isOpenRouterModel(requestedModel: string) {
+  return (
+    (kiloFreeModels.find(m => m.public_id === requestedModel && m.is_enabled)?.gateway ??
+      'openrouter') === 'openrouter'
+  );
+}
+
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest,
@@ -62,6 +76,11 @@ export async function shouldRouteToVercel(
       `[shouldRouteToVercel] not routing to Vercel because data_collection=deny is not supported`
     );
     return false;
+  }
+
+  if (ENABLE_UNIVERSAL_VERCEL_ROUTING && isOpenRouterModel(requestedModel)) {
+    console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
+    return true;
   }
 
   if (!VERCEL_ROUTING_ALLOW_LIST.includes(requestedModel)) {

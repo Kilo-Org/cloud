@@ -44,6 +44,7 @@ import {
   ALARM_INTERVAL_IDLE_MS,
   ALARM_JITTER_MS,
   SELF_HEAL_THRESHOLD,
+  LIVE_CHECK_THROTTLE_MS,
 } from '../config';
 import type { FlyClientConfig } from '../fly/client';
 import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
@@ -127,6 +128,8 @@ function buildMachineConfig(
         ports: [{ port: 443, handlers: ['tls', 'http'] }],
         internal_port: OPENCLAW_PORT,
         protocol: 'tcp' as const,
+        autostart: false,
+        autostop: 'off',
       },
     ],
     mounts: flyVolumeId ? [{ volume: flyVolumeId, path: '/root' }] : [],
@@ -166,6 +169,15 @@ const METADATA_RECOVERY_COOLDOWN_MS = ALARM_INTERVAL_IDLE_MS;
 
 /** States that indicate the machine is dead and should be ignored for recovery. */
 const DEAD_STATES: ReadonlySet<FlyMachineState> = new Set(['destroyed', 'destroying']);
+
+/** Terminal non-running states for live check. Transitional states (starting, stopping, replacing)
+ *  are intentionally excluded to avoid UI flicker during normal operations. */
+const TERMINAL_STOPPED_STATES: ReadonlySet<string> = new Set([
+  'stopped',
+  'created',
+  'destroyed',
+  'suspended',
+]);
 
 /**
  * Priority order for picking a machine to recover.
@@ -241,6 +253,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private pendingDestroyMachineId: string | null = null;
   private pendingDestroyVolumeId: string | null = null;
   private lastMetadataRecoveryAt: number | null = null;
+
+  // In-memory only (not persisted to SQLite) — throttles live Fly checks in getStatus()
+  private lastLiveCheckAt: number | null = null;
 
   // ---- State loading ----
 
@@ -738,7 +753,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       try {
         await fly.stopMachineAndWait(flyConfig, this.flyMachineId);
       } catch (err) {
-        console.error('[DO] Failed to stop machine:', err);
+        if (!fly.isFlyNotFound(err)) {
+          // Real error — don't write 'stopped' when we don't know the actual state
+          throw err;
+        }
+        // 404 = machine already gone, safe to mark stopped
+        console.log('[DO] Machine already gone (404), marking stopped');
       }
     }
 
@@ -821,6 +841,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyRegion: string | null;
   }> {
     await this.loadState();
+
+    // Fire-and-forget live check: when DO thinks the machine is running, verify
+    // with Fly in the background. Updates in-memory state for the *next* poll.
+    // This keeps getStatus() latency consistently low (~0ms) instead of blocking
+    // on a Fly API round-trip (~1-5s) every throttle window.
+    if (
+      this.status === 'running' &&
+      this.flyMachineId &&
+      (this.lastLiveCheckAt === null || Date.now() - this.lastLiveCheckAt >= LIVE_CHECK_THROTTLE_MS)
+    ) {
+      this.lastLiveCheckAt = Date.now();
+      this.ctx.waitUntil(this.syncStatusFromLiveCheck());
+    }
 
     return {
       userId: this.userId,
@@ -1120,6 +1153,42 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           })
         );
       }
+    }
+  }
+
+  /**
+   * Lightweight live check called from getStatus() via waitUntil (fire-and-forget).
+   * Updates in-memory status only — the alarm loop owns persistence.
+   * Silently falls back to cached state on transient errors.
+   * lastLiveCheckAt is set by the caller before dispatching.
+   */
+  private async syncStatusFromLiveCheck(): Promise<void> {
+    try {
+      const flyConfig = this.getFlyConfig();
+      const machine = await fly.getMachine(flyConfig, this.flyMachineId!);
+
+      if (machine.state === 'started') {
+        // Confirmed running — reset in-memory fail count
+        this.healthCheckFailCount = 0;
+        return;
+      }
+
+      if (TERMINAL_STOPPED_STATES.has(machine.state)) {
+        console.log('[DO] Live check: Fly state is', machine.state, '— marking stopped in-memory');
+        this.status = 'stopped';
+      } else {
+        // Transitional state — leave status as running, reset fail count
+        this.healthCheckFailCount = 0;
+      }
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        // Machine gone (404) — flip in-memory status to stopped
+        console.log('[DO] Live check: machine 404 — marking stopped in-memory');
+        this.status = 'stopped';
+        return;
+      }
+      // Transient error — silently fall back to cached state
+      console.warn('[DO] Live check failed, using cached status:', err);
     }
   }
 

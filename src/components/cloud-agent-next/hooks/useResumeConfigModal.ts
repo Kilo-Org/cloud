@@ -16,7 +16,11 @@ export function buildStreamResumeConfig(params: {
   pendingResumeSession: DbSessionDetails | null;
   currentIndexedDbSession: IndexedDbSessionData | null;
 }): StreamResumeConfig | null {
-  const { resumeConfig, pendingResumeSession, currentIndexedDbSession } = params;
+  const {
+    resumeConfig,
+    pendingResumeSession: _pendingResumeSession,
+    currentIndexedDbSession,
+  } = params;
 
   // Local state takes priority (just configured in modal)
   if (resumeConfig) {

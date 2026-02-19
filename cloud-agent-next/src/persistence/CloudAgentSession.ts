@@ -1568,7 +1568,7 @@ export class CloudAgentSession extends DurableObject {
         metadata.gitToken = request.tokenOverrides.gitToken;
       }
 
-      const mode = (request.mode ?? metadata.mode ?? 'build') as ExecutionMode;
+      const mode = (request.mode ?? metadata.mode ?? 'code') as ExecutionMode;
       const model = normalizeKilocodeModel(request.model ?? metadata.model);
       if (!model) {
         return this.buildStartError(

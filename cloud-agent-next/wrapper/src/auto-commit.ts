@@ -103,7 +103,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     await opts.kiloClient.sendPromptAsync({
       sessionId: opts.kiloSessionId,
       prompt,
-      agent: 'build',
+      agent: 'code',
       model: opts.model ? { modelID: opts.model } : undefined,
     });
 

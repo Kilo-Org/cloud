@@ -51,8 +51,11 @@ type ResumeConfigModalProps = {
 };
 
 export const MODES = [
-  { value: 'build', label: 'Build' },
+  { value: 'code', label: 'Code' },
   { value: 'plan', label: 'Plan' },
+  { value: 'debug', label: 'Debug' },
+  { value: 'orchestrator', label: 'Orchestrator' },
+  { value: 'ask', label: 'Ask' },
 ] as const;
 
 /** Valid mode values for validation */
@@ -80,7 +83,7 @@ export function ResumeConfigModal({
   defaultModel,
 }: ResumeConfigModalProps) {
   // Form state
-  const [mode, setMode] = useState<ResumeConfig['mode']>(defaultMode || 'build');
+  const [mode, setMode] = useState<ResumeConfig['mode']>(defaultMode || 'code');
   const [model, setModel] = useState<string>(defaultModel || '');
   const [envVars, setEnvVars] = useState<Record<string, string>>({});
   const [setupCommands, setSetupCommands] = useState<string[]>([]);
@@ -88,7 +91,7 @@ export function ResumeConfigModal({
   // Sync mode when defaultMode prop changes (e.g., when session data loads or modal opens for different session)
   // Always sync to handle both truthy values and reset to fallback when undefined/null
   useEffect(() => {
-    setMode(defaultMode || 'build');
+    setMode(defaultMode || 'code');
   }, [defaultMode]);
 
   // Sync model when defaultModel prop changes (e.g., when session data loads or modal opens for different session)

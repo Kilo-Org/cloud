@@ -135,7 +135,7 @@ describe('streamKilocodeExecution', () => {
     const prompt = 'test prompt';
     const sessionContext = createSessionContext('/workspace/test');
     const events = await collectEvents(
-      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', prompt, {
+      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', prompt, {
         sessionId: 'session-123',
       })
     );
@@ -146,7 +146,7 @@ describe('streamKilocodeExecution', () => {
     );
     expect(mockExecStream).toHaveBeenCalledTimes(1);
     const command = mockExecStream.mock.calls[0]?.[0] as string;
-    expect(command).toContain('--mode=build');
+    expect(command).toContain('--mode=code');
     expect(command).toContain('--workspace=/workspace/test');
     expect(command).toContain('--json');
 
@@ -179,7 +179,7 @@ describe('streamKilocodeExecution', () => {
 
     const sessionContext = createSessionContext('/workspace/test');
     const { events, error } = await collectEventsUntilError(
-      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt')
+      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt')
     );
 
     expect(mockExecStream).toHaveBeenCalledTimes(1);
@@ -202,7 +202,7 @@ describe('streamKilocodeExecution', () => {
 
     const sessionContext = createSessionContext('/workspace/test');
     const { events, error } = await collectEventsUntilError(
-      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt')
+      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt')
     );
 
     expect(mockExecStream).toHaveBeenCalledTimes(1);
@@ -228,7 +228,7 @@ describe('streamKilocodeExecution', () => {
 
     const sessionContext = createSessionContext('/workspace/test');
     const events = await collectEvents(
-      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
         sessionId: 'stream-session',
       })
     );
@@ -262,7 +262,7 @@ describe('streamKilocodeExecution', () => {
 
     const sessionContext = createSessionContext('/workspace/test');
     const events = await collectEvents(
-      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt')
+      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt')
     );
 
     expect(mockExecStream).toHaveBeenCalledTimes(1);
@@ -319,7 +319,7 @@ describe('streamKilocodeExecution', () => {
 
     const sessionContext = createSessionContext('/workspace/test');
     const events = await collectEvents(
-      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt')
+      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt')
     );
 
     expect(mockExecStream).toHaveBeenCalledTimes(1);
@@ -371,7 +371,7 @@ describe('streamKilocodeExecution', () => {
 
     const sessionContext = createSessionContext('/workspace/test');
     const events = await collectEvents(
-      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt')
+      streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt')
     );
 
     expect(mockExecStream).toHaveBeenCalledTimes(1);
@@ -425,7 +425,7 @@ describe('streamKilocodeExecution', () => {
           mockSandbox,
           mockSession,
           sessionContext,
-          'build',
+          'code',
           'test prompt',
           options
         )
@@ -464,7 +464,7 @@ describe('streamKilocodeExecution', () => {
         mockSandbox,
         mockSession,
         sessionContext,
-        'build',
+        'code',
         'prompt',
         undefined,
         fakeEnv
@@ -493,7 +493,7 @@ describe('streamKilocodeExecution', () => {
         mockSandbox,
         mockSession,
         sessionContext,
-        'build',
+        'code',
         'prompt',
         { kiloSessionId, isFirstExecution: false },
         fakeEnv
@@ -521,7 +521,7 @@ describe('streamKilocodeExecution', () => {
         mockSandbox,
         mockSession,
         sessionContext,
-        'build',
+        'code',
         'prompt',
         { isFirstExecution: true },
         fakeEnv
@@ -570,7 +570,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-terminal',
         })
       );
@@ -636,7 +636,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-payment',
         })
       );
@@ -688,7 +688,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-payment-title',
         })
       );
@@ -729,7 +729,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt')
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt')
       );
 
       // Should have attempted to list and kill processes
@@ -776,7 +776,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt')
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt')
       );
 
       // Should have listed processes but not killed any
@@ -815,7 +815,7 @@ describe('streamKilocodeExecution', () => {
         mockSandbox,
         mockSession,
         sessionContext,
-        'build',
+        'code',
         'test prompt'
       );
 
@@ -861,7 +861,7 @@ describe('streamKilocodeExecution', () => {
           mockSandbox,
           mockSession,
           sessionContext,
-          'build',
+          'code',
           'prompt',
           { skipInterruptPolling: true },
           fakeEnv
@@ -896,7 +896,7 @@ describe('streamKilocodeExecution', () => {
           mockSandbox,
           mockSession,
           sessionContext,
-          'build',
+          'code',
           'prompt',
           { skipInterruptPolling: true },
           fakeEnv
@@ -935,7 +935,7 @@ describe('streamKilocodeExecution', () => {
           mockSandbox,
           mockSession,
           sessionContext,
-          'build',
+          'code',
           'prompt',
           { skipInterruptPolling: true },
           fakeEnv
@@ -975,7 +975,7 @@ describe('streamKilocodeExecution', () => {
           mockSandbox,
           mockSession,
           sessionContext,
-          'build',
+          'code',
           'prompt',
           { skipInterruptPolling: true },
           fakeEnv
@@ -1009,7 +1009,7 @@ describe('streamKilocodeExecution', () => {
       const sessionContext = createSessionContext('/workspace/test');
       // No env provided - should not throw
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'prompt')
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'prompt')
       );
 
       // Should still emit the session_created event as a kilocode event
@@ -1042,7 +1042,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-rpc-test',
         })
       );
@@ -1065,7 +1065,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-network-test',
         })
       );
@@ -1087,7 +1087,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-container-test',
         })
       );
@@ -1109,7 +1109,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-deployment-test',
         })
       );
@@ -1131,7 +1131,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-do-storage-test',
         })
       );
@@ -1153,7 +1153,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const events = await collectEvents(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-generic-rpc-test',
         })
       );
@@ -1175,7 +1175,7 @@ describe('streamKilocodeExecution', () => {
 
       const sessionContext = createSessionContext('/workspace/test');
       const { events, error } = await collectEventsUntilError(
-        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'build', 'test prompt', {
+        streamKilocodeExecution(mockSandbox, mockSession, sessionContext, 'code', 'test prompt', {
           sessionId: 'session-unrelated-test',
         })
       );
@@ -1197,7 +1197,7 @@ describe('streamKilocodeExecution', () => {
           mockSandbox,
           mockSession,
           sessionContext,
-          'build',
+          'code',
           'test prompt'
           // No options provided
         )

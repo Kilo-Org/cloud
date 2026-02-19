@@ -16,7 +16,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns false when resumeConfig is provided', () => {
     const resumeConfig: ResumeConfig = {
-      mode: 'build',
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
     };
 
@@ -32,7 +32,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns false when streamResumeConfig is provided', () => {
     const streamResumeConfig: StreamResumeConfig = {
-      mode: 'build',
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
       githubRepo: 'owner/repo',
     };
@@ -49,7 +49,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns true for CLI session without valid config', () => {
     const invalidConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: '', // Empty model is invalid
       repository: '',
       sessionId: '',
@@ -67,7 +67,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns false for web session with valid config', () => {
     const validConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
       repository: 'owner/repo',
       sessionId: 'agent_xyz',
@@ -85,7 +85,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns true for legacy web session with invalid config (empty model)', () => {
     const invalidConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: '', // Legacy sessions may have empty model
       repository: '',
       sessionId: '',
@@ -132,12 +132,12 @@ describe('needsResumeConfiguration', () => {
 
   it('prioritizes resumeConfig over invalid sessionConfig', () => {
     const resumeConfig: ResumeConfig = {
-      mode: 'build',
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
     };
 
     const invalidConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: '', // Invalid
       repository: '',
       sessionId: '',
@@ -155,13 +155,13 @@ describe('needsResumeConfiguration', () => {
 
   it('prioritizes streamResumeConfig over invalid sessionConfig', () => {
     const streamResumeConfig: StreamResumeConfig = {
-      mode: 'build',
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
       githubRepo: 'owner/repo',
     };
 
     const invalidConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: '', // Invalid
       repository: '',
       sessionId: '',

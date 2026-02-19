@@ -34,7 +34,7 @@ describe('CloudAgentSession.startExecutionV2', () => {
       const activeId = 'exc_active' as ExecutionId;
       await instance.addExecution({
         executionId: activeId,
-        mode: 'build',
+        mode: 'code',
         streamingMode: 'websocket',
         ingestToken: activeId,
       });
@@ -45,7 +45,7 @@ describe('CloudAgentSession.startExecutionV2', () => {
         userId,
         authToken: 'token-init',
         prompt: 'do the thing',
-        mode: 'build',
+        mode: 'code',
         model: 'test-model',
         gitUrl: 'https://example.com/repo.git',
         gitToken: 'git-token',
@@ -84,7 +84,7 @@ describe('CloudAgentSession.startExecutionV2', () => {
         orgId: 'org_test',
         kiloSessionId: '88888888-8888-4888-8888-888888888888',
         prompt: 'prepared prompt',
-        mode: 'build',
+        mode: 'code',
         model: 'test-model',
         kilocodeToken: 'token-followup',
         gitUrl: 'https://example.com/repo.git',

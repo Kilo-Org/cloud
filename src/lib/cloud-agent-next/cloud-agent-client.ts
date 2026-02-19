@@ -63,11 +63,19 @@ export type CallbackTarget = {
 
 /**
  * Agent modes accepted by the API.
- * - plan, architect, ask: Planning/analysis mode
- * - code, build, orchestrator: Code generation mode
+ * - code, plan, debug, orchestrator, ask: CLI agent modes
+ * - build, architect: Backward-compatible aliases (build → code, architect → plan)
  * - custom: Custom mode (requires appendSystemPrompt)
  */
-export type AgentMode = 'plan' | 'code' | 'build' | 'orchestrator' | 'architect' | 'ask' | 'custom';
+export type AgentMode =
+  | 'code'
+  | 'plan'
+  | 'debug'
+  | 'orchestrator'
+  | 'ask'
+  | 'build'
+  | 'architect'
+  | 'custom';
 
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = {
@@ -117,7 +125,7 @@ export type InitiateFromPreparedSessionInput = {
 export type SendMessageInput = {
   cloudAgentSessionId: string;
   prompt: string;
-  mode: 'plan' | 'build';
+  mode: 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
   model: string;
   autoCommit?: boolean;
   githubToken?: string;

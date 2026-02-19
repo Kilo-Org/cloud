@@ -85,7 +85,7 @@ const MODE_TO_MODEL = new Map<string, string>([
 const DEFAULT_AUTO_MODEL = SONNET;
 
 function resolveAutoModel(modeHeader: string | null) {
-  const mode = modeHeader?.trim().toLowerCase() ?? 'build';
+  const mode = modeHeader?.trim().toLowerCase() ?? 'code';
   return MODE_TO_MODEL.get(mode) ?? DEFAULT_AUTO_MODEL;
 }
 

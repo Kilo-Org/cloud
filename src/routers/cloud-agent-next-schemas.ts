@@ -8,17 +8,18 @@ import * as z from 'zod';
 
 /**
  * Agent mode enum - all supported modes.
- * - plan, architect, ask: Planning/analysis mode
- * - code, build, orchestrator: Code generation mode
+ * - code, plan, debug, orchestrator, ask: CLI agent modes
+ * - build, architect: Backward-compatible aliases (build → code, architect → plan)
  * - custom: Custom mode (requires appendSystemPrompt)
  */
 export const agentModeNextSchema = z.enum([
-  'plan',
   'code',
-  'build',
+  'plan',
+  'debug',
   'orchestrator',
-  'architect',
   'ask',
+  'build',
+  'architect',
   'custom',
 ]);
 
@@ -113,7 +114,7 @@ export const baseInitiateFromPreparedSessionNextSchema = z.object({
 });
 
 // Agent mode for sendMessage (excludes custom - use prepareSession/updateSession for custom mode)
-export const agentModeSendMessageSchema = z.enum(['plan', 'build']);
+export const agentModeSendMessageSchema = z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask']);
 
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 // Note: custom mode is not allowed for sendMessage - use prepareSession/updateSession instead

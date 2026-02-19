@@ -93,7 +93,7 @@ describe('needsResumeConfigModal', () => {
 
     const indexedDbSession = createIndexedDbSession({
       resumeConfig: {
-        mode: 'build',
+        mode: 'code',
         model: 'anthropic/claude-3-5-sonnet',
       },
     });
@@ -168,7 +168,7 @@ describe('buildStreamResumeConfig', () => {
 
     const result = buildStreamResumeConfig({
       resumeConfig: {
-        mode: 'build',
+        mode: 'code',
         model: 'local-model',
         envVars: { API_KEY: 'secret' },
       },
@@ -177,7 +177,7 @@ describe('buildStreamResumeConfig', () => {
     });
 
     expect(result).toEqual({
-      mode: 'build',
+      mode: 'code',
       model: 'local-model',
       envVars: { API_KEY: 'secret' },
       setupCommands: undefined,

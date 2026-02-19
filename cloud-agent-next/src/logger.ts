@@ -14,7 +14,7 @@ export type CloudAgentTags = {
   inflightId?: string;
 
   // Execution context
-  mode?: 'plan' | 'code' | 'build' | 'orchestrator' | 'architect' | 'ask' | 'custom';
+  mode?: 'plan' | 'code' | 'debug' | 'build' | 'orchestrator' | 'architect' | 'ask' | 'custom';
   model?: string;
   isResume?: boolean;
 

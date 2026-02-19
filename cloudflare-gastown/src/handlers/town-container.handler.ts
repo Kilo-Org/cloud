@@ -143,12 +143,12 @@ export async function handleContainerStreamTicket(
     return c.json(resError('Unexpected container response'), 502);
   }
 
-  // Construct the stream URL. The frontend connects to this URL via EventSource.
-  // Use the request's origin so it works in both dev and production.
-  const origin = new URL(c.req.url).origin;
-  const streamUrl = `${origin}/api/towns/${params.townId}/container/agents/${params.agentId}/stream`;
+  // Return just the path — the caller (tRPC router on the Next.js server)
+  // constructs the full WS URL using its known GASTOWN_SERVICE_URL, which
+  // resolves to the correct host in both local dev and production.
+  const streamPath = `/api/towns/${params.townId}/container/agents/${params.agentId}/stream`;
 
-  return c.json(resSuccess({ url: streamUrl, ticket: parsed.data.ticket }), 200);
+  return c.json(resSuccess({ url: streamPath, ticket: parsed.data.ticket }), 200);
 }
 
 /**

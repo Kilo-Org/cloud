@@ -6,7 +6,7 @@
  * via HTTP, not stdin.
  */
 
-import type { ManagedAgent, StartAgentRequest, KiloSSEEventData } from './types';
+import type { ManagedAgent, StartAgentRequest, KiloSSEEventData, KiloSSEEvent } from './types';
 import {
   ensureServer,
   registerSession,
@@ -20,6 +20,58 @@ import { reportAgentCompleted } from './completion-reporter';
 
 const agents = new Map<string, ManagedAgent>();
 const sseConsumers = new Map<string, SSEConsumer>();
+
+// ── Event buffer for HTTP polling ─────────────────────────────────────────
+// Each agent keeps a ring buffer of recent events. The DO polls
+// GET /agents/:agentId/events?after=N to retrieve them.
+
+type BufferedEvent = {
+  id: number;
+  event: string;
+  data: KiloSSEEventData;
+  timestamp: string;
+};
+
+const MAX_BUFFERED_EVENTS = 500;
+const agentEventBuffers = new Map<string, BufferedEvent[]>();
+let nextEventId = 1;
+
+function bufferAgentEvent(agentId: string, event: KiloSSEEvent): void {
+  let buf = agentEventBuffers.get(agentId);
+  if (!buf) {
+    buf = [];
+    agentEventBuffers.set(agentId, buf);
+  }
+  buf.push({
+    id: nextEventId++,
+    event: event.event,
+    data: event.data,
+    timestamp: new Date().toISOString(),
+  });
+  // Trim to cap
+  if (buf.length > MAX_BUFFERED_EVENTS) {
+    buf.splice(0, buf.length - MAX_BUFFERED_EVENTS);
+  }
+}
+
+/**
+ * Get buffered events for an agent, optionally after a given event id.
+ * Returns events ordered by id ascending.
+ */
+export function getAgentEvents(agentId: string, afterId = 0): BufferedEvent[] {
+  const buf = agentEventBuffers.get(agentId);
+  if (!buf) return [];
+  return buf.filter(e => e.id > afterId);
+}
+
+// Clean up stale event buffers after the DO has had time to poll final events.
+const EVENT_BUFFER_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function scheduleEventBufferCleanup(agentId: string): void {
+  setTimeout(() => {
+    agentEventBuffers.delete(agentId);
+  }, EVENT_BUFFER_TTL_MS);
+}
 
 const startTime = Date.now();
 
@@ -93,10 +145,18 @@ export async function startAgent(
           }
         }
 
+        // Buffer for HTTP polling by the DO
+        bufferAgentEvent(request.agentId, evt);
+
         // Detect completion
         if (isCompletionEvent(evt)) {
           agent.status = 'exited';
           agent.exitReason = 'completed';
+          bufferAgentEvent(request.agentId, {
+            event: 'agent.exited',
+            data: { type: 'agent.exited', properties: { reason: 'completed' } },
+          });
+          scheduleEventBufferCleanup(request.agentId);
           void reportAgentCompleted(agent, 'completed');
         }
       },
@@ -107,6 +167,11 @@ export async function startAgent(
         if (agent.status === 'running') {
           agent.status = 'failed';
           agent.exitReason = `SSE stream closed: ${reason}`;
+          bufferAgentEvent(request.agentId, {
+            event: 'agent.exited',
+            data: { type: 'agent.exited', properties: { reason: `stream closed: ${reason}` } },
+          });
+          scheduleEventBufferCleanup(request.agentId);
           void reportAgentCompleted(agent, 'failed', reason);
         }
       },
@@ -187,6 +252,13 @@ export async function stopAgent(agentId: string): Promise<void> {
 
   agent.status = 'exited';
   agent.exitReason = 'stopped';
+
+  // Buffer exit event for polling
+  bufferAgentEvent(agentId, {
+    event: 'agent.exited',
+    data: { type: 'agent.exited', properties: { reason: 'stopped' } },
+  });
+  scheduleEventBufferCleanup(agentId);
 }
 
 /**

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import * as gastown from '@/lib/gastown/gastown-client';
 import { GastownApiError } from '@/lib/gastown/gastown-client';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { GASTOWN_SERVICE_URL } from '@/lib/config.server';
 
 const LOG_PREFIX = '[gastown-router]';
 
@@ -246,7 +247,18 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
 
-      return withGastownError(() => gastown.getStreamTicket(input.townId, input.agentId));
+      const ticket = await withGastownError(() =>
+        gastown.getStreamTicket(input.townId, input.agentId)
+      );
+
+      // The gastown worker returns a relative path. Construct the full
+      // WebSocket URL using GASTOWN_SERVICE_URL so the browser connects
+      // directly to the gastown worker (not the Next.js server).
+      const baseUrl = new URL(GASTOWN_SERVICE_URL ?? 'http://localhost:8787');
+      const wsProtocol = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+      const fullUrl = `${wsProtocol}//${baseUrl.host}${ticket.url}`;
+
+      return { ...ticket, url: fullUrl };
     }),
 
   // ── Deletes ────────────────────────────────────────────────────────────

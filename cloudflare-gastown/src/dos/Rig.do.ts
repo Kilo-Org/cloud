@@ -8,6 +8,12 @@ import {
   ReviewQueueRecord,
 } from '../db/tables/review-queue.table';
 import { createTableMolecules } from '../db/tables/molecules.table';
+import {
+  createTableAgentEvents,
+  getIndexesAgentEvents,
+  agentEvents,
+  AgentEventRecord,
+} from '../db/tables/agent-events.table';
 import { getTownContainerStub } from './TownContainer.do';
 import { query } from '../util/query.util';
 import { signAgentJWT } from '../util/jwt.util';
@@ -104,6 +110,11 @@ export class RigDO extends DurableObject<Env> {
 
     query(this.sql, createTableReviewQueue(), []);
     query(this.sql, createTableMolecules(), []);
+
+    query(this.sql, createTableAgentEvents(), []);
+    for (const idx of getIndexesAgentEvents()) {
+      query(this.sql, idx, []);
+    }
   }
 
   // ── Beads ──────────────────────────────────────────────────────────────
@@ -449,6 +460,76 @@ export class RigDO extends DurableObject<Env> {
     const agent = this.getAgent(agentId);
     if (!agent?.current_hook_bead_id) return null;
     return this.getBead(agent.current_hook_bead_id);
+  }
+
+  // ── Agent Events (append-only log for streaming) ────────────────────────
+
+  /** Max events kept per agent. Older events are pruned on insert. */
+  private static readonly MAX_EVENTS_PER_AGENT = 2000;
+
+  /**
+   * Append an event to the agent's event log. Used by the container
+   * completion callback or the streaming proxy to persist events for
+   * late-joining clients.
+   */
+  async appendAgentEvent(agentId: string, eventType: string, data: unknown): Promise<void> {
+    await this.ensureInitialized();
+    const timestamp = now();
+    const dataJson = JSON.stringify(data ?? {});
+
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${agentEvents} (
+          ${agentEvents.columns.agent_id},
+          ${agentEvents.columns.event_type},
+          ${agentEvents.columns.data},
+          ${agentEvents.columns.created_at}
+        ) VALUES (?, ?, ?, ?)`,
+      [agentId, eventType, dataJson, timestamp]
+    );
+
+    // Prune old events beyond the cap
+    query(
+      this.sql,
+      /* sql */ `
+        DELETE FROM ${agentEvents}
+        WHERE ${agentEvents.agent_id} = ?
+          AND ${agentEvents.id} NOT IN (
+            SELECT ${agentEvents.id} FROM ${agentEvents}
+            WHERE ${agentEvents.agent_id} = ?
+            ORDER BY ${agentEvents.id} DESC
+            LIMIT ?
+          )`,
+      [agentId, agentId, RigDO.MAX_EVENTS_PER_AGENT]
+    );
+  }
+
+  /**
+   * Get agent events, optionally after a given event id (for catch-up).
+   * Returns events ordered by id ascending.
+   */
+  async getAgentEvents(
+    agentId: string,
+    afterId?: number,
+    limit = 200
+  ): Promise<AgentEventRecord[]> {
+    await this.ensureInitialized();
+
+    const rows = query(
+      this.sql,
+      /* sql */ `
+        SELECT ${agentEvents.id}, ${agentEvents.agent_id}, ${agentEvents.event_type},
+               ${agentEvents.data}, ${agentEvents.created_at}
+        FROM ${agentEvents}
+        WHERE ${agentEvents.agent_id} = ?
+          AND (? IS NULL OR ${agentEvents.id} > ?)
+        ORDER BY ${agentEvents.id} ASC
+        LIMIT ?`,
+      [agentId, afterId ?? null, afterId ?? null, limit]
+    );
+
+    return AgentEventRecord.array().parse(rows);
   }
 
   // ── Mail ───────────────────────────────────────────────────────────────

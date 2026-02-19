@@ -8,14 +8,12 @@ import {
   activeServerCount,
   getUptime,
   stopAll,
+  getAgentEvents,
 } from './process-manager';
 import { startHeartbeat, stopHeartbeat } from './heartbeat';
 import { StartAgentRequest, StopAgentRequest, SendMessageRequest } from './types';
 import type { AgentStatusResponse, HealthResponse, StreamTicketResponse } from './types';
 
-// TODO: Add a WebSocket consumer endpoint (GET /agents/:agentId/stream) that
-// validates and consumes tickets. Until then, tickets are only used as a
-// placeholder for the upcoming streaming implementation.
 const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
@@ -96,12 +94,25 @@ app.get('/agents/:agentId/status', c => {
   return c.json(response);
 });
 
+// GET /agents/:agentId/events?after=N
+// Returns buffered events for the agent, optionally after a given event id.
+// Used by the TownContainerDO to poll for events and relay them to WebSocket clients.
+// Does NOT 404 for unknown agents — returns an empty array so the poller
+// can keep trying while the agent is starting up.
+app.get('/agents/:agentId/events', c => {
+  const { agentId } = c.req.param();
+  const afterParam = c.req.query('after');
+  const afterId = afterParam ? parseInt(afterParam, 10) : 0;
+  const events = getAgentEvents(agentId, afterId);
+  return c.json({ events });
+});
+
 // POST /agents/:agentId/stream-ticket
+// Issues a one-time-use stream ticket for the agent. Does NOT require
+// the agent to be registered yet — tickets can be issued optimistically
+// so the frontend can connect a WebSocket before the agent finishes starting.
 app.post('/agents/:agentId/stream-ticket', c => {
   const { agentId } = c.req.param();
-  if (!getAgentStatus(agentId)) {
-    return c.json({ error: `Agent ${agentId} not found` }, 404);
-  }
 
   const ticket = crypto.randomUUID();
   const expiresAt = Date.now() + 60_000;
@@ -122,6 +133,18 @@ app.post('/agents/:agentId/stream-ticket', c => {
   };
   return c.json(response);
 });
+
+/**
+ * Validate a stream ticket and return the associated agentId, consuming it.
+ * Returns null if the ticket is invalid or expired.
+ */
+export function consumeStreamTicket(ticket: string): string | null {
+  const entry = streamTickets.get(ticket);
+  if (!entry) return null;
+  streamTickets.delete(ticket);
+  if (entry.expiresAt < Date.now()) return null;
+  return entry.agentId;
+}
 
 // Catch-all
 app.notFound(c => c.json({ error: 'Not found' }, 404));

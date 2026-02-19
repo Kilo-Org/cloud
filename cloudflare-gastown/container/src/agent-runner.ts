@@ -1,4 +1,5 @@
-import { chmod, writeFile } from 'node:fs/promises';
+import type { Config } from '@opencode-ai/sdk';
+import { writeFile } from 'node:fs/promises';
 import { cloneRepo, createWorktree } from './git-manager';
 import { startAgent } from './process-manager';
 import type { ManagedAgent, StartAgentRequest } from './types';
@@ -36,7 +37,7 @@ function buildKiloConfigContent(kilocodeToken: string): string {
     // Override the title agent to use a valid model (same as small_model).
     // kilo serve v1.0.23 resolves title model independently and the
     // small_model fallback doesn't prevent ProviderModelNotFoundError.
-    agents: {
+    agent: {
       title: {
         model: 'anthropic/claude-haiku-4.5',
       },
@@ -44,9 +45,13 @@ function buildKiloConfigContent(kilocodeToken: string): string {
     // Auto-approve everything — agents run headless in a container,
     // there's no human to answer permission prompts.
     permission: {
-      '*': 'allow',
+      edit: 'allow',
+      bash: 'allow',
+      webfetch: 'allow',
+      doom_loop: 'allow',
+      external_directory: 'allow',
     },
-  });
+  } satisfies Config);
 }
 
 function buildAgentEnv(request: StartAgentRequest): Record<string, string> {

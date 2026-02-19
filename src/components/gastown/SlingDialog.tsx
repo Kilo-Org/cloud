@@ -46,9 +46,9 @@ export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
   const sling = useMutation(
     trpc.gastown.sling.mutationOptions({
       onSuccess: result => {
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.listAgents.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.getRig.queryKey() });
+        void queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey() });
+        void queryClient.invalidateQueries({ queryKey: trpc.gastown.listAgents.queryKey() });
+        void queryClient.invalidateQueries({ queryKey: trpc.gastown.getRig.queryKey() });
         toast.success(`Work slung to ${result.agent.name}`);
         setTitle('');
         setBody('');
@@ -74,23 +74,24 @@ export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
         <DialogHeader>
           <DialogTitle>Sling Work</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-300">Title</label>
+              <label className="mb-2 block text-sm font-medium text-white/70">Title</label>
               <Input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="What needs to be done?"
                 autoFocus
+                className="border-white/10 bg-black/25"
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-300">
+              <label className="mb-2 block text-sm font-medium text-white/70">
                 Description (optional)
               </label>
               <Textarea
@@ -98,10 +99,11 @@ export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
                 onChange={e => setBody(e.target.value)}
                 placeholder="Additional context or requirements..."
                 rows={4}
+                className="border-white/10 bg-black/25"
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-300">Model</label>
+              <label className="mb-2 block text-sm font-medium text-white/70">Model</label>
               <Select value={model} onValueChange={setModel}>
                 <SelectTrigger>
                   <SelectValue />
@@ -125,6 +127,7 @@ export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
               size="md"
               type="submit"
               disabled={!title.trim() || sling.isPending}
+              className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
             >
               {sling.isPending ? 'Slinging...' : 'Sling'}
             </Button>

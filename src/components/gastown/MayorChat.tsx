@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,7 +25,9 @@ function SessionStatusBadge({ status }: { status: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        isActive ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-400'
+        isActive
+          ? 'bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-400/20'
+          : 'bg-white/5 text-white/55 ring-1 ring-white/10'
       }`}
     >
       <Radio className={`size-2.5 ${isActive ? 'animate-pulse' : ''}`} />
@@ -53,7 +55,7 @@ export function MayorChat({ townId }: MayorChatProps) {
   const sendMessage = useMutation(
     trpc.gastown.sendMessage.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({
+        void queryClient.invalidateQueries({
           queryKey: trpc.gastown.getMayorStatus.queryKey(),
         });
         toast.success('Message sent to Mayor');
@@ -98,13 +100,13 @@ export function MayorChat({ townId }: MayorChatProps) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-gray-700">
+      <Card className="border-white/10 bg-transparent shadow-none">
         <CardContent className="p-4">
           {/* Status indicator */}
           {session && (
             <div className="mb-3 flex items-center justify-between text-sm">
               <SessionStatusBadge status={session.status} />
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-white/45">
                 Last activity: {new Date(session.lastActivityAt).toLocaleTimeString()}
               </span>
             </div>
@@ -117,14 +119,14 @@ export function MayorChat({ townId }: MayorChatProps) {
               onChange={e => setMessage(e.target.value)}
               placeholder="Send a message to the Mayor..."
               disabled={sendMessage.isPending}
-              className="flex-1"
+              className="flex-1 border-white/10 bg-black/25"
             />
             <Button
               variant="primary"
               size="md"
               type="submit"
               disabled={!message.trim() || sendMessage.isPending}
-              className="gap-2"
+              className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
             >
               <Send className="size-4" />
               {sendMessage.isPending ? 'Sending...' : 'Send'}

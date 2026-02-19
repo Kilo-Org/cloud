@@ -16,6 +16,18 @@ const GastownErrorResponse = z.object({
 // ── Domain schemas ────────────────────────────────────────────────────────
 // Mirror the gastown worker's record schemas for validation at the IO boundary.
 
+function parseJsonOrIssue(v: string, ctx: z.RefinementCtx, label: string): unknown {
+  try {
+    return JSON.parse(v) as unknown;
+  } catch {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${label} is not valid JSON`,
+    });
+    return z.NEVER;
+  }
+}
+
 export const TownSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -50,14 +62,14 @@ export const BeadSchema = z.object({
     z.array(z.string()),
     z
       .string()
-      .transform(v => JSON.parse(v))
+      .transform((v, ctx) => parseJsonOrIssue(v, ctx, 'labels'))
       .pipe(z.array(z.string())),
   ]),
   metadata: z.union([
     z.record(z.string(), z.unknown()),
     z
       .string()
-      .transform(v => JSON.parse(v))
+      .transform((v, ctx) => parseJsonOrIssue(v, ctx, 'metadata'))
       .pipe(z.record(z.string(), z.unknown())),
   ]),
   created_at: z.string(),
@@ -314,6 +326,60 @@ export async function deleteBead(rigId: string, beadId: string): Promise<void> {
 
 export async function deleteAgent(rigId: string, agentId: string): Promise<void> {
   await gastownFetch(`/api/rigs/${rigId}/agents/${agentId}`, { method: 'DELETE' });
+}
+
+// ── Event operations ──────────────────────────────────────────────────────
+
+export const BeadEventSchema = z.object({
+  id: z.string(),
+  bead_id: z.string(),
+  agent_id: z.string().nullable(),
+  event_type: z.string(),
+  old_value: z.string().nullable(),
+  new_value: z.string().nullable(),
+  metadata: z.union([
+    z.record(z.string(), z.unknown()),
+    z
+      .string()
+      .transform((v, ctx) => parseJsonOrIssue(v, ctx, 'event metadata'))
+      .pipe(z.record(z.string(), z.unknown())),
+  ]),
+  created_at: z.string(),
+});
+export type BeadEvent = z.output<typeof BeadEventSchema>;
+
+export const TaggedBeadEventSchema = BeadEventSchema.extend({
+  rig_id: z.string(),
+  rig_name: z.string(),
+});
+export type TaggedBeadEvent = z.output<typeof TaggedBeadEventSchema>;
+
+export async function listBeadEvents(
+  rigId: string,
+  options?: { beadId?: string; since?: string; limit?: number }
+): Promise<BeadEvent[]> {
+  const params = new URLSearchParams();
+  if (options?.beadId) params.set('bead_id', options.beadId);
+  if (options?.since) params.set('since', options.since);
+  if (options?.limit) params.set('limit', String(options.limit));
+  const qs = params.toString();
+  const path = `/api/rigs/${rigId}/events${qs ? `?${qs}` : ''}`;
+  const body = await gastownFetch(path);
+  return parseSuccessData(body, BeadEventSchema.array());
+}
+
+export async function listTownEvents(
+  userId: string,
+  townId: string,
+  options?: { since?: string; limit?: number }
+): Promise<TaggedBeadEvent[]> {
+  const params = new URLSearchParams();
+  if (options?.since) params.set('since', options.since);
+  if (options?.limit) params.set('limit', String(options.limit));
+  const qs = params.toString();
+  const path = `/api/users/${userId}/towns/${townId}/events${qs ? `?${qs}` : ''}`;
+  const body = await gastownFetch(path);
+  return parseSuccessData(body, TaggedBeadEventSchema.array());
 }
 
 // ── Container operations (via Town Container DO) ──────────────────────────

@@ -261,6 +261,49 @@ export const gastownRouter = createTRPCRouter({
       return { ...ticket, url: fullUrl };
     }),
 
+  // ── Events ─────────────────────────────────────────────────────────────
+
+  getBeadEvents: baseProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        beadId: z.string().uuid().optional(),
+        since: z.string().optional(),
+        limit: z.number().int().positive().max(500).default(100),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      return withGastownError(() =>
+        gastown.listBeadEvents(input.rigId, {
+          beadId: input.beadId,
+          since: input.since,
+          limit: input.limit,
+        })
+      );
+    }),
+
+  getTownEvents: baseProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        since: z.string().optional(),
+        limit: z.number().int().positive().max(500).default(100),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      return withGastownError(() =>
+        gastown.listTownEvents(ctx.user.id, input.townId, {
+          since: input.since,
+          limit: input.limit,
+        })
+      );
+    }),
+
   // ── Deletes ────────────────────────────────────────────────────────────
 
   deleteTown: baseProcedure

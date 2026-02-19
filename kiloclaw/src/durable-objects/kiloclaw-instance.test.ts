@@ -78,7 +78,6 @@ import {
   ALARM_INTERVAL_IDLE_MS,
   ALARM_JITTER_MS,
   SELF_HEAL_THRESHOLD,
-  LIVE_CHECK_THROTTLE_MS,
 } from '../config';
 
 // ============================================================================

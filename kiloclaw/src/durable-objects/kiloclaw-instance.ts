@@ -1163,9 +1163,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * lastLiveCheckAt is set by the caller before dispatching.
    */
   private async syncStatusFromLiveCheck(): Promise<void> {
+    if (!this.flyMachineId) return;
+
     try {
       const flyConfig = this.getFlyConfig();
-      const machine = await fly.getMachine(flyConfig, this.flyMachineId!);
+      const machine = await fly.getMachine(flyConfig, this.flyMachineId);
 
       if (machine.state === 'started') {
         // Confirmed running — reset in-memory fail count

@@ -307,6 +307,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
       mode: 'ask' as const, // Classification is a Q&A task
       model: config.model_slug,
       githubToken,
+      createdOnPlatform: 'auto-triage',
     };
 
     // Use CloudAgentClient to initiate session

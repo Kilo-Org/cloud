@@ -32,8 +32,19 @@ vi.mock('../fly/apps', async () => {
   };
 });
 
+// -- Mock fly/secrets --
+vi.mock('../fly/secrets', () => ({
+  setAppSecret: vi.fn().mockResolvedValue({ version: 1 }),
+}));
+
+// -- Mock utils/env-encryption (deterministic key for testing) --
+vi.mock('../utils/env-encryption', () => ({
+  generateEnvKey: vi.fn().mockReturnValue('dGVzdC1rZXktMzItYnl0ZXMtcGFkZGVkLi4uLg=='),
+}));
+
 import { KiloClawApp } from './kiloclaw-app';
 import * as appsClient from '../fly/apps';
+import * as secretsClient from '../fly/secrets';
 import { FlyApiError } from '../fly/client';
 
 // ============================================================================
@@ -108,7 +119,7 @@ beforeEach(() => {
 });
 
 describe('ensureApp', () => {
-  it('creates app and allocates both IPs on first call', async () => {
+  it('creates app, allocates both IPs, and sets env key on first call', async () => {
     const { appDO, storage } = createAppDO();
 
     const result = await appDO.ensureApp('user-1');
@@ -117,13 +128,23 @@ describe('ensureApp', () => {
     expect(appsClient.createApp).toHaveBeenCalledWith(
       { apiToken: 'test-token' },
       result.appName,
-      'test-org'
+      'test-org',
+      'user-1',
+      'kiloclaw_user_id'
     );
     expect(appsClient.allocateIP).toHaveBeenCalledTimes(2);
     expect(appsClient.allocateIP).toHaveBeenCalledWith('test-token', result.appName, 'v6');
     expect(appsClient.allocateIP).toHaveBeenCalledWith('test-token', result.appName, 'shared_v4');
     expect(storage._store.get('ipv4Allocated')).toBe(true);
     expect(storage._store.get('ipv6Allocated')).toBe(true);
+    // Env key was set
+    expect(secretsClient.setAppSecret).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: result.appName },
+      'KILOCLAW_ENV_KEY',
+      expect.any(String)
+    );
+    expect(storage._store.get('envKeySet')).toBe(true);
+    expect(storage._store.get('envKey')).toBeTruthy();
   });
 
   it('skips creation if app already exists', async () => {
@@ -147,6 +168,7 @@ describe('ensureApp', () => {
     expect(appsClient.createApp).not.toHaveBeenCalled();
     expect(appsClient.getApp).not.toHaveBeenCalled();
     expect(appsClient.allocateIP).not.toHaveBeenCalled();
+    expect(secretsClient.setAppSecret).not.toHaveBeenCalled();
   });
 
   it('resumes from partial state — IPv6 done, IPv4 pending', async () => {
@@ -300,6 +322,7 @@ describe('alarm retry', () => {
     storage._store.set('flyAppName', 'acct-test');
     storage._store.set('ipv6Allocated', false);
     storage._store.set('ipv4Allocated', false);
+    storage._store.set('envKeySet', false);
 
     (appsClient.getApp as Mock).mockRejectedValue(new FlyApiError('timeout', 503, 'retry'));
 
@@ -315,11 +338,120 @@ describe('alarm retry', () => {
     storage._store.set('flyAppName', 'acct-test');
     storage._store.set('ipv6Allocated', true);
     storage._store.set('ipv4Allocated', true);
+    storage._store.set('envKeySet', true);
+    storage._store.set('envKey', 'test-key');
 
     const { appDO } = createAppDO(storage);
     await appDO.alarm();
 
     expect(appsClient.getApp).not.toHaveBeenCalled();
     expect(appsClient.allocateIP).not.toHaveBeenCalled();
+    expect(secretsClient.setAppSecret).not.toHaveBeenCalled();
+  });
+
+  it('retries env key setup when IPs allocated but key missing', async () => {
+    const storage = createFakeStorage();
+    storage._store.set('userId', 'user-1');
+    storage._store.set('flyAppName', 'acct-test');
+    storage._store.set('ipv6Allocated', true);
+    storage._store.set('ipv4Allocated', true);
+    storage._store.set('envKeySet', false);
+
+    // App exists
+    (appsClient.getApp as Mock).mockResolvedValue({ id: 'existing', created_at: 100 });
+
+    const { appDO } = createAppDO(storage);
+    await appDO.alarm();
+
+    // Should only set the env key, not allocate IPs
+    expect(appsClient.allocateIP).not.toHaveBeenCalled();
+    expect(secretsClient.setAppSecret).toHaveBeenCalled();
+    expect(storage._store.get('envKeySet')).toBe(true);
+  });
+});
+
+describe('ensureEnvKey', () => {
+  it('always re-sets Fly secret (self-healing) even when key exists', async () => {
+    const { appDO } = createAppDO();
+    await appDO.ensureApp('user-1');
+    vi.clearAllMocks();
+
+    const { key, secretsVersion } = await appDO.ensureEnvKey('user-1');
+
+    expect(key).toBeTruthy();
+    expect(secretsVersion).toBe(1);
+    // setAppSecret is always called to self-heal deleted Fly secrets
+    expect(secretsClient.setAppSecret).toHaveBeenCalledWith(
+      expect.objectContaining({ apiToken: 'test-token' }),
+      'KILOCLAW_ENV_KEY',
+      key
+    );
+  });
+
+  it('is idempotent — two calls return the same key', async () => {
+    const { appDO } = createAppDO();
+    await appDO.ensureApp('user-1');
+    vi.clearAllMocks();
+
+    const result1 = await appDO.ensureEnvKey('user-1');
+    const result2 = await appDO.ensureEnvKey('user-1');
+
+    expect(result1.key).toBe(result2.key);
+    // Called twice (once per ensureEnvKey call) but with same key
+    expect(secretsClient.setAppSecret).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates key for legacy app that has no key yet', async () => {
+    const storage = createFakeStorage();
+    storage._store.set('userId', 'user-1');
+    storage._store.set('flyAppName', 'acct-test');
+    storage._store.set('ipv4Allocated', true);
+    storage._store.set('ipv6Allocated', true);
+    storage._store.set('envKeySet', false);
+
+    const { appDO } = createAppDO(storage);
+    const key = await appDO.ensureEnvKey('user-1');
+
+    expect(key).toBeTruthy();
+    expect(secretsClient.setAppSecret).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'acct-test' },
+      'KILOCLAW_ENV_KEY',
+      expect.any(String)
+    );
+    expect(storage._store.get('envKeySet')).toBe(true);
+  });
+
+  it('throws on userId mismatch', async () => {
+    const { appDO } = createAppDO();
+    await appDO.ensureApp('user-1');
+
+    await expect(appDO.ensureEnvKey('user-2')).rejects.toThrow('userId mismatch');
+  });
+});
+
+describe('getEnvKey', () => {
+  it('returns key after ensureApp', async () => {
+    const { appDO } = createAppDO();
+    await appDO.ensureApp('user-1');
+
+    const key = await appDO.getEnvKey('user-1');
+    expect(key).toBeTruthy();
+  });
+
+  it('returns null when key not yet set', async () => {
+    const storage = createFakeStorage();
+    storage._store.set('userId', 'user-1');
+    storage._store.set('flyAppName', 'acct-test');
+
+    const { appDO } = createAppDO(storage);
+    const key = await appDO.getEnvKey('user-1');
+    expect(key).toBeNull();
+  });
+
+  it('throws on userId mismatch', async () => {
+    const { appDO } = createAppDO();
+    await appDO.ensureApp('user-1');
+
+    await expect(appDO.getEnvKey('user-2')).rejects.toThrow('userId mismatch');
   });
 });

@@ -12,6 +12,7 @@ import {
   ProvisionRequestSchema,
   UserIdRequestSchema,
   DestroyRequestSchema,
+  ChannelsPatchSchema,
 } from '../schemas/instance-config';
 import type { ModelEntry } from '../schemas/instance-config';
 import { z } from 'zod';
@@ -143,6 +144,75 @@ platform.patch('/kilocode-config', async c => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[platform] kilocode-config patch failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// PATCH /api/platform/channels
+platform.patch('/channels', async c => {
+  const result = await parseBody(c, ChannelsPatchSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, channels } = result.data;
+
+  try {
+    const updated = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.updateChannels(channels),
+      'updateChannels'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] channels patch failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// GET /api/platform/pairing?userId=...&refresh=true
+platform.get('/pairing', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) return c.json({ error: 'userId is required' }, 400);
+
+  const forceRefresh = c.req.query('refresh') === 'true';
+
+  try {
+    const pairing = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.listPairingRequests(forceRefresh),
+      'listPairingRequests'
+    );
+    return c.json(pairing, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] pairing list failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// POST /api/platform/pairing/approve
+const PairingApproveSchema = z.object({
+  userId: z.string().min(1),
+  channel: z.string().min(1),
+  code: z.string().min(1),
+});
+
+platform.post('/pairing/approve', async c => {
+  const result = await parseBody(c, PairingApproveSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, channel, code } = result.data;
+
+  try {
+    const approved = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.approvePairingRequest(channel, code),
+      'approvePairingRequest'
+    );
+    return c.json(approved, approved.success ? 200 : 500);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] pairing approve failed:', message);
     return c.json({ error: message }, 500);
   }
 });

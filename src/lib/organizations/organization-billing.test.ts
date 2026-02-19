@@ -155,7 +155,7 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
     const updatedBalance = 50000; // 50 dollars in microdollars
     await db
       .update(organizations)
-      .set({ microdollars_balance: updatedBalance })
+      .set({ total_microdollars_acquired: updatedBalance })
       .where(eq(organizations.id, testOrganization.id));
 
     const mockStripeCustomer: Stripe.Customer = {
@@ -192,7 +192,7 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
       where: eq(organizations.id, testOrganization.id),
     });
     expect(updated?.stripe_customer_id).toBe('cus_test_preserve');
-    expect(updated?.microdollars_balance).toBe(updatedBalance);
+    expect(updated?.total_microdollars_acquired).toBe(updatedBalance);
   });
 
   test('should create new organization and then create Stripe customer', async () => {
@@ -418,7 +418,7 @@ describe('findOrganizationByStripeCustomerId', () => {
       .update(organizations)
       .set({
         stripe_customer_id: stripeCustomerId,
-        microdollars_balance: updatedBalance,
+        total_microdollars_acquired: updatedBalance,
       })
       .where(eq(organizations.id, testOrganization.id));
 
@@ -428,7 +428,7 @@ describe('findOrganizationByStripeCustomerId', () => {
     expect(result?.id).toBe(testOrganization.id);
     expect(result?.name).toBe('Test Organization');
     expect(result?.stripe_customer_id).toBe(stripeCustomerId);
-    expect(result?.microdollars_balance).toBe(updatedBalance);
+    expect(result?.total_microdollars_acquired).toBe(updatedBalance);
     expect(result?.auto_top_up_enabled).toBe(false);
     expect(result?.created_at).toBeDefined();
     expect(result?.updated_at).toBeDefined();
@@ -450,7 +450,8 @@ describe('processTopupForOrganization', () => {
     const stripePaymentId = 'pi_test_stripe_123';
     const config = { type: 'stripe' as const, stripe_payment_id: stripePaymentId };
 
-    const initialBalance = testOrganization.microdollars_balance;
+    const initialBalance =
+      testOrganization.total_microdollars_acquired - testOrganization.microdollars_used;
 
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, config);
 
@@ -460,7 +461,12 @@ describe('processTopupForOrganization', () => {
     });
 
     const expectedBalanceIncrease = amountInCents * 10_000; // Convert to microdollars
-    expect(updatedOrg?.microdollars_balance).toBe(initialBalance + expectedBalanceIncrease);
+    const computedBalance =
+      (updatedOrg?.total_microdollars_acquired ?? 0) - (updatedOrg?.microdollars_used ?? 0);
+    expect(computedBalance).toBe(initialBalance + expectedBalanceIncrease);
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + expectedBalanceIncrease
+    );
 
     // Verify credit transaction was created
     const creditTransaction = await db.query.credit_transactions.findFirst({
@@ -482,7 +488,8 @@ describe('processTopupForOrganization', () => {
     const stripePaymentId1 = 'pi_test_first_123';
     const stripePaymentId2 = 'pi_test_second_456';
 
-    const initialBalance = testOrganization.microdollars_balance;
+    const initialBalance =
+      testOrganization.total_microdollars_acquired - testOrganization.microdollars_used;
 
     // First topup
     await processTopupForOrganization(testUser.id, testOrganization.id, firstAmount, {
@@ -502,7 +509,12 @@ describe('processTopupForOrganization', () => {
     });
 
     const expectedTotalIncrease = (firstAmount + secondAmount) * 10_000;
-    expect(updatedOrg?.microdollars_balance).toBe(initialBalance + expectedTotalIncrease);
+    const computedBalance =
+      (updatedOrg?.total_microdollars_acquired ?? 0) - (updatedOrg?.microdollars_used ?? 0);
+    expect(computedBalance).toBe(initialBalance + expectedTotalIncrease);
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + expectedTotalIncrease
+    );
 
     // Verify both credit transactions were created
     const transactions = await db.query.credit_transactions.findMany({
@@ -521,7 +533,7 @@ describe('processTopupForOrganization', () => {
     // Set existing balance
     await db
       .update(organizations)
-      .set({ microdollars_balance: existingBalance })
+      .set({ total_microdollars_acquired: existingBalance })
       .where(eq(organizations.id, testOrganization.id));
 
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
@@ -535,7 +547,10 @@ describe('processTopupForOrganization', () => {
     });
 
     const expectedBalanceIncrease = amountInCents * 10_000;
-    expect(updatedOrg?.microdollars_balance).toBe(existingBalance + expectedBalanceIncrease);
+    const computedBalance =
+      (updatedOrg?.total_microdollars_acquired ?? 0) - (updatedOrg?.microdollars_used ?? 0);
+    expect(computedBalance).toBe(existingBalance + expectedBalanceIncrease);
+    expect(updatedOrg?.total_microdollars_acquired).toBe(existingBalance + expectedBalanceIncrease);
   });
 
   test('should update organization updated_at timestamp', async () => {
@@ -560,7 +575,8 @@ describe('processTopupForOrganization', () => {
 
   test('should handle zero amount correctly', async () => {
     const amountInCents = 0;
-    const initialBalance = testOrganization.microdollars_balance;
+    const initialBalance =
+      testOrganization.total_microdollars_acquired - testOrganization.microdollars_used;
 
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
       type: 'stripe',
@@ -572,7 +588,9 @@ describe('processTopupForOrganization', () => {
       where: eq(organizations.id, testOrganization.id),
     });
 
-    expect(updatedOrg?.microdollars_balance).toBe(initialBalance);
+    const computedBalanceZero =
+      (updatedOrg?.total_microdollars_acquired ?? 0) - (updatedOrg?.microdollars_used ?? 0);
+    expect(computedBalanceZero).toBe(initialBalance);
 
     // Verify credit transaction was still created with zero amount
     const creditTransaction = await db.query.credit_transactions.findFirst({

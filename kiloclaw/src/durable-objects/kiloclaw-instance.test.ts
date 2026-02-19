@@ -38,6 +38,7 @@ vi.mock('../fly/client', async () => {
     getMachine: vi.fn(),
     startMachine: vi.fn(),
     stopMachine: vi.fn(),
+    stopMachineAndWait: vi.fn(),
     destroyMachine: vi.fn(),
     waitForState: vi.fn(),
     updateMachine: vi.fn(),
@@ -56,7 +57,16 @@ vi.mock('../db', () => ({
 
 // -- Mock gateway/env --
 vi.mock('../gateway/env', () => ({
-  buildEnvVars: vi.fn().mockResolvedValue({ KILOCODE_API_KEY: 'test' }),
+  buildEnvVars: vi.fn().mockResolvedValue({
+    env: { AUTO_APPROVE_DEVICES: 'true' },
+    sensitive: { KILOCODE_API_KEY: 'test', OPENCLAW_GATEWAY_TOKEN: 'gw-token' },
+  }),
+}));
+
+// -- Mock utils/env-encryption --
+vi.mock('../utils/env-encryption', () => ({
+  ENCRYPTED_ENV_PREFIX: 'KILOCLAW_ENC_',
+  encryptEnvValue: vi.fn((_key: string, value: string) => `enc:v1:fake_${value}`),
 }));
 
 import { KiloClawInstance } from './kiloclaw-instance';
@@ -107,13 +117,27 @@ function createFakeStorage() {
   };
 }
 
+function createFakeAppStub() {
+  return {
+    ensureEnvKey: vi.fn().mockResolvedValue({
+      key: 'dGVzdC1rZXktMzItYnl0ZXMtcGFkZGVkLi4uLg==',
+      secretsVersion: 1,
+    }),
+  };
+}
+
 function createFakeEnv() {
+  const appStub = createFakeAppStub();
   return {
     FLY_API_TOKEN: 'test-token',
     FLY_APP_NAME: 'test-app',
     FLY_REGION: 'us,eu',
     GATEWAY_TOKEN_SECRET: 'test-secret',
     KILOCLAW_INSTANCE: {} as unknown,
+    KILOCLAW_APP: {
+      idFromName: vi.fn().mockReturnValue('fake-do-id'),
+      get: vi.fn().mockReturnValue(appStub),
+    } as unknown,
     HYPERDRIVE: { connectionString: '' } as unknown,
   };
 }
@@ -416,7 +440,7 @@ describe('status guards', () => {
 
     // Status unchanged
     expect(storage._store.get('status')).toBe('destroying');
-    expect(flyClient.stopMachine).not.toHaveBeenCalled();
+    expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
   });
 });
 
@@ -736,5 +760,73 @@ describe('metadata recovery via alarm', () => {
     await instance.alarm();
 
     expect(flyClient.listMachines).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// updateChannels
+// ============================================================================
+
+describe('updateChannels', () => {
+  const fakeEnvelope = {
+    encryptedData: 'data',
+    encryptedDEK: 'dek',
+    algorithm: 'rsa-aes-256-gcm' as const,
+    version: 1 as const,
+  };
+
+  it('sets a telegram token on a provisioned instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.updateChannels({ telegramBotToken: fakeEnvelope });
+
+    expect(result.telegram).toBe(true);
+    expect(result.discord).toBe(false);
+    const channels = storage._store.get('channels') as Record<string, unknown>;
+    expect(channels.telegramBotToken).toEqual(fakeEnvelope);
+  });
+
+  it('removes a telegram token when null is passed', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { telegramBotToken: fakeEnvelope },
+    });
+
+    const result = await instance.updateChannels({ telegramBotToken: null });
+
+    expect(result.telegram).toBe(false);
+    // channels should be null when all tokens are removed
+    expect(storage._store.get('channels')).toBeNull();
+  });
+
+  it('merges with existing channels — setting telegram preserves discord', async () => {
+    const discordEnvelope = { ...fakeEnvelope, encryptedData: 'discord-data' };
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { discordBotToken: discordEnvelope },
+    });
+
+    const result = await instance.updateChannels({ telegramBotToken: fakeEnvelope });
+
+    expect(result.telegram).toBe(true);
+    expect(result.discord).toBe(true);
+    const channels = storage._store.get('channels') as Record<string, unknown>;
+    expect(channels.telegramBotToken).toEqual(fakeEnvelope);
+    expect(channels.discordBotToken).toEqual(discordEnvelope);
+  });
+
+  it('ignores undefined fields — only patches provided keys', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { telegramBotToken: fakeEnvelope },
+    });
+
+    // Pass only discord, leave telegram undefined (should be preserved)
+    const discordEnvelope = { ...fakeEnvelope, encryptedData: 'discord-data' };
+    const result = await instance.updateChannels({ discordBotToken: discordEnvelope });
+
+    expect(result.telegram).toBe(true);
+    expect(result.discord).toBe(true);
   });
 });

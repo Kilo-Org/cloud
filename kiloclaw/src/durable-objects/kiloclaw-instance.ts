@@ -49,6 +49,7 @@ import type { FlyClientConfig } from '../fly/client';
 import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
 import * as fly from '../fly/client';
 import { appNameFromUserId } from '../fly/apps';
+import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../utils/env-encryption';
 
 type InstanceStatus = PersistedState['status'];
 
@@ -438,6 +439,204 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
+   * Update channel tokens (e.g. Telegram bot token).
+   * Merges incoming channels with existing ones — pass null for a token to remove it.
+   * Does NOT restart the machine; the caller should prompt the user to restart.
+   */
+  async updateChannels(patch: {
+    telegramBotToken?: EncryptedEnvelope | null;
+    discordBotToken?: EncryptedEnvelope | null;
+    slackBotToken?: EncryptedEnvelope | null;
+    slackAppToken?: EncryptedEnvelope | null;
+  }): Promise<{
+    telegram: boolean;
+    discord: boolean;
+    slackBot: boolean;
+    slackApp: boolean;
+  }> {
+    await this.loadState();
+
+    const merged = this.channels ? { ...this.channels } : {};
+
+    if (patch.telegramBotToken !== undefined) {
+      if (patch.telegramBotToken === null) {
+        delete merged.telegramBotToken;
+      } else {
+        merged.telegramBotToken = patch.telegramBotToken;
+      }
+    }
+    if (patch.discordBotToken !== undefined) {
+      if (patch.discordBotToken === null) {
+        delete merged.discordBotToken;
+      } else {
+        merged.discordBotToken = patch.discordBotToken;
+      }
+    }
+    if (patch.slackBotToken !== undefined) {
+      if (patch.slackBotToken === null) {
+        delete merged.slackBotToken;
+      } else {
+        merged.slackBotToken = patch.slackBotToken;
+      }
+    }
+    if (patch.slackAppToken !== undefined) {
+      if (patch.slackAppToken === null) {
+        delete merged.slackAppToken;
+      } else {
+        merged.slackAppToken = patch.slackAppToken;
+      }
+    }
+
+    const hasAny = Object.values(merged).some(Boolean);
+    this.channels = hasAny ? merged : null;
+    await this.ctx.storage.put({ channels: this.channels });
+
+    return {
+      telegram: !!this.channels?.telegramBotToken,
+      discord: !!this.channels?.discordBotToken,
+      slackBot: !!this.channels?.slackBotToken,
+      slackApp: !!this.channels?.slackAppToken,
+    };
+  }
+
+  /** KV cache key for pairing requests, scoped to the specific machine. */
+  private pairingCacheKey(): string | null {
+    const { flyAppName, flyMachineId } = this;
+    if (!flyAppName || !flyMachineId) return null;
+    return `pairing:${flyAppName}:${flyMachineId}`;
+  }
+
+  private static PAIRING_CACHE_TTL_SECONDS = 120;
+
+  /**
+   * List pending channel pairing requests across all configured channels.
+   * Uses the openclaw-pairing-list.js helper script on the machine.
+   * Results are cached in KV for 2 minutes. Pass forceRefresh to bypass cache.
+   * Requires the machine to be running.
+   */
+  async listPairingRequests(forceRefresh = false): Promise<{
+    requests: Array<{
+      code: string;
+      id: string;
+      channel: string;
+      meta?: unknown;
+      createdAt?: string;
+    }>;
+  }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { requests: [] };
+    }
+
+    const cacheKey = this.pairingCacheKey();
+    if (cacheKey && !forceRefresh) {
+      const cached = await this.env.KV_CLAW_CACHE.get(cacheKey, 'json');
+      if (
+        cached &&
+        typeof cached === 'object' &&
+        'requests' in cached &&
+        Array.isArray(cached.requests)
+      ) {
+        console.log(`[DO] pairing list served from KV cache (key=${cacheKey})`);
+        return { requests: cached.requests };
+      }
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'node', '/usr/local/bin/openclaw-pairing-list.js'],
+      20
+    );
+
+    const empty = {
+      requests: [] as Array<{
+        code: string;
+        id: string;
+        channel: string;
+        meta?: unknown;
+        createdAt?: string;
+      }>,
+    };
+
+    if (result.exit_code !== 0) {
+      console.error('[DO] pairing list failed:', result.stderr);
+      return empty;
+    }
+
+    let pairing = empty;
+    try {
+      const data = JSON.parse(result.stdout.trim());
+      if (Array.isArray(data.requests)) {
+        pairing = { requests: data.requests };
+      }
+    } catch {
+      console.error('[DO] pairing list parse error:', result.stdout);
+    }
+
+    if (cacheKey) {
+      await this.env.KV_CLAW_CACHE.put(cacheKey, JSON.stringify(pairing), {
+        expirationTtl: KiloClawInstance.PAIRING_CACHE_TTL_SECONDS,
+      });
+    }
+
+    return pairing;
+  }
+
+  /**
+   * Approve a pending channel pairing request via `openclaw pairing approve` on the machine.
+   * Busts the pairing KV cache on success.
+   * Requires the machine to be running.
+   */
+  async approvePairingRequest(
+    channel: string,
+    code: string
+  ): Promise<{ success: boolean; message: string }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { success: false, message: 'Instance is not running' };
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    // Validate inputs to prevent command injection — channel and code
+    // come from user input and are interpolated into a shell command.
+    if (!/^[a-z][a-z0-9_-]{0,63}$/.test(channel)) {
+      return { success: false, message: 'Invalid channel name' };
+    }
+    if (!/^[A-Za-z0-9]{1,32}$/.test(code)) {
+      return { success: false, message: 'Invalid pairing code' };
+    }
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'pairing', 'approve', channel, code, '--notify'],
+      15
+    );
+
+    const success = result.exit_code === 0;
+
+    if (success) {
+      const cacheKey = this.pairingCacheKey();
+      if (cacheKey) {
+        await this.env.KV_CLAW_CACHE.delete(cacheKey);
+      }
+    }
+
+    return {
+      success,
+      message: success ? 'Pairing approved' : result.stderr || result.stdout || 'Approval failed',
+    };
+  }
+
+  /**
    * Start the Fly Machine.
    */
   async start(userId?: string): Promise<void> {
@@ -460,12 +659,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const flyConfig = this.getFlyConfig();
-    const envVars = await this.buildUserEnvVars();
 
     // Ensure a volume exists
     await this.ensureVolume(flyConfig, 'start');
 
     // If status is 'running', verify the machine is actually alive.
+    // Check BEFORE building env vars — buildUserEnvVars calls ensureEnvKey
+    // which writes to the Fly secrets API and could fail on transient errors.
     if (this.status === 'running' && this.flyMachineId) {
       try {
         const machine = await fly.getMachine(flyConfig, this.flyMachineId);
@@ -480,6 +680,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
     const guest = guestFromSize(this.machineSize);
     const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
     const identity = { userId: this.userId, sandboxId: this.sandboxId };
@@ -493,9 +694,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     );
 
     if (this.flyMachineId) {
-      await this.startExistingMachine(flyConfig, machineConfig);
+      await this.startExistingMachine(flyConfig, machineConfig, minSecretsVersion);
     } else {
-      await this.createNewMachine(flyConfig, machineConfig);
+      await this.createNewMachine(flyConfig, machineConfig, minSecretsVersion);
     }
 
     // Update state
@@ -535,8 +736,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.flyMachineId) {
       const flyConfig = this.getFlyConfig();
       try {
-        await fly.stopMachine(flyConfig, this.flyMachineId);
-        await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+        await fly.stopMachineAndWait(flyConfig, this.flyMachineId);
       } catch (err) {
         console.error('[DO] Failed to stop machine:', err);
       }
@@ -667,10 +867,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     try {
       const flyConfig = this.getFlyConfig();
-      await fly.stopMachine(flyConfig, this.flyMachineId);
-      await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+      await fly.stopMachineAndWait(flyConfig, this.flyMachineId);
 
-      const envVars = await this.buildUserEnvVars();
+      const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
       const guest = guestFromSize(this.machineSize);
       const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
       const identity = { userId: this.userId ?? '', sandboxId: this.sandboxId ?? '' };
@@ -683,7 +882,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         identity
       );
 
-      await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig);
+      await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig, { minSecretsVersion });
       await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
 
       return { success: true };
@@ -947,8 +1146,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (!this.flyMachineId) return;
 
-    await fly.stopMachine(flyConfig, this.flyMachineId);
-    await fly.waitForState(flyConfig, this.flyMachineId, 'stopped', 60);
+    await fly.stopMachineAndWait(flyConfig, this.flyMachineId);
     await fly.updateMachine(flyConfig, this.flyMachineId, {
       ...machine.config,
       mounts: [{ volume: this.flyVolumeId, path: '/root' }],
@@ -1164,14 +1362,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    */
   private async startExistingMachine(
     flyConfig: FlyClientConfig,
-    machineConfig: FlyMachineConfig
+    machineConfig: FlyMachineConfig,
+    minSecretsVersion?: number
   ): Promise<void> {
     if (!this.flyMachineId) return;
 
     try {
       const machine = await fly.getMachine(flyConfig, this.flyMachineId);
       if (machine.state === 'stopped' || machine.state === 'created') {
-        await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig);
+        await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig, { minSecretsVersion });
         await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
         console.log('[DO] Machine updated and started:', this.flyMachineId);
       } else if (machine.state === 'started') {
@@ -1185,7 +1384,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         console.log('[DO] Machine gone (404), creating new one');
         this.flyMachineId = null;
         await this.ctx.storage.put(storageUpdate({ flyMachineId: null }));
-        await this.createNewMachine(flyConfig, machineConfig);
+        await this.createNewMachine(flyConfig, machineConfig, minSecretsVersion);
       } else {
         // Transient error (timeout, 500, network) — don't create a duplicate.
         // Let the caller surface the error; reconciliation will repair later.
@@ -1197,11 +1396,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async createNewMachine(
     flyConfig: FlyClientConfig,
-    machineConfig: FlyMachineConfig
+    machineConfig: FlyMachineConfig,
+    minSecretsVersion?: number
   ): Promise<void> {
     const machine = await fly.createMachine(flyConfig, machineConfig, {
       name: this.sandboxId ?? undefined,
       region: this.flyRegion ?? this.env.FLY_REGION ?? undefined,
+      minSecretsVersion,
     });
     this.flyMachineId = machine.id;
 
@@ -1311,16 +1512,42 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
-  private async buildUserEnvVars(): Promise<Record<string, string>> {
+  private async buildUserEnvVars(): Promise<{
+    envVars: Record<string, string>;
+    minSecretsVersion: number;
+  }> {
     if (!this.sandboxId || !this.env.GATEWAY_TOKEN_SECRET) {
       throw new Error('Cannot build env vars: sandboxId or GATEWAY_TOKEN_SECRET missing');
     }
-    return buildEnvVars(this.env, this.sandboxId, this.env.GATEWAY_TOKEN_SECRET, {
-      envVars: this.envVars ?? undefined,
-      encryptedSecrets: this.encryptedSecrets ?? undefined,
-      kilocodeApiKey: this.kilocodeApiKey ?? undefined,
-      kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
-      channels: this.channels ?? undefined,
-    });
+    if (!this.userId) {
+      throw new Error('Cannot build env vars: userId missing');
+    }
+
+    const { env: plainEnv, sensitive } = await buildEnvVars(
+      this.env,
+      this.sandboxId,
+      this.env.GATEWAY_TOKEN_SECRET,
+      {
+        envVars: this.envVars ?? undefined,
+        encryptedSecrets: this.encryptedSecrets ?? undefined,
+        kilocodeApiKey: this.kilocodeApiKey ?? undefined,
+        kilocodeDefaultModel: this.kilocodeDefaultModel ?? undefined,
+        kilocodeModels: this.kilocodeModels ?? undefined,
+        channels: this.channels ?? undefined,
+      }
+    );
+
+    // Get the env encryption key from the App DO, creating it if needed (legacy migration).
+    // Also returns the Fly secrets version for min_secrets_version on machine create/update.
+    const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(this.userId));
+    const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(this.userId);
+
+    // Encrypt sensitive values and prefix their names with KILOCLAW_ENC_
+    const result: Record<string, string> = { ...plainEnv };
+    for (const [name, value] of Object.entries(sensitive)) {
+      result[`${ENCRYPTED_ENV_PREFIX}${name}`] = encryptEnvValue(envKey, value);
+    }
+
+    return { envVars: result, minSecretsVersion: secretsVersion };
   }
 }

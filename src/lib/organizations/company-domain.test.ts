@@ -48,6 +48,50 @@ describe('normalizeCompanyDomain', () => {
   it('handles subdomain', () => {
     expect(normalizeCompanyDomain('sub.acme.com')).toBe('sub.acme.com');
   });
+
+  it('preserves unicode/IDN domain', () => {
+    expect(normalizeCompanyDomain('münchen.de')).toBe('münchen.de');
+  });
+
+  it('preserves unicode domain from URL', () => {
+    expect(normalizeCompanyDomain('https://münchen.de/about')).toBe('münchen.de');
+  });
+
+  it('preserves non-latin IDN domain', () => {
+    expect(normalizeCompanyDomain('例え.jp')).toBe('例え.jp');
+  });
+
+  it('extracts hostname from URL with userinfo (user:pass@)', () => {
+    expect(normalizeCompanyDomain('https://user:pass@acme.com/path')).toBe('acme.com');
+  });
+
+  it('extracts hostname from URL with user@ only', () => {
+    expect(normalizeCompanyDomain('https://user@acme.com')).toBe('acme.com');
+  });
+
+  it('ignores @ in URL path (not userinfo)', () => {
+    expect(normalizeCompanyDomain('https://example.com/contact@other.com')).toBe('example.com');
+  });
+
+  it('handles userinfo and @ in path together', () => {
+    expect(normalizeCompanyDomain('https://user:pass@acme.com/contact@other.com')).toBe('acme.com');
+  });
+
+  it('handles password containing @ in userinfo', () => {
+    expect(normalizeCompanyDomain('https://user:pa@ss@acme.com/path')).toBe('acme.com');
+  });
+
+  it('ignores @ in query string (no path)', () => {
+    expect(normalizeCompanyDomain('https://example.com?next=@evil.com')).toBe('example.com');
+  });
+
+  it('ignores @ in fragment (no path)', () => {
+    expect(normalizeCompanyDomain('https://example.com#@evil.com')).toBe('example.com');
+  });
+
+  it('ignores @ in query string with path', () => {
+    expect(normalizeCompanyDomain('https://example.com/path?next=@evil.com')).toBe('example.com');
+  });
 });
 
 describe('isValidDomain', () => {
@@ -118,6 +162,22 @@ describe('isValidDomain', () => {
     const label63 = 'a'.repeat(63);
     expect(isValidDomain(`${label63}.com`)).toBe(true);
   });
+
+  it('accepts punycode-encoded domain', () => {
+    expect(isValidDomain('xn--mnchen-3ya.de')).toBe(true);
+  });
+
+  it('accepts unicode domain', () => {
+    expect(isValidDomain('münchen.de')).toBe(true);
+  });
+
+  it('accepts non-latin unicode domain', () => {
+    expect(isValidDomain('例え.jp')).toBe(true);
+  });
+
+  it('accepts punycode TLD', () => {
+    expect(isValidDomain('example.xn--p1ai')).toBe(true);
+  });
 });
 
 describe('CompanyDomainSchema', () => {
@@ -149,5 +209,25 @@ describe('CompanyDomainSchema', () => {
   it('rejects domain without TLD after URL normalization', () => {
     const result = CompanyDomainSchema.safeParse('https://localhost');
     expect(result.success).toBe(false);
+  });
+
+  it('accepts unicode domain and preserves it', () => {
+    const result = CompanyDomainSchema.parse('münchen.de');
+    expect(result).toBe('münchen.de');
+  });
+
+  it('accepts unicode domain URL and preserves unicode', () => {
+    const result = CompanyDomainSchema.parse('https://例え.jp');
+    expect(result).toBe('例え.jp');
+  });
+
+  it('handles URL with userinfo by extracting hostname', () => {
+    const result = CompanyDomainSchema.parse('https://user:pass@acme.com/path');
+    expect(result).toBe('acme.com');
+  });
+
+  it('accepts punycode TLD domain', () => {
+    const result = CompanyDomainSchema.parse('example.xn--p1ai');
+    expect(result).toBe('example.xn--p1ai');
   });
 });

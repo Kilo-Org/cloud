@@ -615,6 +615,7 @@ export const microdollar_usage_metadata = pgTable(
     editor_name_id: integer(),
     has_tools: boolean(),
     machine_id: text(),
+    feature_id: integer(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
@@ -717,6 +718,15 @@ export const editor_name = pgTable(
   table => [uniqueIndex('UQ_editor_name').on(table.editor_name)]
 );
 
+export const feature = pgTable(
+  'feature',
+  {
+    feature_id: serial().notNull().primaryKey(),
+    feature: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_feature').on(table.feature)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -761,6 +771,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   editor_name: text(),
   has_tools: boolean(),
   machine_id: text(),
+  feature: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -805,7 +816,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.cancelled,
     edit.editor_name,
     meta.has_tools,
-    meta.machine_id
+    meta.machine_id,
+    feat.feature
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -816,6 +828,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${http_user_agent} ua ON meta.http_user_agent_id = ua.http_user_agent_id
   LEFT JOIN ${finish_reason} frfr ON meta.finish_reason_id = frfr.finish_reason_id
   LEFT JOIN ${editor_name} edit ON meta.editor_name_id = edit.editor_name_id
+  LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
@@ -829,7 +842,7 @@ export const custom_llm = pgTable('custom_llm', {
   provider: text().notNull().$type<'anthropic' | 'openai' | 'xai'>(),
   base_url: text().notNull(),
   api_key: text().notNull(),
-  verbosity: text().$type<'low' | 'medium' | 'high'>(),
+  verbosity: text().$type<'low' | 'medium' | 'high' | 'max'>(),
   organization_ids: jsonb().notNull().$type<string[]>(),
 });
 
@@ -993,12 +1006,18 @@ export const organizations = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
-    microdollars_balance: bigint({ mode: 'number' })
-      .default(sql`'0'`)
-      .notNull(),
     microdollars_used: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
+    // Deprecated: balance is now computed as total_microdollars_acquired - microdollars_used.
+    // Kept in sync for rollback safety; will be removed in a future migration.
+    microdollars_balance: bigint({ mode: 'number' })
+      .default(sql`'0'`)
+      .notNull(),
+    total_microdollars_acquired: bigint({ mode: 'number' })
+      .default(sql`'0'`)
+      .notNull(),
+    next_credit_expiration_at: timestamp({ withTimezone: true, mode: 'string' }),
     stripe_customer_id: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     settings: jsonb().default({}).$type<OrganizationSettings>().notNull(),

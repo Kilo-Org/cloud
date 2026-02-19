@@ -16,7 +16,17 @@ import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { AnimatedDollars } from './AnimatedDollars';
 import { useState } from 'react';
-import { Edit, Check, X, PiggyBank, Building2, ExternalLink, Bell, Plus } from 'lucide-react';
+import {
+  Edit,
+  Check,
+  X,
+  PiggyBank,
+  Building2,
+  ExternalLink,
+  Bell,
+  Plus,
+  Clock,
+} from 'lucide-react';
 import {
   useIsKiloAdmin,
   useUserOrganizationRole,
@@ -28,9 +38,10 @@ import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/Tri
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { fromMicrodollars } from '@/lib/utils';
+import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useExpiringCredits } from './useExpiringCredits';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -67,7 +78,8 @@ function Inner(props: InnerProps) {
     name,
     created_at,
     updated_at,
-    microdollars_balance,
+    total_microdollars_acquired,
+    microdollars_used,
     stripe_customer_id,
     deleted_at,
     auto_top_up_enabled,
@@ -88,6 +100,8 @@ function Inner(props: InnerProps) {
   const updateCompanyDomain = useUpdateCompanyDomain();
   const adminToggleCodeIndexing = useAdminToggleCodeIndexing();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
+
+  const { expiringBlocks, expiring_mUsd, earliestExpiry } = useExpiringCredits(id);
 
   const handleSave = async () => {
     if (editedName.trim() === name) {
@@ -322,7 +336,7 @@ function Inner(props: InnerProps) {
             </span>{' '}
             <div className="mt-1 flex items-center gap-2">
               <AnimatedDollars
-                dollars={fromMicrodollars(microdollars_balance)}
+                dollars={fromMicrodollars(total_microdollars_acquired - microdollars_used)}
                 className="text-2xl font-semibold"
               />
               <TooltipProvider>
@@ -355,6 +369,13 @@ function Inner(props: InnerProps) {
                 <Link href={`/organizations/${id}/payment-details`}>View Billing</Link>
               </Button>
             </div>
+            {expiringBlocks.length > 0 && earliestExpiry && (
+              <div className="mt-2 flex items-center gap-1 text-sm text-amber-600">
+                <Clock className="h-3.5 w-3.5" />
+                {formatDollars(fromMicrodollars(expiring_mUsd))} expiring at{' '}
+                {formatIsoDateTime_IsoOrderNoSeconds(earliestExpiry)}
+              </div>
+            )}
           </div>
         )}
         {isInAdminDashboard && (

@@ -47,7 +47,7 @@ describe('organizations trpc router', () => {
     await db
       .update(organizations)
       .set({
-        microdollars_balance: 1000000, // $1.00 in microdollars
+        total_microdollars_acquired: 1000000, // $1.00 in microdollars
         stripe_customer_id: 'cus_test_org',
       })
       .where(eq(organizations.id, testOrganization.id));
@@ -71,7 +71,8 @@ describe('organizations trpc router', () => {
       expect(result).toMatchObject({
         id: testOrganization.id,
         name: 'Test Organization',
-        microdollars_balance: 1000000,
+        total_microdollars_acquired: 1000000,
+        microdollars_used: 0,
         stripe_customer_id: 'cus_test_org',
         auto_top_up_enabled: false,
         settings: {},

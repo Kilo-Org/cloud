@@ -212,13 +212,56 @@ export function isFlyNotFound(err: unknown): boolean {
 }
 
 /**
- * Check if an error is a Fly API 412 (insufficient resources).
- * This typically means the physical host where a volume is pinned has no
- * capacity to launch a new machine. Recovery requires replacing the volume
- * in a different region/host.
+ * Capacity-related markers in Fly 412 error bodies. Matched case-insensitively
+ * against the JSON body fields (error, status) and raw body text.
+ */
+const CAPACITY_MARKERS = [
+  'insufficient resources',
+  'insufficient_capacity',
+  'no capacity',
+  'at capacity',
+  'existing volume',
+];
+
+/**
+ * Check if a Fly API 412 error is specifically a capacity/resource exhaustion
+ * issue (host where a volume is pinned has no room for a machine).
+ *
+ * Fly overloads 412 for both capacity issues AND precondition/version mismatches
+ * (e.g. min_secrets_version, machine_version). We only want to trigger
+ * destructive recovery (volume replacement) for genuine capacity problems.
+ *
+ * Returns false for version/precondition 412s to avoid accidental data loss.
+ * Logs a warning for unclassified 412s so we can tune matching.
  */
 export function isFlyInsufficientResources(err: unknown): boolean {
-  return err instanceof FlyApiError && err.status === 412;
+  if (!(err instanceof FlyApiError) || err.status !== 412) return false;
+
+  // Build a single lowercase string from all available signal sources
+  const searchText = `${err.message}\n${err.body}`.toLowerCase();
+
+  // Try to extract structured fields from JSON body
+  try {
+    const json = JSON.parse(err.body) as Record<string, unknown>;
+    if (typeof json.status === 'string') {
+      const status = json.status.toLowerCase();
+      if (CAPACITY_MARKERS.some(m => status.includes(m))) return true;
+    }
+    if (typeof json.error === 'string') {
+      const error = json.error.toLowerCase();
+      if (CAPACITY_MARKERS.some(m => error.includes(m))) return true;
+    }
+  } catch {
+    // Body isn't JSON — fall through to raw text matching
+  }
+
+  // Fall back to raw text matching across message + body
+  if (CAPACITY_MARKERS.some(m => searchText.includes(m))) return true;
+
+  // 412 but no capacity signal — likely a version/precondition issue.
+  // Log so we can tune matching if Fly introduces new capacity error formats.
+  console.warn('[fly] Unclassified 412 error (not treated as capacity):', err.body);
+  return false;
 }
 
 /**

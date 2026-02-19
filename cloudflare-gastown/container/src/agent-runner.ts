@@ -198,28 +198,63 @@ async function configureGitCredentials(
 }
 
 /**
+ * Create a minimal git-initialized workspace for the mayor agent.
+ * The mayor doesn't need a real repo clone — it's a conversational
+ * orchestrator that delegates work via tools. But kilo serve requires
+ * a git repo in the working directory.
+ */
+async function createMayorWorkspace(rigId: string): Promise<string> {
+  const { mkdir: mkdirAsync } = await import('node:fs/promises');
+  const { existsSync } = await import('node:fs');
+  const dir = `/workspace/rigs/${rigId}/mayor-workspace`;
+  await mkdirAsync(dir, { recursive: true });
+
+  // Initialize a bare git repo if not already present
+  if (!existsSync(`${dir}/.git`)) {
+    const init = Bun.spawn(['git', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' });
+    await init.exited;
+    const commit = Bun.spawn(['git', 'commit', '--allow-empty', '-m', 'init'], {
+      cwd: dir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    await commit.exited;
+    console.log(`Created mayor workspace at ${dir}`);
+  }
+
+  return dir;
+}
+
+/**
  * Run the full agent startup sequence:
- * 1. Clone/fetch the rig's git repo
+ * 1. Clone/fetch the rig's git repo (or create minimal workspace for mayor)
  * 2. Create an isolated worktree for the agent's branch
  * 3. Configure git credentials for push/fetch
  * 4. Start a kilo serve instance for the worktree (or reuse existing)
  * 5. Create a session and send the initial prompt via HTTP API
  */
 export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent> {
-  await cloneRepo({
-    rigId: request.rigId,
-    gitUrl: request.gitUrl,
-    defaultBranch: request.defaultBranch,
-    envVars: request.envVars,
-  });
+  let workdir: string;
 
-  const workdir = await createWorktree({
-    rigId: request.rigId,
-    branch: request.branch,
-  });
+  if (request.role === 'mayor') {
+    // Mayor doesn't need a repo clone — just a git-initialized directory
+    workdir = await createMayorWorkspace(request.rigId);
+  } else {
+    await cloneRepo({
+      rigId: request.rigId,
+      gitUrl: request.gitUrl,
+      defaultBranch: request.defaultBranch,
+      envVars: request.envVars,
+    });
 
-  // Set up git credentials so the agent can push
-  await configureGitCredentials(workdir, request.gitUrl, request.envVars);
+    workdir = await createWorktree({
+      rigId: request.rigId,
+      branch: request.branch,
+    });
+
+    // Set up git credentials so the agent can push
+    await configureGitCredentials(workdir, request.gitUrl, request.envVars);
+  }
 
   const env = buildAgentEnv(request);
 

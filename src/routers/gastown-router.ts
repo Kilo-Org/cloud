@@ -217,6 +217,19 @@ export const gastownRouter = createTRPCRouter({
       return result;
     }),
 
+  // ── Mayor Status ──────────────────────────────────────────────────────
+
+  getMayorStatus: baseProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Verify ownership
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      return withGastownError(() => gastown.getMayorStatus(input.townId));
+    }),
+
   // ── Agent Streams ───────────────────────────────────────────────────────
 
   getAgentStreamUrl: baseProcedure

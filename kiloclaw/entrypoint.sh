@@ -5,4 +5,4 @@
 if [ "$(stat -c '%U' /root)" != "openclaw" ]; then
   chown -R openclaw:openclaw /root
 fi
-exec gosu openclaw /usr/local/bin/start-openclaw.sh
+exec gosu openclaw "$@"

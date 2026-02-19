@@ -50,10 +50,11 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Copy custom skills
-COPY skills/ /root/clawd/skills/
+COPY --chown=openclaw:openclaw skills/ /root/clawd/skills/
 
 # Expose the gateway port
 EXPOSE 18789
 
 # Entrypoint: fix volume ownership, drop to non-root, start OpenClaw gateway
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/usr/local/bin/start-openclaw.sh"]

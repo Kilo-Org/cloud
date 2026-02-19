@@ -1,4 +1,5 @@
-import { MessageSquare, Send, Slack } from 'lucide-react';
+import { Send, Slack } from 'lucide-react';
+import { DiscordIcon } from './icons/DiscordIcon';
 
 export type ChannelType = 'telegram' | 'discord' | 'slack';
 
@@ -52,7 +53,7 @@ export const CHANNELS: Record<ChannelType, ChannelDefinition> = {
   },
   discord: {
     label: 'Discord',
-    icon: MessageSquare,
+    icon: DiscordIcon,
     fields: [
       {
         key: 'discordBotToken',

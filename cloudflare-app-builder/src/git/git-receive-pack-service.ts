@@ -6,6 +6,7 @@
 import git from '@ashishkumar472/cf-git';
 import type { MemFS } from './memfs';
 import { logger, formatError } from '../utils/logger';
+import { resolveHeadSymref, formatPacketLine } from './git-protocol-utils';
 import type { RefUpdate, ReceivePackResult } from '../types';
 import { MAX_OBJECT_SIZE } from './constants';
 
@@ -45,14 +46,26 @@ export class GitReceivePackService {
         logger.warn('Failed to list branches', formatError(err));
       }
 
-      // Capabilities for receive-pack
-      const capabilities =
-        'report-status report-status-v2 delete-refs side-band-64k quiet atomic ofs-delta agent=git/isomorphic-git';
+      // Determine symref target for HEAD
+      const symrefTarget = await resolveHeadSymref(fs, branches);
+
+      // Capabilities for receive-pack (symref first per convention)
+      const capabilities = [
+        ...(symrefTarget ? [`symref=HEAD:${symrefTarget}`] : []),
+        'report-status',
+        'report-status-v2',
+        'delete-refs',
+        'side-band-64k',
+        'quiet',
+        'atomic',
+        'ofs-delta',
+        'agent=git/isomorphic-git',
+      ].join(' ');
 
       if (head && branches.length > 0) {
         // Existing repo with refs
         const headLine = `${head} HEAD\0${capabilities}\n`;
-        response += this.formatPacketLine(headLine);
+        response += formatPacketLine(headLine);
 
         // Add branch refs
         for (const branch of branches) {
@@ -62,7 +75,7 @@ export class GitReceivePackService {
               dir: '/',
               ref: `refs/heads/${branch}`,
             });
-            response += this.formatPacketLine(`${oid} refs/heads/${branch}\n`);
+            response += formatPacketLine(`${oid} refs/heads/${branch}\n`);
           } catch (err) {
             logger.warn('Failed to resolve branch ref', { branch, ...formatError(err) });
           }
@@ -71,7 +84,7 @@ export class GitReceivePackService {
         // Empty repo - advertise zero-id for default branch
         const zeroOid = '0000000000000000000000000000000000000000';
         const emptyLine = `${zeroOid} capabilities^{}\0${capabilities}\n`;
-        response += this.formatPacketLine(emptyLine);
+        response += formatPacketLine(emptyLine);
       }
 
       // Flush packet
@@ -408,7 +421,7 @@ export class GitReceivePackService {
     // Unpack status — only report error for global failures (pack-level).
     // Per-ref failures are reported via ng lines; the pack itself unpacked fine.
     const unpackStatus = globalError ? 'unpack error\n' : 'unpack ok\n';
-    chunks.push(this.createSidebandPacket(1, encoder.encode(this.formatPacketLine(unpackStatus))));
+    chunks.push(this.createSidebandPacket(1, encoder.encode(formatPacketLine(unpackStatus))));
 
     // Ref statuses
     for (const cmd of commands) {
@@ -422,7 +435,7 @@ export class GitReceivePackService {
           ? `ng ${cmd.refName} ${sanitizeStatusMessage(refError.message)}\n`
           : `ok ${cmd.refName}\n`;
       }
-      chunks.push(this.createSidebandPacket(1, encoder.encode(this.formatPacketLine(status))));
+      chunks.push(this.createSidebandPacket(1, encoder.encode(formatPacketLine(status))));
     }
 
     // Flush packet for sideband
@@ -463,16 +476,6 @@ export class GitReceivePackService {
     packet.set(data, 5);
 
     return packet;
-  }
-
-  /**
-   * Format git packet line (4-byte hex length prefix + data).
-   * The length counts UTF-8 encoded bytes (not JS string length) per the git protocol spec.
-   */
-  private static formatPacketLine(data: string): string {
-    const byteLength = new TextEncoder().encode(data).length;
-    const hexLength = (byteLength + 4).toString(16).padStart(4, '0');
-    return hexLength + data;
   }
 
   /**

@@ -1,7 +1,8 @@
 import type { Context } from 'hono';
+import { z } from 'zod';
 import type { GastownEnv } from '../gastown.worker';
 import { getTownContainerStub } from '../dos/TownContainer.do';
-import { resError } from '../util/res.util';
+import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 
 const CONTAINER_LOG = '[town-container.handler]';
@@ -101,17 +102,52 @@ export async function handleContainerAgentStatus(
   return proxyToContainer(container, `/agents/${params.agentId}/status`);
 }
 
+const ContainerTicketResponse = z.object({
+  ticket: z.string(),
+  expiresAt: z.string(),
+});
+
 /**
- * Get a WebSocket stream ticket for an agent.
+ * Get a stream ticket for an agent.
+ *
+ * The container returns `{ ticket, expiresAt }` directly. This handler
+ * wraps the response in the standard success envelope and constructs a
+ * stream URL that the frontend can connect to.
  */
 export async function handleContainerStreamTicket(
   c: Context<GastownEnv>,
   params: { townId: string; agentId: string }
 ) {
   const container = getTownContainerStub(c.env, params.townId);
-  return proxyToContainer(container, `/agents/${params.agentId}/stream-ticket`, {
-    method: 'POST',
-  });
+  const response = await container.fetch(
+    `http://container/agents/${params.agentId}/stream-ticket`,
+    { method: 'POST' }
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '(unreadable)');
+    console.error(
+      `${CONTAINER_LOG} handleContainerStreamTicket: container error ${response.status}: ${text.slice(0, 300)}`
+    );
+    return c.json(resError(`Container error: ${response.status}`), response.status as 404 | 500);
+  }
+
+  const raw = await response.json();
+  const parsed = ContainerTicketResponse.safeParse(raw);
+  if (!parsed.success) {
+    console.error(
+      `${CONTAINER_LOG} handleContainerStreamTicket: unexpected container response`,
+      raw
+    );
+    return c.json(resError('Unexpected container response'), 502);
+  }
+
+  // Construct the stream URL. The frontend connects to this URL via EventSource.
+  // Use the request's origin so it works in both dev and production.
+  const origin = new URL(c.req.url).origin;
+  const streamUrl = `${origin}/api/towns/${params.townId}/container/agents/${params.agentId}/stream`;
+
+  return c.json(resSuccess({ url: streamUrl, ticket: parsed.data.ticket }), 200);
 }
 
 /**

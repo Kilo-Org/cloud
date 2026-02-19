@@ -4,11 +4,11 @@ import * as z from 'zod';
 
 const getGatewayErrorRate_cached = unstable_cache(
   async () => {
-    console.debug(`[getProviderErrorRate_cached] refreshing at ${new Date().toISOString()}`);
+    console.debug(`[getGatewayErrorRate_cached] refreshing at ${new Date().toISOString()}`);
     const { rows } = await db.execute(sql`
         select
             provider as "gateway",
-            1.0 * count(*) filter(where mu.has_error = true) / count(*) as "error_rate"
+            1.0 * count(*) filter(where mu.has_error = true) / count(*) as "errorRate"
         from microdollar_usage_view
         where true
             and created_at >= now() - interval '10 minutes'
@@ -20,7 +20,7 @@ const getGatewayErrorRate_cached = unstable_cache(
       .array(
         z.object({
           gateway: z.string(),
-          error_rate: z.number(),
+          errorRate: z.number(),
         })
       )
       .parse(rows);
@@ -45,8 +45,8 @@ export async function getGatewayErrorRate() {
     } else {
       console.debug(`[getGatewayErrorRate] query success after ${performance.now() - start}ms`);
       return {
-        openrouter: result.find(r => r.gateway === 'openrouter')?.error_rate ?? 0,
-        vercel: result.find(r => r.gateway === 'vercel')?.error_rate ?? 0,
+        openrouter: result.find(r => r.gateway === 'openrouter')?.errorRate ?? 0,
+        vercel: result.find(r => r.gateway === 'vercel')?.errorRate ?? 0,
       };
     }
   } catch (e) {

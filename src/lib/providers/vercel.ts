@@ -16,7 +16,7 @@ import type {
 import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
 
-const VERCEL_ROUTING_PERCENTAGE = 100;
+const VERCEL_ROUTING_PERCENTAGE = 10;
 
 const VERCEL_ROUTING_ALLOW_LIST = [
   'arcee-ai/trinity-large-preview:free',

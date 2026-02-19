@@ -5,7 +5,7 @@ const BeadType = z.enum(['issue', 'message', 'escalation', 'merge_request']);
 const BeadStatus = z.enum(['open', 'in_progress', 'closed', 'failed']);
 const BeadPriority = z.enum(['low', 'medium', 'high', 'critical']);
 
-export const BeadRecord = z.object({
+export const RigBeadRecord = z.object({
   id: z.string(),
   type: BeadType,
   status: BeadStatus,
@@ -22,9 +22,9 @@ export const BeadRecord = z.object({
   closed_at: z.string().nullable(),
 });
 
-export type RigBeadRecord = z.output<typeof BeadRecord>;
+export type RigBeadRecord = z.output<typeof RigBeadRecord>;
 
-export const rig_beads = getTableFromZodSchema('rig_beads', BeadRecord);
+export const rig_beads = getTableFromZodSchema('rig_beads', RigBeadRecord);
 
 export function createTableRigBeads(): string {
   return getCreateTableQueryFromTable(rig_beads, {

@@ -3,7 +3,7 @@ import {
   createTableRigBeads,
   getIndexesRigBeads,
   rig_beads,
-  BeadRecord,
+  RigBeadRecord,
 } from '../db/tables/rig-beads.table';
 import { createTableRigAgents, rig_agents, RigAgentRecord } from '../db/tables/rig-agents.table';
 import {
@@ -281,7 +281,7 @@ export class RigDO extends DurableObject<Env> {
       ]),
     ];
     if (rows.length === 0) return null;
-    return BeadRecord.parse(rows[0]);
+    return RigBeadRecord.parse(rows[0]);
   }
 
   async listBeads(filter: BeadFilter): Promise<Bead[]> {
@@ -313,7 +313,7 @@ export class RigDO extends DurableObject<Env> {
         ]
       ),
     ];
-    return BeadRecord.array().parse(rows);
+    return RigBeadRecord.array().parse(rows);
   }
 
   async updateBeadStatus(beadId: string, status: BeadStatus, agentId: string): Promise<Bead> {
@@ -956,7 +956,7 @@ export class RigDO extends DurableObject<Env> {
       agent,
       hooked_bead,
       undelivered_mail: RigMailRecord.array().parse(undeliveredRows),
-      open_beads: BeadRecord.array().parse(openBeadRows),
+      open_beads: RigBeadRecord.array().parse(openBeadRows),
     };
   }
 
@@ -1760,7 +1760,7 @@ export class RigDO extends DurableObject<Env> {
     const guppThreshold = new Date(Date.now() - GUPP_THRESHOLD_MS).toISOString();
 
     const AgentId = RigAgentRecord.pick({ id: true });
-    const BeadId = BeadRecord.pick({ id: true });
+    const BeadId = RigBeadRecord.pick({ id: true });
 
     // Detect dead agents
     const deadAgents = AgentId.array().parse([

@@ -31,12 +31,34 @@ const NonNegativeInt = z.coerce.number().int().nonnegative();
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /**
- * Resolve the userId for the town by reading the JWT payload.
- * The mayor's JWT contains the userId that owns the town.
+ * Resolve the userId for the mayor's town.
+ *
+ * In production the JWT is always present (set by mayorAuthMiddleware).
+ * In development the middleware is skipped, so we fall back to a
+ * `userId` query parameter to keep the routes testable.
  */
-function getUserIdFromJWT(c: Context<GastownEnv>): string | null {
+function resolveUserId(c: Context<GastownEnv>): string | null {
   const jwt = c.get('agentJWT');
-  return jwt?.userId ?? null;
+  if (jwt?.userId) return jwt.userId;
+  // Dev-mode fallback: accept userId as a query param
+  return c.req.query('userId') ?? null;
+}
+
+/**
+ * Verify that `rigId` belongs to `townId` by checking the user's rig
+ * registry. Returns the rig record on success, or null if the rig
+ * doesn't belong to this town (or doesn't exist).
+ */
+async function verifyRigBelongsToTown(
+  c: Context<GastownEnv>,
+  townId: string,
+  rigId: string
+): Promise<boolean> {
+  const userId = resolveUserId(c);
+  if (!userId) return false;
+  const userDO = getGastownUserStub(c.env, userId);
+  const rig = await userDO.getRigAsync(rigId);
+  return rig !== null && rig.town_id === townId;
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────────
@@ -53,6 +75,11 @@ export async function handleMayorSling(c: Context<GastownEnv>, params: { townId:
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
       400
     );
+  }
+
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, parsed.data.rig_id);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
   }
 
   console.log(
@@ -75,13 +102,13 @@ export async function handleMayorSling(c: Context<GastownEnv>, params: { townId:
 
 /**
  * GET /api/mayor/:townId/tools/rigs
- * List all rigs in the town. Requires userId from JWT to route to the
- * correct GastownUserDO instance.
+ * List all rigs in the town. Requires userId to route to the correct
+ * GastownUserDO instance (from JWT in prod, query param in dev).
  */
 export async function handleMayorListRigs(c: Context<GastownEnv>, params: { townId: string }) {
-  const userId = getUserIdFromJWT(c);
+  const userId = resolveUserId(c);
   if (!userId) {
-    return c.json(resError('Missing userId in token'), 401);
+    return c.json(resError('Missing userId in token (or userId query param in dev mode)'), 401);
   }
 
   console.log(`${HANDLER_LOG} handleMayorListRigs: townId=${params.townId} userId=${userId}`);
@@ -100,6 +127,11 @@ export async function handleMayorListBeads(
   c: Context<GastownEnv>,
   params: { townId: string; rigId: string }
 ) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
   const limitRaw = c.req.query('limit');
   const offsetRaw = c.req.query('offset');
   const limit = limitRaw !== undefined ? NonNegativeInt.safeParse(limitRaw) : undefined;
@@ -141,6 +173,11 @@ export async function handleMayorListAgents(
   c: Context<GastownEnv>,
   params: { townId: string; rigId: string }
 ) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
   console.log(
     `${HANDLER_LOG} handleMayorListAgents: townId=${params.townId} rigId=${params.rigId}`
   );
@@ -162,6 +199,11 @@ export async function handleMayorSendMail(c: Context<GastownEnv>, params: { town
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
       400
     );
+  }
+
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, parsed.data.rig_id);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
   }
 
   console.log(

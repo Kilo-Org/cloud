@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import { verifyAgentJWT, type AgentJWTPayload } from '../util/jwt.util';
+import { verifyAgentJWT } from '../util/jwt.util';
 import { resError } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
 

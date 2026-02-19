@@ -1,3 +1,4 @@
+import React from 'react';
 import { Send, Slack } from 'lucide-react';
 import { DiscordIcon } from './icons/DiscordIcon';
 

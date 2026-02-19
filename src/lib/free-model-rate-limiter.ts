@@ -13,22 +13,26 @@ export type RateLimitResult = {
   requestCount: number;
 };
 
-async function getModelUsageSinceTime(windowStart: Date, ipAddress: string): Promise<number> {
+async function getModelUsageSinceTime(
+  windowStart: Date,
+  ipAddress: string,
+  anonymousOnly = false
+): Promise<number> {
+  const conditions = [
+    sql`${free_model_usage.ip_address} = ${ipAddress}`,
+    gte(free_model_usage.created_at, windowStart.toISOString()),
+  ];
+
+  if (anonymousOnly) {
+    conditions.push(sql`${free_model_usage.kilo_user_id} IS NULL`);
+  }
+
   const usage = await db
-    .select({
-      totalRequests: count(),
-    })
+    .select({ totalRequests: count() })
     .from(free_model_usage)
-    .where(
-      and(
-        sql`${free_model_usage.ip_address} = ${ipAddress}`,
-        gte(free_model_usage.created_at, windowStart.toISOString())
-      )
-    );
+    .where(and(...conditions));
 
-  const requestCount = Number(usage[0]?.totalRequests ?? 0);
-
-  return requestCount;
+  return Number(usage[0]?.totalRequests ?? 0);
 }
 
 /**
@@ -51,11 +55,9 @@ export async function checkFreeModelRateLimit(ipAddress: string): Promise<RateLi
  * Applies to free model requests without authentication.
  */
 export async function checkPromotionLimit(ipAddress: string): Promise<RateLimitResult> {
-  const windowStart = new Date(
-    Date.now() - PROMOTION_WINDOW_HOURS * 60 * 60 * 1000
-  );
+  const windowStart = new Date(Date.now() - PROMOTION_WINDOW_HOURS * 60 * 60 * 1000);
 
-  const requestCount = await getModelUsageSinceTime(windowStart, ipAddress);
+  const requestCount = await getModelUsageSinceTime(windowStart, ipAddress, true);
 
   return {
     allowed: requestCount < PROMOTION_MAX_REQUESTS,

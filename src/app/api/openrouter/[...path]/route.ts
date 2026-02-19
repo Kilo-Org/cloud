@@ -229,7 +229,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               'to continue using free models. No credit card or purchase required.',
           },
         },
-        { status: 401 }
+        { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
       );
     }
 

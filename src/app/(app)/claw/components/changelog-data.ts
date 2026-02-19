@@ -11,6 +11,12 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-02-19',
+    description: 'Added Discord and Slack channel configuration',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
     date: '2026-02-18',
     description: 'Fixed an issue where pending pair requests were not displayed',
     category: 'bugfix',

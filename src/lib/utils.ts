@@ -167,6 +167,14 @@ export function getLowerDomainFromEmail(email: string): string | null {
 }
 
 /**
+ * Converts the first character of a string to uppercase.
+ * Note: This is NOT full title-casing (e.g., "hello world" → "Hello world", not "Hello World")
+ */
+export function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
  * Asserts that a value is not null or undefined and narrows its type.
  * Throws an error if the value is null or undefined.
  * This version provides type narrowing of the original parameter.

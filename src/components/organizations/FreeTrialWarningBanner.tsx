@@ -9,7 +9,7 @@ import type {
   OrganizationRole,
   OrganizationWithMembers,
 } from '@/lib/organizations/organization-types';
-import { cn } from '@/lib/utils';
+import { capitalize, cn } from '@/lib/utils';
 
 type FreeTrialWarningBannerProps = {
   organization: OrganizationWithMembers;
@@ -18,7 +18,7 @@ type FreeTrialWarningBannerProps = {
   onUpgradeClick: () => void;
 };
 
-function getStylesForState(state: OrgTrialStatus) {
+function getStylesForState(state: OrgTrialStatus, planName: string) {
   switch (state) {
     case 'trial_active':
       return {
@@ -26,7 +26,7 @@ function getStylesForState(state: OrgTrialStatus) {
         border: 'border-blue-500/50',
         text: 'text-blue-100',
         icon: 'text-blue-400',
-        title: 'Free Trial Active',
+        title: `Free Kilo ${planName} Trial Active`,
       };
     case 'trial_ending_soon':
       return {
@@ -34,7 +34,7 @@ function getStylesForState(state: OrgTrialStatus) {
         border: 'border-orange-500/50',
         text: 'text-orange-100',
         icon: 'text-orange-400',
-        title: 'Trial Ending Soon',
+        title: `Free Kilo ${planName} Trial Ending Soon`,
       };
     case 'trial_ending_very_soon':
       return {
@@ -42,7 +42,7 @@ function getStylesForState(state: OrgTrialStatus) {
         border: 'border-red-500/50',
         text: 'text-red-100',
         icon: 'text-red-400',
-        title: 'Trial Ending Very Soon',
+        title: `Free Kilo ${planName} Trial Ending Very Soon`,
       };
     case 'trial_expires_today':
       return {
@@ -50,7 +50,7 @@ function getStylesForState(state: OrgTrialStatus) {
         border: 'border-red-600',
         text: 'text-red-100',
         icon: 'text-red-400',
-        title: 'Trial Ends Today',
+        title: `Free Kilo ${planName} Trial Ends Today`,
       };
     case 'trial_expired_soft':
     case 'trial_expired_hard':
@@ -59,7 +59,7 @@ function getStylesForState(state: OrgTrialStatus) {
         border: 'border-red-600',
         text: 'text-red-100',
         icon: 'text-red-400',
-        title: 'Trial Has Ended',
+        title: `Free Kilo ${planName} Trial Has Ended`,
       };
     case 'subscribed':
       return {
@@ -116,13 +116,14 @@ function getTrialMessage(daysRemaining: number, isOwner: boolean): string {
 }
 
 export function FreeTrialWarningBanner({
-  organization: _organization,
+  organization,
   daysRemaining,
   userRole,
   onUpgradeClick,
 }: FreeTrialWarningBannerProps) {
   const state = getOrgTrialStatusFromDays(daysRemaining);
-  const styles = getStylesForState(state);
+  const planName = capitalize(organization.plan);
+  const styles = getStylesForState(state, planName);
   const isOwner = userRole === 'owner';
   const buttonVariant = getButtonVariantForState(state);
   const message = getTrialMessage(daysRemaining, isOwner);

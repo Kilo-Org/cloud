@@ -123,9 +123,13 @@ async function gastownFetch(path: string, init?: RequestInit): Promise<unknown> 
   const method = init?.method ?? 'GET';
   console.log(`${CLIENT_LOG} ${method} ${url}`);
   if (init?.body) {
-    console.log(
-      `${CLIENT_LOG}   body: ${typeof init.body === 'string' ? init.body.slice(0, 500) : '[non-string body]'}`
-    );
+    const safeBody =
+      typeof init.body === 'string'
+        ? init.body
+            .replace(/"kilocode_token":"[^"]*"/g, '"kilocode_token":"[REDACTED]"')
+            .slice(0, 500)
+        : '[non-string body]';
+    console.log(`${CLIENT_LOG}   body: ${safeBody}`);
   }
 
   const startTime = Date.now();

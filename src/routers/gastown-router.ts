@@ -4,7 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import * as gastown from '@/lib/gastown/gastown-client';
 import { GastownApiError } from '@/lib/gastown/gastown-client';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 
 const LOG_PREFIX = '[gastown-router]';
 
@@ -80,7 +80,10 @@ export const gastownRouter = createTRPCRouter({
 
       // Generate a user API token so agents can route LLM calls through the
       // Kilo gateway. Stored in RigConfig and injected into agent env vars.
-      const kilocodeToken = generateApiToken(ctx.user);
+      // 30-day expiry to limit blast radius if leaked; refreshed on rig update.
+      const kilocodeToken = generateApiToken(ctx.user, undefined, {
+        expiresIn: TOKEN_EXPIRY.thirtyDays,
+      });
 
       return withGastownError(() =>
         gastown.createRig(ctx.user.id, {

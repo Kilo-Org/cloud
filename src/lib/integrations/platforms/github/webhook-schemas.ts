@@ -130,6 +130,12 @@ export const PullRequestPayloadSchema = z.object({
     head: z.object({
       sha: z.string(),
       ref: z.string(),
+      repo: z
+        .object({
+          full_name: z.string(),
+        })
+        .nullable()
+        .optional(),
     }),
     base: z.object({
       sha: z.string(),

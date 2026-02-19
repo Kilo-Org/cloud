@@ -784,11 +784,8 @@ export class RigDO extends DurableObject<Env> {
   // Singleton roles (mayor, witness, refinery) always return the existing
   // agent even if busy — only polecats scale out by creating new agents.
 
-  private static readonly SINGLETON_ROLES: ReadonlySet<string> = new Set([
-    'mayor',
-    'witness',
-    'refinery',
-  ]);
+  // Mayor removed: now handled by MayorDO (town-level, not per-rig)
+  private static readonly SINGLETON_ROLES: ReadonlySet<string> = new Set(['witness', 'refinery']);
 
   async getOrCreateAgent(role: AgentRole): Promise<Agent> {
     await this.ensureInitialized();

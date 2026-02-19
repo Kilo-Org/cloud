@@ -29,12 +29,14 @@
       { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
       { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
       { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
+      { "name": "MAYOR", "class_name": "MayorDO" },
     ],
   },
 
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["RigDO", "GastownUserDO", "AgentIdentityDO"] },
     { "tag": "v2", "new_sqlite_classes": ["TownContainerDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["MayorDO"] },
   ],
 
   "vars": {
@@ -76,6 +78,7 @@
           { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
           { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
           { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
+          { "name": "MAYOR", "class_name": "MayorDO" },
         ],
       },
       "secrets_store_secrets": [

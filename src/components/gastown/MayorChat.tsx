@@ -11,10 +11,10 @@ import { Send } from 'lucide-react';
 
 type MayorChatProps = {
   townId: string;
-  rigId: string;
+  rigId?: string;
 };
 
-export function MayorChat({ townId, rigId }: MayorChatProps) {
+export function MayorChat({ townId }: MayorChatProps) {
   const [message, setMessage] = useState('');
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -22,7 +22,6 @@ export function MayorChat({ townId, rigId }: MayorChatProps) {
   const sendMessage = useMutation(
     trpc.gastown.sendMessage.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey() });
         queryClient.invalidateQueries({ queryKey: trpc.gastown.listAgents.queryKey() });
         toast.success('Message sent to Mayor');
         setMessage('');
@@ -38,7 +37,6 @@ export function MayorChat({ townId, rigId }: MayorChatProps) {
     if (!message.trim()) return;
     sendMessage.mutate({
       townId,
-      rigId,
       message: message.trim(),
     });
   };

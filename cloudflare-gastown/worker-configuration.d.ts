@@ -4,7 +4,12 @@
 declare namespace Cloudflare {
   interface GlobalProps {
     mainModule: typeof import('./src/gastown.worker');
-    durableNamespaces: 'RigDO' | 'GastownUserDO' | 'AgentIdentityDO' | 'TownContainerDO';
+    durableNamespaces:
+      | 'RigDO'
+      | 'GastownUserDO'
+      | 'AgentIdentityDO'
+      | 'TownContainerDO'
+      | 'MayorDO';
   }
   interface DevEnv {
     GASTOWN_JWT_SECRET: SecretsStoreSecret;
@@ -16,6 +21,7 @@ declare namespace Cloudflare {
     GASTOWN_USER: DurableObjectNamespace<import('./src/gastown.worker').GastownUserDO>;
     AGENT_IDENTITY: DurableObjectNamespace<import('./src/gastown.worker').AgentIdentityDO>;
     TOWN_CONTAINER: DurableObjectNamespace<import('./src/gastown.worker').TownContainerDO>;
+    MAYOR: DurableObjectNamespace<import('./src/gastown.worker').MayorDO>;
   }
   interface Env {
     GASTOWN_JWT_SECRET: SecretsStoreSecret;
@@ -27,6 +33,7 @@ declare namespace Cloudflare {
     GASTOWN_USER: DurableObjectNamespace<import('./src/gastown.worker').GastownUserDO>;
     AGENT_IDENTITY: DurableObjectNamespace<import('./src/gastown.worker').AgentIdentityDO>;
     TOWN_CONTAINER: DurableObjectNamespace<import('./src/gastown.worker').TownContainerDO>;
+    MAYOR: DurableObjectNamespace<import('./src/gastown.worker').MayorDO>;
   }
 }
 interface Env extends Cloudflare.Env {}

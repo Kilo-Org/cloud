@@ -212,6 +212,16 @@ export function isFlyNotFound(err: unknown): boolean {
 }
 
 /**
+ * Check if an error is a Fly API 412 (insufficient resources).
+ * This typically means the physical host where a volume is pinned has no
+ * capacity to launch a new machine. Recovery requires replacing the volume
+ * in a different region/host.
+ */
+export function isFlyInsufficientResources(err: unknown): boolean {
+  return err instanceof FlyApiError && err.status === 412;
+}
+
+/**
  * List machines in the app, optionally filtered by metadata key-value pairs.
  *
  * Metadata filtering (?metadata.{key}=value) is documented in the Fly Machines

@@ -44,6 +44,7 @@ import {
   ALARM_INTERVAL_IDLE_MS,
   ALARM_JITTER_MS,
   SELF_HEAL_THRESHOLD,
+  DEFAULT_FLY_REGION,
 } from '../config';
 import type { FlyClientConfig } from '../fly/client';
 import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
@@ -155,6 +156,19 @@ function volumeNameFromSandboxId(sandboxId: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, '_')
     .slice(0, 30);
+}
+
+// ============================================================================
+// Region priority helper for 412 recovery
+// ============================================================================
+
+/**
+ * Reverse the FLY_REGION priority list so we try different regions first.
+ * E.g. "dfw,yyz,cdg" → "cdg,yyz,dfw" — if dfw was capacity-constrained,
+ * Fly will try cdg first on the next attempt.
+ */
+export function reverseRegionPriority(regionList: string): string {
+  return regionList.split(',').reverse().join(',');
 }
 
 // ============================================================================
@@ -321,7 +335,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Create Fly Volume on first provision
     if (isNew && !this.flyVolumeId) {
       const flyConfig = this.getFlyConfig();
-      const region = config.region ?? this.env.FLY_REGION ?? 'us,eu';
+      const region = config.region ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION;
       const volume = await fly.createVolume(flyConfig, {
         name: volumeNameFromSandboxId(sandboxId),
         region,
@@ -663,6 +677,37 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Ensure a volume exists
     await this.ensureVolume(flyConfig, 'start');
 
+    // When we have a volume but no machine, verify the volume's actual region
+    // matches what we have cached. flyRegion can drift after DO restore, manual
+    // intervention, or bugs. A mismatch would place the machine in the wrong
+    // region, unable to attach the volume.
+    if (this.flyVolumeId && !this.flyMachineId) {
+      try {
+        const volume = await fly.getVolume(flyConfig, this.flyVolumeId);
+        if (volume.region !== this.flyRegion) {
+          console.warn(
+            '[DO] flyRegion drift detected:',
+            this.flyRegion,
+            '-> actual:',
+            volume.region
+          );
+          this.flyRegion = volume.region;
+          await this.ctx.storage.put(storageUpdate({ flyRegion: volume.region }));
+        }
+      } catch (err) {
+        if (fly.isFlyNotFound(err)) {
+          // Volume gone — clear it so ensureVolume creates a new one on next call
+          console.warn('[DO] Volume not found during region check, clearing');
+          this.flyVolumeId = null;
+          this.flyRegion = null;
+          await this.ctx.storage.put(storageUpdate({ flyVolumeId: null, flyRegion: null }));
+          await this.ensureVolume(flyConfig, 'start');
+        }
+        // Other errors: proceed with cached region, createMachine will fail
+        // and the error will surface to the caller
+      }
+    }
+
     // If status is 'running', verify the machine is actually alive.
     // Check BEFORE building env vars — buildUserEnvVars calls ensureEnvKey
     // which writes to the Fly secrets API and could fail on transient errors.
@@ -693,10 +738,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       identity
     );
 
-    if (this.flyMachineId) {
-      await this.startExistingMachine(flyConfig, machineConfig, minSecretsVersion);
-    } else {
-      await this.createNewMachine(flyConfig, machineConfig, minSecretsVersion);
+    try {
+      if (this.flyMachineId) {
+        await this.startExistingMachine(flyConfig, machineConfig, minSecretsVersion);
+      } else {
+        await this.createNewMachine(flyConfig, machineConfig, minSecretsVersion);
+      }
+    } catch (err) {
+      if (!fly.isFlyInsufficientResources(err)) throw err;
+
+      // 412: host where the volume lives has no capacity.
+      // Replace the volume (fork if user data exists, fresh otherwise)
+      // and retry machine creation once.
+      console.warn('[DO] Insufficient resources (412), replacing stranded volume');
+      await this.replaceStrandedVolume(flyConfig, 'start_412_recovery');
+
+      // Rebuild machine config with new volume ID
+      const retryConfig = buildMachineConfig(
+        this.getRegistryApp(),
+        imageTag,
+        envVars,
+        guest,
+        this.flyVolumeId,
+        identity
+      );
+      await this.createNewMachine(flyConfig, retryConfig, minSecretsVersion);
     }
 
     // Update state
@@ -1339,7 +1405,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.flyVolumeId) return;
     if (!this.sandboxId) return;
 
-    const region = this.flyRegion ?? this.env.FLY_REGION ?? 'us,eu';
+    const region = this.flyRegion ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION;
     const volume = await fly.createVolume(flyConfig, {
       name: volumeNameFromSandboxId(this.sandboxId),
       region,
@@ -1354,6 +1420,100 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       volume_id: volume.id,
       region: volume.region,
     });
+  }
+
+  /**
+   * Replace a stranded volume whose host has no capacity (Fly 412).
+   *
+   * For existing instances (lastStartedAt set): forks the volume to preserve
+   * user data, falling back to a fresh volume if the fork fails.
+   * For fresh provisions (never started): deletes and creates a new empty volume.
+   *
+   * Uses reversed FLY_REGION priority so we prefer different regions.
+   * Also destroys any existing machine (it's stuck on the same host).
+   */
+  private async replaceStrandedVolume(flyConfig: FlyClientConfig, reason: string): Promise<void> {
+    if (!this.sandboxId || !this.flyVolumeId) return;
+
+    const oldVolumeId = this.flyVolumeId;
+    const oldRegion = this.flyRegion;
+    const hasUserData = this.lastStartedAt !== null;
+    const reversedRegion = reverseRegionPriority(this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+
+    // Destroy existing machine if any — it's stuck on the constrained host
+    if (this.flyMachineId) {
+      try {
+        await fly.destroyMachine(flyConfig, this.flyMachineId);
+        reconcileLog(reason, 'destroy_stranded_machine', { machine_id: this.flyMachineId });
+      } catch (err) {
+        if (!fly.isFlyNotFound(err)) {
+          console.warn('[DO] Failed to destroy stranded machine:', err);
+        }
+      }
+      this.flyMachineId = null;
+      await this.ctx.storage.put(storageUpdate({ flyMachineId: null }));
+    }
+
+    // Try to fork the volume if it has user data
+    let forked = false;
+    if (hasUserData) {
+      try {
+        const forkedVolume = await fly.createVolume(flyConfig, {
+          name: volumeNameFromSandboxId(this.sandboxId),
+          region: reversedRegion,
+          size_gb: DEFAULT_VOLUME_SIZE_GB,
+          source_volume_id: oldVolumeId,
+        });
+        this.flyVolumeId = forkedVolume.id;
+        this.flyRegion = forkedVolume.region;
+        forked = true;
+        reconcileLog(reason, 'fork_stranded_volume', {
+          old_volume_id: oldVolumeId,
+          old_region: oldRegion,
+          new_volume_id: forkedVolume.id,
+          new_region: forkedVolume.region,
+        });
+      } catch (err) {
+        console.warn('[DO] Volume fork failed, falling back to fresh volume:', err);
+      }
+    }
+
+    // Fresh volume: either because this is a first-time provision or fork failed
+    if (!forked) {
+      this.flyVolumeId = null;
+      this.flyRegion = null;
+      await this.ctx.storage.put(storageUpdate({ flyVolumeId: null, flyRegion: null }));
+
+      const freshVolume = await fly.createVolume(flyConfig, {
+        name: volumeNameFromSandboxId(this.sandboxId),
+        region: reversedRegion,
+        size_gb: DEFAULT_VOLUME_SIZE_GB,
+      });
+      this.flyVolumeId = freshVolume.id;
+      this.flyRegion = freshVolume.region;
+      reconcileLog(reason, 'create_replacement_volume', {
+        old_volume_id: oldVolumeId,
+        old_region: oldRegion,
+        new_volume_id: freshVolume.id,
+        new_region: freshVolume.region,
+        data_loss: hasUserData,
+      });
+    }
+
+    // Persist new volume state
+    await this.ctx.storage.put(
+      storageUpdate({ flyVolumeId: this.flyVolumeId, flyRegion: this.flyRegion })
+    );
+
+    // Delete old volume (best-effort cleanup)
+    try {
+      await fly.deleteVolume(flyConfig, oldVolumeId);
+      reconcileLog(reason, 'delete_stranded_volume', { volume_id: oldVolumeId });
+    } catch (err) {
+      if (!fly.isFlyNotFound(err)) {
+        console.warn('[DO] Failed to delete stranded volume (will leak):', oldVolumeId, err);
+      }
+    }
   }
 
   /**

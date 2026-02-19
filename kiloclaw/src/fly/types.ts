@@ -92,6 +92,8 @@ export type CreateVolumeRequest = {
   region: string;
   size_gb: number;
   snapshot_retention?: number;
+  /** Fork an existing volume. Creates a copy on a different host/region. */
+  source_volume_id?: string;
 };
 
 // -- Exec types --

@@ -30,6 +30,7 @@ export const preferredModels = [
   'anthropic/claude-haiku-4.5',
   'openai/gpt-5.2',
   'openai/gpt-5.2-codex',
+  'google/gemini-3.1-pro-preview',
   'google/gemini-3-pro-preview',
   'google/gemini-3-flash-preview',
   'moonshotai/kimi-k2.5',

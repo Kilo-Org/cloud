@@ -220,40 +220,43 @@ function applyToolChoiceSetting(
   }
 }
 
-function getPreferredProvider(requestedModel: string): OpenRouterInferenceProviderId | null {
+function getPreferredProviders(requestedModel: string): OpenRouterInferenceProviderId[] {
   if (isAnthropicModel(requestedModel)) {
-    return OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'];
+    return [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']];
   }
   if (requestedModel.startsWith('minimax/')) {
-    return OpenRouterInferenceProviderIdSchema.enum.minimax;
+    return [OpenRouterInferenceProviderIdSchema.enum.minimax];
   }
   if (isMistralModel(requestedModel)) {
-    return OpenRouterInferenceProviderIdSchema.enum.mistral;
+    return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
   if (isMoonshotModel(requestedModel)) {
-    return OpenRouterInferenceProviderIdSchema.enum.moonshotai;
+    return [OpenRouterInferenceProviderIdSchema.enum.moonshotai];
   }
   if (requestedModel.startsWith('z-ai/')) {
-    return OpenRouterInferenceProviderIdSchema.enum['z-ai'];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum['z-ai'],
+      OpenRouterInferenceProviderIdSchema.enum.novita,
+    ];
   }
-  return null;
+  return [];
 }
 
 function applyPreferredProvider(
   requestedModel: string,
   requestToMutate: OpenRouterChatCompletionRequest
 ) {
-  const preferredProvider = getPreferredProvider(requestedModel);
-  if (!preferredProvider) {
+  const preferredProviders = getPreferredProviders(requestedModel);
+  if (preferredProviders.length === 0) {
     return;
   }
   console.debug(
-    `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProvider}`
+    `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviders.join(', ')}`
   );
   if (!requestToMutate.provider) {
-    requestToMutate.provider = { order: [preferredProvider] };
+    requestToMutate.provider = { order: preferredProviders };
   } else if (!requestToMutate.provider.order) {
-    requestToMutate.provider.order = [preferredProvider];
+    requestToMutate.provider.order = preferredProviders;
   }
 }
 

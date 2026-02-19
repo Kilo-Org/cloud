@@ -25,7 +25,8 @@ import { z } from 'zod';
 
 const postCommentRequestSchema = z.object({
   ticketId: z.string().uuid(),
-  body: z.string().min(1),
+  // GitHub's hard limit for issue comments is 65536 bytes
+  body: z.string().min(1).max(65536),
 });
 
 export async function POST(req: NextRequest) {

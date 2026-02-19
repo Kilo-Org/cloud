@@ -28,10 +28,21 @@ const parseNextPageUrl = (linkHeader: string | null): string | null => {
  * Fetch all labels from a GitHub repository, following pagination.
  * Returns DEFAULT_LABELS if the fetch fails or the repo has no labels.
  */
+// Matches the GitHub owner/repo format; rejects anything that could alter a URL
+// (query strings, fragments, path traversal, etc.)
+const REPO_FULL_NAME_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
+
 export async function fetchRepoLabels(
   repoFullName: string,
   githubToken: string
 ): Promise<string[]> {
+  if (!REPO_FULL_NAME_RE.test(repoFullName)) {
+    console.warn('[auto-triage:labels] Invalid repoFullName format, falling back to defaults', {
+      repoFullName,
+    });
+    return DEFAULT_LABELS;
+  }
+
   console.log('[auto-triage:labels] Fetching labels for repo:', repoFullName);
 
   const headers = {

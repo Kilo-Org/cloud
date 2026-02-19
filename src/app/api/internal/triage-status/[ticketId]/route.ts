@@ -38,6 +38,7 @@ const statusUpdatePayloadSchema = z.object({
     .optional(),
   actionMetadata: z.record(z.string(), z.unknown()).optional(),
   errorMessage: z.string().optional(),
+  shouldAutoFix: z.boolean().optional(),
 });
 
 const ticketIdSchema = z.string().uuid();
@@ -76,45 +77,35 @@ export async function POST(
       hasError: !!errorMessage,
     });
 
-    // Get current ticket to check if update is needed
-    const ticket = await getTriageTicketById(ticketId);
-
-    if (!ticket) {
-      logExceptInTest('[triage-status] Ticket not found', { ticketId });
-      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
-    }
-
-    // Determine valid transitions based on incoming status
-    const isTerminalState = ticket.status === 'actioned' || ticket.status === 'failed';
-
-    if (isTerminalState) {
-      // Already in terminal state - skip update
-      logExceptInTest('[triage-status] Ticket already in terminal state, skipping update', {
-        ticketId,
-        currentStatus: ticket.status,
-        requestedStatus: status,
-      });
-      return NextResponse.json({
-        success: true,
-        message: 'Ticket already in terminal state',
-        currentStatus: ticket.status,
-      });
-    }
-
-    // Valid transitions:
-    // - pending -> analyzing (orchestrator starting)
-    // - analyzing -> analyzing (sessionId update)
-    // - analyzing -> actioned/failed (callback)
-    // - pending -> actioned/failed (edge case: immediate failure)
-
-    // Update ticket status in database
-    await updateTriageTicketStatus(ticketId, status, {
+    // Atomic update with terminal state guard in the WHERE clause.
+    // Returns 0 if the ticket doesn't exist OR is already in a terminal state.
+    const rowsUpdated = await updateTriageTicketStatus(ticketId, status, {
       sessionId,
       errorMessage,
       startedAt: status === 'analyzing' ? new Date() : undefined,
       completedAt: status === 'actioned' || status === 'failed' ? new Date() : undefined,
       ...updates,
     });
+
+    if (rowsUpdated === 0) {
+      const existing = await getTriageTicketById(ticketId);
+      if (!existing) {
+        logExceptInTest('[triage-status] Ticket not found', { ticketId });
+        return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
+      }
+      logExceptInTest('[triage-status] Ticket already in terminal state, skipping update', {
+        ticketId,
+        currentStatus: existing.status,
+        requestedStatus: status,
+      });
+      return NextResponse.json(
+        {
+          error: 'Ticket already in terminal state',
+          currentStatus: existing.status,
+        },
+        { status: 409 }
+      );
+    }
 
     logExceptInTest('[triage-status] Updated ticket status', {
       ticketId,
@@ -125,16 +116,15 @@ export async function POST(
     // Only trigger dispatch for terminal states (actioned/failed)
     // This frees up a slot for the next pending ticket
     if (status === 'actioned' || status === 'failed') {
+      const ticket = await getTriageTicketById(ticketId);
+      if (!ticket) {
+        return NextResponse.json({ error: 'Ticket not found after update' }, { status: 500 });
+      }
+
       let owner;
       if (ticket.owned_by_organization_id) {
         const botUserId = await getBotUserId(ticket.owned_by_organization_id, 'auto-triage');
-        if (botUserId) {
-          owner = {
-            type: 'org' as const,
-            id: ticket.owned_by_organization_id,
-            userId: botUserId,
-          };
-        } else {
+        if (!botUserId) {
           errorExceptInTest('[triage-status] Bot user not found for organization', {
             organizationId: ticket.owned_by_organization_id,
             ticketId,
@@ -144,7 +134,16 @@ export async function POST(
             tags: { source: 'triage-status' },
             extra: { organizationId: ticket.owned_by_organization_id, ticketId },
           });
+          return NextResponse.json(
+            { error: 'Bot user not found for organization' },
+            { status: 500 }
+          );
         }
+        owner = {
+          type: 'org' as const,
+          id: ticket.owned_by_organization_id,
+          userId: botUserId,
+        };
       } else {
         owner = {
           type: 'user' as const,
@@ -153,21 +152,18 @@ export async function POST(
         };
       }
 
-      if (owner) {
-        // Trigger dispatch in background (don't await - fire and forget)
-        tryDispatchPendingTickets(owner).catch(dispatchError => {
-          errorExceptInTest('[triage-status] Error dispatching pending tickets:', dispatchError);
-          captureException(dispatchError, {
-            tags: { source: 'triage-status-dispatch' },
-            extra: { ticketId, owner },
-          });
+      tryDispatchPendingTickets(owner).catch(dispatchError => {
+        errorExceptInTest('[triage-status] Error dispatching pending tickets:', dispatchError);
+        captureException(dispatchError, {
+          tags: { source: 'triage-status-dispatch' },
+          extra: { ticketId, owner },
         });
+      });
 
-        logExceptInTest('[triage-status] Triggered dispatch for pending tickets', {
-          ticketId,
-          owner,
-        });
-      }
+      logExceptInTest('[triage-status] Triggered dispatch for pending tickets', {
+        ticketId,
+        owner,
+      });
     }
 
     return NextResponse.json({ success: true });

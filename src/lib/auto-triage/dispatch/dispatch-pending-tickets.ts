@@ -18,7 +18,7 @@ import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { updateTriageTicketStatus } from '../db/triage-tickets';
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
-import { triageWorkerClient } from '../client/triage-worker-client';
+import { getTriageWorkerClient } from '../client/triage-worker-client';
 import { AUTO_TRIAGE_CONSTANTS } from '../core/constants';
 
 export interface DispatchResult {
@@ -156,7 +156,7 @@ async function dispatchTicket(ticket: AutoTriageTicket, owner: Owner): Promise<v
   await updateTriageTicketStatus(ticket.id, 'analyzing');
 
   // 4. Dispatch to Cloudflare Worker to create TriageOrchestrator DO
-  await triageWorkerClient.dispatchTriage(payload);
+  await getTriageWorkerClient().dispatchTriage(payload);
 
   logExceptInTest('[dispatchTicket] Ticket dispatched successfully', {
     ticketId: ticket.id,

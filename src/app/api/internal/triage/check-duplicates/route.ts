@@ -25,11 +25,19 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { createEmbeddingService } from '@/lib/embeddings/embedding-providers';
 import { getMilvusClient } from '@/lib/code-indexing/milvus';
+import { ensureTriageCollectionExists } from '@/lib/auto-triage/milvus/setup-collection';
 import { createHash } from 'crypto';
 
 const COLLECTION_NAME = 'auto_triage_tickets';
 const SIMILARITY_THRESHOLD = 0.8; // Adjusted for Mistral embeddings
 const SEARCH_LIMIT = 5;
+
+let collectionEnsured = false;
+async function ensureCollection() {
+  if (collectionEnsured) return;
+  await ensureTriageCollectionExists(getMilvusClient());
+  collectionEnsured = true;
+}
 
 const checkDuplicatesRequestSchema = z.object({
   ticketId: z.string().uuid(),
@@ -176,6 +184,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await ensureCollection();
+
     const parseResult = checkDuplicatesRequestSchema.safeParse(await req.json());
     if (!parseResult.success) {
       return NextResponse.json(
@@ -239,7 +249,7 @@ export async function POST(req: NextRequest) {
     // Determine if duplicate based on similarity threshold
     // For now, we use a simple threshold approach
     // In the future, we could add LLM verification for high-similarity matches
-    const isDuplicate = similarTickets.length > 0 && similarTickets[0].similarity >= 0.9;
+    const isDuplicate = similarTickets.length > 0 && similarTickets[0].similarity >= threshold;
 
     const response: CheckDuplicatesResponse = {
       isDuplicate,

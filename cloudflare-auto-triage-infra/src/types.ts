@@ -70,6 +70,7 @@ export interface TriageTicket {
   similarityScore?: number;
   actionTaken?: TriageAction;
   actionMetadata?: Record<string, unknown>;
+  shouldAutoFix?: boolean;
   errorMessage?: string;
   startedAt?: string;
   completedAt?: string;

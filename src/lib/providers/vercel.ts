@@ -44,15 +44,15 @@ export async function shouldRouteToVercel(
   request: OpenRouterChatCompletionRequest,
   randomSeed: string
 ) {
-  if (!VERCEL_ROUTING_ALLOW_LIST.includes(requestedModel)) {
-    console.debug(`[shouldRouteToVercel] model not on the allow list for Vercel routing`);
-    return false;
-  }
-
   if (request.provider?.data_collection === 'deny') {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because data_collection=deny is not supported`
     );
+    return false;
+  }
+
+  if (!VERCEL_ROUTING_ALLOW_LIST.includes(requestedModel)) {
+    console.debug(`[shouldRouteToVercel] model not on the allow list for Vercel routing`);
     return false;
   }
 

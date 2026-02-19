@@ -2,12 +2,11 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Coins, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { Coins } from 'lucide-react';
 import { formatMicrodollars, formatDate } from '@/lib/admin-utils';
 import { useTRPC } from '@/lib/trpc/utils';
-import { toast } from 'sonner';
+import CheckKiloPassButton from './CheckKiloPassButton';
 
 function formatUsd(value: number | string | null | undefined): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -65,23 +64,6 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
   }
 
   const { subscription, issuances, currentPeriodUsageUsd, thresholds } = data;
-
-  const queryClient = useQueryClient();
-  const checkKiloPass = useMutation(
-    trpc.admin.users.checkKiloPass.mutationOptions({
-      onSuccess: d => {
-        void queryClient.invalidateQueries(
-          trpc.admin.users.getKiloPassState.queryOptions({ userId })
-        );
-        const beforeT = d.before.kilo_pass_threshold;
-        const afterT = d.after?.kilo_pass_threshold ?? null;
-        if (beforeT == null) toast.message('Kilo Pass: no threshold set');
-        else if (afterT == null) toast.success('Kilo Pass: bonus check ran (threshold cleared)');
-        else toast.message('Kilo Pass: bonus check ran (not yet eligible)');
-      },
-      onError: e => toast.error(e.message || 'Kilo Pass check failed'),
-    })
-  );
 
   const statusColor =
     subscription.status === 'active'
@@ -213,22 +195,9 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
                 </Badge>
               </div>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-3"
-              disabled={checkKiloPass.isPending}
-              onClick={() => checkKiloPass.mutate({ userId })}
-            >
-              {checkKiloPass.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Checking...
-                </>
-              ) : (
-                'Check Kilo Pass bonus'
-              )}
-            </Button>
+            <div className="mt-3">
+              <CheckKiloPassButton userId={userId} />
+            </div>
           </div>
         )}
 

@@ -38,8 +38,57 @@ function buildKiloConfigContent(kilocodeToken: string): string {
     // kilo serve v1.0.23 resolves title model independently and the
     // small_model fallback doesn't prevent ProviderModelNotFoundError.
     agent: {
+      build: {
+        model: 'anthropic/claude-sonnet-4.6',
+        // Auto-approve everything — agents run headless in a container,
+        // there's no human to answer permission prompts.
+        permission: {
+          edit: 'allow',
+          bash: 'allow',
+          webfetch: 'allow',
+          doom_loop: 'allow',
+          external_directory: 'allow',
+        },
+      },
+      general: {
+        model: 'anthropic/claude-sonnet-4.6',
+        // Auto-approve everything — agents run headless in a container,
+        // there's no human to answer permission prompts.
+        permission: {
+          edit: 'allow',
+          bash: 'allow',
+          webfetch: 'allow',
+          doom_loop: 'allow',
+          external_directory: 'allow',
+        },
+      },
+      plan: {
+        model: 'anthropic/claude-sonnet-4.6',
+        // Auto-approve everything — agents run headless in a container,
+        // there's no human to answer permission prompts.
+        permission: {
+          edit: 'allow',
+          bash: 'allow',
+          webfetch: 'allow',
+          doom_loop: 'allow',
+          external_directory: 'allow',
+        },
+      },
       title: {
         model: 'anthropic/claude-haiku-4.5',
+      },
+      explore: {
+        small_model: 'anthropic/claude-haiku-4.5',
+        model: 'anthropic/claude-sonnet-4.6',
+        // Auto-approve everything — agents run headless in a container,
+        // there's no human to answer permission prompts.
+        permission: {
+          edit: 'allow',
+          bash: 'allow',
+          webfetch: 'allow',
+          doom_loop: 'allow',
+          external_directory: 'allow',
+        },
       },
     },
     // Auto-approve everything — agents run headless in a container,

@@ -9,6 +9,7 @@
  * is unaffected.
  */
 
+import { mkdir, writeFile } from 'node:fs/promises';
 import type { Subprocess } from 'bun';
 import type { KiloServerInstance } from './types';
 
@@ -95,6 +96,17 @@ async function doStartServer(workdir: string, env: Record<string, string>): Prom
   }
 
   const port = allocatePort();
+
+  // Write KILO_CONFIG_CONTENT to the filesystem config file so kilo serve
+  // reads it as the primary config. kilo serve loads config.json from
+  // $XDG_CONFIG_HOME/kilo/ (defaults to ~/.config/kilo/) at startup and
+  // may ignore or deprioritize the KILO_CONFIG_CONTENT env var, causing
+  // the model to fall back to 'kilo/auto' which doesn't exist.
+  if (env.KILO_CONFIG_CONTENT) {
+    const configDir = `${env.HOME ?? '/root'}/.config/kilo`;
+    await mkdir(configDir, { recursive: true });
+    await writeFile(`${configDir}/config.json`, env.KILO_CONFIG_CONTENT);
+  }
 
   const mergedEnv = { ...process.env, ...env };
 

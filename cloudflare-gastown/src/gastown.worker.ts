@@ -228,9 +228,11 @@ app.post('/api/towns/:townId/mayor/destroy', c => handleDestroyMayor(c, c.req.pa
 // Tool endpoints called by the mayor's kilo serve session via the Gastown plugin.
 // Authenticated via mayor JWT (townId-scoped, no rigId restriction).
 
-app.use('/api/mayor/:townId/tools/*', async (c, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : mayorAuthMiddleware(c, next)
-);
+// Always run mayor auth — even in dev. The handler's resolveUserId()
+// reads agentJWT.userId which is only set after the middleware parses
+// the token. Skipping auth in dev leaves agentJWT null and causes 401s
+// from the handler itself.
+app.use('/api/mayor/:townId/tools/*', mayorAuthMiddleware);
 
 app.post('/api/mayor/:townId/tools/sling', c => handleMayorSling(c, c.req.param()));
 app.get('/api/mayor/:townId/tools/rigs', c => handleMayorListRigs(c, c.req.param()));

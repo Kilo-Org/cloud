@@ -108,7 +108,7 @@ export class MayorDO extends DurableObject<Env> {
 
     let session = await this.getSession();
 
-    if (session && session.status !== 'starting') {
+    if (session) {
       // Verify existing session is still alive in the container
       const alive = await this.isSessionAlive(config.townId, session.agentId);
       if (!alive) {
@@ -133,7 +133,21 @@ export class MayorDO extends DurableObject<Env> {
     console.log(
       `${MAYOR_LOG} sendMessage: sending follow-up to session ${session.sessionId} agent=${session.agentId}`
     );
-    await this.sendFollowUp(config.townId, session.agentId, message);
+    try {
+      await this.sendFollowUp(config.townId, session.agentId, message);
+    } catch (err) {
+      // The container may have restarted, losing the agent. Clear the
+      // stale session and start fresh rather than surfacing the error.
+      console.warn(
+        `${MAYOR_LOG} sendMessage: follow-up failed, clearing stale session and recreating`,
+        err instanceof Error ? err.message : err
+      );
+      await this.clearSession();
+      session = await this.createSession(config, message, model);
+      await this.saveSession(session);
+      await this.armAlarm();
+      return { agentId: session.agentId, sessionStatus: session.status };
+    }
     session = { ...session, status: 'active', lastActivityAt: now() };
     await this.saveSession(session);
     await this.armAlarm();
@@ -313,6 +327,11 @@ export class MayorDO extends DurableObject<Env> {
     );
 
     const token = await this.mintMayorToken(agentId, config);
+    if (!token) {
+      console.error(
+        `${MAYOR_LOG} createSession: mintMayorToken returned null — GASTOWN_SESSION_TOKEN will be missing from the container env. The gastown plugin will fail to load mayor tools.`
+      );
+    }
 
     const envVars: Record<string, string> = {
       // Mayor-specific: tells the plugin to load mayor tools instead of rig tools

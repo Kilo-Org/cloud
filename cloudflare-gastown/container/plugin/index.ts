@@ -4,6 +4,7 @@ import { createTools } from './tools';
 import { createMayorTools } from './mayor-tools';
 
 const SERVICE = 'gastown-plugin';
+console.log(`[${SERVICE}] Starting...`);
 
 function formatPrimeContextForInjection(primeResult: string): string {
   return [
@@ -22,15 +23,45 @@ export const GastownPlugin: Plugin = async ({ client }) => {
 
   // Mayor gets town-scoped tools; rig agents get rig-scoped tools.
   // The mayor doesn't have a rigId — it operates across rigs.
-  const gastownClient = isMayor ? null : createClientFromEnv();
-  const mayorClient = isMayor ? createMayorClientFromEnv() : null;
+  let gastownClient: ReturnType<typeof createClientFromEnv> | null = null;
+  let mayorClient: ReturnType<typeof createMayorClientFromEnv> | null = null;
+
+  if (isMayor) {
+    try {
+      mayorClient = createMayorClientFromEnv();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[${SERVICE}] Failed to create mayor client — mayor tools will NOT be registered: ${message}`
+      );
+      console.error(
+        `[${SERVICE}] Mayor env check: GASTOWN_API_URL=${process.env.GASTOWN_API_URL ? 'set' : 'MISSING'} GASTOWN_SESSION_TOKEN=${process.env.GASTOWN_SESSION_TOKEN ? 'set' : 'MISSING'} GASTOWN_AGENT_ID=${process.env.GASTOWN_AGENT_ID ? 'set' : 'MISSING'} GASTOWN_TOWN_ID=${process.env.GASTOWN_TOWN_ID ? 'set' : 'MISSING'}`
+      );
+    }
+  } else {
+    try {
+      gastownClient = createClientFromEnv();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[${SERVICE}] Failed to create rig client — rig tools will NOT be registered: ${message}`
+      );
+    }
+  }
 
   const rigTools = gastownClient ? createTools(gastownClient) : {};
   const mayorTools = mayorClient ? createMayorTools(mayorClient) : {};
   const tools = { ...rigTools, ...mayorTools };
 
+  const toolNames = Object.keys(tools);
+  console.log(
+    `[${SERVICE}] Loaded: role=${isMayor ? 'mayor' : 'rig'} tools=[${toolNames.join(', ')}] (${toolNames.length} total)`
+  );
+
   // Best-effort logging — never let telemetry failures break tool execution
   async function log(level: 'info' | 'error', message: string) {
+    console.log(`${SERVICE} ${level}: ${message}`);
+
     try {
       await client.app.log({ body: { service: SERVICE, level, message } });
     } catch {
@@ -56,6 +87,8 @@ export const GastownPlugin: Plugin = async ({ client }) => {
     tool: tools,
 
     event: async ({ event }) => {
+      // console.log(`[${SERVICE}] event:`, event);
+
       if (event.type === 'session.deleted' && gastownClient) {
         // Notify Rig DO that session ended — best-effort, don't throw
         try {
@@ -71,8 +104,17 @@ export const GastownPlugin: Plugin = async ({ client }) => {
       }
     },
 
+    // 'chat.message'(input, output) {
+    //   console.log(`[${SERVICE}] chat.message:`, input, output);
+    // },
+
+    // 'experimental.text.complete'(input, output) {
+    //   console.log(`[${SERVICE}] experimental.text.complete:`, input, output);
+    // },
+
     // Inject prime context into the system prompt on the first message (rig agents only)
     'experimental.chat.system.transform': async (_input, output) => {
+      // console.log(`[${SERVICE}] experimental.chat.system.transform:`, output);
       const alreadyInjected = output.system.some(s => s.includes('GASTOWN CONTEXT'));
       if (!alreadyInjected) {
         const primeResult = await primeAndLog();

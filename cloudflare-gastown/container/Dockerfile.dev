@@ -29,8 +29,8 @@ RUN mkdir -p /workspace/rigs /app
 # imports in index.ts resolve via the symlink's real path (/opt/…).
 COPY plugin/ /opt/gastown-plugin/
 RUN cd /opt/gastown-plugin && npm install --omit=dev && \
-    mkdir -p /root/.config/opencode/plugins && \
-    ln -s /opt/gastown-plugin/index.ts /root/.config/opencode/plugins/gastown.ts
+    mkdir -p /root/.config/kilo/plugins && \
+    ln -s /opt/gastown-plugin/index.ts /root/.config/kilo/plugins/gastown.ts
 
 WORKDIR /app
 

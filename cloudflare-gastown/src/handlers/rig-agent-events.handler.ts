@@ -3,12 +3,18 @@ import { z } from 'zod';
 import { getRigDOStub } from '../dos/Rig.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
+import { getEnforcedAgentId } from '../middleware/auth.middleware';
 import type { GastownEnv } from '../gastown.worker';
 
 const AppendEventBody = z.object({
   agent_id: z.string().min(1),
   event_type: z.string().min(1),
   data: z.unknown().default({}),
+});
+
+const GetEventsQuery = z.object({
+  after_id: z.coerce.number().int().nonnegative().optional(),
+  limit: z.coerce.number().int().positive().max(1000).optional(),
 });
 
 /**
@@ -20,6 +26,12 @@ export async function handleAppendAgentEvent(c: Context<GastownEnv>, params: { r
   const parsed = AppendEventBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(resError('Invalid request body'), 400);
+  }
+
+  // Verify the caller's agent identity matches the agent_id in the body
+  const enforced = getEnforcedAgentId(c);
+  if (enforced && enforced !== parsed.data.agent_id) {
+    return c.json(resError('agent_id does not match authenticated agent'), 403);
   }
 
   const rig = getRigDOStub(c.env, params.rigId);
@@ -36,14 +48,19 @@ export async function handleGetAgentEvents(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }
 ) {
-  const afterId = c.req.query('after_id');
-  const limit = c.req.query('limit');
+  const queryParsed = GetEventsQuery.safeParse({
+    after_id: c.req.query('after_id'),
+    limit: c.req.query('limit'),
+  });
+  if (!queryParsed.success) {
+    return c.json(resError('Invalid query parameters'), 400);
+  }
 
   const rig = getRigDOStub(c.env, params.rigId);
   const events = await rig.getAgentEvents(
     params.agentId,
-    afterId ? Number(afterId) : undefined,
-    limit ? Number(limit) : undefined
+    queryParsed.data.after_id,
+    queryParsed.data.limit
   );
 
   return c.json(resSuccess(events));

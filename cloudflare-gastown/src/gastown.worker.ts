@@ -142,6 +142,10 @@ app.post('/api/rigs/:rigId/agents/get-or-create', c => handleGetOrCreateAgent(c,
 app.get('/api/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
 app.delete('/api/rigs/:rigId/agents/:agentId', c => handleDeleteAgent(c, c.req.param()));
 
+// Dashboard-accessible agent events (before agentOnlyMiddleware so the
+// frontend can query events without an agent JWT)
+app.get('/api/rigs/:rigId/agents/:agentId/events', c => handleGetAgentEvents(c, c.req.param()));
+
 // Agent-scoped routes — agentOnlyMiddleware enforces JWT agentId match
 app.use('/api/rigs/:rigId/agents/:agentId/*', async (c, next) =>
   c.env.ENVIRONMENT === 'development' ? next() : agentOnlyMiddleware(c, next)
@@ -160,7 +164,6 @@ app.post('/api/rigs/:rigId/agents/:agentId/heartbeat', c => handleHeartbeat(c, c
 // ── Agent Events ─────────────────────────────────────────────────────────
 
 app.post('/api/rigs/:rigId/agent-events', c => handleAppendAgentEvent(c, c.req.param()));
-app.get('/api/rigs/:rigId/agents/:agentId/events', c => handleGetAgentEvents(c, c.req.param()));
 
 // ── Mail ────────────────────────────────────────────────────────────────
 

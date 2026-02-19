@@ -64,6 +64,15 @@ export function getAgentEvents(agentId: string, afterId = 0): BufferedEvent[] {
   return buf.filter(e => e.id > afterId);
 }
 
+// Clean up stale event buffers after the DO has had time to poll final events.
+const EVENT_BUFFER_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function scheduleEventBufferCleanup(agentId: string): void {
+  setTimeout(() => {
+    agentEventBuffers.delete(agentId);
+  }, EVENT_BUFFER_TTL_MS);
+}
+
 const startTime = Date.now();
 
 export function getUptime(): number {
@@ -147,6 +156,7 @@ export async function startAgent(
             event: 'agent.exited',
             data: { type: 'agent.exited', properties: { reason: 'completed' } },
           });
+          scheduleEventBufferCleanup(request.agentId);
           void reportAgentCompleted(agent, 'completed');
         }
       },
@@ -161,6 +171,7 @@ export async function startAgent(
             event: 'agent.exited',
             data: { type: 'agent.exited', properties: { reason: `stream closed: ${reason}` } },
           });
+          scheduleEventBufferCleanup(request.agentId);
           void reportAgentCompleted(agent, 'failed', reason);
         }
       },
@@ -247,6 +258,7 @@ export async function stopAgent(agentId: string): Promise<void> {
     event: 'agent.exited',
     data: { type: 'agent.exited', properties: { reason: 'stopped' } },
   });
+  scheduleEventBufferCleanup(agentId);
 }
 
 /**

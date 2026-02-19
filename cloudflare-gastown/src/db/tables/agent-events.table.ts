@@ -5,7 +5,10 @@ export const AgentEventRecord = z.object({
   id: z.number(),
   agent_id: z.string(),
   event_type: z.string(),
-  data: z.string().transform(v => JSON.parse(v) as Record<string, unknown>),
+  data: z
+    .string()
+    .transform(v => JSON.parse(v))
+    .pipe(z.record(z.string(), z.unknown())),
   created_at: z.string(),
 });
 

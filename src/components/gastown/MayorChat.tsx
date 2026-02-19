@@ -85,24 +85,16 @@ export function MayorChat({ townId }: MayorChatProps) {
   const currentAgentId = session?.agentId ?? null;
   const isSessionLive = session?.status === 'active' || session?.status === 'starting';
 
-  // Latch when a session becomes active
+  // Latch when a session becomes active, and re-show the stream if
+  // the agentId changes (new session started)
   if (isSessionLive && currentAgentId) {
-    latchedAgentIdRef.current = currentAgentId;
-  }
-  // Clear latch when the agentId changes (new session) or user closes the stream
-  if (currentAgentId && currentAgentId !== latchedAgentIdRef.current && isSessionLive) {
-    latchedAgentIdRef.current = currentAgentId;
-    setShowStream(true);
+    if (currentAgentId !== latchedAgentIdRef.current) {
+      latchedAgentIdRef.current = currentAgentId;
+      setShowStream(true);
+    }
   }
 
   const mayorAgentId = latchedAgentIdRef.current;
-
-  // Reset latch + show when user sends a new message (new session may start)
-  useEffect(() => {
-    if (sendMessage.isSuccess) {
-      setShowStream(true);
-    }
-  }, [sendMessage.isSuccess]);
 
   return (
     <div className="space-y-4">

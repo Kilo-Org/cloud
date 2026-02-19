@@ -64,6 +64,17 @@ function BeadCard({
   agentNameById?: Record<string, string>;
 }) {
   const assigneeName = bead.assignee_agent_id ? agentNameById?.[bead.assignee_agent_id] : null;
+
+  // Use a non-interactive wrapper (div) + interactive elements inside.
+  // Avoid nesting <button> inside <button> (invalid HTML, a11y issues).
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!onSelect) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect();
+    }
+  };
+
   return (
     <Card
       className={cn(
@@ -74,13 +85,17 @@ function BeadCard({
           : ''
       )}
     >
-      <button
-        type="button"
+      <div
+        role={onSelect ? 'button' : undefined}
+        tabIndex={onSelect ? 0 : undefined}
         onClick={onSelect}
-        disabled={!onSelect}
+        onKeyDown={handleKeyDown}
         className={cn(
-          'w-full text-left disabled:cursor-default',
-          'focus-visible:ring-2 focus-visible:ring-[color:oklch(95%_0.15_108_/_0.35)] focus-visible:ring-offset-0 focus-visible:outline-none'
+          'w-full text-left',
+          onSelect
+            ? 'focus-visible:ring-2 focus-visible:ring-[color:oklch(95%_0.15_108_/_0.35)]'
+            : '',
+          'focus-visible:ring-offset-0 focus-visible:outline-none'
         )}
       >
         <CardContent className="p-3">
@@ -129,7 +144,7 @@ function BeadCard({
             </div>
           )}
         </CardContent>
-      </button>
+      </div>
     </Card>
   );
 }

@@ -10,7 +10,8 @@ import { EnvironmentSettings } from './EnvironmentSettings';
 import { PasswordSettings } from './PasswordSettings';
 import { SlugEditor } from './SlugEditor';
 import { Button } from '@/components/Button';
-import { Loader2, AlertCircle, Trash2, RotateCw, XCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertCircle, Trash2, RotateCw, XCircle, Blocks } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { isDeploymentFinished, isDeploymentInProgress } from '@/lib/user-deployments/types';
 import { toast } from 'sonner';
@@ -104,19 +105,6 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
-          {appBuilderProjectId && (
-            <Link
-              href={
-                organizationId
-                  ? `/organizations/${organizationId}/app-builder/${appBuilderProjectId}`
-                  : `/app-builder/${appBuilderProjectId}`
-              }
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm transition-colors"
-            >
-              <ArrowLeft className="size-4" />
-              App Builder
-            </Link>
-          )}
           <DialogTitle>Deployment Details</DialogTitle>
         </DialogHeader>
 
@@ -162,7 +150,23 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
                     currentSlug={deployment.deployment_slug}
                     deploymentUrl={deployment.deployment_url}
                   />
-                  <StatusBadge status={deploymentStatus} className="shrink-0" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    {appBuilderProjectId && (
+                      <Link
+                        href={
+                          organizationId
+                            ? `/organizations/${organizationId}/app-builder/${appBuilderProjectId}`
+                            : `/app-builder/${appBuilderProjectId}`
+                        }
+                      >
+                        <Badge className="border-purple-600/30 bg-purple-600/20 text-purple-400">
+                          <Blocks className="size-3" />
+                          App Builder
+                        </Badge>
+                      </Link>
+                    )}
+                    <StatusBadge status={deploymentStatus} />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">

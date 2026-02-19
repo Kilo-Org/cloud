@@ -120,17 +120,14 @@ export class TriageOrchestrator extends DurableObject<Env> {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const isTimeout = error instanceof Error && error.message.includes('timed out');
-      const isClassificationTimeout =
-        error instanceof Error && error.message.includes('Classification timed out');
-      const isPRTimeout = error instanceof Error && error.message.includes('PR creation timed out');
 
       console.error('[TriageOrchestrator] Error:', {
         ticketId: this.state.ticketId,
         error: errorMessage,
-        isTimeout,
-        isClassificationTimeout,
-        isPRTimeout,
+        isTimeout: error instanceof Error && error.message.includes('timed out'),
+        isClassificationTimeout:
+          error instanceof Error && error.message.includes('Classification timed out'),
+        isPRTimeout: error instanceof Error && error.message.includes('PR creation timed out'),
       });
 
       try {
@@ -147,6 +144,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
         this.state.completedAt = new Date().toISOString();
         this.state.updatedAt = new Date().toISOString();
         await this.ctx.storage.put('state', this.state);
+        await this.ctx.storage.deleteAlarm();
       }
     }
   }
@@ -189,6 +187,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
       this.state.completedAt = new Date().toISOString();
       this.state.updatedAt = new Date().toISOString();
       await this.ctx.storage.put('state', this.state);
+      await this.ctx.storage.deleteAlarm();
     }
   }
 
@@ -352,7 +351,8 @@ export class TriageOrchestrator extends DurableObject<Env> {
       result.similarTickets?.find(t => t.ticketId === result.duplicateOfTicketId) ??
       result.similarTickets?.[0];
     if (duplicateTicket) {
-      const issueUrl = `https://github.com/${duplicateTicket.repoFullName}/issues/${duplicateTicket.issueNumber}`;
+      const [repoOwner, repoName] = duplicateTicket.repoFullName.split('/');
+      const issueUrl = `https://github.com/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/issues/${duplicateTicket.issueNumber}`;
       const escapedTitle = duplicateTicket.issueTitle.replace(/([\\*_~`[\]()#>!|])/g, '\\$1');
       const commentBody = [
         `This issue appears to be a duplicate of ${issueUrl}.`,
@@ -479,8 +479,13 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
       // HTTP 207 Multi-Status means partial failure (some labels applied, some not).
       // response.ok is true for all 2xx, so we must check the body explicitly.
-      const body: { success: boolean } = await addLabelResponse.json();
-      if (!body.success) {
+      const responseBody: unknown = await addLabelResponse.json();
+      const succeeded =
+        typeof responseBody === 'object' &&
+        responseBody !== null &&
+        'success' in responseBody &&
+        responseBody.success === true;
+      if (!succeeded) {
         console.error('[TriageOrchestrator] Partial label failure (207):', {
           ticketId: this.state.ticketId,
         });

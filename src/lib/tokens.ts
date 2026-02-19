@@ -126,5 +126,6 @@ export function validateAuthorizationHeader(headers: Headers) {
     organizationRole: payload.organizationRole,
     internalApiUse: payload.internalApiUse,
     createdOnPlatform: payload.createdOnPlatform,
+    botId: payload.botId,
   };
 }

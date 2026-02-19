@@ -1,6 +1,7 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CallbackJob } from './callbacks/index.js';
+import type { SessionIngestBinding } from './session-ingest-binding.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 
@@ -64,6 +65,12 @@ export type SessionContext = {
   botId?: string;
   githubRepo?: string;
   githubToken?: string;
+  /** Generic git URL (e.g., GitLab, Bitbucket) */
+  gitUrl?: string;
+  /** Token for generic git authentication (e.g., GitLab token) */
+  gitToken?: string;
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
 };
 /** Result of interrupting a session's running processes */
@@ -87,7 +94,7 @@ export type Env = {
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Service binding for the session ingest worker */
-  SESSION_INGEST: Fetcher;
+  SESSION_INGEST: SessionIngestBinding;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** KV namespace for caching GitHub installation tokens */

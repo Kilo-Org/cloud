@@ -391,6 +391,7 @@ export class SessionService {
     gitToken?: string;
     upstreamBranch?: string;
     botId?: string;
+    platform?: 'github' | 'gitlab';
   }): SessionContext {
     const sessionHome = options.sessionHome ?? getSessionHomePath(options.sessionId);
     const workspacePath =
@@ -411,6 +412,9 @@ export class SessionService {
       botId: options.botId,
       githubRepo: options.githubRepo,
       githubToken: options.githubToken,
+      gitUrl: options.gitUrl,
+      gitToken: options.gitToken,
+      platform: options.platform,
     };
   }
 
@@ -424,7 +428,10 @@ export class SessionService {
     githubToken?: string,
     githubRepo?: string,
     encryptedSecrets?: EncryptedSecrets,
-    createdOnPlatform?: string
+    createdOnPlatform?: string,
+    gitUrl?: string,
+    gitToken?: string,
+    platform?: 'github' | 'gitlab'
   ): Record<string, string> {
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
@@ -458,11 +465,47 @@ export class SessionService {
       KILOCODE_TOKEN: kilocodeToken,
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
+      // Feature attribution for microdollar usage tracking
+      KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
 
     // Set GH_TOKEN for GitHub repos only, respecting user overrides
     if (githubToken && githubRepo && !baseEnvVars.GH_TOKEN) {
       envVars.GH_TOKEN = githubToken;
+    }
+
+    // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
+    // The fallback ensures backward compatibility for callers that don't pass platform yet
+    const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
+
+    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
+    // This is used by the glab CLI and Kilocode for GitLab operations
+    if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
+      envVars.GITLAB_TOKEN = gitToken;
+      // Also set GITLAB_HOST for the glab CLI to know which instance to authenticate against
+      // Extract host from gitUrl (e.g., "https://gitlab.example.com/owner/repo.git" -> "gitlab.example.com")
+      if (!baseEnvVars.GITLAB_HOST) {
+        if (gitUrl) {
+          try {
+            const url = new URL(gitUrl);
+            envVars.GITLAB_HOST = url.host;
+          } catch {
+            // If URL parsing fails, default to gitlab.com
+            envVars.GITLAB_HOST = 'gitlab.com';
+          }
+        } else {
+          envVars.GITLAB_HOST = 'gitlab.com';
+        }
+      }
+
+      // Debug logging for GitLab token setup
+      logger
+        .withFields({
+          gitUrl,
+          gitlabHost: envVars.GITLAB_HOST,
+          gitTokenLength: gitToken.length,
+        })
+        .info('[GITLAB] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
     }
 
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)
@@ -505,7 +548,10 @@ export class SessionService {
       context.githubToken,
       context.githubRepo,
       encryptedSecrets,
-      createdOnPlatform
+      createdOnPlatform,
+      context.gitUrl,
+      context.gitToken,
+      context.platform
     );
 
     const session = await sandbox.createSession({
@@ -598,6 +644,7 @@ export class SessionService {
       gitToken,
       upstreamBranch,
       botId,
+      platform: options.platform,
     });
 
     // Inject env vars into context for session creation
@@ -825,6 +872,7 @@ export class SessionService {
       // For legacy CLI resumes, let the CLI manage its own branch state (undefined)
       upstreamBranch: isPreparedSession ? existingMetadata?.upstreamBranch : undefined,
       botId,
+      platform: existingMetadata?.platform,
     });
 
     if (envVars) {
@@ -1035,6 +1083,7 @@ export class SessionService {
       githubToken: metadata?.githubToken,
       gitUrl: metadata?.gitUrl,
       gitToken: metadata?.gitToken,
+      platform: metadata?.platform,
     });
 
     // Inject env vars from metadata into context (before creating session)
@@ -1392,7 +1441,7 @@ export class SessionService {
     },
     existing?: CloudAgentSessionState
   ): Promise<void> {
-    const { orgId, userId, sessionId, botId } = context;
+    const { orgId, userId, sessionId, botId, platform } = context;
     const doKey = `${userId}:${sessionId}`;
 
     // Build metadata, preserving prepared session fields from existing if provided
@@ -1405,6 +1454,7 @@ export class SessionService {
       orgId,
       userId,
       botId,
+      platform,
       timestamp: Date.now(),
       // Apply the new data (may override some existing fields, which is intentional)
       githubRepo: data.githubRepo,
@@ -1460,12 +1510,13 @@ export class SessionService {
     organizationId?: string,
     lastMode?: string,
     lastModel?: string,
-    gitUrl?: string
+    gitUrl?: string,
+    createdOnPlatform?: string
   ): Promise<string> {
     const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
 
     const input = {
-      created_on_platform: 'cloud-agent',
+      created_on_platform: createdOnPlatform ?? 'cloud-agent',
       organization_id: organizationId ?? null,
       cloud_agent_session_id: cloudAgentSessionId,
       version: 2,
@@ -1677,6 +1728,8 @@ export interface InitiateOptions {
   githubToken?: string;
   gitUrl?: string;
   gitToken?: string;
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
   env: PersistenceEnv;
   envVars?: Record<string, string>;
   encryptedSecrets?: EncryptedSecrets;

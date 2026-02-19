@@ -4,6 +4,8 @@ import { and, count, gte, sql } from 'drizzle-orm';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
+  PROMOTION_WINDOW_HOURS,
+  PROMOTION_MAX_REQUESTS,
 } from '@/lib/constants';
 
 export type RateLimitResult = {
@@ -11,31 +13,54 @@ export type RateLimitResult = {
   requestCount: number;
 };
 
+async function getModelUsageSinceTime(
+  windowStart: Date,
+  ipAddress: string,
+  anonymousOnly = false
+): Promise<number> {
+  const conditions = [
+    sql`${free_model_usage.ip_address} = ${ipAddress}`,
+    gte(free_model_usage.created_at, windowStart.toISOString()),
+  ];
+
+  if (anonymousOnly) {
+    conditions.push(sql`${free_model_usage.kilo_user_id} IS NULL`);
+  }
+
+  const usage = await db
+    .select({ totalRequests: count() })
+    .from(free_model_usage)
+    .where(and(...conditions));
+
+  return Number(usage[0]?.totalRequests ?? 0);
+}
+
 /**
  * Check if an IP address is within the free model rate limit.
  * This applies to ALL free model requests, both anonymous and authenticated.
  */
 export async function checkFreeModelRateLimit(ipAddress: string): Promise<RateLimitResult> {
-  const windowStart = new Date(
-    Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000
-  ).toISOString();
+  const windowStart = new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);
 
-  const usage = await db
-    .select({
-      totalRequests: count(),
-    })
-    .from(free_model_usage)
-    .where(
-      and(
-        sql`${free_model_usage.ip_address} = ${ipAddress}`,
-        gte(free_model_usage.created_at, windowStart)
-      )
-    );
-
-  const requestCount = Number(usage[0]?.totalRequests ?? 0);
+  const requestCount = await getModelUsageSinceTime(windowStart, ipAddress);
 
   return {
     allowed: requestCount < FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
+    requestCount,
+  };
+}
+
+/**
+ * Check if an IP address is within the promotion limit.
+ * Applies to free model requests without authentication.
+ */
+export async function checkPromotionLimit(ipAddress: string): Promise<RateLimitResult> {
+  const windowStart = new Date(Date.now() - PROMOTION_WINDOW_HOURS * 60 * 60 * 1000);
+
+  const requestCount = await getModelUsageSinceTime(windowStart, ipAddress, true);
+
+  return {
+    allowed: requestCount < PROMOTION_MAX_REQUESTS,
     requestCount,
   };
 }

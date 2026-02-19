@@ -8,7 +8,6 @@ import type {
   InterruptResult,
 } from './types.js';
 import type { ExecutionParams as _ExecutionParams } from './schema.js';
-import { DEFAULT_BACKEND_URL } from './constants.js';
 import { generateSandboxId } from './sandbox-id.js';
 import {
   checkDiskSpace,
@@ -289,6 +288,27 @@ export async function writeMCPSettings(
     .info('Configured MCP servers');
 }
 
+// Write Kilo auth file so the CLI's KiloSessions can call session ingest.
+// The CLI reads ~/.local/share/kilo/auth.json via Auth.get("kilo") but we
+// never run `kilo auth login` — credentials are injected purely via env vars
+// for config (KILO_CONFIG_CONTENT). The session ingest code path ignores the
+// provider config and only reads the auth file.
+export async function writeAuthFile(
+  sandbox: SandboxInstance,
+  sessionHome: string,
+  kilocodeToken: string
+): Promise<void> {
+  const authDir = `${sessionHome}/.local/share/kilo`;
+  const authPath = `${authDir}/auth.json`;
+
+  await sandbox.exec(`mkdir -p ${authDir}`);
+
+  const authContent = JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } }, null, 2);
+  await sandbox.writeFile(authPath, authContent);
+
+  logger.info('Wrote kilo auth file for session ingest');
+}
+
 /**
  * Fetch session metadata from Durable Object using RPC with retry logic.
  * Creates a fresh stub for each retry attempt as recommended by Cloudflare.
@@ -397,6 +417,7 @@ export class SessionService {
     gitToken?: string;
     upstreamBranch?: string;
     botId?: string;
+    platform?: 'github' | 'gitlab';
   }): SessionContext {
     const sessionHome = options.sessionHome ?? getSessionHomePath(options.sessionId);
     const workspacePath =
@@ -417,6 +438,9 @@ export class SessionService {
       botId: options.botId,
       githubRepo: options.githubRepo,
       githubToken: options.githubToken,
+      gitUrl: options.gitUrl,
+      gitToken: options.gitToken,
+      platform: options.platform,
     };
   }
 
@@ -432,7 +456,10 @@ export class SessionService {
     githubRepo?: string,
     encryptedSecrets?: EncryptedSecrets,
     createdOnPlatform?: string,
-    appendSystemPrompt?: string
+    appendSystemPrompt?: string,
+    gitUrl?: string,
+    gitToken?: string,
+    platform?: 'github' | 'gitlab'
   ): Record<string, string> {
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
@@ -466,6 +493,8 @@ export class SessionService {
       KILOCODE_TOKEN: kilocodeToken,
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
+      // Feature attribution for microdollar usage tracking
+      KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
 
     const providerOptions: Record<string, string> = {
@@ -512,6 +541,33 @@ export class SessionService {
       envVars.GH_TOKEN = githubToken;
     }
 
+    // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
+    const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
+
+    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
+    if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
+      envVars.GITLAB_TOKEN = gitToken;
+      if (!baseEnvVars.GITLAB_HOST) {
+        if (gitUrl) {
+          try {
+            const url = new URL(gitUrl);
+            envVars.GITLAB_HOST = url.host;
+          } catch {
+            envVars.GITLAB_HOST = 'gitlab.com';
+          }
+        } else {
+          envVars.GITLAB_HOST = 'gitlab.com';
+        }
+      }
+      logger
+        .withFields({
+          gitUrl,
+          gitlabHost: envVars.GITLAB_HOST,
+          gitTokenLength: gitToken.length,
+        })
+        .info('[GITLAB] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
+    }
+
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)
     if (kilocodeOrganizationId) {
       envVars.KILOCODE_ORGANIZATION_ID = kilocodeOrganizationId;
@@ -519,6 +575,8 @@ export class SessionService {
 
     if (env.KILOCODE_BACKEND_BASE_URL) {
       envVars.KILOCODE_BACKEND_BASE_URL = env.KILOCODE_BACKEND_BASE_URL;
+      // Used by kilo server to check user auth to send to ingest
+      envVars.KILO_API_URL = env.KILOCODE_BACKEND_BASE_URL;
     }
 
     if (env.KILO_SESSION_INGEST_URL) {
@@ -560,7 +618,10 @@ export class SessionService {
       context.githubRepo,
       encryptedSecrets,
       createdOnPlatform,
-      appendSystemPrompt
+      appendSystemPrompt,
+      context.gitUrl,
+      context.gitToken,
+      context.platform
     );
 
     const session = await sandbox.createSession({
@@ -644,6 +705,7 @@ export class SessionService {
       gitToken,
       upstreamBranch,
       botId,
+      platform: options.platform,
     });
 
     // Inject env vars into context for session creation
@@ -709,6 +771,9 @@ export class SessionService {
       await writeMCPSettings(sandbox, context.sessionHome, mcpServers);
     }
 
+    // Write auth file for session ingest
+    await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
+
     // Save metadata to Durable Object
     const existingMetadata = await this.loadSessionMetadata(env, context);
     await this.saveSessionMetadata(
@@ -731,7 +796,6 @@ export class SessionService {
     let isFirstCall = true;
     let capturedKiloSessionId: string | undefined = undefined;
 
-    const linkKiloSessionInBackend = this.linkKiloSessionInBackend.bind(this);
     const captureAndStoreBranch = this.captureAndStoreBranch.bind(this);
 
     return {
@@ -766,16 +830,6 @@ export class SessionService {
           ) {
             capturedKiloSessionId = String(event.payload.sessionId);
             logger.setTags({ kiloSessionId: capturedKiloSessionId });
-            void linkKiloSessionInBackend(
-              capturedKiloSessionId,
-              sessionId,
-              kilocodeToken,
-              env
-            ).catch((error: unknown) => {
-              logger
-                .withFields({ error: error instanceof Error ? error.message : String(error) })
-                .error('Failed to link sessions in backend');
-            });
           }
           yield event;
         }
@@ -788,38 +842,24 @@ export class SessionService {
   private async restoreSessionSnapshot(
     session: ExecutionSession,
     sessionId: string,
-    authToken: string,
+    kiloSessionId: string,
     env: PersistenceEnv,
     userId: string
   ): Promise<void> {
     const tmpPath = `/tmp/kilo-session-export-${sessionId}.json`;
     let wroteSnapshot = false;
     try {
-      const response = await env.SESSION_INGEST.fetch(
-        `https://session-ingest/api/session/${sessionId}/export`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
+      const payload = await env.SESSION_INGEST.exportSession({
+        sessionId: kiloSessionId,
+        kiloUserId: userId,
+      });
 
-      if (!response) {
-        throw new Error('Session ingest fetch returned no response');
-      }
-
-      if (response.status === 401 || response.status === 404) {
+      if (payload === null) {
         throw new SessionSnapshotRestoreError(
-          `Session snapshot restore failed with status ${response.status}`,
-          response.status
+          `Session snapshot restore failed: session not found`,
+          404
         );
       }
-
-      if (!response.ok) {
-        throw new Error(`Session ingest returned ${response.status}`);
-      }
-
-      const payload = await response.text();
       await session.writeFile(tmpPath, payload);
       wroteSnapshot = true;
 
@@ -911,7 +951,6 @@ export class SessionService {
       setupCommands,
       mcpServers,
       botId,
-      skipLinking,
       githubAppType,
       existingMetadata,
     } = options;
@@ -951,6 +990,7 @@ export class SessionService {
       // For legacy CLI resumes, let the CLI manage its own branch state (undefined)
       upstreamBranch: isPreparedSession ? existingMetadata?.upstreamBranch : undefined,
       botId,
+      platform: existingMetadata?.platform,
     });
 
     if (envVars) {
@@ -1024,6 +1064,9 @@ export class SessionService {
       await writeMCPSettings(sandbox, context.sessionHome, mcpServers);
     }
 
+    // Write auth file for session ingest
+    await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
+
     // Fetch metadata from DO if not provided, to ensure we preserve existing fields
     const metadataToPreserve =
       existingMetadata ?? (await this.loadSessionMetadata(env, context)) ?? undefined;
@@ -1044,20 +1087,6 @@ export class SessionService {
       },
       metadataToPreserve
     );
-
-    // Skip linking if requested (e.g., for prepared sessions where backend already linked)
-    if (!skipLinking) {
-      try {
-        await this.linkKiloSessionInBackend(kiloSessionId, sessionId, kilocodeToken, env);
-        logger.info('Linked cloud-agent session to kilo session in backend');
-      } catch (error) {
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .warn('Failed to link sessions in backend');
-      }
-    } else {
-      logger.debug('Skipping backend linking (prepared session mode)');
-    }
 
     const captureAndStoreBranch = this.captureAndStoreBranch.bind(this);
 
@@ -1160,6 +1189,7 @@ export class SessionService {
       githubToken: metadata?.githubToken,
       gitUrl: metadata?.gitUrl,
       gitToken: metadata?.gitToken,
+      platform: metadata?.platform,
     });
 
     // Inject env vars from metadata into context (before creating session)
@@ -1260,7 +1290,12 @@ export class SessionService {
     }
 
     // Cold-start resume must restore snapshot or fail.
-    await this.restoreSessionSnapshot(session, sessionId, kilocodeToken, env, userId);
+    if (!metadata.kiloSessionId) {
+      throw new Error(
+        `Session ${sessionId} has no kiloSessionId in metadata. Cannot restore snapshot.`
+      );
+    }
+    await this.restoreSessionSnapshot(session, sessionId, metadata.kiloSessionId, env, userId);
 
     await restoreWorkspace(session, context.workspacePath, context.branchName, {
       githubRepo: metadata.githubRepo,
@@ -1281,6 +1316,9 @@ export class SessionService {
     if (metadata.mcpServers && Object.keys(metadata.mcpServers).length > 0) {
       await writeMCPSettings(sandbox, context.sessionHome, metadata.mcpServers);
     }
+
+    // Re-write auth file (fresh clone)
+    await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
   }
 
   /**
@@ -1527,7 +1565,7 @@ export class SessionService {
     },
     existing?: CloudAgentSessionState
   ): Promise<void> {
-    const { orgId, userId, sessionId, botId } = context;
+    const { orgId, userId, sessionId, botId, platform } = context;
     const doKey = `${userId}:${sessionId}`;
 
     // Build metadata, preserving prepared session fields from existing if provided
@@ -1540,6 +1578,7 @@ export class SessionService {
       orgId,
       userId,
       botId,
+      platform,
       timestamp: Date.now(),
       // Apply the new data (may override some existing fields, which is intentional)
       githubRepo: data.githubRepo,
@@ -1584,144 +1623,61 @@ export class SessionService {
   }
 
   /**
-   * Create a minimal cliSession in kilocode-backend.
-   * Uses the customer's auth token (forwarded from the original request).
-   * Returns the generated kiloSessionId.
+   * Create a cli_sessions_v2 record via session-ingest RPC.
+   * Called during session preparation so the DB record exists before execution.
    */
-  async createKiloSessionInBackend(
+  async createCliSessionViaSessionIngest(
+    kiloSessionId: string,
     cloudAgentSessionId: string,
-    authToken: string,
+    kiloUserId: string,
     env: PersistenceEnv,
-    organizationId?: string,
-    lastMode?: string,
-    lastModel?: string,
-    gitUrl?: string
-  ): Promise<string> {
-    const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
-
-    const input = {
-      created_on_platform: 'cloud-agent',
-      organization_id: organizationId ?? null,
-      cloud_agent_session_id: cloudAgentSessionId,
-      version: 2,
-      last_mode: lastMode,
-      last_model: lastModel,
-      git_url: gitUrl,
-    };
-
-    const response = await fetch(`${backendUrl}/api/trpc/cliSessions.createV2`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('[createKiloSessionInBackend] Backend error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: '[redacted]',
-        backendUrl,
-        organizationId,
+    organizationId: string | undefined,
+    createdOnPlatform: string
+  ): Promise<void> {
+    try {
+      await env.SESSION_INGEST.createSessionForCloudAgent({
+        sessionId: kiloSessionId,
+        kiloUserId,
         cloudAgentSessionId,
+        organizationId,
+        createdOnPlatform,
       });
-      throw new Error(
-        `Failed to create kilo session: ${response.status} - ${text.substring(0, 200)}`
-      );
-    }
-
-    const result = await response.json();
-
-    type TrpcResponse = { result?: { data?: { session_id?: string } } };
-    const typedResult = result as TrpcResponse;
-
-    const sessionId = typedResult.result?.data?.session_id;
-    if (!sessionId) {
-      throw new Error('Backend did not return session_id');
-    }
-
-    return sessionId;
-  }
-
-  /**
-   * Delete a cliSession in kilocode-backend.
-   * Used for rollback when DO prepare() fails after backend session was created.
-   */
-  async deleteKiloSessionInBackend(
-    kiloSessionId: string,
-    authToken: string,
-    env: PersistenceEnv
-  ): Promise<void> {
-    const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
-
-    const input = {
-      session_id: kiloSessionId,
-    };
-
-    const response = await fetch(`${backendUrl}/api/trpc/cliSessions.delete`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Failed to delete kilo session: ${response.status} ${text}`);
-    }
-
-    const result = await response.json();
-
-    type TrpcResponse = { result?: { data?: { success?: boolean } } };
-    const typedResult = result as TrpcResponse;
-
-    if (!typedResult.result?.data?.success) {
-      throw new Error('Backend did not confirm successful deletion');
+    } catch (error) {
+      logger
+        .withFields({
+          kiloSessionId,
+          cloudAgentSessionId,
+          kiloUserId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('session-ingest RPC createSessionForCloudAgent failed');
+      throw error;
     }
   }
 
   /**
-   * Helper to link sessions in backend using tRPC wire format
+   * Delete a cli_sessions_v2 record via session-ingest RPC.
+   * Used for rollback when DO prepare() fails after the record was created.
    */
-  private async linkKiloSessionInBackend(
+  async deleteCliSessionViaSessionIngest(
     kiloSessionId: string,
-    cloudAgentSessionId: string,
-    authToken: string,
+    kiloUserId: string,
     env: PersistenceEnv
   ): Promise<void> {
-    const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
-
-    const input = {
-      kilo_session_id: kiloSessionId,
-      cloud_agent_session_id: cloudAgentSessionId,
-    };
-
-    const response = await fetch(`${backendUrl}/api/trpc/cliSessions.linkCloudAgent`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Failed to link sessions: ${response.status} ${text}`);
-    }
-
-    const result = await response.json();
-
-    type TrpcResponse = { result?: { data?: { success?: boolean } } };
-    const typedResult = result as TrpcResponse;
-
-    if (!typedResult.result?.data?.success) {
-      throw new Error('Backend did not confirm successful link');
+    try {
+      await env.SESSION_INGEST.deleteSessionForCloudAgent({
+        sessionId: kiloSessionId,
+        kiloUserId,
+      });
+    } catch (error) {
+      logger
+        .withFields({
+          kiloSessionId,
+          kiloUserId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('session-ingest RPC deleteSessionForCloudAgent failed');
+      throw error;
     }
   }
 
@@ -1832,6 +1788,8 @@ export interface InitiateOptions {
    * Useful for fire-and-forget scenarios like code reviews where full history isn't needed.
    */
   shallow?: boolean;
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
 }
 
 export interface ResumeOptions {
@@ -1865,7 +1823,6 @@ type InitiateFromKiloSessionBaseOptions = {
   setupCommands?: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   botId?: string;
-  skipLinking?: boolean;
   /** GitHub App type for selecting correct slug/bot identity */
   githubAppType?: 'standard' | 'lite';
   /**

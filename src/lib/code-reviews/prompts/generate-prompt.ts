@@ -1,31 +1,39 @@
 /**
- * Code Review Prompt Generation (v5.4.0)
+ * Code Review Prompt Generation (v5.5.0)
  *
- * Simplified prompt generation - most content lives in the JSON template.
- * This file only handles:
+ * Prompt generation with per-style overrides. Most content lives in the JSON template.
+ * This file handles:
  * 1. Loading template from PostHog (remote) or falling back to local JSON
  * 2. Assembling template sections in order
  * 3. Replacing placeholders ({REPO}, {PR}, {COMMENT_ID}, {FIX_LINK})
  * 4. Adding dynamic context (existing comments table)
  * 5. Selecting CREATE vs UPDATE summary command
+ * 6. Platform-specific template selection (GitHub vs GitLab)
+ * 7. Injecting style guidance, custom instructions, and focus areas from config
+ * 8. Applying per-style comment format and summary format overrides
  */
 
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { getFeatureFlagPayload } from '@/lib/posthog-feature-flags';
-import DEFAULT_PROMPT_TEMPLATE from '@/lib/code-reviews/prompts/default-prompt-template.json';
+import DEFAULT_PROMPT_TEMPLATE_GITHUB from '@/lib/code-reviews/prompts/default-prompt-template.json';
+import DEFAULT_PROMPT_TEMPLATE_GITLAB from '@/lib/code-reviews/prompts/default-prompt-template-gitlab.json';
 import { logExceptInTest } from '@/lib/utils.server';
+import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
+import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-helpers';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { sanitizeUserInput } from './prompt-utils';
 
 /**
  * Inline comment info for duplicate detection
  */
-export interface InlineComment {
+export type InlineComment = {
   id: number;
   path: string;
   line: number | null;
   body: string;
   isOutdated: boolean;
-}
+};
 
 /**
  * Previous review status for state machine
@@ -35,23 +43,20 @@ export type PreviousReviewStatus = 'no-review' | 'no-issues' | 'issues-found';
 /**
  * Complete review state for intelligent update/create decisions
  */
-export interface ExistingReviewState {
+export type ExistingReviewState = {
   summaryComment: { commentId: number; body: string } | null;
   inlineComments: InlineComment[];
   previousStatus: PreviousReviewStatus;
   headCommitSha: string;
-}
+};
 
 /**
  * @deprecated Use ExistingReviewState instead
  */
-export interface ExistingReviewComment {
+export type ExistingReviewComment = {
   commentId: number;
   body: string;
-}
-
-// PostHog feature flag name for remote prompt template
-const PROMPT_TEMPLATE_FLAG = 'code-review-prompt-template';
+};
 
 // Zod schema for validating prompt template structure
 const PromptTemplateSchema = z.object({
@@ -68,24 +73,51 @@ const PromptTemplateSchema = z.object({
   summaryCommandUpdate: z.string(),
   inlineCommentsApi: z.string(),
   fixLinkTemplate: z.string(),
+  // Per-style overrides (optional — only needed for non-default styles like roast)
+  styleGuidance: z.record(z.string(), z.string()).optional(),
+  commentFormatOverrides: z.record(z.string(), z.string()).optional(),
+  summaryFormatOverrides: z
+    .record(z.string(), z.object({ issuesFound: z.string(), noIssues: z.string() }))
+    .optional(),
 });
 
 // Template type derived from schema
 type PromptTemplate = z.infer<typeof PromptTemplateSchema>;
 
 /**
+ * Get the default local template for a platform
+ */
+function getDefaultTemplate(platform: CodeReviewPlatform): PromptTemplate {
+  switch (platform) {
+    case 'github':
+      return DEFAULT_PROMPT_TEMPLATE_GITHUB as PromptTemplate;
+    case PLATFORM.GITLAB:
+      return DEFAULT_PROMPT_TEMPLATE_GITLAB as PromptTemplate;
+    default: {
+      const _exhaustive: never = platform;
+      throw new Error(`Unknown platform: ${_exhaustive}`);
+    }
+  }
+}
+
+/**
  * Load prompt template from PostHog or fall back to local
+ * @param platform The platform to load template for
  * @returns Template and source indicator
  */
-async function loadPromptTemplate(): Promise<{
+async function loadPromptTemplate(platform: CodeReviewPlatform): Promise<{
   template: PromptTemplate;
   source: 'posthog' | 'local';
 }> {
+  const featureFlagName = getPromptTemplateFeatureFlag(platform);
+  const defaultTemplate = getDefaultTemplate(platform);
+
   // Try to load from PostHog first
-  const remoteTemplate = await getFeatureFlagPayload(PromptTemplateSchema, PROMPT_TEMPLATE_FLAG);
+  const remoteTemplate = await getFeatureFlagPayload(PromptTemplateSchema, featureFlagName);
 
   if (remoteTemplate) {
     logExceptInTest('[loadPromptTemplate] Loaded template from PostHog', {
+      platform,
       version: remoteTemplate.version,
     });
     return { template: remoteTemplate, source: 'posthog' };
@@ -93,38 +125,68 @@ async function loadPromptTemplate(): Promise<{
 
   // Fall back to local template
   logExceptInTest('[loadPromptTemplate] Using local template', {
-    version: (DEFAULT_PROMPT_TEMPLATE as PromptTemplate).version,
+    platform,
+    version: defaultTemplate.version,
   });
-  return { template: DEFAULT_PROMPT_TEMPLATE as PromptTemplate, source: 'local' };
+  return { template: defaultTemplate, source: 'local' };
 }
+
+/**
+ * GitLab-specific context for inline comments
+ */
+export type GitLabDiffContext = {
+  baseSha: string;
+  startSha: string;
+  headSha: string;
+};
 
 /**
  * Generates a code review prompt based on configuration
  * @param config Agent configuration with review settings
- * @param repository GitHub repository in format "owner/repo"
- * @param prNumber Pull request number (optional for GitHub Actions workflow)
+ * @param repository Repository in format "owner/repo" (GitHub) or "namespace/project" (GitLab)
+ * @param prNumber Pull request number (GitHub) or merge request IID (GitLab)
  * @param reviewId Code review ID for generating fix link (optional)
  * @param existingReviewState Complete review state for intelligent decisions (optional)
+ * @param platform Platform type (defaults to 'github' for backward compatibility)
+ * @param gitlabContext GitLab-specific diff context for inline comments (optional)
  * @returns Generated prompt with version and source info
  */
 export async function generateReviewPrompt(
-  _config: CodeReviewAgentConfig, // Reserved for future: custom instructions, focus areas
+  config: CodeReviewAgentConfig,
   repository: string,
   prNumber?: number,
   reviewId?: string,
-  existingReviewState?: ExistingReviewState | null
+  existingReviewState?: ExistingReviewState | null,
+  platform: CodeReviewPlatform = 'github',
+  gitlabContext?: GitLabDiffContext
 ): Promise<{ prompt: string; version: string; source: 'posthog' | 'local' }> {
   // Load template from PostHog (remote) or local fallback
-  const { template, source } = await loadPromptTemplate();
-  const pr = prNumber || '{PR_NUMBER}';
+  const { template, source } = await loadPromptTemplate(platform);
+  const platformConfig = getPlatformConfig(platform);
+  const pr = prNumber || `{${platformConfig.prTerm}_NUMBER}`;
+  const reviewStyle = config.review_style;
 
   // Helper to replace common placeholders
   const replacePlaceholders = (text: string, commentId?: number): string => {
-    return text
+    let result = text
       .replace(/{PR_NUMBER}/g, String(pr))
+      .replace(/{MR_IID}/g, String(pr))
       .replace(/{REPO}/g, repository)
+      .replace(/{PROJECT_PATH}/g, repository)
+      .replace(/{PROJECT_PATH_ENCODED}/g, encodeURIComponent(repository))
       .replace(/{PR}/g, String(pr))
-      .replace(/{COMMENT_ID}/g, commentId ? String(commentId) : '{COMMENT_ID}');
+      .replace(/{COMMENT_ID}/g, commentId ? String(commentId) : '{COMMENT_ID}')
+      .replace(/{NOTE_ID}/g, commentId ? String(commentId) : '{NOTE_ID}');
+
+    // GitLab-specific SHA placeholders
+    if (gitlabContext) {
+      result = result
+        .replace(/{BASE_SHA}/g, gitlabContext.baseSha)
+        .replace(/{START_SHA}/g, gitlabContext.startSha)
+        .replace(/{HEAD_SHA}/g, gitlabContext.headSha);
+    }
+
+    return result;
   };
 
   let prompt = '';
@@ -132,24 +194,50 @@ export async function generateReviewPrompt(
   // 1. System role
   prompt += template.systemRole + '\n\n';
 
-  // 2. Hard constraints (MOST IMPORTANT - at top)
+  // 2. Style guidance (persona/tone override for non-default styles like roast)
+  const styleGuide = template.styleGuidance?.[reviewStyle];
+  if (styleGuide) {
+    prompt += styleGuide + '\n\n';
+  }
+
+  // 3. Custom instructions (user-provided, sanitized to prevent injection)
+  if (config.custom_instructions) {
+    prompt += '# CUSTOM INSTRUCTIONS\n\n' + sanitizeUserInput(config.custom_instructions) + '\n\n';
+  }
+
+  // 4. Hard constraints (MOST IMPORTANT - always included)
   prompt += template.hardConstraints + '\n\n';
 
-  // 3. Workflow with placeholders replaced
+  // 5. Workflow with placeholders replaced
   prompt += replacePlaceholders(template.workflow) + '\n\n';
 
-  // 4. What to review
+  // 6. What to review
   prompt += template.whatToReview + '\n\n';
 
-  // 5. Comment format
-  prompt += template.commentFormat + '\n\n';
+  // 7. Focus areas (if any selected)
+  if (config.focus_areas.length > 0) {
+    prompt +=
+      '# FOCUS AREAS\n\nPay special attention to: ' + config.focus_areas.join(', ') + '\n\n';
+  }
 
-  // 6. Dynamic context section (separator)
-  prompt += '---\n\n# CONTEXT FOR THIS PR\n\n';
-  prompt += `**Repository:** ${repository}\n`;
-  prompt += `**PR Number:** ${pr}\n\n`;
+  // 8. Comment format (use style override if available, otherwise default)
+  const commentFormat = template.commentFormatOverrides?.[reviewStyle] ?? template.commentFormat;
+  prompt += commentFormat + '\n\n';
 
-  // 7. Existing inline comments table (dynamic - built at runtime)
+  // 9. Dynamic context section (separator)
+  prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';
+  prompt += `**${platform === PLATFORM.GITLAB ? 'Project' : 'Repository'}:** ${repository}\n`;
+  prompt += `**${platformConfig.prTerm} Number:** ${pr}\n\n`;
+
+  // Add GitLab-specific SHA context if available
+  if (platform === PLATFORM.GITLAB && gitlabContext) {
+    prompt += `**Diff Context (for inline comments):**\n`;
+    prompt += `- Base SHA: \`${gitlabContext.baseSha}\`\n`;
+    prompt += `- Start SHA: \`${gitlabContext.startSha}\`\n`;
+    prompt += `- Head SHA: \`${gitlabContext.headSha}\`\n\n`;
+  }
+
+  // 10. Existing inline comments table (dynamic - built at runtime)
   if (existingReviewState?.inlineComments && existingReviewState.inlineComments.length > 0) {
     const active = existingReviewState.inlineComments.filter(c => !c.isOutdated);
 
@@ -168,11 +256,12 @@ export async function generateReviewPrompt(
     prompt += '\n';
   }
 
-  // 8. Summary format templates (from JSON)
-  prompt += template.summaryFormatIssuesFound + '\n\n';
-  prompt += template.summaryFormatNoIssues + '\n\n';
+  // 11. Summary format templates (use style override if available, otherwise default)
+  const summaryOverride = template.summaryFormatOverrides?.[reviewStyle];
+  prompt += (summaryOverride?.issuesFound ?? template.summaryFormatIssuesFound) + '\n\n';
+  prompt += (summaryOverride?.noIssues ?? template.summaryFormatNoIssues) + '\n\n';
 
-  // 9. Summary marker note and command (CREATE or UPDATE)
+  // 12. Summary marker note and command (CREATE or UPDATE)
   prompt += template.summaryMarkerNote + '\n\n';
   if (existingReviewState?.summaryComment) {
     prompt +=
@@ -184,14 +273,14 @@ export async function generateReviewPrompt(
     prompt += replacePlaceholders(template.summaryCommandCreate) + '\n\n';
   }
 
-  // 10. Fix link (dynamic - only if reviewId provided)
+  // 13. Fix link (dynamic - only if reviewId provided)
   if (reviewId) {
     const baseUrl = process.env.NEXTAUTH_URL || 'https://kilo.ai';
     const fixLink = `${baseUrl}/cloud-agent-fork/review/${reviewId}`;
     prompt += template.fixLinkTemplate.replace(/{FIX_LINK}/g, fixLink) + '\n\n';
   }
 
-  // 11. Inline comments API call template (from JSON)
+  // 14. Inline comments API call template (from JSON)
   prompt += replacePlaceholders(template.inlineCommentsApi) + '\n';
 
   return {

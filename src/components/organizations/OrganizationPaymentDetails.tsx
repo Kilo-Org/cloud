@@ -13,10 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { AnimatedDollars } from './AnimatedDollars';
-import { fromMicrodollars } from '@/lib/utils';
+import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } from '@/lib/utils';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
-import { PiggyBank, Bell, ChevronRight } from 'lucide-react';
+import { PiggyBank, Bell, ChevronRight, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { useExpiringCredits } from './useExpiringCredits';
 
 type Props = {
   organizationId: string;
@@ -30,6 +31,7 @@ export function OrganizationPaymentDetails({ organizationId, role }: Props) {
   const session = useSession();
   const isKiloAdmin = session?.data?.isAdmin ?? false;
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
+  const { expiringBlocks, expiring_mUsd, earliestExpiry } = useExpiringCredits(organizationId);
 
   return (
     <OrganizationContextProvider value={{ userRole, isKiloAdmin }}>
@@ -69,7 +71,10 @@ export function OrganizationPaymentDetails({ organizationId, role }: Props) {
                   </span>
                   <div className="flex items-center gap-2">
                     <AnimatedDollars
-                      dollars={fromMicrodollars(organizationData?.microdollars_balance ?? 0)}
+                      dollars={fromMicrodollars(
+                        (organizationData?.total_microdollars_acquired ?? 0) -
+                          (organizationData?.microdollars_used ?? 0)
+                      )}
                       className="text-2xl font-semibold"
                     />
                     <TooltipProvider>
@@ -103,6 +108,18 @@ export function OrganizationPaymentDetails({ organizationId, role }: Props) {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {expiringBlocks.length > 0 && earliestExpiry && (
+          <Card>
+            <CardContent className="flex items-center gap-2 py-3">
+              <Clock className="h-4 w-4 shrink-0 text-amber-500" />
+              <span className="text-sm">
+                {formatDollars(fromMicrodollars(expiring_mUsd))} in credits expiring at{' '}
+                {formatIsoDateTime_IsoOrderNoSeconds(earliestExpiry)}
+              </span>
+            </CardContent>
+          </Card>
         )}
 
         <Tabs value={timePeriod} onValueChange={value => setTimePeriod(value as TimePeriod)}>

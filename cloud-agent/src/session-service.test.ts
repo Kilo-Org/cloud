@@ -148,6 +148,7 @@ describe('SessionService', () => {
           KILOCODE_TOKEN: 'token',
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
+          KILOCODE_FEATURE: 'cloud-agent',
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -249,6 +250,7 @@ describe('SessionService', () => {
           KILOCODE_TOKEN: 'token',
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
+          KILOCODE_FEATURE: 'cloud-agent',
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -844,6 +846,7 @@ describe('SessionService', () => {
           KILOCODE_TOKEN: 'token',
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
+          KILOCODE_FEATURE: 'cloud-agent',
           API_KEY: 'test-key-123',
           DATABASE_URL: 'postgres://localhost:5432/test',
           NODE_ENV: 'development',
@@ -942,6 +945,7 @@ describe('SessionService', () => {
           KILOCODE_TOKEN: 'token',
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
+          KILOCODE_FEATURE: 'cloud-agent',
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });

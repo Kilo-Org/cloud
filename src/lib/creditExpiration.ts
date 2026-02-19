@@ -1,7 +1,11 @@
 import type { credit_transactions, CreditTransaction, User } from '@/db/schema';
-import { credit_transactions as creditTransactionsTable, kilocode_users } from '@/db/schema';
+import {
+  credit_transactions as creditTransactionsTable,
+  kilocode_users,
+  organizations,
+} from '@/db/schema';
 import { db } from '@/lib/drizzle';
-import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, inArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { sentryLogger } from '@/lib/utils.server';
 
@@ -18,7 +22,8 @@ export type ExpiringTransaction = Pick<
 export type CreditTransactionForBlocks = ExpiringTransaction &
   Pick<CreditTransaction, 'credit_category' | 'original_transaction_id' | 'created_at'>;
 
-export type UserForExpiration = Pick<User, 'id' | 'microdollars_used'>;
+export type EntityForExpiration = { id: string; microdollars_used: number };
+export type UserForExpiration = EntityForExpiration;
 export type UserForLocalExpiration = Pick<
   User,
   | 'id'
@@ -33,7 +38,7 @@ type ExpirationResult = {
   newBaselines: Map<CreditTransaction['id'], number>;
 };
 /**
- * Computes the expiration of credits for a user.
+ * Computes the expiration of credits for an entity (user or organization).
  *
  * **Core idea:** Each credit can only be claimed once. To keep the algorithm
  * simple and incrementally runnable, each transaction's state is a consecutive
@@ -44,7 +49,7 @@ type ExpirationResult = {
  * When the later credits expire, the right amount expires.
  *
  * **How it works:** Process transactions in expiry order. Each claims usage from
- * its baseline up to min(baseline+amount, user's total usage). When a credit
+ * its baseline up to min(baseline+amount, entity's total usage). When a credit
  * expires and claims usage, raise the baselines of all later credits that overlap
  * with the claimed range. This prevents double-counting while keeping each
  * transaction's state as a simple consecutive range.
@@ -56,8 +61,9 @@ type ExpirationResult = {
 
 export function computeExpiration(
   transactions: ExpiringTransaction[],
-  user: UserForExpiration,
-  now: Date
+  entity: EntityForExpiration,
+  now: Date,
+  kilo_user_id: string
 ): ExpirationResult {
   const newBaselines = new Map<CreditTransaction['id'], number>();
   const newTransactions: (typeof credit_transactions.$inferInsert)[] = [];
@@ -72,18 +78,18 @@ export function computeExpiration(
 
     const baseline = newBaselines.get(t.id) ?? t.expiration_baseline_microdollars_used ?? 0;
     const transactionEnd = baseline + t.amount_microdollars;
-    const usageEnd = Math.min(transactionEnd, user.microdollars_used);
+    const usageEnd = Math.min(transactionEnd, entity.microdollars_used);
     const usage = Math.max(0, usageEnd - baseline);
     const expiredAmount = t.amount_microdollars - usage;
     newTransactions.push({
-      kilo_user_id: user.id,
+      kilo_user_id,
       amount_microdollars: expiredAmount === 0 ? 0 : -expiredAmount,
       credit_category: 'credits_expired',
-      original_transaction_id: t.id, // Link expiration to original transaction (post-Orb fallback)
+      original_transaction_id: t.id,
       description: `Expired: ${t.description ?? ''}`,
       is_free: t.is_free,
       created_at: t.expiry_date,
-      original_baseline_microdollars_used: user.microdollars_used,
+      original_baseline_microdollars_used: entity.microdollars_used,
     });
     for (let laterIndex = currentIndex + 1; laterIndex < sortedByExpiry.length; laterIndex++) {
       const otherT = sortedByExpiry[laterIndex];
@@ -152,8 +158,7 @@ export async function processLocalExpirations(
   const next_credit_expiration_at = user.next_credit_expiration_at;
   const all_expiring_transactions = await fetchExpiringTransactions(user.id);
 
-  // Compute expiration results (pass ALL transactions so baselines can be adjusted)
-  const expirationResult = computeExpiration(all_expiring_transactions, user, now);
+  const expirationResult = computeExpiration(all_expiring_transactions, user, now, user.id);
 
   // Compute next expiration date from transactions that weren't just expired
   const expiredTransactionIds = new Set(
@@ -216,5 +221,122 @@ export async function processLocalExpirations(
 
   if (!somethingExpired) return null;
 
+  return { total_microdollars_acquired: new_total_microdollars_acquired };
+}
+
+export async function fetchExpiringTransactionsForOrganization(
+  organizationId: string,
+  fromDb: typeof db = db
+) {
+  const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
+
+  return await fromDb
+    .select({
+      id: creditTransactionsTable.id,
+      amount_microdollars: creditTransactionsTable.amount_microdollars,
+      expiration_baseline_microdollars_used:
+        creditTransactionsTable.expiration_baseline_microdollars_used,
+      expiry_date: creditTransactionsTable.expiry_date,
+      description: creditTransactionsTable.description,
+      is_free: creditTransactionsTable.is_free,
+      kilo_user_id: creditTransactionsTable.kilo_user_id,
+    })
+    .from(creditTransactionsTable)
+    .leftJoin(
+      expiredCredits,
+      and(
+        eq(expiredCredits.organization_id, organizationId),
+        eq(expiredCredits.credit_category, 'credits_expired'),
+        eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
+      )
+    )
+    .where(
+      and(
+        eq(creditTransactionsTable.organization_id, organizationId),
+        isNotNull(creditTransactionsTable.expiry_date),
+        isNull(expiredCredits.id)
+      )
+    );
+}
+
+type OrganizationForExpiration = {
+  id: string;
+  microdollars_used: number;
+  next_credit_expiration_at: string | null;
+  total_microdollars_acquired: number;
+};
+
+export async function processOrganizationExpirations(
+  org: OrganizationForExpiration,
+  now: Date
+): Promise<null | { total_microdollars_acquired: number }> {
+  const next_credit_expiration_at = org.next_credit_expiration_at;
+  const all_expiring_transactions = await fetchExpiringTransactionsForOrganization(org.id);
+
+  const expirationResult = computeExpiration(all_expiring_transactions, org, now, 'system');
+
+  const expiredTransactionIds = new Set(
+    expirationResult.newTransactions.map(t => t.original_transaction_id)
+  );
+  const new_next_expiration =
+    all_expiring_transactions
+      .filter(t => !expiredTransactionIds.has(t.id))
+      .map(t => t.expiry_date)
+      .filter(Boolean)
+      .sort()[0] ?? null;
+
+  const total_expired = expirationResult.newTransactions.reduce(
+    (sum, t) => sum + (t.amount_microdollars ?? 0),
+    0
+  );
+  const new_total_microdollars_acquired = org.total_microdollars_acquired + total_expired;
+
+  const somethingExpired = await db.transaction(async tx => {
+    const updateResult = await tx
+      .update(organizations)
+      .set({
+        next_credit_expiration_at: new_next_expiration,
+        total_microdollars_acquired: new_total_microdollars_acquired,
+        microdollars_balance: sql`${organizations.microdollars_balance} + ${total_expired}`,
+      })
+      .where(
+        and(
+          eq(organizations.id, org.id),
+          eq(organizations.total_microdollars_acquired, org.total_microdollars_acquired),
+          next_credit_expiration_at
+            ? eq(organizations.next_credit_expiration_at, next_credit_expiration_at)
+            : isNull(organizations.next_credit_expiration_at)
+        )
+      );
+
+    if (updateResult.rowCount === 0) {
+      sentryLogger('processOrganizationExpirations', 'error')(
+        'optimistic concurrency check failed',
+        {
+          organization_id: org.id,
+        }
+      );
+      return false;
+    }
+
+    if (!expirationResult.newTransactions.length && !expirationResult.newBaselines.size)
+      return false;
+
+    const transactionsWithOrgId = expirationResult.newTransactions.map(t => ({
+      ...t,
+      organization_id: org.id,
+    }));
+    await tx.insert(creditTransactionsTable).values(transactionsWithOrgId);
+
+    for (const [transactionId, newBaseline] of expirationResult.newBaselines) {
+      await tx
+        .update(creditTransactionsTable)
+        .set({ expiration_baseline_microdollars_used: newBaseline })
+        .where(eq(creditTransactionsTable.id, transactionId));
+    }
+    return true;
+  });
+
+  if (!somethingExpired) return null;
   return { total_microdollars_acquired: new_total_microdollars_acquired };
 }

@@ -9,6 +9,7 @@ import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { SessionSyncInputSchema } from '../types/session-sync';
 import { withDORetry } from '../util/do-retry';
 import { splitIngestBatchForDO } from '../util/ingest-batching';
+import { getSessionExport } from '../services/session-export';
 
 export type ApiContext = {
   Bindings: Env;
@@ -230,6 +231,10 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
     ? (mergedChanges.get('platform') ?? null)
     : undefined;
   const orgId = mergedChanges.has('orgId') ? (mergedChanges.get('orgId') ?? null) : undefined;
+  const gitUrl = mergedChanges.has('gitUrl') ? (mergedChanges.get('gitUrl') ?? null) : undefined;
+  const gitBranch = mergedChanges.has('gitBranch')
+    ? (mergedChanges.get('gitBranch') ?? null)
+    : undefined;
 
   let hasSessionUpdate = false;
   let sessionUpdate = db.updateTable('cli_sessions_v2');
@@ -244,6 +249,14 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
   if (orgId !== undefined) {
     hasSessionUpdate = true;
     sessionUpdate = sessionUpdate.set({ organization_id: orgId });
+  }
+  if (gitUrl !== undefined) {
+    hasSessionUpdate = true;
+    sessionUpdate = sessionUpdate.set({ git_url: gitUrl });
+  }
+  if (gitBranch !== undefined) {
+    hasSessionUpdate = true;
+    sessionUpdate = sessionUpdate.set({ git_branch: gitBranch });
   }
 
   if (hasSessionUpdate) {
@@ -293,25 +306,12 @@ api.get('/session/:sessionId/export', async c => {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
-  const db = getDb(c.env.HYPERDRIVE);
   const kiloUserId = c.get('user_id');
+  const json = await getSessionExport(c.env, parsed.data, kiloUserId);
 
-  const session = await db
-    .selectFrom('cli_sessions_v2')
-    .select(['session_id'])
-    .where('session_id', '=', parsed.data)
-    .where('kilo_user_id', '=', kiloUserId)
-    .executeTakeFirst();
-
-  if (!session) {
+  if (json === null) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  const json = await withDORetry(
-    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-    stub => stub.getAll(),
-    'SessionIngestDO.getAll'
-  );
 
   return c.body(json, 200, {
     'content-type': 'application/json; charset=utf-8',

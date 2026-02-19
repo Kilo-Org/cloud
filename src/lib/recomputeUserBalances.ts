@@ -146,7 +146,8 @@ export function computeUserBalanceUpdates(
   const expirationResult = computeExpiration(
     expiringTransactions,
     { id: user.id, microdollars_used: cumulativeUsage },
-    lastExpirationTime
+    lastExpirationTime,
+    user.id
   );
 
   // Merge: original baselines as base, then overwrite with any shifts from computeExpiration

@@ -261,19 +261,22 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const pendingChange = Boolean(scheduledChange);
   const showUpdatePanel = panel === 'update';
 
-  const cancellationReasons = useMemo(
-    () =>
-      [
-        'Too expensive',
-        'Not using it enough',
-        'Missing features',
-        'Bugs / reliability issues',
-        'Performance issues',
-        'Using another tool',
-        'Other',
-      ] as const,
-    []
-  );
+  const cancellationReasons = useMemo(() => {
+    const reasons = [
+      'Too expensive',
+      'Not using it enough',
+      'Missing features',
+      'Bugs / reliability issues',
+      'Performance issues',
+      'Using another tool',
+    ];
+    // Fisher-Yates shuffle
+    for (let i = reasons.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [reasons[i], reasons[j]] = [reasons[j], reasons[i]];
+    }
+    return [...reasons, 'Other'];
+  }, []);
 
   const toggleCancellationReason = (reason: string) => {
     setSelectedCancellationReasons(current =>

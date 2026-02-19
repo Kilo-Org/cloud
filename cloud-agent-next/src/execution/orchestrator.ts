@@ -322,7 +322,6 @@ export class ExecutionOrchestrator {
           setupCommands: initContext.setupCommands,
           mcpServers: initContext.mcpServers,
           botId: initContext.botId,
-          skipLinking: true,
           githubAppType: initContext.githubAppType,
           // Note: existingMetadata requires CloudAgentSessionState, not our simplified type
           ...gitSource,
@@ -351,6 +350,7 @@ export class ExecutionOrchestrator {
         upstreamBranch: initContext.upstreamBranch,
         botId: initContext.botId,
         githubAppType: initContext.githubAppType,
+        platform: initContext.platform,
       });
     } catch (error) {
       if (error instanceof ExecutionError) throw error;

@@ -696,7 +696,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
 
   // Handle new session
   const handleNewSession = () => {
-    const basePath = organizationId ? `/organizations/${organizationId}/cloud-next` : '/cloud-next';
+    const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
     router.push(basePath);
   };
 
@@ -748,7 +748,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         if (needsLegacyPrepare && effectiveSessionId && currentDbSessionId) {
           const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
-          const repoParams = buildPrepareSessionRepoParams({ repo: resumeRepo, gitUrl });
+          const repoParams = buildPrepareSessionRepoParams({
+            repo: resumeRepo,
+            platform: gitUrl ? 'gitlab' : 'github',
+          });
           if (!repoParams) {
             setError('Cannot prepare session without a repository.');
             toast.error('Cannot prepare session without a repository.');
@@ -794,7 +797,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         if (!effectiveSessionId) {
           const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
-          const repoParams = buildPrepareSessionRepoParams({ repo: resumeRepo, gitUrl });
+          const repoParams = buildPrepareSessionRepoParams({
+            repo: resumeRepo,
+            platform: gitUrl ? 'gitlab' : 'github',
+          });
           if (!repoParams) {
             setError('Cannot prepare session without a repository.');
             toast.error('Cannot prepare session without a repository.');
@@ -867,9 +873,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   // Handle session selection
   const handleSelectSession = useCallback(
     (sessionId: string) => {
-      const basePath = organizationId
-        ? `/organizations/${organizationId}/cloud-next`
-        : '/cloud-next';
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${sessionId}`);
     },
     [organizationId, router]

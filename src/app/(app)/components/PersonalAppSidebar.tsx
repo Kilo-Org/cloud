@@ -23,7 +23,6 @@ import {
   Key,
   Wrench,
   Webhook,
-  Shell,
   Factory,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
@@ -33,6 +32,7 @@ import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE, ENABLE_GASTOWN_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { data: user, isLoading } = useUser();
@@ -84,15 +84,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Cloud,
       url: '/cloud',
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Cloud Next',
-            icon: Cloud,
-            url: '/cloud-next',
-          },
-        ]
-      : []),
     {
       title: 'Sessions',
       icon: List,
@@ -162,7 +153,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       ? [
           {
             title: 'Claw',
-            icon: Shell,
+            icon: KiloCrabIcon,
             url: '/claw',
           },
         ]

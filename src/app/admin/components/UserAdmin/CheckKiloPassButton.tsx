@@ -39,7 +39,7 @@ export default function CheckKiloPassButton({ userId }: { userId: string }) {
       disabled={mutation.isPending}
       onClick={() => mutation.mutate({ userId })}
     >
-      Check Kilo Pass
+      Check bonus
     </Button>
   );
 }

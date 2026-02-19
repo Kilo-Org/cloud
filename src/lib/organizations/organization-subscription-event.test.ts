@@ -167,11 +167,14 @@ async function getCreditTransactionsForOrg(organizationId: string): Promise<Cred
 // Helper function to get organization balance
 async function getOrganizationBalance(organizationId: string): Promise<number> {
   const org = await db
-    .select({ balance: organizations.microdollars_balance })
+    .select({
+      total_microdollars_acquired: organizations.total_microdollars_acquired,
+      microdollars_used: organizations.microdollars_used,
+    })
     .from(organizations)
     .where(eq(organizations.id, organizationId))
     .then(rows => rows[0]);
-  return org?.balance || 0;
+  return (org?.total_microdollars_acquired ?? 0) - (org?.microdollars_used ?? 0);
 }
 
 describe('handleSubscriptionEvent', () => {

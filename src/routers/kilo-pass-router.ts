@@ -148,6 +148,39 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
   return Boolean(unlockedItem);
 }
 
+/**
+ * Get the timestamp when base credits were issued for the most recent issuance of a subscription.
+ *
+ * The Kilo Pass usage window should start from when base credits were actually issued (via the
+ * invoice.paid webhook), not from Stripe's `current_period_start`. There is often a gap between
+ * these two timestamps during which usage is served from pre-existing credits, not pass credits.
+ */
+async function getBaseCreditsIssuedAtForSubscription(
+  subscriptionId: string
+): Promise<string | null> {
+  const rows = await db
+    .select({ createdAt: kilo_pass_issuance_items.created_at })
+    .from(kilo_pass_issuance_items)
+    .innerJoin(
+      kilo_pass_issuances,
+      eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+    )
+    .where(
+      and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      )
+    )
+    .orderBy(desc(kilo_pass_issuances.issue_month))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row?.createdAt) return null;
+
+  const parsed = dayjs(row.createdAt).utc();
+  return parsed.isValid() ? parsed.toISOString() : null;
+}
+
 async function getCurrentPeriodUsageUsd(params: {
   kiloUserId: string;
   startInclusiveIso: string;
@@ -366,9 +399,14 @@ export const kiloPassRouter = createTRPCRouter({
     const nowUtc = dayjs().utc();
     const nowIso = nowUtc.toISOString();
 
-    // For monthly cadence, Stripe's billing period matches our bonus period.
-    // For yearly cadence, bonuses are issued monthly based on `next_yearly_issue_at` (not the yearly billing window).
-    let usageStartInclusiveIso = secondsToIso(periodStartSeconds);
+    // Usage window starts from when base credits were actually issued (credit transaction
+    // created_at), not from Stripe's current_period_start. There is a delay between when Stripe
+    // advances the billing period and when the invoice.paid webhook fires to issue credits.
+    // Usage during that gap is served from pre-existing credits, not pass credits.
+    const baseCreditsIssuedAtIso = await getBaseCreditsIssuedAtForSubscription(
+      subscriptionBase.subscriptionId
+    );
+    let usageStartInclusiveIso = baseCreditsIssuedAtIso ?? secondsToIso(periodStartSeconds);
     if (subscriptionBase.cadence === KiloPassCadence.Yearly) {
       const nextYearlyIssueAtUtc =
         subscriptionBase.nextYearlyIssueAt != null

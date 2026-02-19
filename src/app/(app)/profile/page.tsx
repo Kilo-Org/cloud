@@ -1,10 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Mail, Wrench } from 'lucide-react';
+import { Wrench } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import ProfileCreditsCounter from '@/components/profile/ProfileCreditsCounter';
 import ProfileExpiringCredits from '@/components/profile/ProfileExpiringCredits';
-import { getInitials } from '@/lib/utils';
 import { getCustomerInfo } from '@/lib/customerInfo';
 import { DevNukeAccountButton } from '@/components/dev/DevNukeAccountButton';
 import { DevConsumeCreditsButton } from '@/components/dev/DevConsumeCreditsButton';
@@ -24,6 +22,8 @@ import { ProfileOrganizationsSection } from '@/components/profile/ProfileOrganiz
 import { ProfileKiloPassSection } from '@/components/profile/ProfileKiloPassSection';
 import { CreateKilocodeOrgButton } from '@/components/dev/CreateKilocodeOrgButton';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { WelcomeTypeformModal } from '@/components/profile/WelcomeTypeformModal';
+import { UserProfileCard } from '@/components/profile/UserProfileCard';
 
 export default async function ProfilePage({ searchParams }: AppPageProps) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
@@ -42,29 +42,21 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
     : 'Remaining Credits';
   return (
     <>
+      {!user.completed_welcome_form && (
+        <WelcomeTypeformModal userEmail={user.google_user_email} kiloUserId={user.id} />
+      )}
       {/* NOTE: When making changes to this structure, make sure to also update the structure in the loading.tsx file */}
       <PageLayout title="Profile">
         <div className="flex w-full flex-col gap-4 lg:flex-row">
           <Card className="flex-1 rounded-xl shadow-sm">
             <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-14 w-14">
-                  {user.google_user_image_url ? (
-                    <AvatarImage
-                      src={user.google_user_image_url}
-                      alt={`${user.google_user_name}`}
-                    />
-                  ) : null}
-                  <AvatarFallback className="text-xl">{getInitials(user)}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <h2 className="text-foreground text-xl font-semibold">{user.google_user_name}</h2>
-                  <p className="text-muted-foreground flex items-center text-sm">
-                    <Mail className="mr-1.5 h-3.5 w-3.5" />
-                    {user.google_user_email}
-                  </p>
-                </div>
-              </div>
+              <UserProfileCard
+                name={user.google_user_name}
+                email={user.google_user_email}
+                imageUrl={user.google_user_image_url}
+                linkedinUrl={user.linkedin_url ?? null}
+                githubUrl={user.github_url ?? null}
+              />
             </CardContent>
           </Card>
 

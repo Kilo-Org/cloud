@@ -37,6 +37,7 @@ export type ListDeploymentsResponse = {
   data: Array<{
     deployment: Deployment;
     latestBuild: DeploymentBuild | null;
+    appBuilderProjectId: string | null;
   }>;
 };
 
@@ -47,6 +48,7 @@ export type GetDeploymentResponse = {
   success: boolean;
   deployment: Deployment;
   latestBuild: DeploymentBuild | null;
+  appBuilderProjectId: string | null;
 };
 
 /**

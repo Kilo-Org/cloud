@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { stripRequiredPrefix } from '@/lib/utils';
 import { generateProviderSpecificHash } from '@/lib/providerHash';
 import { extractPromptInfo, type MicrodollarUsageContext } from '@/lib/processUsage';
+import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import { applyProviderSpecificLogic, getProvider, openRouterRequest } from '@/lib/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
@@ -14,7 +15,6 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isSlackbotOnlyModel,
-  isKiloStealthModel,
   isRateLimitedModel,
 } from '@/lib/models';
 import {
@@ -37,13 +37,18 @@ import {
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
-import { redactedModelResponse } from '@/lib/redactedModelResponse';
+import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
-import { checkFreeModelRateLimit, logFreeModelRequest } from '@/lib/free-model-rate-limiter';
+import {
+  checkFreeModelRateLimit,
+  logFreeModelRequest,
+  checkPromotionLimit,
+} from '@/lib/free-model-rate-limiter';
+import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import { classifyAbuse } from '@/lib/abuse-service';
 import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import {
@@ -56,12 +61,18 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
+import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
+import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
+import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
 const OPUS = CLAUDE_OPUS_CURRENT_MODEL_ID;
 const SONNET = CLAUDE_SONNET_CURRENT_MODEL_ID;
+
+const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
+const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 
 // Mode → model mappings for kilo/auto routing.
 // Add/remove/modify entries here to change routing behavior.
@@ -124,7 +135,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   delete requestBodyParsed.models; // OpenRouter specific field we do not support
-  if (!requestBodyParsed.model) {
+  if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {
     return modelDoesNotExistResponse();
   }
 
@@ -176,23 +187,58 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     authFailedResponse,
     organizationId: authOrganizationId,
     internalApiUse: authInternalApiUse,
+    botId: authBotId,
   } = await getUserFromAuth({ adminOnly: false });
   authSpan.end();
 
   let user: typeof maybeUser | AnonymousUserContext;
   let organizationId: string | undefined = authOrganizationId;
   let internalApiUse: boolean | undefined = authInternalApiUse;
+  let botId: string | undefined = authBotId;
 
   if (authFailedResponse) {
     // No valid auth
     if (!isFreeModel(originalModelIdLowerCased)) {
       // Paid model requires authentication
-      return authFailedResponse;
+      return NextResponse.json(
+        {
+          error: {
+            code: PAID_MODEL_AUTH_REQUIRED,
+            message: 'You need to sign in to use this model.',
+          },
+        },
+        { status: 401 }
+      );
     }
+
+    const promotionLimit = await checkPromotionLimit(ipAddress);
+
+    if (!promotionLimit.allowed) {
+      console.warn(
+        `Promotion model limit exceeded, ip: ${ipAddress}, ` +
+          `model: ${originalModelIdLowerCased}, ` +
+          `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
+          `in ${PROMOTION_WINDOW_HOURS}h window`
+      );
+
+      return NextResponse.json(
+        {
+          error: {
+            code: PROMOTION_MODEL_LIMIT_REACHED,
+            message:
+              'Sign up to receive $5 in credits for paid models and ' +
+              'to continue using free models. No credit card or purchase required.',
+          },
+        },
+        { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
+      );
+    }
+
     // Anonymous access for free model (already rate-limited above)
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     internalApiUse = false;
+    botId = undefined;
   } else {
     user = maybeUser;
   }
@@ -209,11 +255,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const taskId = request.headers.get('X-KiloCode-TaskId') ?? undefined;
-  const { provider, userByok } = await getProvider(
+  const { provider, userByok, customLlm } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
     user,
-    organizationId
+    organizationId,
+    taskId
   );
 
   console.debug(`Routing request to ${provider.id}`);
@@ -238,6 +285,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (isDeadFreeModel(originalModelIdLowerCased)) {
     return alphaPeriodEndedResponse();
+  }
+
+  if (isRateLimitedToDeath(originalModelIdLowerCased)) {
+    return modelDoesNotExistResponse();
   }
 
   // Slackbot-only models are only available through Kilo for Slack (internalApiUse)
@@ -269,15 +320,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
+    botId,
+    feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user)) {
+  const bypassAccessCheckForCustomLlm =
+    !!customLlm && !!organizationId && customLlm.organization_ids.includes(organizationId);
+  if (!isAnonymousContext(user) && !bypassAccessCheckForCustomLlm) {
     const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
 
-    if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
+    if (
+      balance <= 0 &&
+      !isFreeModel(originalModelIdLowerCased) &&
+      !userByok &&
+      !isActiveReviewPromo(botId, originalModelIdLowerCased)
+    ) {
       return await usageLimitExceededResponse(user, balance);
     }
 
@@ -336,15 +396,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     userByok
   );
 
-  const response = await openRouterRequest({
-    path,
-    search: url.search,
-    method: request.method,
-    body: requestBodyParsed,
-    extraHeaders,
-    provider,
-    signal: request.signal,
-  });
+  const response = customLlm
+    ? await customLlmRequest(
+        customLlm,
+        requestBodyParsed,
+        !!fraudHeaders.http_user_agent?.startsWith('Kilo-Code/')
+      )
+    : await openRouterRequest({
+        path,
+        search: url.search,
+        method: request.method,
+        body: requestBodyParsed,
+        extraHeaders,
+        provider,
+        signal: request.signal,
+      });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
 
   emitApiMetricsForResponse(
@@ -444,8 +510,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (isKiloStealthModel(originalModelIdLowerCased)) {
-    return redactedModelResponse(response, originalModelIdLowerCased);
+  if (provider.requiresResponseRewrite) {
+    return rewriteModelResponse(response, originalModelIdLowerCased);
   }
 
   return wrapInSafeNextResponse(response);

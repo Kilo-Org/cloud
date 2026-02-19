@@ -3,7 +3,7 @@ import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter
 import { normalizeToolCallIds } from '@/lib/tool-calling';
 import type OpenAI from 'openai';
 
-export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.5';
+export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.6';
 
@@ -13,7 +13,7 @@ export const opus_46_free_slackbot_model = {
   description: 'Free version of Claude Opus 4.6 for use in Kilo for Slack only',
   context_length: 1_000_000,
   max_completion_tokens: 32000,
-  is_enabled: true,
+  is_enabled: false,
   flags: ['reasoning', 'prompt_cache', 'vision'],
   gateway: 'openrouter',
   internal_id: 'anthropic/claude-opus-4.6',
@@ -179,10 +179,6 @@ export function applyAnthropicModelSettings(
     // additionally it is a common bug to forget adding cache breakpoints
     // we may want to gate this for Kilo-clients at some point
     addCacheBreakpoints(requestToMutate.messages);
-  }
-
-  if (isOpusModel(requestedModel) && !requestToMutate.verbosity) {
-    requestToMutate.verbosity = 'medium';
   }
 
   // anthropic doesn't allow '.' in tool call ids

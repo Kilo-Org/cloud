@@ -12,6 +12,7 @@ import {
 } from '@/db/schema';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
+import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
@@ -27,6 +28,11 @@ import { toNonNullish } from '@/lib/utils';
 import { TRPCError } from '@trpc/server';
 import { assertNoError, successResult } from '@/lib/maybe-result';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
+import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+import { kilo_pass_issuances, kilo_pass_issuance_items, microdollar_usage } from '@/db/schema';
+import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
+import { fromMicrodollars } from '@/lib/utils';
+import { sum } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
@@ -310,6 +316,102 @@ export const adminRouter = createTRPCRouter({
           fingerprints: userFingerprints,
           relatedUsers,
           fingerprintType,
+        };
+      }),
+
+    getKiloPassState: adminProcedure
+      .input(z.object({ userId: z.string() }))
+      .query(async ({ input }) => {
+        const user = await db.query.kilocode_users.findFirst({
+          columns: {
+            microdollars_used: true,
+            total_microdollars_acquired: true,
+            kilo_pass_threshold: true,
+          },
+          where: eq(kilocode_users.id, input.userId),
+        });
+
+        if (!user) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+
+        const subscription = await getKiloPassStateForUser(db, input.userId);
+        if (!subscription) {
+          return {
+            subscription: null,
+            issuances: [],
+            currentPeriodUsageUsd: null,
+            thresholds: null,
+          };
+        }
+
+        // Fetch all issuances with their items for this subscription
+        const issuanceRows = await db
+          .select({
+            issueMonth: kilo_pass_issuances.issue_month,
+            issuanceCreatedAt: kilo_pass_issuances.created_at,
+            itemKind: kilo_pass_issuance_items.kind,
+            itemAmountUsd: kilo_pass_issuance_items.amount_usd,
+            itemCreatedAt: kilo_pass_issuance_items.created_at,
+            bonusPercentApplied: kilo_pass_issuance_items.bonus_percent_applied,
+          })
+          .from(kilo_pass_issuances)
+          .innerJoin(
+            kilo_pass_issuance_items,
+            eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+          )
+          .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription.subscriptionId))
+          .orderBy(desc(kilo_pass_issuances.issue_month), asc(kilo_pass_issuance_items.created_at));
+
+        // Find the most recent base credit issuance to compute usage since
+        const latestBaseIssuance = issuanceRows.find(
+          r => r.itemKind === KiloPassIssuanceItemKind.Base
+        );
+
+        let currentPeriodUsageUsd: number | null = null;
+        if (latestBaseIssuance) {
+          const result = await db
+            .select({
+              totalCost_mUsd: sql<unknown>`COALESCE(${sum(microdollar_usage.cost)}, 0)`,
+            })
+            .from(microdollar_usage)
+            .where(
+              and(
+                eq(microdollar_usage.kilo_user_id, input.userId),
+                isNull(microdollar_usage.organization_id),
+                sql`${microdollar_usage.created_at} >= ${latestBaseIssuance.itemCreatedAt}`,
+                sql`${microdollar_usage.created_at} < now()`
+              )
+            );
+          const raw = Number(result[0]?.totalCost_mUsd);
+          currentPeriodUsageUsd = isNaN(raw) ? 0 : Math.round(fromMicrodollars(raw) * 100) / 100;
+        }
+
+        const effectiveThreshold =
+          user.kilo_pass_threshold != null
+            ? Math.max(0, user.kilo_pass_threshold - 1_000_000)
+            : null;
+
+        return {
+          subscription: {
+            ...subscription,
+          },
+          issuances: issuanceRows.map(r => ({
+            issueMonth: r.issueMonth,
+            issuanceCreatedAt: r.issuanceCreatedAt,
+            itemKind: r.itemKind,
+            itemAmountUsd: r.itemAmountUsd,
+            itemCreatedAt: r.itemCreatedAt,
+            bonusPercentApplied: r.bonusPercentApplied,
+          })),
+          currentPeriodUsageUsd,
+          thresholds: {
+            kiloPassThreshold_mUsd: user.kilo_pass_threshold,
+            effectiveThreshold_mUsd: effectiveThreshold,
+            microdollarsUsed: user.microdollars_used,
+            totalMicrodollarsAcquired: user.total_microdollars_acquired,
+            bonusUnlocked: user.kilo_pass_threshold === null,
+          },
         };
       }),
 
@@ -683,6 +785,7 @@ export const adminRouter = createTRPCRouter({
       }),
   }),
   appBuilder: adminAppBuilderRouter,
+  kiloclawInstances: adminKiloclawInstancesRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   bulkUserCredits: bulkUserCreditsRouter,

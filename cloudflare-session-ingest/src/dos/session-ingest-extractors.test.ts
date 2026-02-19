@@ -5,13 +5,20 @@ import {
   extractNormalizedParentIdFromItem,
   extractNormalizedPlatformFromItem,
   extractNormalizedOrgIdFromItem,
+  extractNormalizedGitUrlFromItem,
+  extractNormalizedGitBranchFromItem,
 } from './session-ingest-extractors';
 
 function sessionItem(data: Record<string, unknown>): IngestBatch[number] {
   return { type: 'session', data } as IngestBatch[number];
 }
 
-function kiloMetaItem(data: { platform: string; orgId?: string }): IngestBatch[number] {
+function kiloMetaItem(data: {
+  platform: string;
+  orgId?: string;
+  gitUrl?: string | null;
+  gitBranch?: string | null;
+}): IngestBatch[number] {
   return { type: 'kilo_meta', data } as IngestBatch[number];
 }
 
@@ -100,5 +107,130 @@ describe('extractNormalizedOrgIdFromItem', () => {
 
   it('returns undefined for non-kilo_meta item', () => {
     expect(extractNormalizedOrgIdFromItem(messageItem())).toBeUndefined();
+  });
+});
+
+describe('extractNormalizedGitUrlFromItem', () => {
+  it('extracts gitUrl from kilo_meta item', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(
+        kiloMetaItem({ platform: 'cli', gitUrl: 'https://github.com/user/repo' })
+      )
+    ).toBe('https://github.com/user/repo');
+  });
+
+  it('strips credentials from HTTPS git url', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(
+        kiloMetaItem({ platform: 'cli', gitUrl: 'https://token@github.com/user/repo' })
+      )
+    ).toBe('https://github.com/user/repo');
+  });
+
+  it('strips credentials, query params, and hash from HTTPS git url', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(
+        kiloMetaItem({
+          platform: 'cli',
+          gitUrl: 'https://user:pass@github.com/org/repo.git?ref=main#L10',
+        })
+      )
+    ).toBe('https://github.com/org/repo.git');
+  });
+
+  it('strips query params and hash from HTTPS git url without credentials', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(
+        kiloMetaItem({ platform: 'cli', gitUrl: 'https://github.com/org/repo?token=abc#readme' })
+      )
+    ).toBe('https://github.com/org/repo');
+  });
+
+  it('accepts SSH git url', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(
+        kiloMetaItem({ platform: 'cli', gitUrl: 'git@github.com:user/repo.git' })
+      )
+    ).toBe('git@github.com:user/repo.git');
+  });
+
+  it('strips query params from SSH git url', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(
+        kiloMetaItem({ platform: 'cli', gitUrl: 'git@github.com:org/repo.git?ref=main' })
+      )
+    ).toBe('git@github.com:org/repo.git');
+  });
+
+  it('handles SSH git url with subgroups', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(
+        kiloMetaItem({ platform: 'cli', gitUrl: 'git@gitlab.com:group/subgroup/repo.git' })
+      )
+    ).toBe('git@gitlab.com:group/subgroup/repo.git');
+  });
+
+  it('returns null for invalid git url', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(kiloMetaItem({ platform: 'cli', gitUrl: 'not-a-url' }))
+    ).toBeNull();
+  });
+
+  it('returns undefined for kilo_meta item without gitUrl', () => {
+    expect(extractNormalizedGitUrlFromItem(kiloMetaItem({ platform: 'cli' }))).toBeUndefined();
+  });
+
+  it('returns undefined for non-kilo_meta item', () => {
+    expect(extractNormalizedGitUrlFromItem(messageItem())).toBeUndefined();
+  });
+
+  it('returns null for empty string gitUrl', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(kiloMetaItem({ platform: 'cli', gitUrl: '' }))
+    ).toBeNull();
+  });
+
+  it('trims whitespace from gitUrl', () => {
+    expect(
+      extractNormalizedGitUrlFromItem(
+        kiloMetaItem({ platform: 'cli', gitUrl: '  https://github.com/user/repo  ' })
+      )
+    ).toBe('https://github.com/user/repo');
+  });
+});
+
+describe('extractNormalizedGitBranchFromItem', () => {
+  it('extracts gitBranch from kilo_meta item', () => {
+    expect(
+      extractNormalizedGitBranchFromItem(kiloMetaItem({ platform: 'cli', gitBranch: 'main' }))
+    ).toBe('main');
+  });
+
+  it('trims whitespace from gitBranch', () => {
+    expect(
+      extractNormalizedGitBranchFromItem(
+        kiloMetaItem({ platform: 'cli', gitBranch: '  feature/test  ' })
+      )
+    ).toBe('feature/test');
+  });
+
+  it('returns null for empty string gitBranch', () => {
+    expect(
+      extractNormalizedGitBranchFromItem(kiloMetaItem({ platform: 'cli', gitBranch: '' }))
+    ).toBeNull();
+  });
+
+  it('returns undefined for kilo_meta item without gitBranch', () => {
+    expect(extractNormalizedGitBranchFromItem(kiloMetaItem({ platform: 'cli' }))).toBeUndefined();
+  });
+
+  it('returns undefined for non-kilo_meta item', () => {
+    expect(extractNormalizedGitBranchFromItem(messageItem())).toBeUndefined();
+  });
+
+  it('returns null for null gitBranch', () => {
+    expect(
+      extractNormalizedGitBranchFromItem(kiloMetaItem({ platform: 'cli', gitBranch: null }))
+    ).toBeNull();
   });
 });

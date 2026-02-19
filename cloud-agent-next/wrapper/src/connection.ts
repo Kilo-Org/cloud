@@ -74,6 +74,10 @@ type UserMessageInfo = {
  */
 type MessageInfo = UserMessageInfo | AssistantMessageInfo;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 /**
  * Type guard for message.updated kilocode event data.
  * Kilo server sends: {type: "message.updated", properties: {info: {...}}}
@@ -82,16 +86,26 @@ type MessageInfo = UserMessageInfo | AssistantMessageInfo;
 function isMessageUpdatedEvent(
   data: unknown
 ): data is { event: 'message.updated'; properties: { info: MessageInfo } } {
-  if (typeof data !== 'object' || data === null) return false;
-  const obj = data as Record<string, unknown>;
-  if (obj.event !== 'message.updated') return false;
-  const props = obj.properties as Record<string, unknown> | undefined;
-  return (
-    typeof props === 'object' &&
-    props !== null &&
-    typeof props.info === 'object' &&
-    props.info !== null
-  );
+  if (!isRecord(data)) return false;
+  if (data.event !== 'message.updated') return false;
+  const props = data.properties;
+  if (!isRecord(props)) return false;
+  const info = props.info;
+  return isRecord(info) && typeof info.role === 'string' && isRecord(info.time);
+}
+
+/**
+ * Type guard for session.idle events.
+ * Kilo server sends: {type: "session.idle", properties: {sessionID: "..."}}
+ * After mapping: {type: "session.idle", properties: {sessionID: "..."}, event: "session.idle"}
+ */
+export function isSessionIdleEvent(
+  data: unknown
+): data is { event: 'session.idle'; properties: { sessionID: string } } {
+  if (!isRecord(data)) return false;
+  if (data.event !== 'session.idle') return false;
+  const props = data.properties;
+  return isRecord(props) && typeof props.sessionID === 'string';
 }
 
 /**
@@ -325,8 +339,21 @@ export function createConnectionManager(
           }
 
           // session.idle is the primary completion signal - it means the assistant finished
-          // and the session is waiting for the next user input
+          // and the session is waiting for the next user input.
+          // Only the root session's idle event should trigger completion — child sessions
+          // (subagents) also emit session.idle, which we must ignore.
           if (data.event === 'session.idle') {
+            if (!isSessionIdleEvent(data)) {
+              logToFile(`session.idle without parseable sessionID — ignoring`);
+              return;
+            }
+            const currentSessionId = state.currentJob?.kiloSessionId;
+            if (currentSessionId && data.properties.sessionID !== currentSessionId) {
+              logToFile(
+                `ignoring session.idle for child session: event=${data.properties.sessionID} current=${currentSessionId}`
+              );
+              return;
+            }
             logToFile(`session.idle received - marking all inflight as complete`);
             // Complete ALL inflight messages for this job - the session is idle
             const inflightIds = state.inflightMessageIds;

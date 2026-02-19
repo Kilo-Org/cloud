@@ -34,7 +34,7 @@ type AutoTopUpResult = Result<{ stripe_id: string }, string>;
 
 type AutoTopUpOrganization = Pick<
   Organization,
-  'id' | 'auto_top_up_enabled' | 'microdollars_balance'
+  'id' | 'auto_top_up_enabled' | 'total_microdollars_acquired' | 'microdollars_used'
 >;
 
 /**
@@ -110,7 +110,10 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
         }
       : {
           auto_top_up_enabled: entity.organization.auto_top_up_enabled,
-          initialBalance_USD: entity.organization.microdollars_balance / 1_000_000,
+          initialBalance_USD:
+            (entity.organization.total_microdollars_acquired -
+              entity.organization.microdollars_used) /
+            1_000_000,
         };
   // Only for users with auto-top-up enabled
   if (!auto_top_up_enabled) {
@@ -343,7 +346,8 @@ async function getEntityBalanceAndStripeCustomer(
   } else {
     const freshOrg = await getOrganizationById(entity.organization.id);
     if (!freshOrg) throw new Error('Organization not found:' + entity.organization.id);
-    const currentBalance_USD = freshOrg.microdollars_balance / 1_000_000;
+    const currentBalance_USD =
+      (freshOrg.total_microdollars_acquired - freshOrg.microdollars_used) / 1_000_000;
     return { currentBalance_USD, stripe_customer_id: freshOrg.stripe_customer_id };
   }
 }

@@ -1,0 +1,48 @@
+'use client';
+
+import { Badge } from '@/components/ui/badge';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
+import { AccessCodeActions } from './AccessCodeActions';
+import { CLAW_STATUS_BADGE, type ClawState } from './claw.types';
+
+export function ClawHeader({
+  status,
+  sandboxId,
+  region,
+  gatewayUrl,
+}: {
+  status: ClawState;
+  sandboxId: string | null;
+  region: string | null;
+  gatewayUrl: string;
+}) {
+  const statusInfo = status ? CLAW_STATUS_BADGE[status] : null;
+  const displayRegion = region ? region.toUpperCase() : 'Region pending';
+
+  return (
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <div className="bg-secondary flex h-10 w-10 items-center justify-center rounded-lg">
+          <KiloCrabIcon className="text-muted-foreground h-5 w-5" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-foreground text-lg font-semibold tracking-tight">KiloClaw</h1>
+            <Badge variant="beta">Beta</Badge>
+            {statusInfo && (
+              <Badge variant="outline" className={statusInfo.className}>
+                {statusInfo.label}
+              </Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground font-mono text-sm">
+            {displayRegion} {sandboxId ? `- ${sandboxId}` : ''}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <AccessCodeActions canShow={status === 'running'} gatewayUrl={gatewayUrl} />
+      </div>
+    </header>
+  );
+}

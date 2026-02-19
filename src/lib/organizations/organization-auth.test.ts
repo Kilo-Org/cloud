@@ -17,7 +17,6 @@ describe('getAuthorizedOrgContext', () => {
       .insert(organizations)
       .values({
         name: 'Test Organization',
-        microdollars_balance: 0,
         auto_top_up_enabled: true,
       })
       .returning();
@@ -224,7 +223,6 @@ describe('getAuthorizedOrgContext', () => {
         .insert(organizations)
         .values({
           name: 'Other Organization',
-          microdollars_balance: 0,
           auto_top_up_enabled: true,
         })
         .returning();

@@ -13,44 +13,127 @@ type AgentStreamProps = {
   onClose: () => void;
 };
 
-type StreamEvent = {
+type StreamEntry = {
   id: number;
-  type: string;
-  data: Record<string, unknown>;
+  kind: 'text' | 'tool' | 'status' | 'error';
+  content: string;
+  meta?: string;
   timestamp: Date;
 };
 
-const MAX_EVENTS = 500;
+const MAX_ENTRIES = 500;
+
+/**
+ * Extract displayable content from a kilo serve SSE event.
+ * Returns null for events that shouldn't produce a visible entry
+ * (e.g. session.updated noise, message.created before content arrives).
+ */
+function toStreamEntry(
+  event: string,
+  data: Record<string, unknown>,
+  nextId: () => number
+): StreamEntry | null {
+  const props = data.properties as Record<string, unknown> | undefined;
+  const ts = new Date();
+
+  // Text / reasoning parts — the main LLM output
+  if (event === 'message_part.updated' && props) {
+    const part = props.part as Record<string, unknown> | undefined;
+    if (part) {
+      const partType = part.type as string | undefined;
+
+      if (partType === 'text' && typeof part.text === 'string' && part.text) {
+        return { id: nextId(), kind: 'text', content: part.text, timestamp: ts };
+      }
+
+      if (partType === 'reasoning' && typeof part.text === 'string' && part.text) {
+        return { id: nextId(), kind: 'text', content: part.text, meta: 'thinking', timestamp: ts };
+      }
+
+      if (partType === 'tool') {
+        const toolName = (part.tool ?? part.name ?? 'unknown') as string;
+        const state = (part.state ?? '') as string;
+        const stateLabel =
+          state === 'running'
+            ? 'running...'
+            : state === 'completed'
+              ? 'done'
+              : state === 'error'
+                ? 'failed'
+                : state || 'pending';
+        return {
+          id: nextId(),
+          kind: 'tool',
+          content: toolName,
+          meta: stateLabel,
+          timestamp: ts,
+        };
+      }
+    }
+  }
+
+  // Session lifecycle events
+  if (event === 'session.idle') {
+    return { id: nextId(), kind: 'status', content: 'Session idle', timestamp: ts };
+  }
+  if (event === 'session.completed') {
+    return { id: nextId(), kind: 'status', content: 'Session completed', timestamp: ts };
+  }
+  if (event === 'agent.exited') {
+    const reason = props && typeof props.reason === 'string' ? props.reason : 'unknown reason';
+    return { id: nextId(), kind: 'status', content: `Agent exited: ${reason}`, timestamp: ts };
+  }
+
+  // Errors
+  if (event === 'error' || event === 'payment_required' || event === 'insufficient_funds') {
+    const errorMsg = props && typeof props.error === 'string' ? props.error : event;
+    return { id: nextId(), kind: 'error', content: errorMsg, timestamp: ts };
+  }
+
+  return null;
+}
 
 export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
   const trpc = useTRPC();
-  const [events, setEvents] = useState<StreamEvent[]>([]);
+  const [entries, setEntries] = useState<StreamEntry[]>([]);
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState<string>('Fetching ticket...');
   const wsRef = useRef<WebSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const eventIdRef = useRef(0);
-  // Track whether the component is still mounted to avoid state updates after unmount
+  const entryIdRef = useRef(0);
   const mountedRef = useRef(true);
 
   const ticketQuery = useQuery(trpc.gastown.getAgentStreamUrl.queryOptions({ agentId, townId }));
 
-  const appendEvent = useCallback((type: string, data: Record<string, unknown>) => {
-    if (!mountedRef.current) return;
-    setEvents(prev => [
-      ...prev.slice(-(MAX_EVENTS - 1)),
-      {
-        id: eventIdRef.current++,
-        type,
-        data,
-        timestamp: new Date(),
-      },
-    ]);
-  }, []);
+  const nextId = useCallback(() => entryIdRef.current++, []);
 
-  // Connect the WebSocket once we have a ticket. This effect runs exactly
-  // once per successful ticket fetch. Reconnection is NOT automatic — the
-  // user can refetch manually or we accept that the stream is done.
+  const handleMessage = useCallback(
+    (event: string, data: Record<string, unknown>) => {
+      if (!mountedRef.current) return;
+
+      // For text parts, merge into the last text entry if it's from the same
+      // streaming burst (avoids one entry per delta). We detect "same burst"
+      // by checking if the last entry is also text with no tool/status in between.
+      const entry = toStreamEntry(event, data, nextId);
+      if (!entry) return;
+
+      if (entry.kind === 'text' && !entry.meta) {
+        setEntries(prev => {
+          const last = prev[prev.length - 1];
+          if (last && last.kind === 'text' && !last.meta) {
+            // Merge: replace last entry with accumulated text
+            const merged = { ...last, content: entry.content, timestamp: entry.timestamp };
+            return [...prev.slice(0, -1), merged];
+          }
+          return [...prev.slice(-(MAX_ENTRIES - 1)), entry];
+        });
+      } else {
+        setEntries(prev => [...prev.slice(-(MAX_ENTRIES - 1)), entry]);
+      }
+    },
+    [nextId]
+  );
+
   useEffect(() => {
     mountedRef.current = true;
     const url = ticketQuery.data?.url;
@@ -78,7 +161,7 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
           event: string;
           data: Record<string, unknown>;
         };
-        appendEvent(msg.event, msg.data);
+        handleMessage(msg.event, msg.data);
 
         if (msg.event === 'agent.exited') {
           if (!mountedRef.current) return;
@@ -93,8 +176,6 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
     ws.onclose = () => {
       if (!mountedRef.current) return;
       setConnected(false);
-      // Don't try to reconnect — the ticket is consumed. If the user
-      // wants to reconnect they can re-open the stream panel.
       setStatus(prev => (prev === 'Agent exited' ? prev : 'Disconnected'));
     };
 
@@ -111,14 +192,14 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
       ws.close(1000, 'Component unmount');
       wsRef.current = null;
     };
-  }, [ticketQuery.data?.url, ticketQuery.data?.ticket, appendEvent]);
+  }, [ticketQuery.data?.url, ticketQuery.data?.ticket, handleMessage]);
 
   // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [events]);
+  }, [entries]);
 
   return (
     <Card className="border-gray-700">
@@ -137,15 +218,11 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
       <CardContent>
         <div
           ref={scrollRef}
-          className="h-64 overflow-y-auto rounded-md bg-gray-900 p-3 font-mono text-xs"
+          className="h-80 overflow-y-auto rounded-md bg-gray-900 p-3 text-sm leading-relaxed"
         >
-          {events.length === 0 && <p className="text-gray-600">Waiting for events...</p>}
-          {events.map(event => (
-            <div key={event.id} className="mb-1">
-              <span className="text-gray-600">{event.timestamp.toLocaleTimeString()}</span>{' '}
-              <span className="text-blue-400">[{event.type}]</span>{' '}
-              <span className="text-gray-300">{formatEventData(event.data)}</span>
-            </div>
+          {entries.length === 0 && <p className="text-xs text-gray-600">Waiting for events...</p>}
+          {entries.map(entry => (
+            <EntryLine key={entry.id} entry={entry} />
           ))}
         </div>
       </CardContent>
@@ -153,26 +230,32 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
   );
 }
 
-/** Format event data for display — show a concise summary of relevant fields. */
-function formatEventData(data: Record<string, unknown>): string {
-  const type = data.type;
-  const props = data.properties;
+function EntryLine({ entry }: { entry: StreamEntry }) {
+  switch (entry.kind) {
+    case 'text':
+      return (
+        <div className="mb-2">
+          {entry.meta === 'thinking' && (
+            <span className="text-xs text-purple-400 italic">thinking: </span>
+          )}
+          <span className="whitespace-pre-wrap text-gray-200">{entry.content}</span>
+        </div>
+      );
 
-  if (typeof props === 'object' && props !== null) {
-    const p = props as Record<string, unknown>;
-    if (Array.isArray(p.activeTools) && p.activeTools.length > 0) {
-      return `tools: ${p.activeTools.join(', ')}`;
-    }
-    if (typeof p.reason === 'string') {
-      return p.reason;
-    }
-    if (typeof p.error === 'string') {
-      return `error: ${p.error}`;
-    }
-  }
+    case 'tool':
+      return (
+        <div className="mb-1 flex items-center gap-2 text-xs">
+          <span className="rounded bg-blue-900/50 px-1.5 py-0.5 text-blue-300">
+            {entry.content}
+          </span>
+          <span className="text-gray-500">{entry.meta}</span>
+        </div>
+      );
 
-  if (typeof type === 'string') {
-    return type;
+    case 'status':
+      return <div className="my-2 text-center text-xs text-gray-600">— {entry.content} —</div>;
+
+    case 'error':
+      return <div className="mb-1 text-xs text-red-400">Error: {entry.content}</div>;
   }
-  return JSON.stringify(data).slice(0, 200);
 }

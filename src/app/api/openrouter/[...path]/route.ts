@@ -43,7 +43,12 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
-import { checkFreeModelRateLimit, logFreeModelRequest } from '@/lib/free-model-rate-limiter';
+import {
+  checkFreeModelRateLimit,
+  logFreeModelRequest,
+  checkPromotionLimit,
+} from '@/lib/free-model-rate-limiter';
+import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import { classifyAbuse } from '@/lib/abuse-service';
 import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import {
@@ -65,6 +70,9 @@ const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
 const OPUS = CLAUDE_OPUS_CURRENT_MODEL_ID;
 const SONNET = CLAUDE_SONNET_CURRENT_MODEL_ID;
+
+const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
+const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 
 // Mode → model mappings for kilo/auto routing.
 // Add/remove/modify entries here to change routing behavior.
@@ -192,8 +200,40 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // No valid auth
     if (!isFreeModel(originalModelIdLowerCased)) {
       // Paid model requires authentication
-      return authFailedResponse;
+      return NextResponse.json(
+        {
+          error: {
+            code: PAID_MODEL_AUTH_REQUIRED,
+            message: 'You need to sign in to use this model.',
+          },
+        },
+        { status: 401 }
+      );
     }
+
+    const promotionLimit = await checkPromotionLimit(ipAddress);
+
+    if (!promotionLimit.allowed) {
+      console.warn(
+        `Promotion model limit exceeded, ip: ${ipAddress}, ` +
+          `model: ${originalModelIdLowerCased}, ` +
+          `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
+          `in ${PROMOTION_WINDOW_HOURS}h window`
+      );
+
+      return NextResponse.json(
+        {
+          error: {
+            code: PROMOTION_MODEL_LIMIT_REACHED,
+            message:
+              'Sign up to receive $5 in credits for paid models and ' +
+              'to continue using free models. No credit card or purchase required.',
+          },
+        },
+        { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
+      );
+    }
+
     // Anonymous access for free model (already rate-limited above)
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;

@@ -57,6 +57,8 @@ export async function startAgent(
     activeTools: [],
     messageCount: 0,
     exitReason: null,
+    gastownApiUrl: request.envVars?.GASTOWN_API_URL ?? process.env.GASTOWN_API_URL ?? null,
+    gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
   };
   agents.set(request.agentId, agent);
 

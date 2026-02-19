@@ -16,11 +16,11 @@ export async function reportAgentCompleted(
   status: 'completed' | 'failed',
   reason?: string
 ): Promise<void> {
-  const apiUrl = process.env.GASTOWN_API_URL;
-  const token = process.env.GASTOWN_SESSION_TOKEN;
+  const apiUrl = agent.gastownApiUrl;
+  const token = agent.gastownSessionToken;
   if (!apiUrl || !token) {
     console.warn(
-      `Cannot report agent ${agent.agentId} completion: GASTOWN_API_URL or GASTOWN_SESSION_TOKEN not set`
+      `Cannot report agent ${agent.agentId} completion: no API credentials on agent record`
     );
     return;
   }

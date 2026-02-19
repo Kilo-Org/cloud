@@ -260,22 +260,23 @@ export default {
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       const url = new URL(request.url);
       const match = url.pathname.match(WS_STREAM_PATTERN);
+      console.log(`[gastown-worker] WS upgrade: pathname=${url.pathname} match=${!!match}`);
       if (match) {
         const townId = match[1];
         const agentId = match[2];
-        const ticket = url.searchParams.get('ticket');
 
-        // Build a container-internal URL for the DO's fetch handler
-        const containerUrl = new URL(
-          `/agents/${agentId}/stream${ticket ? `?ticket=${encodeURIComponent(ticket)}` : ''}`,
-          'http://container'
+        console.log(
+          `[gastown-worker] WS upgrade: routing to DO townId=${townId} agentId=${agentId}`
         );
-        const doRequest = new Request(containerUrl.toString(), {
-          headers: request.headers,
-        });
 
+        // Pass the original request directly to the DO. The CF runtime
+        // needs the original Request object (not a reconstructed one) to
+        // properly handle the WebSocket upgrade handshake. The DO's
+        // fetch() override will parse the path from the URL.
         const stub = getTownContainerStub(env, townId);
-        return stub.fetch(doRequest);
+        const response = await stub.fetch(request);
+        console.log(`[gastown-worker] WS upgrade: DO returned status=${response.status}`);
+        return response;
       }
     }
 

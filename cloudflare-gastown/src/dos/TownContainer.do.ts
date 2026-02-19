@@ -69,9 +69,14 @@ export class TownContainerDO extends Container<Env> {
    */
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    const streamMatch = url.pathname.match(/^\/agents\/([^/]+)\/stream$/);
+    const upgrade = request.headers.get('Upgrade');
+    console.log(`${TC_LOG} fetch: url=${url.pathname} upgrade=${upgrade}`);
 
-    if (streamMatch && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+    // Match both the full worker path and the short container path
+    const streamMatch = url.pathname.match(/\/agents\/([^/]+)\/stream$/);
+
+    if (streamMatch && upgrade?.toLowerCase() === 'websocket') {
+      console.log(`${TC_LOG} fetch: matched stream route for agent ${streamMatch[1]}`);
       return this.handleStreamWebSocket(request, streamMatch[1], url.searchParams.get('ticket'));
     }
 

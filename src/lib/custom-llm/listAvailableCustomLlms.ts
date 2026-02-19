@@ -1,5 +1,6 @@
 import { custom_llm, type CustomLlm } from '@/db/schema';
 import { readDb } from '@/lib/drizzle';
+import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 
 export function convert(model: CustomLlm) {
   return {
@@ -11,8 +12,8 @@ export function convert(model: CustomLlm) {
     description: model.display_name,
     context_length: model.context_length,
     architecture: {
-      modality: 'text+image-\u003Etext',
-      input_modalities: ['text', 'image'],
+      modality: model.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',
+      input_modalities: model.supports_image_input ? ['text', 'image'] : ['text'],
       output_modalities: ['text'],
       tokenizer: 'Other',
       instruct_type: null,
@@ -34,7 +35,11 @@ export function convert(model: CustomLlm) {
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-  };
+    settings: {
+      included_tools: model.included_tools,
+      excluded_tools: model.excluded_tools,
+    },
+  } as OpenRouterModel;
 }
 
 export async function listAvailableCustomLlms(organizationId: string) {

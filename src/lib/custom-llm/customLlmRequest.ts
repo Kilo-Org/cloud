@@ -527,12 +527,15 @@ function buildCommonParams(
       anthropic: {
         thinking: { type: 'adaptive' },
         effort: verbosity,
+        disableParallelToolUse: request.parallel_tool_calls === false,
       } satisfies AnthropicProviderOptions,
       openai: {
         reasoningSummary: 'auto',
         textVerbosity: verbosity === 'max' ? 'high' : verbosity,
-        reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort,
+        reasoningEffort:
+          customLlm.reasoning_effort ?? request.reasoning?.effort ?? request.reasoning_effort,
         include: ['reasoning.encrypted_content'],
+        parallelToolCalls: request.parallel_tool_calls,
         store: false,
       } satisfies OpenAILanguageModelResponsesOptions,
       xai: {

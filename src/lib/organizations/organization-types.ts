@@ -186,6 +186,8 @@ const ToolSchema = z.enum([
   'write_to_file',
 ]);
 
+export type Tool = z.infer<typeof ToolSchema>;
+
 const ModelSettingsSchema = z.object({
   included_tools: z.array(ToolSchema), // adds to the standard tool set
   excluded_tools: z.array(ToolSchema), // removes from the standard tool set

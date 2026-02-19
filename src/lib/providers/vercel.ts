@@ -39,6 +39,7 @@ const VERCEL_ROUTING_ALLOW_LIST = [
   'z-ai/glm-4.7',
   zai_glm5_free_model.public_id,
   'z-ai/glm-5',
+  // TODO: test and add anthropic, kat-coder, kimi, mistral, qwen models
 ];
 
 const ERROR_RATE_THRESHOLD = 0.5;

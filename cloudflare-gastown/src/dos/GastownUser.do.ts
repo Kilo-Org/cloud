@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
-import { createTableTowns, towns, TownRecord } from '../db/tables/towns.table';
-import { createTableRigs, rigs, RigRecord } from '../db/tables/rigs.table';
+import { createTableUserTowns, user_towns, UserTownRecord } from '../db/tables/user-towns.table';
+import { createTableUserRigs, user_rigs, UserRigRecord } from '../db/tables/user-rigs.table';
 import { query } from '../util/query.util';
 
 const USER_LOG = '[GastownUser.do]';
@@ -47,13 +47,13 @@ export class GastownUserDO extends DurableObject<Env> {
   }
 
   private async initializeDatabase(): Promise<void> {
-    query(this.sql, createTableTowns(), []);
-    query(this.sql, createTableRigs(), []);
+    query(this.sql, createTableUserTowns(), []);
+    query(this.sql, createTableUserRigs(), []);
   }
 
   // ── Towns ─────────────────────────────────────────────────────────────
 
-  async createTown(input: { name: string; owner_user_id: string }): Promise<TownRecord> {
+  async createTown(input: { name: string; owner_user_id: string }): Promise<UserTownRecord> {
     await this.ensureInitialized();
     const id = generateId();
     const timestamp = now();
@@ -62,12 +62,12 @@ export class GastownUserDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${towns} (
-          ${towns.columns.id},
-          ${towns.columns.name},
-          ${towns.columns.owner_user_id},
-          ${towns.columns.created_at},
-          ${towns.columns.updated_at}
+        INSERT INTO ${user_towns} (
+          ${user_towns.columns.id},
+          ${user_towns.columns.name},
+          ${user_towns.columns.owner_user_id},
+          ${user_towns.columns.created_at},
+          ${user_towns.columns.updated_at}
         ) VALUES (?, ?, ?, ?, ?)
       `,
       [id, input.name, input.owner_user_id, timestamp, timestamp]
@@ -79,31 +79,33 @@ export class GastownUserDO extends DurableObject<Env> {
     return town;
   }
 
-  async getTownAsync(townId: string): Promise<TownRecord | null> {
+  async getTownAsync(townId: string): Promise<UserTownRecord | null> {
     await this.ensureInitialized();
     return this.getTown(townId);
   }
 
-  private getTown(townId: string): TownRecord | null {
+  private getTown(townId: string): UserTownRecord | null {
     const rows = [
-      ...query(this.sql, /* sql */ `SELECT * FROM ${towns} WHERE ${towns.columns.id} = ?`, [
-        townId,
-      ]),
+      ...query(
+        this.sql,
+        /* sql */ `SELECT * FROM ${user_towns} WHERE ${user_towns.columns.id} = ?`,
+        [townId]
+      ),
     ];
     if (rows.length === 0) return null;
-    return TownRecord.parse(rows[0]);
+    return UserTownRecord.parse(rows[0]);
   }
 
-  async listTowns(): Promise<TownRecord[]> {
+  async listTowns(): Promise<UserTownRecord[]> {
     await this.ensureInitialized();
     const rows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT * FROM ${towns} ORDER BY ${towns.columns.created_at} DESC`,
+        /* sql */ `SELECT * FROM ${user_towns} ORDER BY ${user_towns.columns.created_at} DESC`,
         []
       ),
     ];
-    return TownRecord.array().parse(rows);
+    return UserTownRecord.array().parse(rows);
   }
 
   // ── Rigs ──────────────────────────────────────────────────────────────
@@ -113,7 +115,7 @@ export class GastownUserDO extends DurableObject<Env> {
     name: string;
     git_url: string;
     default_branch: string;
-  }): Promise<RigRecord> {
+  }): Promise<UserRigRecord> {
     await this.ensureInitialized();
     console.log(
       `${USER_LOG} createRig: town_id=${input.town_id} name=${input.name} git_url=${input.git_url} default_branch=${input.default_branch}`
@@ -132,14 +134,14 @@ export class GastownUserDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${rigs} (
-          ${rigs.columns.id},
-          ${rigs.columns.town_id},
-          ${rigs.columns.name},
-          ${rigs.columns.git_url},
-          ${rigs.columns.default_branch},
-          ${rigs.columns.created_at},
-          ${rigs.columns.updated_at}
+        INSERT INTO ${user_rigs} (
+          ${user_rigs.columns.id},
+          ${user_rigs.columns.town_id},
+          ${user_rigs.columns.name},
+          ${user_rigs.columns.git_url},
+          ${user_rigs.columns.default_branch},
+          ${user_rigs.columns.created_at},
+          ${user_rigs.columns.updated_at}
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       [id, input.town_id, input.name, input.git_url, input.default_branch, timestamp, timestamp]
@@ -151,39 +153,43 @@ export class GastownUserDO extends DurableObject<Env> {
     return rig;
   }
 
-  async getRigAsync(rigId: string): Promise<RigRecord | null> {
+  async getRigAsync(rigId: string): Promise<UserRigRecord | null> {
     await this.ensureInitialized();
     return this.getRig(rigId);
   }
 
-  private getRig(rigId: string): RigRecord | null {
+  private getRig(rigId: string): UserRigRecord | null {
     const rows = [
-      ...query(this.sql, /* sql */ `SELECT * FROM ${rigs} WHERE ${rigs.columns.id} = ?`, [rigId]),
+      ...query(this.sql, /* sql */ `SELECT * FROM ${user_rigs} WHERE ${user_rigs.columns.id} = ?`, [
+        rigId,
+      ]),
     ];
     if (rows.length === 0) return null;
-    return RigRecord.parse(rows[0]);
+    return UserRigRecord.parse(rows[0]);
   }
 
-  async listRigs(townId: string): Promise<RigRecord[]> {
+  async listRigs(townId: string): Promise<UserRigRecord[]> {
     await this.ensureInitialized();
     const rows = [
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${rigs}
-          WHERE ${rigs.columns.town_id} = ?
-          ORDER BY ${rigs.columns.created_at} DESC
+          SELECT * FROM ${user_rigs}
+          WHERE ${user_rigs.columns.town_id} = ?
+          ORDER BY ${user_rigs.columns.created_at} DESC
         `,
         [townId]
       ),
     ];
-    return RigRecord.array().parse(rows);
+    return UserRigRecord.array().parse(rows);
   }
 
   async deleteRig(rigId: string): Promise<boolean> {
     await this.ensureInitialized();
     if (!this.getRig(rigId)) return false;
-    query(this.sql, /* sql */ `DELETE FROM ${rigs} WHERE ${rigs.columns.id} = ?`, [rigId]);
+    query(this.sql, /* sql */ `DELETE FROM ${user_rigs} WHERE ${user_rigs.columns.id} = ?`, [
+      rigId,
+    ]);
     return true;
   }
 
@@ -191,8 +197,12 @@ export class GastownUserDO extends DurableObject<Env> {
     await this.ensureInitialized();
     if (!this.getTown(townId)) return false;
     // Cascade: delete all rigs belonging to this town first
-    query(this.sql, /* sql */ `DELETE FROM ${rigs} WHERE ${rigs.columns.town_id} = ?`, [townId]);
-    query(this.sql, /* sql */ `DELETE FROM ${towns} WHERE ${towns.columns.id} = ?`, [townId]);
+    query(this.sql, /* sql */ `DELETE FROM ${user_rigs} WHERE ${user_rigs.columns.town_id} = ?`, [
+      townId,
+    ]);
+    query(this.sql, /* sql */ `DELETE FROM ${user_towns} WHERE ${user_towns.columns.id} = ?`, [
+      townId,
+    ]);
     return true;
   }
 

@@ -14,7 +14,7 @@ type Agent = {
   status: string;
   current_hook_bead_id: string | null;
   last_activity_at: string;
-  checkpoint: string | null;
+  checkpoint?: unknown;
   created_at: string;
 };
 

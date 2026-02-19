@@ -4,7 +4,7 @@ import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/
 const AgentRole = z.enum(['polecat', 'refinery', 'mayor', 'witness']);
 const AgentStatus = z.enum(['idle', 'working', 'blocked', 'dead']);
 
-export const AgentRecord = z.object({
+export const RigAgentRecord = z.object({
   id: z.string(),
   role: AgentRole,
   name: z.string(),
@@ -21,18 +21,18 @@ export const AgentRecord = z.object({
   created_at: z.string(),
 });
 
-export type AgentRecord = z.output<typeof AgentRecord>;
+export type RigAgentRecord = z.output<typeof RigAgentRecord>;
 
-export const agents = getTableFromZodSchema('agents', AgentRecord);
+export const rig_agents = getTableFromZodSchema('rig_agents', RigAgentRecord);
 
-export function createTableAgents(): string {
-  return getCreateTableQueryFromTable(agents, {
+export function createTableRigAgents(): string {
+  return getCreateTableQueryFromTable(rig_agents, {
     id: `text primary key`,
     role: `text not null check(role in ('polecat', 'refinery', 'mayor', 'witness'))`,
     name: `text not null`,
     identity: `text not null unique`,
     status: `text not null default 'idle' check(status in ('idle', 'working', 'blocked', 'dead'))`,
-    current_hook_bead_id: `text references beads(id)`,
+    current_hook_bead_id: `text references rig_beads(id)`,
     dispatch_attempts: `integer not null default 0`,
     last_activity_at: `text`,
     checkpoint: `text`,

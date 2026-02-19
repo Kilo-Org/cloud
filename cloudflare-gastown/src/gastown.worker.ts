@@ -78,6 +78,7 @@ import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 export { RigDO } from './dos/Rig.do';
 export { GastownUserDO } from './dos/GastownUser.do';
 export { AgentIdentityDO } from './dos/AgentIdentity.do';
+export { TownDO } from './dos/Town.do';
 export { TownContainerDO } from './dos/TownContainer.do';
 export { MayorDO } from './dos/Mayor.do';
 

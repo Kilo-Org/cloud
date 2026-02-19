@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import type { BeadRecord } from './db/tables/beads.table';
-import type { AgentRecord } from './db/tables/agents.table';
-import type { MailRecord } from './db/tables/mail.table';
-import type { ReviewQueueRecord } from './db/tables/review-queue.table';
-import type { MoleculeRecord } from './db/tables/molecules.table';
+import type { RigBeadRecord } from './db/tables/rig-beads.table';
+import type { RigAgentRecord } from './db/tables/rig-agents.table';
+import type { RigMailRecord } from './db/tables/rig-mail.table';
+import type { RigReviewQueueRecord } from './db/tables/rig-review-queue.table';
+import type { RigMoleculeRecord } from './db/tables/rig-molecules.table';
 
 // -- Beads --
 
@@ -16,7 +16,7 @@ export type BeadType = z.infer<typeof BeadType>;
 export const BeadPriority = z.enum(['low', 'medium', 'high', 'critical']);
 export type BeadPriority = z.infer<typeof BeadPriority>;
 
-export type Bead = BeadRecord;
+export type Bead = RigBeadRecord;
 
 export type CreateBeadInput = {
   type: BeadType;
@@ -46,7 +46,7 @@ export type AgentRole = z.infer<typeof AgentRole>;
 export const AgentStatus = z.enum(['idle', 'working', 'blocked', 'dead']);
 export type AgentStatus = z.infer<typeof AgentStatus>;
 
-export type Agent = AgentRecord;
+export type Agent = RigAgentRecord;
 
 export type RegisterAgentInput = {
   role: AgentRole;
@@ -61,7 +61,7 @@ export type AgentFilter = {
 
 // -- Mail --
 
-export type Mail = MailRecord;
+export type Mail = RigMailRecord;
 
 export type SendMailInput = {
   from_agent_id: string;
@@ -75,7 +75,7 @@ export type SendMailInput = {
 export const ReviewStatus = z.enum(['pending', 'running', 'merged', 'failed']);
 export type ReviewStatus = z.infer<typeof ReviewStatus>;
 
-export type ReviewQueueEntry = ReviewQueueRecord;
+export type ReviewQueueEntry = RigReviewQueueRecord;
 
 export type ReviewQueueInput = {
   agent_id: string;
@@ -90,7 +90,7 @@ export type ReviewQueueInput = {
 export const MoleculeStatus = z.enum(['active', 'completed', 'failed']);
 export type MoleculeStatus = z.infer<typeof MoleculeStatus>;
 
-export type Molecule = MoleculeRecord;
+export type Molecule = RigMoleculeRecord;
 
 // -- Prime context --
 

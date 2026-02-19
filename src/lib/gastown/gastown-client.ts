@@ -87,7 +87,7 @@ export const AgentSchema = z.object({
   current_hook_bead_id: z.string().nullable(),
   dispatch_attempts: z.number().default(0),
   last_activity_at: z.string(),
-  checkpoint: z.string().nullable(),
+  checkpoint: z.unknown().optional(),
   created_at: z.string(),
 });
 export type Agent = z.output<typeof AgentSchema>;

@@ -28,6 +28,7 @@
       { "name": "RIG", "class_name": "RigDO" },
       { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
       { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
+      { "name": "TOWN", "class_name": "TownDO" },
       { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
       { "name": "MAYOR", "class_name": "MayorDO" },
     ],
@@ -37,6 +38,7 @@
     { "tag": "v1", "new_sqlite_classes": ["RigDO", "GastownUserDO", "AgentIdentityDO"] },
     { "tag": "v2", "new_sqlite_classes": ["TownContainerDO"] },
     { "tag": "v3", "new_sqlite_classes": ["MayorDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["TownDO"] },
   ],
 
   "vars": {
@@ -79,6 +81,7 @@
           { "name": "RIG", "class_name": "RigDO" },
           { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
           { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
+          { "name": "TOWN", "class_name": "TownDO" },
           { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
           { "name": "MAYOR", "class_name": "MayorDO" },
         ],

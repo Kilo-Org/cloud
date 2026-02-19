@@ -107,6 +107,34 @@ describe('manageBranch', () => {
     });
 
     describe('and it is an upstream branch', () => {
+      it('should fetch and checkout GitHub pull refs', async () => {
+        mockExec
+          .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
+          .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
+          .mockResolvedValueOnce({ exitCode: 1 }) // remote check (does not exist)
+          .mockResolvedValueOnce({ exitCode: 0 }) // fetch pull ref
+          .mockResolvedValueOnce({ exitCode: 0 }); // checkout from FETCH_HEAD
+
+        const result = await manageBranch(fakeSession, '/workspace', 'refs/pull/42/head', true);
+
+        const execCalls = mockExec.mock.calls;
+        expect(execCalls[3]?.[0]).toContain("git fetch origin 'refs/pull/42/head'");
+        expect(execCalls[4]?.[0]).toContain("git checkout -B 'refs/pull/42/head' FETCH_HEAD");
+        expect(result).toBe('refs/pull/42/head');
+      });
+
+      it('should throw when pull ref fetch fails', async () => {
+        mockExec
+          .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
+          .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
+          .mockResolvedValueOnce({ exitCode: 1 }) // remote check (does not exist)
+          .mockResolvedValueOnce({ exitCode: 1, stderr: 'fetch pull ref error' }); // fetch pull ref fails
+
+        await expect(
+          manageBranch(fakeSession, '/workspace', 'refs/pull/42/head', true)
+        ).rejects.toThrow('Failed to fetch pull ref refs/pull/42/head');
+      });
+
       it('should throw error', async () => {
         mockExec
           .mockResolvedValueOnce({ exitCode: 0 }) // git fetch

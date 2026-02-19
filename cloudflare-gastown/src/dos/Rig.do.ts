@@ -17,6 +17,8 @@ import {
 import { getTownContainerStub } from './TownContainer.do';
 import { query } from '../util/query.util';
 import { signAgentJWT } from '../util/jwt.util';
+import { buildPolecatSystemPrompt } from '../prompts/polecat-system.prompt';
+import { buildMayorSystemPrompt } from '../prompts/mayor-system.prompt';
 import type {
   Bead,
   BeadStatus,
@@ -1311,20 +1313,39 @@ export class RigDO extends DurableObject<Env> {
     return parts.join('\n\n');
   }
 
-  /** Default system prompt per agent role. */
-  private static systemPromptForRole(role: string, identity: string): string {
-    const base = `You are ${identity}, a Gastown ${role} agent. Follow all instructions in the GASTOWN CONTEXT injected into this session.`;
-    switch (role) {
+  /** Build the system prompt for an agent given its role and context. */
+  private static systemPromptForRole(params: {
+    role: string;
+    identity: string;
+    agentName: string;
+    rigId: string;
+    townId: string;
+  }): string {
+    switch (params.role) {
       case 'polecat':
-        return `${base} Your job is to implement the assigned task on a feature branch, write clean code, and call gt_done when finished.`;
+        return buildPolecatSystemPrompt({
+          agentName: params.agentName,
+          rigId: params.rigId,
+          townId: params.townId,
+          identity: params.identity,
+        });
       case 'mayor':
-        return `${base} You coordinate work across the town. Respond to messages and delegate tasks via gt_mail_send.`;
-      case 'refinery':
-        return `${base} You review code quality and merge PRs. Check for correctness, style, and test coverage.`;
-      case 'witness':
-        return `${base} You monitor agent health and report anomalies.`;
-      default:
-        return base;
+        return buildMayorSystemPrompt({
+          identity: params.identity,
+          townId: params.townId,
+        });
+      default: {
+        // Fallback for roles without a dedicated prompt builder
+        const base = `You are ${params.identity}, a Gastown ${params.role} agent. Follow all instructions in the GASTOWN CONTEXT injected into this session.`;
+        switch (params.role) {
+          case 'refinery':
+            return `${base} You review code quality and merge PRs. Check for correctness, style, and test coverage.`;
+          case 'witness':
+            return `${base} You monitor agent health and report anomalies.`;
+          default:
+            return base;
+        }
+      }
     }
   }
 
@@ -1416,7 +1437,13 @@ export class RigDO extends DurableObject<Env> {
           identity: params.identity,
           prompt,
           model: RigDO.modelForRole(params.role),
-          systemPrompt: RigDO.systemPromptForRole(params.role, params.identity),
+          systemPrompt: RigDO.systemPromptForRole({
+            role: params.role,
+            identity: params.identity,
+            agentName: params.agentName,
+            rigId,
+            townId: config.townId,
+          }),
           gitUrl: config.gitUrl,
           branch: RigDO.branchForAgent(params.agentName),
           defaultBranch: config.defaultBranch,

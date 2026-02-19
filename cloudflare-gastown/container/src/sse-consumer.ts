@@ -92,27 +92,21 @@ function parseSSEChunk(chunk: string, flush = false): KiloSSEEvent[] {
   return events;
 }
 
-/** Events that indicate the agent finished its current task. */
-const COMPLETION_EVENTS = new Set([
-  'session.completed',
-  'session.idle',
-  'message.completed',
-  'assistant.completed',
-]);
-
 /**
- * Events that complete a single turn but NOT the entire session.
- * Mayor agents are persistent — session.idle just means "done with this
- * turn, waiting for the next message." Only rig agents (polecat, etc.)
- * should treat idle as terminal.
+ * Events that definitively indicate the session is over.
+ * `session.completed` means kilo serve has finished the session entirely.
+ *
+ * We intentionally exclude `session.idle`, `message.completed`, and
+ * `assistant.completed` — these fire after every LLM turn. A polecat
+ * may need multiple turns (tool calls → responses → more tool calls)
+ * before it's actually done. The authoritative "polecat is done" signal
+ * comes from the polecat calling `gt_done`, which triggers
+ * `reportAgentCompleted` via the completion-reporter callback.
  */
-const TURN_COMPLETE_EVENTS = new Set(['session.idle']);
+const SESSION_TERMINAL_EVENTS = new Set(['session.completed']);
 
-export function isCompletionEvent(event: KiloSSEEvent, opts?: { persistent?: boolean }): boolean {
-  if (opts?.persistent && TURN_COMPLETE_EVENTS.has(event.event)) {
-    return false;
-  }
-  return COMPLETION_EVENTS.has(event.event);
+export function isCompletionEvent(event: KiloSSEEvent, _opts?: { persistent?: boolean }): boolean {
+  return SESSION_TERMINAL_EVENTS.has(event.event);
 }
 
 /**

@@ -4,6 +4,7 @@ import { createTools } from './tools';
 import { createMayorTools } from './mayor-tools';
 
 const SERVICE = 'gastown-plugin';
+console.log(`[${SERVICE}] Starting...`);
 
 function formatPrimeContextForInjection(primeResult: string): string {
   return [
@@ -59,6 +60,8 @@ export const GastownPlugin: Plugin = async ({ client }) => {
 
   // Best-effort logging — never let telemetry failures break tool execution
   async function log(level: 'info' | 'error', message: string) {
+    console.log(`${SERVICE} ${level}: ${message}`);
+
     try {
       await client.app.log({ body: { service: SERVICE, level, message } });
     } catch {
@@ -84,6 +87,8 @@ export const GastownPlugin: Plugin = async ({ client }) => {
     tool: tools,
 
     event: async ({ event }) => {
+      // console.log(`[${SERVICE}] event:`, event);
+
       if (event.type === 'session.deleted' && gastownClient) {
         // Notify Rig DO that session ended — best-effort, don't throw
         try {
@@ -99,8 +104,17 @@ export const GastownPlugin: Plugin = async ({ client }) => {
       }
     },
 
+    // 'chat.message'(input, output) {
+    //   console.log(`[${SERVICE}] chat.message:`, input, output);
+    // },
+
+    // 'experimental.text.complete'(input, output) {
+    //   console.log(`[${SERVICE}] experimental.text.complete:`, input, output);
+    // },
+
     // Inject prime context into the system prompt on the first message (rig agents only)
     'experimental.chat.system.transform': async (_input, output) => {
+      // console.log(`[${SERVICE}] experimental.chat.system.transform:`, output);
       const alreadyInjected = output.system.some(s => s.includes('GASTOWN CONTEXT'));
       if (!alreadyInjected) {
         const primeResult = await primeAndLog();

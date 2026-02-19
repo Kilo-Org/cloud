@@ -34,7 +34,7 @@ export function NewOrganizationWelcomeHeader({
           </div>
           <div className="flex-1">
             <h3 className="mb-2 text-xl font-semibold text-green-100">
-              Welcome to Kilo {titleCase(plan)}!
+              Welcome to Kilo {capitalize(plan)}!
             </h3>
             <div className="mb-4 space-y-2 text-green-200">
               <p>Invite your team members to start coding together today!</p>

@@ -143,13 +143,12 @@ export async function handleContainerStreamTicket(
     return c.json(resError('Unexpected container response'), 502);
   }
 
-  // Construct the WebSocket stream URL. The frontend connects via WebSocket.
-  // Use the request's origin and swap the protocol to ws:// or wss://.
-  const reqUrl = new URL(c.req.url);
-  const wsProtocol = reqUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-  const streamUrl = `${wsProtocol}//${reqUrl.host}/api/towns/${params.townId}/container/agents/${params.agentId}/stream`;
+  // Return just the path — the caller (tRPC router on the Next.js server)
+  // constructs the full WS URL using its known GASTOWN_SERVICE_URL, which
+  // resolves to the correct host in both local dev and production.
+  const streamPath = `/api/towns/${params.townId}/container/agents/${params.agentId}/stream`;
 
-  return c.json(resSuccess({ url: streamUrl, ticket: parsed.data.ticket }), 200);
+  return c.json(resSuccess({ url: streamPath, ticket: parsed.data.ticket }), 200);
 }
 
 /**

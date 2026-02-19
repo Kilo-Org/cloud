@@ -46,7 +46,6 @@ export class TownContainerDO extends Container<Env> {
       `${TC_LOG} container stopped: exitCode=${exitCode} reason=${reason} id=${this.ctx.id.toString()}`
     );
     this.stopPolling();
-    // Close all WebSocket connections
     for (const sessions of this.wsSessions.values()) {
       for (const session of sessions) {
         try {
@@ -69,18 +68,15 @@ export class TownContainerDO extends Container<Env> {
    */
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    const upgrade = request.headers.get('Upgrade');
-    console.log(`${TC_LOG} fetch: url=${url.pathname} upgrade=${upgrade}`);
 
-    // Match both the full worker path and the short container path
+    // Match the agent stream path (works with both full worker path and
+    // short container-relative path)
     const streamMatch = url.pathname.match(/\/agents\/([^/]+)\/stream$/);
 
-    if (streamMatch && upgrade?.toLowerCase() === 'websocket') {
-      console.log(`${TC_LOG} fetch: matched stream route for agent ${streamMatch[1]}`);
-      return this.handleStreamWebSocket(request, streamMatch[1], url.searchParams.get('ticket'));
+    if (streamMatch && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      return this.handleStreamWebSocket(streamMatch[1], url.searchParams.get('ticket'));
     }
 
-    // Delegate all other requests to the base Container class
     return super.fetch(request);
   }
 
@@ -89,15 +85,7 @@ export class TownContainerDO extends Container<Env> {
    * Creates a WebSocketPair, starts polling the container for events,
    * and relays them to the connected client.
    */
-  private handleStreamWebSocket(
-    _request: Request,
-    agentId: string,
-    ticket: string | null
-  ): Response {
-    console.log(
-      `${TC_LOG} handleStreamWebSocket: agentId=${agentId} ticket=${ticket?.slice(0, 8)}...`
-    );
-
+  private handleStreamWebSocket(agentId: string, ticket: string | null): Response {
     if (!ticket) {
       return new Response(JSON.stringify({ error: 'Missing ticket' }), {
         status: 400,
@@ -109,7 +97,7 @@ export class TownContainerDO extends Container<Env> {
     const [client, server] = Object.values(pair);
 
     server.accept();
-    console.log(`${TC_LOG} WebSocket accepted for agent ${agentId}`);
+    console.log(`${TC_LOG} WS connected: agent=${agentId}`);
 
     // Track this session
     let sessions = this.wsSessions.get(agentId);
@@ -124,11 +112,11 @@ export class TownContainerDO extends Container<Env> {
     this.ensurePolling();
 
     // Send historical backfill asynchronously
-    void this.validateAndBackfill(agentId, ticket, server, session);
+    void this.backfillEvents(agentId, server, session);
 
     // Handle client disconnect
     server.addEventListener('close', event => {
-      console.log(`${TC_LOG} WebSocket closed for agent ${agentId}: code=${event.code}`);
+      console.log(`${TC_LOG} WS closed: agent=${agentId} code=${event.code}`);
       sessions.delete(session);
       if (sessions.size === 0) {
         this.wsSessions.delete(agentId);
@@ -139,73 +127,57 @@ export class TownContainerDO extends Container<Env> {
     });
 
     server.addEventListener('error', event => {
-      console.error(`${TC_LOG} WebSocket error for agent ${agentId}:`, event);
+      console.error(`${TC_LOG} WS error: agent=${agentId}`, event);
     });
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
   /**
-   * Validate the ticket and send a historical backfill of all buffered
-   * events to the newly connected WebSocket client. This ensures that
-   * even if the client connects after the agent has finished, they see
-   * everything that happened.
+   * Send a historical backfill of all buffered events to a newly connected
+   * WebSocket client. Ensures late-joining clients see everything.
    */
-  private async validateAndBackfill(
+  private async backfillEvents(
     agentId: string,
-    _ticket: string,
     ws: WebSocket,
     session: { ws: WebSocket; lastEventId: number }
   ): Promise<void> {
     try {
-      console.log(`${TC_LOG} backfill: fetching status for agent ${agentId}`);
+      // Send current agent status
       const statusRes = await this.containerFetch(`http://container/agents/${agentId}/status`);
-      console.log(`${TC_LOG} backfill: status response ${statusRes.status}`);
       if (statusRes.ok) {
         const status = (await statusRes.json()) as Record<string, unknown>;
         ws.send(JSON.stringify({ event: 'agent.status', data: status }));
-        console.log(`${TC_LOG} backfill: sent agent.status to WS`);
       }
 
-      console.log(`${TC_LOG} backfill: fetching events for agent ${agentId}`);
+      // Fetch and send all buffered events
       const eventsRes = await this.containerFetch(
         `http://container/agents/${agentId}/events?after=0`
       );
-      console.log(`${TC_LOG} backfill: events response ${eventsRes.status}`);
       if (eventsRes.ok) {
         const body = (await eventsRes.json()) as {
           events: Array<{ id: number; event: string; data: unknown; timestamp: string }>;
         };
-        console.log(`${TC_LOG} backfill: got ${body.events?.length ?? 0} events`);
         if (body.events && body.events.length > 0) {
           for (const evt of body.events) {
             try {
               ws.send(JSON.stringify({ event: evt.event, data: evt.data }));
             } catch {
-              console.log(`${TC_LOG} backfill: WS closed during send`);
-              return;
+              return; // WS closed during backfill
             }
           }
-          const lastEvt = body.events[body.events.length - 1];
-          session.lastEventId = lastEvt.id;
-          console.log(
-            `${TC_LOG} backfill: sent ${body.events.length} events, cursor=${lastEvt.id}`
-          );
+          // Advance cursor past the backfill
+          session.lastEventId = body.events[body.events.length - 1].id;
         }
       }
     } catch (err) {
-      console.error(`${TC_LOG} backfill error for agent ${agentId}:`, err);
+      console.error(`${TC_LOG} backfill error: agent=${agentId}`, err);
     }
   }
 
-  /**
-   * Start the event polling loop if not already running.
-   */
   private ensurePolling(): void {
     if (this.pollTimer) return;
-    console.log(`${TC_LOG} starting poll loop (${POLL_INTERVAL_MS}ms interval)`);
     this.pollTimer = setInterval(() => void this.pollEvents(), POLL_INTERVAL_MS);
-    // Don't poll immediately — let the backfill complete first
   }
 
   private stopPolling(): void {
@@ -234,19 +206,13 @@ export class TownContainerDO extends Container<Env> {
         const res = await this.containerFetch(
           `http://container/agents/${agentId}/events?after=${minLastId}`
         );
-        if (!res.ok) {
-          console.log(`${TC_LOG} poll: events ${res.status} for agent ${agentId}`);
-          continue;
-        }
+        if (!res.ok) continue;
 
         const body = (await res.json()) as {
           events: Array<{ id: number; event: string; data: unknown; timestamp: string }>;
         };
         if (!body.events || body.events.length === 0) continue;
 
-        console.log(`${TC_LOG} poll: relaying ${body.events.length} events for agent ${agentId}`);
-
-        // Relay each event to sessions that haven't seen it yet
         for (const evt of body.events) {
           const msg = JSON.stringify({ event: evt.event, data: evt.data });
           for (const session of sessions) {
@@ -255,13 +221,13 @@ export class TownContainerDO extends Container<Env> {
                 session.ws.send(msg);
                 session.lastEventId = evt.id;
               } catch {
-                // WS likely closed; will be cleaned up by close handler
+                // WS likely closed; cleaned up by close handler
               }
             }
           }
         }
-      } catch (err) {
-        console.error(`${TC_LOG} poll error for agent ${agentId}:`, err);
+      } catch {
+        // Container may be starting up or unavailable; skip this cycle
       }
     }
   }

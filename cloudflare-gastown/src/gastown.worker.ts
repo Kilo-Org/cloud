@@ -256,30 +256,20 @@ const WS_STREAM_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/s
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    console.log(
-      `[gastown-worker] fetch: ${request.method} ${new URL(request.url).pathname} upgrade=${request.headers.get('Upgrade')}`
-    );
-    // Intercept WebSocket upgrade requests for agent streaming
+    // Intercept WebSocket upgrade requests for agent streaming.
+    // Must bypass Hono — the DO returns a 101 + WebSocketPair that the
+    // runtime handles directly.
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       const url = new URL(request.url);
       const match = url.pathname.match(WS_STREAM_PATTERN);
-      console.log(`[gastown-worker] WS upgrade: pathname=${url.pathname} match=${!!match}`);
       if (match) {
         const townId = match[1];
         const agentId = match[2];
-
-        console.log(
-          `[gastown-worker] WS upgrade: routing to DO townId=${townId} agentId=${agentId}`
-        );
-
-        // Pass the original request directly to the DO. The CF runtime
-        // needs the original Request object (not a reconstructed one) to
-        // properly handle the WebSocket upgrade handshake. The DO's
-        // fetch() override will parse the path from the URL.
+        console.log(`[gastown-worker] WS upgrade: townId=${townId} agentId=${agentId}`);
+        // Pass the original request to the DO — the CF runtime needs the
+        // original Request object to handle the WebSocket upgrade.
         const stub = getTownContainerStub(env, townId);
-        const response = await stub.fetch(request);
-        console.log(`[gastown-worker] WS upgrade: DO returned status=${response.status}`);
-        return response;
+        return stub.fetch(request);
       }
     }
 

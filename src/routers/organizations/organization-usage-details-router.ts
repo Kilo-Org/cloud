@@ -6,7 +6,12 @@ import {
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage, kilocode_users } from '@/db/schema';
+import {
+  microdollar_usage,
+  microdollar_usage_metadata,
+  feature,
+  kilocode_users,
+} from '@/db/schema';
 import { eq, sum, count, sql, and, gte, lte } from 'drizzle-orm';
 import * as z from 'zod';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
@@ -61,6 +66,7 @@ const UsageDetailsResponseSchema = z.object({
         email: z.string(),
       }),
       model: z.string().optional(),
+      feature: z.string().nullable().optional(),
       microdollarCost: z.string().nullable(),
       tokenCount: z.number(),
       inputTokens: z.number(),
@@ -299,6 +305,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           userName: kilocode_users.google_user_name,
           userEmail: kilocode_users.google_user_email,
           ...(groupByModel && { model: microdollar_usage.model }),
+          feature: feature.feature,
           microdollarCost: sum(microdollar_usage.cost),
           tokenCount: sum(
             sql`${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens} + ${microdollar_usage.cache_write_tokens} + ${microdollar_usage.cache_hit_tokens}`
@@ -309,12 +316,18 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         })
         .from(microdollar_usage)
         .innerJoin(kilocode_users, eq(kilocode_users.id, microdollar_usage.kilo_user_id))
+        .leftJoin(
+          microdollar_usage_metadata,
+          eq(microdollar_usage.id, microdollar_usage_metadata.id)
+        )
+        .leftJoin(feature, eq(microdollar_usage_metadata.feature_id, feature.feature_id))
         .where(and(...whereConditions))
         .groupBy(
           sql`DATE(${microdollar_usage.created_at})`,
           kilocode_users.google_user_name,
           kilocode_users.google_user_email,
-          ...(groupByModel ? [microdollar_usage.model] : [])
+          ...(groupByModel ? [microdollar_usage.model] : []),
+          feature.feature
         )
         .orderBy(sql`DATE(${microdollar_usage.created_at}) DESC`);
 
@@ -325,6 +338,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           email: row.userEmail,
         },
         ...(groupByModel && { model: 'model' in row ? row.model || undefined : undefined }),
+        feature: row.feature ?? null,
         microdollarCost: row.microdollarCost?.toString() || null,
         tokenCount: Number(row.tokenCount) || 0,
         inputTokens: Number(row.inputTokens) || 0,

@@ -122,6 +122,7 @@ export type UsageDetailByDay = Array<{
     email: string;
   };
   model?: string;
+  feature?: string | null;
   microdollarCost: string | null;
   tokenCount: number;
   inputTokens: number;

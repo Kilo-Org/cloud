@@ -95,6 +95,11 @@ export function useUsageTableData(
           ]
         : []),
       {
+        key: 'feature',
+        label: 'Feature',
+        render: (value: unknown) => (value as string) || '—',
+      },
+      {
         key: 'totalCost',
         label: 'Cost',
         render: value => <FormattedMicrodollars microdollars={value as number} />,
@@ -154,6 +159,7 @@ export function useUsageTableData(
         date: rollup.date,
         user: usage.user,
         ...(groupByModel && { model: usage.model || 'Unknown' }),
+        feature: usage.feature || null,
         totalCost: usage.microdollarCost ? parseFloat(usage.microdollarCost) : 0,
         totalTokens: usage.tokenCount,
         inputTokens: usage.inputTokens,

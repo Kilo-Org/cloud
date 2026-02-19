@@ -12,8 +12,9 @@ function now(): string {
   return new Date().toISOString();
 }
 
-// Re-check session health every 60 seconds while a session exists
-const ALARM_INTERVAL_MS = 60_000;
+// Re-check session health every 15 seconds while a session exists.
+// Primary completion is via the callback; this is a safety net.
+const ALARM_INTERVAL_MS = 15_000;
 
 // Mark session stale if no activity for 30 minutes (container may have slept)
 const SESSION_STALE_MS = 30 * 60 * 1000;
@@ -148,6 +149,37 @@ export class MayorDO extends DurableObject<Env> {
       session,
       townId: config?.townId ?? null,
     };
+  }
+
+  // ── Agent Completion Callback ──────────────────────────────────────────
+
+  /**
+   * Called by the container's completion reporter when the mayor agent
+   * finishes. Clears the session immediately so the UI reflects idle
+   * status without waiting for the next alarm.
+   */
+  async agentCompleted(
+    agentId: string,
+    status: 'completed' | 'failed',
+    reason?: string
+  ): Promise<void> {
+    const session = await this.getSession();
+    if (!session) {
+      console.log(`${MAYOR_LOG} agentCompleted: no active session, ignoring`);
+      return;
+    }
+    if (session.agentId !== agentId) {
+      console.log(
+        `${MAYOR_LOG} agentCompleted: agentId mismatch (expected ${session.agentId}, got ${agentId}), ignoring`
+      );
+      return;
+    }
+
+    console.log(
+      `${MAYOR_LOG} agentCompleted: agent ${agentId} ${status}${reason ? ` (${reason})` : ''}, clearing session`
+    );
+    await this.clearSession();
+    await this.ctx.storage.deleteAlarm();
   }
 
   // ── Destroy ───────────────────────────────────────────────────────────
@@ -295,6 +327,12 @@ export class MayorDO extends DurableObject<Env> {
     }
     if (config.kilocodeToken) {
       envVars.KILOCODE_TOKEN = config.kilocodeToken;
+    }
+
+    // Tell the container's completion reporter to call back to the MayorDO
+    // instead of the Rig DO, so the session is cleared immediately.
+    if (this.env.GASTOWN_API_URL) {
+      envVars.GASTOWN_COMPLETION_CALLBACK_URL = `${this.env.GASTOWN_API_URL}/api/towns/${config.townId}/mayor/completed`;
     }
 
     const container = getTownContainerStub(this.env, config.townId);

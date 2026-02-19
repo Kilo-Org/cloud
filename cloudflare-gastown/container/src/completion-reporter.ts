@@ -25,7 +25,9 @@ export async function reportAgentCompleted(
     return;
   }
 
-  const url = `${apiUrl}/api/rigs/${agent.rigId}/agents/${agent.agentId}/completed`;
+  const url =
+    agent.completionCallbackUrl ??
+    `${apiUrl}/api/rigs/${agent.rigId}/agents/${agent.agentId}/completed`;
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -33,7 +35,7 @@ export async function reportAgentCompleted(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ status, reason }),
+      body: JSON.stringify({ status, reason, agentId: agent.agentId }),
     });
 
     if (!response.ok) {

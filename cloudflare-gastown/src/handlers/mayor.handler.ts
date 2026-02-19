@@ -20,6 +20,12 @@ const SendMayorMessageBody = z.object({
   model: z.string().optional(),
 });
 
+const MayorCompletedBody = z.object({
+  status: z.enum(['completed', 'failed']),
+  reason: z.string().optional(),
+  agentId: z.string().optional(),
+});
+
 /**
  * POST /api/towns/:townId/mayor/configure
  * Configure the MayorDO for a town. Called when a rig is created.
@@ -75,6 +81,33 @@ export async function handleGetMayorStatus(c: Context<GastownEnv>, params: { tow
   const mayor = getMayorDOStub(c.env, params.townId);
   const status = await mayor.getMayorStatus();
   return c.json(resSuccess(status), 200);
+}
+
+/**
+ * POST /api/towns/:townId/mayor/completed
+ * Completion callback from the container. Clears the session immediately
+ * so the UI reflects idle status without waiting for the alarm.
+ */
+export async function handleMayorCompleted(c: Context<GastownEnv>, params: { townId: string }) {
+  const body = await parseJsonBody(c);
+  const parsed = MayorCompletedBody.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${MAYOR_HANDLER_LOG} handleMayorCompleted: townId=${params.townId} status=${parsed.data.status}`
+  );
+
+  const mayor = getMayorDOStub(c.env, params.townId);
+  // The completion reporter sends agentId in the URL path for Rig DO,
+  // but for MayorDO we get it from the session — pass a placeholder.
+  // The MayorDO.agentCompleted validates it against the active session.
+  await mayor.agentCompleted(parsed.data.agentId ?? '', parsed.data.status, parsed.data.reason);
+  return c.json(resSuccess({ acknowledged: true }), 200);
 }
 
 /**

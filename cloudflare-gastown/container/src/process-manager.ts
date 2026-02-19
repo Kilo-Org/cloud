@@ -59,6 +59,7 @@ export async function startAgent(
     exitReason: null,
     gastownApiUrl: request.envVars?.GASTOWN_API_URL ?? process.env.GASTOWN_API_URL ?? null,
     gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
+    completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
   };
   agents.set(request.agentId, agent);
 

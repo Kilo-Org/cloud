@@ -89,6 +89,10 @@ export class TownContainerDO extends Container<Env> {
     agentId: string,
     ticket: string | null
   ): Response {
+    console.log(
+      `${TC_LOG} handleStreamWebSocket: agentId=${agentId} ticket=${ticket?.slice(0, 8)}...`
+    );
+
     if (!ticket) {
       return new Response(JSON.stringify({ error: 'Missing ticket' }), {
         status: 400,
@@ -96,14 +100,11 @@ export class TownContainerDO extends Container<Env> {
       });
     }
 
-    // Validate the ticket by consuming it on the container (synchronous
-    // validation isn't possible since the ticket lives in the container's
-    // memory). We'll validate asynchronously after accepting the WS.
-
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
     server.accept();
+    console.log(`${TC_LOG} WebSocket accepted for agent ${agentId}`);
 
     // Track this session
     let sessions = this.wsSessions.get(agentId);
@@ -117,19 +118,23 @@ export class TownContainerDO extends Container<Env> {
     // Start polling if not already running
     this.ensurePolling();
 
-    // Validate and send historical backfill asynchronously
+    // Send historical backfill asynchronously
     void this.validateAndBackfill(agentId, ticket, server, session);
 
-    // Handle client messages (none expected, but clean up on close)
-    server.addEventListener('close', () => {
+    // Handle client disconnect
+    server.addEventListener('close', event => {
+      console.log(`${TC_LOG} WebSocket closed for agent ${agentId}: code=${event.code}`);
       sessions.delete(session);
       if (sessions.size === 0) {
         this.wsSessions.delete(agentId);
       }
-      // Stop polling if no more sessions
       if (this.wsSessions.size === 0) {
         this.stopPolling();
       }
+    });
+
+    server.addEventListener('error', event => {
+      console.error(`${TC_LOG} WebSocket error for agent ${agentId}:`, event);
     });
 
     return new Response(null, { status: 101, webSocket: client });
@@ -148,40 +153,43 @@ export class TownContainerDO extends Container<Env> {
     session: { ws: WebSocket; lastEventId: number }
   ): Promise<void> {
     try {
-      // Fetch agent status (may 404 if agent hasn't started yet — that's OK,
-      // we'll still try to get events and poll until the agent appears)
+      console.log(`${TC_LOG} backfill: fetching status for agent ${agentId}`);
       const statusRes = await this.containerFetch(`http://container/agents/${agentId}/status`);
+      console.log(`${TC_LOG} backfill: status response ${statusRes.status}`);
       if (statusRes.ok) {
         const status = (await statusRes.json()) as Record<string, unknown>;
         ws.send(JSON.stringify({ event: 'agent.status', data: status }));
+        console.log(`${TC_LOG} backfill: sent agent.status to WS`);
       }
 
-      // Fetch all buffered events (backfill) — start from 0 to get everything
+      console.log(`${TC_LOG} backfill: fetching events for agent ${agentId}`);
       const eventsRes = await this.containerFetch(
         `http://container/agents/${agentId}/events?after=0`
       );
+      console.log(`${TC_LOG} backfill: events response ${eventsRes.status}`);
       if (eventsRes.ok) {
         const body = (await eventsRes.json()) as {
           events: Array<{ id: number; event: string; data: unknown; timestamp: string }>;
         };
+        console.log(`${TC_LOG} backfill: got ${body.events?.length ?? 0} events`);
         if (body.events && body.events.length > 0) {
           for (const evt of body.events) {
             try {
               ws.send(JSON.stringify({ event: evt.event, data: evt.data }));
             } catch {
-              return; // WS closed during backfill
+              console.log(`${TC_LOG} backfill: WS closed during send`);
+              return;
             }
           }
-          // Advance the session cursor past the backfill so polling
-          // doesn't re-send these events
           const lastEvt = body.events[body.events.length - 1];
           session.lastEventId = lastEvt.id;
+          console.log(
+            `${TC_LOG} backfill: sent ${body.events.length} events, cursor=${lastEvt.id}`
+          );
         }
       }
     } catch (err) {
       console.error(`${TC_LOG} backfill error for agent ${agentId}:`, err);
-      // Don't close the WS on backfill failure — polling will pick up
-      // events as the container becomes available
     }
   }
 
@@ -190,9 +198,9 @@ export class TownContainerDO extends Container<Env> {
    */
   private ensurePolling(): void {
     if (this.pollTimer) return;
+    console.log(`${TC_LOG} starting poll loop (${POLL_INTERVAL_MS}ms interval)`);
     this.pollTimer = setInterval(() => void this.pollEvents(), POLL_INTERVAL_MS);
-    // Also poll immediately
-    void this.pollEvents();
+    // Don't poll immediately — let the backfill complete first
   }
 
   private stopPolling(): void {
@@ -221,12 +229,17 @@ export class TownContainerDO extends Container<Env> {
         const res = await this.containerFetch(
           `http://container/agents/${agentId}/events?after=${minLastId}`
         );
-        if (!res.ok) continue;
+        if (!res.ok) {
+          console.log(`${TC_LOG} poll: events ${res.status} for agent ${agentId}`);
+          continue;
+        }
 
         const body = (await res.json()) as {
           events: Array<{ id: number; event: string; data: unknown; timestamp: string }>;
         };
         if (!body.events || body.events.length === 0) continue;
+
+        console.log(`${TC_LOG} poll: relaying ${body.events.length} events for agent ${agentId}`);
 
         // Relay each event to sessions that haven't seen it yet
         for (const evt of body.events) {
@@ -242,8 +255,8 @@ export class TownContainerDO extends Container<Env> {
             }
           }
         }
-      } catch {
-        // Container may be starting up or unavailable; skip this poll cycle
+      } catch (err) {
+        console.error(`${TC_LOG} poll error for agent ${agentId}:`, err);
       }
     }
   }

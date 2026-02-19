@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -77,11 +77,32 @@ export function MayorChat({ townId }: MayorChatProps) {
   const session = statusQuery.data?.session;
   const [showStream, setShowStream] = useState(true);
 
-  // Show the agent stream when the mayor has an active session
-  const mayorAgentId =
-    session && (session.status === 'active' || session.status === 'starting')
-      ? session.agentId
-      : null;
+  // Latch the agentId: once we see an active/starting session, keep the
+  // stream open even after the status transitions to idle. This prevents
+  // the AgentStream from unmounting (and losing buffered events) when
+  // the 3s status poll returns idle before all events have been streamed.
+  const latchedAgentIdRef = useRef<string | null>(null);
+  const currentAgentId = session?.agentId ?? null;
+  const isSessionLive = session?.status === 'active' || session?.status === 'starting';
+
+  // Latch when a session becomes active
+  if (isSessionLive && currentAgentId) {
+    latchedAgentIdRef.current = currentAgentId;
+  }
+  // Clear latch when the agentId changes (new session) or user closes the stream
+  if (currentAgentId && currentAgentId !== latchedAgentIdRef.current && isSessionLive) {
+    latchedAgentIdRef.current = currentAgentId;
+    setShowStream(true);
+  }
+
+  const mayorAgentId = latchedAgentIdRef.current;
+
+  // Reset latch + show when user sends a new message (new session may start)
+  useEffect(() => {
+    if (sendMessage.isSuccess) {
+      setShowStream(true);
+    }
+  }, [sendMessage.isSuccess]);
 
   return (
     <div className="space-y-4">

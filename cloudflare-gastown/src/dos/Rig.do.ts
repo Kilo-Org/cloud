@@ -1507,13 +1507,13 @@ export class RigDO extends DurableObject<Env> {
   private static modelForRole(role: string): string {
     switch (role) {
       case 'polecat':
-        return 'kilo/claude-sonnet-4-20250514';
+        return 'anthropic/claude-sonnet-4.6';
       case 'refinery':
-        return 'kilo/claude-sonnet-4-20250514';
+        return 'anthropic/claude-sonnet-4.6';
       case 'mayor':
-        return 'kilo/claude-sonnet-4-20250514';
+        return 'anthropic/claude-sonnet-4.6';
       default:
-        return 'kilo/claude-sonnet-4-20250514';
+        return 'anthropic/claude-sonnet-4.6';
     }
   }
 

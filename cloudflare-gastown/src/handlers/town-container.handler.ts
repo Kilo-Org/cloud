@@ -4,6 +4,8 @@ import { getTownContainerStub } from '../dos/TownContainer.do';
 import { resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 
+const CONTAINER_LOG = '[town-container.handler]';
+
 /**
  * Proxy a request to the town container's control server and return the response.
  * Preserves the original status code and JSON body.
@@ -13,12 +15,25 @@ async function proxyToContainer(
   path: string,
   init?: RequestInit
 ): Promise<Response> {
-  const response = await container.fetch(`http://container${path}`, init);
-  const data = await response.text();
-  return new Response(data, {
-    status: response.status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const method = init?.method ?? 'GET';
+  console.log(`${CONTAINER_LOG} proxyToContainer: ${method} ${path}`);
+  if (init?.body) {
+    console.log(`${CONTAINER_LOG} proxyToContainer: body=${String(init.body).slice(0, 300)}`);
+  }
+  try {
+    const response = await container.fetch(`http://container${path}`, init);
+    const data = await response.text();
+    console.log(
+      `${CONTAINER_LOG} proxyToContainer: ${method} ${path} -> ${response.status} body=${data.slice(0, 300)}`
+    );
+    return new Response(data, {
+      status: response.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    console.error(`${CONTAINER_LOG} proxyToContainer: EXCEPTION for ${method} ${path}:`, err);
+    throw err;
+  }
 }
 
 /**

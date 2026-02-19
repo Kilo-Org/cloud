@@ -7,6 +7,8 @@ import { getEnforcedAgentId } from '../middleware/auth.middleware';
 import { BeadType, BeadPriority, BeadStatus } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
+const HANDLER_LOG = '[rig-beads.handler]';
+
 const CreateBeadBody = z.object({
   type: BeadType,
   title: z.string().min(1),
@@ -32,13 +34,20 @@ const NonNegativeInt = z.coerce.number().int().nonnegative();
 export async function handleCreateBead(c: Context<GastownEnv>, params: { rigId: string }) {
   const parsed = CreateBeadBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
+    console.error(`${HANDLER_LOG} handleCreateBead: invalid body`, parsed.error.issues);
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
       400
     );
   }
+  console.log(
+    `${HANDLER_LOG} handleCreateBead: rigId=${params.rigId} type=${parsed.data.type} title="${parsed.data.title?.slice(0, 80)}" assignee=${parsed.data.assignee_agent_id ?? 'none'}`
+  );
   const rig = getRigDOStub(c.env, params.rigId);
   const bead = await rig.createBead(parsed.data);
+  console.log(
+    `${HANDLER_LOG} handleCreateBead: created bead ${JSON.stringify(bead).slice(0, 200)}`
+  );
   return c.json(resSuccess(bead), 201);
 }
 
@@ -130,13 +139,20 @@ const SlingBeadBody = z.object({
 export async function handleSlingBead(c: Context<GastownEnv>, params: { rigId: string }) {
   const parsed = SlingBeadBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
+    console.error(`${HANDLER_LOG} handleSlingBead: invalid body`, parsed.error.issues);
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
       400
     );
   }
+  console.log(
+    `${HANDLER_LOG} handleSlingBead: rigId=${params.rigId} title="${parsed.data.title?.slice(0, 80)}" metadata=${JSON.stringify(parsed.data.metadata)}`
+  );
   const rig = getRigDOStub(c.env, params.rigId);
   const result = await rig.slingBead(parsed.data);
+  console.log(
+    `${HANDLER_LOG} handleSlingBead: completed, result=${JSON.stringify(result).slice(0, 300)}`
+  );
   return c.json(resSuccess(result), 201);
 }
 

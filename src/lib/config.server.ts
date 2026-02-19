@@ -142,7 +142,7 @@ export const AGENT_ENV_VARS_PUBLIC_KEY = getEnvVariable('AGENT_ENV_VARS_PUBLIC_K
 // Gastown Service
 export const GASTOWN_SERVICE_URL =
   getEnvVariable('GASTOWN_SERVICE_URL') ||
-  (process.env.NODE_ENV === 'production' ? 'https://gastown.kiloapps.io' : null);
+  (process.env.NODE_ENV === 'production' ? 'https://gastown.kiloapps.io' : 'http://localhost:8787');
 export const GASTOWN_CF_ACCESS_CLIENT_ID = getEnvVariable('GASTOWN_CF_ACCESS_CLIENT_ID');
 export const GASTOWN_CF_ACCESS_CLIENT_SECRET = getEnvVariable('GASTOWN_CF_ACCESS_CLIENT_SECRET');
 

@@ -11,6 +11,24 @@ function resolveEnv(request: StartAgentRequest, key: string): string | undefined
   return request.envVars?.[key] ?? process.env[key];
 }
 
+/**
+ * Build KILO_CONFIG_CONTENT JSON so kilo serve can authenticate with
+ * the Kilo LLM gateway. Mirrors the pattern in cloud-agent-next's
+ * session-service.ts getSaferEnvVars().
+ */
+function buildKiloConfigContent(kilocodeToken: string): string {
+  return JSON.stringify({
+    provider: {
+      kilo: {
+        options: {
+          apiKey: kilocodeToken,
+          kilocodeToken,
+        },
+      },
+    },
+  });
+}
+
 function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   const env: Record<string, string> = {
     GASTOWN_AGENT_ID: request.agentId,
@@ -25,12 +43,23 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
 
   // Conditionally set config vars — only when a value is available from
   // the request or the container's own environment.
-  const conditionalKeys = ['GASTOWN_API_URL', 'GASTOWN_SESSION_TOKEN', 'KILO_API_URL'];
+  const conditionalKeys = [
+    'GASTOWN_API_URL',
+    'GASTOWN_SESSION_TOKEN',
+    'KILO_API_URL',
+    'KILOCODE_TOKEN',
+  ];
   for (const key of conditionalKeys) {
     const value = resolveEnv(request, key);
     if (value) {
       env[key] = value;
     }
+  }
+
+  // Build KILO_CONFIG_CONTENT so kilo serve can authenticate LLM calls
+  const kilocodeToken = env.KILOCODE_TOKEN;
+  if (kilocodeToken) {
+    env.KILO_CONFIG_CONTENT = buildKiloConfigContent(kilocodeToken);
   }
 
   if (request.envVars) {

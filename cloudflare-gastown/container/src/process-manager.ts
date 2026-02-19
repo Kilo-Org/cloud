@@ -16,6 +16,7 @@ import {
 } from './kilo-server';
 import { createKiloClient } from './kilo-client';
 import { createSSEConsumer, isCompletionEvent, type SSEConsumer } from './sse-consumer';
+import { reportAgentCompleted } from './completion-reporter';
 
 const agents = new Map<string, ManagedAgent>();
 const sseConsumers = new Map<string, SSEConsumer>();
@@ -56,6 +57,8 @@ export async function startAgent(
     activeTools: [],
     messageCount: 0,
     exitReason: null,
+    gastownApiUrl: request.envVars?.GASTOWN_API_URL ?? process.env.GASTOWN_API_URL ?? null,
+    gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
   };
   agents.set(request.agentId, agent);
 
@@ -93,6 +96,7 @@ export async function startAgent(
         if (isCompletionEvent(evt)) {
           agent.status = 'exited';
           agent.exitReason = 'completed';
+          void reportAgentCompleted(agent, 'completed');
         }
       },
       onActivity: () => {
@@ -102,6 +106,7 @@ export async function startAgent(
         if (agent.status === 'running') {
           agent.status = 'failed';
           agent.exitReason = `SSE stream closed: ${reason}`;
+          void reportAgentCompleted(agent, 'failed', reason);
         }
       },
     });

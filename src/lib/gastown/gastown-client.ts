@@ -39,7 +39,7 @@ export type Rig = z.output<typeof RigSchema>;
 export const BeadSchema = z.object({
   id: z.string(),
   type: z.enum(['issue', 'message', 'escalation', 'merge_request']),
-  status: z.enum(['open', 'in_progress', 'closed']),
+  status: z.enum(['open', 'in_progress', 'closed', 'failed']),
   title: z.string(),
   body: z.string().nullable(),
   assignee_agent_id: z.string().nullable(),
@@ -73,6 +73,7 @@ export const AgentSchema = z.object({
   identity: z.string(),
   status: z.enum(['idle', 'working', 'blocked', 'dead']),
   current_hook_bead_id: z.string().nullable(),
+  dispatch_attempts: z.number().default(0),
   last_activity_at: z.string(),
   checkpoint: z.string().nullable(),
   created_at: z.string(),
@@ -110,21 +111,41 @@ function getHeaders(): Record<string, string> {
   return headers;
 }
 
+const CLIENT_LOG = '[gastown-client]';
+
 async function gastownFetch(path: string, init?: RequestInit): Promise<unknown> {
   if (!GASTOWN_SERVICE_URL) {
+    console.error(`${CLIENT_LOG} GASTOWN_SERVICE_URL is not configured!`);
     throw new GastownApiError('GASTOWN_SERVICE_URL is not configured', 500);
   }
 
   const url = `${GASTOWN_SERVICE_URL}${path}`;
+  const method = init?.method ?? 'GET';
+  console.log(`${CLIENT_LOG} ${method} ${url}`);
+  if (init?.body) {
+    const safeBody =
+      typeof init.body === 'string'
+        ? init.body
+            .replace(/"kilocode_token":"[^"]*"/g, '"kilocode_token":"[REDACTED]"')
+            .slice(0, 500)
+        : '[non-string body]';
+    console.log(`${CLIENT_LOG}   body: ${safeBody}`);
+  }
+
+  const startTime = Date.now();
   const response = await fetch(url, {
     ...init,
     headers: { ...getHeaders(), ...init?.headers },
   });
+  const elapsed = Date.now() - startTime;
+
+  console.log(`${CLIENT_LOG} ${method} ${path} -> ${response.status} (${elapsed}ms)`);
 
   let body: unknown;
   try {
     body = await response.json();
   } catch {
+    console.error(`${CLIENT_LOG} Non-JSON response from ${path}: status=${response.status}`);
     throw new GastownApiError(
       `Gastown returned non-JSON response (${response.status})`,
       response.status
@@ -134,9 +155,12 @@ async function gastownFetch(path: string, init?: RequestInit): Promise<unknown> 
   if (!response.ok) {
     const parsed = GastownErrorResponse.safeParse(body);
     const message = parsed.success ? parsed.data.error : `Gastown API error (${response.status})`;
+    console.error(`${CLIENT_LOG} Error from ${path}: ${response.status} - ${message}`);
+    console.error(`${CLIENT_LOG}   Response body: ${JSON.stringify(body).slice(0, 500)}`);
     throw new GastownApiError(message, response.status);
   }
 
+  console.log(`${CLIENT_LOG} ${method} ${path} response: ${JSON.stringify(body).slice(0, 300)}`);
   return body;
 }
 
@@ -169,7 +193,13 @@ export async function getTown(userId: string, townId: string): Promise<Town> {
 
 export async function createRig(
   userId: string,
-  input: { town_id: string; name: string; git_url: string; default_branch: string }
+  input: {
+    town_id: string;
+    name: string;
+    git_url: string;
+    default_branch: string;
+    kilocode_token?: string;
+  }
 ): Promise<Rig> {
   const body = await gastownFetch(`/api/users/${userId}/rigs`, {
     method: 'POST',

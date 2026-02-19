@@ -68,6 +68,10 @@ export type ManagedAgent = {
   messageCount: number;
   /** Exit reason if status is 'exited' or 'failed' */
   exitReason: string | null;
+  /** Gastown worker API URL for completion callbacks */
+  gastownApiUrl: string | null;
+  /** Agent-scoped JWT for authenticating callbacks to the Gastown worker */
+  gastownSessionToken: string | null;
 };
 
 export type AgentStatusResponse = {

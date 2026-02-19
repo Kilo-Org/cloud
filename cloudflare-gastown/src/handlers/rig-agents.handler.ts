@@ -6,6 +6,8 @@ import { parseJsonBody } from '../util/parse-json-body.util';
 import { AgentRole, AgentStatus } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
+const AGENT_LOG = '[rig-agents.handler]';
+
 const RegisterAgentBody = z.object({
   role: AgentRole,
   name: z.string().min(1),
@@ -20,6 +22,11 @@ const AgentDoneBody = z.object({
   branch: z.string().min(1),
   pr_url: z.string().optional(),
   summary: z.string().optional(),
+});
+
+const AgentCompletedBody = z.object({
+  status: z.enum(['completed', 'failed']),
+  reason: z.string().optional(),
 });
 
 const WriteCheckpointBody = z.object({
@@ -72,13 +79,18 @@ export async function handleHookBead(
 ) {
   const parsed = HookBeadBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
+    console.error(`${AGENT_LOG} handleHookBead: invalid body`, parsed.error.issues);
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
       400
     );
   }
+  console.log(
+    `${AGENT_LOG} handleHookBead: rigId=${params.rigId} agentId=${params.agentId} beadId=${parsed.data.bead_id}`
+  );
   const rig = getRigDOStub(c.env, params.rigId);
   await rig.hookBead(params.agentId, parsed.data.bead_id);
+  console.log(`${AGENT_LOG} handleHookBead: hooked successfully`);
   return c.json(resSuccess({ hooked: true }));
 }
 
@@ -114,6 +126,26 @@ export async function handleAgentDone(
   const rig = getRigDOStub(c.env, params.rigId);
   await rig.agentDone(params.agentId, parsed.data);
   return c.json(resSuccess({ done: true }));
+}
+
+/**
+ * Called by the container when an agent session completes or fails.
+ * Transitions the hooked bead to closed/failed and unhooks the agent.
+ */
+export async function handleAgentCompleted(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const parsed = AgentCompletedBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const rig = getRigDOStub(c.env, params.rigId);
+  await rig.agentCompleted(params.agentId, parsed.data);
+  return c.json(resSuccess({ completed: true }));
 }
 
 export async function handleWriteCheckpoint(
@@ -165,13 +197,18 @@ const GetOrCreateAgentBody = z.object({
 export async function handleGetOrCreateAgent(c: Context<GastownEnv>, params: { rigId: string }) {
   const parsed = GetOrCreateAgentBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
+    console.error(`${AGENT_LOG} handleGetOrCreateAgent: invalid body`, parsed.error.issues);
     return c.json(
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
       400
     );
   }
+  console.log(
+    `${AGENT_LOG} handleGetOrCreateAgent: rigId=${params.rigId} role=${parsed.data.role}`
+  );
   const rig = getRigDOStub(c.env, params.rigId);
   const agent = await rig.getOrCreateAgent(parsed.data.role);
+  console.log(`${AGENT_LOG} handleGetOrCreateAgent: result=${JSON.stringify(agent).slice(0, 200)}`);
   return c.json(resSuccess(agent));
 }
 

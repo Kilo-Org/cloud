@@ -1,4 +1,4 @@
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { CloneOptions, WorktreeOptions } from './types';
 
@@ -71,7 +71,12 @@ async function exec(cmd: string, args: string[], cwd?: string): Promise<string> 
 }
 
 async function pathExists(p: string): Promise<boolean> {
-  return Bun.file(p).exists();
+  try {
+    await stat(p);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function repoDir(rigId: string): string {

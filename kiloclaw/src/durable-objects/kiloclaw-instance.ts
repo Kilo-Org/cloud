@@ -172,7 +172,7 @@ const DEAD_STATES: ReadonlySet<FlyMachineState> = new Set(['destroyed', 'destroy
 
 /** Terminal non-running states for live check. Transitional states (starting, stopping, replacing)
  *  are intentionally excluded to avoid UI flicker during normal operations. */
-const TERMINAL_STOPPED_STATES: ReadonlySet<string> = new Set([
+const TERMINAL_STOPPED_STATES: ReadonlySet<FlyMachineState> = new Set([
   'stopped',
   'created',
   'destroyed',

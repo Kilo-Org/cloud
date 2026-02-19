@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useSyncExternalStore } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { MessageSquareWarning, Loader2, Check } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -15,6 +15,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useProject } from './ProjectSession';
+import type { CloudMessage } from '@/components/cloud-agent/types';
+import type { StoredMessage } from '@/components/cloud-agent-next/types';
+import { isTextPart } from '@/components/cloud-agent-next/types';
+import type { V1Session, V2Session } from './project-manager/types';
 
 type FeedbackDialogProps = {
   disabled?: boolean;
@@ -28,6 +32,20 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
 
   const { manager, state } = useProject();
   const trpc = useTRPC();
+
+  // Get the active session (last in state.sessions)
+  const activeSession =
+    state.sessions.length > 0 ? state.sessions[state.sessions.length - 1] : undefined;
+
+  // Subscribe to the active session's state, split by type for correct typing
+  const v1State = useSyncExternalStore(
+    activeSession?.type === 'v1' ? activeSession.subscribe : noopSubscribe,
+    activeSession?.type === 'v1' ? activeSession.getState : emptyV1State
+  );
+  const v2State = useSyncExternalStore(
+    activeSession?.type === 'v2' ? activeSession.subscribe : noopSubscribe,
+    activeSession?.type === 'v2' ? activeSession.getState : emptyV2State
+  );
 
   const {
     mutate,
@@ -59,11 +77,19 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
   const handleSubmit = useCallback(() => {
     if (!feedbackText.trim()) return;
 
-    const recentMessages = state.messages.slice(-5).map(msg => ({
-      role: msg.type,
-      text: (msg.text ?? msg.content ?? '').slice(0, 10_000),
-      ts: msg.ts,
-    }));
+    let recentMessages: { role: string; text: string; ts: number }[];
+    let messageCount: number;
+
+    if (activeSession?.type === 'v1') {
+      recentMessages = buildV1RecentMessages(v1State.messages);
+      messageCount = v1State.messages.length;
+    } else if (activeSession?.type === 'v2') {
+      recentMessages = buildV2RecentMessages(v2State.messages);
+      messageCount = v2State.messages.length;
+    } else {
+      recentMessages = [];
+      messageCount = 0;
+    }
 
     mutate({
       project_id: manager.projectId,
@@ -72,10 +98,19 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
       model: state.model || undefined,
       preview_status: state.previewStatus,
       is_streaming: state.isStreaming,
-      message_count: state.messages.length,
+      message_count: messageCount,
       recent_messages: recentMessages,
     });
-  }, [feedbackText, manager.projectId, organizationId, state, mutate]);
+  }, [
+    feedbackText,
+    manager.projectId,
+    organizationId,
+    state,
+    activeSession?.type,
+    v1State.messages,
+    v2State.messages,
+    mutate,
+  ]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -144,4 +179,59 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * Build recent_messages from V1 CloudMessage array.
+ */
+function buildV1RecentMessages(
+  messages: CloudMessage[]
+): { role: string; text: string; ts: number }[] {
+  return messages.slice(-5).map(msg => ({
+    role: msg.type,
+    text: (msg.text ?? msg.content ?? '').slice(0, 10_000),
+    ts: msg.ts,
+  }));
+}
+
+/**
+ * Build recent_messages from V2 StoredMessage array.
+ * V2 messages store text in parts, not on info directly.
+ */
+function buildV2RecentMessages(
+  messages: StoredMessage[]
+): { role: string; text: string; ts: number }[] {
+  return messages.slice(-5).map(msg => {
+    const textContent = msg.parts
+      .filter(isTextPart)
+      .map(p => p.text)
+      .join('')
+      .slice(0, 10_000);
+
+    return {
+      role: msg.info.role,
+      text: textContent,
+      ts: msg.info.time.created,
+    };
+  });
+}
+
+function noopSubscribe() {
+  return () => {};
+}
+
+const EMPTY_V1: { messages: CloudMessage[]; isStreaming: boolean } = {
+  messages: [],
+  isStreaming: false,
+};
+function emptyV1State() {
+  return EMPTY_V1;
+}
+
+const EMPTY_V2: { messages: StoredMessage[]; isStreaming: boolean } = {
+  messages: [],
+  isStreaming: false,
+};
+function emptyV2State() {
+  return EMPTY_V2;
 }

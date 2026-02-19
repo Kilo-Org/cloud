@@ -1,51 +1,29 @@
 /**
- * ProjectManager
+ * ProjectManager — closure-based orchestrator for App Builder project lifecycle.
  *
- * Thin orchestrator class for App Builder project lifecycle.
- * Composes specialized modules for state, streaming, preview, and deployments.
- *
- * Module composition:
- * - store.ts: State management and subscriber notifications
- * - messages.ts: Message creation and version tracking
- * - streaming.ts: WebSocket-based streaming coordination (V2 API)
- * - preview-polling.ts: Preview status polling and build triggers
- * - deployments.ts: Production deployment logic
- * - logging.ts: Prefixed console logging
+ * Composes session objects (V1/V2) for streaming and message handling,
+ * and specialized modules for state, preview, and deployments.
  */
 
-import { type TRPCClient } from '@trpc/client';
-import type { RootRouter } from '@/routers/root-router';
-import type { CloudMessage } from '@/components/cloud-agent/types';
-import type { DeployProjectResult, ProjectWithMessages } from '@/lib/app-builder/types';
+import type {
+  DeployProjectResult,
+  ProjectSessionInfo,
+  ProjectWithMessages,
+} from '@/lib/app-builder/types';
 import type { Images } from '@/lib/images-schema';
-import { createLogger, type Logger } from './project-manager/logging';
+import type { TRPCClient } from '@trpc/client';
+import type { RootRouter } from '@/routers/root-router';
+import { createLogger } from './project-manager/logging';
 import { createProjectStore, createInitialState } from './project-manager/store';
-import type { ProjectStore, V2StreamingCoordinator } from './project-manager/types';
+import type { ProjectState, ProjectStore, AppBuilderSession } from './project-manager/types';
 import { startPreviewPolling, type PreviewPollingState } from './project-manager/preview-polling';
-import { createStreamingCoordinator } from './project-manager/streaming';
 import { deploy as deployProject } from './project-manager/deployments';
-
-// =============================================================================
-// Type Definitions
-// =============================================================================
+import { createV1Session } from './project-manager/sessions/v1/v1-session';
+import { createV2Session } from './project-manager/sessions/v2/v2-session';
 
 type AppTRPCClient = TRPCClient<RootRouter>;
 
-export type PreviewStatus = 'idle' | 'building' | 'running' | 'error';
-
-export type ProjectState = {
-  messages: CloudMessage[];
-  isStreaming: boolean;
-  isInterrupting: boolean;
-  previewUrl: string | null;
-  previewStatus: PreviewStatus;
-  deploymentId: string | null;
-  model: string;
-  /** Current URL the user is viewing in the preview iframe (tracked via postMessage) */
-  currentIframeUrl: string | null;
-  /** GitHub repo name if migrated (e.g., "owner/repo"), null if not migrated */
-  gitRepoFullName: string | null;
-};
+export type { ProjectState };
 
 export type ProjectManagerConfig = {
   project: ProjectWithMessages;
@@ -55,208 +33,308 @@ export type ProjectManagerConfig = {
 
 export type DeployResult = DeployProjectResult;
 
-// =============================================================================
-// ProjectManager Class
-// =============================================================================
-
-export class ProjectManager {
+export type ProjectManager = {
   readonly projectId: string;
-  readonly organizationId: string | null;
+  destroyed: boolean;
+  subscribe: (listener: () => void) => () => void;
+  getState: () => ProjectState;
+  sendMessage: (message: string, images?: Images, model?: string) => void;
+  interrupt: () => void;
+  setCurrentIframeUrl: (url: string | null) => void;
+  setGitRepoFullName: (repoFullName: string) => void;
+  deploy: () => Promise<DeployResult>;
+  destroy: () => void;
+};
 
-  private store: ProjectStore;
-  private previewPollingState: PreviewPollingState | null = null;
-  private trpcClient: AppTRPCClient;
-  private logger: Logger;
-  private streamingCoordinator: V2StreamingCoordinator;
-  /** Whether this manager has been destroyed. Used by React to detect Strict Mode re-mounts. */
-  destroyed = false;
+export function createProjectManager(config: ProjectManagerConfig): ProjectManager {
+  const { project, trpcClient, organizationId } = config;
 
-  private pendingInitialStreamingStart = false;
-  private pendingReconnect = false;
-  private hasStartedInitialStreaming = false;
-  /** The cloud agent session ID from the project, used for reconnection */
-  private cloudAgentSessionId: string | null;
+  const projectId = project.id;
+  const logger = createLogger(projectId);
+  let destroyed = false;
+  let cloudAgentSessionId = project.session_id ?? null;
+  let previewPollingState: PreviewPollingState | null = null;
+  let pendingInitialStreamingStart = false;
+  let pendingReconnect = false;
+  let hasStartedInitialStreaming = false;
+  let sessionUnsubscribes: Array<() => void> = [];
 
-  constructor(config: ProjectManagerConfig) {
-    const { project, trpcClient, organizationId } = config;
+  const initialState = createInitialState(
+    project.deployment_id ?? null,
+    project.model_id ?? null,
+    project.git_repo_full_name ?? null
+  );
+  const store: ProjectStore = createProjectStore(initialState);
 
-    this.projectId = project.id;
-    this.organizationId = organizationId;
-    this.trpcClient = trpcClient;
-    this.logger = createLogger(project.id);
-    this.cloudAgentSessionId = project.session_id ?? null;
+  // --- Session building ---
 
-    // Initialize store with initial state
-    const initialState = createInitialState(
-      project.messages,
-      project.deployment_id ?? null,
-      project.model_id ?? null,
-      project.git_repo_full_name ?? null
-    );
-    this.store = createProjectStore(initialState);
-
-    // Initialize streaming coordinator with V2 WebSocket support
-    this.streamingCoordinator = createStreamingCoordinator({
-      projectId: this.projectId,
-      organizationId: this.organizationId,
-      trpcClient: this.trpcClient,
-      store: this.store,
-      onStreamComplete: () => this.startPreviewPollingIfNeeded(),
-      cloudAgentSessionId: this.cloudAgentSessionId,
-      sessionPrepared: project.sessionPrepared,
-    });
-
-    // Determine what to do based on session state
-    if (project.sessionInitiated === false) {
-      // New project - session prepared but not initiated
-      // Defer the actual start until React has subscribed (see subscribe method)
-      this.pendingInitialStreamingStart = true;
-    } else if (this.cloudAgentSessionId) {
-      // Existing project with session - reconnect to WebSocket for live updates
-      this.pendingReconnect = true;
-    } else {
-      // Existing project with no session ID - just start preview polling
-      this.startPreviewPollingIfNeeded();
+  function createStaticSession(info: ProjectSessionInfo): AppBuilderSession {
+    if (info.worker_version === 'v2') {
+      return createV2Session({ info, initialMessages: [] });
     }
+    return createV1Session({ info, initialMessages: [] });
   }
 
-  // ===========================================================================
-  // React Integration (useSyncExternalStore pattern)
-  // ===========================================================================
+  function getActiveSession(): AppBuilderSession | undefined {
+    const sessions = store.getState().sessions;
+    return sessions[sessions.length - 1];
+  }
+
+  function subscribeToSession(session: AppBuilderSession): void {
+    const unsubscribe = session.subscribe(() => {
+      const active = getActiveSession();
+      const isStreaming = active?.getState().isStreaming ?? false;
+      store.setState({ isStreaming });
+    });
+    sessionUnsubscribes.push(unsubscribe);
+  }
 
   /**
-   * Subscribe to state changes. Returns an unsubscribe function.
-   * Compatible with React's useSyncExternalStore.
+   * Builds sessions from backend project data.
+   * Ended sessions are static (no streaming). The active session (last or
+   * the one without ended_at) gets streaming capabilities.
    */
-  subscribe = (listener: () => void): (() => void) => {
-    const unsubscribe = this.store.subscribe(listener);
+  function buildSessions(proj: ProjectWithMessages): AppBuilderSession[] {
+    const sessionInfos = proj.sessions;
+    if (sessionInfos.length === 0) return [];
 
-    // Start pending initial streaming once React has subscribed
-    // This ensures the first subscriber is registered before events arrive
-    if (this.pendingInitialStreamingStart && !this.hasStartedInitialStreaming) {
-      this.hasStartedInitialStreaming = true;
-      // Use queueMicrotask to ensure subscribe() returns before streaming starts
-      // This guarantees React's subscription setup is complete
+    const activeInfo =
+      sessionInfos.find(s => s.ended_at === null) ?? sessionInfos[sessionInfos.length - 1];
+
+    const sessions: AppBuilderSession[] = [];
+
+    for (const info of sessionInfos) {
+      const isActive = info.id === activeInfo?.id;
+
+      if (!isActive) {
+        sessions.push(createStaticSession(info));
+      } else if (info.worker_version === 'v2') {
+        sessions.push(
+          createV2Session({
+            info,
+            initialMessages: [],
+            projectId,
+            organizationId,
+            trpcClient,
+            cloudAgentSessionId: proj.session_id ?? null,
+            onStreamComplete: () => startPreviewPollingIfNeeded(),
+          })
+        );
+      } else {
+        sessions.push(
+          createV1Session({
+            info,
+            initialMessages: proj.messages,
+            projectId,
+            organizationId,
+            trpcClient,
+            cloudAgentSessionId: proj.session_id ?? null,
+            sessionPrepared: proj.sessionPrepared,
+            onStreamComplete: () => startPreviewPollingIfNeeded(),
+            onUpgradeDetected: handleUpgradeDetected,
+          })
+        );
+      }
+    }
+
+    return sessions;
+  }
+
+  // --- Upgrade detection ---
+
+  function handleUpgradeDetected(newSessionId: string): void {
+    logger.log('V1→V2 upgrade detected', { newSessionId });
+
+    const currentActive = getActiveSession();
+    currentActive?.destroy();
+
+    const v2Info: ProjectSessionInfo = {
+      id: newSessionId,
+      cloud_agent_session_id: newSessionId,
+      worker_version: 'v2',
+      created_at: new Date().toISOString(),
+      ended_at: null,
+      reason: 'upgraded',
+    };
+
+    const v2Session = createV2Session({
+      info: v2Info,
+      initialMessages: [],
+      projectId,
+      organizationId,
+      trpcClient,
+      cloudAgentSessionId: newSessionId,
+      onStreamComplete: () => startPreviewPollingIfNeeded(),
+    });
+
+    subscribeToSession(v2Session);
+
+    const currentSessions = store.getState().sessions;
+    store.setState({
+      sessions: [...currentSessions, v2Session],
+      isStreaming: true,
+    });
+    cloudAgentSessionId = newSessionId;
+
+    v2Session.connectToExistingSession(newSessionId);
+  }
+
+  // --- Preview polling ---
+
+  function startPreviewPollingIfNeeded(): void {
+    if (previewPollingState?.isPolling || destroyed) return;
+
+    logger.log('Starting preview polling');
+    previewPollingState = startPreviewPolling({
+      projectId,
+      organizationId,
+      trpcClient,
+      store,
+      isDestroyed: () => destroyed,
+    });
+  }
+
+  // --- Initialize sessions ---
+
+  const sessions = buildSessions(project);
+  store.setState({ sessions });
+
+  for (const session of sessions) {
+    subscribeToSession(session);
+  }
+
+  if (project.sessionInitiated === false) {
+    pendingInitialStreamingStart = true;
+  } else if (cloudAgentSessionId) {
+    pendingReconnect = true;
+  } else {
+    startPreviewPollingIfNeeded();
+  }
+
+  // --- Public API ---
+
+  function subscribe(listener: () => void): () => void {
+    const unsubscribe = store.subscribe(listener);
+
+    // Deferred start: wait for React's first subscription before streaming
+    if (pendingInitialStreamingStart && !hasStartedInitialStreaming) {
+      hasStartedInitialStreaming = true;
       queueMicrotask(() => {
-        if (!this.destroyed) {
-          // Start preview polling immediately for faster initial display
-          setTimeout(() => {
-            this.startPreviewPollingIfNeeded();
-          }, 100);
-          this.streamingCoordinator.startInitialStreaming();
+        if (!destroyed) {
+          setTimeout(() => startPreviewPollingIfNeeded(), 100);
+          getActiveSession()?.startInitialStreaming();
         }
       });
-    } else if (this.pendingReconnect && this.cloudAgentSessionId) {
-      this.pendingReconnect = false;
-      // Reconnect to existing session for live updates
+    } else if (pendingReconnect && cloudAgentSessionId) {
+      pendingReconnect = false;
+      const sessionIdForReconnect = cloudAgentSessionId;
       queueMicrotask(() => {
-        if (!this.destroyed && this.cloudAgentSessionId) {
-          this.startPreviewPollingIfNeeded();
-          // Connect to WebSocket but don't replay events (undefined fromId)
-          void this.streamingCoordinator.connectToExistingSession(this.cloudAgentSessionId);
+        if (!destroyed) {
+          startPreviewPollingIfNeeded();
+          getActiveSession()?.connectToExistingSession(sessionIdForReconnect);
         }
       });
     }
 
     return unsubscribe;
-  };
-
-  /** Returns the current project state snapshot. */
-  getState = (): ProjectState => {
-    return this.store.getState();
-  };
-
-  // ===========================================================================
-  // Public Actions
-  // ===========================================================================
-
-  /**
-   * Send a user message to the AI assistant and start streaming the response.
-   * @param message - The user's text message
-   * @param images - Optional array of image attachments
-   * @param model - Optional model override for this request
-   */
-  sendMessage(message: string, images?: Images, model?: string): void {
-    this.streamingCoordinator.sendMessage(message, images, model);
   }
 
-  /**
-   * Update the current iframe URL (called from preview component via postMessage listener).
-   * @param url - The current URL in the preview iframe, or null to clear
-   */
-  setCurrentIframeUrl(url: string | null): void {
-    this.store.setState({ currentIframeUrl: url });
+  function getState(): ProjectState {
+    return store.getState();
   }
 
-  /** Interrupt the current streaming response. */
-  interrupt(): void {
-    this.streamingCoordinator.interrupt();
+  function sendMessage(message: string, images?: Images, model?: string): void {
+    const activeSession = getActiveSession();
+    if (!activeSession) {
+      logger.logWarn('Cannot send message: no active session');
+      return;
+    }
+
+    if (model) {
+      store.setState({ model });
+    }
+
+    const effectiveModel = model ?? store.getState().model;
+    void activeSession.sendMessage(message, images, effectiveModel);
   }
 
-  /** Update the GitHub repo full name after migration (e.g., "owner/repo"). */
-  setGitRepoFullName(repoFullName: string): void {
-    this.store.setState({ gitRepoFullName: repoFullName });
+  function interrupt(): void {
+    const activeSession = getActiveSession();
+    if (!activeSession) return;
+
+    void activeSession.interrupt();
+
+    store.setState({ isStreaming: false, isInterrupting: true });
+
+    const handleComplete = () => {
+      if (!destroyed) {
+        store.setState({ isInterrupting: false });
+      }
+    };
+
+    if (organizationId) {
+      void trpcClient.organizations.appBuilder.interruptSession
+        .mutate({ projectId, organizationId })
+        .catch((err: Error) => logger.logError('Failed to interrupt session', err))
+        .finally(handleComplete);
+    } else {
+      void trpcClient.appBuilder.interruptSession
+        .mutate({ projectId })
+        .catch((err: Error) => logger.logError('Failed to interrupt session', err))
+        .finally(handleComplete);
+    }
   }
 
-  /**
-   * Deploy the project to production.
-   * @returns Promise resolving to deployment result with URL or error
-   * @throws Error if manager is destroyed
-   */
-  async deploy(): Promise<DeployResult> {
-    if (this.destroyed) {
+  function setCurrentIframeUrl(url: string | null): void {
+    store.setState({ currentIframeUrl: url });
+  }
+
+  function setGitRepoFullName(repoFullName: string): void {
+    store.setState({ gitRepoFullName: repoFullName });
+  }
+
+  async function deploy(): Promise<DeployResult> {
+    if (destroyed) {
       throw new Error('Cannot deploy: ProjectManager is destroyed');
     }
-
-    this.logger.log('Deploying project');
-
-    return deployProject({
-      projectId: this.projectId,
-      organizationId: this.organizationId,
-      trpcClient: this.trpcClient,
-      store: this.store,
-    });
+    logger.log('Deploying project');
+    return deployProject({ projectId, organizationId, trpcClient, store });
   }
 
-  /**
-   * Destroy the manager and clean up all resources.
-   * Called automatically on component unmount.
-   * Safe to call multiple times.
-   */
-  destroy(): void {
-    if (this.destroyed) {
-      return;
+  function destroy(): void {
+    if (destroyed) return;
+    destroyed = true;
+
+    for (const unsub of sessionUnsubscribes) {
+      unsub();
+    }
+    sessionUnsubscribes = [];
+
+    for (const session of store.getState().sessions) {
+      session.destroy();
     }
 
-    this.destroyed = true;
-
-    // Clean up streaming coordinator
-    this.streamingCoordinator.destroy();
-
-    // Stop preview polling
-    if (this.previewPollingState) {
-      this.previewPollingState.stop();
-      this.previewPollingState = null;
+    if (previewPollingState) {
+      previewPollingState.stop();
+      previewPollingState = null;
     }
   }
 
-  // ===========================================================================
-  // Private Methods
-  // ===========================================================================
-
-  private startPreviewPollingIfNeeded(): void {
-    // Prevent multiple concurrent polling loops
-    if (this.previewPollingState?.isPolling || this.destroyed) {
-      return;
-    }
-
-    this.logger.log('Starting preview polling');
-    this.previewPollingState = startPreviewPolling({
-      projectId: this.projectId,
-      organizationId: this.organizationId,
-      trpcClient: this.trpcClient,
-      store: this.store,
-      isDestroyed: () => this.destroyed,
-    });
-  }
+  return {
+    projectId,
+    get destroyed() {
+      return destroyed;
+    },
+    set destroyed(value: boolean) {
+      destroyed = value;
+    },
+    subscribe,
+    getState,
+    sendMessage,
+    interrupt,
+    setCurrentIframeUrl,
+    setGitRepoFullName,
+    deploy,
+    destroy,
+  };
 }

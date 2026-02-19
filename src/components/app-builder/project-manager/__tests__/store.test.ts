@@ -6,7 +6,6 @@
 
 import { createProjectStore, createInitialState } from '../store';
 import type { ProjectState } from '../types';
-import type { CloudMessage } from '@/components/cloud-agent/types';
 
 /**
  * Helper to flush pending notifications.
@@ -18,34 +17,32 @@ function flushNotifications(): Promise<void> {
 }
 
 describe('createInitialState', () => {
-  it('creates state with provided messages', () => {
-    const messages: CloudMessage[] = [{ ts: 1000, type: 'user', text: 'Hello', partial: false }];
+  it('creates state with default values', () => {
+    const state = createInitialState(null, null, null);
 
-    const state = createInitialState(messages, null, null, null);
-
-    expect(state.messages).toEqual(messages);
     expect(state.isStreaming).toBe(false);
     expect(state.previewUrl).toBeNull();
     expect(state.previewStatus).toBe('idle');
     expect(state.deploymentId).toBeNull();
     expect(state.model).toBe('anthropic/claude-sonnet-4');
     expect(state.gitRepoFullName).toBeNull();
+    expect(state.sessions).toEqual([]);
   });
 
   it('uses provided deployment ID', () => {
-    const state = createInitialState([], 'deploy-123', null, null);
+    const state = createInitialState('deploy-123', null, null);
 
     expect(state.deploymentId).toBe('deploy-123');
   });
 
   it('uses provided model ID', () => {
-    const state = createInitialState([], null, 'openai/gpt-4o', null);
+    const state = createInitialState(null, 'openai/gpt-4o', null);
 
     expect(state.model).toBe('openai/gpt-4o');
   });
 
   it('uses provided git repo full name', () => {
-    const state = createInitialState([], null, null, 'owner/my-repo');
+    const state = createInitialState(null, null, 'owner/my-repo');
 
     expect(state.gitRepoFullName).toBe('owner/my-repo');
   });
@@ -53,7 +50,6 @@ describe('createInitialState', () => {
 
 describe('createProjectStore', () => {
   const initialState: ProjectState = {
-    messages: [],
     isStreaming: false,
     isInterrupting: false,
     previewUrl: null,
@@ -62,6 +58,7 @@ describe('createProjectStore', () => {
     model: 'anthropic/claude-sonnet-4',
     currentIframeUrl: null,
     gitRepoFullName: null,
+    sessions: [],
   };
 
   describe('getState', () => {
@@ -79,7 +76,7 @@ describe('createProjectStore', () => {
       store.setState({ isStreaming: true });
 
       expect(store.getState().isStreaming).toBe(true);
-      expect(store.getState().messages).toEqual([]);
+      expect(store.getState().previewUrl).toBeNull();
     });
 
     it('notifies subscribers on state change', async () => {
@@ -114,25 +111,10 @@ describe('createProjectStore', () => {
 
       store.subscribe(listener);
 
-      // Simulate rapid WebSocket messages arriving
+      // Simulate rapid state changes
       store.setState({ isStreaming: true });
       store.setState({ previewStatus: 'building' });
-      store.setState({
-        messages: [{ ts: 1, type: 'user', text: 'msg1', partial: false }],
-      });
-      store.setState({
-        messages: [
-          { ts: 1, type: 'user', text: 'msg1', partial: false },
-          { ts: 2, type: 'assistant', text: 'msg2', partial: false },
-        ],
-      });
-      store.setState({
-        messages: [
-          { ts: 1, type: 'user', text: 'msg1', partial: false },
-          { ts: 2, type: 'assistant', text: 'msg2', partial: false },
-          { ts: 3, type: 'assistant', text: 'msg3', partial: false },
-        ],
-      });
+      store.setState({ previewUrl: 'http://preview.example.com' });
 
       // No notifications yet (batched)
       expect(listener).not.toHaveBeenCalled();
@@ -141,7 +123,7 @@ describe('createProjectStore', () => {
       const state = store.getState();
       expect(state.isStreaming).toBe(true);
       expect(state.previewStatus).toBe('building');
-      expect(state.messages).toHaveLength(3);
+      expect(state.previewUrl).toBe('http://preview.example.com');
 
       // After microtask, single notification
       await flushNotifications();
@@ -198,53 +180,6 @@ describe('createProjectStore', () => {
       await flushNotifications();
       expect(listener1).not.toHaveBeenCalled();
       expect(listener2).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('updateMessages', () => {
-    it('updates messages using updater function', () => {
-      const store = createProjectStore(initialState);
-      const newMessage: CloudMessage = {
-        ts: 1000,
-        type: 'user',
-        text: 'Hello',
-        partial: false,
-      };
-
-      store.updateMessages(messages => [...messages, newMessage]);
-
-      expect(store.getState().messages).toEqual([newMessage]);
-    });
-
-    it('notifies subscribers when messages are updated', async () => {
-      const store = createProjectStore(initialState);
-      const listener = jest.fn();
-
-      store.subscribe(listener);
-      store.updateMessages(messages => [
-        ...messages,
-        { ts: 1000, type: 'user', text: 'Hi', partial: false },
-      ]);
-
-      await flushNotifications();
-      expect(listener).toHaveBeenCalledTimes(1);
-    });
-
-    it('allows transforming existing messages', () => {
-      const existingMessages: CloudMessage[] = [
-        { ts: 1000, type: 'assistant', text: 'Hello', partial: true },
-      ];
-      const store = createProjectStore({ ...initialState, messages: existingMessages });
-
-      store.updateMessages(messages =>
-        messages.map(msg =>
-          msg.ts === 1000 ? { ...msg, text: 'Hello World', partial: false } : msg
-        )
-      );
-
-      const updatedMessages = store.getState().messages;
-      expect(updatedMessages[0].text).toBe('Hello World');
-      expect(updatedMessages[0].partial).toBe(false);
     });
   });
 });

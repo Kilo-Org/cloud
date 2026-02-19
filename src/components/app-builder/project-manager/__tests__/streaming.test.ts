@@ -1,18 +1,22 @@
 /**
- * Streaming Module Tests
+ * V1 Streaming Module Tests
  *
- * Tests for the WebSocket-based streaming coordinator.
+ * Tests for the V1 WebSocket-based streaming coordinator.
  */
 
-import { createStreamingCoordinator, formatStreamError } from '../streaming';
-import type { StreamingConfig, ProjectStore, ProjectState } from '../types';
+import {
+  createV1StreamingCoordinator,
+  type V1StreamingConfig,
+  type V1StreamingCoordinator,
+} from '../sessions/v1/streaming';
+import { formatStreamError } from '../logging';
+import type { V1SessionState } from '../sessions/types';
 import type { CloudMessage } from '@/components/cloud-agent/types';
-import type { StreamingCoordinatorConfig } from '../streaming';
 import { TRPCClientError } from '@trpc/client';
 
-// Mock the websocket-streaming module
-jest.mock('../websocket-streaming', () => ({
-  createWebSocketStreamingCoordinator: jest.fn(() => ({
+// Mock the V1 websocket-streaming module
+jest.mock('../sessions/v1/websocket-streaming', () => ({
+  createV1WebSocketStreamingCoordinator: jest.fn(() => ({
     connectToStream: jest.fn().mockResolvedValue(undefined),
     interrupt: jest.fn(),
     destroy: jest.fn(),
@@ -24,33 +28,32 @@ jest.mock('../websocket-streaming', () => ({
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-// Helper to create a mock store for testing
-function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, unknown>> } {
+// Helper to create a mock V1 session store for testing
+function createMockStore(): {
+  getState: () => V1SessionState;
+  setState: jest.Mock;
+  subscribe: jest.Mock;
+  updateMessages: jest.Mock;
+  stateUpdates: Array<Record<string, unknown>>;
+} {
   const stateUpdates: Array<Record<string, unknown>> = [];
   let messages: CloudMessage[] = [];
-  let currentState: Omit<ProjectState, 'messages'> = {
-    isStreaming: false,
-    isInterrupting: false,
-    previewUrl: null,
-    previewStatus: 'idle',
-    deploymentId: null,
-    model: 'anthropic/claude-sonnet-4',
-    currentIframeUrl: null,
-    gitRepoFullName: null,
-  };
+  let isStreaming = false;
 
   return {
     stateUpdates,
-    getState: (): ProjectState => ({ ...currentState, messages }),
-    setState: jest.fn((partial: Partial<ProjectState>) => {
+    getState: () => ({ messages, isStreaming }),
+    setState: jest.fn((partial: Partial<V1SessionState>) => {
       stateUpdates.push(partial);
-      currentState = { ...currentState, ...partial };
-      if (partial.messages) {
+      if ('messages' in partial && partial.messages) {
         messages = partial.messages;
+      }
+      if ('isStreaming' in partial && partial.isStreaming !== undefined) {
+        isStreaming = partial.isStreaming;
       }
     }),
     subscribe: jest.fn(() => () => {}),
-    updateMessages: jest.fn(updater => {
+    updateMessages: jest.fn((updater: (msgs: CloudMessage[]) => CloudMessage[]) => {
       messages = updater(messages);
     }),
   };
@@ -69,6 +72,9 @@ function createMockTrpcClient() {
       interruptSession: {
         mutate: jest.fn(async () => ({ success: true })),
       },
+      prepareLegacySession: {
+        mutate: jest.fn(async () => ({ cloudAgentSessionId: 'session-123' })),
+      },
     },
     organizations: {
       appBuilder: {
@@ -81,12 +87,15 @@ function createMockTrpcClient() {
         interruptSession: {
           mutate: jest.fn(async () => ({ success: true })),
         },
+        prepareLegacySession: {
+          mutate: jest.fn(async () => ({ cloudAgentSessionId: 'session-456' })),
+        },
       },
     },
   };
 }
 
-describe('createStreamingCoordinator (WebSocket)', () => {
+describe('createV1StreamingCoordinator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetch.mockReset();
@@ -94,10 +103,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
 
   describe('Configuration', () => {
     it('requires cloudAgentSessionId in config', () => {
-      const config: StreamingCoordinatorConfig = {
+      const config: V1StreamingConfig = {
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: createMockTrpcClient() as unknown as StreamingConfig['trpcClient'],
+        trpcClient: createMockTrpcClient() as unknown as V1StreamingConfig['trpcClient'],
         store: createMockStore(),
         cloudAgentSessionId: 'session-123',
         sessionPrepared: true,
@@ -107,10 +116,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
     });
 
     it('accepts null cloudAgentSessionId for new projects', () => {
-      const config: StreamingCoordinatorConfig = {
+      const config: V1StreamingConfig = {
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: createMockTrpcClient() as unknown as StreamingConfig['trpcClient'],
+        trpcClient: createMockTrpcClient() as unknown as V1StreamingConfig['trpcClient'],
         store: createMockStore(),
         cloudAgentSessionId: null,
         sessionPrepared: null,
@@ -125,10 +134,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -151,10 +160,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: 'org-123',
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -177,10 +186,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -200,10 +209,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -214,32 +223,14 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       expect(store.stateUpdates).toContainEqual({ isStreaming: true });
     });
 
-    it('updates model when provided', () => {
-      const store = createMockStore();
-      const trpcClient = createMockTrpcClient();
-
-      const coordinator = createStreamingCoordinator({
-        projectId: 'project-1',
-        organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
-        store,
-        cloudAgentSessionId: null,
-        sessionPrepared: true,
-      });
-
-      coordinator.sendMessage('Hello!', undefined, 'openai/gpt-4o');
-
-      expect(store.stateUpdates).toContainEqual({ isStreaming: true, model: 'openai/gpt-4o' });
-    });
-
     it('does not send when destroyed', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -256,10 +247,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const trpcClient = createMockTrpcClient();
       const images = { path: 'app-builder/msg-123', files: ['image1.png'] };
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -283,10 +274,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -305,10 +296,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: 'org-123',
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -328,10 +319,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -346,10 +337,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -367,10 +358,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -389,10 +380,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: 'org-123',
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -408,14 +399,14 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       });
     });
 
-    it('sets isStreaming to false and isInterrupting to true', () => {
+    it('sets isStreaming to false', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -423,17 +414,17 @@ describe('createStreamingCoordinator (WebSocket)', () => {
 
       coordinator.interrupt();
 
-      expect(store.stateUpdates).toContainEqual({ isStreaming: false, isInterrupting: true });
+      expect(store.stateUpdates).toContainEqual({ isStreaming: false });
     });
 
     it('does not interrupt when destroyed', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -447,40 +438,39 @@ describe('createStreamingCoordinator (WebSocket)', () => {
   });
 
   describe('connectToExistingSession', () => {
-    it('sets isStreaming to true', async () => {
+    it('sets isStreaming to true', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
       });
 
-      // connectToExistingSession will try to connect to WebSocket
-      await coordinator.connectToExistingSession('session-123');
+      coordinator.connectToExistingSession('session-123');
 
       expect(store.stateUpdates).toContainEqual({ isStreaming: true });
     });
 
-    it('does not connect when destroyed', async () => {
+    it('does not connect when destroyed', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
       });
 
       coordinator.destroy();
-      await coordinator.connectToExistingSession('session-123');
+      coordinator.connectToExistingSession('session-123');
 
       // Should not set isStreaming when destroyed
       const streamingUpdates = store.stateUpdates.filter(u => 'isStreaming' in u);
@@ -493,10 +483,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,
@@ -518,10 +508,10 @@ describe('createStreamingCoordinator (WebSocket)', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
-      const coordinator = createStreamingCoordinator({
+      const coordinator = createV1StreamingCoordinator({
         projectId: 'project-1',
         organizationId: null,
-        trpcClient: trpcClient as unknown as StreamingConfig['trpcClient'],
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
         sessionPrepared: true,

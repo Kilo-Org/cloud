@@ -11,7 +11,6 @@ import type { PreviewPollingConfig, ProjectStore, ProjectState } from '../types'
 function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, unknown>> } {
   const stateUpdates: Array<Record<string, unknown>> = [];
   let currentState: ProjectState = {
-    messages: [],
     isStreaming: false,
     isInterrupting: false,
     previewUrl: null,
@@ -20,6 +19,7 @@ function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, 
     model: 'anthropic/claude-sonnet-4',
     currentIframeUrl: null,
     gitRepoFullName: null,
+    sessions: [],
   };
 
   return {
@@ -30,7 +30,6 @@ function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, 
       currentState = { ...currentState, ...partial };
     }),
     subscribe: jest.fn(() => () => {}),
-    updateMessages: jest.fn(),
   };
 }
 

@@ -52,6 +52,23 @@ export type SendMessageInput = {
 };
 
 /**
+ * Worker version for cloud agent sessions
+ */
+export type WorkerVersion = 'v1' | 'v2';
+
+/**
+ * Session info returned with project data
+ */
+export type ProjectSessionInfo = {
+  id: string;
+  cloud_agent_session_id: string;
+  worker_version: WorkerVersion;
+  created_at: string;
+  ended_at: string | null;
+  reason: string;
+};
+
+/**
  * Result of deploying a project
  */
 export type DeployProjectResult =
@@ -63,6 +80,8 @@ export type DeployProjectResult =
  */
 export type ProjectWithMessages = AppBuilderProject & {
   messages: CloudMessage[];
+  /** All sessions for this project, ordered by created_at ascending */
+  sessions: ProjectSessionInfo[];
   /**
    * Whether the cloud agent session has been initiated (already started streaming).
    * - false: Session is prepared but not yet initiated (need to call startSessionForProject)

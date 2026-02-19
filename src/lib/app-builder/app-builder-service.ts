@@ -5,6 +5,12 @@ import {
   type InterruptResult,
   type InitiateSessionV2Output,
 } from '@/lib/cloud-agent/cloud-agent-client';
+import {
+  createAppBuilderCloudAgentNextClient,
+  type InterruptResult as InterruptResultV2,
+  type InitiateSessionOutput as InitiateSessionV2OutputNext,
+} from '@/lib/cloud-agent-next/cloud-agent-client';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import * as appBuilderClient from '@/lib/app-builder/app-builder-client';
 import { APP_BUILDER_APPEND_SYSTEM_PROMPT } from '@/lib/app-builder/constants';
 import { db } from '@/lib/drizzle';
@@ -15,7 +21,7 @@ import {
   cliSessions,
 } from '@/db/schema';
 import { TRPCError } from '@trpc/server';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, asc } from 'drizzle-orm';
 import type { CloudMessage } from '@/components/cloud-agent/types';
 import { APP_BUILDER_URL } from '@/lib/config.server';
 import { createDeployment, getDeployment } from '@/lib/user-deployments/deployments-service';
@@ -30,6 +36,8 @@ import type {
   SendMessageInput,
   DeployProjectResult,
   ProjectWithMessages,
+  ProjectSessionInfo,
+  WorkerVersion,
 } from '@/lib/app-builder/types';
 
 export type {
@@ -63,6 +71,83 @@ export type {
 function getProjectGitUrl(projectId: string): string {
   return `${APP_BUILDER_URL}/apps/${projectId}.git`;
 }
+
+/**
+ * Parse and validate a worker_version string from the database.
+ * Returns null for unknown/invalid values rather than throwing.
+ */
+function parseWorkerVersion(value: string | null): WorkerVersion | null {
+  if (value === 'v1' || value === 'v2') return value;
+  return null;
+}
+
+/**
+ * Feature flag name for cloud-agent-next usage in App Builder.
+ */
+const APP_BUILDER_USE_CLOUD_AGENT_NEXT_FLAG = 'APP_BUILDER_USE_CLOUD_AGENT_NEXT';
+
+/**
+ * Check if new sessions should use cloud-agent-next (v2).
+ */
+async function shouldUseCloudAgentNext(): Promise<boolean> {
+  return isFeatureFlagEnabled(APP_BUILDER_USE_CLOUD_AGENT_NEXT_FLAG);
+}
+
+/**
+ * Get the required worker version based on the feature flag.
+ */
+async function getRequiredWorkerVersion(): Promise<WorkerVersion> {
+  return (await shouldUseCloudAgentNext()) ? 'v2' : 'v1';
+}
+
+/**
+ * Fetch all sessions for a project, ordered by created_at ascending.
+ */
+async function getProjectSessions(projectId: string): Promise<ProjectSessionInfo[]> {
+  const rows = await db
+    .select({
+      id: app_builder_project_sessions.id,
+      cloud_agent_session_id: app_builder_project_sessions.cloud_agent_session_id,
+      worker_version: app_builder_project_sessions.worker_version,
+      created_at: app_builder_project_sessions.created_at,
+      ended_at: app_builder_project_sessions.ended_at,
+      reason: app_builder_project_sessions.reason,
+    })
+    .from(app_builder_project_sessions)
+    .where(eq(app_builder_project_sessions.project_id, projectId))
+    .orderBy(asc(app_builder_project_sessions.created_at));
+
+  return rows.map(row => ({
+    id: row.id,
+    cloud_agent_session_id: row.cloud_agent_session_id,
+    worker_version: parseWorkerVersion(row.worker_version) ?? 'v1',
+    created_at: row.created_at,
+    ended_at: row.ended_at,
+    reason: row.reason,
+  }));
+}
+
+/**
+ * Get the current (active) session's worker version for a project.
+ * Returns null if no active session exists.
+ */
+async function getCurrentSessionWorkerVersion(
+  projectSessionId: string
+): Promise<WorkerVersion | null> {
+  const [row] = await db
+    .select({ worker_version: app_builder_project_sessions.worker_version })
+    .from(app_builder_project_sessions)
+    .where(eq(app_builder_project_sessions.cloud_agent_session_id, projectSessionId))
+    .limit(1);
+
+  if (!row) return null;
+  return parseWorkerVersion(row.worker_version);
+}
+
+/**
+ * Union type for interrupt results from v1 and v2 clients.
+ */
+type AnyInterruptResult = InterruptResult | InterruptResultV2;
 
 export { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
 import { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
@@ -101,25 +186,43 @@ export async function createProject(input: CreateProjectInput): Promise<CreatePr
       template: template,
     });
 
-    // Prepare the cloud agent session
-    const client = createAppBuilderCloudAgentClient(authToken);
+    // Determine which worker version to use based on feature flag
+    const workerVersion = await getRequiredWorkerVersion();
+
     const gitUrl = getProjectGitUrl(projectId);
     const { token: gitToken } = await appBuilderClient.generateGitToken(projectId, 'full');
 
-    const { cloudAgentSessionId } = await client.prepareSession({
+    const sharedParams = {
       gitUrl,
       gitToken,
       prompt,
-      mode: mode ?? 'code',
       model,
-      upstreamBranch: 'main',
+      upstreamBranch: 'main' as const,
       autoCommit: true,
       setupCommands: ['bun install'],
       kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
       images,
       appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
       createdOnPlatform: 'app-builder',
-    });
+    };
+
+    let cloudAgentSessionId: string;
+
+    if (workerVersion === 'v2') {
+      const client = createAppBuilderCloudAgentNextClient(authToken);
+      const result = await client.prepareSession({
+        ...sharedParams,
+        mode: mode === 'ask' ? 'plan' : 'build',
+      });
+      cloudAgentSessionId = result.cloudAgentSessionId;
+    } else {
+      const client = createAppBuilderCloudAgentClient(authToken);
+      const result = await client.prepareSession({
+        ...sharedParams,
+        mode: mode ?? 'code',
+      });
+      cloudAgentSessionId = result.cloudAgentSessionId;
+    }
 
     // Save session ID and track it atomically
     await db.transaction(async tx => {
@@ -132,6 +235,7 @@ export async function createProject(input: CreateProjectInput): Promise<CreatePr
         project_id: projectId,
         cloud_agent_session_id: cloudAgentSessionId,
         reason: AppBuilderSessionReason.Initial,
+        worker_version: workerVersion,
       });
     });
 
@@ -197,6 +301,9 @@ export async function getProject(
 ): Promise<ProjectWithMessages> {
   const project = await getProjectWithOwnershipCheck(projectId, owner);
 
+  // Fetch all sessions for this project
+  const sessions = await getProjectSessions(projectId);
+
   // Determine session state by checking cloud-agent
   let sessionInitiated: boolean | null = null;
   let sessionPrepared: boolean | null = null;
@@ -204,42 +311,61 @@ export async function getProject(
 
   if (project.session_id) {
     try {
-      const client = createAppBuilderCloudAgentClient(authToken);
-      const sessionState = await client.getSession(project.session_id);
+      // Determine which client to use based on the current session's worker version
+      const currentWorkerVersion = await getCurrentSessionWorkerVersion(project.session_id);
 
-      // Session is prepared if preparedAt timestamp is set
-      sessionPrepared = sessionState.preparedAt != null;
-      // Session is initiated if initiatedAt timestamp is set
-      sessionInitiated = sessionState.initiatedAt != null;
+      if (currentWorkerVersion === 'v2') {
+        // V2 session: get state from cloud-agent-next
+        const v2Client = createAppBuilderCloudAgentNextClient(authToken);
+        const sessionState = await v2Client.getSession(project.session_id);
 
-      // For legacy sessions (not prepared or prepared before 2026-01-22 10:00 UTC), fetch historical messages from R2
-      // New sessions get their messages via WebSocket replay from the DO
-      const migrationCutoffTimestamp = Date.UTC(2026, 0, 22, 10, 0, 0); // 2026-01-22 10:00:00 UTC
-      if (
-        !sessionPrepared ||
-        (sessionState.preparedAt && sessionState.preparedAt < migrationCutoffTimestamp)
-      ) {
-        messages = await getHistoricalMessages(project.session_id);
-      }
+        sessionPrepared = sessionState.preparedAt != null;
+        sessionInitiated = sessionState.initiatedAt != null;
 
-      // For new sessions (not yet initiated), include the initial prompt as first message
-      // This provides instant display when navigating from landing page to project.
-      // Uses say: 'user_feedback' to match WebSocket format for content-based deduplication
-      // (see updateMessage in messages.ts - dedup only triggers for user_feedback messages)
-      if (messages.length === 0 && sessionInitiated === false && sessionState.prompt) {
-        messages = [
-          {
-            ts: sessionState.preparedAt ?? Date.now(),
-            type: 'user',
-            say: 'user_feedback',
-            text: sessionState.prompt,
-            partial: false,
-          },
-        ];
+        // V2 sessions get messages via WebSocket replay, no historical messages needed
+        // For new sessions (not yet initiated), include initial prompt
+        if (messages.length === 0 && sessionInitiated === false && sessionState.prompt) {
+          messages = [
+            {
+              ts: sessionState.preparedAt ?? Date.now(),
+              type: 'user',
+              say: 'user_feedback',
+              text: sessionState.prompt,
+              partial: false,
+            },
+          ];
+        }
+      } else {
+        // V1 session: use old cloud-agent client
+        const v1Client = createAppBuilderCloudAgentClient(authToken);
+        const sessionState = await v1Client.getSession(project.session_id);
+
+        sessionPrepared = sessionState.preparedAt != null;
+        sessionInitiated = sessionState.initiatedAt != null;
+
+        // For legacy sessions (not prepared or prepared before cutoff), fetch historical messages from R2
+        const migrationCutoffTimestamp = Date.UTC(2026, 0, 22, 10, 0, 0);
+        if (
+          !sessionPrepared ||
+          (sessionState.preparedAt && sessionState.preparedAt < migrationCutoffTimestamp)
+        ) {
+          messages = await getHistoricalMessages(project.session_id);
+        }
+
+        // For new sessions (not yet initiated), include the initial prompt as first message
+        if (messages.length === 0 && sessionInitiated === false && sessionState.prompt) {
+          messages = [
+            {
+              ts: sessionState.preparedAt ?? Date.now(),
+              type: 'user',
+              say: 'user_feedback',
+              text: sessionState.prompt,
+              partial: false,
+            },
+          ];
+        }
       }
     } catch {
-      // If we can't reach cloud-agent, default to null (unknown state)
-      // The client can fall back to checking messages in this case
       sessionInitiated = null;
       sessionPrepared = null;
     }
@@ -248,6 +374,7 @@ export async function getProject(
   return {
     ...project,
     messages,
+    sessions,
     sessionInitiated,
     sessionPrepared,
   };
@@ -394,7 +521,7 @@ export async function interruptSession(
   projectId: string,
   owner: Owner,
   authToken: string
-): Promise<InterruptResult> {
+): Promise<AnyInterruptResult> {
   const project = await getProjectWithOwnershipCheck(projectId, owner);
 
   if (!project.session_id) {
@@ -404,8 +531,16 @@ export async function interruptSession(
     });
   }
 
-  const client = createAppBuilderCloudAgentClient(authToken);
-  return client.interruptSession(project.session_id);
+  // Route to the correct cloud agent based on session's worker version
+  const workerVersion = await getCurrentSessionWorkerVersion(project.session_id);
+
+  if (workerVersion === 'v2') {
+    const client = createAppBuilderCloudAgentNextClient(authToken);
+    return client.interruptSession(project.session_id);
+  } else {
+    const client = createAppBuilderCloudAgentClient(authToken);
+    return client.interruptSession(project.session_id);
+  }
 }
 
 // ============================================================================
@@ -420,12 +555,11 @@ export async function interruptSession(
  */
 export async function startSessionForProject(
   input: StartSessionInput
-): Promise<InitiateSessionV2Output> {
+): Promise<InitiateSessionV2Output | InitiateSessionV2OutputNext> {
   const { projectId, owner, authToken } = input;
 
   const project = await getProjectWithOwnershipCheck(projectId, owner);
 
-  // Session should already be prepared during createProject
   if (!project.session_id) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -433,28 +567,53 @@ export async function startSessionForProject(
     });
   }
 
-  // App Builder handles its own billing, skip balance check in cloud-agent
-  const client = createAppBuilderCloudAgentClient(authToken);
+  const workerVersion = await getCurrentSessionWorkerVersion(project.session_id);
 
-  const existingSession = await client.getSession(project.session_id);
-  if (existingSession.initiatedAt) {
-    throw new TRPCError({
-      code: 'CONFLICT',
-      message: 'Session already initiated.',
+  if (workerVersion === 'v2') {
+    // V2: use cloud-agent-next
+    const client = createAppBuilderCloudAgentNextClient(authToken);
+    const sessionState = await client.getSession(project.session_id);
+
+    if (sessionState.initiatedAt) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Session already initiated.',
+      });
+    }
+
+    const result = await client.initiateFromPreparedSession({
+      cloudAgentSessionId: project.session_id,
     });
+
+    return {
+      cloudAgentSessionId: result.cloudAgentSessionId,
+      executionId: result.executionId,
+      status: result.status,
+      streamUrl: result.streamUrl,
+    };
+  } else {
+    // V1: use old cloud-agent
+    const client = createAppBuilderCloudAgentClient(authToken);
+    const existingSession = await client.getSession(project.session_id);
+
+    if (existingSession.initiatedAt) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Session already initiated.',
+      });
+    }
+
+    const result = await client.initiateFromKilocodeSessionV2({
+      cloudAgentSessionId: project.session_id,
+    });
+
+    return {
+      cloudAgentSessionId: result.cloudAgentSessionId,
+      executionId: result.executionId,
+      status: result.status,
+      streamUrl: result.streamUrl,
+    };
   }
-
-  // Initiate the prepared session using V2 mutation (returns immediately)
-  const result = await client.initiateFromKilocodeSessionV2({
-    cloudAgentSessionId: project.session_id,
-  });
-
-  return {
-    cloudAgentSessionId: result.cloudAgentSessionId,
-    executionId: result.executionId,
-    status: result.status,
-    streamUrl: result.streamUrl,
-  };
 }
 
 /**
@@ -465,7 +624,9 @@ export async function startSessionForProject(
  * a new session is created with the GitHub repo. The frontend will receive a different
  * cloudAgentSessionId and should reconnect to the new session's WebSocket.
  */
-export async function sendMessage(input: SendMessageInput): Promise<InitiateSessionV2Output> {
+export async function sendMessage(
+  input: SendMessageInput
+): Promise<InitiateSessionV2Output | InitiateSessionV2OutputNext> {
   const { projectId, owner, message, authToken, images, model } = input;
 
   const project = await getProjectWithOwnershipCheck(projectId, owner);
@@ -490,16 +651,118 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
       .where(eq(app_builder_projects.id, projectId));
   }
 
-  // Create Cloud Agent client - App Builder handles its own billing, skip balance check
+  // Determine current and required worker versions
+  const currentWorkerVersion = await getCurrentSessionWorkerVersion(currentSessionId);
+  const requiredWorkerVersion = await getRequiredWorkerVersion();
+
+  // Auto-upgrade: current session is v1 but flag requires v2
+  if (currentWorkerVersion === 'v1' && requiredWorkerVersion === 'v2') {
+    const v2Client = createAppBuilderCloudAgentNextClient(authToken);
+    const gitUrl = getProjectGitUrl(projectId);
+
+    // Determine git params based on whether project is on GitHub
+    let prepareParams: Parameters<typeof v2Client.prepareSession>[0];
+
+    if (project.git_repo_full_name) {
+      prepareParams = {
+        githubRepo: project.git_repo_full_name,
+        prompt: message,
+        mode: 'build',
+        model: effectiveModel,
+        upstreamBranch: 'main',
+        autoCommit: true,
+        setupCommands: ['bun install'],
+        kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
+        images,
+        appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
+      };
+    } else {
+      const { token: gitToken } = await appBuilderClient.generateGitToken(projectId, 'full');
+      prepareParams = {
+        gitUrl,
+        gitToken,
+        prompt: message,
+        mode: 'build',
+        model: effectiveModel,
+        upstreamBranch: 'main',
+        autoCommit: true,
+        setupCommands: ['bun install'],
+        kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
+        images,
+        appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
+      };
+    }
+
+    const { cloudAgentSessionId: newSessionId } = await v2Client.prepareSession(prepareParams);
+
+    const result = await v2Client.initiateFromPreparedSession({
+      cloudAgentSessionId: newSessionId,
+    });
+
+    // Atomically end old session, update project, and record new session
+    await db.transaction(async tx => {
+      await tx
+        .update(app_builder_project_sessions)
+        .set({ ended_at: sql`now()` })
+        .where(eq(app_builder_project_sessions.cloud_agent_session_id, currentSessionId));
+
+      await tx
+        .update(app_builder_projects)
+        .set({ session_id: newSessionId })
+        .where(eq(app_builder_projects.id, projectId));
+
+      await tx.insert(app_builder_project_sessions).values({
+        project_id: projectId,
+        cloud_agent_session_id: newSessionId,
+        reason: AppBuilderSessionReason.Upgrade,
+        worker_version: 'v2',
+      });
+    });
+
+    return {
+      cloudAgentSessionId: newSessionId,
+      executionId: result.executionId,
+      status: result.status,
+      streamUrl: result.streamUrl,
+    };
+  }
+
+  // V2 session: use cloud-agent-next
+  if (currentWorkerVersion === 'v2') {
+    const v2Client = createAppBuilderCloudAgentNextClient(authToken);
+
+    // Generate git token for non-migrated projects
+    let gitToken: string | undefined;
+    if (!project.git_repo_full_name) {
+      const tokenResult = await appBuilderClient.generateGitToken(projectId, 'full');
+      gitToken = tokenResult.token;
+    }
+
+    const result = await v2Client.sendMessage({
+      cloudAgentSessionId: project.session_id,
+      prompt: message,
+      mode: 'build',
+      model: effectiveModel,
+      autoCommit: true,
+      gitToken,
+      images,
+    });
+
+    return {
+      cloudAgentSessionId: result.cloudAgentSessionId,
+      executionId: result.executionId,
+      status: result.status,
+      streamUrl: result.streamUrl,
+    };
+  }
+
+  // V1 session: use old cloud-agent
   const client = createAppBuilderCloudAgentClient(authToken);
 
-  // If project was migrated to GitHub, check if the session still uses the internal
-  // git repo and create a new session pointing at GitHub.
+  // Handle GitHub migration path for v1 sessions
   if (project.git_repo_full_name) {
     const session = await client.getSession(project.session_id);
 
-    // Session was prepared with internal gitUrl, but project is now on GitHub —
-    // create a new session with the GitHub repo
     if (session.gitUrl && !session.githubRepo) {
       const { cloudAgentSessionId: newSessionId } = await client.prepareSession({
         githubRepo: project.git_repo_full_name,
@@ -519,7 +782,6 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
         cloudAgentSessionId: newSessionId,
       });
 
-      // Atomically end old session, update project, and record new session
       await db.transaction(async tx => {
         await tx
           .update(app_builder_project_sessions)
@@ -535,6 +797,7 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
           project_id: projectId,
           cloud_agent_session_id: newSessionId,
           reason: AppBuilderSessionReason.GitHubMigration,
+          worker_version: 'v1',
         });
       });
 
@@ -547,23 +810,20 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
     }
   }
 
-  // Non-migrated project OR session already has githubRepo - use existing flow
-  // For non-migrated projects, generate a fresh internal git token
-  // For migrated projects (session has githubRepo), Cloud Agent handles GitHub token refresh
+  // Non-migrated v1 project - use existing flow
   let gitToken: string | undefined;
   if (!project.git_repo_full_name) {
     const tokenResult = await appBuilderClient.generateGitToken(projectId, 'full');
     gitToken = tokenResult.token;
   }
 
-  // Send message to existing session using V2 mutation (returns immediately)
   const result = await client.sendMessageV2({
     cloudAgentSessionId: project.session_id,
     prompt: message,
     mode: 'code',
     model: effectiveModel,
     autoCommit: true,
-    gitToken, // undefined for migrated projects - Cloud Agent handles GitHub tokens
+    gitToken,
     images,
     condenseOnComplete: true,
   });

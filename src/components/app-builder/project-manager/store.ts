@@ -4,25 +4,24 @@
  * Manages project state using a simple pub/sub pattern.
  * Designed to work with React's useSyncExternalStore.
  *
- * Batches rapid state updates (e.g., from WebSocket reconnect replaying many messages)
+ * Batches rapid state updates (e.g., from session streaming changes)
  * to prevent excessive React re-renders. Updates are batched until the next animation
  * frame, coalescing all changes that happen before the browser paints.
  */
 
-import type { CloudMessage } from '@/components/cloud-agent/types';
 import type { ProjectState, ProjectStore, StateListener } from './types';
 
 /**
  * Creates an initial project state.
+ * Messages and streaming are now per-session — the project store only
+ * holds project-wide state and the sessions array.
  */
 export function createInitialState(
-  messages: CloudMessage[],
   deploymentId: string | null,
   modelId: string | null,
   gitRepoFullName: string | null
 ): ProjectState {
   return {
-    messages,
     isStreaming: false,
     isInterrupting: false,
     previewUrl: null,
@@ -31,6 +30,7 @@ export function createInitialState(
     model: modelId ?? 'anthropic/claude-sonnet-4',
     currentIframeUrl: null,
     gitRepoFullName,
+    sessions: [],
   };
 }
 
@@ -41,7 +41,7 @@ export function createInitialState(
  * until the next animation frame, then a single notification is fired. This works
  * for both:
  * - Multiple calls in the same event loop tick (synchronous)
- * - Multiple calls across event loop ticks (e.g., rapid WebSocket messages)
+ * - Multiple calls across event loop ticks (e.g., rapid session state changes)
  *
  * The batching window ends when the browser is ready to paint, ensuring all updates
  * that arrive before a frame are combined into a single React re-render.
@@ -90,15 +90,9 @@ export function createProjectStore(initialState: ProjectState): ProjectStore {
     };
   }
 
-  function updateMessages(updater: (messages: CloudMessage[]) => CloudMessage[]): void {
-    const newMessages = updater(state.messages);
-    setState({ messages: newMessages });
-  }
-
   return {
     getState,
     setState,
     subscribe,
-    updateMessages,
   };
 }

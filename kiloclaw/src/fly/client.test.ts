@@ -25,63 +25,45 @@ describe('isFlyNotFound', () => {
 });
 
 describe('isFlyInsufficientResources', () => {
-  // -- Capacity signals: should return true --
+  // -- Confirmed production payload --
 
-  it('matches exact production payload (insufficient resources + existing volume)', () => {
+  it('matches production payload: insufficient resources + existing volume', () => {
     const body =
       '{"error":"insufficient resources to create new machine with existing volume \'vol_4y5gkog8p5kj839r\'"}';
     const err = new FlyApiError(`Fly API createMachine failed (412): ${body}`, 412, body);
     expect(isFlyInsufficientResources(err)).toBe(true);
   });
 
-  it('matches insufficient_capacity in json.status field', () => {
-    const body = '{"status":"insufficient_capacity","error":"no hosts available"}';
-    const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
-    expect(isFlyInsufficientResources(err)).toBe(true);
-  });
-
-  it('matches "no capacity" in json.error field', () => {
-    const body = '{"error":"no capacity in region iad"}';
-    const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
-    expect(isFlyInsufficientResources(err)).toBe(true);
-  });
-
-  it('matches "at capacity" in json.error field', () => {
-    const body = '{"error":"host at capacity"}';
-    const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
-    expect(isFlyInsufficientResources(err)).toBe(true);
-  });
-
-  it('matches capacity markers case-insensitively', () => {
+  it('matches capacity marker case-insensitively', () => {
     const body = '{"error":"Insufficient Resources for volume"}';
     const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
     expect(isFlyInsufficientResources(err)).toBe(true);
   });
 
-  it('matches capacity markers in non-JSON body text', () => {
+  it('matches capacity marker in non-JSON body text', () => {
     const body = 'insufficient resources to create machine';
     const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
     expect(isFlyInsufficientResources(err)).toBe(true);
   });
 
-  // -- Version/precondition signals: should return false --
+  // -- Version/precondition 412s: must NOT trigger recovery --
 
-  it('returns false for min_secrets_version mismatch', () => {
-    const body = '{"error":"min_secrets_version 3 is not yet available on this app"}';
-    const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
-    expect(isFlyInsufficientResources(err)).toBe(false);
-  });
+  it('returns false for version/precondition 412s', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-  it('returns false for machine_version mismatch', () => {
-    const body = '{"error":"machine_version mismatch: expected 5, got 4"}';
-    const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
-    expect(isFlyInsufficientResources(err)).toBe(false);
-  });
+    // These are hypothetical but represent the class of 412s we must NOT match
+    const preconditionBodies = [
+      '{"error":"min_secrets_version 3 is not yet available on this app"}',
+      '{"error":"machine_version mismatch: expected 5, got 4"}',
+      '{"error":"precondition failed: current_version does not match"}',
+    ];
 
-  it('returns false for generic precondition failure', () => {
-    const body = '{"error":"precondition failed: current_version does not match"}';
-    const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
-    expect(isFlyInsufficientResources(err)).toBe(false);
+    for (const body of preconditionBodies) {
+      const err = new FlyApiError(`Fly API failed (412): ${body}`, 412, body);
+      expect(isFlyInsufficientResources(err)).toBe(false);
+    }
+
+    warnSpy.mockRestore();
   });
 
   // -- Unclassified 412: should return false and warn --
@@ -99,7 +81,7 @@ describe('isFlyInsufficientResources', () => {
     warnSpy.mockRestore();
   });
 
-  // -- Non-412 and non-FlyApiError: should return false --
+  // -- Non-412 and non-FlyApiError --
 
   it('returns false for non-412 status', () => {
     expect(isFlyInsufficientResources(new FlyApiError('not found', 404, '{}'))).toBe(false);

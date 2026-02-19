@@ -214,14 +214,14 @@ export function isFlyNotFound(err: unknown): boolean {
 /**
  * Capacity-related markers in Fly 412 error bodies. Matched case-insensitively
  * against the JSON body fields (error, status) and raw body text.
+ *
+ * Confirmed from production: "insufficient resources to create new machine
+ * with existing volume 'vol_xxx'"
+ *
+ * Add new markers here when the unclassified-412 warning log reveals new
+ * capacity error formats from Fly.
  */
-const CAPACITY_MARKERS = [
-  'insufficient resources',
-  'insufficient_capacity',
-  'no capacity',
-  'at capacity',
-  'existing volume',
-];
+const CAPACITY_MARKERS = ['insufficient resources'];
 
 /**
  * Check if a Fly API 412 error is specifically a capacity/resource exhaustion

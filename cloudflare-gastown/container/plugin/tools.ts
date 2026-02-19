@@ -1,4 +1,4 @@
-import { tool } from '@opencode-ai/plugin';
+import { tool } from '@kilocode/plugin';
 import type { GastownClient } from './client';
 
 function parseJsonArg(value: string, label: string): unknown {

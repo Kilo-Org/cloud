@@ -1,4 +1,4 @@
-import { tool } from '@opencode-ai/plugin';
+import { tool } from '@kilocode/plugin';
 import type { MayorGastownClient } from './client';
 
 function parseJsonObject(value: string, label: string): Record<string, unknown> {

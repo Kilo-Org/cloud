@@ -1,4 +1,4 @@
-import type { Config } from '@opencode-ai/sdk';
+import type { Config } from '@kilocode/sdk';
 import { writeFile } from 'node:fs/promises';
 import { cloneRepo, createWorktree } from './git-manager';
 import { startAgent } from './process-manager';
@@ -38,7 +38,7 @@ function buildKiloConfigContent(kilocodeToken: string): string {
     // kilo serve v1.0.23 resolves title model independently and the
     // small_model fallback doesn't prevent ProviderModelNotFoundError.
     agent: {
-      build: {
+      code: {
         model: 'anthropic/claude-sonnet-4.6',
         // Auto-approve everything — agents run headless in a container,
         // there's no human to answer permission prompts.
@@ -130,10 +130,16 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     }
   }
 
-  // Build KILO_CONFIG_CONTENT so kilo serve can authenticate LLM calls
+  // Build KILO_CONFIG_CONTENT so kilo serve can authenticate LLM calls.
+  // Must also set OPENCODE_CONFIG_CONTENT — kilo serve checks both names.
   const kilocodeToken = env.KILOCODE_TOKEN;
   if (kilocodeToken) {
-    env.KILO_CONFIG_CONTENT = buildKiloConfigContent(kilocodeToken);
+    const configJson = buildKiloConfigContent(kilocodeToken);
+    env.KILO_CONFIG_CONTENT = configJson;
+    env.OPENCODE_CONFIG_CONTENT = configJson;
+    console.log(`[buildAgentEnv] KILO_CONFIG_CONTENT set (model=${JSON.parse(configJson).model})`);
+  } else {
+    console.warn('[buildAgentEnv] No KILOCODE_TOKEN available — KILO_CONFIG_CONTENT not set');
   }
 
   if (request.envVars) {

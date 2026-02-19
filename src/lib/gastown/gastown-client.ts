@@ -16,6 +16,18 @@ const GastownErrorResponse = z.object({
 // ── Domain schemas ────────────────────────────────────────────────────────
 // Mirror the gastown worker's record schemas for validation at the IO boundary.
 
+function parseJsonOrIssue(v: string, ctx: z.RefinementCtx, label: string): unknown {
+  try {
+    return JSON.parse(v) as unknown;
+  } catch {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${label} is not valid JSON`,
+    });
+    return z.NEVER;
+  }
+}
+
 export const TownSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -50,14 +62,14 @@ export const BeadSchema = z.object({
     z.array(z.string()),
     z
       .string()
-      .transform(v => JSON.parse(v) as unknown)
+      .transform((v, ctx) => parseJsonOrIssue(v, ctx, 'labels'))
       .pipe(z.array(z.string())),
   ]),
   metadata: z.union([
     z.record(z.string(), z.unknown()),
     z
       .string()
-      .transform(v => JSON.parse(v) as unknown)
+      .transform((v, ctx) => parseJsonOrIssue(v, ctx, 'metadata'))
       .pipe(z.record(z.string(), z.unknown())),
   ]),
   created_at: z.string(),
@@ -329,7 +341,7 @@ export const BeadEventSchema = z.object({
     z.record(z.string(), z.unknown()),
     z
       .string()
-      .transform(v => JSON.parse(v) as unknown)
+      .transform((v, ctx) => parseJsonOrIssue(v, ctx, 'event metadata'))
       .pipe(z.record(z.string(), z.unknown())),
   ]),
   created_at: z.string(),

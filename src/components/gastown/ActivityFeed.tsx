@@ -2,6 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { RootRouter } from '@/routers/root-router';
 import { formatDistanceToNow } from 'date-fns';
 import {
   Activity,
@@ -37,6 +39,10 @@ const EVENT_COLORS: Record<string, string> = {
   mail_sent: 'text-sky-500',
 };
 
+type RouterOutputs = inferRouterOutputs<RootRouter>;
+type TownEvent = RouterOutputs['gastown']['getTownEvents'][number];
+type BeadEvent = RouterOutputs['gastown']['getBeadEvents'][number];
+
 function eventDescription(event: {
   event_type: string;
   old_value: string | null;
@@ -71,14 +77,34 @@ function eventDescription(event: {
   }
 }
 
-export function ActivityFeed({ townId }: { townId: string }) {
+function toEventDescriptionInput(event: TownEvent | BeadEvent) {
+  return {
+    event_type: event.event_type,
+    old_value: event.old_value,
+    new_value: event.new_value,
+    metadata: event.metadata,
+    rig_name: 'rig_name' in event ? event.rig_name : undefined,
+  };
+}
+
+type ActivityFeedViewProps = {
+  townId: string;
+  events?: TownEvent[];
+  isLoading?: boolean;
+};
+
+export function ActivityFeedView({ townId, events, isLoading }: ActivityFeedViewProps) {
   const trpc = useTRPC();
-  const { data: events, isLoading } = useQuery({
+  const query = useQuery({
     ...trpc.gastown.getTownEvents.queryOptions({ townId, limit: 50 }),
     refetchInterval: 5000,
+    enabled: events === undefined,
   });
 
-  if (isLoading) {
+  const effectiveEvents = events ?? query.data;
+  const effectiveLoading = isLoading ?? query.isLoading;
+
+  if (effectiveLoading) {
     return (
       <div className="space-y-2 p-3">
         {Array.from({ length: 5 }).map((_, i) => (
@@ -91,7 +117,7 @@ export function ActivityFeed({ townId }: { townId: string }) {
     );
   }
 
-  if (!events?.length) {
+  if (!effectiveEvents?.length) {
     return (
       <div className="text-muted-foreground flex flex-col items-center justify-center p-6 text-sm">
         <Activity className="mb-2 h-8 w-8 opacity-40" />
@@ -101,7 +127,7 @@ export function ActivityFeed({ townId }: { townId: string }) {
   }
 
   // Show newest first
-  const sorted = [...events].reverse();
+  const sorted = [...effectiveEvents].reverse();
 
   return (
     <div className="max-h-[420px] space-y-1 overflow-y-auto p-2">
@@ -117,7 +143,7 @@ export function ActivityFeed({ townId }: { townId: string }) {
             <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-white/85">
-                {eventDescription(event as Parameters<typeof eventDescription>[0])}
+                {eventDescription(toEventDescriptionInput(event))}
               </p>
               <p className="text-xs text-white/40">
                 {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
@@ -128,6 +154,10 @@ export function ActivityFeed({ townId }: { townId: string }) {
       })}
     </div>
   );
+}
+
+export function ActivityFeed({ townId }: { townId: string }) {
+  return <ActivityFeedView townId={townId} />;
 }
 
 export function BeadEventTimeline({ rigId, beadId }: { rigId: string; beadId: string }) {
@@ -165,7 +195,7 @@ export function BeadEventTimeline({ rigId, beadId }: { rigId: string; beadId: st
             <Icon className={`mt-0.5 h-3 w-3 shrink-0 ${color}`} />
             <div className="min-w-0 flex-1">
               <span className="text-foreground">
-                {eventDescription(event as Parameters<typeof eventDescription>[0])}
+                {eventDescription(toEventDescriptionInput(event))}
               </span>
               <span className="text-muted-foreground ml-1">
                 {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}

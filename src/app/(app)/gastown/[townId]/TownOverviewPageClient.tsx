@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateRigDialog } from '@/components/gastown/CreateRigDialog';
 import { MayorChat } from '@/components/gastown/MayorChat';
-import { ActivityFeed } from '@/components/gastown/ActivityFeed';
+import { ActivityFeedView } from '@/components/gastown/ActivityFeed';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
 import { ArrowLeft, Plus, GitBranch, Trash2, Activity, Bot, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -240,7 +240,11 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
             </h2>
             <GastownBackdrop>
               <div className="p-0">
-                <ActivityFeed townId={townId} />
+                <ActivityFeedView
+                  townId={townId}
+                  events={(townEventsQuery.data ?? []).slice(-50)}
+                  isLoading={townEventsQuery.isLoading}
+                />
               </div>
             </GastownBackdrop>
           </div>

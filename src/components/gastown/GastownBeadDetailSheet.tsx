@@ -11,21 +11,13 @@ import {
 } from '@/components/ui/sheet';
 import { BeadEventTimeline } from '@/components/gastown/ActivityFeed';
 import { cn } from '@/lib/utils';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { RootRouter } from '@/routers/root-router';
 import { formatDistanceToNow } from 'date-fns';
 import { Clock, Flag, Hash, Tags, User } from 'lucide-react';
 
-type Bead = {
-  id: string;
-  type: string;
-  status: string;
-  title: string;
-  body: string | null;
-  assignee_agent_id: string | null;
-  priority: string;
-  labels: string[];
-  created_at: string;
-  closed_at: string | null;
-};
+type RouterOutputs = inferRouterOutputs<RootRouter>;
+type Bead = RouterOutputs['gastown']['listBeads'][number];
 
 type GastownBeadDetailSheetProps = {
   open: boolean;

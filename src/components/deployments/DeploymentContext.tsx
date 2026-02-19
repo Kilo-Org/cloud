@@ -6,6 +6,7 @@ import type { DeploymentQueries, DeploymentMutations } from '@/lib/user-deployme
 type DeploymentContextValue = {
   queries: DeploymentQueries;
   mutations: DeploymentMutations;
+  organizationId?: string;
 };
 
 const DeploymentContext = createContext<DeploymentContextValue | null>(null);
@@ -29,14 +30,16 @@ export function useDeploymentQueries() {
 export function DeploymentProvider({
   queries,
   mutations,
+  organizationId,
   children,
 }: {
   queries: DeploymentQueries;
   mutations: DeploymentMutations;
+  organizationId?: string;
   children: ReactNode;
 }) {
   return (
-    <DeploymentContext.Provider value={{ queries, mutations }}>
+    <DeploymentContext.Provider value={{ queries, mutations, organizationId }}>
       {children}
     </DeploymentContext.Provider>
   );

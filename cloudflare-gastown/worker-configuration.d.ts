@@ -17,7 +17,7 @@ declare namespace Cloudflare {
     CF_ACCESS_TEAM: 'engineering-e11';
     CF_ACCESS_AUD: 'f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809';
     KILO_API_URL: 'https://api.kilo.ai';
-    GASTOWN_API_URL: 'http://localhost:8787';
+    GASTOWN_API_URL: 'http://host.docker.internal:8787';
     RIG: DurableObjectNamespace<import('./src/gastown.worker').RigDO>;
     GASTOWN_USER: DurableObjectNamespace<import('./src/gastown.worker').GastownUserDO>;
     AGENT_IDENTITY: DurableObjectNamespace<import('./src/gastown.worker').AgentIdentityDO>;
@@ -30,7 +30,7 @@ declare namespace Cloudflare {
     CF_ACCESS_TEAM: 'engineering-e11';
     CF_ACCESS_AUD: 'f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809';
     KILO_API_URL: 'https://api.kilo.ai';
-    GASTOWN_API_URL: 'http://localhost:8787' | 'https://gastown.kiloapps.io';
+    GASTOWN_API_URL: 'http://host.docker.internal:8787' | 'https://gastown.kiloapps.io';
     RIG: DurableObjectNamespace<import('./src/gastown.worker').RigDO>;
     GASTOWN_USER: DurableObjectNamespace<import('./src/gastown.worker').GastownUserDO>;
     AGENT_IDENTITY: DurableObjectNamespace<import('./src/gastown.worker').AgentIdentityDO>;

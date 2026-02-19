@@ -23,13 +23,14 @@ RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64
 RUN mkdir -p /workspace/rigs /app
 
 # ── Gastown plugin ──────────────────────────────────────────────────
-# Install the plugin as a global opencode plugin so kilo serve always
-# loads it regardless of which repo is cloned into the worktree.
-# OpenCode scans ~/.config/opencode/plugins/ (plural) for local plugins.
+# OpenCode discovers local plugins by scanning {plugin,plugins}/*.{ts,js}
+# inside each config directory. We install deps into the plugin source
+# dir then symlink the entry-point file so the glob finds it. Relative
+# imports in index.ts resolve via the symlink's real path (/opt/…).
 COPY plugin/ /opt/gastown-plugin/
 RUN cd /opt/gastown-plugin && npm install --omit=dev && \
     mkdir -p /root/.config/opencode/plugins && \
-    ln -s /opt/gastown-plugin /root/.config/opencode/plugins/opencode-gastown
+    ln -s /opt/gastown-plugin/index.ts /root/.config/opencode/plugins/gastown.ts
 
 WORKDIR /app
 

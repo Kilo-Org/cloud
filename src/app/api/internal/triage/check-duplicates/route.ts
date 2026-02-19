@@ -18,6 +18,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getTriageTicketById, updateTriageTicketStatus } from '@/lib/auto-triage/db/triage-tickets';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
@@ -30,11 +31,11 @@ const COLLECTION_NAME = 'auto_triage_tickets';
 const SIMILARITY_THRESHOLD = 0.8; // Adjusted for Mistral embeddings
 const SEARCH_LIMIT = 5;
 
-type CheckDuplicatesRequest = {
-  ticketId: string;
-  threshold?: number;
-  limit?: number;
-};
+const checkDuplicatesRequestSchema = z.object({
+  ticketId: z.string().uuid(),
+  threshold: z.number().min(0).max(1).optional(),
+  limit: z.number().int().positive().max(20).optional(),
+});
 
 type SimilarTicket = {
   ticketId: string;
@@ -175,13 +176,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body: CheckDuplicatesRequest = await req.json();
-    const { ticketId, threshold = SIMILARITY_THRESHOLD, limit = SEARCH_LIMIT } = body;
-
-    // Validate payload
-    if (!ticketId) {
-      return NextResponse.json({ error: 'Missing required field: ticketId' }, { status: 400 });
+    const parseResult = checkDuplicatesRequestSchema.safeParse(await req.json());
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: parseResult.error.flatten().fieldErrors },
+        { status: 400 }
+      );
     }
+    const { ticketId, threshold = SIMILARITY_THRESHOLD, limit = SEARCH_LIMIT } = parseResult.data;
 
     logExceptInTest('[check-duplicates] Checking for duplicates', {
       ticketId,

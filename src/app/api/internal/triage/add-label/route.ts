@@ -25,7 +25,8 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 
 const addLabelRequestSchema = z.object({
   ticketId: z.string().uuid(),
-  labels: z.array(z.string()).min(1),
+  // GitHub label names max 50 chars; cap array size to prevent abuse
+  labels: z.array(z.string().min(1).max(50)).min(1).max(20),
 });
 
 export async function POST(req: NextRequest) {

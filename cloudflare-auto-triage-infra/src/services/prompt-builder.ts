@@ -4,6 +4,17 @@
  * Builds prompt templates for classification.
  */
 
+/** Max characters of issue body to include in the prompt */
+const MAX_ISSUE_BODY_LENGTH = 32_000;
+
+/**
+ * Neutralize XML-like closing tags that match our prompt delimiters.
+ * Replaces e.g. `</issue_body>` with `&lt;/issue_body&gt;` so an attacker
+ * cannot escape the delimited region.
+ */
+const neutralizeXmlDelimiters = (text: string): string =>
+  text.replace(/<\/(issue_title|issue_body|custom_instructions)\s*>/gi, '&lt;/$1&gt;');
+
 type IssueInfo = {
   repoFullName: string;
   issueNumber: number;
@@ -23,7 +34,11 @@ export const buildClassificationPrompt = (
   config: ClassificationConfig,
   availableLabels: string[]
 ): string => {
-  const { repoFullName, issueNumber, issueTitle, issueBody } = issueInfo;
+  const { repoFullName, issueNumber } = issueInfo;
+  const issueTitle = neutralizeXmlDelimiters(issueInfo.issueTitle);
+  const issueBody = issueInfo.issueBody
+    ? neutralizeXmlDelimiters(issueInfo.issueBody).slice(0, MAX_ISSUE_BODY_LENGTH)
+    : null;
 
   const labelList = availableLabels.map(l => `- "${l}"`).join('\n');
 

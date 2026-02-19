@@ -87,6 +87,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/mdx": "^2.0.13",
     "@uiw/react-json-view": "2.0.0-alpha.39",
+    "@vercel/edge-config": "^1.4.3",
     "@vercel/functions": "^3.3.3",
     "@vercel/otel": "^2.1.0",
     "@workos-inc/node": "^8.0.0",

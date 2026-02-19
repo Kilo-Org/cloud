@@ -1,4 +1,5 @@
 import type { BYOKResult } from '@/lib/byok';
+import { isUniversalVercelRoutingEnabled } from '@/lib/edge-config';
 import { kiloFreeModels } from '@/lib/models';
 import { isAnthropicModel, isOpusModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
@@ -17,12 +18,6 @@ import type {
 } from '@/lib/providers/openrouter/types';
 import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
-
-// EMERGENCY SWITCH
-// This routes all models that normally would be routed to OpenRouter to Vercel instead.
-// Many of these models are not available, named differently or not tested on Vercel.
-// Only use when OpenRouter is down and automatic failover is not working adequately.
-const ENABLE_UNIVERSAL_VERCEL_ROUTING = false;
 
 const VERCEL_ROUTING_ALLOW_LIST = [
   'arcee-ai/trinity-large-preview:free',
@@ -79,7 +74,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (ENABLE_UNIVERSAL_VERCEL_ROUTING && isOpenRouterModel(requestedModel)) {
+  if ((await isUniversalVercelRoutingEnabled()) && isOpenRouterModel(requestedModel)) {
     console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
     return true;
   }

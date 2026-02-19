@@ -1,6 +1,7 @@
 import type { Plugin } from '@opencode-ai/plugin';
-import { createClientFromEnv, GastownApiError } from './client';
+import { createClientFromEnv, createMayorClientFromEnv, GastownApiError } from './client';
 import { createTools } from './tools';
+import { createMayorTools } from './mayor-tools';
 
 const SERVICE = 'gastown-plugin';
 
@@ -17,8 +18,16 @@ function formatPrimeContextForInjection(primeResult: string): string {
 }
 
 export const GastownPlugin: Plugin = async ({ client }) => {
-  const gastownClient = createClientFromEnv();
-  const tools = createTools(gastownClient);
+  const isMayor = process.env.GASTOWN_AGENT_ROLE === 'mayor';
+
+  // Mayor gets town-scoped tools; rig agents get rig-scoped tools.
+  // The mayor doesn't have a rigId — it operates across rigs.
+  const gastownClient = isMayor ? null : createClientFromEnv();
+  const mayorClient = isMayor ? createMayorClientFromEnv() : null;
+
+  const rigTools = gastownClient ? createTools(gastownClient) : {};
+  const mayorTools = mayorClient ? createMayorTools(mayorClient) : {};
+  const tools = { ...rigTools, ...mayorTools };
 
   // Best-effort logging — never let telemetry failures break tool execution
   async function log(level: 'info' | 'error', message: string) {
@@ -29,8 +38,9 @@ export const GastownPlugin: Plugin = async ({ client }) => {
     }
   }
 
-  // Prime on session start and inject into context
-  async function primeAndLog(): Promise<string> {
+  // Prime on session start and inject context (rig agents only — mayor has no prime)
+  async function primeAndLog(): Promise<string | null> {
+    if (!gastownClient) return null;
     try {
       const ctx = await gastownClient.prime();
       await log('info', 'primed successfully');
@@ -46,7 +56,7 @@ export const GastownPlugin: Plugin = async ({ client }) => {
     tool: tools,
 
     event: async ({ event }) => {
-      if (event.type === 'session.deleted') {
+      if (event.type === 'session.deleted' && gastownClient) {
         // Notify Rig DO that session ended — best-effort, don't throw
         try {
           await gastownClient.writeCheckpoint({
@@ -61,20 +71,23 @@ export const GastownPlugin: Plugin = async ({ client }) => {
       }
     },
 
-    // Inject prime context into the system prompt on the first message
+    // Inject prime context into the system prompt on the first message (rig agents only)
     'experimental.chat.system.transform': async (_input, output) => {
-      // Only inject once — check if already present
       const alreadyInjected = output.system.some(s => s.includes('GASTOWN CONTEXT'));
       if (!alreadyInjected) {
         const primeResult = await primeAndLog();
-        output.system.push(formatPrimeContextForInjection(primeResult));
+        if (primeResult) {
+          output.system.push(formatPrimeContextForInjection(primeResult));
+        }
       }
     },
 
-    // Re-inject prime context after compaction so the agent doesn't lose orientation
+    // Re-inject prime context after compaction (rig agents only)
     'experimental.session.compacting': async (_input, output) => {
       const primeResult = await primeAndLog();
-      output.context.push(formatPrimeContextForInjection(primeResult));
+      if (primeResult) {
+        output.context.push(formatPrimeContextForInjection(primeResult));
+      }
     },
   };
 };

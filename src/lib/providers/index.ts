@@ -250,10 +250,14 @@ function applyPreferredProvider(
   console.debug(
     `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProvider}`
   );
+  let providerOrder: string[] = [preferredProvider];
+  if (requestedModel.startsWith('z-ai/')) {
+    providerOrder = ['z-ai', 'novita'];
+  }
   if (!requestToMutate.provider) {
-    requestToMutate.provider = { order: [preferredProvider] };
+    requestToMutate.provider = { order: providerOrder };
   } else if (!requestToMutate.provider.order) {
-    requestToMutate.provider.order = [preferredProvider];
+    requestToMutate.provider.order = providerOrder;
   }
 }
 

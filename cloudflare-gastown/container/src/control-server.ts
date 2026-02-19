@@ -97,12 +97,10 @@ app.get('/agents/:agentId/status', c => {
 // GET /agents/:agentId/events?after=N
 // Returns buffered events for the agent, optionally after a given event id.
 // Used by the TownContainerDO to poll for events and relay them to WebSocket clients.
+// Does NOT 404 for unknown agents — returns an empty array so the poller
+// can keep trying while the agent is starting up.
 app.get('/agents/:agentId/events', c => {
   const { agentId } = c.req.param();
-  if (!getAgentStatus(agentId)) {
-    return c.json({ error: `Agent ${agentId} not found` }, 404);
-  }
-
   const afterParam = c.req.query('after');
   const afterId = afterParam ? parseInt(afterParam, 10) : 0;
   const events = getAgentEvents(agentId, afterId);
@@ -110,11 +108,11 @@ app.get('/agents/:agentId/events', c => {
 });
 
 // POST /agents/:agentId/stream-ticket
+// Issues a one-time-use stream ticket for the agent. Does NOT require
+// the agent to be registered yet — tickets can be issued optimistically
+// so the frontend can connect a WebSocket before the agent finishes starting.
 app.post('/agents/:agentId/stream-ticket', c => {
   const { agentId } = c.req.param();
-  if (!getAgentStatus(agentId)) {
-    return c.json({ error: `Agent ${agentId} not found` }, 404);
-  }
 
   const ticket = crypto.randomUUID();
   const expiresAt = Date.now() + 60_000;

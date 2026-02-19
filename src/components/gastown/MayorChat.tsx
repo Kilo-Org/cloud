@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/Button';
 import { toast } from 'sonner';
 import { Send, Radio } from 'lucide-react';
+import { AgentStream } from './AgentStream';
 
 type MayorChatProps = {
   townId: string;
@@ -74,41 +75,55 @@ export function MayorChat({ townId }: MayorChatProps) {
   };
 
   const session = statusQuery.data?.session;
+  const [showStream, setShowStream] = useState(true);
+
+  // Show the agent stream when the mayor has an active session
+  const mayorAgentId =
+    session && (session.status === 'active' || session.status === 'starting')
+      ? session.agentId
+      : null;
 
   return (
-    <Card className="border-gray-700">
-      <CardContent className="p-4">
-        {/* Status indicator */}
-        {session && (
-          <div className="mb-3 flex items-center justify-between text-sm">
-            <SessionStatusBadge status={session.status} />
-            <span className="text-xs text-gray-500">
-              Last activity: {new Date(session.lastActivityAt).toLocaleTimeString()}
-            </span>
-          </div>
-        )}
+    <div className="space-y-4">
+      <Card className="border-gray-700">
+        <CardContent className="p-4">
+          {/* Status indicator */}
+          {session && (
+            <div className="mb-3 flex items-center justify-between text-sm">
+              <SessionStatusBadge status={session.status} />
+              <span className="text-xs text-gray-500">
+                Last activity: {new Date(session.lastActivityAt).toLocaleTimeString()}
+              </span>
+            </div>
+          )}
 
-        {/* Message input */}
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            placeholder="Send a message to the Mayor..."
-            disabled={sendMessage.isPending}
-            className="flex-1"
-          />
-          <Button
-            variant="primary"
-            size="md"
-            type="submit"
-            disabled={!message.trim() || sendMessage.isPending}
-            className="gap-2"
-          >
-            <Send className="size-4" />
-            {sendMessage.isPending ? 'Sending...' : 'Send'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+          {/* Message input */}
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <Input
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              placeholder="Send a message to the Mayor..."
+              disabled={sendMessage.isPending}
+              className="flex-1"
+            />
+            <Button
+              variant="primary"
+              size="md"
+              type="submit"
+              disabled={!message.trim() || sendMessage.isPending}
+              className="gap-2"
+            >
+              <Send className="size-4" />
+              {sendMessage.isPending ? 'Sending...' : 'Send'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Mayor agent stream — shows live events when the mayor is working */}
+      {mayorAgentId && showStream && (
+        <AgentStream townId={townId} agentId={mayorAgentId} onClose={() => setShowStream(false)} />
+      )}
+    </div>
   );
 }

@@ -56,7 +56,7 @@ import {
 } from '@/lib/kilo-pass/enums';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
-import type { Tool } from '@/lib/organizations/organization-types';
+import type { Tool } from '@/lib/organizations/model-settings';
 
 /**
  * Generates a complete check constraint for an enum column.

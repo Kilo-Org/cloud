@@ -8,7 +8,6 @@ import { formatDate } from '@/lib/admin-utils';
 import type { UserDetailProps } from '@/types/admin';
 import ResetAPIKeyButton from './ResetAPIKeyButton';
 import ResetToMagicLinkLoginButton from './ResetToMagicLinkLoginButton';
-import CheckKiloPassButton from './CheckKiloPassButton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Webhook } from 'lucide-react';
@@ -51,7 +50,6 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
           <div className="flex grow basis-auto flex-col items-end space-y-2">
             <ResetAPIKeyButton userId={user.id} />
             {!user.is_sso_protected_domain && <ResetToMagicLinkLoginButton userId={user.id} />}
-            <CheckKiloPassButton userId={user.id} />
             <Button variant="outline" size="sm" asChild>
               <Link href={`/admin/users/${encodeURIComponent(user.id)}/heuristic-abuse`}>
                 View usage + abuse

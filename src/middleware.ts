@@ -1,9 +1,16 @@
+import type { NextRequestWithAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 import { withAuthenticatedAdminApiRoutes } from './middleware/withAuthenticatedAdminApiRoutes';
 import { withKiloEditorCookie } from './middleware/withKiloEditorCookie';
 
-export function defaultMiddleware() {
-  return NextResponse.next();
+export function defaultMiddleware(request: NextRequestWithAuth) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', request.nextUrl.pathname);
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export default withAuthenticatedAdminApiRoutes(withKiloEditorCookie(defaultMiddleware));

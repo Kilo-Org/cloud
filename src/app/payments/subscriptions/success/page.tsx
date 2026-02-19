@@ -8,7 +8,7 @@ export default async function Page({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  await getUserFromAuthOrRedirect('/');
+  await getUserFromAuthOrRedirect();
   const params = await searchParams;
   const sessionId = params[STRIPE_SUB_QUERY_STRING_KEY];
   const organizationId = params['organizationId'];

@@ -287,6 +287,11 @@ if (process.env.DISCORD_BOT_TOKEN) {
         enabled: true,
         dm: dm,
     };
+    // Enable the Discord plugin (onboard --skip-channels disables it)
+    config.plugins = config.plugins || {};
+    config.plugins.entries = config.plugins.entries || {};
+    config.plugins.entries.discord = config.plugins.entries.discord || {};
+    config.plugins.entries.discord.enabled = true;
 }
 
 // Slack configuration
@@ -296,6 +301,11 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
         appToken: process.env.SLACK_APP_TOKEN,
         enabled: true,
     };
+    // Enable the Slack plugin (onboard --skip-channels disables it)
+    config.plugins = config.plugins || {};
+    config.plugins.entries = config.plugins.entries || {};
+    config.plugins.entries.slack = config.plugins.entries.slack || {};
+    config.plugins.entries.slack.enabled = true;
 }
 
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));

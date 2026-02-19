@@ -11,6 +11,7 @@ import {
   countTriageTickets,
   getTriageTicketById,
   resetTriageTicketForRetry,
+  interruptTriageTicket,
 } from '@/lib/auto-triage/db/triage-tickets';
 import type { Owner } from '@/lib/auto-triage/db/types';
 import { successResult, failureResult } from '@/lib/maybe-result';
@@ -395,6 +396,79 @@ export function createAutoTriageRouter({
     },
 
     /**
+     * Interrupt a pending or analyzing triage ticket
+     * Sets status to failed and frees the concurrency slot
+     */
+    interruptTicket: {
+      inputSchema: z.object({
+        ticketId: z.string().uuid(),
+      }),
+      handler: async ({ ctx, input }: { ctx: TRPCContext; input: { ticketId: string } }) => {
+        try {
+          // 1. Get ticket and verify ownership
+          const ticket = await getTriageTicketById(input.ticketId);
+
+          if (!ticket) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Ticket not found',
+            });
+          }
+
+          // 2. Verify ticket belongs to owner
+          const owner = await ownerResolver(ctx, input);
+          if (!ticketOwnershipVerifier(ticket, owner)) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Ticket does not belong to this owner',
+            });
+          }
+
+          // 3. Verify ticket is in pending or analyzing state
+          if (ticket.status !== 'pending' && ticket.status !== 'analyzing') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Only pending or analyzing tickets can be interrupted',
+            });
+          }
+
+          // 4. Interrupt the ticket (status-guarded to avoid TOCTOU race)
+          const wasInterrupted = await interruptTriageTicket(input.ticketId);
+
+          if (!wasInterrupted) {
+            // Ticket moved to a terminal state between our check and the update
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'Ticket has already completed and cannot be interrupted',
+            });
+          }
+
+          // 5. Dispatch pending tickets to free the concurrency slot
+          await tryDispatchPendingTickets(owner);
+
+          // 6. Audit log (if provided)
+          if (auditLogger) {
+            await auditLogger({
+              owner,
+              ctx,
+              message: `Interrupted auto-triage ticket ${input.ticketId}`,
+            });
+          }
+
+          return { success: true };
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+
+          console.error('Error interrupting triage ticket:', error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to interrupt triage ticket',
+          });
+        }
+      },
+    },
+
+    /**
      * List triage tickets
      */
     listTickets: {
@@ -476,6 +550,9 @@ export function wrapSharedHandlersInRouter(
     retryTicket: procedure
       .input(handlers.retryTicket.inputSchema)
       .mutation(handlers.retryTicket.handler),
+    interruptTicket: procedure
+      .input(handlers.interruptTicket.inputSchema)
+      .mutation(handlers.interruptTicket.handler),
     listTickets: procedure
       .input(handlers.listTickets.inputSchema)
       .query(handlers.listTickets.handler),

@@ -23,7 +23,6 @@ import {
   Key,
   Wrench,
   Webhook,
-  Shell,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -32,6 +31,7 @@ import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { data: user, isLoading } = useUser();
@@ -143,7 +143,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       ? [
           {
             title: 'Claw',
-            icon: Shell,
+            icon: KiloCrabIcon,
             url: '/claw',
           },
         ]

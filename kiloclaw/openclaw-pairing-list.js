@@ -31,12 +31,9 @@ for (const channel of channels) {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, HOME: '/root' },
     });
-    const match = output.match(/\{"requests"[\s\S]*\}/);
-    if (match) {
-      const data = JSON.parse(match[0]);
-      for (const req of data.requests || []) {
-        allRequests.push({ ...req, channel });
-      }
+    const data = JSON.parse(output.trim());
+    for (const req of data.requests || []) {
+      allRequests.push({ ...req, channel });
     }
   } catch (err) {
     // Log to stderr so the caller can see what went wrong

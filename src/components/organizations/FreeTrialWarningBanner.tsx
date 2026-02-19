@@ -9,7 +9,7 @@ import type {
   OrganizationRole,
   OrganizationWithMembers,
 } from '@/lib/organizations/organization-types';
-import { cn, titleCase } from '@/lib/utils';
+import { capitalize, cn } from '@/lib/utils';
 
 type FreeTrialWarningBannerProps = {
   organization: OrganizationWithMembers;

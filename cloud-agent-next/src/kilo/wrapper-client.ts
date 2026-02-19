@@ -376,7 +376,7 @@ export class WrapperClient {
   /**
    * Answer a question.
    */
-  async answerQuestion(questionId: string, answers: string[]): Promise<{ success: boolean }> {
+  async answerQuestion(questionId: string, answers: string[][]): Promise<{ success: boolean }> {
     const result = await this.request<{
       status: string;
       success: boolean;

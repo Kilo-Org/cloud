@@ -35,6 +35,8 @@ import {
   updateChildSessionMessageAtom,
   updateChildSessionPartAtom,
   removeChildSessionPartAtom,
+  setQuestionRequestIdAtom,
+  sessionOrganizationIdAtom,
 } from './store/atoms';
 import {
   updateHighWaterMarkAtom,
@@ -108,6 +110,12 @@ export function useCloudAgentStream({
   const updateChildSessionPart = useSetAtom(updateChildSessionPartAtom);
   const removeChildSessionPart = useSetAtom(removeChildSessionPartAtom);
 
+  // Atom for question tracking
+  const setQuestionRequestId = useSetAtom(setQuestionRequestIdAtom);
+
+  // Atom for organization ID (used by QuestionToolCard for tRPC calls)
+  const setSessionOrganizationId = useSetAtom(sessionOrganizationIdAtom);
+
   // Common atoms
   const setCurrentSessionId = useSetAtom(currentSessionIdAtom);
   const setIsStreaming = useSetAtom(isStreamingAtom);
@@ -155,7 +163,8 @@ export function useCloudAgentStream({
 
   useEffect(() => {
     organizationIdRef.current = organizationId;
-  }, [organizationId]);
+    setSessionOrganizationId(organizationId ?? null);
+  }, [organizationId, setSessionOrganizationId]);
 
   /**
    * Create the event processor with callbacks wired to Jotai atoms and IndexedDB.
@@ -287,6 +296,10 @@ export function useCloudAgentStream({
           onCompleteRef.current?.();
         }
       },
+
+      onQuestionAsked: (requestId, callId) => {
+        setQuestionRequestId({ callId, requestId });
+      },
     }),
     [
       updateMessage,
@@ -303,6 +316,7 @@ export function useCloudAgentStream({
       updateChildSessionPart,
       removeChildSessionPart,
       setError,
+      setQuestionRequestId,
     ]
   );
 

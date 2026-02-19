@@ -44,6 +44,7 @@ const HANDLED_EVENT_TYPES = new Set([
   'session.updated',
   'session.error',
   'session.idle',
+  'question.asked',
 ]);
 
 function isHandledEventType(type: string): boolean {
@@ -361,6 +362,17 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   }
 
   /**
+   * Handle question.asked events — extract the callID→requestId mapping.
+   */
+  function handleQuestionAsked(data: { id: string; tool?: { callID: string } }): void {
+    const requestId = data.id;
+    const callId = data.tool?.callID;
+    if (requestId && callId) {
+      callbacks.onQuestionAsked?.(requestId, callId);
+    }
+  }
+
+  /**
    * Handle session.idle events.
    * Completes all pending user messages since they don't have their own completion signals.
    */
@@ -425,6 +437,10 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
       case 'session.idle':
         handleSessionIdle();
+        break;
+
+      case 'question.asked':
+        handleQuestionAsked(data as { id: string; tool?: { callID: string } });
         break;
     }
   }

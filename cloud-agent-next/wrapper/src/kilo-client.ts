@@ -90,7 +90,7 @@ export type KiloClient = {
   /** Answer a permission request */
   answerPermission: (permissionId: string, response: PermissionResponse) => Promise<boolean>;
   /** Answer a question */
-  answerQuestion: (questionId: string, answers: string[]) => Promise<boolean>;
+  answerQuestion: (questionId: string, answers: string[][]) => Promise<boolean>;
   /** Reject a question */
   rejectQuestion: (questionId: string) => Promise<boolean>;
 };
@@ -191,7 +191,7 @@ export function createKiloClient(baseUrl: string): KiloClient {
       return true;
     },
 
-    answerQuestion: async (questionId: string, answers: string[]) => {
+    answerQuestion: async (questionId: string, answers: string[][]) => {
       // Question answers go to POST /question/:questionId/reply
       await requestNoContent('POST', `/question/${questionId}/reply`, { answers });
       return true;

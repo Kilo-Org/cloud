@@ -20,6 +20,7 @@ import {
   Upload,
   Bell,
   Server,
+  Zap,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -97,6 +98,11 @@ const financialItems: MenuItem[] = [
 ];
 
 const productEngineeringItems: MenuItem[] = [
+  {
+    title: () => 'Routing Switch',
+    url: '/admin/routing-switch',
+    icon: () => <Zap />,
+  },
   {
     title: () => 'Community PRs',
     url: '/admin/community-prs',

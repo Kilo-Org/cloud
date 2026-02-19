@@ -256,6 +256,9 @@ const WS_STREAM_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/s
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    console.log(
+      `[gastown-worker] fetch: ${request.method} ${new URL(request.url).pathname} upgrade=${request.headers.get('Upgrade')}`
+    );
     // Intercept WebSocket upgrade requests for agent streaming
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       const url = new URL(request.url);

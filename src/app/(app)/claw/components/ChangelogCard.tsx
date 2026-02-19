@@ -64,7 +64,7 @@ export function ChangelogCard() {
           <History className="h-4 w-4" />
           Changelog
         </CardTitle>
-        <CardDescription>Recent changes and updates to the Kilo Claw platform.</CardDescription>
+        <CardDescription>Recent changes and updates to the KiloClaw platform.</CardDescription>
       </CardHeader>
       <CardContent className="divide-y">
         {CHANGELOG_ENTRIES.map((entry, i) => (

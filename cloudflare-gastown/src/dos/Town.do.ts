@@ -17,6 +17,7 @@ import { query } from '../util/query.util';
 import { getTownContainerStub } from './TownContainer.do';
 import { getMayorDOStub } from './Mayor.do';
 import { z } from 'zod';
+import { TownConfigSchema, type TownConfig, type TownConfigUpdate } from '../types';
 
 const TOWN_LOG = '[Town.do]';
 
@@ -29,6 +30,12 @@ function now(): string {
 }
 
 const HEARTBEAT_ALARM_INTERVAL_MS = 3 * 60 * 1000;
+
+// Auto-re-escalation: unacknowledged escalations older than this threshold
+// get their severity bumped (default 4 hours)
+const STALE_ESCALATION_THRESHOLD_MS = 4 * 60 * 60 * 1000;
+const MAX_RE_ESCALATIONS = 3;
+const SEVERITY_ORDER = ['low', 'medium', 'high', 'critical'] as const;
 
 export class TownDO extends DurableObject<Env> {
   private sql: SqlStorage;
@@ -62,6 +69,43 @@ export class TownDO extends DurableObject<Env> {
       /* sql */ `CREATE UNIQUE INDEX IF NOT EXISTS idx_town_convoy_beads_pk ON ${town_convoy_beads}(${town_convoy_beads.columns.convoy_id}, ${town_convoy_beads.columns.bead_id})`,
       []
     );
+  }
+
+  // ── Town Configuration ─────────────────────────────────────────────────
+
+  private static readonly CONFIG_KEY = 'town:config';
+
+  async getTownConfig(): Promise<TownConfig> {
+    const raw = await this.ctx.storage.get<unknown>(TownDO.CONFIG_KEY);
+    if (!raw) return TownConfigSchema.parse({});
+    return TownConfigSchema.parse(raw);
+  }
+
+  async updateTownConfig(update: TownConfigUpdate): Promise<TownConfig> {
+    const current = await this.getTownConfig();
+
+    // Shallow merge top-level keys; deep merge env_vars and git_auth
+    const merged: TownConfig = {
+      ...current,
+      ...update,
+      env_vars: { ...current.env_vars, ...(update.env_vars ?? {}) },
+      git_auth: { ...current.git_auth, ...(update.git_auth ?? {}) },
+      refinery:
+        update.refinery !== undefined
+          ? { ...current.refinery, ...update.refinery }
+          : current.refinery,
+      container:
+        update.container !== undefined
+          ? { ...current.container, ...update.container }
+          : current.container,
+    };
+
+    const validated = TownConfigSchema.parse(merged);
+    await this.ctx.storage.put(TownDO.CONFIG_KEY, validated);
+    console.log(
+      `${TOWN_LOG} updateTownConfig: saved config with ${Object.keys(validated.env_vars).length} env vars`
+    );
+    return validated;
   }
 
   // ── Rig Registry (KV for now) ─────────────────────────────────────────
@@ -267,11 +311,62 @@ export class TownDO extends DurableObject<Env> {
 
   // ── Escalations ───────────────────────────────────────────────────────
 
+  async acknowledgeEscalation(escalationId: string): Promise<TownEscalationRecord | null> {
+    await this.ensureInitialized();
+    const parsed = z.string().min(1).parse(escalationId);
+
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${town_escalations}
+        SET ${town_escalations.columns.acknowledged} = 1,
+            ${town_escalations.columns.acknowledged_at} = ?
+        WHERE ${town_escalations.columns.id} = ?
+          AND ${town_escalations.columns.acknowledged} = 0
+      `,
+      [now(), parsed]
+    );
+
+    return this.getEscalation(parsed);
+  }
+
+  async listEscalations(filter?: { acknowledged?: boolean }): Promise<TownEscalationRecord[]> {
+    await this.ensureInitialized();
+
+    const rows =
+      filter?.acknowledged !== undefined
+        ? [
+            ...query(
+              this.sql,
+              /* sql */ `
+              SELECT * FROM ${town_escalations}
+              WHERE ${town_escalations.columns.acknowledged} = ?
+              ORDER BY ${town_escalations.columns.created_at} DESC
+              LIMIT 100
+            `,
+              [filter.acknowledged ? 1 : 0]
+            ),
+          ]
+        : [
+            ...query(
+              this.sql,
+              /* sql */ `
+              SELECT * FROM ${town_escalations}
+              ORDER BY ${town_escalations.columns.created_at} DESC
+              LIMIT 100
+            `,
+              []
+            ),
+          ];
+
+    return TownEscalationRecord.array().parse(rows);
+  }
+
   async routeEscalation(input: {
     townId: string;
     source_rig_id: string;
     source_agent_id?: string;
-    severity: 'low' | 'medium' | 'high';
+    severity: 'low' | 'medium' | 'high' | 'critical';
     category?: string;
     message: string;
   }): Promise<TownEscalationRecord> {
@@ -281,7 +376,7 @@ export class TownDO extends DurableObject<Env> {
         townId: z.string().min(1),
         source_rig_id: z.string().min(1),
         source_agent_id: z.string().min(1).optional(),
-        severity: z.enum(['low', 'medium', 'high']),
+        severity: z.enum(['low', 'medium', 'high', 'critical']),
         category: z.string().min(1).optional(),
         message: z.string().min(1),
       })
@@ -381,7 +476,73 @@ export class TownDO extends DurableObject<Env> {
     } catch (err) {
       console.warn(`${TOWN_LOG} alarm: watchdogHeartbeat failed`, err);
     }
+
+    // Auto-re-escalation: bump severity of stale unacknowledged escalations
+    try {
+      await this.reEscalateStaleEscalations(townId);
+    } catch (err) {
+      console.warn(`${TOWN_LOG} alarm: reEscalateStaleEscalations failed`, err);
+    }
+
     await this.ctx.storage.setAlarm(Date.now() + HEARTBEAT_ALARM_INTERVAL_MS);
+  }
+
+  /**
+   * Find unacknowledged escalations older than the stale threshold
+   * and bump their severity by one level.
+   */
+  private async reEscalateStaleEscalations(townId: string): Promise<void> {
+    await this.ensureInitialized();
+    const threshold = new Date(Date.now() - STALE_ESCALATION_THRESHOLD_MS).toISOString();
+
+    const staleRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${town_escalations}
+          WHERE ${town_escalations.columns.acknowledged} = 0
+            AND ${town_escalations.columns.created_at} < ?
+            AND ${town_escalations.columns.re_escalation_count} < ?
+        `,
+        [threshold, MAX_RE_ESCALATIONS]
+      ),
+    ];
+
+    const stale = TownEscalationRecord.array().parse(staleRows);
+    if (stale.length === 0) return;
+
+    for (const esc of stale) {
+      const currentIdx = SEVERITY_ORDER.indexOf(esc.severity as (typeof SEVERITY_ORDER)[number]);
+      if (currentIdx < 0 || currentIdx >= SEVERITY_ORDER.length - 1) continue;
+
+      const newSeverity = SEVERITY_ORDER[currentIdx + 1];
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${town_escalations}
+          SET ${town_escalations.columns.severity} = ?,
+              ${town_escalations.columns.re_escalation_count} = ${town_escalations.columns.re_escalation_count} + 1
+          WHERE ${town_escalations.columns.id} = ?
+        `,
+        [newSeverity, esc.id]
+      );
+
+      console.log(
+        `${TOWN_LOG} reEscalateStaleEscalations: escalation ${esc.id} bumped from ${esc.severity} to ${newSeverity} (re-escalation #${esc.re_escalation_count + 1})`
+      );
+
+      // Notify mayor for medium+ escalations
+      if (newSeverity !== 'low') {
+        try {
+          const mayor = getMayorDOStub(this.env, townId);
+          await mayor.sendMessage(
+            `[Re-Escalation:${newSeverity}] rig=${esc.source_rig_id} ${esc.message} (auto-bumped from ${esc.severity} after ${STALE_ESCALATION_THRESHOLD_MS / 3600000}h unacknowledged)`
+          );
+        } catch (err) {
+          console.warn(`${TOWN_LOG} reEscalateStaleEscalations: failed to notify mayor:`, err);
+        }
+      }
+    }
   }
 
   private async armAlarm(): Promise<void> {

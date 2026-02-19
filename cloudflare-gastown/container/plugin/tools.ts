@@ -152,5 +152,37 @@ export function createTools(client: GastownClient) {
         return 'Checkpoint saved.';
       },
     }),
+
+    gt_mol_current: tool({
+      description:
+        'Get the current molecule step for your hooked bead. Returns the step title, ' +
+        'instructions, step number (N of M), and molecule status. ' +
+        'Returns null if no molecule is attached to your current bead.',
+      args: {},
+      async execute() {
+        const step = await client.getMoleculeCurrentStep();
+        if (!step) return 'No molecule attached to your current bead.';
+        return JSON.stringify(step, null, 2);
+      },
+    }),
+
+    gt_mol_advance: tool({
+      description:
+        'Complete the current molecule step and advance to the next one. ' +
+        'Provide a summary of what you accomplished in this step. ' +
+        'If this is the final step, the molecule is marked as completed.',
+      args: {
+        summary: tool.schema
+          .string()
+          .describe('Brief summary of what you accomplished in this step'),
+      },
+      async execute(args) {
+        const result = await client.advanceMoleculeStep(args.summary);
+        if (result.completed) {
+          return `Molecule completed! All ${result.totalSteps} steps are done.`;
+        }
+        return `Advanced to step ${result.currentStep + 1} of ${result.totalSteps}.`;
+      },
+    }),
   };
 }

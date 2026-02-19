@@ -177,6 +177,7 @@ app.post('/git/merge', async c => {
       branch: req.branch,
       targetBranch: req.targetBranch,
       gitUrl: req.gitUrl,
+      envVars: req.envVars,
     });
 
     // Report result back to the Rig DO

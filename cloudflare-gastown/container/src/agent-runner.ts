@@ -93,23 +93,70 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
 }
 
 /**
+ * Configure a git credential helper in the agent's environment so that
+ * git push/fetch from the worktree can authenticate without SSH or
+ * an interactive prompt. Uses `git credential-store` with an in-memory
+ * credentials file written at startup.
+ */
+async function configureGitCredentials(
+  workdir: string,
+  gitUrl: string,
+  envVars?: Record<string, string>
+): Promise<void> {
+  const token = envVars?.GIT_TOKEN ?? envVars?.GITHUB_TOKEN;
+  const gitlabToken = envVars?.GITLAB_TOKEN;
+  if (!token && !gitlabToken) return;
+
+  try {
+    const url = new URL(gitUrl);
+    const credentialLine =
+      gitlabToken && (url.hostname.includes('gitlab') || envVars?.GITLAB_INSTANCE_URL)
+        ? `https://oauth2:${gitlabToken}@${url.hostname}`
+        : token
+          ? `https://x-access-token:${token}@${url.hostname}`
+          : null;
+
+    if (!credentialLine) return;
+
+    // Write a .git-credentials file inside the worktree
+    const credFile = `${workdir}/.git-credentials`;
+    await Bun.write(credFile, credentialLine + '\n');
+
+    // Configure the worktree to use credential-store pointing at this file
+    const proc = Bun.spawn(['git', 'config', 'credential.helper', `store --file=${credFile}`], {
+      cwd: workdir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    await proc.exited;
+  } catch (err) {
+    console.warn('Failed to configure git credentials:', err);
+  }
+}
+
+/**
  * Run the full agent startup sequence:
  * 1. Clone/fetch the rig's git repo
  * 2. Create an isolated worktree for the agent's branch
- * 3. Start a kilo serve instance for the worktree (or reuse existing)
- * 4. Create a session and send the initial prompt via HTTP API
+ * 3. Configure git credentials for push/fetch
+ * 4. Start a kilo serve instance for the worktree (or reuse existing)
+ * 5. Create a session and send the initial prompt via HTTP API
  */
 export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent> {
   await cloneRepo({
     rigId: request.rigId,
     gitUrl: request.gitUrl,
     defaultBranch: request.defaultBranch,
+    envVars: request.envVars,
   });
 
   const workdir = await createWorktree({
     rigId: request.rigId,
     branch: request.branch,
   });
+
+  // Set up git credentials so the agent can push
+  await configureGitCredentials(workdir, request.gitUrl, request.envVars);
 
   const env = buildAgentEnv(request);
 

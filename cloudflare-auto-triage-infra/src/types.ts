@@ -100,11 +100,20 @@ export interface TriageResponse {
   status: TriageStatus;
 }
 
+export type SimilarTicket = {
+  ticketId: string;
+  issueNumber: number;
+  issueTitle: string;
+  similarity: number;
+  repoFullName: string;
+};
+
 export interface DuplicateResult {
   isDuplicate: boolean;
   duplicateOfTicketId: string | null;
   similarityScore: number | null;
   reasoning?: string;
+  similarTickets?: SimilarTicket[];
 }
 
 /**
@@ -124,6 +133,7 @@ export const classificationResultSchema = z.object({
   intentSummary: z.string().min(1),
   relatedFiles: z.array(z.string()).optional(),
   reasoning: z.string().optional(),
+  selectedLabels: z.array(z.string()).default([]),
 });
 
 export type ClassificationResult = z.infer<typeof classificationResultSchema>;

@@ -95,8 +95,8 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
 /**
  * Configure a git credential helper in the agent's environment so that
  * git push/fetch from the worktree can authenticate without SSH or
- * an interactive prompt. Uses `git credential-store` with an in-memory
- * credentials file written at startup.
+ * an interactive prompt. Writes credentials to /tmp (outside the worktree)
+ * to prevent accidental commit of tokens.
  */
 async function configureGitCredentials(
   workdir: string,
@@ -118,8 +118,10 @@ async function configureGitCredentials(
 
     if (!credentialLine) return;
 
-    // Write a .git-credentials file inside the worktree
-    const credFile = `${workdir}/.git-credentials`;
+    // Write credentials to /tmp — outside the worktree so they can't be
+    // accidentally committed by `git add .` or `git add -A`.
+    const uniqueSuffix = workdir.replace(/[^a-zA-Z0-9]/g, '-');
+    const credFile = `/tmp/.git-credentials${uniqueSuffix}`;
     await Bun.write(credFile, credentialLine + '\n');
 
     // Configure the worktree to use credential-store pointing at this file

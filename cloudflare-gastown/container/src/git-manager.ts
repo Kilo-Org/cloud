@@ -33,6 +33,13 @@ function validateGitUrl(url: string): void {
  * Inject authentication token into a git URL.
  * Supports GitHub (x-access-token) and GitLab (oauth2) token formats.
  * If no token is available, returns the original URL unchanged.
+ *
+ * Security note: The authenticated URL is passed as a CLI argument to
+ * `git clone`, making the token visible in the process list. This is
+ * acceptable because the container is single-tenant (one town per container)
+ * and only runs Gastown agent processes. For agent push/fetch operations
+ * after clone, the credential-store helper configured in agent-runner.ts
+ * is used instead.
  */
 function authenticateGitUrl(gitUrl: string, envVars?: Record<string, string>): string {
   if (!envVars) return gitUrl;

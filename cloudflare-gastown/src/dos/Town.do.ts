@@ -84,11 +84,12 @@ export class TownDO extends DurableObject<Env> {
   async updateTownConfig(update: TownConfigUpdate): Promise<TownConfig> {
     const current = await this.getTownConfig();
 
-    // Shallow merge top-level keys; deep merge env_vars and git_auth
+    // Top-level: replace when provided. env_vars is fully replaced (not merged)
+    // so the UI can delete variables by omitting them.
     const merged: TownConfig = {
       ...current,
       ...update,
-      env_vars: { ...current.env_vars, ...(update.env_vars ?? {}) },
+      env_vars: update.env_vars ?? current.env_vars,
       git_auth: { ...current.git_auth, ...(update.git_auth ?? {}) },
       refinery:
         update.refinery !== undefined

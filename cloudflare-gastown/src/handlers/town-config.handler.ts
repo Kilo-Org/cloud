@@ -45,19 +45,6 @@ export async function handleUpdateTownConfig(c: Context<GastownEnv>, params: { t
   return c.json(resSuccess(maskSensitiveValues(config)));
 }
 
-/**
- * Get the raw (unmasked) town config. Used internally by the Rig DO
- * dispatch path — not exposed to dashboards.
- */
-export async function handleGetTownConfigInternal(
-  c: Context<GastownEnv>,
-  params: { townId: string }
-) {
-  const townDO = getTownDOStub(c.env, params.townId);
-  const config = await townDO.getTownConfig();
-  return c.json(resSuccess(config));
-}
-
 // Mask token values: show only last 4 chars
 function maskToken(value: string | undefined): string | undefined {
   if (!value) return value;

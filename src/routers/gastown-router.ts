@@ -279,7 +279,7 @@ export const gastownRouter = createTRPCRouter({
     .input(
       z.object({
         townId: z.string().uuid(),
-        config: z.record(z.string(), z.unknown()),
+        config: gastown.TownConfigSchema.partial(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -287,9 +287,7 @@ export const gastownRouter = createTRPCRouter({
       if (town.owner_user_id !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
-      return withGastownError(() =>
-        gastown.updateTownConfig(input.townId, input.config as Partial<gastown.TownConfigClient>)
-      );
+      return withGastownError(() => gastown.updateTownConfig(input.townId, input.config));
     }),
 
   // ── Events ─────────────────────────────────────────────────────────────

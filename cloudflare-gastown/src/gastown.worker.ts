@@ -74,11 +74,7 @@ import {
   handleMayorSendMail,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
-import {
-  handleGetTownConfig,
-  handleUpdateTownConfig,
-  handleGetTownConfigInternal,
-} from './handlers/town-config.handler';
+import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
 import {
   handleGetMoleculeCurrentStep,
   handleAdvanceMoleculeStep,
@@ -244,7 +240,6 @@ app.post('/api/towns/:townId/escalations/:escalationId/acknowledge', c =>
 
 app.get('/api/towns/:townId/config', c => handleGetTownConfig(c, c.req.param()));
 app.patch('/api/towns/:townId/config', c => handleUpdateTownConfig(c, c.req.param()));
-app.get('/api/internal/towns/:townId/config', c => handleGetTownConfigInternal(c, c.req.param()));
 
 // ── Town Events ─────────────────────────────────────────────────────────
 

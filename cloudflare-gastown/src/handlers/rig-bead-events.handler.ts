@@ -7,7 +7,7 @@ export async function handleListBeadEvents(c: Context<GastownEnv>, params: { rig
   const since = c.req.query('since') ?? undefined;
   const beadId = c.req.query('bead_id') ?? undefined;
   const limitStr = c.req.query('limit');
-  const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+  const limit = limitStr ? parseInt(limitStr, 10) || undefined : undefined;
 
   const rig = getRigDOStub(c.env, params.rigId);
   const events = await rig.listBeadEvents({ beadId, since, limit });

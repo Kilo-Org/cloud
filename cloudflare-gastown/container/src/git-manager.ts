@@ -226,7 +226,8 @@ export async function mergeBranch(options: {
   // Create a temporary worktree for the merge on the target branch
   const mergeDir = resolve(WORKSPACE_ROOT, options.rigId, 'merge-tmp', `merge-${Date.now()}`);
   assertInsideWorkspace(mergeDir);
-  await mkdir(mergeDir, { recursive: true });
+  // Only create the parent — git worktree add creates the leaf directory itself
+  await mkdir(resolve(WORKSPACE_ROOT, options.rigId, 'merge-tmp'), { recursive: true });
 
   try {
     // Add worktree tracking the target branch

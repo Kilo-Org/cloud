@@ -17,7 +17,7 @@ export async function handleListTownEvents(
 ) {
   const since = c.req.query('since') ?? undefined;
   const limitStr = c.req.query('limit');
-  const limit = limitStr ? parseInt(limitStr, 10) : 100;
+  const limit = limitStr ? parseInt(limitStr, 10) || 100 : 100;
 
   // Look up all rigs in the town
   const townDO = getGastownUserStub(c.env, params.userId);
@@ -30,9 +30,10 @@ export async function handleListTownEvents(
     return events.map(e => ({ ...e, rig_id: rig.id, rig_name: rig.name }));
   });
 
-  const results = await Promise.all(eventPromises);
+  const results = await Promise.allSettled(eventPromises);
   const allEvents = results
-    .flat()
+    .filter((r): r is PromiseFulfilledResult<TaggedBeadEvent[]> => r.status === 'fulfilled')
+    .flatMap(r => r.value)
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .slice(0, limit);
 

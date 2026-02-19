@@ -219,7 +219,7 @@ app.post('/git/merge', async c => {
     console.error(`Merge failed for entry ${req.entryId}:`, err);
   });
 
-  const result: MergeResult = { status: 'merged', message: 'Merge started' };
+  const result: MergeResult = { status: 'accepted', message: 'Merge started' };
   return c.json(result, 202);
 });
 

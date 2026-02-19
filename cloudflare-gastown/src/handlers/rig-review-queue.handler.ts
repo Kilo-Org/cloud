@@ -32,7 +32,6 @@ export async function handleSubmitToReviewQueue(c: Context<GastownEnv>, params: 
 }
 
 const CompleteReviewBody = z.object({
-  entry_id: z.string().min(1),
   status: z.enum(['merged', 'conflict']),
   message: z.string(),
   commit_sha: z.string().optional(),
@@ -50,6 +49,9 @@ export async function handleCompleteReview(
     );
   }
   const rig = getRigDOStub(c.env, params.rigId);
-  await rig.completeReviewWithResult(parsed.data);
+  await rig.completeReviewWithResult({
+    entry_id: params.entryId,
+    ...parsed.data,
+  });
   return c.json(resSuccess({ completed: true }));
 }

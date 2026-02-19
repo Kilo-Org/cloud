@@ -836,6 +836,10 @@ export class RigDO extends DurableObject<Env> {
     const entry = ReviewQueueRecord.parse(rows[0]);
 
     if (input.status === 'merged') {
+      // Read the bead's current status before closing it
+      const beadBefore = this.getBead(entry.bead_id);
+      const oldStatus = beadBefore?.status ?? null;
+
       // Close the bead
       const timestamp = now();
       query(
@@ -854,7 +858,7 @@ export class RigDO extends DurableObject<Env> {
         beadId: entry.bead_id,
         agentId: entry.agent_id,
         eventType: 'review_completed',
-        oldValue: 'running',
+        oldValue: oldStatus,
         newValue: 'merged',
         metadata: { commit_sha: input.commit_sha, branch: entry.branch },
       });
@@ -1011,6 +1015,10 @@ export class RigDO extends DurableObject<Env> {
 
     const beadId = agent.current_hook_bead_id;
     if (beadId) {
+      // Read previous status before mutating
+      const beadBefore = this.getBead(beadId);
+      const oldStatus = beadBefore?.status ?? null;
+
       const beadStatus = input.status === 'completed' ? 'closed' : 'failed';
       console.log(
         `${RIG_LOG} agentCompleted: agent ${agentId} ${input.status}, transitioning bead ${beadId} to '${beadStatus}'`
@@ -1032,6 +1040,7 @@ export class RigDO extends DurableObject<Env> {
         beadId,
         agentId,
         eventType: input.status === 'completed' ? 'closed' : 'status_changed',
+        oldValue: oldStatus,
         newValue: beadStatus,
         metadata: { reason: input.reason },
       });
@@ -1668,7 +1677,14 @@ export class RigDO extends DurableObject<Env> {
   private async startMergeInContainer(config: RigConfig, entry: ReviewQueueEntry): Promise<void> {
     try {
       const token = await this.mintAgentToken(entry.agent_id, config);
-      const rigId = this.ctx.id.name ?? config.rigId ?? '';
+      const rigId = this.ctx.id.name ?? config.rigId;
+      if (!rigId) {
+        console.error(
+          `${RIG_LOG} startMergeInContainer: no rigId available, cannot dispatch merge for entry ${entry.id}`
+        );
+        await this.completeReview(entry.id, 'failed');
+        return;
+      }
 
       const envVars: Record<string, string> = {};
       if (token) {

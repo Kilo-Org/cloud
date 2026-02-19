@@ -25,7 +25,14 @@ export const BeadEventRecord = z.object({
   event_type: BeadEventType,
   old_value: z.string().nullable(),
   new_value: z.string().nullable(),
-  metadata: z.string().transform(v => JSON.parse(v) as Record<string, unknown>),
+  metadata: z.string().transform((v, ctx): Record<string, unknown> => {
+    try {
+      return JSON.parse(v);
+    } catch {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid JSON in metadata' });
+      return {};
+    }
+  }),
   created_at: z.string(),
 });
 

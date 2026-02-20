@@ -26,16 +26,17 @@ export function RunDoctorDialog({
   mutation: DoctorMutation;
 }) {
   const hasFired = useRef(false);
-  const mutateRef = useRef(mutation.mutate);
-  mutateRef.current = mutation.mutate;
+  const mutationRef = useRef(mutation);
+  mutationRef.current = mutation;
 
   useEffect(() => {
     if (open && !hasFired.current) {
       hasFired.current = true;
-      mutateRef.current(undefined);
+      mutationRef.current.mutate(undefined);
     }
     if (!open) {
       hasFired.current = false;
+      mutationRef.current.reset();
     }
   }, [open]);
 

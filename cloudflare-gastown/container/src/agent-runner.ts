@@ -135,6 +135,9 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
       townConfig && typeof townConfig.kilocode_token === 'string'
         ? townConfig.kilocode_token
         : undefined;
+    console.log(
+      `[buildAgentEnv] KILOCODE_TOKEN fallback: townConfig=${townConfig ? 'present' : 'null'} hasToken=${!!tokenFromConfig} requestEnvKeys=${Object.keys(request.envVars ?? {}).join(',')}`
+    );
     if (tokenFromConfig) {
       env.KILOCODE_TOKEN = tokenFromConfig;
     }

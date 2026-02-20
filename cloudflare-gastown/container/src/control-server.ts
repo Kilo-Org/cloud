@@ -38,9 +38,15 @@ app.use('*', async (c, next) => {
   const configHeader = c.req.header('X-Town-Config');
   if (configHeader) {
     try {
-      currentTownConfig = JSON.parse(configHeader);
+      const parsed = JSON.parse(configHeader);
+      currentTownConfig = parsed;
+      const hasToken =
+        typeof parsed.kilocode_token === 'string' && parsed.kilocode_token.length > 0;
+      console.log(
+        `[control-server] X-Town-Config received: hasKilocodeToken=${hasToken} keys=${Object.keys(parsed).join(',')}`
+      );
     } catch {
-      // Ignore malformed config
+      console.warn('[control-server] X-Town-Config header malformed');
     }
   }
   await next();

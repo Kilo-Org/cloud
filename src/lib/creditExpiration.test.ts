@@ -1,4 +1,4 @@
-import type { credit_transactions } from '@/db/schema';
+import { credit_transactions } from '@/db/schema';
 import { credit_transactions as creditTransactionsTable, kilocode_users } from '@/db/schema';
 import { computeExpiration, processLocalExpirations } from './creditExpiration';
 import { db } from '@/lib/drizzle';
@@ -911,11 +911,10 @@ describe('processLocalExpirations', () => {
       expiration_baseline_microdollars_used: 2_000_000,
       description: 'Vibe eng $100',
     });
-    await insertCreditTransaction(user.id, {
+    const txn = await insertCreditTransaction(user.id, {
       amount_usd: 5,
       expiry_date: null,
       original_baseline_microdollars_used: 2_000_000,
-      expiration_baseline_microdollars_used: 20_000_000,
       description: 'in-app survey $5',
     });
 
@@ -923,12 +922,36 @@ describe('processLocalExpirations', () => {
 
     user = await refetchUser(user.id);
 
-    const now = new Date('2026-01-05T00:00:00Z');
+    let now = new Date('2026-01-05T00:00:00Z');
     await processLocalExpirations(user, now);
 
     user = await refetchUser(user.id);
 
-    expect(user.total_microdollars_acquired / 1_000_000).toBe(23);
+    expect(user.total_microdollars_acquired / 1_000_000).toBe(27);
+    expect(user.microdollars_used / 1_000_000).toBe(4);
+
+    // Retroactively expire credits
+    await db
+      .update(creditTransactionsTable)
+      .set({
+        expiry_date: '2026-01-06T00:00:00Z',
+        expiration_baseline_microdollars_used: 2_000_000,
+      })
+      .where(eq(credit_transactions.id, txn.id));
+    await db
+      .update(kilocode_users)
+      .set({ next_credit_expiration_at: '2026-01-06T00:00:00Z' })
+      .where(eq(kilocode_users.id, user.id));
+
+    user = await refetchUser(user.id);
+
+    now = new Date('2026-01-07T00:00:00Z');
+    await processLocalExpirations(user, now);
+
+    user = await refetchUser(user.id);
+
+    expect(user.total_microdollars_acquired / 1_000_000).toBe(22);
+    expect(user.microdollars_used / 1_000_000).toBe(4);
   });
 
   it('zero-amount expirations are created and do not affect balance', async () => {

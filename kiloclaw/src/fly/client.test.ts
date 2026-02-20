@@ -52,6 +52,27 @@ describe('isFlyInsufficientResources', () => {
     expect(isFlyInsufficientResources(err)).toBe(true);
   });
 
+  // -- Confirmed production 409 payload --
+
+  it('matches production 409 payload: insufficient memory on updateMachine', () => {
+    const body =
+      '{"error":"aborted: could not reserve resource for machine: insufficient memory available to fulfill request"}';
+    const err = new FlyApiError(`Fly API updateMachine failed (409): ${body}`, 409, body);
+    expect(isFlyInsufficientResources(err)).toBe(true);
+  });
+
+  // -- Non-capacity 409s: must NOT trigger recovery --
+
+  it('returns false for non-capacity 409 conflicts', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const body = '{"error":"conflict: machine is already being updated"}';
+    const err = new FlyApiError(`Fly API failed (409): ${body}`, 409, body);
+    expect(isFlyInsufficientResources(err)).toBe(false);
+
+    warnSpy.mockRestore();
+  });
+
   // -- Version/precondition 412s: must NOT trigger recovery --
 
   it('returns false for version/precondition 412s', () => {
@@ -72,7 +93,7 @@ describe('isFlyInsufficientResources', () => {
     warnSpy.mockRestore();
   });
 
-  // -- Unclassified 412: should return false and warn --
+  // -- Unclassified 409/412: should return false and warn --
 
   it('returns false and logs warning for unclassified 412', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -87,9 +108,22 @@ describe('isFlyInsufficientResources', () => {
     warnSpy.mockRestore();
   });
 
-  // -- Non-412 and non-FlyApiError --
+  it('returns false and logs warning for unclassified 409', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const body = '{"error":"some unknown 409 reason"}';
+    const err = new FlyApiError(`Fly API failed (409): ${body}`, 409, body);
 
-  it('returns false for non-412 status', () => {
+    expect(isFlyInsufficientResources(err)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[fly] Unclassified 409 error (not treated as capacity):',
+      body
+    );
+    warnSpy.mockRestore();
+  });
+
+  // -- Other status codes and non-FlyApiError --
+
+  it('returns false for other status codes', () => {
     expect(isFlyInsufficientResources(new FlyApiError('not found', 404, '{}'))).toBe(false);
     expect(isFlyInsufficientResources(new FlyApiError('server error', 500, '{}'))).toBe(false);
   });

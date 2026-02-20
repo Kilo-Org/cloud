@@ -11,13 +11,23 @@ export const giga_potato_model = {
   context_length: 256_000,
   max_completion_tokens: 32_000,
   is_enabled: true,
-  flags: ['reasoning', 'prompt_cache', 'vision'],
+  flags: ['prompt_cache', 'vision'],
   gateway: 'gigapotato',
   internal_id: 'ep-20260109111813-hztxv',
   inference_providers: ['stealth'],
 } as KiloFreeModel;
 
-export function applyGigaPotatoProviderSettings(requestToMutate: OpenRouterChatCompletionRequest) {
+export const giga_potato_thinking_model = {
+  ...giga_potato_model,
+  public_id: 'giga-potato-thinking',
+  display_name: 'Giga Potato Thinking (free)',
+  flags: giga_potato_model.flags.concat(['reasoning']),
+} as KiloFreeModel;
+
+export function applyGigaPotatoProviderSettings(
+  requestedModel: string,
+  requestToMutate: OpenRouterChatCompletionRequest
+) {
   // https://kilo-code.slack.com/archives/C09L90J0B3J/p1768024809733959?thread_ts=1767929401.984039&cid=C09L90J0B3J
   const nonDisclosureRule = {
     type: 'text' as const,
@@ -37,7 +47,7 @@ export function applyGigaPotatoProviderSettings(requestToMutate: OpenRouterChatC
   } else {
     requestToMutate.messages.splice(0, 0, { role: 'system', content: [nonDisclosureRule] });
   }
-  if (requestToMutate.reasoning?.effort && requestToMutate.reasoning.effort !== 'none') {
-    requestToMutate.thinking = { type: 'enabled' };
-  }
+  requestToMutate.thinking = {
+    type: giga_potato_thinking_model.public_id === requestedModel ? 'enabled' : 'disabled',
+  };
 }

@@ -471,7 +471,9 @@ export class TownDO extends DurableObject<Env> {
    * Send a message to the mayor agent. Creates the mayor if it doesn't exist.
    * The mayor is tracked as an agent with role='mayor'.
    */
-  async sendMayorMessage(message: string): Promise<void> {
+  async sendMayorMessage(
+    message: string
+  ): Promise<{ agentId: string; sessionStatus: 'idle' | 'active' | 'starting' }> {
     await this.ensureInitialized();
     const townId = this.townId;
 
@@ -487,12 +489,15 @@ export class TownDO extends DurableObject<Env> {
     }
 
     // Check if mayor session is alive in container
-    const status = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
-    const isAlive = status.status === 'running' || status.status === 'starting';
+    const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
+    const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
+
+    let sessionStatus: 'idle' | 'active' | 'starting';
 
     if (isAlive) {
       // Send follow-up message
       await dispatch.sendMessageToAgent(this.env, townId, mayor.id, message);
+      sessionStatus = 'active';
     } else {
       // Start a new mayor session
       const townConfig = await this.getTownConfig();
@@ -517,9 +522,11 @@ export class TownDO extends DurableObject<Env> {
       });
 
       agents.updateAgentStatus(this.sql, mayor.id, 'working');
+      sessionStatus = 'starting';
     }
 
     await this.armAlarmIfNeeded();
+    return { agentId: mayor.id, sessionStatus };
   }
 
   async getMayorStatus(): Promise<{

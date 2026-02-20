@@ -19,7 +19,9 @@ RUN apt-get update && \
 # explicitly install the platform-specific binary package alongside the CLI.
 # Also install @kilocode/plugin globally so repo-local tools (e.g.
 # .opencode/tool/*.ts) can resolve it without a local node_modules.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64 @kilocode/plugin && \
+# Install both glibc and musl variants — the CLI's binary resolver may
+# pick either depending on the detected libc.
+RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64 @kilocode/cli-linux-x64-musl @kilocode/plugin && \
     ln -s "$(which kilo)" /usr/local/bin/opencode
 
 # Create workspace directories

@@ -15,6 +15,7 @@
 		{ "name": "compaction_count", "type": "int32", "required": true },
 		{ "name": "stuck_tool_call_count", "type": "int32", "required": true },
 		{ "name": "auto_compaction_count", "type": "int32", "required": true },
-		{ "name": "ingest_version", "type": "int32", "required": true }
+		{ "name": "ingest_version", "type": "int32", "required": true },
+		{ "name": "created_at", "type": "int64", "required": true }
 	]
 }

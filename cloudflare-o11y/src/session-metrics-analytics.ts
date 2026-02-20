@@ -70,6 +70,7 @@ export async function writeSessionMetricsDataPoint(params: SessionMetricsParams,
 			stuck_tool_call_count: params.stuckToolCallCount,
 			auto_compaction_count: params.autoCompactionCount,
 			ingest_version: params.ingestVersion,
+			created_at: Date.now(),
 		},
 	]);
 }

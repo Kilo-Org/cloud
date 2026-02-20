@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
 import { Settings, Save } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -62,8 +63,8 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
   const [skipLabels, setSkipLabels] = useState<string>('');
   const [requiredLabels, setRequiredLabels] = useState<string>('');
-  const [duplicateThreshold, setDuplicateThreshold] = useState('0.8');
-  const [autoFixThreshold, setAutoFixThreshold] = useState('0.9');
+  const [duplicateThreshold, setDuplicateThreshold] = useState([0.8]);
+  const [autoFixThreshold, setAutoFixThreshold] = useState([0.9]);
   const [customInstructions, setCustomInstructions] = useState('');
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [maxClassificationTime, setMaxClassificationTime] = useState([5]);
@@ -76,8 +77,8 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
       setSelectedRepositoryIds(configData.selected_repository_ids || []);
       setSkipLabels((configData.skip_labels || []).join(', '));
       setRequiredLabels((configData.required_labels || []).join(', '));
-      setDuplicateThreshold(String(configData.duplicate_threshold || 0.8));
-      setAutoFixThreshold(String(configData.auto_fix_threshold || 0.9));
+      setDuplicateThreshold([parseFloat(String(configData.duplicate_threshold)) || 0.8]);
+      setAutoFixThreshold([parseFloat(String(configData.auto_fix_threshold)) || 0.9]);
       setCustomInstructions(configData.custom_instructions || '');
       setSelectedModel(configData.model_slug);
       setMaxClassificationTime([configData.max_classification_time_minutes || 5]);
@@ -176,8 +177,8 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
         selected_repository_ids: selectedRepositoryIds,
         skip_labels: skipLabelsArray,
         required_labels: requiredLabelsArray,
-        duplicate_threshold: parseFloat(duplicateThreshold),
-        auto_fix_threshold: parseFloat(autoFixThreshold),
+        duplicate_threshold: duplicateThreshold[0],
+        auto_fix_threshold: autoFixThreshold[0],
         custom_instructions: customInstructions.trim() || null,
         model_slug: selectedModel,
         max_classification_time_minutes: maxClassificationTime[0],
@@ -189,8 +190,8 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
         selected_repository_ids: selectedRepositoryIds,
         skip_labels: skipLabelsArray,
         required_labels: requiredLabelsArray,
-        duplicate_threshold: parseFloat(duplicateThreshold),
-        auto_fix_threshold: parseFloat(autoFixThreshold),
+        duplicate_threshold: duplicateThreshold[0],
+        auto_fix_threshold: autoFixThreshold[0],
         custom_instructions: customInstructions.trim() || null,
         model_slug: selectedModel,
         max_classification_time_minutes: maxClassificationTime[0],
@@ -353,6 +354,27 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
               />
               <p className="text-muted-foreground text-sm">
                 Comma-separated list of labels that must be present for auto triage to proceed
+              </p>
+            </div>
+
+            {/* Duplicate Detection Threshold */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Duplicate Detection Threshold</Label>
+                <span className="text-muted-foreground text-sm font-medium">
+                  {Math.round(duplicateThreshold[0] * 100)}%
+                </span>
+              </div>
+              <Slider
+                min={0.5}
+                max={1.0}
+                step={0.05}
+                value={duplicateThreshold}
+                onValueChange={setDuplicateThreshold}
+              />
+              <p className="text-muted-foreground text-sm">
+                Issues with similarity above this threshold will be flagged as duplicates. Higher
+                values reduce false positives but may miss some duplicates.
               </p>
             </div>
 

@@ -280,14 +280,6 @@ export const userRouter = createTRPCRouter({
     return successResult();
   }),
 
-  markWelcomeFormCompleted: baseProcedure.mutation(async ({ ctx }) => {
-    await db
-      .update(kilocode_users)
-      .set({ completed_welcome_form: true })
-      .where(eq(kilocode_users.id, ctx.user.id));
-    return successResult();
-  }),
-
   updateProfile: baseProcedure
     .input(
       z.object({

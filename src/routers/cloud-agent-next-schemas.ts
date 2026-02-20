@@ -194,6 +194,19 @@ export const baseGetSessionNextOutputSchema = z.object({
   version: z.number(),
 });
 
+// Schema for answering a question
+export const baseAnswerQuestionNextSchema = z.object({
+  sessionId: z.string(),
+  questionId: z.string().min(1),
+  answers: z.array(z.array(z.string())),
+});
+
+// Schema for rejecting a question
+export const baseRejectQuestionNextSchema = z.object({
+  sessionId: z.string(),
+  questionId: z.string().min(1),
+});
+
 // Output schema for V2 initiation/message procedures
 export const baseInitiateSessionNextOutputSchema = z.object({
   cloudAgentSessionId: z.string(),

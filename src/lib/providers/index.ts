@@ -298,7 +298,7 @@ export function applyProviderSpecificLogic(
   }
 
   if (provider.id === 'gigapotato') {
-    applyGigaPotatoProviderSettings(requestToMutate);
+    applyGigaPotatoProviderSettings(requestedModel, requestToMutate);
   }
 
   if (provider.id === 'corethink') {

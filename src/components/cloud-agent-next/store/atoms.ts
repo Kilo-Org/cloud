@@ -33,6 +33,25 @@ export const partsMapAtom = atom<Map<string, { messageId: string; part: Part }>>
 export const childSessionsMapAtom = atom<Map<string, StoredMessage[]>>(new Map());
 
 /**
+ * Map of tool callID -> question requestId.
+ * Populated from question.asked events. Used by QuestionToolCard
+ * to know which requestId to send when answering/rejecting.
+ */
+export const questionRequestIdsAtom = atom<Map<string, string>>(new Map());
+
+/**
+ * Record a callID -> requestId mapping from a question.asked event.
+ */
+export const setQuestionRequestIdAtom = atom(
+  null,
+  (get, set, payload: { callId: string; requestId: string }) => {
+    const map = new Map(get(questionRequestIdsAtom));
+    map.set(payload.callId, payload.requestId);
+    set(questionRequestIdsAtom, map);
+  }
+);
+
+/**
  * Session status from session.status events
  * Can be 'idle', 'busy', or 'retry' with additional metadata
  */
@@ -47,6 +66,8 @@ export const sessionStatusAtom = atom<
 // ============================================================================
 
 export const currentSessionIdAtom = atom<string | null>(null);
+/** Organization ID for the current session (null for personal sessions) */
+export const sessionOrganizationIdAtom = atom<string | null>(null);
 export const sessionConfigAtom = atom<SessionConfig | null>(null);
 export const isStreamingAtom = atom(false);
 export const errorAtom = atom<string | null>(null);
@@ -107,9 +128,11 @@ export const totalCostAtom = atom(get => {
 export const clearMessagesAtom = atom(null, (_get, set) => {
   set(isStreamingAtom, false);
   set(currentSessionIdAtom, null);
+  set(sessionOrganizationIdAtom, null);
   set(errorAtom, null);
   set(messagesMapAtom, new Map());
   set(partsMapAtom, new Map());
+  set(questionRequestIdsAtom, new Map());
 });
 
 // ============================================================================
@@ -275,17 +298,6 @@ export const addUserMessageAtom = atom(
     set(partsMapAtom, partsMap);
   }
 );
-
-/**
- * Clear all streaming state atoms.
- * Resets messagesMapAtom, partsMapAtom, childSessionsMapAtom, and sessionStatusAtom to initial state.
- */
-export const clearStreamingStateAtom = atom(null, (_get, set) => {
-  set(messagesMapAtom, new Map());
-  set(partsMapAtom, new Map());
-  set(childSessionsMapAtom, new Map());
-  set(sessionStatusAtom, { type: 'idle' });
-});
 
 /**
  * Update a message in a child session.

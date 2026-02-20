@@ -48,6 +48,7 @@ export function writeApiMetricsDataPoint(
 				ttfb_ms: params.ttfbMs,
 				complete_request_ms: params.completeRequestMs,
 				status_code: params.statusCode,
+				created_at: Date.now(),
 			},
 		]),
 	);

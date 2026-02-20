@@ -14,7 +14,6 @@ import {
   isFreeModel,
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
-  isSlackbotOnlyModel,
   isRateLimitedModel,
 } from '@/lib/models';
 import {
@@ -68,9 +67,6 @@ import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
-const OPUS = CLAUDE_OPUS_CURRENT_MODEL_ID;
-const SONNET = CLAUDE_SONNET_CURRENT_MODEL_ID;
-
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 
@@ -78,19 +74,19 @@ const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 // Add/remove/modify entries here to change routing behavior.
 const MODE_TO_MODEL = new Map<string, string>([
   // Opus modes (planning, reasoning, orchestration, debugging)
-  ['plan', OPUS],
-  ['general', OPUS],
-  ['architect', OPUS],
-  ['orchestrator', OPUS],
-  ['ask', OPUS],
-  ['debug', OPUS],
+  ['plan', CLAUDE_OPUS_CURRENT_MODEL_ID],
+  ['general', CLAUDE_OPUS_CURRENT_MODEL_ID],
+  ['architect', CLAUDE_OPUS_CURRENT_MODEL_ID],
+  ['orchestrator', CLAUDE_OPUS_CURRENT_MODEL_ID],
+  ['ask', CLAUDE_OPUS_CURRENT_MODEL_ID],
+  ['debug', CLAUDE_OPUS_CURRENT_MODEL_ID],
   // Sonnet modes (implementation, exploration)
-  ['build', SONNET],
-  ['explore', SONNET],
-  ['code', SONNET],
+  ['build', CLAUDE_SONNET_CURRENT_MODEL_ID],
+  ['explore', CLAUDE_SONNET_CURRENT_MODEL_ID],
+  ['code', CLAUDE_SONNET_CURRENT_MODEL_ID],
 ]);
 
-const DEFAULT_AUTO_MODEL = SONNET;
+const DEFAULT_AUTO_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 function resolveAutoModel(modeHeader: string | null) {
   const mode = modeHeader?.trim().toLowerCase() ?? 'build';
@@ -186,14 +182,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user: maybeUser,
     authFailedResponse,
     organizationId: authOrganizationId,
-    internalApiUse: authInternalApiUse,
     botId: authBotId,
   } = await getUserFromAuth({ adminOnly: false });
   authSpan.end();
 
   let user: typeof maybeUser | AnonymousUserContext;
   let organizationId: string | undefined = authOrganizationId;
-  let internalApiUse: boolean | undefined = authInternalApiUse;
   let botId: string | undefined = authBotId;
 
   if (authFailedResponse) {
@@ -237,7 +231,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // Anonymous access for free model (already rate-limited above)
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
-    internalApiUse = false;
     botId = undefined;
   } else {
     user = maybeUser;
@@ -288,11 +281,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (isRateLimitedToDeath(originalModelIdLowerCased)) {
-    return modelDoesNotExistResponse();
-  }
-
-  // Slackbot-only models are only available through Kilo for Slack (internalApiUse)
-  if (isSlackbotOnlyModel(originalModelIdLowerCased) && !internalApiUse) {
     return modelDoesNotExistResponse();
   }
 

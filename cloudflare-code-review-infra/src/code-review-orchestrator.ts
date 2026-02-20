@@ -97,6 +97,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     if (storedState) {
       this.state = storedState;
+
+      // Restore usage accumulators from persisted state so they survive DO eviction
+      if (storedState.model) this.model = storedState.model;
+      if (storedState.totalTokensIn) this.totalTokensIn = storedState.totalTokensIn;
+      if (storedState.totalTokensOut) this.totalTokensOut = storedState.totalTokensOut;
+      if (storedState.totalCost) this.totalCost = storedState.totalCost;
     }
   }
 
@@ -347,10 +353,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       cliSessionId: this.state.cliSessionId,
       startedAt: this.state.startedAt,
       completedAt: this.state.completedAt,
-      model: this.state.model ?? this.model,
-      totalTokensIn: this.state.totalTokensIn ?? this.totalTokensIn,
-      totalTokensOut: this.state.totalTokensOut ?? this.totalTokensOut,
-      totalCost: this.state.totalCost ?? this.totalCost,
+      model: this.state.model,
+      totalTokensIn: this.state.totalTokensIn,
+      totalTokensOut: this.state.totalTokensOut,
+      totalCost: this.state.totalCost,
       errorMessage: this.state.errorMessage,
     };
   }
@@ -731,6 +737,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
                   if (typeof event.payload.metadata.cost === 'number') {
                     this.totalCost += event.payload.metadata.cost;
                   }
+
+                  // Sync usage data to persistent state so it survives DO eviction
+                  this.state.model = this.model;
+                  this.state.totalTokensIn = this.totalTokensIn;
+                  this.state.totalTokensOut = this.totalTokensOut;
+                  this.state.totalCost = this.totalCost;
                 }
 
                 // Add CLI session ID for session_created events

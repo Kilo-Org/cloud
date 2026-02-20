@@ -10,6 +10,7 @@ import type {
   ChannelsPatchResponse,
   PairingListResponse,
   PairingApproveResponse,
+  DoctorResponse,
 } from './types';
 
 /**
@@ -116,6 +117,13 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/pairing/approve', {
       method: 'POST',
       body: JSON.stringify({ userId, channel, code }),
+    });
+  }
+
+  async runDoctor(userId: string): Promise<DoctorResponse> {
+    return this.request('/api/platform/doctor', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
     });
   }
 }

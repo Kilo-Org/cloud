@@ -83,5 +83,8 @@ export function useKiloClawMutations() {
         },
       })
     ),
+    runDoctor: useMutation(
+      trpc.kiloclaw.runDoctor.mutationOptions({ onSuccess: invalidateStatus })
+    ),
   };
 }

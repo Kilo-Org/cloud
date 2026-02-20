@@ -105,6 +105,12 @@ export type UserConfigResponse = {
   };
 };
 
+/** Response from POST /api/platform/doctor */
+export type DoctorResponse = {
+  success: boolean;
+  output: string;
+};
+
 /** Response from POST /api/admin/gateway/restart */
 export type RestartGatewayResponse = {
   success: boolean;

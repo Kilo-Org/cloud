@@ -14,7 +14,6 @@ import {
 import { applyXaiModelSettings, isXaiModel } from '@/lib/providers/xai';
 import { applyVercelSettings, shouldRouteToVercel } from '@/lib/providers/vercel';
 import { kiloFreeModels } from '@/lib/models';
-import { applyMinimaxProviderSettings } from '@/lib/providers/minimax';
 import {
   applyAnthropicModelSettings,
   isAnthropicModel,
@@ -71,13 +70,6 @@ export const PROVIDERS = {
     hasGenerationEndpoint: false,
     requiresResponseRewrite: true,
   },
-  INCEPTION: {
-    id: 'inception',
-    apiUrl: 'https://api.inceptionlabs.ai/v1',
-    apiKey: getEnvVariable('INCEPTION_API_KEY'),
-    hasGenerationEndpoint: false,
-    requiresResponseRewrite: false,
-  },
   MARTIAN: {
     id: 'martian',
     apiUrl: 'https://api.withmartian.com/v1',
@@ -92,32 +84,11 @@ export const PROVIDERS = {
     hasGenerationEndpoint: false,
     requiresResponseRewrite: false,
   },
-  MINIMAX: {
-    id: 'minimax',
-    apiUrl: 'https://api.minimax.io/v1',
-    apiKey: getEnvVariable('MINIMAX_API_KEY'),
-    hasGenerationEndpoint: false,
-    requiresResponseRewrite: false,
-  },
-  STREAMLAKE: {
-    id: 'streamlake',
-    apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',
-    apiKey: getEnvVariable('STREAMLAKE_API_KEY'),
-    hasGenerationEndpoint: false,
-    requiresResponseRewrite: false,
-  },
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
     hasGenerationEndpoint: true,
-    requiresResponseRewrite: false,
-  },
-  XAI: {
-    id: 'x-ai',
-    apiUrl: 'https://api.x.ai/v1',
-    apiKey: getEnvVariable('XAI_API_KEY'),
-    hasGenerationEndpoint: false,
     requiresResponseRewrite: false,
   },
 } as const satisfies Record<string, Provider>;
@@ -303,10 +274,6 @@ export function applyProviderSpecificLogic(
 
   if (provider.id === 'corethink') {
     applyCoreThinkProviderSettings(requestToMutate);
-  }
-
-  if (provider.id === 'minimax') {
-    applyMinimaxProviderSettings(requestToMutate);
   }
 
   if (provider.id === 'mistral') {

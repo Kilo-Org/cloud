@@ -48,7 +48,12 @@ import {
   LIVE_CHECK_THROTTLE_MS,
 } from '../config';
 import type { FlyClientConfig } from '../fly/client';
-import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
+import type {
+  FlyMachineConfig,
+  FlyMachine,
+  FlyMachineState,
+  FlyVolumeSnapshot,
+} from '../fly/types';
 import * as fly from '../fly/client';
 import { appNameFromUserId } from '../fly/apps';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../utils/env-encryption';
@@ -992,6 +997,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       channels: this.channels ?? undefined,
       machineSize: this.machineSize ?? undefined,
     };
+  }
+
+  async listVolumeSnapshots(): Promise<FlyVolumeSnapshot[]> {
+    await this.loadState();
+    if (!this.flyVolumeId) return [];
+    const flyConfig = this.getFlyConfig();
+    return fly.listVolumeSnapshots(flyConfig, this.flyVolumeId);
   }
 
   // ========================================================================

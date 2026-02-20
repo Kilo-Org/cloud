@@ -90,6 +90,22 @@ export type PlatformStatusResponse = {
   flyRegion: string | null;
 };
 
+/** A Fly volume snapshot. */
+export type VolumeSnapshot = {
+  id: string;
+  created_at: string;
+  digest: string;
+  retention_days: number;
+  size: number;
+  status: string;
+  volume_size: number;
+};
+
+/** Response from GET /api/platform/volume-snapshots */
+export type VolumeSnapshotsResponse = {
+  snapshots: VolumeSnapshot[];
+};
+
 /** Response from GET /api/kiloclaw/config */
 export type UserConfigResponse = {
   envVarKeys: string[];

@@ -10,6 +10,7 @@ import type {
   ChannelsPatchResponse,
   PairingListResponse,
   PairingApproveResponse,
+  VolumeSnapshotsResponse,
   DoctorResponse,
 } from './types';
 
@@ -101,6 +102,10 @@ export class KiloClawInternalClient {
       method: 'PATCH',
       body: JSON.stringify({ userId, ...input }),
     });
+  }
+
+  async listVolumeSnapshots(userId: string): Promise<VolumeSnapshotsResponse> {
+    return this.request(`/api/platform/volume-snapshots?userId=${encodeURIComponent(userId)}`);
   }
 
   async listPairingRequests(userId: string, refresh = false): Promise<PairingListResponse> {

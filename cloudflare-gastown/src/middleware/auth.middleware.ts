@@ -81,3 +81,21 @@ export function getEnforcedAgentId(c: Context<GastownEnv>): string | null {
   const jwt = c.get('agentJWT') as AgentJWTPayload | null;
   return jwt?.agentId ?? null;
 }
+
+/**
+ * Resolve townId from (in priority order):
+ * 1. Route param `:townId`
+ * 2. JWT payload `townId`
+ * 3. `X-Town-Id` header (for internal worker→worker calls)
+ *
+ * Returns null if none found.
+ */
+export function getTownId(c: Context<GastownEnv>): string | null {
+  const fromParam = c.req.param('townId');
+  if (fromParam) return fromParam;
+
+  const jwt = c.get('agentJWT') as AgentJWTPayload | null;
+  if (jwt?.townId) return jwt.townId;
+
+  return c.req.header('X-Town-Id') ?? null;
+}

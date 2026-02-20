@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
-import { getRigDOStub } from '../dos/Rig.do';
+import { getTownDOStub } from '../dos/Town.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
@@ -86,11 +86,10 @@ export async function handleMayorSling(c: Context<GastownEnv>, params: { townId:
     `${HANDLER_LOG} handleMayorSling: townId=${params.townId} rigId=${parsed.data.rig_id} title="${parsed.data.title.slice(0, 80)}"`
   );
 
-  const rig = getRigDOStub(c.env, parsed.data.rig_id);
-  const result = await rig.slingBead({
-    title: parsed.data.title,
-    body: parsed.data.body,
-    metadata: parsed.data.metadata,
+  const town = getTownDOStub(c.env, params.townId);
+  const result = await town.slingBead({
+    rigId: parsed.data.rig_id,
+    ...parsed.data,
   });
 
   console.log(
@@ -152,8 +151,8 @@ export async function handleMayorListBeads(
     `${HANDLER_LOG} handleMayorListBeads: townId=${params.townId} rigId=${params.rigId} status=${statusRaw ?? 'all'} type=${typeRaw ?? 'all'}`
   );
 
-  const rig = getRigDOStub(c.env, params.rigId);
-  const beads = await rig.listBeads({
+  const town = getTownDOStub(c.env, params.townId);
+  const beads = await town.listBeads({
     status: status?.data,
     type: type?.data,
     assignee_agent_id: c.req.query('assignee_agent_id'),
@@ -182,8 +181,8 @@ export async function handleMayorListAgents(
     `${HANDLER_LOG} handleMayorListAgents: townId=${params.townId} rigId=${params.rigId}`
   );
 
-  const rig = getRigDOStub(c.env, params.rigId);
-  const agents = await rig.listAgents({});
+  const town = getTownDOStub(c.env, params.townId);
+  const agents = await town.listAgents({});
 
   return c.json(resSuccess(agents));
 }
@@ -210,8 +209,8 @@ export async function handleMayorSendMail(c: Context<GastownEnv>, params: { town
     `${HANDLER_LOG} handleMayorSendMail: townId=${params.townId} rigId=${parsed.data.rig_id} to=${parsed.data.to_agent_id} subject="${parsed.data.subject.slice(0, 80)}"`
   );
 
-  const rig = getRigDOStub(c.env, parsed.data.rig_id);
-  await rig.sendMail({
+  const town = getTownDOStub(c.env, params.townId);
+  await town.sendMail({
     from_agent_id: parsed.data.from_agent_id,
     to_agent_id: parsed.data.to_agent_id,
     subject: parsed.data.subject,

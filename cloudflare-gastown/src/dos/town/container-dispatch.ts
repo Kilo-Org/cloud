@@ -7,7 +7,6 @@ import { getTownContainerStub } from '../TownContainer.do';
 import { signAgentJWT } from '../../util/jwt.util';
 import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
 import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
-import { buildRefinerySystemPrompt } from '../../prompts/refinery-system.prompt';
 import type { TownConfig } from '../../types';
 import { buildContainerConfig } from './config';
 

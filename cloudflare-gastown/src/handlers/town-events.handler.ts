@@ -1,15 +1,11 @@
 import type { Context } from 'hono';
-import { getGastownUserStub } from '../dos/GastownUser.do';
-import { getRigDOStub } from '../dos/Rig.do';
+import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
-import type { RigBeadEventRecord } from '../db/tables/rig-bead-events.table';
-import type { UserRigRecord } from '../db/tables/user-rigs.table';
-
-type TaggedBeadEvent = RigBeadEventRecord & { rig_id: string; rig_name: string };
 
 /**
- * Fan out to all Rig DOs in a town and return a merged, sorted event stream.
+ * List bead events for a town. Since all data lives in the Town DO now,
+ * this is a single call rather than a fan-out across Rig DOs.
  * GET /api/users/:userId/towns/:townId/events?since=<iso>&limit=<n>
  */
 export async function handleListTownEvents(
@@ -20,23 +16,8 @@ export async function handleListTownEvents(
   const limitStr = c.req.query('limit');
   const limit = limitStr ? parseInt(limitStr, 10) || 100 : 100;
 
-  // Look up all rigs in the town (intra-worker DO RPC — already validated by the DO)
-  const townDO = getGastownUserStub(c.env, params.userId);
-  const rigs: UserRigRecord[] = await townDO.listRigs(params.townId);
+  const town = getTownDOStub(c.env, params.townId);
+  const events = await town.listBeadEvents({ since, limit });
 
-  // Fan out to each Rig DO in parallel
-  const eventPromises = rigs.map(async (rig): Promise<TaggedBeadEvent[]> => {
-    const rigDO = getRigDOStub(c.env, rig.id);
-    const events: RigBeadEventRecord[] = await rigDO.listBeadEvents({ since, limit });
-    return events.map(e => ({ ...e, rig_id: rig.id, rig_name: rig.name }));
-  });
-
-  const results = await Promise.allSettled(eventPromises);
-  const allEvents = results
-    .filter((r): r is PromiseFulfilledResult<TaggedBeadEvent[]> => r.status === 'fulfilled')
-    .flatMap(r => r.value)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at))
-    .slice(0, limit);
-
-  return c.json(resSuccess(allEvents));
+  return c.json(resSuccess(events));
 }

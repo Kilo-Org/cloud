@@ -26,7 +26,13 @@ export const RigRecord = z.object({
   default_branch: z.string(),
   config: z
     .string()
-    .transform(v => JSON.parse(v))
+    .transform(v => {
+      try {
+        return JSON.parse(v);
+      } catch {
+        return {};
+      }
+    })
     .pipe(z.record(z.string(), z.unknown())),
   created_at: z.string(),
 });
@@ -51,8 +57,12 @@ export function addRig(
   query(
     sql,
     /* sql */ `
-      INSERT OR REPLACE INTO rigs (id, name, git_url, default_branch, config, created_at)
+      INSERT INTO rigs (id, name, git_url, default_branch, config, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        git_url = excluded.git_url,
+        default_branch = excluded.default_branch
     `,
     [input.rigId, input.name, input.gitUrl, input.defaultBranch, '{}', timestamp]
   );

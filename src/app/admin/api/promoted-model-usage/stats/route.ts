@@ -13,10 +13,6 @@ export type PromotedModelUsageStatsResponse = {
   windowAvgRequestsPerIp: number;
   windowIpsAtRequestLimit: number;
 
-  // Last 24 hours stats (anonymous only)
-  dailyUniqueIps: number;
-  dailyTotalRequests: number;
-
   // Rate limit configuration
   promotionWindowHours: number;
   promotionMaxRequests: number;
@@ -55,17 +51,6 @@ export async function GET(
     )
     .groupBy(free_model_usage.ip_address);
 
-  // Get stats for the last 24 hours (anonymous only)
-  const dailyResult = await db
-    .select({
-      unique_ips: sql<number>`COUNT(DISTINCT ${free_model_usage.ip_address})`,
-      total_requests: sql<number>`COUNT(*)`,
-    })
-    .from(free_model_usage)
-    .where(
-      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '24 hours' AND ${ANONYMOUS_FILTER}`
-    );
-
   const bigIntToNumber = (value: unknown): number => {
     if (value === null || value === undefined) return 0;
     if (typeof value === 'bigint') return Number(value);
@@ -74,7 +59,6 @@ export async function GET(
   };
 
   const windowStats = windowResult[0];
-  const dailyStats = dailyResult[0];
 
   const windowUniqueIps = bigIntToNumber(windowStats.unique_ips);
   const windowTotalRequests = bigIntToNumber(windowStats.total_requests);
@@ -95,10 +79,6 @@ export async function GET(
     windowAvgRequestsPerIp:
       windowUniqueIps > 0 ? Math.round(windowTotalRequests / windowUniqueIps) : 0,
     windowIpsAtRequestLimit: ipsAtRequestLimit,
-
-    // Last 24 hours stats
-    dailyUniqueIps: bigIntToNumber(dailyStats.unique_ips),
-    dailyTotalRequests: bigIntToNumber(dailyStats.total_requests),
 
     // Rate limit configuration
     promotionWindowHours: PROMOTION_WINDOW_HOURS,

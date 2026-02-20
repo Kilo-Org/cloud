@@ -124,30 +124,6 @@ export function PromotedModelUsageStats() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Daily Stats */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Last 24 Hours</CardTitle>
-          <CardDescription>
-            Anonymous promoted model usage statistics for the past day
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <div className="text-muted-foreground text-sm">Unique IPs</div>
-              <div className="text-2xl font-bold">{formatNumber(data?.dailyUniqueIps ?? 0)}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground text-sm">Total Requests</div>
-              <div className="text-2xl font-bold">
-                {formatNumber(data?.dailyTotalRequests ?? 0)}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

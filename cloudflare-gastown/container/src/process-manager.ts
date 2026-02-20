@@ -1,87 +1,178 @@
 /**
- * Agent manager — tracks agents as kilo serve sessions.
+ * Agent manager — tracks agents as SDK-managed opencode sessions.
  *
- * Replaces the old Bun.spawn + stdin pipe approach. Each agent is a session
- * within a kilo serve instance (one server per worktree). Messages are sent
- * via HTTP, not stdin.
+ * Uses @kilocode/sdk's createOpencode() to start server instances in-process
+ * and client.event.subscribe() for typed event streams. No subprocesses,
+ * no SSE text parsing, no ring buffers.
  */
 
-import type { ManagedAgent, StartAgentRequest, KiloSSEEventData, KiloSSEEvent } from './types';
-import {
-  ensureServer,
-  registerSession,
-  unregisterSession,
-  stopAllServers,
-  activeServerCount,
-} from './kilo-server';
-import { createKiloClient } from './kilo-client';
-import { createSSEConsumer, isCompletionEvent, type SSEConsumer } from './sse-consumer';
+import { createOpencode, createOpencodeClient, type OpencodeClient } from '@kilocode/sdk';
+import type { ManagedAgent, StartAgentRequest, KiloSSEEvent, KiloSSEEventData } from './types';
 import { reportAgentCompleted } from './completion-reporter';
 
-const agents = new Map<string, ManagedAgent>();
-const sseConsumers = new Map<string, SSEConsumer>();
+const MANAGER_LOG = '[process-manager]';
 
-// ── Event buffer for HTTP polling ─────────────────────────────────────────
-// Each agent keeps a ring buffer of recent events. The DO polls
-// GET /agents/:agentId/events?after=N to retrieve them.
-
-type BufferedEvent = {
-  id: number;
-  event: string;
-  data: KiloSSEEventData;
-  timestamp: string;
+type SDKInstance = {
+  client: OpencodeClient;
+  server: { url: string; close(): void };
+  sessionCount: number;
 };
 
-const MAX_BUFFERED_EVENTS = 500;
-const agentEventBuffers = new Map<string, BufferedEvent[]>();
-let nextEventId = 1;
+const agents = new Map<string, ManagedAgent>();
+// One SDK server instance per workdir (shared by agents in the same worktree)
+const sdkInstances = new Map<string, SDKInstance>();
+// Tracks active event subscription abort controllers per agent
+const eventAbortControllers = new Map<string, AbortController>();
+// Event sinks for WebSocket forwarding
+const eventSinks = new Set<(agentId: string, event: string, data: unknown) => void>();
 
-function bufferAgentEvent(agentId: string, event: KiloSSEEvent): void {
-  let buf = agentEventBuffers.get(agentId);
-  if (!buf) {
-    buf = [];
-    agentEventBuffers.set(agentId, buf);
-  }
-  buf.push({
-    id: nextEventId++,
-    event: event.event,
-    data: event.data,
-    timestamp: new Date().toISOString(),
-  });
-  // Trim to cap
-  if (buf.length > MAX_BUFFERED_EVENTS) {
-    buf.splice(0, buf.length - MAX_BUFFERED_EVENTS);
-  }
-}
-
-/**
- * Get buffered events for an agent, optionally after a given event id.
- * Returns events ordered by id ascending.
- */
-export function getAgentEvents(agentId: string, afterId = 0): BufferedEvent[] {
-  const buf = agentEventBuffers.get(agentId);
-  if (!buf) return [];
-  return buf.filter(e => e.id > afterId);
-}
-
-// Clean up stale event buffers after the DO has had time to poll final events.
-const EVENT_BUFFER_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-function scheduleEventBufferCleanup(agentId: string): void {
-  setTimeout(() => {
-    agentEventBuffers.delete(agentId);
-  }, EVENT_BUFFER_TTL_MS);
-}
-
+let nextPort = 4096;
 const startTime = Date.now();
 
 export function getUptime(): number {
   return Date.now() - startTime;
 }
 
+export function registerEventSink(
+  sink: (agentId: string, event: string, data: unknown) => void
+): void {
+  eventSinks.add(sink);
+}
+
+export function unregisterEventSink(
+  sink: (agentId: string, event: string, data: unknown) => void
+): void {
+  eventSinks.delete(sink);
+}
+
+function broadcastEvent(agentId: string, event: string, data: unknown): void {
+  for (const sink of eventSinks) {
+    try {
+      sink(agentId, event, data);
+    } catch {
+      // Best-effort
+    }
+  }
+}
+
 /**
- * Start an agent: ensure kilo serve is running for the workdir, create a
- * session, send the initial prompt, and subscribe to SSE events.
+ * Get or create an SDK server instance for a workdir.
+ */
+async function ensureSDKServer(
+  workdir: string,
+  env: Record<string, string>
+): Promise<{ client: OpencodeClient; port: number }> {
+  const existing = sdkInstances.get(workdir);
+  if (existing) {
+    return {
+      client: existing.client,
+      port: parseInt(new URL(existing.server.url).port),
+    };
+  }
+
+  const port = nextPort++;
+  console.log(`${MANAGER_LOG} Starting SDK server on port ${port} for ${workdir}`);
+
+  // Set env vars before creating the server
+  for (const [key, value] of Object.entries(env)) {
+    process.env[key] = value;
+  }
+
+  // Save and set CWD for the server
+  const prevCwd = process.cwd();
+  try {
+    process.chdir(workdir);
+    const { client, server } = await createOpencode({
+      hostname: '127.0.0.1',
+      port,
+      timeout: 30_000,
+    });
+
+    const instance: SDKInstance = { client, server, sessionCount: 0 };
+    sdkInstances.set(workdir, instance);
+
+    console.log(`${MANAGER_LOG} SDK server started: ${server.url}`);
+    return { client, port };
+  } finally {
+    process.chdir(prevCwd);
+  }
+}
+
+/**
+ * Subscribe to SDK events for an agent's session and forward them.
+ */
+async function subscribeToEvents(
+  client: OpencodeClient,
+  agent: ManagedAgent,
+  request: StartAgentRequest
+): Promise<void> {
+  const controller = new AbortController();
+  eventAbortControllers.set(agent.agentId, controller);
+
+  try {
+    const result = await client.event.subscribe();
+    if (!result.stream) {
+      console.warn(`${MANAGER_LOG} No event stream returned for agent ${agent.agentId}`);
+      return;
+    }
+
+    for await (const event of result.stream) {
+      if (controller.signal.aborted) break;
+
+      // Filter by session
+      const sessionID =
+        event.properties && 'sessionID' in event.properties
+          ? String(event.properties.sessionID)
+          : undefined;
+      if (sessionID && sessionID !== agent.sessionId) continue;
+
+      agent.lastActivityAt = new Date().toISOString();
+
+      // Track active tool calls
+      if (event.properties && 'activeTools' in event.properties) {
+        const tools = event.properties.activeTools;
+        if (Array.isArray(tools)) {
+          agent.activeTools = tools.filter((t): t is string => typeof t === 'string');
+        }
+      }
+
+      // Broadcast to WebSocket sinks
+      broadcastEvent(agent.agentId, event.type ?? 'unknown', event.properties ?? {});
+
+      // Detect completion. session.idle means "done processing this turn."
+      // Mayor agents are persistent — session.idle for them means "turn done,"
+      // not "task finished." Only non-mayor agents exit on idle.
+      const isTerminal = event.type === 'session.idle' && request.role !== 'mayor';
+
+      if (isTerminal) {
+        console.log(
+          `${MANAGER_LOG} Completion detected for agent ${agent.agentId} (${agent.name}) event=${event.type}`
+        );
+        agent.status = 'exited';
+        agent.exitReason = 'completed';
+        broadcastEvent(agent.agentId, 'agent.exited', { reason: 'completed' });
+        void reportAgentCompleted(agent, 'completed');
+        break;
+      }
+    }
+  } catch (err) {
+    if (!controller.signal.aborted) {
+      console.error(`${MANAGER_LOG} Event stream error for agent ${agent.agentId}:`, err);
+      if (agent.status === 'running') {
+        agent.status = 'failed';
+        agent.exitReason = 'Event stream error';
+        broadcastEvent(agent.agentId, 'agent.exited', { reason: 'stream error' });
+        void reportAgentCompleted(agent, 'failed', 'Event stream error');
+      }
+    }
+  } finally {
+    eventAbortControllers.delete(agent.agentId);
+  }
+}
+
+/**
+ * Start an agent: ensure SDK server, create session, subscribe to events,
+ * send initial prompt.
  */
 export async function startAgent(
   request: StartAgentRequest,
@@ -116,98 +207,41 @@ export async function startAgent(
   agents.set(request.agentId, agent);
 
   try {
-    // 1. Ensure kilo serve is running for this workdir
-    console.log(
-      `[startAgent] Active agents: ${agents.size}, active servers: ${activeServerCount()}`
-    );
-    const port = await ensureServer(workdir, env);
+    // 1. Ensure SDK server is running for this workdir
+    const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
-    console.log(`[startAgent] kilo serve ready on port ${port} for agent ${request.agentId}`);
 
-    // 2. Create a session on the server
-    const client = createKiloClient(port);
-    const session = await client.createSession();
-    agent.sessionId = session.id;
-    registerSession(workdir, session.id);
+    // Track session count on the SDK instance
+    const instance = sdkInstances.get(workdir);
+    if (instance) instance.sessionCount++;
 
-    // 3. Subscribe to SSE events for observability.
-    //    The SSE stream is server-wide, so filter by our sessionId to avoid
-    //    cross-talk when multiple agents share a kilo serve instance.
-    const consumer = createSSEConsumer({
-      port,
-      onEvent: evt => {
-        const sessionID = extractSessionID(evt.data);
-        if (sessionID && sessionID !== agent.sessionId) return;
+    // 2. Create a session
+    const sessionResult = await client.session.create({ body: {} });
+    const session = sessionResult.data ?? sessionResult;
+    const sessionId =
+      typeof session === 'object' && session && 'id' in session ? String(session.id) : '';
+    agent.sessionId = sessionId;
 
-        agent.lastActivityAt = new Date().toISOString();
-
-        // Track active tool calls from event data
-        if ('properties' in evt.data && evt.data.properties) {
-          const props = evt.data.properties;
-          if ('activeTools' in props && Array.isArray(props.activeTools)) {
-            agent.activeTools = props.activeTools.filter((t): t is string => typeof t === 'string');
-          }
-        }
-
-        // Buffer for HTTP polling by the DO
-        bufferAgentEvent(request.agentId, evt);
-
-        // Detect completion. Mayor agents are persistent sessions — session.idle
-        // just means "done with this turn," not "task finished." Only rig agents
-        // (polecat, etc.) should exit on idle.
-        if (isCompletionEvent(evt, { persistent: request.role === 'mayor' })) {
-          console.log(
-            `[startAgent] Completion detected for agent ${request.agentId} (${request.name}) role=${request.role} event=${evt.event}`
-          );
-          agent.status = 'exited';
-          agent.exitReason = 'completed';
-          bufferAgentEvent(request.agentId, {
-            event: 'agent.exited',
-            data: { type: 'agent.exited', properties: { reason: 'completed' } },
-          });
-          scheduleEventBufferCleanup(request.agentId);
-          void reportAgentCompleted(agent, 'completed');
-        }
-      },
-      onActivity: () => {
-        agent.lastActivityAt = new Date().toISOString();
-      },
-      onClose: reason => {
-        console.log(
-          `[startAgent] SSE closed for agent ${request.agentId} (${request.name}) role=${request.role} reason=${reason} currentStatus=${agent.status}`
-        );
-        if (agent.status === 'running') {
-          agent.status = 'failed';
-          agent.exitReason = `SSE stream closed: ${reason}`;
-          bufferAgentEvent(request.agentId, {
-            event: 'agent.exited',
-            data: { type: 'agent.exited', properties: { reason: `stream closed: ${reason}` } },
-          });
-          scheduleEventBufferCleanup(request.agentId);
-          void reportAgentCompleted(agent, 'failed', reason);
-        }
-      },
-    });
-    sseConsumers.set(request.agentId, consumer);
+    // 3. Subscribe to events (async, runs in background)
+    void subscribeToEvents(client, agent, request);
 
     // 4. Send the initial prompt
-    await client.sendPromptAsync(session.id, {
-      prompt: request.prompt,
-      model: request.model,
-      systemPrompt: request.systemPrompt,
+    await client.session.prompt({
+      path: { id: sessionId },
+      body: {
+        parts: [{ type: 'text', text: request.prompt }],
+        ...(request.model ? { model: { providerID: 'kilo', modelID: request.model } } : {}),
+        ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
+      },
     });
 
-    // Only transition to 'running' if the SSE consumer hasn't already
-    // moved us to a terminal state (e.g. a fast completion event arrived
-    // between subscription and here).
     if (agent.status === 'starting') {
       agent.status = 'running';
     }
     agent.messageCount = 1;
 
     console.log(
-      `Started agent ${request.name} (${request.agentId}) ` +
-        `session=${session.id} port=${port} role=${request.role}`
+      `${MANAGER_LOG} Started agent ${request.name} (${request.agentId}) session=${sessionId} port=${port}`
     );
 
     return agent;
@@ -219,141 +253,116 @@ export async function startAgent(
 }
 
 /**
- * Extract sessionID from a parsed SSE event's properties, if present.
- */
-function extractSessionID(data: KiloSSEEventData): string | undefined {
-  if ('properties' in data && data.properties && 'sessionID' in data.properties) {
-    const id = data.properties.sessionID;
-    return typeof id === 'string' ? id : undefined;
-  }
-  return undefined;
-}
-
-/**
- * Stop an agent by aborting its session and cleaning up.
+ * Stop an agent by aborting its session.
  */
 export async function stopAgent(agentId: string): Promise<void> {
   const agent = agents.get(agentId);
-  if (!agent) {
-    throw new Error(`Agent ${agentId} not found`);
-  }
-
-  if (agent.status !== 'running' && agent.status !== 'starting') {
-    return;
-  }
+  if (!agent) throw new Error(`Agent ${agentId} not found`);
+  if (agent.status !== 'running' && agent.status !== 'starting') return;
 
   agent.status = 'stopping';
 
-  // Stop SSE consumer
-  const consumer = sseConsumers.get(agentId);
-  if (consumer) {
-    consumer.stop();
-    sseConsumers.delete(agentId);
-  }
+  // Abort event subscription
+  const controller = eventAbortControllers.get(agentId);
+  if (controller) controller.abort();
 
-  // Abort the session via the kilo serve API
+  // Abort the session via SDK
   try {
-    const client = createKiloClient(agent.serverPort);
-    await client.abortSession(agent.sessionId);
+    const instance = sdkInstances.get(agent.workdir);
+    if (instance) {
+      await instance.client.session.abort({ path: { id: agent.sessionId } });
+      instance.sessionCount--;
+      // Stop server if no sessions left
+      if (instance.sessionCount <= 0) {
+        instance.server.close();
+        sdkInstances.delete(agent.workdir);
+      }
+    }
   } catch (err) {
-    console.warn(`Failed to abort session for agent ${agentId}:`, err);
+    console.warn(`${MANAGER_LOG} Failed to abort session for agent ${agentId}:`, err);
   }
-
-  // Unregister the session (may stop the server if last session)
-  await unregisterSession(agent.workdir, agent.sessionId);
 
   agent.status = 'exited';
   agent.exitReason = 'stopped';
-
-  // Buffer exit event for polling
-  bufferAgentEvent(agentId, {
-    event: 'agent.exited',
-    data: { type: 'agent.exited', properties: { reason: 'stopped' } },
-  });
-  scheduleEventBufferCleanup(agentId);
+  broadcastEvent(agentId, 'agent.exited', { reason: 'stopped' });
 }
 
 /**
- * Send a follow-up prompt to an agent via the kilo serve HTTP API.
+ * Send a follow-up message to an agent.
  */
 export async function sendMessage(agentId: string, prompt: string): Promise<void> {
   const agent = agents.get(agentId);
-  if (!agent) {
-    throw new Error(`Agent ${agentId} not found`);
-  }
+  if (!agent) throw new Error(`Agent ${agentId} not found`);
   if (agent.status !== 'running') {
     throw new Error(`Agent ${agentId} is not running (status: ${agent.status})`);
   }
 
-  console.log(
-    `[sendMessage] agentId=${agentId} port=${agent.serverPort} session=${agent.sessionId} status=${agent.status} role=${agent.role} messageCount=${agent.messageCount}`
-  );
+  const instance = sdkInstances.get(agent.workdir);
+  if (!instance) throw new Error(`No SDK instance for agent ${agentId}`);
 
-  const client = createKiloClient(agent.serverPort);
-  await client.sendPromptAsync(agent.sessionId, { prompt });
+  await instance.client.session.prompt({
+    path: { id: agent.sessionId },
+    body: {
+      parts: [{ type: 'text', text: prompt }],
+    },
+  });
+
   agent.messageCount++;
   agent.lastActivityAt = new Date().toISOString();
-
-  console.log(
-    `[sendMessage] sent successfully to agent ${agentId}, messageCount=${agent.messageCount}`
-  );
 }
 
-/**
- * Get the status of an agent.
- */
 export function getAgentStatus(agentId: string): ManagedAgent | null {
   return agents.get(agentId) ?? null;
 }
 
-/**
- * List all managed agents.
- */
 export function listAgents(): ManagedAgent[] {
   return [...agents.values()];
 }
 
-/**
- * Count of active (running/starting) agents.
- */
 export function activeAgentCount(): number {
   let count = 0;
   for (const a of agents.values()) {
-    if (a.status === 'running' || a.status === 'starting') {
-      count++;
-    }
+    if (a.status === 'running' || a.status === 'starting') count++;
   }
   return count;
 }
 
-/**
- * Stop all agents and all kilo serve instances.
- */
-export async function stopAll(): Promise<void> {
-  // Stop all SSE consumers
-  for (const [id, consumer] of sseConsumers) {
-    consumer.stop();
-    sseConsumers.delete(id);
-  }
-
-  // Abort all running agent sessions
-  const running = [...agents.values()].filter(
-    a => a.status === 'running' || a.status === 'starting'
-  );
-  for (const agent of running) {
-    try {
-      const client = createKiloClient(agent.serverPort);
-      await client.abortSession(agent.sessionId);
-    } catch {
-      /* best-effort */
-    }
-    agent.status = 'exited';
-    agent.exitReason = 'container shutdown';
-  }
-
-  // Stop all kilo serve instances
-  await stopAllServers();
+export function activeServerCount(): number {
+  return sdkInstances.size;
 }
 
-/** Re-export for control-server health endpoint */
-export { activeServerCount };
+export async function stopAll(): Promise<void> {
+  // Abort all event subscriptions
+  for (const [, controller] of eventAbortControllers) {
+    controller.abort();
+  }
+  eventAbortControllers.clear();
+
+  // Abort all running sessions
+  for (const agent of agents.values()) {
+    if (agent.status === 'running' || agent.status === 'starting') {
+      try {
+        const instance = sdkInstances.get(agent.workdir);
+        if (instance) {
+          await instance.client.session.abort({ path: { id: agent.sessionId } });
+        }
+      } catch {
+        // Best-effort
+      }
+      agent.status = 'exited';
+      agent.exitReason = 'container shutdown';
+    }
+  }
+
+  // Close all SDK servers
+  for (const [, instance] of sdkInstances) {
+    instance.server.close();
+  }
+  sdkInstances.clear();
+}
+
+// Legacy: getAgentEvents is no longer needed since events flow via WebSocket.
+// Keep a stub for backward compatibility during migration.
+export function getAgentEvents(_agentId: string, _afterId = 0): unknown[] {
+  return [];
+}

@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { findUserById, softDeleteUser } from '@/lib/user';
+import { deleteStripeCustomer } from '@/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
 
 export async function nuke(kiloUserId: string) {
@@ -11,6 +12,7 @@ export async function nuke(kiloUserId: string) {
       throw new Error(`User not found: ${kiloUserId}`);
     }
 
+    await deleteStripeCustomer(user.stripe_customer_id);
     await softDeleteUser(kiloUserId);
   } catch (error) {
     console.error('Error nuking account:', error);

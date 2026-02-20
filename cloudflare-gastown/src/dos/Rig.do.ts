@@ -17,7 +17,12 @@ import {
   rig_review_queue,
   RigReviewQueueRecord,
 } from '../db/tables/rig-review-queue.table';
-import { createTableRigMolecules } from '../db/tables/rig-molecules.table';
+import {
+  createTableRigMolecules,
+  rig_molecules,
+  RigMoleculeRecord,
+} from '../db/tables/rig-molecules.table';
+import { z } from 'zod';
 import {
   createTableRigBeadEvents,
   getIndexesRigBeadEvents,
@@ -32,10 +37,12 @@ import {
   RigAgentEventRecord,
 } from '../db/tables/rig-agent-events.table';
 import { getTownContainerStub } from './TownContainer.do';
+import { getTownDOStub } from './Town.do';
 import { query } from '../util/query.util';
 import { signAgentJWT } from '../util/jwt.util';
 import { buildPolecatSystemPrompt } from '../prompts/polecat-system.prompt';
 import { buildMayorSystemPrompt } from '../prompts/mayor-system.prompt';
+import { buildRefinerySystemPrompt } from '../prompts/refinery-system.prompt';
 import type {
   Bead,
   BeadStatus,
@@ -53,6 +60,7 @@ import type {
   PrimeContext,
   AgentDoneInput,
   PatrolResult,
+  TownConfig,
 } from '../types';
 
 const RIG_LOG = '[Rig.do]';
@@ -79,6 +87,34 @@ const REVIEW_RUNNING_TIMEOUT_MS = 5 * 60 * 1000;
 
 // Max consecutive dispatch attempts before marking a bead as failed
 const MAX_DISPATCH_ATTEMPTS = 5;
+
+// Default max concurrent polecats per rig (overridable via TownConfig.max_polecats_per_rig)
+const DEFAULT_MAX_POLECATS = 5;
+
+// Polecat name pool — human-readable, unique, memorable names.
+// Names are assigned sequentially; recycled when polecats are deleted.
+const POLECAT_NAMES = [
+  'Toast',
+  'Maple',
+  'Birch',
+  'Shadow',
+  'Copper',
+  'Ember',
+  'Frost',
+  'Sage',
+  'Flint',
+  'Cedar',
+  'Dusk',
+  'Slate',
+  'Thorn',
+  'Drift',
+  'Spark',
+  'Onyx',
+  'Moss',
+  'Rust',
+  'Wren',
+  'Quartz',
+] as const;
 
 // KV keys for rig configuration (stored in DO KV storage, not SQL)
 const TOWN_ID_KEY = 'townId';
@@ -348,6 +384,20 @@ export class RigDO extends DurableObject<Env> {
 
     const bead = this.getBead(beadId);
     if (!bead) throw new Error(`Bead ${beadId} not found`);
+
+    // Notify Town DO if this bead belongs to a convoy and was just closed
+    if (status === 'closed' && bead.convoy_id) {
+      const townId = await this.getTownId();
+      if (townId) {
+        try {
+          const townDO = getTownDOStub(this.env, townId);
+          await townDO.onBeadClosed({ convoyId: bead.convoy_id, beadId });
+        } catch (err) {
+          console.warn(`${RIG_LOG} updateBeadStatus: failed to notify TownDO of bead close:`, err);
+        }
+      }
+    }
+
     return bead;
   }
 
@@ -1071,6 +1121,205 @@ export class RigDO extends DurableObject<Env> {
     await this.armAlarmIfNeeded();
   }
 
+  // ── Molecules ──────────────────────────────────────────────────────────
+
+  /** Formula step definition for molecules. */
+  private static readonly FormulaSchema = z.object({
+    steps: z
+      .array(
+        z.object({
+          title: z.string(),
+          instructions: z.string(),
+        })
+      )
+      .min(1),
+  });
+
+  async createMolecule(
+    beadId: string,
+    formula: { steps: Array<{ title: string; instructions: string }> }
+  ): Promise<RigMoleculeRecord> {
+    await this.ensureInitialized();
+    const parsed = RigDO.FormulaSchema.parse(formula);
+
+    const id = generateId();
+    const timestamp = now();
+
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${rig_molecules} (
+          ${rig_molecules.columns.id},
+          ${rig_molecules.columns.bead_id},
+          ${rig_molecules.columns.formula},
+          ${rig_molecules.columns.current_step},
+          ${rig_molecules.columns.status},
+          ${rig_molecules.columns.created_at},
+          ${rig_molecules.columns.updated_at}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [id, beadId, JSON.stringify(parsed), 0, 'active', timestamp, timestamp]
+    );
+
+    // Link molecule to bead
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${rig_beads}
+        SET ${rig_beads.columns.molecule_id} = ?
+        WHERE ${rig_beads.columns.id} = ?
+      `,
+      [id, beadId]
+    );
+
+    const mol = this.getMolecule(id);
+    if (!mol) throw new Error('Failed to create molecule');
+    console.log(
+      `${RIG_LOG} createMolecule: id=${id} beadId=${beadId} steps=${parsed.steps.length}`
+    );
+    return mol;
+  }
+
+  async getMoleculeAsync(moleculeId: string): Promise<RigMoleculeRecord | null> {
+    await this.ensureInitialized();
+    return this.getMolecule(moleculeId);
+  }
+
+  private getMolecule(moleculeId: string): RigMoleculeRecord | null {
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT * FROM ${rig_molecules} WHERE ${rig_molecules.columns.id} = ?`,
+        [moleculeId]
+      ),
+    ];
+    if (rows.length === 0) return null;
+    return RigMoleculeRecord.parse(rows[0]);
+  }
+
+  async getMoleculeForBead(beadId: string): Promise<RigMoleculeRecord | null> {
+    await this.ensureInitialized();
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT * FROM ${rig_molecules} WHERE ${rig_molecules.columns.bead_id} = ?`,
+        [beadId]
+      ),
+    ];
+    if (rows.length === 0) return null;
+    return RigMoleculeRecord.parse(rows[0]);
+  }
+
+  /**
+   * Get the current molecule step for an agent's hooked bead.
+   * Returns the step info or null if no molecule is attached.
+   */
+  async getMoleculeCurrentStep(agentId: string): Promise<{
+    moleculeId: string;
+    currentStep: number;
+    totalSteps: number;
+    step: { title: string; instructions: string };
+    status: string;
+  } | null> {
+    await this.ensureInitialized();
+    const agent = this.getAgent(agentId);
+    if (!agent?.current_hook_bead_id) return null;
+
+    const mol = await this.getMoleculeForBead(agent.current_hook_bead_id);
+    if (!mol) return null;
+
+    const formula = RigDO.FormulaSchema.parse(mol.formula);
+    if (mol.current_step >= formula.steps.length) return null;
+
+    return {
+      moleculeId: mol.id,
+      currentStep: mol.current_step,
+      totalSteps: formula.steps.length,
+      step: formula.steps[mol.current_step],
+      status: mol.status,
+    };
+  }
+
+  /**
+   * Advance the molecule to the next step. If the final step is completed,
+   * marks the molecule as completed and triggers the agent done flow.
+   */
+  async advanceMoleculeStep(
+    agentId: string,
+    summary: string
+  ): Promise<{
+    moleculeId: string;
+    previousStep: number;
+    currentStep: number;
+    totalSteps: number;
+    completed: boolean;
+  }> {
+    await this.ensureInitialized();
+    const agent = this.getAgent(agentId);
+    if (!agent?.current_hook_bead_id) {
+      throw new Error('Agent has no hooked bead');
+    }
+
+    const mol = await this.getMoleculeForBead(agent.current_hook_bead_id);
+    if (!mol) throw new Error('No molecule attached to hooked bead');
+    if (mol.status !== 'active') throw new Error(`Molecule is ${mol.status}, cannot advance`);
+
+    const formula = RigDO.FormulaSchema.parse(mol.formula);
+    const previousStep = mol.current_step;
+    const nextStep = previousStep + 1;
+    const completed = nextStep >= formula.steps.length;
+
+    // Record step completion as a bead event
+    this.writeBeadEvent({
+      beadId: agent.current_hook_bead_id,
+      agentId,
+      eventType: 'status_changed',
+      metadata: {
+        event: 'molecule_step_completed',
+        step: previousStep,
+        step_title: formula.steps[previousStep].title,
+        summary,
+      },
+    });
+
+    if (completed) {
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${rig_molecules}
+          SET ${rig_molecules.columns.current_step} = ?,
+              ${rig_molecules.columns.status} = 'completed',
+              ${rig_molecules.columns.updated_at} = ?
+          WHERE ${rig_molecules.columns.id} = ?
+        `,
+        [nextStep, now(), mol.id]
+      );
+      console.log(`${RIG_LOG} advanceMoleculeStep: molecule ${mol.id} completed`);
+    } else {
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${rig_molecules}
+          SET ${rig_molecules.columns.current_step} = ?,
+              ${rig_molecules.columns.updated_at} = ?
+          WHERE ${rig_molecules.columns.id} = ?
+        `,
+        [nextStep, now(), mol.id]
+      );
+      console.log(
+        `${RIG_LOG} advanceMoleculeStep: molecule ${mol.id} advanced to step ${nextStep}/${formula.steps.length}`
+      );
+    }
+
+    return {
+      moleculeId: mol.id,
+      previousStep,
+      currentStep: nextStep,
+      totalSteps: formula.steps.length,
+      completed,
+    };
+  }
+
   // ── Atomic Sling ────────────────────────────────────────────────────────
   // Creates bead, assigns or reuses an idle polecat, hooks them together,
   // and arms the alarm — all within a single DO call to avoid TOCTOU races.
@@ -1154,13 +1403,70 @@ export class RigDO extends DurableObject<Env> {
       console.log(`${RIG_LOG} getOrCreateAgent: no existing agent found for role=${role}`);
     }
 
-    // No idle agent found (polecat) or no agent at all — create a new one
-    console.log(`${RIG_LOG} getOrCreateAgent: creating new agent for role=${role}`);
-    return this.registerAgent({
-      role,
-      name: `${role}-${Date.now()}`,
-      identity: `${role}-${generateId()}`,
-    });
+    // For polecats: enforce concurrency cap before creating a new one
+    if (role === 'polecat') {
+      const townConfig = await this.fetchTownConfig();
+      const maxPolecats = townConfig?.max_polecats_per_rig ?? DEFAULT_MAX_POLECATS;
+      const polecatCount = this.countAgentsByRole('polecat');
+      if (polecatCount >= maxPolecats) {
+        console.error(
+          `${RIG_LOG} getOrCreateAgent: polecat cap reached (${polecatCount}/${maxPolecats}), cannot create new polecat`
+        );
+        throw new Error(
+          `Maximum polecats per rig reached (${maxPolecats}). Wait for a polecat to finish or increase the limit in town settings.`
+        );
+      }
+    }
+
+    // Allocate a name from the pool (polecats) or use role-based naming
+    const name = role === 'polecat' ? this.allocatePolecatName() : role;
+    const identity = `${role}/${name}`;
+
+    console.log(`${RIG_LOG} getOrCreateAgent: creating new agent for role=${role} name=${name}`);
+    return this.registerAgent({ role, name, identity });
+  }
+
+  /** Count agents of a given role (all statuses). */
+  private countAgentsByRole(role: string): number {
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT COUNT(*) as cnt FROM ${rig_agents}
+          WHERE ${rig_agents.columns.role} = ?
+        `,
+        [role]
+      ),
+    ];
+    return Number(rows[0]?.cnt ?? 0);
+  }
+
+  /** Pick the next available name from the polecat name pool. */
+  private allocatePolecatName(): string {
+    const usedNames = new Set(
+      [
+        ...query(
+          this.sql,
+          /* sql */ `
+            SELECT ${rig_agents.columns.name} FROM ${rig_agents}
+            WHERE ${rig_agents.columns.role} = 'polecat'
+          `,
+          []
+        ),
+      ].map(row => {
+        const parsed = RigAgentRecord.pick({ name: true }).parse(row);
+        return parsed.name;
+      })
+    );
+
+    for (const name of POLECAT_NAMES) {
+      if (!usedNames.has(name)) return name;
+    }
+
+    // Pool exhausted — fall back to numbered name
+    let n = POLECAT_NAMES.length + 1;
+    while (usedNames.has(`Polecat-${n}`)) n++;
+    return `Polecat-${n}`;
   }
 
   // ── Rig configuration (links this rig to its town + git repo) ────────
@@ -1544,14 +1850,32 @@ export class RigDO extends DurableObject<Env> {
     }
   }
 
-  /** Generate a branch name for an agent. */
-  private static branchForAgent(name: string): string {
+  /** Generate a branch name for an agent working on a specific bead. */
+  private static branchForAgent(name: string, beadId?: string): string {
     // Sanitize agent name → branch-safe slug
     const slug = name
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/-+/g, '-');
-    return `gt/${slug}`;
+    // Include bead ID prefix for branch isolation between assignments
+    const beadSuffix = beadId ? `/${beadId.slice(0, 8)}` : '';
+    return `gt/${slug}${beadSuffix}`;
+  }
+
+  /**
+   * Fetch TownConfig from the Town DO for this rig's town.
+   * Returns null if no town is configured.
+   */
+  private async fetchTownConfig(): Promise<TownConfig | null> {
+    const townId = await this.getTownId();
+    if (!townId) return null;
+    try {
+      const townDO = getTownDOStub(this.env, townId);
+      return await townDO.getTownConfig();
+    } catch (err) {
+      console.warn(`${RIG_LOG} fetchTownConfig: failed to fetch config from TownDO:`, err);
+      return null;
+    }
   }
 
   /**
@@ -1579,7 +1903,22 @@ export class RigDO extends DurableObject<Env> {
       const token = await this.mintAgentToken(params.agentId, config);
       console.log(`${RIG_LOG} startAgentInContainer: JWT minted=${!!token}`);
 
-      const envVars: Record<string, string> = {};
+      // 1. Start with town-level env vars (config inheritance: town → system → agent)
+      const townConfig = await this.fetchTownConfig();
+      const envVars: Record<string, string> = { ...(townConfig?.env_vars ?? {}) };
+
+      // 2. Map git_auth tokens to env vars
+      if (townConfig?.git_auth?.github_token) {
+        envVars.GIT_TOKEN = townConfig.git_auth.github_token;
+      }
+      if (townConfig?.git_auth?.gitlab_token) {
+        envVars.GITLAB_TOKEN = townConfig.git_auth.gitlab_token;
+      }
+      if (townConfig?.git_auth?.gitlab_instance_url) {
+        envVars.GITLAB_INSTANCE_URL = townConfig.git_auth.gitlab_instance_url;
+      }
+
+      // 3. System defaults (overwrite user-provided values for reserved keys)
       if (token) {
         envVars.GASTOWN_SESSION_TOKEN = token;
       }
@@ -1594,7 +1933,7 @@ export class RigDO extends DurableObject<Env> {
 
       const rigId = this.ctx.id.name ?? config.rigId ?? '';
       console.log(
-        `${RIG_LOG} startAgentInContainer: rigId=${rigId} gitUrl=${config.gitUrl} branch=${RigDO.branchForAgent(params.agentName)}`
+        `${RIG_LOG} startAgentInContainer: rigId=${rigId} gitUrl=${config.gitUrl} branch=${RigDO.branchForAgent(params.agentName, params.beadId)}`
       );
 
       const prompt = RigDO.buildPrompt({
@@ -1626,7 +1965,7 @@ export class RigDO extends DurableObject<Env> {
             townId: config.townId,
           }),
           gitUrl: config.gitUrl,
-          branch: RigDO.branchForAgent(params.agentName),
+          branch: RigDO.branchForAgent(params.agentName, params.beadId),
           defaultBranch: config.defaultBranch,
           envVars,
         }),
@@ -1664,8 +2003,66 @@ export class RigDO extends DurableObject<Env> {
     const entry = await this.popReviewQueue();
     if (!entry) return false;
 
-    await this.startMergeInContainer(config, entry);
+    // If refinery gates are configured, dispatch an AI refinery agent.
+    // Otherwise, use the deterministic merge fallback.
+    const townConfig = await this.fetchTownConfig();
+    const gates = townConfig?.refinery?.gates ?? [];
+
+    if (gates.length > 0) {
+      await this.startRefineryAgent(config, entry, gates);
+    } else {
+      await this.startMergeInContainer(config, entry);
+    }
     return true;
+  }
+
+  /**
+   * Dispatch an AI refinery agent to review and merge a polecat's branch.
+   * The refinery runs quality gates, reviews the diff, and decides
+   * whether to merge or request rework.
+   */
+  private async startRefineryAgent(
+    config: RigConfig,
+    entry: ReviewQueueEntry,
+    gates: string[]
+  ): Promise<void> {
+    const refineryAgent = await this.getOrCreateAgent('refinery');
+    const rigId = this.ctx.id.name ?? config.rigId ?? '';
+
+    const systemPrompt = buildRefinerySystemPrompt({
+      identity: refineryAgent.identity,
+      rigId,
+      townId: config.townId,
+      gates,
+      branch: entry.branch,
+      targetBranch: config.defaultBranch,
+      polecatAgentId: entry.agent_id,
+    });
+
+    const prompt = `Review and process merge request for branch "${entry.branch}" into "${config.defaultBranch}".${entry.summary ? `\n\nPolecat summary: ${entry.summary}` : ''}`;
+
+    // Hook the review's bead to the refinery so it shows in the dashboard
+    await this.hookBead(refineryAgent.id, entry.bead_id);
+
+    const started = await this.startAgentInContainer(config, {
+      agentId: refineryAgent.id,
+      agentName: refineryAgent.name,
+      role: 'refinery',
+      identity: refineryAgent.identity,
+      beadId: entry.bead_id,
+      beadTitle: prompt,
+      beadBody: `Quality gates: ${gates.join(', ')}\nBranch: ${entry.branch}\nTarget: ${config.defaultBranch}`,
+      checkpoint: null,
+    });
+
+    if (!started) {
+      console.error(
+        `${RIG_LOG} startRefineryAgent: failed to start refinery for entry ${entry.id}`
+      );
+      await this.unhookBead(refineryAgent.id);
+      // Fall back to deterministic merge
+      await this.startMergeInContainer(config, entry);
+    }
   }
 
   /**
@@ -1704,7 +2101,21 @@ export class RigDO extends DurableObject<Env> {
         return;
       }
 
-      const envVars: Record<string, string> = {};
+      // Start with town-level env vars for git auth tokens
+      const townConfig = await this.fetchTownConfig();
+      const envVars: Record<string, string> = { ...(townConfig?.env_vars ?? {}) };
+
+      // Map git_auth tokens
+      if (townConfig?.git_auth?.github_token) {
+        envVars.GIT_TOKEN = townConfig.git_auth.github_token;
+      }
+      if (townConfig?.git_auth?.gitlab_token) {
+        envVars.GITLAB_TOKEN = townConfig.git_auth.gitlab_token;
+      }
+      if (townConfig?.git_auth?.gitlab_instance_url) {
+        envVars.GITLAB_INSTANCE_URL = townConfig.git_auth.gitlab_instance_url;
+      }
+
       if (token) {
         envVars.GASTOWN_SESSION_TOKEN = token;
       }

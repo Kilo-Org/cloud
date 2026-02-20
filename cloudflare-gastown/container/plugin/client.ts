@@ -141,6 +141,34 @@ export class GastownClient {
       body: JSON.stringify(input),
     });
   }
+
+  async getMoleculeCurrentStep(): Promise<{
+    moleculeId: string;
+    currentStep: number;
+    totalSteps: number;
+    step: { title: string; instructions: string };
+    status: string;
+  } | null> {
+    try {
+      return await this.request(this.rigPath(`/agents/${this.agentId}/molecule/current`));
+    } catch (err) {
+      if (err instanceof GastownApiError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  async advanceMoleculeStep(summary: string): Promise<{
+    moleculeId: string;
+    previousStep: number;
+    currentStep: number;
+    totalSteps: number;
+    completed: boolean;
+  }> {
+    return this.request(this.rigPath(`/agents/${this.agentId}/molecule/advance`), {
+      method: 'POST',
+      body: JSON.stringify({ summary }),
+    });
+  }
 }
 
 /**

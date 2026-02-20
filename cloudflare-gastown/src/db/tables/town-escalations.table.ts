@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
-export const EscalationSeverity = z.enum(['low', 'medium', 'high']);
+export const EscalationSeverity = z.enum(['low', 'medium', 'high', 'critical']);
 
 export const TownEscalationRecord = z.object({
   id: z.string(),
@@ -25,7 +25,7 @@ export function createTableTownEscalations(): string {
     id: `text primary key`,
     source_rig_id: `text not null`,
     source_agent_id: `text`,
-    severity: `text not null check(severity in ('low', 'medium', 'high'))`,
+    severity: `text not null check(severity in ('low', 'medium', 'high', 'critical'))`,
     category: `text`,
     message: `text not null`,
     acknowledged: `integer not null default 0`,

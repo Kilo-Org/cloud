@@ -370,7 +370,7 @@ export class MayorDO extends DurableObject<Env> {
         name: agentName,
         identity,
         prompt: initialMessage,
-        model: model ?? 'kilo/claude-sonnet-4-20250514',
+        model,
         systemPrompt: MayorDO.mayorSystemPrompt(identity, config.townId),
         gitUrl: config.gitUrl,
         branch: `gt/mayor`,

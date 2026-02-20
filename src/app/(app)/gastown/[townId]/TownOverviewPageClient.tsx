@@ -12,7 +12,7 @@ import { CreateRigDialog } from '@/components/gastown/CreateRigDialog';
 import { MayorChat } from '@/components/gastown/MayorChat';
 import { ActivityFeedView } from '@/components/gastown/ActivityFeed';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
-import { ArrowLeft, Plus, GitBranch, Trash2, Activity, Bot, Users } from 'lucide-react';
+import { ArrowLeft, Plus, GitBranch, Trash2, Activity, Bot, Users, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -62,15 +62,24 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
               Back to towns
             </button>
 
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setIsCreateRigOpen(true)}
-              className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-            >
-              <Plus className="size-5" />
-              New Rig
-            </Button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void router.push(`/gastown/${townId}/settings`)}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white/85"
+              >
+                <Settings className="size-4" />
+                Settings
+              </button>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setIsCreateRigOpen(true)}
+                className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              >
+                <Plus className="size-5" />
+                New Rig
+              </Button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3">

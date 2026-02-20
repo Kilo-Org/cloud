@@ -19,6 +19,7 @@ const CreateRigBody = z.object({
   git_url: z.string().url(),
   default_branch: z.string().min(1).default('main'),
   kilocode_token: z.string().min(1).optional(),
+  platform_integration_id: z.string().min(1).optional(),
 });
 
 /**

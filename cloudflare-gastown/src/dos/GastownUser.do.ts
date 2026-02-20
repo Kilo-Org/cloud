@@ -115,10 +115,11 @@ export class GastownUserDO extends DurableObject<Env> {
     name: string;
     git_url: string;
     default_branch: string;
+    platform_integration_id?: string;
   }): Promise<UserRigRecord> {
     await this.ensureInitialized();
     console.log(
-      `${USER_LOG} createRig: town_id=${input.town_id} name=${input.name} git_url=${input.git_url} default_branch=${input.default_branch}`
+      `${USER_LOG} createRig: town_id=${input.town_id} name=${input.name} git_url=${input.git_url} default_branch=${input.default_branch} integration=${input.platform_integration_id ?? 'none'}`
     );
 
     // Verify town exists
@@ -140,11 +141,21 @@ export class GastownUserDO extends DurableObject<Env> {
           ${user_rigs.columns.name},
           ${user_rigs.columns.git_url},
           ${user_rigs.columns.default_branch},
+          ${user_rigs.columns.platform_integration_id},
           ${user_rigs.columns.created_at},
           ${user_rigs.columns.updated_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [id, input.town_id, input.name, input.git_url, input.default_branch, timestamp, timestamp]
+      [
+        id,
+        input.town_id,
+        input.name,
+        input.git_url,
+        input.default_branch,
+        input.platform_integration_id ?? null,
+        timestamp,
+        timestamp,
+      ]
     );
 
     const rig = this.getRig(id);

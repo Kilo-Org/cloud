@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { GastownClient } from './client';
 import type { Bead, Mail, PrimeContext } from './types';
 
-// Mock the @opencode-ai/plugin module to avoid its broken ESM import chain.
+// Mock the @kilocode/plugin module to avoid its broken ESM import chain.
 // The real `tool` is a passthrough that attaches `tool.schema = z`.
 import { z } from 'zod';
 
@@ -11,7 +11,7 @@ function toolFn(def: Record<string, unknown>) {
 }
 toolFn.schema = z;
 
-vi.mock('@opencode-ai/plugin', () => ({
+vi.mock('@kilocode/plugin', () => ({
   tool: toolFn,
 }));
 

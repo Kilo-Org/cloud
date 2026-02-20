@@ -116,3 +116,60 @@ export type PatrolResult = {
   stale_agents: string[];
   orphaned_beads: string[];
 };
+
+// -- Town Configuration --
+
+export const TownConfigSchema = z.object({
+  /** Environment variables injected into all agent processes */
+  env_vars: z.record(z.string(), z.string()).default({}),
+
+  /** Git authentication (used by git-manager for clone/push) */
+  git_auth: z
+    .object({
+      github_token: z.string().optional(),
+      gitlab_token: z.string().optional(),
+      gitlab_instance_url: z.string().optional(),
+    })
+    .default({}),
+
+  /** Default LLM model for new agent sessions */
+  default_model: z.string().optional(),
+
+  /** Maximum concurrent polecats per rig */
+  max_polecats_per_rig: z.number().int().min(1).max(20).optional(),
+
+  /** Refinery configuration */
+  refinery: z
+    .object({
+      gates: z.array(z.string()).default([]),
+      auto_merge: z.boolean().default(true),
+      require_clean_merge: z.boolean().default(true),
+    })
+    .optional(),
+
+  /** Alarm interval when agents are active (seconds) */
+  alarm_interval_active: z.number().int().min(5).max(600).optional(),
+
+  /** Alarm interval when idle (seconds) */
+  alarm_interval_idle: z.number().int().min(30).max(3600).optional(),
+
+  /** Container settings */
+  container: z
+    .object({
+      sleep_after_minutes: z.number().int().min(5).max(120).optional(),
+    })
+    .optional(),
+});
+
+export type TownConfig = z.infer<typeof TownConfigSchema>;
+
+/** Partial update schema — all fields optional for merge updates */
+export const TownConfigUpdateSchema = TownConfigSchema.partial();
+export type TownConfigUpdate = z.infer<typeof TownConfigUpdateSchema>;
+
+/** Agent-level config overrides (merged on top of town config) */
+export const AgentConfigOverridesSchema = z.object({
+  env_vars: z.record(z.string(), z.string()).optional(),
+  model: z.string().optional(),
+});
+export type AgentConfigOverrides = z.infer<typeof AgentConfigOverridesSchema>;

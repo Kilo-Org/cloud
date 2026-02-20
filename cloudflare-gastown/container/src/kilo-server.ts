@@ -9,6 +9,7 @@
  * is unaffected.
  */
 
+import { mkdir, writeFile } from 'node:fs/promises';
 import type { Subprocess } from 'bun';
 import type { KiloServerInstance } from './types';
 
@@ -96,7 +97,34 @@ async function doStartServer(workdir: string, env: Record<string, string>): Prom
 
   const port = allocatePort();
 
-  const mergedEnv = { ...process.env, ...env };
+  // Write config to a per-workdir config directory. Each kilo serve instance
+  // gets its own config file to avoid races when multiple servers start
+  // concurrently (e.g., mayor + polecat). We set XDG_CONFIG_HOME in the
+  // child env so kilo serve reads from this isolated directory.
+  const configDir = `/tmp/kilo-config-${port}`;
+  if (env.KILO_CONFIG_CONTENT) {
+    await mkdir(`${configDir}/kilo`, { recursive: true });
+    await writeFile(`${configDir}/kilo/config.json`, env.KILO_CONFIG_CONTENT, { mode: 0o600 });
+    console.log(`[kilo-server] Wrote config.json to ${configDir}/kilo/ for port ${port}`);
+  }
+
+  // Also ensure the global config dir has the gastown plugin symlink visible
+  // to this instance. Copy the plugin symlink into the per-instance config.
+  try {
+    const { symlink } = await import('node:fs/promises');
+    await mkdir(`${configDir}/kilo/plugins`, { recursive: true });
+    await symlink('/opt/gastown-plugin/index.ts', `${configDir}/kilo/plugins/gastown.ts`).catch(
+      () => {}
+    );
+  } catch {
+    // Plugin symlink already exists or /opt/gastown-plugin not available
+  }
+
+  const mergedEnv = {
+    ...process.env,
+    ...env,
+    XDG_CONFIG_HOME: configDir,
+  };
 
   const child: Subprocess = Bun.spawn(
     ['kilo', 'serve', '--port', String(port), '--hostname', '127.0.0.1', '--print-logs'],

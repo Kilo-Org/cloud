@@ -111,6 +111,7 @@ describe('analysis-service', () => {
     expect(mockInitiateSessionStream).toHaveBeenCalledWith(
       expect.objectContaining({
         kilocodeOrganizationId: organizationId,
+        createdOnPlatform: 'security-agent',
       })
     );
   });

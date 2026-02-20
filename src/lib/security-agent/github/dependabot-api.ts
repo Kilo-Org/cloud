@@ -105,6 +105,11 @@ function toInternalAlert(alert: GitHubDependabotAlert): DependabotAlertRaw {
   };
 }
 
+export type FetchAlertsResult =
+  | { status: 'success'; alerts: DependabotAlertRaw[] }
+  | { status: 'repo_not_found' }
+  | { status: 'alerts_disabled' };
+
 /**
  * Fetch ALL Dependabot alerts for a repository (including fixed/dismissed)
  * This is used for full sync to capture complete history.
@@ -115,7 +120,7 @@ export async function fetchAllDependabotAlerts(
   installationId: string,
   owner: string,
   repo: string
-): Promise<DependabotAlertRaw[]> {
+): Promise<FetchAlertsResult> {
   log(`Fetching alerts for ${owner}/${repo}`, { installationId });
 
   const apiStartTime = performance.now();
@@ -154,20 +159,28 @@ export async function fetchAllDependabotAlerts(
       durationMs: apiDurationMs,
     });
 
-    return alerts;
+    return { status: 'success', alerts };
   } catch (error) {
     const apiDurationMs = Math.round(performance.now() - apiStartTime);
-    const status = (error as { status?: number }).status;
+    const httpStatus = (error as { status?: number }).status;
     const message = (error as { message?: string }).message;
 
     // Handle case where Dependabot alerts are disabled for the repository
-    if (status === 403 && message?.includes('Dependabot alerts are disabled')) {
+    if (httpStatus === 403 && message?.includes('Dependabot alerts are disabled')) {
       log(`Dependabot alerts are disabled for ${owner}/${repo}, skipping`);
-      return [];
+      return { status: 'alerts_disabled' };
+    }
+
+    // Handle case where repository no longer exists or is inaccessible
+    if (httpStatus === 404) {
+      warn(
+        `Repository ${owner}/${repo} not found (may have been deleted or transferred), skipping`
+      );
+      return { status: 'repo_not_found' };
     }
 
     logError(`Error fetching alerts for ${owner}/${repo}`, {
-      status,
+      status: httpStatus,
       message,
       durationMs: apiDurationMs,
     });

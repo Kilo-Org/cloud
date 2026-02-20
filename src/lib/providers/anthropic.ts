@@ -35,10 +35,6 @@ export function isHaikuModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/claude-haiku');
 }
 
-export function isOpusModel(requestedModel: string) {
-  return requestedModel.startsWith('anthropic/claude-opus');
-}
-
 type ReadFileParametersSchema = {
   properties?: {
     files?: {

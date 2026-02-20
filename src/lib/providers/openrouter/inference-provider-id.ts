@@ -1,6 +1,7 @@
 import * as z from 'zod';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
+  'alibaba',
   'amazon-bedrock',
   'anthropic',
   'arcee-ai',
@@ -46,7 +47,7 @@ export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
-export const VercelNonUserByokInferenceProviderIdSchema = z.enum(['bedrock', 'vertex']);
+export const VercelNonUserByokInferenceProviderIdSchema = z.enum(['alibaba', 'bedrock', 'vertex']);
 
 export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
   VercelNonUserByokInferenceProviderIdSchema
@@ -81,19 +82,22 @@ const modelPrefixToVercelInferenceProviderMapping = {
   openai: VercelUserByokInferenceProviderIdSchema.enum.openai,
   minimax: VercelUserByokInferenceProviderIdSchema.enum.minimax,
   mistralai: VercelUserByokInferenceProviderIdSchema.enum.mistral,
+  qwen: VercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
   'x-ai': VercelUserByokInferenceProviderIdSchema.enum.xai,
   'z-ai': VercelUserByokInferenceProviderIdSchema.enum.zai,
-} as Record<string, VercelUserByokInferenceProviderId | undefined>;
+} as Record<string, VercelInferenceProviderId | undefined>;
 
 export function inferUserByokProviderForModel(model: string): UserByokProviderId | null {
   return model.startsWith('mistralai/codestral')
     ? AutocompleteUserByokProviderIdSchema.enum.codestral
-    : inferVercelFirstPartyInferenceProviderForModel(model);
+    : (VercelUserByokInferenceProviderIdSchema.safeParse(
+        inferVercelFirstPartyInferenceProviderForModel(model)
+      ).data ?? null);
 }
 
 export function inferVercelFirstPartyInferenceProviderForModel(
   model: string
-): VercelUserByokInferenceProviderId | null {
+): VercelInferenceProviderId | null {
   return model.startsWith('openai/gpt-oss')
     ? null
     : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);

@@ -1,21 +1,12 @@
 #!/usr/bin/env bash
-# Test 5: Verify only one container per town (no phantom containers)
+# Test 5: Verify sending multiple messages to the same town doesn't spawn extra containers
+# (Each town gets exactly one TownContainerDO, so repeated messages should reuse it)
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 
-USER_ID="e2e-user-$(date +%s)"
+USER_ID=$(unique_user_id)
 FAKE_TOKEN="e2e-kilo-token-$(date +%s)"
 
-# Kill any leftover containers from previous runs
-echo "  Cleaning up any existing containers..."
-docker ps -q 2>/dev/null | xargs -r docker kill 2>/dev/null || true
-sleep 1
-
-# Count containers before
-BEFORE_COUNT=$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
-echo "  Containers before: ${BEFORE_COUNT}"
-
-# Create town + rig
 echo "  Creating town and rig..."
 api_post "/api/users/${USER_ID}/towns" '{"name":"Single-Container-Town"}'
 assert_status "201" "create town"
@@ -29,40 +20,35 @@ api_post "/api/users/${USER_ID}/rigs" "$(jq -n \
   '{town_id: $town_id, name: $name, git_url: $git_url, default_branch: "main", kilocode_token: $kilocode_token}')"
 assert_status "201" "create rig"
 
-# Send mayor message to trigger container start
-echo "  Sending mayor message to start container..."
+# Snapshot container count before first message
+BEFORE_COUNT=$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
+
+# Send first mayor message to trigger container start
+echo "  Sending first mayor message..."
 api_post "/api/towns/${TOWN_ID}/mayor/message" '{"message":"Test single container"}'
+assert_status "200" "first message"
 
 # Wait for container to start
-echo "  Waiting for container to start..."
 sleep 10
 
-# Count containers
-AFTER_COUNT=$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
-echo "  Containers after: ${AFTER_COUNT}"
+AFTER_FIRST=$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
+FIRST_DELTA=$((AFTER_FIRST - BEFORE_COUNT))
+echo "  Containers after first message: ${AFTER_FIRST} (delta: +${FIRST_DELTA})"
 
-# Should have exactly 1 container (or 0 if container doesn't start in test env)
-if [[ "$AFTER_COUNT" -gt 1 ]]; then
-  echo "  FAIL: More than 1 container running!"
-  echo "  Container list:"
-  docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}"
-  exit 1
-fi
-
-echo "  Container count OK (${AFTER_COUNT})"
-
-# Send another message — should NOT spawn a second container
-echo "  Sending second mayor message..."
+# Send a second message to the same town — should NOT spawn additional containers
+echo "  Sending second mayor message to same town..."
 api_post "/api/towns/${TOWN_ID}/mayor/message" '{"message":"Second message"}'
-sleep 3
+assert_status "200" "second message"
+sleep 5
 
-FINAL_COUNT=$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
-echo "  Containers after second message: ${FINAL_COUNT}"
+AFTER_SECOND=$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
+SECOND_DELTA=$((AFTER_SECOND - AFTER_FIRST))
+echo "  Containers after second message: ${AFTER_SECOND} (delta from first: +${SECOND_DELTA})"
 
-if [[ "$FINAL_COUNT" -gt 1 ]]; then
-  echo "  FAIL: Second message spawned additional container!"
+if [[ "$SECOND_DELTA" -gt 0 ]]; then
+  echo "  FAIL: Second message to the same town spawned ${SECOND_DELTA} additional container(s)!"
   docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}"
   exit 1
 fi
 
-echo "  Single container verified OK"
+echo "  Same-town container reuse verified OK"

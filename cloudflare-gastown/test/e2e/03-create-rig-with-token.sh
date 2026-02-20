@@ -3,7 +3,7 @@
 set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 
-USER_ID="e2e-user-$(date +%s)"
+USER_ID=$(unique_user_id)
 FAKE_TOKEN="test-kilocode-token-$(date +%s)"
 
 # Create town

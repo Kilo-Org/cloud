@@ -5,6 +5,11 @@ BASE_URL="${BASE_URL:-http://localhost:9787}"
 HTTP_STATUS=""
 HTTP_BODY=""
 
+# Generate a unique user ID for this test run
+unique_user_id() {
+  echo "e2e-user-$(date +%s)-${RANDOM}"
+}
+
 # Temp files for IPC between subshell and parent
 _E2E_STATUS_FILE=$(mktemp)
 _E2E_BODY_FILE=$(mktemp)
@@ -13,6 +18,9 @@ _e2e_cleanup_tmpfiles() {
   rm -f "$_E2E_STATUS_FILE" "$_E2E_BODY_FILE" 2>/dev/null
 }
 trap _e2e_cleanup_tmpfiles EXIT
+
+# Set this to a town ID to have it sent as X-Town-Id header on all requests
+CURRENT_TOWN_ID=""
 
 # Generic fetch: api_call METHOD PATH [BODY]
 # Sets $HTTP_STATUS and $HTTP_BODY
@@ -23,6 +31,9 @@ api_call() {
   local url="${BASE_URL}${path}"
 
   local curl_args=(-s -o "$_E2E_BODY_FILE" -w '%{http_code}' -X "$method" -H 'Content-Type: application/json')
+  if [[ -n "$CURRENT_TOWN_ID" ]]; then
+    curl_args+=(-H "X-Town-Id: ${CURRENT_TOWN_ID}")
+  fi
   if [[ -n "$body" ]]; then
     curl_args+=(-d "$body")
   fi

@@ -462,7 +462,7 @@ export class TownDO extends DurableObject<Env> {
   }): Promise<{ bead: Bead; agent: Agent }> {
     await this.ensureInitialized();
 
-    const bead = beads.createBead(this.sql, {
+    const createdBead = beads.createBead(this.sql, {
       type: 'issue',
       title: input.title,
       body: input.body,
@@ -470,10 +470,14 @@ export class TownDO extends DurableObject<Env> {
     });
 
     const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
-    agents.hookBead(this.sql, agent.id, bead.id);
+    agents.hookBead(this.sql, agent.id, createdBead.id);
+
+    // Re-read bead and agent after hook (hookBead updates both)
+    const bead = beads.getBead(this.sql, createdBead.id) ?? createdBead;
+    const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
 
     await this.armAlarmIfNeeded();
-    return { bead, agent };
+    return { bead, agent: hookedAgent };
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1146,25 +1150,20 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /**
-   * Proactive container + mayor startup.
-   * Pings the container to keep it warm and ensures the mayor agent is alive.
+   * Proactive container health check.
+   * Only pings the container if there's been recent activity (active agents
+   * or pending work). This avoids waking sleeping containers for idle towns.
    */
   private async ensureContainerReady(): Promise<void> {
+    // Only keep the container warm if there are active/pending agents
+    if (!this.hasActiveWork()) return;
+
     const townId = this.townId;
     if (!townId) return;
 
     try {
       const container = getTownContainerStub(this.env, townId);
-      const res = await container.fetch('http://container/health');
-      if (!res.ok) return;
-
-      // Container is up — check if mayor needs starting
-      const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
-      if (mayor && mayor.status === 'working') return; // Already running
-
-      // If there are rigs configured, the mayor should be running
-      const rigList = rigs.listRigs(this.sql);
-      if (rigList.length === 0) return; // No rigs, no mayor needed yet
+      await container.fetch('http://container/health');
     } catch {
       // Container is starting up or unavailable — alarm will retry
     }

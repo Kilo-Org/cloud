@@ -347,7 +347,7 @@ export async function execCommand(
   config: FlyClientConfig,
   machineId: string,
   command: string[],
-  timeout = 10
+  timeout = 60
 ): Promise<MachineExecResponse> {
   const body: MachineExecRequest = { command, timeout };
   const resp = await flyFetch(config, `/machines/${machineId}/exec`, {

@@ -1,5 +1,6 @@
 import { microdollar_usage, organization_seats_purchases, organizations } from '@/db/schema';
 import { db } from '@/lib/drizzle';
+import { successResult } from '@/lib/maybe-result';
 import { captureMessage } from '@sentry/nextjs';
 import type { OrganizationWithMembers } from '@/lib/organizations/organization-types';
 import {
@@ -9,6 +10,7 @@ import {
   OrganizationCreateRequestSchema,
   OrganizationPlanSchema,
 } from '@/lib/organizations/organization-types';
+import { CompanyDomainSchema } from '@/lib/organizations/company-domain';
 import {
   createOrganization,
   getOrganizationById,
@@ -32,6 +34,9 @@ import { TRPCError } from '@trpc/server';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { processOrganizationExpirations } from '@/lib/creditExpiration';
+import { credit_transactions } from '@/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { organizationSsoRouter } from '@/routers/organizations/organization-sso-router';
 import { organizationAuditLogRouter } from '@/routers/organizations/organization-audit-log-router';
@@ -132,7 +137,12 @@ export const organizationsRouter = createTRPCRouter({
         message: `You have reached the maximum number of organizations (${MAX_ORGANIZATIONS_PER_USER}) allowed. Please contact support if you need more.`,
       });
     }
-    const org = await createOrganization(opts.input.name, user.id, opts.input.autoAddCreator);
+    const org = await createOrganization(
+      opts.input.name,
+      user.id,
+      opts.input.autoAddCreator,
+      opts.input.company_domain ?? undefined
+    );
     await getOrCreateStripeCustomerIdForOrganization(org.id);
 
     const hog = PostHogClient();
@@ -164,10 +174,24 @@ export const organizationsRouter = createTRPCRouter({
     return { organization: org };
   }),
 
+  updateCompanyDomain: organizationOwnerProcedure
+    .input(
+      OrganizationIdInputSchema.extend({
+        company_domain: CompanyDomainSchema.nullable(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      await db
+        .update(organizations)
+        .set({ company_domain: input.company_domain })
+        .where(eq(organizations.id, input.organizationId));
+      return successResult();
+    }),
+
   withMembers: organizationMemberProcedure.query<OrganizationWithMembers>(async opts => {
     const organizationId = opts.input.organizationId;
 
-    const organization = await getOrganizationById(organizationId);
+    let organization = await getOrganizationById(organizationId);
 
     if (!organization) {
       throw new TRPCError({
@@ -175,6 +199,26 @@ export const organizationsRouter = createTRPCRouter({
         message: 'Organization not found',
       });
     }
+
+    // Process pending credit expirations before returning stale balance
+    if (
+      organization.next_credit_expiration_at &&
+      new Date() >= new Date(organization.next_credit_expiration_at)
+    ) {
+      const expiryResult = await processOrganizationExpirations(
+        {
+          id: organizationId,
+          microdollars_used: organization.microdollars_used,
+          next_credit_expiration_at: organization.next_credit_expiration_at,
+          total_microdollars_acquired: organization.total_microdollars_acquired,
+        },
+        new Date()
+      );
+      if (expiryResult) {
+        organization = (await getOrganizationById(organizationId)) ?? organization;
+      }
+    }
+
     const members = await getOrganizationMembers(organizationId);
 
     return {
@@ -253,6 +297,31 @@ export const organizationsRouter = createTRPCRouter({
 
   creditTransactions: organizationMemberProcedure.query(async opts => {
     return await getCreditTransactionsForOrganization(opts.input.organizationId);
+  }),
+
+  getCreditBlocks: organizationMemberProcedure.query(async opts => {
+    const now = new Date();
+    const organizationId = opts.input.organizationId;
+
+    const org = await getOrganizationById(organizationId);
+    if (!org) throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+
+    const transactions = await db.query.credit_transactions.findMany({
+      where: eq(credit_transactions.organization_id, organizationId),
+    });
+
+    const kilo_user_id = 'system';
+
+    return getCreditBlocks(
+      transactions,
+      now,
+      {
+        id: org.id,
+        microdollars_used: org.microdollars_used,
+        total_microdollars_acquired: org.total_microdollars_acquired,
+      },
+      kilo_user_id
+    );
   }),
 
   seats: organizationMemberProcedure.query(async opts => {

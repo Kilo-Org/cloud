@@ -8,7 +8,7 @@ export default async function DeploymentDetailPage({
 }: {
   params: Promise<{ deploymentId: string }>;
 }) {
-  await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/deploy');
+  await getUserFromAuthOrRedirect();
 
   if (!ENABLE_DEPLOY_FEATURE) {
     return notFound();

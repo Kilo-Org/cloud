@@ -8,19 +8,44 @@ import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@/db/schema';
 import {
-  credit_transactions,
-  microdollar_usage,
   payment_methods,
   kilocode_users,
-  stytch_fingerprints,
   user_admin_notes,
   user_auth_provider,
-  sharedCliSessions,
-  cliSessions,
-  cli_sessions_v2,
-  app_builder_projects,
+  kilo_pass_subscriptions,
+  cloud_agent_webhook_triggers,
+  enrichment_data,
+  source_embeddings,
+  code_indexing_search,
+  code_indexing_manifest,
+  referral_codes,
+  organization_memberships,
+  organization_user_limits,
+  organization_user_usage,
+  organization_invitations,
+  organization_audit_logs,
+  magic_link_tokens,
+  device_auth_requests,
+  auto_top_up_configs,
+  platform_integrations,
+  byok_api_keys,
+  agent_configs,
+  webhook_events,
+  agent_environment_profiles,
+  security_findings,
+  auto_triage_tickets,
+  auto_fix_tickets,
+  slack_bot_requests,
+  cloud_agent_code_reviews,
+  kiloclaw_instances,
+  kiloclaw_access_codes,
+  user_period_cache,
+  user_feedback,
+  app_builder_feedback,
+  free_model_usage,
+  kilo_pass_scheduled_changes,
 } from '@/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -333,20 +358,207 @@ export async function linkAccountToExistingUser(
   return successResult({ user: existingUser });
 }
 
-export async function deleteUserDatabaseRecords(userId: string) {
+/**
+ * Error thrown when soft-delete preconditions are not met.
+ */
+export class SoftDeletePreconditionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SoftDeletePreconditionError';
+  }
+}
+
+/**
+ * Soft-delete a user: anonymize PII, scrub related data, but keep the
+ * user row and financial/billing records intact.
+ *
+ * Preconditions (will throw SoftDeletePreconditionError if violated):
+ * - User must not have an active, non-cancelling Kilo Pass subscription
+ *
+ * What is kept:
+ * - The kilocode_users row (anonymized)
+ * - Stripe link (stripe_customer_id unchanged)
+ * - credit_transactions, microdollar_usage (billing records)
+ * - kilo_pass_subscriptions/issuances/issuance_items (financial)
+ * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
+ * - deployments, app_builder_projects (user assets)
+ * - stytch_fingerprints (abuse detection)
+ * - referral_code_usages (financial, references anonymized user)
+ *
+ * What is scrubbed/deleted:
+ * - PII on the user row (email, name, avatar, urls)
+ * - user_auth_provider (auth links with email/avatar)
+ * - enrichment_data (GitHub/LinkedIn/Clay PII)
+ * - user_admin_notes
+ * - referral_codes (user's own code)
+ * - magic_link_tokens (email-based)
+ * - organization_memberships (removed from all orgs)
+ * - organization_invitations (sent by user + addressed to user's email)
+ * - organization_user_limits/usage
+ * - organization_audit_logs (actor PII nulled)
+ * - payment_methods (soft-deleted, address/name/IP fields nulled)
+ * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - Various user-owned resources (platform_integrations, byok_api_keys,
+ *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
+ *   cloud_agent_webhook_triggers, agent_environment_profiles,
+ *   security_findings, auto_triage/fix_tickets, slack_bot_requests,
+ *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
+ *   kiloclaw_instances/access_codes, user_period_cache,
+ *   kilo_pass_scheduled_changes)
+ */
+export async function softDeleteUser(userId: string) {
+  const user = await findUserById(userId);
+  if (!user) return; // Nothing to do for non-existent user
+
+  // Grab the original email before we anonymize — needed for cleanup of
+  // magic_link_tokens and organization_invitations addressed to this user.
+  const originalEmail = user.google_user_email;
+
   await db.transaction(async tx => {
-    await tx.delete(microdollar_usage).where(eq(microdollar_usage.kilo_user_id, userId));
-    await tx.delete(payment_methods).where(eq(payment_methods.user_id, userId));
-    await tx.delete(credit_transactions).where(eq(credit_transactions.kilo_user_id, userId));
-    await tx.delete(stytch_fingerprints).where(eq(stytch_fingerprints.kilo_user_id, userId));
-    await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
+    // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
+    const activeSubscriptions = await tx
+      .select({ id: kilo_pass_subscriptions.id })
+      .from(kilo_pass_subscriptions)
+      .where(
+        and(
+          eq(kilo_pass_subscriptions.kilo_user_id, userId),
+          eq(kilo_pass_subscriptions.status, 'active'),
+          eq(kilo_pass_subscriptions.cancel_at_period_end, false)
+        )
+      );
+
+    if (activeSubscriptions.length > 0) {
+      throw new SoftDeletePreconditionError(
+        `User ${userId} has an active Kilo Pass subscription. Cancel the subscription before deleting the account.`
+      );
+    }
+
+    // ── 1. Anonymize the user row ────────────────────────────────────────
+    await tx
+      .update(kilocode_users)
+      .set({
+        google_user_email: `deleted+${userId}@deleted.invalid`,
+        google_user_name: 'Deleted User',
+        google_user_image_url: '',
+        hosted_domain: null,
+        linkedin_url: null,
+        github_url: null,
+        api_token_pepper: null,
+        default_model: null,
+        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+        auto_top_up_enabled: false,
+        completed_welcome_form: false,
+        cohorts: {},
+        is_admin: false,
+      })
+      .where(eq(kilocode_users.id, userId));
+
+    // ── 2. Hard-delete PII tables ────────────────────────────────────────
     await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
-    await tx.delete(sharedCliSessions).where(eq(sharedCliSessions.kilo_user_id, userId));
-    await tx.delete(cliSessions).where(eq(cliSessions.kilo_user_id, userId));
-    await tx.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, userId));
-    await tx.delete(app_builder_projects).where(eq(app_builder_projects.owned_by_user_id, userId));
-    await tx.delete(kilocode_users).where(eq(kilocode_users.id, userId));
-    //TODO: OrbEvent deletion - not implementable yet?
+    await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
+    await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
+    await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
+    await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+
+    // Remove from organizations
+    await tx
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    // Delete invitations sent BY this user and invitations sent TO this user's email
+    await tx
+      .delete(organization_invitations)
+      .where(eq(organization_invitations.invited_by, userId));
+    await tx
+      .delete(organization_invitations)
+      .where(eq(organization_invitations.email, originalEmail));
+    await tx
+      .delete(organization_user_limits)
+      .where(eq(organization_user_limits.kilo_user_id, userId));
+    await tx
+      .delete(organization_user_usage)
+      .where(eq(organization_user_usage.kilo_user_id, userId));
+
+    // User-owned resources (these would have been CASCADE-deleted if we
+    // deleted the user row, but since we keep it, we delete them explicitly)
+
+    // cloud_agent_webhook_triggers has RESTRICT FK on agent_environment_profiles,
+    // so delete triggers before profiles
+    await tx
+      .delete(cloud_agent_webhook_triggers)
+      .where(eq(cloud_agent_webhook_triggers.user_id, userId));
+    await tx
+      .delete(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+
+    await tx
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, userId));
+    await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+    await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
+    await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
+    await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
+    await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
+    await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
+    await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
+    await tx
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+    await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
+    await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
+    await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
+    await tx.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, userId));
+    await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
+    await tx
+      .delete(kilo_pass_scheduled_changes)
+      .where(eq(kilo_pass_scheduled_changes.kilo_user_id, userId));
+
+    // Code indexing data
+    await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));
+    await tx.delete(code_indexing_search).where(eq(code_indexing_search.kilo_user_id, userId));
+    await tx.delete(code_indexing_manifest).where(eq(code_indexing_manifest.kilo_user_id, userId));
+
+    // ── 3. Anonymize PII in retained tables ──────────────────────────────
+
+    // Organization audit logs: keep the log entries, strip actor PII
+    await tx
+      .update(organization_audit_logs)
+      .set({ actor_email: null, actor_name: null })
+      .where(eq(organization_audit_logs.actor_id, userId));
+
+    // Payment methods: soft-delete and strip address/name/IP fields
+    await tx
+      .update(payment_methods)
+      .set({
+        deleted_at: sql`now()`,
+        name: null,
+        address_line1: null,
+        address_line2: null,
+        address_city: null,
+        address_state: null,
+        address_zip: null,
+        address_country: null,
+        http_x_forwarded_for: null,
+        http_x_vercel_ip_city: null,
+        http_x_vercel_ip_country: null,
+        http_x_vercel_ip_latitude: null,
+        http_x_vercel_ip_longitude: null,
+        http_x_vercel_ja4_digest: null,
+      })
+      .where(eq(payment_methods.user_id, userId));
+
+    // ── 4. Nullify FK references ─────────────────────────────────────────
+    await tx
+      .update(user_feedback)
+      .set({ kilo_user_id: null })
+      .where(eq(user_feedback.kilo_user_id, userId));
+    await tx
+      .update(app_builder_feedback)
+      .set({ kilo_user_id: null })
+      .where(eq(app_builder_feedback.kilo_user_id, userId));
+    await tx
+      .update(free_model_usage)
+      .set({ kilo_user_id: null })
+      .where(eq(free_model_usage.kilo_user_id, userId));
   });
 }
 

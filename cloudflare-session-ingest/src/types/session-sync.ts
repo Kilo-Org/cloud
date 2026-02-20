@@ -8,6 +8,8 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
     data: z.object({
       platform: z.string().min(1),
       orgId: z.uuid().optional(),
+      gitUrl: z.string().max(2048).optional(),
+      gitBranch: z.string().max(256).optional(),
     }),
   }),
   z.object({

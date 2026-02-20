@@ -35,6 +35,8 @@ import {
   updateChildSessionMessageAtom,
   updateChildSessionPartAtom,
   removeChildSessionPartAtom,
+  setQuestionRequestIdAtom,
+  sessionOrganizationIdAtom,
 } from './store/atoms';
 import {
   updateHighWaterMarkAtom,
@@ -58,6 +60,8 @@ export type UseCloudAgentStreamOptions = {
   onKiloSessionCreated?: (kiloSessionId: string) => void;
   /** Callback when session is confirmed initiated (first session_synced event) */
   onSessionInitiated?: () => void;
+  /** Callback when the agent asks a question */
+  onQuestionAsked?: () => void;
 };
 
 export type UseCloudAgentStreamReturn = {
@@ -94,6 +98,7 @@ export function useCloudAgentStream({
   onComplete,
   onKiloSessionCreated,
   onSessionInitiated,
+  onQuestionAsked,
 }: UseCloudAgentStreamOptions): UseCloudAgentStreamReturn {
   const trpcClient = useRawTRPCClient();
 
@@ -107,6 +112,12 @@ export function useCloudAgentStream({
   const updateChildSessionMessage = useSetAtom(updateChildSessionMessageAtom);
   const updateChildSessionPart = useSetAtom(updateChildSessionPartAtom);
   const removeChildSessionPart = useSetAtom(removeChildSessionPartAtom);
+
+  // Atom for question tracking
+  const setQuestionRequestId = useSetAtom(setQuestionRequestIdAtom);
+
+  // Atom for organization ID (used by QuestionToolCard for tRPC calls)
+  const setSessionOrganizationId = useSetAtom(sessionOrganizationIdAtom);
 
   // Common atoms
   const setCurrentSessionId = useSetAtom(currentSessionIdAtom);
@@ -136,6 +147,7 @@ export function useCloudAgentStream({
   const onCompleteRef = useRef(onComplete);
   const onKiloSessionCreatedRef = useRef(onKiloSessionCreated);
   const onSessionInitiatedRef = useRef(onSessionInitiated);
+  const onQuestionAskedRef = useRef(onQuestionAsked);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -150,12 +162,17 @@ export function useCloudAgentStream({
   }, [onSessionInitiated]);
 
   useEffect(() => {
+    onQuestionAskedRef.current = onQuestionAsked;
+  }, [onQuestionAsked]);
+
+  useEffect(() => {
     cloudAgentSessionIdRef.current = cloudAgentSessionIdProp ?? null;
   }, [cloudAgentSessionIdProp]);
 
   useEffect(() => {
     organizationIdRef.current = organizationId;
-  }, [organizationId]);
+    setSessionOrganizationId(organizationId ?? null);
+  }, [organizationId, setSessionOrganizationId]);
 
   /**
    * Create the event processor with callbacks wired to Jotai atoms and IndexedDB.
@@ -287,6 +304,11 @@ export function useCloudAgentStream({
           onCompleteRef.current?.();
         }
       },
+
+      onQuestionAsked: (requestId, callId) => {
+        setQuestionRequestId({ callId, requestId });
+        onQuestionAskedRef.current?.();
+      },
     }),
     [
       updateMessage,
@@ -303,6 +325,7 @@ export function useCloudAgentStream({
       updateChildSessionPart,
       removeChildSessionPart,
       setError,
+      setQuestionRequestId,
     ]
   );
 

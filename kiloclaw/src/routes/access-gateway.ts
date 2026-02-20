@@ -230,7 +230,7 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   setCookie(c, KILOCLAW_AUTH_COOKIE, token, {
     path: '/',
     httpOnly: true,
-    secure: new URL(c.req.url).protocol === 'https:',
+    secure: c.env.WORKER_ENV !== 'development',
     sameSite: 'Lax',
     maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
   });

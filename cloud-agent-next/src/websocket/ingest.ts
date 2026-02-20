@@ -110,8 +110,6 @@ export type ExecutionData = {
 export type IngestDOContext = {
   /** Persist the kiloSessionId in DO metadata */
   updateKiloSessionId: (id: string) => Promise<void>;
-  /** Link kiloSessionId to backend for analytics */
-  linkKiloSessionInBackend: (id: string) => Promise<void>;
   /** Persist the upstream branch in DO metadata */
   updateUpstreamBranch: (branch: string) => Promise<void>;
   /** Clear the active execution when done */
@@ -342,7 +340,6 @@ export function createIngestHandler(
               attachment.kiloSessionState,
               {
                 updateKiloSessionId: id => doContext.updateKiloSessionId(id),
-                linkToBackend: id => doContext.linkKiloSessionInBackend(id),
                 logger: console,
               }
             );

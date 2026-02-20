@@ -156,7 +156,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
           input.kilocodeOrganizationId,
           input.mode,
           input.model,
-          gitUrlForBackend
+          gitUrlForBackend,
+          input.createdOnPlatform
         );
       } catch (error) {
         logger
@@ -193,11 +194,13 @@ const prepareSessionHandler = internalApiProtectedProcedure
         githubAppType: resolvedGithubAppType,
         gitUrl: input.gitUrl,
         gitToken: input.gitToken,
+        platform: input.platform,
         envVars: input.envVars,
         encryptedSecrets: input.encryptedSecrets,
         setupCommands: input.setupCommands,
         mcpServers: input.mcpServers,
         upstreamBranch: input.upstreamBranch,
+        createdOnPlatform: input.createdOnPlatform,
         autoCommit: input.autoCommit,
         condenseOnComplete: input.condenseOnComplete,
         appendSystemPrompt: input.appendSystemPrompt,

@@ -358,7 +358,7 @@ export function OrgDeploymentProvider({ organizationId, children }: OrgDeploymen
   };
 
   return (
-    <DeploymentProvider queries={queries} mutations={mutations}>
+    <DeploymentProvider queries={queries} mutations={mutations} organizationId={organizationId}>
       {children}
     </DeploymentProvider>
   );

@@ -254,3 +254,19 @@ Then restart the dev server, and you should be able to access the app behind the
 ### But ... why?
 
 Some OAuth providers restrict `redirect_uri` to be HTTPS, and others explicitly block `localhost` for security reasons.
+
+## Common errors
+
+### Error - Duplicate Vercel Project Causing MaxDuration Errors on PRs
+
+If GitHub PRs show Vercel build errors referencing `MaxDuration`, but deployments are working correctly on the Enterprise Vercel account, the likely cause is a duplicate Vercel project (e.g., “cloud”) existing in a separate account that is still connected to the same GitHub repository.
+
+When this happens, GitHub receives deployment signals from both projects, which can trigger misleading `MaxDuration` errors.
+
+#### Fix
+
+- Check for duplicate Vercel projects across all team member accounts.
+- Identify any secondary or hobby-tier project connected to the same GitHub repository.
+- Delete or disconnect the duplicate project.
+- Confirm that only the intended Enterprise Vercel project remains connected.
+- Verify that new PRs no longer trigger duplicate Vercel notifications or `MaxDuration` errors.

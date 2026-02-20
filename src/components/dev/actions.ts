@@ -1,7 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { findUserById, deleteUserDatabaseRecords } from '@/lib/user';
+import { findUserById, softDeleteUser } from '@/lib/user';
 import { deleteStripeCustomer } from '@/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
 
@@ -12,8 +12,8 @@ export async function nuke(kiloUserId: string) {
       throw new Error(`User not found: ${kiloUserId}`);
     }
 
+    await softDeleteUser(kiloUserId);
     await deleteStripeCustomer(user.stripe_customer_id);
-    await deleteUserDatabaseRecords(kiloUserId);
   } catch (error) {
     console.error('Error nuking account:', error);
     captureException(error, {

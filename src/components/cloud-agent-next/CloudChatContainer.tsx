@@ -41,6 +41,7 @@ import {
 import { useCloudAgentStream } from './useCloudAgentStream';
 import { useAutoScroll } from './hooks/useAutoScroll';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
+import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useSidebarSessions } from './hooks/useSidebarSessions';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
 import { useSessionDeletion } from './hooks/useSessionDeletion';
@@ -190,6 +191,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   // Celebration sound
   const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
 
+  // Notification chime for agent questions
+  const { playNotification } = useNotificationSound();
+
   // Toggle sound handler
   const handleToggleSound = useCallback(() => {
     setSoundEnabled(prev => !prev);
@@ -246,6 +250,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     onComplete: handleStreamComplete,
     onKiloSessionCreated: handleKiloSessionCreated,
     onSessionInitiated: handleSessionInitiated,
+    onQuestionAsked: playNotification,
   });
 
   // Wrapper for sendMessage that doesn't use sessionIdOverride
@@ -696,7 +701,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
 
   // Handle new session
   const handleNewSession = () => {
-    const basePath = organizationId ? `/organizations/${organizationId}/cloud-next` : '/cloud-next';
+    const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
     router.push(basePath);
   };
 
@@ -748,7 +753,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         if (needsLegacyPrepare && effectiveSessionId && currentDbSessionId) {
           const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
-          const repoParams = buildPrepareSessionRepoParams({ repo: resumeRepo, gitUrl });
+          const repoParams = buildPrepareSessionRepoParams({
+            repo: resumeRepo,
+            platform: gitUrl ? 'gitlab' : 'github',
+          });
           if (!repoParams) {
             setError('Cannot prepare session without a repository.');
             toast.error('Cannot prepare session without a repository.');
@@ -794,7 +802,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         if (!effectiveSessionId) {
           const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
-          const repoParams = buildPrepareSessionRepoParams({ repo: resumeRepo, gitUrl });
+          const repoParams = buildPrepareSessionRepoParams({
+            repo: resumeRepo,
+            platform: gitUrl ? 'gitlab' : 'github',
+          });
           if (!repoParams) {
             setError('Cannot prepare session without a repository.');
             toast.error('Cannot prepare session without a repository.');
@@ -867,9 +878,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   // Handle session selection
   const handleSelectSession = useCallback(
     (sessionId: string) => {
-      const basePath = organizationId
-        ? `/organizations/${organizationId}/cloud-next`
-        : '/cloud-next';
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${sessionId}`);
     },
     [organizationId, router]

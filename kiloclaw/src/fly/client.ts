@@ -15,6 +15,8 @@ import type {
   CreateVolumeRequest,
   CreateMachineRequest,
   FlyWaitableState,
+  MachineExecRequest,
+  MachineExecResponse,
 } from './types';
 
 const FLY_API_BASE = 'https://api.machines.dev';
@@ -65,13 +67,14 @@ async function assertOk(resp: Response, context: string): Promise<void> {
 export async function createMachine(
   config: FlyClientConfig,
   machineConfig: FlyMachineConfig,
-  options?: { name?: string; region?: string; skipLaunch?: boolean }
+  options?: { name?: string; region?: string; skipLaunch?: boolean; minSecretsVersion?: number }
 ): Promise<FlyMachine> {
-  const body: CreateMachineRequest = {
+  const body: CreateMachineRequest & { min_secrets_version?: number } = {
     config: machineConfig,
     name: options?.name,
     region: options?.region,
     skip_launch: options?.skipLaunch,
+    min_secrets_version: options?.minSecretsVersion,
   };
   const resp = await flyFetch(config, '/machines', {
     method: 'POST',
@@ -99,6 +102,21 @@ export async function stopMachine(config: FlyClientConfig, machineId: string): P
     method: 'POST',
   });
   await assertOk(resp, 'stopMachine');
+}
+
+/**
+ * Stop a machine and wait for it to reach the 'stopped' state.
+ * Fly requires instance_id when waiting for 'stopped', so this fetches
+ * the current machine state after issuing the stop to get the instance_id.
+ */
+export async function stopMachineAndWait(
+  config: FlyClientConfig,
+  machineId: string,
+  timeoutSeconds = 60
+): Promise<void> {
+  await stopMachine(config, machineId);
+  const machine = await getMachine(config, machineId);
+  await waitForState(config, machineId, 'stopped', timeoutSeconds, machine.instance_id);
 }
 
 export async function destroyMachine(
@@ -149,11 +167,16 @@ export async function waitForState(
 export async function updateMachine(
   config: FlyClientConfig,
   machineId: string,
-  machineConfig: FlyMachineConfig
+  machineConfig: FlyMachineConfig,
+  options?: { minSecretsVersion?: number }
 ): Promise<FlyMachine> {
+  const body: { config: FlyMachineConfig; min_secrets_version?: number } = {
+    config: machineConfig,
+    min_secrets_version: options?.minSecretsVersion,
+  };
   const resp = await flyFetch(config, `/machines/${machineId}`, {
     method: 'POST',
-    body: JSON.stringify({ config: machineConfig }),
+    body: JSON.stringify(body),
   });
   await assertOk(resp, 'updateMachine');
   return resp.json();
@@ -173,6 +196,40 @@ export async function createVolume(
   return resp.json();
 }
 
+/**
+ * Create a volume, walking a list of regions until one succeeds.
+ *
+ * Fly doesn't support meta-regions (us, eu) for volume creation, so callers
+ * must provide an explicit list of regions to try. On capacity-related 412
+ * errors, the next region is tried. Any other error is thrown immediately.
+ *
+ * The compute hint tells Fly what machine spec will attach to this volume,
+ * so it can pick a host with capacity for both.
+ */
+export async function createVolumeWithFallback(
+  config: FlyClientConfig,
+  request: Omit<CreateVolumeRequest, 'region'>,
+  regions: string[]
+): Promise<FlyVolume> {
+  if (regions.length === 0) {
+    throw new Error('createVolumeWithFallback: no regions provided');
+  }
+
+  let lastError: unknown;
+  for (const region of regions) {
+    try {
+      return await createVolume(config, { ...request, region });
+    } catch (err) {
+      lastError = err;
+      if (!isFlyInsufficientResources(err)) throw err;
+      console.warn(`[fly] Volume creation failed in ${region} (capacity), trying next region`);
+    }
+  }
+
+  // All regions exhausted
+  throw lastError;
+}
+
 export async function deleteVolume(config: FlyClientConfig, volumeId: string): Promise<void> {
   const resp = await flyFetch(config, `/volumes/${volumeId}`, {
     method: 'DELETE',
@@ -186,6 +243,59 @@ export async function deleteVolume(config: FlyClientConfig, volumeId: string): P
  */
 export function isFlyNotFound(err: unknown): boolean {
   return err instanceof FlyApiError && err.status === 404;
+}
+
+/**
+ * Capacity-related markers in Fly 412 error bodies. Matched case-insensitively
+ * against the JSON body fields (error, status) and raw body text.
+ *
+ * Confirmed from production: "insufficient resources to create new machine
+ * with existing volume 'vol_xxx'"
+ *
+ * Add new markers here when the unclassified-412 warning log reveals new
+ * capacity error formats from Fly.
+ */
+const CAPACITY_MARKERS = ['insufficient resources'];
+
+/**
+ * Check if a Fly API 412 error is specifically a capacity/resource exhaustion
+ * issue (host where a volume is pinned has no room for a machine).
+ *
+ * Fly overloads 412 for both capacity issues AND precondition/version mismatches
+ * (e.g. min_secrets_version, machine_version). We only trigger volume
+ * replacement recovery for genuine capacity problems — version/precondition
+ * 412s should surface to the caller as-is.
+ *
+ * Logs a warning for unclassified 412s so we can tune matching.
+ */
+export function isFlyInsufficientResources(err: unknown): boolean {
+  if (!(err instanceof FlyApiError) || err.status !== 412) return false;
+
+  // Build a single lowercase string from all available signal sources
+  const searchText = `${err.message}\n${err.body}`.toLowerCase();
+
+  // Try to extract structured fields from JSON body
+  try {
+    const json = JSON.parse(err.body) as Record<string, unknown>;
+    if (typeof json.status === 'string') {
+      const status = json.status.toLowerCase();
+      if (CAPACITY_MARKERS.some(m => status.includes(m))) return true;
+    }
+    if (typeof json.error === 'string') {
+      const error = json.error.toLowerCase();
+      if (CAPACITY_MARKERS.some(m => error.includes(m))) return true;
+    }
+  } catch {
+    // Body isn't JSON — fall through to raw text matching
+  }
+
+  // Fall back to raw text matching across message + body
+  if (CAPACITY_MARKERS.some(m => searchText.includes(m))) return true;
+
+  // 412 but no capacity signal — likely a version/precondition issue.
+  // Log so we can tune matching if Fly introduces new capacity error formats.
+  console.warn('[fly] Unclassified 412 error (not treated as capacity):', err.body);
+  return false;
 }
 
 /**
@@ -216,5 +326,26 @@ export async function listMachines(
 export async function getVolume(config: FlyClientConfig, volumeId: string): Promise<FlyVolume> {
   const resp = await flyFetch(config, `/volumes/${volumeId}`);
   await assertOk(resp, 'getVolume');
+  return resp.json();
+}
+
+// -- Exec --
+
+/**
+ * Execute a command on a running machine and return the output.
+ * Uses the Fly Machines exec endpoint: POST /apps/{app}/machines/{id}/exec
+ */
+export async function execCommand(
+  config: FlyClientConfig,
+  machineId: string,
+  command: string[],
+  timeout = 10
+): Promise<MachineExecResponse> {
+  const body: MachineExecRequest = { command, timeout };
+  const resp = await flyFetch(config, `/machines/${machineId}/exec`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  await assertOk(resp, 'execCommand');
   return resp.json();
 }

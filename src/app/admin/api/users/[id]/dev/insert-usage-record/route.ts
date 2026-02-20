@@ -89,6 +89,7 @@ export async function POST(
     editor_name: null,
     has_tools: false,
     machine_id: null,
+    feature: null,
   };
 
   await insertUsageRecord(coreUsageFields, metadataFields);

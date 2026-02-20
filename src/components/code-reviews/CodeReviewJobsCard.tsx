@@ -25,8 +25,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { CodeReviewStreamView } from './CodeReviewStreamView';
 
+type Platform = 'github' | 'gitlab';
+
 type CodeReviewJobsCardProps = {
   organizationId?: string;
+  platform?: Platform;
 };
 
 type CodeReviewStatus =
@@ -57,7 +60,10 @@ const statusConfig: Record<
 
 const PAGE_SIZE = 10;
 
-export function CodeReviewJobsCard({ organizationId }: CodeReviewJobsCardProps) {
+export function CodeReviewJobsCard({
+  organizationId,
+  platform = 'github',
+}: CodeReviewJobsCardProps) {
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [actionInProgressId, setActionInProgressId] = useState<string | null>(null);
@@ -66,6 +72,7 @@ export function CodeReviewJobsCard({ organizationId }: CodeReviewJobsCardProps) 
   const queryClient = useQueryClient();
 
   const offset = (currentPage - 1) * PAGE_SIZE;
+  const prLabel = platform === 'gitlab' ? 'merge requests' : 'pull requests';
 
   // Fetch code reviews with auto-refresh every 5 seconds if there are active jobs
   const { data, isLoading, isFetching } = useQuery({
@@ -74,10 +81,12 @@ export function CodeReviewJobsCard({ organizationId }: CodeReviewJobsCardProps) 
           organizationId,
           limit: PAGE_SIZE,
           offset,
+          platform,
         })
       : trpc.codeReviews.listForUser.queryOptions({
           limit: PAGE_SIZE,
           offset,
+          platform,
         })),
     refetchInterval: query => {
       const result = query.state.data;
@@ -103,8 +112,9 @@ export function CodeReviewJobsCard({ organizationId }: CodeReviewJobsCardProps) 
                 organizationId,
                 limit: PAGE_SIZE,
                 offset,
+                platform,
               })
-            : trpc.codeReviews.listForUser.queryKey({ limit: PAGE_SIZE, offset }),
+            : trpc.codeReviews.listForUser.queryKey({ limit: PAGE_SIZE, offset, platform }),
         });
       },
       onError: error => {
@@ -131,8 +141,9 @@ export function CodeReviewJobsCard({ organizationId }: CodeReviewJobsCardProps) 
                 organizationId,
                 limit: PAGE_SIZE,
                 offset,
+                platform,
               })
-            : trpc.codeReviews.listForUser.queryKey({ limit: PAGE_SIZE, offset }),
+            : trpc.codeReviews.listForUser.queryKey({ limit: PAGE_SIZE, offset, platform }),
         });
       },
       onError: error => {
@@ -175,7 +186,7 @@ export function CodeReviewJobsCard({ organizationId }: CodeReviewJobsCardProps) 
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-sm">
-            Code review jobs will appear here when pull requests are reviewed.
+            Code review jobs will appear here when {prLabel} are reviewed.
           </p>
         </CardContent>
       </Card>

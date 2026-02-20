@@ -16,11 +16,18 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
 
   const [amount, setAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [expirationDate, setExpirationDate] = useState<string>('');
+  const [expiryHours, setExpiryHours] = useState<string>('');
+  const [neverExpire, setNeverExpire] = useState(true);
 
   const parsedAmount = parseFloat(amount);
   const isNegative = parsedAmount < 0;
+  const hasExpiration = expirationDate.trim() !== '' || Number(expiryHours) > 0 || neverExpire;
   const isFormValid =
-    !isNaN(parsedAmount) && parsedAmount !== 0 && (!isNegative || description.trim().length > 0);
+    !isNaN(parsedAmount) &&
+    parsedAmount !== 0 &&
+    (!isNegative || description.trim().length > 0) &&
+    (isNegative || hasExpiration);
 
   const handleGrantCredit = async () => {
     if (!isFormValid) return;
@@ -30,15 +37,25 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
         ? `${description.trim()} (${session?.user?.name || session?.user?.email || 'Admin'})`
         : undefined;
 
+      const expiry_date = expirationDate ? new Date(expirationDate).toISOString() : null;
+      const expiry_hours_parsed = expiryHours ? parseFloat(expiryHours) : null;
+      const expiry_hours_val =
+        expiry_hours_parsed !== null && expiry_hours_parsed > 0 ? expiry_hours_parsed : null;
+
       await grantCreditMutation.mutateAsync({
         organizationId,
         amount_usd: parsedAmount,
         description: finalDescription,
+        expiry_date: neverExpire ? null : expiry_date,
+        expiry_hours: neverExpire ? null : expiry_hours_val,
       });
 
       toast.success(`Successfully granted $${amount} credits to organization`);
       setAmount('');
       setDescription('');
+      setExpirationDate('');
+      setExpiryHours('');
+      setNeverExpire(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to grant credit');
     }
@@ -63,7 +80,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
         >
           <div className="flex flex-row flex-wrap justify-between gap-4">
             <div>
-              <Label className="text-muted-foreground text-sm font-medium" htmlFor="amount">
+              <Label className="text-muted-foreground text-sm font-medium" htmlFor="org-amount">
                 Amount ($) (Required)
               </Label>
               <Input
@@ -72,14 +89,75 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 step="0.01"
-                id="amount"
+                id="org-amount"
                 required
               />
             </div>
           </div>
 
+          {!isNegative && (
+            <div className="grid [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))] gap-4">
+              <div>
+                <Label
+                  className="text-muted-foreground text-sm font-medium"
+                  htmlFor="org-expiry-hours"
+                >
+                  Expiry Hours{!neverExpire ? ' *' : ''}
+                </Label>
+                <Input
+                  type="number"
+                  placeholder="Enter hours"
+                  value={expiryHours}
+                  onChange={e => setExpiryHours(e.target.value)}
+                  min="0"
+                  step="0.01"
+                  id="org-expiry-hours"
+                  disabled={neverExpire}
+                />
+              </div>
+              <div>
+                <Label
+                  className="text-muted-foreground text-sm font-medium"
+                  htmlFor="org-expiry-date"
+                >
+                  Expiration Date{!neverExpire ? ' *' : ''}
+                </Label>
+                <Input
+                  type="date"
+                  value={expirationDate}
+                  onChange={e => setExpirationDate(e.target.value)}
+                  id="org-expiry-date"
+                  disabled={neverExpire}
+                />
+              </div>
+              <div className="flex items-end">
+                <Label className="flex items-center gap-2 pb-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={neverExpire}
+                    onChange={e => {
+                      setNeverExpire(e.target.checked);
+                      if (e.target.checked) {
+                        setExpirationDate('');
+                        setExpiryHours('');
+                      }
+                    }}
+                  />
+                  Never expire
+                </Label>
+              </div>
+            </div>
+          )}
+
+          {!isNegative && !isNaN(parsedAmount) && parsedAmount !== 0 && !hasExpiration && (
+            <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+              Please specify an expiration date or expiry hours, or check &quot;Never expire&quot;
+              to grant credits without expiration.
+            </div>
+          )}
+
           <div>
-            <Label className="text-muted-foreground text-sm font-medium" htmlFor="description">
+            <Label className="text-muted-foreground text-sm font-medium" htmlFor="org-description">
               Description {isNegative ? '(Required)' : '(Optional)'}
             </Label>
             <Input
@@ -91,7 +169,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
               }
               value={description}
               onChange={e => setDescription(e.target.value)}
-              id="description"
+              id="org-description"
             />
           </div>
 

@@ -28,6 +28,9 @@ export const DEFAULT_MACHINE_GUEST = {
 /** Default Fly Volume size in GB */
 export const DEFAULT_VOLUME_SIZE_GB = 10;
 
+/** Default Fly region priority list when FLY_REGION env var is not set */
+export const DEFAULT_FLY_REGION = 'dfw,yyz,cdg';
+
 // Alarm cadence by instance status
 /** Running machines: fast health checks */
 export const ALARM_INTERVAL_RUNNING_MS = 5 * 60 * 1000; // 5 min
@@ -40,3 +43,7 @@ export const ALARM_JITTER_MS = 60 * 1000; // 0-60s
 
 /** Consecutive failed health checks before marking a running instance as stopped */
 export const SELF_HEAL_THRESHOLD = 5;
+
+/** Minimum interval between live Fly API checks in getStatus() (30 seconds).
+ *  At 10s UI poll interval, only ~1 in 3 polls will hit Fly. */
+export const LIVE_CHECK_THROTTLE_MS = 30 * 1000;

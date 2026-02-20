@@ -120,7 +120,6 @@ export async function run(...args: string[]) {
         name: config.name,
         plan: 'enterprise' as OrganizationPlan,
         free_trial_end_at: trialEndAt,
-        microdollars_balance: 0,
         microdollars_used: 0,
         auto_top_up_enabled: true,
         settings: {},

@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import type { Organization, organization_invitations } from '@/db/schema';
 import type { Result } from '@/lib/maybe-result';
+import { CompanyDomainSchema } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
@@ -18,6 +19,7 @@ export {
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
+import { ModelSettingsSchema, VersionedSettingsSchema } from '@/lib/organizations/model-settings';
 
 export const OrganizationNameSchema = z
   .string()
@@ -29,6 +31,7 @@ export const OrganizationCreateRequestSchema = z.object({
   name: OrganizationNameSchema,
   autoAddCreator: z.boolean().optional().default(false),
   plan: OrganizationPlanSchema.optional().default('teams'),
+  company_domain: CompanyDomainSchema.optional(),
 });
 
 export const OrganizationSchema = z.object({
@@ -36,8 +39,9 @@ export const OrganizationSchema = z.object({
   name: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
-  microdollars_balance: z.number(),
   microdollars_used: z.number(),
+  total_microdollars_acquired: z.number(),
+  next_credit_expiration_at: z.string().nullable(),
   stripe_customer_id: z.string().nullable(),
   auto_top_up_enabled: z.boolean(),
   settings: OrganizationSettingsSchema,
@@ -48,6 +52,7 @@ export const OrganizationSchema = z.object({
   sso_domain: z.string().nullable(),
   plan: z.enum(['teams', 'enterprise']),
   free_trial_end_at: z.string().nullable(),
+  company_domain: z.string().nullable(),
 });
 
 export type UserOrganizationWithSeats = {
@@ -170,27 +175,6 @@ const OpenRouterProviderSchema = z.object({
 export const OpenRouterProvidersResponseSchema = z.object({
   data: z.array(OpenRouterProviderSchema),
 });
-
-const ToolSchema = z.enum([
-  'apply_diff',
-  'apply_patch',
-  'delete_file',
-  'edit_file',
-  'search_replace',
-  'search_and_replace',
-  'write_file',
-  'write_to_file',
-]);
-
-const ModelSettingsSchema = z.object({
-  included_tools: z.array(ToolSchema), // adds to the standard tool set
-  excluded_tools: z.array(ToolSchema), // removes from the standard tool set
-});
-
-export type ModelSettings = z.infer<typeof ModelSettingsSchema>;
-
-const VersionedSettingsSchema = z.record(z.string(), ModelSettingsSchema);
-export type VersionedSettings = z.infer<typeof VersionedSettingsSchema>;
 
 const OpenRouterModelSchema = z.object({
   // kilocode additions:

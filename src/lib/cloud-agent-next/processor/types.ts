@@ -83,6 +83,9 @@ export type EventProcessorCallbacks = {
 
   /** Called when streaming state changes */
   onStreamingChanged?: (isStreaming: boolean) => void;
+
+  /** Called when a question.asked event maps a tool callID to a requestId */
+  onQuestionAsked?: (requestId: string, callId: string) => void;
 };
 
 /**

@@ -47,7 +47,7 @@ describe('organizations trpc router', () => {
     await db
       .update(organizations)
       .set({
-        microdollars_balance: 1000000, // $1.00 in microdollars
+        total_microdollars_acquired: 1000000, // $1.00 in microdollars
         stripe_customer_id: 'cus_test_org',
       })
       .where(eq(organizations.id, testOrganization.id));
@@ -71,7 +71,8 @@ describe('organizations trpc router', () => {
       expect(result).toMatchObject({
         id: testOrganization.id,
         name: 'Test Organization',
-        microdollars_balance: 1000000,
+        total_microdollars_acquired: 1000000,
+        microdollars_used: 0,
         stripe_customer_id: 'cus_test_org',
         auto_top_up_enabled: false,
         settings: {},
@@ -395,6 +396,164 @@ describe('organizations trpc router', () => {
         .update(organizations)
         .set({ name: 'Test Organization' })
         .where(eq(organizations.id, testOrganization.id));
+    });
+  });
+
+  describe('createOrganization with company_domain', () => {
+    let createdOrgId: string | undefined;
+
+    afterEach(async () => {
+      if (createdOrgId) {
+        await db.delete(organizations).where(eq(organizations.id, createdOrgId));
+        createdOrgId = undefined;
+      }
+    });
+
+    it('should store company_domain when provided', async () => {
+      const org = await createOrganization('Domain Org', regularUser.id, true, 'acme.com');
+      createdOrgId = org.id;
+
+      const [row] = await db.select().from(organizations).where(eq(organizations.id, org.id));
+
+      expect(row.company_domain).toBe('acme.com');
+    });
+
+    it('should default company_domain to null when omitted', async () => {
+      const org = await createOrganization('No Domain Org', regularUser.id, true);
+      createdOrgId = org.id;
+
+      const [row] = await db.select().from(organizations).where(eq(organizations.id, org.id));
+
+      expect(row.company_domain).toBeNull();
+    });
+  });
+
+  describe('updateCompanyDomain procedure', () => {
+    it('should set company_domain for organization owner', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.updateCompanyDomain({
+        organizationId: testOrganization.id,
+        company_domain: 'example.com',
+      });
+
+      expect(result).toEqual({ success: true });
+
+      const [row] = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      expect(row.company_domain).toBe('example.com');
+    });
+
+    it('should normalize a URL to just the domain', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.updateCompanyDomain({
+        organizationId: testOrganization.id,
+        company_domain: 'https://acme.com/about',
+      });
+
+      expect(result).toEqual({ success: true });
+
+      const [row] = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      expect(row.company_domain).toBe('acme.com');
+    });
+
+    it('should pass through a bare domain unchanged', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await caller.organizations.updateCompanyDomain({
+        organizationId: testOrganization.id,
+        company_domain: 'my-company.co.uk',
+      });
+
+      const [row] = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      expect(row.company_domain).toBe('my-company.co.uk');
+    });
+
+    it('should reject an invalid domain format', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.organizations.updateCompanyDomain({
+          organizationId: testOrganization.id,
+          company_domain: 'not-a-domain',
+        })
+      ).rejects.toThrow();
+    });
+
+    it('should clear company_domain with null', async () => {
+      // First set a domain
+      await db
+        .update(organizations)
+        .set({ company_domain: 'to-be-cleared.com' })
+        .where(eq(organizations.id, testOrganization.id));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.updateCompanyDomain({
+        organizationId: testOrganization.id,
+        company_domain: null,
+      });
+
+      expect(result).toEqual({ success: true });
+
+      const [row] = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      expect(row.company_domain).toBeNull();
+    });
+
+    it('should clear company_domain with empty string', async () => {
+      await db
+        .update(organizations)
+        .set({ company_domain: 'to-be-cleared.com' })
+        .where(eq(organizations.id, testOrganization.id));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.updateCompanyDomain({
+        organizationId: testOrganization.id,
+        company_domain: '',
+      });
+
+      expect(result).toEqual({ success: true });
+
+      const [row] = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      expect(row.company_domain).toBeNull();
+    });
+
+    it('should reject non-owner members', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.updateCompanyDomain({
+          organizationId: testOrganization.id,
+          company_domain: 'hacker.com',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('should reject non-members', async () => {
+      const caller = await createCallerForUser(nonMemberUser.id);
+
+      await expect(
+        caller.organizations.updateCompanyDomain({
+          organizationId: testOrganization.id,
+          company_domain: 'hacker.com',
+        })
+      ).rejects.toThrow('You do not have access to this organization');
     });
   });
 });

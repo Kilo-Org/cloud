@@ -92,6 +92,7 @@ export function createSessionInitHandlers() {
                 githubToken: input.githubToken,
                 gitUrl: input.gitUrl,
                 gitToken: input.gitToken,
+                platform: input.platform,
                 env: ctx.env,
                 envVars: input.envVars,
                 setupCommands: input.setupCommands,
@@ -263,6 +264,7 @@ export function createSessionInitHandlers() {
                 githubToken: input.githubToken,
                 gitUrl: input.gitUrl,
                 gitToken: input.gitToken,
+                platform: input.platform,
                 env: ctx.env,
                 envVars: input.envVars,
                 setupCommands: input.setupCommands,
@@ -572,6 +574,7 @@ export function createSessionInitHandlers() {
                     setupCommands: metadata.setupCommands,
                     mcpServers: metadata.mcpServers,
                     botId: ctx.botId,
+                    createdOnPlatform: metadata.createdOnPlatform,
                     // Skip linking - backend already linked during prepareSession
                     skipLinking: true,
                     // Pass existing metadata to preserve preparedAt, initiatedAt, prompt, mode, model, autoCommit

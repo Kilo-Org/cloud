@@ -34,6 +34,29 @@ const CreateOrganizationSchema = z.object({
 
 type CreateOrganizationForm = z.infer<typeof CreateOrganizationSchema>;
 
+const DEFAULT_ERROR = 'Failed to create organization. Please try again.';
+
+function extractErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return DEFAULT_ERROR;
+  try {
+    const parsed: unknown = JSON.parse(error.message);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const first: unknown = parsed[0];
+      if (
+        first &&
+        typeof first === 'object' &&
+        'message' in first &&
+        typeof first.message === 'string'
+      ) {
+        return first.message;
+      }
+    }
+  } catch {
+    // not JSON — use raw message
+  }
+  return error.message || DEFAULT_ERROR;
+}
+
 type CreateOrganizationPageProps = {
   mockSelectedOrgName?: string; // For Storybook
 };
@@ -58,6 +81,7 @@ const enterpriseTrialFeatures: FeatureItem[] = [
 
 export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizationPageProps = {}) {
   const [name, setName] = useState(mockSelectedOrgName || '');
+  const [companyDomain, setCompanyDomain] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
@@ -97,6 +121,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
           name: validationResult.data.organizationName,
           autoAddCreator: true,
           plan: 'enterprise',
+          company_domain: companyDomain.trim() || undefined,
         })
       ).organization.id;
 
@@ -105,10 +130,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
     } catch (error) {
       console.error('Failed to create organization:', error);
       setErrors({
-        general:
-          error instanceof Error
-            ? error.message
-            : 'Failed to create organization. Please try again.',
+        general: extractErrorMessage(error),
       });
       setIsSubmitting(false);
     }
@@ -185,6 +207,16 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
                     errors.name ? 'border-red-400 focus:ring-red-400/20' : 'focus:ring-blue-500/20'
                   }`}
                   autoFocus
+                />
+                <Input
+                  id="company_domain"
+                  name="company_domain"
+                  value={companyDomain}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setCompanyDomain(e.target.value)
+                  }
+                  placeholder="Company Website (e.g. acme.com)"
+                  className={`h-12 text-center text-lg transition-all duration-200 focus:ring-2 focus:ring-blue-500/20`}
                 />
                 <AnimatePresence>
                   {errors.name && (

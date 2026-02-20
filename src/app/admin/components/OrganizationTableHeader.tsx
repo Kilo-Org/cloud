@@ -39,7 +39,7 @@ export function OrganizationTableHeader({
           </SortableButton>
         </TableHead>
         <TableHead>
-          <SortableButton field="microdollars_balance" sortConfig={sortConfig} onSort={onSort}>
+          <SortableButton field="balance" sortConfig={sortConfig} onSort={onSort}>
             Balance
           </SortableButton>
         </TableHead>

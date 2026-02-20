@@ -1,6 +1,5 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
-import { eq as _eq, and as _and } from 'drizzle-orm';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   createCloudAgentNextClient,
@@ -31,10 +30,11 @@ import {
   baseInterruptSessionNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
+  baseAnswerQuestionNextSchema,
+  baseRejectQuestionNextSchema,
 } from '../cloud-agent-next-schemas';
-import { db } from '@/lib/drizzle';
-import { cli_sessions_v2 } from '@/db/schema';
 import * as z from 'zod';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 // Extend base schemas with organizationId for organization context
 const PrepareSessionInput = basePrepareSessionNextSchema.and(
@@ -56,6 +56,14 @@ const InterruptSessionInput = baseInterruptSessionNextSchema.extend({
 });
 
 const GetSessionInput = baseGetSessionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const AnswerQuestionInput = baseAnswerQuestionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const RejectQuestionInput = baseRejectQuestionNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -118,6 +126,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           githubRepo?: string;
           gitUrl?: string;
           gitToken?: string;
+          platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
@@ -131,10 +140,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           }
           const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken };
+          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
         } else {
           // GitHub flow: use githubRepo (token will be fetched in cloud-agent-next)
-          gitParams = { githubRepo };
+          gitParams = { githubRepo, platform: PLATFORM.GITHUB };
         }
 
         const result = await client.prepareSession({
@@ -145,24 +154,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           encryptedSecrets: merged.encryptedSecrets,
           setupCommands: merged.setupCommands,
         });
-
-        // Insert cli_sessions_v2 with session IDs
-        await db
-          .insert(cli_sessions_v2)
-          .values({
-            session_id: result.kiloSessionId,
-            kilo_user_id: ctx.user.id,
-            cloud_agent_session_id: result.cloudAgentSessionId,
-            organization_id: organizationId,
-            version: 0,
-          })
-          .onConflictDoUpdate({
-            target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
-            set: {
-              cloud_agent_session_id: result.cloudAgentSessionId,
-              organization_id: organizationId,
-            },
-          });
 
         return result;
       } catch (error) {
@@ -245,6 +236,31 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.interruptSession(input.sessionId);
+    }),
+
+  answerQuestion: organizationMemberProcedure
+    .input(AnswerQuestionInput)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const authToken = generateApiToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.answerQuestion({
+        sessionId: input.sessionId,
+        questionId: input.questionId,
+        answers: input.answers,
+      });
+    }),
+
+  rejectQuestion: organizationMemberProcedure
+    .input(RejectQuestionInput)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const authToken = generateApiToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.rejectQuestion({
+        sessionId: input.sessionId,
+        questionId: input.questionId,
+      });
     }),
 
   /**

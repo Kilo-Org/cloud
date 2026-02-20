@@ -19,7 +19,12 @@ export function applyCoreThinkProviderSettings(requestToMutate: OpenRouterChatCo
   delete requestToMutate.transforms;
   delete requestToMutate.prompt_cache_key;
   delete requestToMutate.safety_identifier;
+  delete requestToMutate.description;
+  delete requestToMutate.usage;
   for (const message of requestToMutate.messages) {
+    if ('reasoning' in message) {
+      delete message.reasoning;
+    }
     if ('reasoning_details' in message) {
       delete message.reasoning_details;
     }

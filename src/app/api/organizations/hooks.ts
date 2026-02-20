@@ -158,6 +158,16 @@ export function useUpdateOrganizationName() {
   );
 }
 
+export function useUpdateCompanyDomain() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationAndMembers();
+  return useMutation(
+    trpc.organizations.updateCompanyDomain.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
 export function useUpdateOrganizationSettings() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

@@ -88,7 +88,6 @@ describe('autoTopUp', () => {
       .set({
         stripe_customer_id: `cus_org_${Date.now()}`,
         auto_top_up_enabled: false,
-        microdollars_balance: 0,
       })
       .where(eq(organizations.id, testOrg.id));
   });
@@ -275,7 +274,6 @@ describe('autoTopUp', () => {
         .update(organizations)
         .set({
           auto_top_up_enabled: false,
-          microdollars_balance: 0,
         })
         .where(eq(organizations.id, testOrg.id));
       await db
@@ -287,7 +285,8 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: false,
-        microdollars_balance: 0,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
       };
 
       await maybePerformOrganizationAutoTopUp(org);
@@ -304,7 +303,8 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: balanceAboveThreshold,
+        total_microdollars_acquired: balanceAboveThreshold,
+        microdollars_used: 0,
       };
 
       await maybePerformOrganizationAutoTopUp(org);
@@ -326,7 +326,8 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: 0,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
       };
 
       await maybePerformOrganizationAutoTopUp(org);
@@ -355,7 +356,8 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: 0,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
       };
 
       // This should return early due to concurrent attempt
@@ -391,7 +393,8 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: 0,
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
       };
 
       await maybePerformOrganizationAutoTopUp(org);
@@ -422,23 +425,24 @@ describe('autoTopUp', () => {
         .update(organizations)
         .set({
           auto_top_up_enabled: true,
-          microdollars_balance: 0,
         })
         .where(eq(organizations.id, testOrg.id));
 
       // Increase balance above threshold BEFORE calling auto-top-up
       // This simulates a race condition where balance increases between the initial check and lock acquisition
+      const aboveThreshold = toMicrodollars(ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS + 10);
       await db
         .update(organizations)
         .set({
-          microdollars_balance: toMicrodollars(ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS + 10),
+          total_microdollars_acquired: aboveThreshold,
         })
         .where(eq(organizations.id, testOrg.id));
 
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: 0, // Pass old balance to trigger the check
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
       };
 
       // Call auto-top-up - it should acquire lock, re-check balance, and release lock
@@ -480,7 +484,8 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: justBelowThreshold,
+        total_microdollars_acquired: justBelowThreshold,
+        microdollars_used: 0,
       };
 
       await maybePerformOrganizationAutoTopUp(org);
@@ -498,7 +503,8 @@ describe('autoTopUp', () => {
       const org = {
         id: testOrg.id,
         auto_top_up_enabled: true,
-        microdollars_balance: exactlyAtThreshold,
+        total_microdollars_acquired: exactlyAtThreshold,
+        microdollars_used: 0,
       };
 
       // Reset org state

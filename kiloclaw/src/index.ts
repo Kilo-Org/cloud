@@ -8,7 +8,6 @@
  * Auth model:
  * - User routes + catch-all proxy: JWT via authMiddleware (Bearer header or cookie)
  * - Platform routes: x-internal-api-key via internalApiMiddleware
- * - Debug routes: internal API key or debug secret via debugRoutesGate
  * - Public routes: no auth (health check only)
  */
 
@@ -16,14 +15,14 @@ import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 
 import type { AppEnv, KiloClawEnv } from './types';
-import { accessGatewayRoutes, publicRoutes, api, kiloclaw, debug, platform } from './routes';
+import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
-import { debugRoutesGate } from './auth/debug-gate';
 
-// Export the KiloClawInstance DO (matches wrangler.jsonc class_name)
+// Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
+export { KiloClawApp } from './durable-objects/kiloclaw-app';
 
 // =============================================================================
 // Helpers
@@ -46,7 +45,6 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
   if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
   if (!env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
-  if (!env.FLY_APP_NAME) missing.push('FLY_APP_NAME');
   return missing;
 }
 
@@ -68,21 +66,15 @@ async function logRequest(c: Context<AppEnv>, next: Next) {
   await next();
 }
 
-/** Debug routes bypass env validation and auth -- gated by DEBUG_ROUTES + secret. */
-function isDebugRoute(c: Context<AppEnv>): boolean {
-  const path = new URL(c.req.url).pathname;
-  return path === '/debug' || path.startsWith('/debug/');
-}
-
 /** Platform routes use internalApiMiddleware instead of JWT auth. */
 function isPlatformRoute(c: Context<AppEnv>): boolean {
   const path = new URL(c.req.url).pathname;
   return path === '/api/platform' || path.startsWith('/api/platform/');
 }
 
-/** Reject early if required secrets are missing (skip for debug routes and dev mode). */
+/** Reject early if required secrets are missing (skip in dev mode). */
 async function requireEnvVars(c: Context<AppEnv>, next: Next) {
-  if (isDebugRoute(c) || c.env.DEV_MODE === 'true') {
+  if (c.env.DEV_MODE === 'true') {
     return next();
   }
 
@@ -93,7 +85,6 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
     if (!c.env.HYPERDRIVE?.connectionString) missing.push('HYPERDRIVE');
     if (!c.env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
     if (!c.env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
-    if (!c.env.FLY_APP_NAME) missing.push('FLY_APP_NAME');
     if (missing.length > 0) {
       console.error('[CONFIG] Platform route missing bindings:', missing.join(', '));
       return c.json({ error: 'Configuration error', missing }, 503);
@@ -118,9 +109,9 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
   return next();
 }
 
-/** Authenticate user via JWT (Bearer header or cookie). Skip for debug and platform routes. */
+/** Authenticate user via JWT (Bearer header or cookie). Skip for platform routes. */
 async function authGuard(c: Context<AppEnv>, next: Next) {
-  if (isDebugRoute(c) || isPlatformRoute(c)) {
+  if (isPlatformRoute(c)) {
     return next();
   }
   return authMiddleware(c, next);
@@ -150,6 +141,10 @@ app.use('*', logRequest);
 app.route('/', publicRoutes);
 app.route('/', accessGatewayRoutes);
 
+// Debug routes are removed.
+app.all('/debug', c => c.notFound());
+app.all('/debug/*', c => c.notFound());
+
 // Protected middleware chain
 app.use('*', requireEnvVars);
 app.use('*', authGuard);
@@ -162,10 +157,6 @@ app.route('/api/kiloclaw', kiloclaw);
 // Platform routes (backend-to-backend, x-internal-api-key)
 app.use('/api/platform/*', internalApiMiddleware);
 app.route('/api/platform', platform);
-
-// Debug routes (gated by env flag + secret/internal key)
-app.use('/debug/*', debugRoutesGate);
-app.route('/debug', debug);
 
 // =============================================================================
 // CATCH-ALL: Proxy to per-user OpenClaw gateway via Fly Proxy
@@ -198,22 +189,23 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
 }
 
 /**
- * Resolve the flyMachineId and status for the current user from their DO.
+ * Resolve the flyMachineId, flyAppName, and status for the current user from their DO.
  * Returns null machineId if the instance is destroying (blocks proxy during teardown).
  */
 async function resolveInstance(c: Context<AppEnv>): Promise<{
   machineId: string | null;
+  flyAppName: string | null;
   status: string | null;
 }> {
   const userId = c.get('userId');
-  if (!userId) return { machineId: null, status: null };
+  if (!userId) return { machineId: null, flyAppName: null, status: null };
 
   const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
   const s = await stub.getStatus();
 
-  if (s.status === 'destroying') return { machineId: null, status: 'destroying' };
+  if (s.status === 'destroying') return { machineId: null, flyAppName: null, status: 'destroying' };
 
-  return { machineId: s.flyMachineId, status: s.status };
+  return { machineId: s.flyMachineId, flyAppName: s.flyAppName, status: s.status };
 }
 
 app.all('*', async c => {
@@ -225,12 +217,7 @@ app.all('*', async c => {
     );
   }
 
-  const appName = c.env.FLY_APP_NAME;
-  if (!appName) {
-    return c.json({ error: 'FLY_APP_NAME not configured' }, 503);
-  }
-
-  const { machineId, status } = await resolveInstance(c);
+  const { machineId, flyAppName, status } = await resolveInstance(c);
   if (status === 'destroying') {
     return c.json(
       { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
@@ -245,6 +232,12 @@ app.all('*', async c => {
       },
       404
     );
+  }
+
+  // Per-user app name, with legacy fallback for existing instances
+  const appName = flyAppName ?? c.env.FLY_APP_NAME;
+  if (!appName) {
+    return c.json({ error: 'No Fly app name for this instance' }, 503);
   }
 
   const request = c.req.raw;
@@ -263,13 +256,7 @@ app.all('*', async c => {
 
   // WebSocket proxy
   if (isWebSocketRequest) {
-    const debugLogs = c.env.DEBUG_ROUTES === 'true';
-    const redactedSearch = redactSensitiveParams(url);
-
     console.log('[WS] Proxying WebSocket connection to OpenClaw via Fly Proxy');
-    if (debugLogs) {
-      console.log('[WS] URL:', url.pathname + redactedSearch);
-    }
 
     let containerResponse: Response;
     try {
@@ -314,10 +301,6 @@ app.all('*', async c => {
       return containerResponse;
     }
 
-    if (debugLogs) {
-      console.log('[WS] Got container WebSocket, setting up relay');
-    }
-
     const [clientWs, serverWs] = Object.values(new WebSocketPair());
 
     serverWs.accept();
@@ -325,13 +308,6 @@ app.all('*', async c => {
 
     // Client -> Container relay
     serverWs.addEventListener('message', event => {
-      if (debugLogs) {
-        console.log(
-          '[WS] Client -> Container:',
-          typeof event.data,
-          typeof event.data === 'string' ? event.data.slice(0, 200) : '(binary)'
-        );
-      }
       if (containerWs.readyState === WebSocket.OPEN) {
         containerWs.send(event.data);
       }
@@ -432,16 +408,7 @@ app.all('*', async c => {
     }
   }
   console.log('[HTTP] Response status:', httpResponse.status);
-
-  const newHeaders = new Headers(httpResponse.headers);
-  newHeaders.set('X-Worker-Debug', 'proxy-to-openclaw');
-  newHeaders.set('X-Debug-Path', url.pathname);
-
-  return new Response(httpResponse.body, {
-    status: httpResponse.status,
-    statusText: httpResponse.statusText,
-    headers: newHeaders,
-  });
+  return httpResponse;
 });
 
 export default {

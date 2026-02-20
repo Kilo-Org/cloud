@@ -41,9 +41,7 @@ export function ChatSidebar({
       onSelectSession(sessionId);
     } else {
       // Navigate to the session
-      const basePath = organizationId
-        ? `/organizations/${organizationId}/cloud-next`
-        : '/cloud-next';
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${sessionId}`);
     }
   };

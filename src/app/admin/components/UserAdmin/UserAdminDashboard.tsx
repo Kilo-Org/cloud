@@ -20,6 +20,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { UserAdminOrganizations } from '@/app/admin/components/UserAdmin/UserAdminOrganizations';
+import { UserAdminKiloPass } from '@/app/admin/components/UserAdmin/UserAdminKiloPass';
 
 export function UserAdminDashboard({ ...user }: UserDetailProps) {
   const breadcrumbs = (
@@ -46,6 +47,7 @@ export function UserAdminDashboard({ ...user }: UserDetailProps) {
           <UserAdminOrganizations organization_memberships={user.organization_memberships} />
           <UserAdminNotes {...user} />
           <UserAdminGdprRemoval {...user} />
+          <UserAdminKiloPass userId={user.id} />
           <UserAdminUsageBilling {...user} />
           <UserAdminCreditGrant
             {...user}

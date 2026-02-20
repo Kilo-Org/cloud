@@ -601,3 +601,112 @@ export async function upsertPlatformIntegrationForOwner(
     });
   }
 }
+
+/**
+ * Find GitLab integration by project path
+ * GitLab webhooks include the project path, so we need to find the integration
+ * that has access to this project (either via 'all' repository access or selected repos)
+ *
+ * For MVP: We look up by webhook secret token stored in metadata
+ */
+export async function findGitLabIntegrationByWebhookToken(webhookToken: string) {
+  // GitLab integrations store webhook_secret in metadata
+  // We need to find the integration where metadata.webhook_secret matches
+  const integrations = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.platform, PLATFORM.GITLAB));
+
+  // Find the integration with matching webhook token
+  for (const integration of integrations) {
+    const metadata = integration.metadata as { webhook_secret?: string } | null;
+    if (metadata?.webhook_secret === webhookToken) {
+      return integration;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find GitLab integration by project ID
+ * Used when we know the GitLab project ID from the webhook payload
+ */
+export async function findGitLabIntegrationByProjectId(projectId: number) {
+  // Find integrations that have this project in their repositories list
+  const integrations = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.platform, PLATFORM.GITLAB));
+
+  for (const integration of integrations) {
+    // Check if repository_access is 'all' or if project is in selected repos
+    if (integration.repository_access === 'all') {
+      return integration;
+    }
+
+    // Check if project is in the repositories list
+    const repos = integration.repositories;
+    if (repos?.some(repo => repo.id === projectId)) {
+      return integration;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Updates the metadata for a platform integration
+ * Used for storing webhook configuration, tokens, etc.
+ */
+export async function updateIntegrationMetadata(
+  integrationId: string,
+  metadata: Record<string, unknown>
+) {
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integrationId));
+}
+
+/**
+ * Updates the metadata for a platform integration owned by a specific owner
+ * Merges new metadata with existing metadata
+ */
+export async function updateIntegrationMetadataForOwner(
+  owner: Owner,
+  platform: string,
+  metadataUpdates: Record<string, unknown>
+) {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(platform_integrations.owned_by_user_id, owner.id)
+      : eq(platform_integrations.owned_by_organization_id, owner.id);
+
+  // Get existing integration to merge metadata
+  const [existing] = await db
+    .select()
+    .from(platform_integrations)
+    .where(and(ownershipCondition, eq(platform_integrations.platform, platform)))
+    .limit(1);
+
+  if (!existing) {
+    throw new Error(`No ${platform} integration found for owner`);
+  }
+
+  const existingMetadata = (existing.metadata as Record<string, unknown>) || {};
+  const mergedMetadata = { ...existingMetadata, ...metadataUpdates };
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: mergedMetadata,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, existing.id));
+
+  return mergedMetadata;
+}

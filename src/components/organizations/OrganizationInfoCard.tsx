@@ -5,16 +5,28 @@ import { Button } from '@/components/ui/button';
 import { BooleanBadge } from '@/components/ui/boolean-badge';
 import {
   useUpdateOrganizationName,
+  useUpdateCompanyDomain,
   useOrganizationWithMembers,
   useAdminToggleCodeIndexing,
   useUpdateSuppressTrialMessaging,
 } from '@/app/api/organizations/hooks';
 import type { OrganizationWithMembers } from '@/lib/organizations/organization-types';
+import { normalizeCompanyDomain, isValidDomain } from '@/lib/organizations/company-domain';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { AnimatedDollars } from './AnimatedDollars';
 import { useState } from 'react';
-import { Edit, Check, X, PiggyBank, Building2, ExternalLink, Bell, Plus } from 'lucide-react';
+import {
+  Edit,
+  Check,
+  X,
+  PiggyBank,
+  Building2,
+  ExternalLink,
+  Bell,
+  Plus,
+  Clock,
+} from 'lucide-react';
 import {
   useIsKiloAdmin,
   useUserOrganizationRole,
@@ -26,9 +38,10 @@ import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/Tri
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { fromMicrodollars } from '@/lib/utils';
+import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useExpiringCredits } from './useExpiringCredits';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -50,7 +63,7 @@ const OSS_TIER_NAMES: Record<number, string> = {
 function useCanManagePaymentInfo() {
   const isKiloAdmin = useIsKiloAdmin();
   const orgRole = useUserOrganizationRole();
-  return isKiloAdmin || orgRole === 'owner';
+  return isKiloAdmin || orgRole === 'owner' || orgRole === 'billing_manager';
 }
 
 type InnerProps = {
@@ -65,7 +78,8 @@ function Inner(props: InnerProps) {
     name,
     created_at,
     updated_at,
-    microdollars_balance,
+    total_microdollars_acquired,
+    microdollars_used,
     stripe_customer_id,
     deleted_at,
     auto_top_up_enabled,
@@ -73,6 +87,9 @@ function Inner(props: InnerProps) {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
+  const [isEditingDomain, setIsEditingDomain] = useState(false);
+  const [editedDomain, setEditedDomain] = useState(info.company_domain ?? '');
+  const [domainError, setDomainError] = useState<string | null>(null);
   const [seatsDialogOpen, setSeatsDialogOpen] = useState(false);
   const [pendingSeatsValue, setPendingSeatsValue] = useState<boolean | null>(null);
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
@@ -80,8 +97,11 @@ function Inner(props: InnerProps) {
   const [isSpendingAlertsModalOpen, setIsSpendingAlertsModalOpen] = useState(false);
   const [ossSponsorshipDialogOpen, setOssSponsorshipDialogOpen] = useState(false);
   const updateOrganizationName = useUpdateOrganizationName();
+  const updateCompanyDomain = useUpdateCompanyDomain();
   const adminToggleCodeIndexing = useAdminToggleCodeIndexing();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
+
+  const { expiringBlocks, expiring_mUsd, earliestExpiry } = useExpiringCredits(id);
 
   const handleSave = async () => {
     if (editedName.trim() === name) {
@@ -112,6 +132,48 @@ function Inner(props: InnerProps) {
       void handleSave();
     } else if (e.key === 'Escape') {
       handleCancel();
+    }
+  };
+
+  const handleDomainSave = async () => {
+    setDomainError(null);
+    const normalized = normalizeCompanyDomain(editedDomain);
+
+    if (normalized === (info.company_domain ?? null)) {
+      setEditedDomain(info.company_domain ?? '');
+      setIsEditingDomain(false);
+      return;
+    }
+
+    if (normalized && !isValidDomain(normalized)) {
+      setDomainError('Please enter a valid domain (e.g. acme.com)');
+      return;
+    }
+
+    try {
+      await updateCompanyDomain.mutateAsync({
+        organizationId: id,
+        company_domain: normalized,
+      });
+      setEditedDomain(normalized ?? '');
+      setIsEditingDomain(false);
+    } catch (error) {
+      console.error('Failed to update company domain:', error);
+      setEditedDomain(info.company_domain ?? '');
+    }
+  };
+
+  const handleDomainCancel = () => {
+    setEditedDomain(info.company_domain ?? '');
+    setDomainError(null);
+    setIsEditingDomain(false);
+  };
+
+  const handleDomainKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      void handleDomainSave();
+    } else if (e.key === 'Escape') {
+      handleDomainCancel();
     }
   };
 
@@ -209,6 +271,63 @@ function Inner(props: InnerProps) {
             </div>
           )}
         </div>
+        <div>
+          <label className="text-muted-foreground text-sm font-medium">Company Domain</label>
+          {isEditingDomain ? (
+            <div className="mt-1">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editedDomain}
+                  onChange={e => {
+                    setEditedDomain(e.target.value);
+                    setDomainError(null);
+                  }}
+                  onKeyDown={handleDomainKeyDown}
+                  className={`text-lg font-semibold ${domainError ? 'border-red-400' : ''}`}
+                  autoFocus
+                  placeholder="e.g. acme.com"
+                  disabled={updateCompanyDomain.isPending}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDomainSave}
+                  disabled={updateCompanyDomain.isPending}
+                  className="h-8 w-8 p-0"
+                >
+                  <Check className="h-4 w-4 text-green-400" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDomainCancel}
+                  disabled={updateCompanyDomain.isPending}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4 text-red-400" />
+                </Button>
+              </div>
+              {domainError && <p className="mt-1 text-sm text-red-400">{domainError}</p>}
+            </div>
+          ) : (
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-lg font-semibold">
+                {info.company_domain || (
+                  <span className="text-muted-foreground text-sm">Not set</span>
+                )}
+              </p>
+              {isOrgOwner && (
+                <button
+                  onClick={() => setIsEditingDomain(true)}
+                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
+                  title="Edit company domain"
+                >
+                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         {isOrgOwner && (
           <div>
             <span className="text-muted-foreground text-sm font-medium">
@@ -217,7 +336,7 @@ function Inner(props: InnerProps) {
             </span>{' '}
             <div className="mt-1 flex items-center gap-2">
               <AnimatedDollars
-                dollars={fromMicrodollars(microdollars_balance)}
+                dollars={fromMicrodollars(total_microdollars_acquired - microdollars_used)}
                 className="text-2xl font-semibold"
               />
               <TooltipProvider>
@@ -250,6 +369,13 @@ function Inner(props: InnerProps) {
                 <Link href={`/organizations/${id}/payment-details`}>View Billing</Link>
               </Button>
             </div>
+            {expiringBlocks.length > 0 && earliestExpiry && (
+              <div className="mt-2 flex items-center gap-1 text-sm text-amber-600">
+                <Clock className="h-3.5 w-3.5" />
+                {formatDollars(fromMicrodollars(expiring_mUsd))} expiring at{' '}
+                {formatIsoDateTime_IsoOrderNoSeconds(earliestExpiry)}
+              </div>
+            )}
           </div>
         )}
         {isInAdminDashboard && (

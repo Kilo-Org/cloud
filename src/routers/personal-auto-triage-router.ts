@@ -72,6 +72,9 @@ export const personalAutoTriageRouter = createTRPCRouter({
   retryTicket: baseProcedure
     .input(sharedHandlers.retryTicket.inputSchema)
     .mutation(sharedHandlers.retryTicket.handler),
+  interruptTicket: baseProcedure
+    .input(sharedHandlers.interruptTicket.inputSchema)
+    .mutation(sharedHandlers.interruptTicket.handler),
   listTickets: baseProcedure
     .input(sharedHandlers.listTickets.inputSchema)
     .query(sharedHandlers.listTickets.handler),

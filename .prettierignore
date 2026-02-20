@@ -23,6 +23,7 @@ public/
 *.min.*
 _journal.json
 src/db/migrations/meta/*.json
+**/worker-configuration.d.ts
 
 # Package files
 package-lock.json
@@ -34,3 +35,4 @@ pnpm-lock.yaml
 .env*
 !.env.example
 *.sql
+

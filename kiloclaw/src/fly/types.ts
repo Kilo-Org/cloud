@@ -87,9 +87,38 @@ export type FlyVolume = {
   created_at: string;
 };
 
+/**
+ * Hint to Fly about the expected machine spec that will attach to this volume.
+ * When provided, Fly places the volume on a host with capacity for the machine,
+ * reducing the chance of a 412 "insufficient resources" on subsequent machine creation.
+ */
+export type VolumeComputeHint = {
+  cpu_kind?: 'shared' | 'performance';
+  cpus?: number;
+  memory_mb?: number;
+};
+
 export type CreateVolumeRequest = {
   name: string;
   region: string;
   size_gb: number;
   snapshot_retention?: number;
+  /** Fork an existing volume. Creates a copy on a different host/region. */
+  source_volume_id?: string;
+  /** Expected machine spec — helps Fly pick a host with capacity. */
+  compute?: VolumeComputeHint;
+};
+
+// -- Exec types --
+
+export type MachineExecRequest = {
+  command: string[];
+  timeout?: number;
+};
+
+export type MachineExecResponse = {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+  exit_signal?: number;
 };

@@ -33,6 +33,8 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
         base_ref: params.baseRef,
         head_ref: params.headRef,
         head_sha: params.headSha,
+        platform: params.platform ?? 'github',
+        platform_project_id: params.platformProjectId ?? null,
         status: 'pending',
       })
       .returning({ id: cloud_agent_code_reviews.id });
@@ -138,7 +140,7 @@ export async function updateCodeReviewStatus(
  */
 export async function listCodeReviews(params: ListReviewsParams): Promise<CloudAgentCodeReview[]> {
   try {
-    const { owner, limit = 50, offset = 0, status, repoFullName } = params;
+    const { owner, limit = 50, offset = 0, status, repoFullName, platform } = params;
 
     console.log('[listCodeReviews] Query params:', {
       owner,
@@ -146,6 +148,7 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CloudA
       offset,
       status,
       repoFullName,
+      platform,
     });
 
     // Build WHERE conditions
@@ -166,6 +169,9 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CloudA
     }
     if (repoFullName) {
       conditions.push(eq(cloud_agent_code_reviews.repo_full_name, repoFullName));
+    }
+    if (platform) {
+      conditions.push(eq(cloud_agent_code_reviews.platform, platform));
     }
 
     const reviews = await db
@@ -196,9 +202,10 @@ export async function countCodeReviews(params: {
   owner: Owner;
   status?: CodeReviewStatus;
   repoFullName?: string;
+  platform?: 'github' | 'gitlab';
 }): Promise<number> {
   try {
-    const { owner, status, repoFullName } = params;
+    const { owner, status, repoFullName, platform } = params;
 
     // Build WHERE conditions
     const conditions = [];
@@ -216,6 +223,9 @@ export async function countCodeReviews(params: {
     }
     if (repoFullName) {
       conditions.push(eq(cloud_agent_code_reviews.repo_full_name, repoFullName));
+    }
+    if (platform) {
+      conditions.push(eq(cloud_agent_code_reviews.platform, platform));
     }
 
     const result = await db

@@ -4,16 +4,20 @@ import * as path from 'path';
 import { Writable } from 'stream';
 import { after } from 'next/server';
 
-const inStreamDebugMode =
-  process.env.NODE_ENV === 'development' && getEnvVariable('DEV_SAVE_PROXY_STREAMS');
+export const inStreamDebugMode =
+  process.env.NODE_ENV === 'development' && !!getEnvVariable('DEV_SAVE_PROXY_STREAMS');
 
 const fileSafeIsoDate = () => new Date().toISOString().replace(/[:.]/g, '-');
 const debugRequestLogPath = path.join(process.cwd(), 'dev-debug-request-logs');
 
-export function debugSaveProxyRequest(requestBodyText: string): void {
+export function debugSaveLog(requestBodyText: string, logFileExtension: string): void {
   if (!inStreamDebugMode) return;
-  const filePath = path.join(debugRequestLogPath, `${fileSafeIsoDate()}.log.req.json`);
+  const filePath = path.join(debugRequestLogPath, `${fileSafeIsoDate()}.${logFileExtension}`);
   after(saveStringToFile(filePath, requestBodyText));
+}
+
+export function debugSaveProxyRequest(requestBodyText: string): void {
+  debugSaveLog(requestBodyText, 'log.req.json');
 }
 
 export function debugSaveProxyResponseStream(response: Response, logFileExtension: string): void {

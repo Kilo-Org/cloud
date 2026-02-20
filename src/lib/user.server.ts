@@ -23,6 +23,7 @@ import LinkedInProvider from 'next-auth/providers/linkedin';
 import WorkOSProvider from 'next-auth/providers/workos';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
 import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
@@ -126,7 +127,7 @@ function createGitlabAccountInfo(
   account: Account,
   user: NextUser | AdapterUser
 ): CreateOrUpdateUserArgs | null {
-  if (account.provider !== 'gitlab') return null;
+  if (account.provider !== PLATFORM.GITLAB) return null;
   assert(user.email, 'User email is required for GitLab auth');
   assert(user.name, 'User name is required for GitLab auth');
 
@@ -642,6 +643,7 @@ type GetAuthResponse =
       isNewUser?: undefined;
       organizationId?: undefined;
       internalApiUse?: undefined;
+      botId?: undefined;
     }
   | {
       user: User;
@@ -649,6 +651,7 @@ type GetAuthResponse =
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
+      botId?: string;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -674,6 +677,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
 
     const organizationId = headersList.get(ORGANIZATION_ID_HEADER) || undefined;
     const internalApiUse = authorizationValidationResult.internalApiUse;
+    const botId = authorizationValidationResult.botId;
 
     return await validateUserAuthorization(
       authorizationValidationResult.kiloUserId,
@@ -682,7 +686,8 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       false,
       organizationId,
       internalApiUse,
-      readDb
+      readDb,
+      botId
     );
   }
 
@@ -709,15 +714,32 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   );
 }
 
-export async function getUserFromAuthOrRedirect(loggedOutRedirectUrl: string): Promise<User> {
+export async function getUserFromAuthOrRedirect(
+  loggedOutRedirectUrl = '/users/sign_in'
+): Promise<User> {
   const { user } = await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true });
   if (!user) {
-    redirect(loggedOutRedirectUrl);
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
   if (user.blocked_reason) {
     redirect('/account-blocked');
   }
   return user;
+}
+
+export async function signInUrlWithCallbackPath(): Promise<string> {
+  return appendCallbackPath('/users/sign_in');
+}
+
+async function appendCallbackPath(url: string): Promise<string> {
+  if (url.includes('callbackPath')) return url;
+  const headersList = await headers();
+  const pathname = headersList.get('x-pathname');
+  if (pathname && pathname !== '/') {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
+  }
+  return url;
 }
 
 function authError(status: number, error: string, kiloUserId: string) {
@@ -732,7 +754,8 @@ async function validateUserAuthorization(
   isNewUser?: boolean,
   organizationId?: Organization['id'],
   internalApiUse?: boolean,
-  fromDb: typeof db = db
+  fromDb: typeof db = db,
+  botId?: string
 ): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId);
@@ -755,7 +778,7 @@ async function validateUserAuthorization(
     }
   }
 
-  return { user, authFailedResponse: null, isNewUser, organizationId, internalApiUse };
+  return { user, authFailedResponse: null, isNewUser, organizationId, internalApiUse, botId };
 }
 
 export const isUserBlacklistedByDomain = (existingUser: Pick<User, 'google_user_email'>) =>

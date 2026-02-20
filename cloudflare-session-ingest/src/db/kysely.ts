@@ -14,12 +14,15 @@ types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
 export type CliSessionsV2Table = {
   session_id: string;
   kilo_user_id: string;
+  cloud_agent_session_id: Generated<string | null>;
   version: ColumnType<number, number | undefined, never>;
   public_id: Generated<string | null>;
   parent_session_id: Generated<string | null>;
   title: Generated<string | null>;
   created_on_platform: Generated<string | null>;
   organization_id: Generated<string | null>;
+  git_url: Generated<string | null>;
+  git_branch: Generated<string | null>;
   created_at: Generated<string>;
   updated_at: Generated<string>;
 };

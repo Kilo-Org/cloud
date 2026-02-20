@@ -2923,7 +2923,7 @@ describe('SessionService', () => {
         preparedAt: 1700000000000,
         initiatedAt: 1700000001000,
         prompt: 'Original prompt from prepareSession',
-        mode: 'build',
+        mode: 'code',
         model: 'claude-3-opus',
         autoCommit: true,
         kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
@@ -2976,7 +2976,7 @@ describe('SessionService', () => {
           preparedAt: 1700000000000,
           initiatedAt: 1700000001000,
           prompt: 'Original prompt from prepareSession',
-          mode: 'build',
+          mode: 'code',
           model: 'claude-3-opus',
           autoCommit: true,
           // These fields should be updated
@@ -3062,7 +3062,7 @@ describe('SessionService', () => {
         initiatedAt: 1700000001000,
         upstreamBranch: 'feature/my-branch', // This triggers manageBranch path
         prompt: 'Test prompt',
-        mode: 'build',
+        mode: 'code',
         model: 'claude-3',
         kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
       };
@@ -3133,7 +3133,7 @@ describe('SessionService', () => {
         initiatedAt: 1700000001000,
         // NO upstreamBranch - should create session branch
         prompt: 'Test prompt',
-        mode: 'build',
+        mode: 'code',
         model: 'claude-3',
         kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
       };

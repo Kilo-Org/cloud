@@ -31,7 +31,7 @@ function dbSessionV2ToStoredSession(session: DbSessionV2): StoredSession {
     sessionId: session.session_id,
     repository: 'Repository', // V2 sessions don't store git_url in DB - shown as generic
     prompt: title,
-    mode: 'build', // Default mode for V2
+    mode: 'code', // Default mode for V2
     model: '', // Not stored in DB session list
     status: session.cloud_agent_session_id ? 'active' : 'completed',
     createdAt: session.created_at.toISOString(),

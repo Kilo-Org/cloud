@@ -6,27 +6,31 @@ import type { MCPServerConfig } from './persistence/types.js';
  * Internal agent modes used by the kilo CLI.
  * These are the actual modes passed to `kilo run --agent <mode>`.
  */
-export const InternalAgentModes = ['plan', 'code', 'custom'] as const;
+export const InternalAgentModes = [
+  'code',
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+  'custom',
+] as const;
 export type InternalAgentMode = (typeof InternalAgentModes)[number];
 
 /**
  * Input agent modes accepted by the API.
- * These include aliases that map to internal modes:
- * - plan: maps to 'plan'
- * - code: maps to 'code'
- * - build: maps to 'code' (alias)
- * - orchestrator: maps to 'code' (alias)
- * - architect: maps to 'plan' (alias)
- * - ask: maps to 'plan' (alias)
- * - custom: maps to 'custom'
+ * These include backward-compatible aliases:
+ * - build: maps to 'code'
+ * - architect: maps to 'plan'
+ * All other modes pass through 1:1 to the CLI.
  */
 export const AgentModes = [
-  'plan',
   'code',
-  'build',
+  'plan',
+  'debug',
   'orchestrator',
-  'architect',
   'ask',
+  'build',
+  'architect',
   'custom',
 ] as const;
 export type AgentMode = (typeof AgentModes)[number];
@@ -37,16 +41,17 @@ export const AgentModeSchema = z.enum(AgentModes);
  */
 export function normalizeAgentMode(mode: AgentMode): InternalAgentMode {
   switch (mode) {
-    case 'architect':
-    case 'ask':
-    case 'plan':
-      return 'plan';
-    case 'orchestrator':
     case 'build':
-    case 'code':
       return 'code';
+    case 'architect':
+      return 'plan';
+    case 'code':
+    case 'plan':
+    case 'debug':
+    case 'orchestrator':
+    case 'ask':
     case 'custom':
-      return 'custom';
+      return mode;
   }
 }
 

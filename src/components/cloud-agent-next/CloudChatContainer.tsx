@@ -54,6 +54,13 @@ import { CloudChatPresentation } from './CloudChatPresentation';
 import type { ResumeConfig } from './ResumeConfigModal';
 import type { AgentMode, SessionStartConfig } from './types';
 
+/** Normalize legacy mode strings ('build' → 'code', 'architect' → 'plan') from DB/DO */
+function normalizeMode(mode: string): AgentMode {
+  if (mode === 'build') return 'code';
+  if (mode === 'architect') return 'plan';
+  return mode as AgentMode;
+}
+
 type CloudChatContainerProps = {
   organizationId?: string;
 };
@@ -177,7 +184,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
 
   // Input toolbar state for mode/model selection
   // These persist between messages and update sessionConfig when changed
-  const [inputMode, setInputMode] = useState<AgentMode>('build');
+  const [inputMode, setInputMode] = useState<AgentMode>('code');
   const [inputModel, setInputModel] = useState<string>('');
 
   // Auto-scroll behavior
@@ -288,7 +295,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   // Only sync when sessionConfig changes (new session loaded or initial config)
   useEffect(() => {
     if (sessionConfig?.mode) {
-      setInputMode(sessionConfig.mode as AgentMode);
+      setInputMode(normalizeMode(sessionConfig.mode));
     }
     if (sessionConfig?.model) {
       setInputModel(sessionConfig.model);
@@ -426,17 +433,19 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
           // Apply runtime state from DO (mode, model, repository)
           if (runtimeState) {
             if (runtimeState.mode) {
-              setInputMode(runtimeState.mode as AgentMode);
+              setInputMode(normalizeMode(runtimeState.mode));
             }
             if (runtimeState.model) {
               setInputModel(runtimeState.model);
             }
             // Update sessionConfig with mode/model/repository from cloud-agent DO
             if (runtimeState.mode && runtimeState.model) {
+              const normalizedMode = normalizeMode(runtimeState.mode);
+              const model = runtimeState.model;
               setSessionConfig(prev => ({
                 sessionId: sessionData.cloud_agent_session_id ?? sessionData.session_id,
-                mode: runtimeState.mode as AgentMode,
-                model: runtimeState.model as string,
+                mode: normalizedMode,
+                model,
                 repository: runtimeState.githubRepo ?? prev?.repository ?? '',
               }));
             }

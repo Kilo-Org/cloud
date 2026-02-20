@@ -517,7 +517,7 @@ export const createNewSessionInIndexedDbAtom = atom(
       /** Organization context if applicable */
       orgContext?: OrgContext | null;
       /** Session mode from the form */
-      mode?: 'plan' | 'build';
+      mode?: 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
       /** Session model from the form */
       model?: string;
     }

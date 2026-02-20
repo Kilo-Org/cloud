@@ -93,7 +93,7 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
   const [prompt, setPrompt] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<RepositoryPlatform>('github');
-  const [mode, setMode] = useState<AgentMode>('build');
+  const [mode, setMode] = useState<AgentMode>('code');
   const [model, setModel] = useState<string>('');
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);

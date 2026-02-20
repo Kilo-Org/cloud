@@ -643,7 +643,7 @@ describe('router sessionId validation', () => {
             gitUrl: undefined,
             gitToken: undefined,
             prompt: 'Build a feature',
-            mode: 'build',
+            mode: 'code',
             model: 'claude-3-sonnet',
             autoCommit: true,
             upstreamBranch: 'main',
@@ -667,7 +667,7 @@ describe('router sessionId validation', () => {
           expect(result.orgId).toBe('org-123');
           expect(result.githubRepo).toBe('acme/repo');
           expect(result.prompt).toBe('Build a feature');
-          expect(result.mode).toBe('build');
+          expect(result.mode).toBe('code');
           expect(result.model).toBe('claude-3-sonnet');
           expect(result.autoCommit).toBe(true);
           expect(result.upstreamBranch).toBe('main');

@@ -27,7 +27,7 @@ for (const channel of channels) {
   try {
     const output = execFileSync('openclaw', ['pairing', 'list', channel, '--json'], {
       encoding: 'utf8',
-      timeout: 10000,
+      timeout: 30000,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, HOME: '/root' },
     });

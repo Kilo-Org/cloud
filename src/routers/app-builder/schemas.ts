@@ -27,6 +27,13 @@ export const sendMessageBaseSchema = z.object({
   images: imagesSchema,
   /** Optional model override - if provided, updates the project's model_id */
   model: z.string().min(1).optional(),
+  /** Current preview path the user is viewing (e.g., "/about") */
+  previewPath: z
+    .string()
+    .startsWith('/')
+    .max(2048)
+    .regex(/^[^\s]*$/, 'Must not contain whitespace')
+    .optional(),
 });
 
 // Common extension for organizationId

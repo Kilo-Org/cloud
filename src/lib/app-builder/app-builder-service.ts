@@ -466,7 +466,7 @@ export async function startSessionForProject(
  * cloudAgentSessionId and should reconnect to the new session's WebSocket.
  */
 export async function sendMessage(input: SendMessageInput): Promise<InitiateSessionV2Output> {
-  const { projectId, owner, message, authToken, images, model } = input;
+  const { projectId, owner, message, authToken, images, model, previewPath } = input;
 
   const project = await getProjectWithOwnershipCheck(projectId, owner);
 
@@ -501,9 +501,13 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
     // Session was prepared with internal gitUrl, but project is now on GitHub —
     // create a new session with the GitHub repo
     if (session.gitUrl && !session.githubRepo) {
+      // Prepend preview path context for GitHub migration path too
+      const migrationPrompt = previewPath
+        ? `[The user is currently viewing: ${previewPath}]\n\n${message}`
+        : message;
       const { cloudAgentSessionId: newSessionId } = await client.prepareSession({
         githubRepo: project.git_repo_full_name,
-        prompt: message,
+        prompt: migrationPrompt,
         mode: 'code',
         model: effectiveModel,
         upstreamBranch: 'main',
@@ -556,10 +560,15 @@ export async function sendMessage(input: SendMessageInput): Promise<InitiateSess
     gitToken = tokenResult.token;
   }
 
+  // Prepend preview path context to the prompt if available
+  const prompt = previewPath
+    ? `[The user is currently viewing: ${previewPath}]\n\n${message}`
+    : message;
+
   // Send message to existing session using V2 mutation (returns immediately)
   const result = await client.sendMessageV2({
     cloudAgentSessionId: project.session_id,
-    prompt: message,
+    prompt,
     mode: 'code',
     model: effectiveModel,
     autoCommit: true,

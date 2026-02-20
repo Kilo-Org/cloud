@@ -198,6 +198,29 @@ export class ProjectManager {
     this.store.setState({ gitRepoFullName: repoFullName });
   }
 
+  private previewNavigateHandler: ((path: string) => void) | null = null;
+
+  /**
+   * Register a callback that navigates the preview iframe.
+   * Called by AppBuilderPreview on mount; returns an unregister function.
+   */
+  onPreviewNavigate(handler: (path: string) => void): () => void {
+    this.previewNavigateHandler = handler;
+    return () => {
+      if (this.previewNavigateHandler === handler) {
+        this.previewNavigateHandler = null;
+      }
+    };
+  }
+
+  /**
+   * Navigate the preview iframe to a relative path.
+   * No-op if the preview hasn't registered a handler (e.g., iframe not ready).
+   */
+  navigatePreview(path: string): void {
+    this.previewNavigateHandler?.(path);
+  }
+
   /**
    * Deploy the project to production.
    * @returns Promise resolving to deployment result with URL or error

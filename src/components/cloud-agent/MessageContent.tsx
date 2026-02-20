@@ -13,17 +13,33 @@ import { cn } from '@/lib/utils';
 import { ToolExecutionCard } from './ToolExecutionCard';
 import type { ToolExecution } from './types';
 import remarkGfm from 'remark-gfm';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
-function LinkRenderer({ href, children }: { href?: string; children?: ReactNode }) {
-  return (
-    <a href={href} target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
-  );
+function createMarkdownComponents(onPreviewNavigate?: (path: string) => void) {
+  function LinkRenderer({ href, children }: { href?: string; children?: ReactNode }) {
+    if (onPreviewNavigate && href && href.startsWith('/')) {
+      return (
+        <a
+          href={href}
+          onClick={e => {
+            e.preventDefault();
+            onPreviewNavigate(href);
+          }}
+        >
+          {children}
+        </a>
+      );
+    }
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    );
+  }
+  return { a: LinkRenderer };
 }
 
-const markdownComponents = { a: LinkRenderer };
+const defaultMarkdownComponents = createMarkdownComponents();
 
 export interface MessageContentProps {
   content: string;
@@ -32,6 +48,8 @@ export interface MessageContentProps {
   metadata?: Record<string, unknown>;
   partial?: boolean;
   isStreaming?: boolean;
+  /** Callback for navigating the preview iframe to a relative path (e.g., "/about") */
+  onPreviewNavigate?: (path: string) => void;
 }
 
 /**
@@ -45,6 +63,7 @@ export function MessageContent({
   metadata,
   partial,
   isStreaming,
+  onPreviewNavigate,
 }: MessageContentProps) {
   if (ask === 'tool' || ask === 'use_mcp_tool' || ask === 'command') {
     return <ToolMessage metadata={metadata} partial={partial} ask={ask} content={content} />;
@@ -55,7 +74,13 @@ export function MessageContent({
   }
 
   if (say === 'completion_result') {
-    return <CompletionResultMessage content={content} isStreaming={isStreaming} />;
+    return (
+      <CompletionResultMessage
+        content={content}
+        isStreaming={isStreaming}
+        onPreviewNavigate={onPreviewNavigate}
+      />
+    );
   }
 
   if (say === 'command_output') {
@@ -63,7 +88,13 @@ export function MessageContent({
   }
 
   // Default: regular text message
-  return <TextMessage content={content} isStreaming={isStreaming} />;
+  return (
+    <TextMessage
+      content={content}
+      isStreaming={isStreaming}
+      onPreviewNavigate={onPreviewNavigate}
+    />
+  );
 }
 
 /**
@@ -148,10 +179,17 @@ function ApiRequestMessage({
 function CompletionResultMessage({
   content,
   isStreaming,
+  onPreviewNavigate,
 }: {
   content: string;
   isStreaming?: boolean;
+  onPreviewNavigate?: (path: string) => void;
 }) {
+  const components = useMemo(
+    () =>
+      onPreviewNavigate ? createMarkdownComponents(onPreviewNavigate) : defaultMarkdownComponents,
+    [onPreviewNavigate]
+  );
   return (
     <div
       className={cn(
@@ -160,7 +198,7 @@ function CompletionResultMessage({
       )}
     >
       {content ? (
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
           {content}
         </ReactMarkdown>
       ) : isStreaming ? (
@@ -174,7 +212,20 @@ function CompletionResultMessage({
  * Regular Text Message
  * Default message renderer
  */
-function TextMessage({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+function TextMessage({
+  content,
+  isStreaming,
+  onPreviewNavigate,
+}: {
+  content: string;
+  isStreaming?: boolean;
+  onPreviewNavigate?: (path: string) => void;
+}) {
+  const components = useMemo(
+    () =>
+      onPreviewNavigate ? createMarkdownComponents(onPreviewNavigate) : defaultMarkdownComponents,
+    [onPreviewNavigate]
+  );
   return (
     <div
       className={cn(
@@ -183,7 +234,7 @@ function TextMessage({ content, isStreaming }: { content: string; isStreaming?: 
       )}
     >
       {content ? (
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
           {content}
         </ReactMarkdown>
       ) : isStreaming ? (

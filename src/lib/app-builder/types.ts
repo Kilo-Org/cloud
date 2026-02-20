@@ -49,6 +49,8 @@ export type SendMessageInput = {
   images?: Images;
   /** Optional model override - if provided, updates the project's model_id */
   model?: string;
+  /** Current preview path the user is viewing (e.g., "/about") */
+  previewPath?: string;
 };
 
 /**

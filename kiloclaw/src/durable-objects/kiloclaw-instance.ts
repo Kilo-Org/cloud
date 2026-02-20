@@ -146,7 +146,7 @@ function guestFromSize(machineSize: MachineSize | null): FlyMachineConfig['guest
   return {
     cpus: machineSize.cpus,
     memory_mb: machineSize.memory_mb,
-    cpu_kind: machineSize.cpu_kind,
+    cpu_kind: machineSize.cpu_kind ?? 'shared',
   };
 }
 

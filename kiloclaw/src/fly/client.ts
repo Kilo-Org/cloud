@@ -246,30 +246,38 @@ export function isFlyNotFound(err: unknown): boolean {
 }
 
 /**
- * Capacity-related markers in Fly 412 error bodies. Matched case-insensitively
- * against the JSON body fields (error, status) and raw body text.
- *
- * Confirmed from production: "insufficient resources to create new machine
- * with existing volume 'vol_xxx'"
- *
- * Add new markers here when the unclassified-412 warning log reveals new
- * capacity error formats from Fly.
+ * Status codes that Fly uses for capacity/resource exhaustion errors.
+ * - 412: "insufficient resources" when creating a machine with an existing volume
+ * - 409: "insufficient memory" when updating/starting a machine on a full host
  */
-const CAPACITY_MARKERS = ['insufficient resources'];
+const CAPACITY_STATUS_CODES = [409, 412];
 
 /**
- * Check if a Fly API 412 error is specifically a capacity/resource exhaustion
- * issue (host where a volume is pinned has no room for a machine).
+ * Capacity-related markers in Fly error bodies. Matched case-insensitively
+ * against the JSON body fields (error, status) and raw body text.
  *
- * Fly overloads 412 for both capacity issues AND precondition/version mismatches
- * (e.g. min_secrets_version, machine_version). We only trigger volume
- * replacement recovery for genuine capacity problems — version/precondition
- * 412s should surface to the caller as-is.
+ * Confirmed from production:
+ * - 412: "insufficient resources to create new machine with existing volume 'vol_xxx'"
+ * - 409: "could not reserve resource for machine: insufficient memory available to fulfill request"
  *
- * Logs a warning for unclassified 412s so we can tune matching.
+ * Add new markers here when the unclassified warning log reveals new
+ * capacity error formats from Fly.
+ */
+const CAPACITY_MARKERS = ['insufficient resources', 'insufficient memory'];
+
+/**
+ * Check if a Fly API error is a capacity/resource exhaustion issue
+ * (host where a volume/machine lives has no room).
+ *
+ * Fly uses 412 for volume-pinned capacity issues and 409 for memory
+ * exhaustion on updateMachine. Both codes are also used for unrelated
+ * errors (precondition/version mismatches, conflicts), so we only
+ * trigger recovery when the body contains explicit capacity markers.
+ *
+ * Logs a warning for unclassified 409/412s so we can tune matching.
  */
 export function isFlyInsufficientResources(err: unknown): boolean {
-  if (!(err instanceof FlyApiError) || err.status !== 412) return false;
+  if (!(err instanceof FlyApiError) || !CAPACITY_STATUS_CODES.includes(err.status)) return false;
 
   // Build a single lowercase string from all available signal sources
   const searchText = `${err.message}\n${err.body}`.toLowerCase();
@@ -292,9 +300,9 @@ export function isFlyInsufficientResources(err: unknown): boolean {
   // Fall back to raw text matching across message + body
   if (CAPACITY_MARKERS.some(m => searchText.includes(m))) return true;
 
-  // 412 but no capacity signal — likely a version/precondition issue.
+  // 409/412 but no capacity signal — likely a version/precondition/conflict issue.
   // Log so we can tune matching if Fly introduces new capacity error formats.
-  console.warn('[fly] Unclassified 412 error (not treated as capacity):', err.body);
+  console.warn(`[fly] Unclassified ${err.status} error (not treated as capacity):`, err.body);
   return false;
 }
 

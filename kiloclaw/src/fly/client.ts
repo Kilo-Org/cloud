@@ -196,6 +196,40 @@ export async function createVolume(
   return resp.json();
 }
 
+/**
+ * Create a volume, walking a list of regions until one succeeds.
+ *
+ * Fly doesn't support meta-regions (us, eu) for volume creation, so callers
+ * must provide an explicit list of regions to try. On capacity-related 412
+ * errors, the next region is tried. Any other error is thrown immediately.
+ *
+ * The compute hint tells Fly what machine spec will attach to this volume,
+ * so it can pick a host with capacity for both.
+ */
+export async function createVolumeWithFallback(
+  config: FlyClientConfig,
+  request: Omit<CreateVolumeRequest, 'region'>,
+  regions: string[]
+): Promise<FlyVolume> {
+  if (regions.length === 0) {
+    throw new Error('createVolumeWithFallback: no regions provided');
+  }
+
+  let lastError: unknown;
+  for (const region of regions) {
+    try {
+      return await createVolume(config, { ...request, region });
+    } catch (err) {
+      lastError = err;
+      if (!isFlyInsufficientResources(err)) throw err;
+      console.warn(`[fly] Volume creation failed in ${region} (capacity), trying next region`);
+    }
+  }
+
+  // All regions exhausted
+  throw lastError;
+}
+
 export async function deleteVolume(config: FlyClientConfig, volumeId: string): Promise<void> {
   const resp = await flyFetch(config, `/volumes/${volumeId}`, {
     method: 'DELETE',

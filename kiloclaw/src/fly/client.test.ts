@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { FlyApiError, isFlyNotFound, isFlyInsufficientResources } from './client';
+import {
+  FlyApiError,
+  isFlyNotFound,
+  isFlyInsufficientResources,
+  createVolumeWithFallback,
+} from './client';
+import type { FlyClientConfig } from './client';
 
 describe('isFlyNotFound', () => {
   it('returns true for FlyApiError with status 404', () => {
@@ -96,5 +102,118 @@ describe('isFlyInsufficientResources', () => {
     expect(isFlyInsufficientResources('string')).toBe(false);
     expect(isFlyInsufficientResources(null)).toBe(false);
     expect(isFlyInsufficientResources(undefined)).toBe(false);
+  });
+});
+
+// ============================================================================
+// createVolumeWithFallback
+// ============================================================================
+
+const fakeConfig: FlyClientConfig = { apiToken: 'test', appName: 'test-app' };
+
+function mockFetchResponse(status: number, body: object | string): Response {
+  const text = typeof body === 'string' ? body : JSON.stringify(body);
+  return new Response(text, { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+describe('createVolumeWithFallback', () => {
+  const baseRequest = { name: 'vol', size_gb: 10, compute: { cpus: 2, memory_mb: 4096 } };
+
+  it('returns volume from first region on success', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        mockFetchResponse(200, { id: 'vol-1', name: 'vol', region: 'dfw', state: 'created' })
+      );
+
+    const vol = await createVolumeWithFallback(fakeConfig, baseRequest, ['dfw', 'yyz']);
+
+    expect(vol.id).toBe('vol-1');
+    expect(vol.region).toBe('dfw');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
+  });
+
+  it('falls through to next region on capacity 412', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        mockFetchResponse(412, { error: 'insufficient resources in region dfw' })
+      )
+      .mockResolvedValueOnce(
+        mockFetchResponse(200, { id: 'vol-2', name: 'vol', region: 'yyz', state: 'created' })
+      );
+
+    const vol = await createVolumeWithFallback(fakeConfig, baseRequest, ['dfw', 'yyz']);
+
+    expect(vol.id).toBe('vol-2');
+    expect(vol.region).toBe('yyz');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    fetchSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('throws last error when all regions exhausted', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(412, { error: 'insufficient resources in dfw' }))
+      .mockResolvedValueOnce(mockFetchResponse(412, { error: 'insufficient resources in yyz' }));
+
+    await expect(createVolumeWithFallback(fakeConfig, baseRequest, ['dfw', 'yyz'])).rejects.toThrow(
+      'insufficient resources'
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    fetchSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('throws immediately on non-capacity errors (no fallthrough)', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(500, { error: 'internal error' }));
+
+    await expect(createVolumeWithFallback(fakeConfig, baseRequest, ['dfw', 'yyz'])).rejects.toThrow(
+      'internal error'
+    );
+
+    // Should NOT have tried yyz
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
+  });
+
+  it('throws when no regions provided', async () => {
+    await expect(createVolumeWithFallback(fakeConfig, baseRequest, [])).rejects.toThrow(
+      'no regions provided'
+    );
+  });
+
+  it('passes compute hint and other fields to each attempt', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(412, { error: 'insufficient resources' }))
+      .mockResolvedValueOnce(
+        mockFetchResponse(200, { id: 'vol-1', name: 'vol', region: 'yyz', state: 'created' })
+      );
+
+    const request = { ...baseRequest, source_volume_id: 'vol-old' };
+    await createVolumeWithFallback(fakeConfig, request, ['dfw', 'yyz']);
+
+    // Both calls should have the full request body including compute and source_volume_id
+    const firstBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    expect(firstBody.region).toBe('dfw');
+    expect(firstBody.compute).toEqual({ cpus: 2, memory_mb: 4096 });
+    expect(firstBody.source_volume_id).toBe('vol-old');
+
+    const secondBody = JSON.parse(fetchSpy.mock.calls[1][1]?.body as string);
+    expect(secondBody.region).toBe('yyz');
+    expect(secondBody.compute).toEqual({ cpus: 2, memory_mb: 4096 });
+    expect(secondBody.source_volume_id).toBe('vol-old');
+
+    fetchSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 });

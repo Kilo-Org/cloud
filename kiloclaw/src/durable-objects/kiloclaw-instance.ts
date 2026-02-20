@@ -159,16 +159,25 @@ function volumeNameFromSandboxId(sandboxId: string): string {
 }
 
 // ============================================================================
-// Region priority helper for 412 recovery
+// Region helpers
 // ============================================================================
 
+/** Split a comma-separated region string into an array. */
+export function parseRegions(regionList: string): string[] {
+  return regionList
+    .split(',')
+    .map(r => r.trim())
+    .filter(Boolean);
+}
+
 /**
- * Reverse the FLY_REGION priority list so we try different regions first.
- * E.g. "dfw,yyz,cdg" → "cdg,yyz,dfw" — if dfw was capacity-constrained,
- * Fly will try cdg first on the next attempt.
+ * Move a failed region to the end of the list so we try other regions first.
+ * E.g. deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'dfw') → ['yyz', 'cdg', 'dfw']
  */
-export function reverseRegionPriority(regionList: string): string {
-  return regionList.split(',').reverse().join(',');
+export function deprioritizeRegion(regions: string[], failedRegion: string | null): string[] {
+  if (!failedRegion) return regions;
+  const without = regions.filter(r => r !== failedRegion);
+  return without.length < regions.length ? [...without, failedRegion] : regions;
 }
 
 // ============================================================================
@@ -332,15 +341,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       console.log('[DO] Per-user Fly App ensured:', appName);
     }
 
-    // Create Fly Volume on first provision
+    // Create Fly Volume on first provision.
+    // Walks the region list and passes a compute hint so Fly picks a host
+    // with capacity for both the volume and the expected machine spec.
     if (isNew && !this.flyVolumeId) {
       const flyConfig = this.getFlyConfig();
-      const region = config.region ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION;
-      const volume = await fly.createVolume(flyConfig, {
-        name: volumeNameFromSandboxId(sandboxId),
-        region,
-        size_gb: DEFAULT_VOLUME_SIZE_GB,
-      });
+      const regions = parseRegions(config.region ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+      const guest = guestFromSize(config.machineSize ?? null);
+      const volume = await fly.createVolumeWithFallback(
+        flyConfig,
+        {
+          name: volumeNameFromSandboxId(sandboxId),
+          size_gb: DEFAULT_VOLUME_SIZE_GB,
+          compute: guest,
+        },
+        regions
+      );
       this.flyVolumeId = volume.id;
       this.flyRegion = volume.region;
       console.log('[DO] Created Fly Volume:', volume.id, 'region:', volume.region);
@@ -1399,18 +1415,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   /**
    * Ensure a Fly Volume exists. Creates one if flyVolumeId is null.
-   * Persists the new volume ID immediately.
+   * Walks the region list with a compute hint so Fly picks a host with
+   * capacity for the expected machine spec. Persists the new volume ID immediately.
    */
   private async ensureVolume(flyConfig: FlyClientConfig, reason: string): Promise<void> {
     if (this.flyVolumeId) return;
     if (!this.sandboxId) return;
 
-    const region = this.flyRegion ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION;
-    const volume = await fly.createVolume(flyConfig, {
-      name: volumeNameFromSandboxId(this.sandboxId),
-      region,
-      size_gb: DEFAULT_VOLUME_SIZE_GB,
-    });
+    const regions = parseRegions(this.flyRegion ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+    const volume = await fly.createVolumeWithFallback(
+      flyConfig,
+      {
+        name: volumeNameFromSandboxId(this.sandboxId),
+        size_gb: DEFAULT_VOLUME_SIZE_GB,
+        compute: guestFromSize(this.machineSize),
+      },
+      regions
+    );
 
     this.flyVolumeId = volume.id;
     this.flyRegion = volume.region;
@@ -1429,7 +1450,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * user data. If the fork fails, the error propagates to the caller.
    * For fresh provisions (never started): deletes and creates a new empty volume.
    *
-   * Uses reversed FLY_REGION priority so we prefer different regions.
+   * Deprioritizes the failed region so we try other regions first, and walks
+   * the full region list via createVolumeWithFallback.
    * Also destroys any existing machine (it's stuck on the same host).
    */
   private async replaceStrandedVolume(flyConfig: FlyClientConfig, reason: string): Promise<void> {
@@ -1438,7 +1460,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const oldVolumeId = this.flyVolumeId;
     const oldRegion = this.flyRegion;
     const hasUserData = this.lastStartedAt !== null;
-    const reversedRegion = reverseRegionPriority(this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+    const allRegions = parseRegions(this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+    const regions = deprioritizeRegion(allRegions, oldRegion);
+    const compute = guestFromSize(this.machineSize);
 
     // Destroy existing machine if any — it's stuck on the constrained host
     if (this.flyMachineId) {
@@ -1455,13 +1479,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     if (hasUserData) {
-      // Fork the volume to preserve user data (workspace, config)
-      const forkedVolume = await fly.createVolume(flyConfig, {
-        name: volumeNameFromSandboxId(this.sandboxId),
-        region: reversedRegion,
-        size_gb: DEFAULT_VOLUME_SIZE_GB,
-        source_volume_id: oldVolumeId,
-      });
+      // Fork the volume to preserve user data (workspace, config).
+      // Walks regions so if one is at capacity, the next is tried.
+      const forkedVolume = await fly.createVolumeWithFallback(
+        flyConfig,
+        {
+          name: volumeNameFromSandboxId(this.sandboxId),
+          size_gb: DEFAULT_VOLUME_SIZE_GB,
+          source_volume_id: oldVolumeId,
+          compute,
+        },
+        regions
+      );
       this.flyVolumeId = forkedVolume.id;
       this.flyRegion = forkedVolume.region;
       reconcileLog(reason, 'fork_stranded_volume', {
@@ -1476,11 +1505,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.flyRegion = null;
       await this.ctx.storage.put(storageUpdate({ flyVolumeId: null, flyRegion: null }));
 
-      const freshVolume = await fly.createVolume(flyConfig, {
-        name: volumeNameFromSandboxId(this.sandboxId),
-        region: reversedRegion,
-        size_gb: DEFAULT_VOLUME_SIZE_GB,
-      });
+      const freshVolume = await fly.createVolumeWithFallback(
+        flyConfig,
+        {
+          name: volumeNameFromSandboxId(this.sandboxId),
+          size_gb: DEFAULT_VOLUME_SIZE_GB,
+          compute,
+        },
+        regions
+      );
       this.flyVolumeId = freshVolume.id;
       this.flyRegion = freshVolume.region;
       reconcileLog(reason, 'create_replacement_volume', {

@@ -6,7 +6,12 @@ import {
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage, kilocode_users } from '@/db/schema';
+import {
+  microdollar_usage,
+  kilocode_users,
+  microdollar_usage_metadata,
+  feature,
+} from '@/db/schema';
 import { eq, sum, count, sql, and, gte, lte } from 'drizzle-orm';
 import * as z from 'zod';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
@@ -44,6 +49,7 @@ const UsageTimeseriesOutputSchema = z.object({
       model: z.string(),
       provider: z.string(),
       projectId: z.string().nullable(),
+      feature: z.string().nullable(),
       costMicrodollars: z.number(),
       inputTokenCount: z.number(),
       outputTokenCount: z.number(),
@@ -61,6 +67,7 @@ const UsageDetailsResponseSchema = z.object({
         email: z.string(),
       }),
       model: z.string().optional(),
+      feature: z.string().optional(),
       microdollarCost: z.string().nullable(),
       tokenCount: z.number(),
       inputTokens: z.number(),
@@ -163,6 +170,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           model: microdollar_usage.model,
           provider: microdollar_usage.provider,
           projectId: microdollar_usage.project_id,
+          feature: feature.feature,
           costMicrodollars: sum(microdollar_usage.cost),
           inputTokenCount: sum(microdollar_usage.input_tokens),
           outputTokenCount: sum(microdollar_usage.output_tokens),
@@ -170,6 +178,11 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         })
         .from(microdollar_usage)
         .innerJoin(kilocode_users, eq(kilocode_users.id, microdollar_usage.kilo_user_id))
+        .leftJoin(
+          microdollar_usage_metadata,
+          eq(microdollar_usage.id, microdollar_usage_metadata.id)
+        )
+        .leftJoin(feature, eq(microdollar_usage_metadata.feature_id, feature.feature_id))
         .where(
           and(
             eq(microdollar_usage.organization_id, organizationId),
@@ -183,19 +196,27 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           kilocode_users.google_user_email,
           microdollar_usage.model,
           microdollar_usage.provider,
-          microdollar_usage.project_id
+          microdollar_usage.project_id,
+          feature.feature
         )
         .orderBy(timeBucket);
 
       // Fill in 0's for missing data
       // TODO surely there's a better way to do this
-      // Get all unique combinations of user/model/provider/projectId from the data
+      // Get all unique combinations of user/model/provider/projectId/feature from the data
       const uniqueCombinations = new Map<
         string,
-        { name: string; email: string; model: string; provider: string; projectId: string | null }
+        {
+          name: string;
+          email: string;
+          model: string;
+          provider: string;
+          projectId: string | null;
+          feature: string | null;
+        }
       >();
       usageData.forEach(row => {
-        const key = `${row.userEmail}|${row.model}|${row.provider}|${row.projectId || 'null'}`;
+        const key = `${row.userEmail}|${row.model}|${row.provider}|${row.projectId || 'null'}|${row.feature || 'null'}`;
         if (!uniqueCombinations.has(key)) {
           uniqueCombinations.set(key, {
             name: row.userName || 'Unknown',
@@ -203,6 +224,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
             model: row.model || 'Unknown',
             provider: row.provider || 'Unknown',
             projectId: row.projectId || null,
+            feature: row.feature || null,
           });
         }
       });
@@ -232,7 +254,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       // Create a map of existing data for quick lookup
       const dataMap = new Map<string, (typeof usageData)[0]>();
       usageData.forEach(row => {
-        const key = `${new Date(row.datetime).toISOString()}|${row.userEmail}|${row.model}|${row.provider}|${row.projectId || 'null'}`;
+        const key = `${new Date(row.datetime).toISOString()}|${row.userEmail}|${row.model}|${row.provider}|${row.projectId || 'null'}|${row.feature || 'null'}`;
         dataMap.set(key, row);
       });
 
@@ -244,6 +266,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         model: string;
         provider: string;
         projectId: string | null;
+        feature: string | null;
         costMicrodollars: number;
         inputTokenCount: number;
         outputTokenCount: number;
@@ -253,7 +276,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       allTimeBuckets.forEach(bucket => {
         const bucketISO = bucket.toISOString();
         uniqueCombinations.forEach(combo => {
-          const key = `${bucketISO}|${combo.email}|${combo.model}|${combo.provider}|${combo.projectId || 'null'}`;
+          const key = `${bucketISO}|${combo.email}|${combo.model}|${combo.provider}|${combo.projectId || 'null'}|${combo.feature || 'null'}`;
           const existingData = dataMap.get(key);
 
           timeseries.push({
@@ -263,6 +286,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
             model: combo.model,
             provider: combo.provider,
             projectId: combo.projectId,
+            feature: combo.feature,
             costMicrodollars: existingData
               ? Number.parseInt(existingData.costMicrodollars?.toString() || '0')
               : 0,
@@ -299,6 +323,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           userName: kilocode_users.google_user_name,
           userEmail: kilocode_users.google_user_email,
           ...(groupByModel && { model: microdollar_usage.model }),
+          feature: feature.feature,
           microdollarCost: sum(microdollar_usage.cost),
           tokenCount: sum(
             sql`${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens} + ${microdollar_usage.cache_write_tokens} + ${microdollar_usage.cache_hit_tokens}`
@@ -309,12 +334,18 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         })
         .from(microdollar_usage)
         .innerJoin(kilocode_users, eq(kilocode_users.id, microdollar_usage.kilo_user_id))
+        .leftJoin(
+          microdollar_usage_metadata,
+          eq(microdollar_usage.id, microdollar_usage_metadata.id)
+        )
+        .leftJoin(feature, eq(microdollar_usage_metadata.feature_id, feature.feature_id))
         .where(and(...whereConditions))
         .groupBy(
           sql`DATE(${microdollar_usage.created_at})`,
           kilocode_users.google_user_name,
           kilocode_users.google_user_email,
-          ...(groupByModel ? [microdollar_usage.model] : [])
+          ...(groupByModel ? [microdollar_usage.model] : []),
+          feature.feature
         )
         .orderBy(sql`DATE(${microdollar_usage.created_at}) DESC`);
 
@@ -325,6 +356,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           email: row.userEmail,
         },
         ...(groupByModel && { model: 'model' in row ? row.model || undefined : undefined }),
+        feature: row.feature || undefined,
         microdollarCost: row.microdollarCost?.toString() || null,
         tokenCount: Number(row.tokenCount) || 0,
         inputTokens: Number(row.inputTokens) || 0,

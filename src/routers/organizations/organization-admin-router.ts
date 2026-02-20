@@ -11,6 +11,7 @@ import { ilike, or, asc, desc, count, eq, and, gt, isNull, isNotNull, sql } from
 import * as z from 'zod';
 import { OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { isValidUUID, toMicrodollars } from '@/lib/utils';
+import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,
   getOrganizationById,
@@ -26,7 +27,7 @@ const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100_000).default(25),
   sortBy: z
-    .enum(['name', 'created_at', 'microdollars_used', 'microdollars_balance', 'member_count'])
+    .enum(['name', 'created_at', 'microdollars_used', 'balance', 'member_count'])
     .default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional().default(''),
@@ -74,7 +75,8 @@ const AdminOrganizationDetailsSchema = z.object({
   name: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
-  microdollars_balance: z.number(),
+  total_microdollars_acquired: z.number(),
+  microdollars_used: z.number(),
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
@@ -85,6 +87,8 @@ const GrantCreditInputSchema = z
     organizationId: z.uuid(),
     amount_usd: z.number().refine(n => n !== 0, 'Amount cannot be zero'),
     description: z.string().optional(),
+    expiry_date: z.string().datetime().nullable().optional(),
+    expiry_hours: z.number().positive().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.amount_usd < 0 && (!data.description || data.description.trim().length === 0)) {
@@ -233,7 +237,8 @@ export const organizationAdminRouter = createTRPCRouter({
           name: organizations.name,
           created_at: organizations.created_at,
           updated_at: organizations.updated_at,
-          microdollars_balance: organizations.microdollars_balance,
+          total_microdollars_acquired: organizations.total_microdollars_acquired,
+          microdollars_used: organizations.microdollars_used,
           created_by_kilo_user_id: organizations.created_by_kilo_user_id,
           created_by_user_email: kilocode_users.google_user_email,
           created_by_user_name: kilocode_users.google_user_name,
@@ -270,23 +275,49 @@ export const organizationAdminRouter = createTRPCRouter({
 
       const amountMicrodollars = toMicrodollars(amount_usd);
 
+      const explicit_expiry_date = input.expiry_date ? new Date(input.expiry_date) : null;
+      const expiryFromHours = input.expiry_hours
+        ? new Date(Date.now() + input.expiry_hours * millisecondsInHour)
+        : null;
+      // Negative grants must not expire (expiring a negative would mint credits)
+      const credit_expiry_date =
+        amount_usd < 0
+          ? null
+          : explicit_expiry_date && expiryFromHours
+            ? explicit_expiry_date < expiryFromHours
+              ? explicit_expiry_date
+              : expiryFromHours
+            : (explicit_expiry_date ?? expiryFromHours);
+
       await db.transaction(async tx => {
+        const [org] = await tx
+          .select({ microdollars_used: organizations.microdollars_used })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .for('update');
+
         await tx.insert(credit_transactions).values({
           kilo_user_id: user.id,
           is_free: true,
           amount_microdollars: amountMicrodollars,
           description: description?.trim() || 'Admin credit grant',
           credit_category: 'organization_custom',
-          expiry_date: null,
+          expiry_date: credit_expiry_date?.toISOString() ?? null,
           organization_id: organizationId,
-          original_baseline_microdollars_used: existingOrg.microdollars_used,
+          original_baseline_microdollars_used: org?.microdollars_used ?? 0,
+          expiration_baseline_microdollars_used: credit_expiry_date
+            ? (org?.microdollars_used ?? 0)
+            : null,
         });
 
-        // Update organization balance
         await tx
           .update(organizations)
           .set({
+            total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
             microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
+            ...(credit_expiry_date && {
+              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
+            }),
           })
           .where(eq(organizations.id, organizationId));
       });
@@ -307,7 +338,7 @@ export const organizationAdminRouter = createTRPCRouter({
       const result = await db.transaction(async tx => {
         const [lockedOrg] = await tx
           .select({
-            microdollars_balance: organizations.microdollars_balance,
+            total_microdollars_acquired: organizations.total_microdollars_acquired,
             microdollars_used: organizations.microdollars_used,
             name: organizations.name,
           })
@@ -322,14 +353,14 @@ export const organizationAdminRouter = createTRPCRouter({
           });
         }
 
-        if (lockedOrg.microdollars_balance <= 0) {
+        const currentBalance = lockedOrg.total_microdollars_acquired - lockedOrg.microdollars_used;
+
+        if (currentBalance <= 0) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Organization has no credits to nullify',
           });
         }
-
-        const currentBalance = lockedOrg.microdollars_balance;
 
         await tx.insert(credit_transactions).values({
           kilo_user_id: user.id,
@@ -345,7 +376,9 @@ export const organizationAdminRouter = createTRPCRouter({
         await tx
           .update(organizations)
           .set({
+            total_microdollars_acquired: sql`${organizations.microdollars_used}`,
             microdollars_balance: 0,
+            next_credit_expiration_at: null,
           })
           .where(eq(organizations.id, organizationId));
 
@@ -528,9 +561,13 @@ export const organizationAdminRouter = createTRPCRouter({
       }
 
       if (hasBalance === 'true') {
-        conditions.push(gt(organizations.microdollars_balance, 0));
+        conditions.push(
+          gt(organizations.total_microdollars_acquired, organizations.microdollars_used)
+        );
       } else if (hasBalance === 'false') {
-        conditions.push(eq(organizations.microdollars_balance, 0));
+        conditions.push(
+          eq(organizations.total_microdollars_acquired, organizations.microdollars_used)
+        );
       }
 
       if (plan === 'enterprise') {
@@ -560,11 +597,14 @@ export const organizationAdminRouter = createTRPCRouter({
       const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
       let orderCondition;
+      const orderFunction = sortOrder === 'asc' ? asc : desc;
       if (sortField === 'member_count') {
-        const orderFunction = sortOrder === 'asc' ? asc : desc;
         orderCondition = orderFunction(count(organization_memberships.id));
+      } else if (sortField === 'balance') {
+        orderCondition = orderFunction(
+          sql`${organizations.total_microdollars_acquired} - ${organizations.microdollars_used}`
+        );
       } else {
-        const orderFunction = sortOrder === 'asc' ? asc : desc;
         orderCondition = orderFunction(organizations[sortField]);
       }
 
@@ -587,8 +627,9 @@ export const organizationAdminRouter = createTRPCRouter({
         name: organizations.name,
         created_at: organizations.created_at,
         updated_at: organizations.updated_at,
-        microdollars_balance: organizations.microdollars_balance,
         microdollars_used: organizations.microdollars_used,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        next_credit_expiration_at: organizations.next_credit_expiration_at,
         stripe_customer_id: organizations.stripe_customer_id,
         auto_top_up_enabled: organizations.auto_top_up_enabled,
         settings: organizations.settings,
@@ -602,6 +643,7 @@ export const organizationAdminRouter = createTRPCRouter({
         sso_domain: organizations.sso_domain,
         plan: organizations.plan,
         free_trial_end_at: organizations.free_trial_end_at,
+        company_domain: organizations.company_domain,
         subscription_amount_usd: latestSubscriptions.amount_usd,
       };
 

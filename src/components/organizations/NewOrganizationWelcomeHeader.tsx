@@ -6,15 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Users, Mail, X, PartyPopperIcon } from 'lucide-react';
 import { InviteMemberDialog } from './members/InviteMemberDialog';
 import BuyOrganizationCreditsDialog from '@/components/payment/BuyOrganizationCreditsDialog';
+import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import { capitalize } from '@/lib/utils';
 
 type NewOrganizationWelcomeHeaderProps = {
   organizationId: string;
   organizationName: string;
+  plan: OrganizationPlan;
   onDismiss: () => void;
 };
 
 export function NewOrganizationWelcomeHeader({
   organizationId,
+  plan,
   onDismiss,
 }: NewOrganizationWelcomeHeaderProps) {
   const [isInviteMemberDialogOpen, setIsInviteMemberDialogOpen] = useState(false);
@@ -29,7 +33,9 @@ export function NewOrganizationWelcomeHeader({
             </div>
           </div>
           <div className="flex-1">
-            <h3 className="mb-2 text-xl font-semibold text-green-100">Welcome to Kilo Teams!</h3>
+            <h3 className="mb-2 text-xl font-semibold text-green-100">
+              Welcome to Kilo {capitalize(plan)}!
+            </h3>
             <div className="mb-4 space-y-2 text-green-200">
               <p>Invite your team members to start coding together today!</p>
             </div>

@@ -10,10 +10,12 @@ import { EnvironmentSettings } from './EnvironmentSettings';
 import { PasswordSettings } from './PasswordSettings';
 import { SlugEditor } from './SlugEditor';
 import { Button } from '@/components/Button';
-import { Loader2, AlertCircle, Trash2, RotateCw, XCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Trash2, RotateCw, XCircle, Blocks } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { isDeploymentFinished, isDeploymentInProgress } from '@/lib/user-deployments/types';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 type DeploymentDetailsProps = {
   deploymentId: string;
@@ -23,7 +25,7 @@ type DeploymentDetailsProps = {
 
 export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentDetailsProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'environment' | 'password'>('overview');
-  const { queries, mutations } = useDeploymentQueries();
+  const { queries, mutations, organizationId } = useDeploymentQueries();
 
   // Check if password features are available (org-only)
   const hasPasswordFeature = !!mutations.setPassword;
@@ -41,6 +43,7 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
 
   const deployment = deploymentData?.deployment;
   const latestBuild = deploymentData?.latestBuild;
+  const appBuilderProjectId = deploymentData?.appBuilderProjectId ?? null;
   const deploymentStatus = latestBuild?.status || 'queued';
   const showActionButtons = isDeploymentFinished(deploymentStatus);
   const showCancelButton = latestBuild && isDeploymentInProgress(deploymentStatus);
@@ -147,7 +150,23 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
                     currentSlug={deployment.deployment_slug}
                     deploymentUrl={deployment.deployment_url}
                   />
-                  <StatusBadge status={deploymentStatus} className="shrink-0" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    {appBuilderProjectId && (
+                      <Link
+                        href={
+                          organizationId
+                            ? `/organizations/${organizationId}/app-builder/${appBuilderProjectId}`
+                            : `/app-builder/${appBuilderProjectId}`
+                        }
+                      >
+                        <Badge className="border-purple-600/30 bg-purple-600/20 text-purple-400">
+                          <Blocks className="size-3" />
+                          App Builder
+                        </Badge>
+                      </Link>
+                    )}
+                    <StatusBadge status={deploymentStatus} />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">

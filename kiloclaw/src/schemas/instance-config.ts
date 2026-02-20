@@ -19,9 +19,22 @@ const MachineSizeSchema = z.object({
 
 export type MachineSize = z.infer<typeof MachineSizeSchema>;
 
+/**
+ * Valid env var name: must be a valid shell identifier and must not use
+ * reserved prefixes (KILOCLAW_ENC_, KILOCLAW_ENV_) which are reserved
+ * for the env var encryption system.
+ */
+const envVarNameSchema = z
+  .string()
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Must be a valid shell identifier')
+  .refine(
+    s => !s.startsWith('KILOCLAW_ENC_') && !s.startsWith('KILOCLAW_ENV_'),
+    'Uses reserved prefix (KILOCLAW_ENC_ or KILOCLAW_ENV_)'
+  );
+
 export const InstanceConfigSchema = z.object({
-  envVars: z.record(z.string(), z.string()).optional(),
-  encryptedSecrets: z.record(z.string(), EncryptedEnvelopeSchema).optional(),
+  envVars: z.record(envVarNameSchema, z.string()).optional(),
+  encryptedSecrets: z.record(envVarNameSchema, EncryptedEnvelopeSchema).optional(),
   kilocodeApiKey: z.string().nullable().optional(),
   kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
   kilocodeDefaultModel: z.string().nullable().optional(),
@@ -44,6 +57,16 @@ export const InstanceConfigSchema = z.object({
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
 export type EncryptedEnvelope = z.infer<typeof EncryptedEnvelopeSchema>;
 export type EncryptedChannelTokens = NonNullable<InstanceConfig['channels']>;
+
+export const ChannelsPatchSchema = z.object({
+  userId: z.string().min(1),
+  channels: z.object({
+    telegramBotToken: EncryptedEnvelopeSchema.nullable().optional(),
+    discordBotToken: EncryptedEnvelopeSchema.nullable().optional(),
+    slackBotToken: EncryptedEnvelopeSchema.nullable().optional(),
+    slackAppToken: EncryptedEnvelopeSchema.nullable().optional(),
+  }),
+});
 
 export const ProvisionRequestSchema = z.object({
   userId: z.string().min(1),
@@ -90,7 +113,8 @@ export const PersistedStateSchema = z.object({
   provisionedAt: z.number().nullable().default(null),
   lastStartedAt: z.number().nullable().default(null),
   lastStoppedAt: z.number().nullable().default(null),
-  // Fly.io machine/volume identifiers
+  // Fly.io app/machine/volume identifiers
+  flyAppName: z.string().nullable().default(null),
   flyMachineId: z.string().nullable().default(null),
   flyVolumeId: z.string().nullable().default(null),
   flyRegion: z.string().nullable().default(null),

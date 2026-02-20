@@ -1,5 +1,7 @@
 import type { BYOKResult } from '@/lib/byok';
+import { kiloFreeModels } from '@/lib/models';
 import { isAnthropicModel, isOpusModel } from '@/lib/providers/anthropic';
+import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import { minimax_m21_free_model, minimax_m25_free_model } from '@/lib/providers/minimax';
 import {
   AutocompleteUserByokProviderIdSchema,
@@ -16,7 +18,11 @@ import type {
 import { zai_glm47_free_model, zai_glm5_free_model } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
 
-const VERCEL_ROUTING_PERCENTAGE = 10;
+// EMERGENCY SWITCH
+// This routes all models that normally would be routed to OpenRouter to Vercel instead.
+// Many of these models are not available, named differently or not tested on Vercel.
+// Only use when OpenRouter is down and automatic failover is not working adequately.
+const ENABLE_UNIVERSAL_VERCEL_ROUTING = false;
 
 const VERCEL_ROUTING_ALLOW_LIST = [
   'arcee-ai/trinity-large-preview:free',
@@ -33,22 +39,39 @@ const VERCEL_ROUTING_ALLOW_LIST = [
   'z-ai/glm-4.7',
   zai_glm5_free_model.public_id,
   'z-ai/glm-5',
+  // TODO: test and add anthropic, kat-coder, kimi, mistral, qwen models
 ];
 
-function getRandomNumberLessThan100(userId: string) {
-  return crypto.createHash('sha256').update(userId).digest().readUInt32BE(0) % 100;
+const ERROR_RATE_THRESHOLD = 0.5;
+
+function getRandomNumberLessThan100(randomSeed: string) {
+  return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
+}
+
+async function getVercelRoutingPercentage() {
+  const errorRate = await getGatewayErrorRate();
+  const isOpenRouterErrorRateHigh =
+    errorRate.openrouter > ERROR_RATE_THRESHOLD && errorRate.vercel < ERROR_RATE_THRESHOLD;
+  if (isOpenRouterErrorRateHigh) {
+    console.error(
+      `[getVercelRoutingPercentage] OpenRouter error rate is high: ${errorRate.openrouter}`
+    );
+  }
+  return isOpenRouterErrorRateHigh ? 90 : 10;
+}
+
+function isOpenRouterModel(requestedModel: string) {
+  return (
+    (kiloFreeModels.find(m => m.public_id === requestedModel && m.is_enabled)?.gateway ??
+      'openrouter') === 'openrouter'
+  );
 }
 
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest,
-  userId: string
+  randomSeed: string
 ) {
-  if (!VERCEL_ROUTING_ALLOW_LIST.includes(requestedModel)) {
-    console.debug(`[shouldRouteToVercel] model not on the allow list for Vercel routing`);
-    return false;
-  }
-
   if (request.provider?.data_collection === 'deny') {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because data_collection=deny is not supported`
@@ -56,8 +79,21 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  if (ENABLE_UNIVERSAL_VERCEL_ROUTING && isOpenRouterModel(requestedModel)) {
+    console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
+    return true;
+  }
+
+  if (!VERCEL_ROUTING_ALLOW_LIST.includes(requestedModel)) {
+    console.debug(`[shouldRouteToVercel] model not on the allow list for Vercel routing`);
+    return false;
+  }
+
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  return getRandomNumberLessThan100('vercel_routing_' + userId) < VERCEL_ROUTING_PERCENTAGE;
+  return (
+    getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
+    (await getVercelRoutingPercentage())
+  );
 }
 
 function convertProviderOptions(

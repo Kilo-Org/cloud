@@ -3,11 +3,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
 import { Settings, Save } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -355,80 +353,6 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
               />
               <p className="text-muted-foreground text-sm">
                 Comma-separated list of labels that must be present for auto triage to proceed
-              </p>
-            </div>
-
-            {/* Thresholds */}
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="duplicate-threshold">
-                  Duplicate Detection Threshold: {duplicateThreshold}
-                </Label>
-                <Input
-                  id="duplicate-threshold"
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={duplicateThreshold}
-                  onChange={e => setDuplicateThreshold(e.target.value)}
-                />
-                <p className="text-muted-foreground text-sm">
-                  Similarity threshold for duplicate detection (0-1, higher = more strict)
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <Label htmlFor="auto-fix-threshold">
-                  Auto-Fix Confidence Threshold: {autoFixThreshold}
-                </Label>
-                <Input
-                  id="auto-fix-threshold"
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={autoFixThreshold}
-                  onChange={e => setAutoFixThreshold(e.target.value)}
-                />
-                <p className="text-muted-foreground text-sm">
-                  Detect Bug or Feature Requests and apply kilo-auto-fix label (0-1, higher = more
-                  strict)
-                </p>
-              </div>
-            </div>
-
-            {/* Timeout Configuration */}
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <Label>Maximum Classification Time: {maxClassificationTime[0]} minutes</Label>
-                <Slider
-                  value={maxClassificationTime}
-                  onValueChange={setMaxClassificationTime}
-                  min={1}
-                  max={15}
-                  step={1}
-                  className="w-full"
-                />
-                <p className="text-muted-foreground text-sm">
-                  Timeout for issue classification (1-15 minutes)
-                </p>
-              </div>
-            </div>
-
-            {/* Custom Instructions */}
-            <div className="space-y-3">
-              <Label htmlFor="custom-instructions">Custom Instructions (Optional)</Label>
-              <Textarea
-                id="custom-instructions"
-                placeholder="e.g., 'Always check for security vulnerabilities' or 'Focus on user-facing issues'"
-                value={customInstructions}
-                onChange={e => setCustomInstructions(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-              <p className="text-muted-foreground text-sm">
-                Add specific guidelines for your team's triage standards
               </p>
             </div>
 

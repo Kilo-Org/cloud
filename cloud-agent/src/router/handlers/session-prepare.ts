@@ -156,7 +156,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
           input.kilocodeOrganizationId,
           input.mode,
           input.model,
-          gitUrlForBackend
+          gitUrlForBackend,
+          input.createdOnPlatform
         );
       } catch (error) {
         logger
@@ -199,6 +200,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         setupCommands: input.setupCommands,
         mcpServers: input.mcpServers,
         upstreamBranch: input.upstreamBranch,
+        createdOnPlatform: input.createdOnPlatform,
         autoCommit: input.autoCommit,
         condenseOnComplete: input.condenseOnComplete,
         appendSystemPrompt: input.appendSystemPrompt,

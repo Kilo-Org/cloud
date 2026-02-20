@@ -27,14 +27,14 @@ import {
   extractFormat,
   type AiSdkReasoningPart,
 } from './reasoning-provider-metadata';
-import type { OpenRouterStreamChatCompletionChunkSchema } from './schemas';
-import type * as z from 'zod';
+import type { ChatCompletionChunk, ChatCompletionChunkChoice } from './schemas';
 import type { CustomLlm } from '@/db/schema';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
-
-type ChatCompletionChunk = z.infer<typeof OpenRouterStreamChatCompletionChunkSchema>;
+import type { XaiLanguageModelResponsesOptions } from '@ai-sdk/xai';
+import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
+import { ReasoningFormat } from '@/lib/custom-llm/format';
 
 function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage[] {
   const toolNameByCallId = new Map<string, string>();
@@ -255,16 +255,25 @@ const FINISH_REASON_MAP: Record<string, string> = {
   other: 'stop',
 };
 
-function createStreamPartConverter() {
+function createStreamPartConverter(model: string) {
   const toolCallIndices = new Map<string, number>();
   let nextToolIndex = 0;
+  let nextReasoningIndex = 0;
+  let currentTextBlockIndex: number | null = null;
+  let inReasoningBlock = false;
+  let responseId: string | undefined;
 
   return function convertStreamPartToChunk(
     part: TextStreamPart<ToolSet>
   ): ChatCompletionChunk | null {
+    const id = responseId;
     switch (part.type) {
       case 'text-delta':
-        return { choices: [{ delta: { content: part.text } }] };
+        return {
+          ...(id !== undefined ? { id } : {}),
+          model,
+          choices: [{ delta: { content: part.text } }],
+        };
 
       case 'reasoning-start': {
         // Anthropic redacted_thinking: reasoning-start carries redactedData
@@ -272,7 +281,10 @@ function createStreamPartConverter() {
         if (encData) {
           const itemId = extractItemId(part.providerMetadata);
           const format = extractFormat(part.providerMetadata);
+          const index = nextReasoningIndex++;
           return {
+            ...(id !== undefined ? { id } : {}),
+            model,
             choices: [
               {
                 delta: {
@@ -280,6 +292,7 @@ function createStreamPartConverter() {
                     {
                       type: ReasoningDetailType.Encrypted,
                       data: encData,
+                      index,
                       ...(itemId ? { id: itemId } : {}),
                       ...(format ? { format } : {}),
                     },
@@ -289,6 +302,7 @@ function createStreamPartConverter() {
             ],
           };
         }
+        inReasoningBlock = true;
         return null;
       }
 
@@ -298,10 +312,15 @@ function createStreamPartConverter() {
         const format = extractFormat(part.providerMetadata);
 
         if (part.text) {
+          if (inReasoningBlock) {
+            currentTextBlockIndex = nextReasoningIndex++;
+            inReasoningBlock = false;
+          }
           const itemId = extractItemId(part.providerMetadata);
           details.push({
             type: ReasoningDetailType.Text,
             text: part.text,
+            index: currentTextBlockIndex ?? 0,
             ...(signature ? { signature } : {}),
             ...(itemId ? { id: itemId } : {}),
             ...(format ? { format } : {}),
@@ -312,6 +331,7 @@ function createStreamPartConverter() {
             type: ReasoningDetailType.Text,
             text: '',
             signature,
+            index: currentTextBlockIndex ?? 0,
             ...(format ? { format } : {}),
           });
         }
@@ -319,6 +339,8 @@ function createStreamPartConverter() {
         if (details.length === 0) return null;
 
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [
             {
               delta: {
@@ -342,9 +364,11 @@ function createStreamPartConverter() {
         const format = extractFormat(part.providerMetadata);
 
         if (encData) {
+          const index = nextReasoningIndex++;
           details.push({
             type: ReasoningDetailType.Encrypted,
             data: encData,
+            index,
             ...(itemId ? { id: itemId } : {}),
             ...(format ? { format } : {}),
           });
@@ -355,12 +379,15 @@ function createStreamPartConverter() {
             type: ReasoningDetailType.Text,
             text: '',
             signature,
+            index: currentTextBlockIndex ?? 0,
             ...(itemId ? { id: itemId } : {}),
             ...(format ? { format } : {}),
           });
         }
 
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [{ delta: { reasoning_details: details } }],
         };
       }
@@ -369,6 +396,8 @@ function createStreamPartConverter() {
         const index = nextToolIndex++;
         toolCallIndices.set(part.id, index);
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [
             {
               delta: {
@@ -389,6 +418,8 @@ function createStreamPartConverter() {
       case 'tool-input-delta': {
         const index = toolCallIndices.get(part.id) ?? 0;
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [
             {
               delta: {
@@ -404,6 +435,8 @@ function createStreamPartConverter() {
         if (toolCallIndices.has(part.toolCallId)) return null;
         const index = nextToolIndex++;
         return {
+          ...(id !== undefined ? { id } : {}),
+          model,
           choices: [
             {
               delta: {
@@ -425,9 +458,12 @@ function createStreamPartConverter() {
       }
 
       case 'finish-step': {
+        responseId = part.response.id;
         const cacheReadTokens = part.usage.inputTokenDetails.cacheReadTokens;
         const cacheWriteTokens = part.usage.inputTokenDetails.cacheWriteTokens;
         return {
+          id: responseId,
+          model,
           choices: [
             {
               delta: {},
@@ -476,8 +512,10 @@ function errorResponse(status: number, message: string) {
 function buildCommonParams(
   customLlm: CustomLlm,
   messages: ModelMessage[],
-  request: OpenRouterChatCompletionRequest
+  request: OpenRouterChatCompletionRequest,
+  isLegacyExtension: boolean
 ) {
+  const verbosity = customLlm.verbosity ?? request.verbosity ?? undefined;
   return {
     messages,
     tools: convertTools(request.tools),
@@ -489,17 +527,32 @@ function buildCommonParams(
     providerOptions: {
       anthropic: {
         thinking: { type: 'adaptive' },
-        effort: customLlm.verbosity ?? request.verbosity ?? undefined,
+        effort: verbosity,
+        disableParallelToolUse: request.parallel_tool_calls === false || isLegacyExtension,
       } satisfies AnthropicProviderOptions,
       openai: {
-        textVerbosity: customLlm.verbosity ?? request.verbosity,
-        reasoningEffort: request.reasoning?.effort ?? request.reasoning_effort,
+        reasoningSummary: 'auto',
+        textVerbosity: verbosity === 'max' ? 'high' : verbosity,
+        reasoningEffort:
+          customLlm.reasoning_effort ?? request.reasoning?.effort ?? request.reasoning_effort,
+        include: ['reasoning.encrypted_content'],
+        parallelToolCalls: (request.parallel_tool_calls ?? true) && !isLegacyExtension,
+        store: false,
+        promptCacheKey: request.prompt_cache_key,
+        safetyIdentifier: request.safety_identifier,
+        user: request.user,
       } satisfies OpenAILanguageModelResponsesOptions,
+      xai: {
+        store: false,
+      } satisfies XaiLanguageModelResponsesOptions,
     },
   };
 }
 
-function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof generateText>>) {
+function convertGenerateResultToResponse(
+  result: Awaited<ReturnType<typeof generateText>>,
+  model: string
+) {
   const toolCalls = result.toolCalls.map((tc, i) => ({
     id: tc.toolCallId,
     type: 'function' as const,
@@ -514,6 +567,8 @@ function convertGenerateResultToResponse(result: Awaited<ReturnType<typeof gener
     result.reasoning.length > 0 ? reasoningOutputToDetails(result.reasoning) : undefined;
 
   return {
+    id: result.response.id,
+    model,
     choices: [
       {
         message: {
@@ -571,43 +626,107 @@ function createModel(customLlm: CustomLlm) {
   throw new Error(`Unknown provider: ${customLlm.provider}`);
 }
 
+function debugLogChunks(chunks: unknown[], fileExtension: string) {
+  if (chunks.length > 0) {
+    debugSaveLog(chunks.map(chunk => JSON.stringify(chunk)).join('\n'), fileExtension);
+  }
+}
+
+function reverseLegacyExtensionHack(messages: OpenRouterChatCompletionsInput) {
+  for (const msg of messages) {
+    if (msg.role === 'assistant') {
+      for (const rd of msg.reasoning_details ?? []) {
+        if (rd.format === ReasoningFormat.OpenAIResponsesV1_Obscured) {
+          rd.format = ReasoningFormat.OpenAIResponsesV1;
+        }
+      }
+    }
+  }
+}
+
+function applyLegacyExtensionHack(choice: ChatCompletionChunkChoice | undefined) {
+  for (const rd of choice?.delta?.reasoning_details ?? []) {
+    if (rd.format === ReasoningFormat.OpenAIResponsesV1) {
+      rd.format = ReasoningFormat.OpenAIResponsesV1_Obscured;
+    }
+  }
+}
+
 export async function customLlmRequest(
   customLlm: CustomLlm,
-  request: OpenRouterChatCompletionRequest
+  request: OpenRouterChatCompletionRequest,
+  isLegacyExtension: boolean
 ) {
-  const messages = convertMessages(request.messages as OpenRouterChatCompletionsInput);
+  const messages = request.messages as OpenRouterChatCompletionsInput;
+  if (isLegacyExtension) {
+    reverseLegacyExtensionHack(messages);
+  }
 
   const model = createModel(customLlm);
-  const commonParams = buildCommonParams(customLlm, messages, request);
+  const commonParams = buildCommonParams(
+    customLlm,
+    convertMessages(messages),
+    request,
+    isLegacyExtension
+  );
+
+  const modelId = customLlm.public_id;
 
   if (!request.stream) {
     try {
       const result = await generateText({ model, ...commonParams });
-      return NextResponse.json(convertGenerateResultToResponse(result));
+      const convertedResponse = convertGenerateResultToResponse(result, modelId);
+
+      if (inStreamDebugMode) {
+        debugSaveLog(JSON.stringify(result.response.body, undefined, 2), 'response.native.json');
+        debugSaveLog(JSON.stringify(convertedResponse, undefined, 2), 'response.gateway.json');
+      }
+
+      return NextResponse.json(convertedResponse);
     } catch (e) {
+      console.error('Caught exception while processing non-streaming request', e);
       const status = APICallError.isInstance(e) ? (e.statusCode ?? 500) : 500;
       const msg = e instanceof Error ? e.message : 'Generation failed';
       return errorResponse(status, msg);
     }
   }
 
-  const result = streamText({ model, ...commonParams });
+  const result = streamText({ model, ...commonParams, includeRawChunks: inStreamDebugMode });
 
-  const convertStreamPartToChunk = createStreamPartConverter();
+  if (inStreamDebugMode) {
+    debugSaveLog(JSON.stringify(request, undefined, 2), 'request.gateway.json');
+    debugSaveLog(JSON.stringify((await result.request).body, undefined, 2), 'request.native.json');
+  }
+
+  const convertStreamPartToChunk = createStreamPartConverter(modelId);
+
+  const debugGatewayChunks = new Array<unknown>();
+  const debugNativeChunks = new Array<unknown>();
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of result.fullStream) {
+          if (chunk.type === 'raw') {
+            debugNativeChunks.push(chunk.rawValue);
+          }
+
           const converted = convertStreamPartToChunk(chunk);
           if (converted) {
+            if (isLegacyExtension) {
+              applyLegacyExtensionHack((converted.choices as ChatCompletionChunkChoice[])[0]);
+            }
+            if (inStreamDebugMode) {
+              debugGatewayChunks.push(converted);
+            }
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(converted)}\n\n`));
           }
         }
 
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       } catch (e) {
+        console.error('Caught exception while processing streaming request', e);
         const errorChunk = {
           error: {
             message: e instanceof Error ? e.message : 'Stream error',
@@ -621,6 +740,8 @@ export async function customLlmRequest(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
       } finally {
         controller.close();
+        debugLogChunks(debugGatewayChunks, 'response.gateway.jsonl');
+        debugLogChunks(debugNativeChunks, 'response.native.jsonl');
       }
     },
   });

@@ -19,6 +19,7 @@ import {
   FileX,
   HelpCircle,
   RotateCw,
+  StopCircle,
 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -83,6 +84,8 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
   const [classificationFilter, setClassificationFilter] = useState<
     TriageClassification | undefined
   >(undefined);
+  const [interruptingTicketId, setInterruptingTicketId] = useState<string | null>(null);
+  const [retryingTicketId, setRetryingTicketId] = useState<string | null>(null);
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -121,7 +124,6 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
         toast.success('Ticket retry initiated', {
           description: 'The ticket has been reset to pending and will be processed soon.',
         });
-        // Invalidate the query to refetch the list
         if (organizationId) {
           await queryClient.invalidateQueries({
             queryKey: trpc.organizations.autoTriage.listTickets.queryKey({
@@ -139,6 +141,7 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
           description: error.message,
         });
       },
+      onSettled: () => setRetryingTicketId(null),
     })
   );
 
@@ -149,7 +152,6 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
         toast.success('Ticket retry initiated', {
           description: 'The ticket has been reset to pending and will be processed soon.',
         });
-        // Invalidate the query to refetch the list
         await queryClient.invalidateQueries({
           queryKey: trpc.personalAutoTriage.listTickets.queryKey({
             limit: PAGE_SIZE,
@@ -164,8 +166,71 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
           description: error.message,
         });
       },
+      onSettled: () => setRetryingTicketId(null),
     })
   );
+
+  // Interrupt mutation for pending/analyzing tickets (organization)
+  const interruptOrgMutation = useMutation(
+    trpc.organizations.autoTriage.interruptTicket.mutationOptions({
+      onSuccess: async () => {
+        toast.success('Ticket interrupted', {
+          description: 'The ticket has been marked as failed.',
+        });
+        if (organizationId) {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.organizations.autoTriage.listTickets.queryKey({
+              organizationId,
+              limit: PAGE_SIZE,
+              offset,
+              status: statusFilter,
+              classification: classificationFilter,
+            }),
+          });
+        }
+      },
+      onError: error => {
+        toast.error('Failed to interrupt ticket', {
+          description: error.message,
+        });
+      },
+      onSettled: () => setInterruptingTicketId(null),
+    })
+  );
+
+  // Interrupt mutation for pending/analyzing tickets (personal)
+  const interruptPersonalMutation = useMutation(
+    trpc.personalAutoTriage.interruptTicket.mutationOptions({
+      onSuccess: async () => {
+        toast.success('Ticket interrupted', {
+          description: 'The ticket has been marked as failed.',
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.personalAutoTriage.listTickets.queryKey({
+            limit: PAGE_SIZE,
+            offset,
+            status: statusFilter,
+            classification: classificationFilter,
+          }),
+        });
+      },
+      onError: error => {
+        toast.error('Failed to interrupt ticket', {
+          description: error.message,
+        });
+      },
+      onSettled: () => setInterruptingTicketId(null),
+    })
+  );
+
+  const handleInterrupt = (ticketId: string) => {
+    setInterruptingTicketId(ticketId);
+    if (organizationId) {
+      interruptOrgMutation.mutate({ organizationId, ticketId });
+    } else {
+      interruptPersonalMutation.mutate({ ticketId });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -439,6 +504,22 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
                       </div>
                     )}
 
+                    {/* Interrupt Button for Pending/Analyzing Tickets */}
+                    {(ticket.status === 'pending' || ticket.status === 'analyzing') && (
+                      <div className="mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleInterrupt(ticket.id)}
+                          disabled={interruptingTicketId === ticket.id}
+                          className="gap-2 text-red-500 hover:text-red-600"
+                        >
+                          <StopCircle className="h-3 w-3" />
+                          {interruptingTicketId === ticket.id ? 'Interrupting...' : 'Interrupt'}
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Retry Button for Failed Tickets */}
                     {ticket.status === 'failed' && (
                       <div className="mt-2">
@@ -446,21 +527,20 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
                           variant="outline"
                           size="sm"
                           onClick={() => {
+                            setRetryingTicketId(ticket.id);
                             if (organizationId) {
                               retryOrgMutation.mutate({ organizationId, ticketId: ticket.id });
                             } else {
                               retryPersonalMutation.mutate({ ticketId: ticket.id });
                             }
                           }}
-                          disabled={retryOrgMutation.isPending || retryPersonalMutation.isPending}
+                          disabled={retryingTicketId === ticket.id}
                           className="gap-2"
                         >
                           <RotateCw
-                            className={`h-3 w-3 ${retryOrgMutation.isPending || retryPersonalMutation.isPending ? 'animate-spin' : ''}`}
+                            className={`h-3 w-3 ${retryingTicketId === ticket.id ? 'animate-spin' : ''}`}
                           />
-                          {retryOrgMutation.isPending || retryPersonalMutation.isPending
-                            ? 'Retrying...'
-                            : 'Retry'}
+                          {retryingTicketId === ticket.id ? 'Retrying...' : 'Retry'}
                         </Button>
                       </div>
                     )}
@@ -472,21 +552,20 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
                           variant="outline"
                           size="sm"
                           onClick={() => {
+                            setRetryingTicketId(ticket.id);
                             if (organizationId) {
                               retryOrgMutation.mutate({ organizationId, ticketId: ticket.id });
                             } else {
                               retryPersonalMutation.mutate({ ticketId: ticket.id });
                             }
                           }}
-                          disabled={retryOrgMutation.isPending || retryPersonalMutation.isPending}
+                          disabled={retryingTicketId === ticket.id}
                           className="gap-2"
                         >
                           <RotateCw
-                            className={`h-3 w-3 ${retryOrgMutation.isPending || retryPersonalMutation.isPending ? 'animate-spin' : ''}`}
+                            className={`h-3 w-3 ${retryingTicketId === ticket.id ? 'animate-spin' : ''}`}
                           />
-                          {retryOrgMutation.isPending || retryPersonalMutation.isPending
-                            ? 'Re-classifying...'
-                            : 'Re-classify'}
+                          {retryingTicketId === ticket.id ? 'Re-classifying...' : 'Re-classify'}
                         </Button>
                       </div>
                     )}

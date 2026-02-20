@@ -23,13 +23,14 @@ import { formatDistanceToNow } from 'date-fns';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect, type Repository } from './RepositoryMultiSelect';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { REVIEW_PROMO_MODEL, REVIEW_PROMO_END } from '@/lib/code-reviews/core/constants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type Platform = 'github' | 'gitlab';
@@ -73,6 +74,12 @@ const REVIEW_STYLES = [
     value: 'lenient',
     label: 'Lenient',
     description: 'Only critical bugs and security issues, be encouraging',
+  },
+  {
+    value: 'roast',
+    label: 'Roast',
+    description:
+      'Brutally honest, technically accurate feedback wrapped in sharp, witty commentary',
   },
 ] as const;
 
@@ -176,9 +183,19 @@ export function ReviewConfigForm({
   // Fetch available models
   const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
 
+  const promoModelOptions = useMemo(() => {
+    const promoActive = Date.now() < Date.parse(REVIEW_PROMO_END);
+    if (!promoActive) return modelOptions;
+    return modelOptions.map(m =>
+      m.id === REVIEW_PROMO_MODEL ? { ...m, name: `${m.name} (free)` } : m
+    );
+  }, [modelOptions]);
+
   // Local state
   const [isEnabled, setIsEnabled] = useState(false);
-  const [reviewStyle, setReviewStyle] = useState<'strict' | 'balanced' | 'lenient'>('balanced');
+  const [reviewStyle, setReviewStyle] = useState<'strict' | 'balanced' | 'lenient' | 'roast'>(
+    'balanced'
+  );
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [customInstructions, setCustomInstructions] = useState('');
   const [maxReviewTime, setMaxReviewTime] = useState([10]);
@@ -501,7 +518,7 @@ export function ReviewConfigForm({
             {/* AI Model Selection */}
             <ModelCombobox
               label="AI Model"
-              models={modelOptions}
+              models={promoModelOptions}
               value={selectedModel}
               onValueChange={setSelectedModel}
               isLoading={isLoadingModels}
@@ -513,7 +530,9 @@ export function ReviewConfigForm({
               <Label>Review Style</Label>
               <RadioGroup
                 value={reviewStyle}
-                onValueChange={value => setReviewStyle(value as 'strict' | 'balanced' | 'lenient')}
+                onValueChange={value =>
+                  setReviewStyle(value as 'strict' | 'balanced' | 'lenient' | 'roast')
+                }
               >
                 {REVIEW_STYLES.map(style => (
                   <div key={style.value} className="flex items-start space-y-0 space-x-3">

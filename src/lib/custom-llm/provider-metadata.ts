@@ -18,7 +18,7 @@ export const FileAnnotationSchema = z
                 type: z.string(),
                 text: z.string().optional(),
               })
-              .catchall(z.any()),
+              .catchall(z.any())
           )
           .optional(),
       })
@@ -65,9 +65,7 @@ export const OpenRouterProviderMetadataSchema = z
   })
   .catchall(z.any());
 
-export type OpenRouterProviderMetadata = z.infer<
-  typeof OpenRouterProviderMetadataSchema
->;
+export type OpenRouterProviderMetadata = z.infer<typeof OpenRouterProviderMetadataSchema>;
 
 /**
  * Schema for parsing provider options that may contain reasoning_details and annotations

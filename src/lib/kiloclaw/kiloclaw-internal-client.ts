@@ -6,6 +6,10 @@ import type {
   PlatformStatusResponse,
   KiloCodeConfigPatchInput,
   KiloCodeConfigResponse,
+  ChannelsPatchInput,
+  ChannelsPatchResponse,
+  PairingListResponse,
+  PairingApproveResponse,
 } from './types';
 
 /**
@@ -88,6 +92,30 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/kilocode-config', {
       method: 'PATCH',
       body: JSON.stringify({ userId, ...patch }),
+    });
+  }
+
+  async patchChannels(userId: string, input: ChannelsPatchInput): Promise<ChannelsPatchResponse> {
+    return this.request('/api/platform/channels', {
+      method: 'PATCH',
+      body: JSON.stringify({ userId, ...input }),
+    });
+  }
+
+  async listPairingRequests(userId: string, refresh = false): Promise<PairingListResponse> {
+    const params = new URLSearchParams({ userId });
+    if (refresh) params.set('refresh', 'true');
+    return this.request(`/api/platform/pairing?${params.toString()}`);
+  }
+
+  async approvePairingRequest(
+    userId: string,
+    channel: string,
+    code: string
+  ): Promise<PairingApproveResponse> {
+    return this.request('/api/platform/pairing/approve', {
+      method: 'POST',
+      body: JSON.stringify({ userId, channel, code }),
     });
   }
 }

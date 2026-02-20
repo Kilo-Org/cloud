@@ -465,6 +465,8 @@ export class SessionService {
       KILOCODE_TOKEN: kilocodeToken,
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
+      // Feature attribution for microdollar usage tracking
+      KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
 
     // Set GH_TOKEN for GitHub repos only, respecting user overrides
@@ -1508,12 +1510,13 @@ export class SessionService {
     organizationId?: string,
     lastMode?: string,
     lastModel?: string,
-    gitUrl?: string
+    gitUrl?: string,
+    createdOnPlatform?: string
   ): Promise<string> {
     const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
 
     const input = {
-      created_on_platform: 'cloud-agent',
+      created_on_platform: createdOnPlatform ?? 'cloud-agent',
       organization_id: organizationId ?? null,
       cloud_agent_session_id: cloudAgentSessionId,
       version: 2,

@@ -30,12 +30,10 @@ export const preferredModels = [
   'anthropic/claude-haiku-4.5',
   'openai/gpt-5.2',
   'openai/gpt-5.2-codex',
-  'google/gemini-3-pro-preview',
+  'google/gemini-3.1-pro-preview',
   'google/gemini-3-flash-preview',
   'moonshotai/kimi-k2.5',
-  grok_code_fast_1_optimized_free_model.is_enabled
-    ? grok_code_fast_1_optimized_free_model.public_id
-    : 'x-ai/grok-code-fast-1',
+  'x-ai/grok-code-fast-1',
 ];
 
 export function getFirstFreeModel() {

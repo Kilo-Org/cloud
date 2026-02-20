@@ -53,14 +53,15 @@ vi.mock('./kilo/server-manager.js', () => ({
 
 // Define mocks BEFORE vi.mock() to avoid hoisting issues
 // vi.hoisted() ensures these are available when the mock factory runs
-const { generateSessionIdMock, createKiloSessionInBackendMock, deleteKiloSessionInBackendMock } =
-  vi.hoisted(() => ({
-    generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
-    createKiloSessionInBackendMock: vi
-      .fn()
-      .mockResolvedValue('123e4567-e89b-12d3-a456-426614174000'),
-    deleteKiloSessionInBackendMock: vi.fn().mockResolvedValue(undefined),
-  }));
+const {
+  generateSessionIdMock,
+  createCliSessionViaSessionIngestMock,
+  deleteCliSessionViaSessionIngestMock,
+} = vi.hoisted(() => ({
+  generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
+  createCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
+  deleteCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
+}));
 
 // Mock session-service to isolate router tests
 vi.mock('./session-service.js', () => ({
@@ -70,6 +71,7 @@ vi.mock('./session-service.js', () => ({
     (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
   ),
   runSetupCommands: vi.fn().mockResolvedValue(undefined),
+  writeAuthFile: vi.fn().mockResolvedValue(undefined),
   writeMCPSettings: vi.fn().mockResolvedValue(undefined),
   InvalidSessionMetadataError: class InvalidSessionMetadataError extends Error {
     constructor(
@@ -82,8 +84,8 @@ vi.mock('./session-service.js', () => ({
     }
   },
   SessionService: class SessionService {
-    createKiloSessionInBackend = createKiloSessionInBackendMock;
-    deleteKiloSessionInBackend = deleteKiloSessionInBackendMock;
+    createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
+    deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
     getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
     buildContext = vi.fn().mockReturnValue({
       sandboxId: 'test-sandbox',
@@ -174,6 +176,11 @@ function createInternalApiContext(options: {
         idFromName: vi.fn((id: string) => ({ id })),
         get: vi.fn(() => doStub),
       } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+      SESSION_INGEST: {
+        fetch: vi.fn(),
+        createSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
+        deleteSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
+      } as unknown as TRPCContext['env']['SESSION_INGEST'],
       INTERNAL_API_SECRET: effectiveInternalApiSecret,
       NEXTAUTH_SECRET: 'test-secret',
     },
@@ -184,8 +191,8 @@ describe('prepareSession endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
-    createKiloSessionInBackendMock.mockResolvedValue('123e4567-e89b-12d3-a456-426614174000');
-    deleteKiloSessionInBackendMock.mockResolvedValue(undefined);
+    createCliSessionViaSessionIngestMock.mockResolvedValue(undefined);
+    deleteCliSessionViaSessionIngestMock.mockResolvedValue(undefined);
   });
 
   describe('authentication', () => {
@@ -426,7 +433,7 @@ describe('prepareSession endpoint', () => {
       ).rejects.toThrow('Session already prepared');
     });
 
-    // NOTE: Backend session creation (createKiloSessionInBackend) is currently disabled.
+    // NOTE: CLI session creation (createCliSessionViaSessionIngest) is handled via session-ingest.
     // The kiloSessionId now comes from the kilo CLI server's POST /session API.
     // Tests for backend session creation error handling and rollback have been removed.
   });

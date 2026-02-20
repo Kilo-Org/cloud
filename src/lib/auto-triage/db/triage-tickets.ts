@@ -374,6 +374,41 @@ export async function resetTriageTicketForRetry(ticketId: string): Promise<void>
 }
 
 /**
+ * Interrupts a pending or analyzing triage ticket.
+ * Uses a status guard in the WHERE clause to avoid overwriting a ticket
+ * that was concurrently completed by the orchestrator (TOCTOU protection).
+ * Returns true if the ticket was actually interrupted, false if it had
+ * already moved to a terminal state.
+ */
+export async function interruptTriageTicket(ticketId: string): Promise<boolean> {
+  try {
+    const result = await db
+      .update(auto_triage_tickets)
+      .set({
+        status: 'failed',
+        error_message: 'Manually interrupted by user',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(auto_triage_tickets.id, ticketId),
+          or(eq(auto_triage_tickets.status, 'pending'), eq(auto_triage_tickets.status, 'analyzing'))
+        )
+      )
+      .returning({ id: auto_triage_tickets.id });
+
+    return result.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'interruptTriageTicket' },
+      extra: { ticketId },
+    });
+    throw error;
+  }
+}
+
+/**
  * Gets count of active triage tickets for an owner (for concurrency control)
  * Active tickets are those with status 'analyzing'
  */

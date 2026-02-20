@@ -86,7 +86,8 @@ export async function getUserOrganizationsWithSeats(
     organizationId: result.organization.id,
     role: result.membership.role,
     memberCount: result.total_member_count,
-    balance: result.organization.microdollars_balance,
+    balance:
+      result.organization.total_microdollars_acquired - result.organization.microdollars_used,
     requireSeats: result.organization.require_seats,
     plan: result.organization.plan,
     created_at: result.organization.created_at,
@@ -155,7 +156,8 @@ export async function createOrganization(
   // this is only used in tests
   // TODO(bmc): remove this from tests in the future. nbd rn.
   userId?: User['id'] | null,
-  addUserAsOwner: boolean = true
+  addUserAsOwner: boolean = true,
+  company_domain?: string
 ): Promise<Organization> {
   return await db.transaction(async tx => {
     const now = new Date();
@@ -174,6 +176,7 @@ export async function createOrganization(
           // all new orgs will have code indexing enabled by default
           code_indexing_enabled: true,
         },
+        ...(company_domain ? { company_domain } : {}),
       })
       .returning();
 

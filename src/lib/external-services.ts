@@ -1,7 +1,6 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
 
-import { safeDeleteStripeCustomer } from './stripe-client';
 import { captureException } from '@sentry/nextjs';
 import type { User } from '@/db/schema';
 import { db } from '@/lib/drizzle';
@@ -145,10 +144,13 @@ function generateGdprDeletionToken(userId: string): string {
   );
 }
 
+const V2_SESSION_DELETE_CONCURRENCY = 10;
+
 /**
  * Delete CLI session v2 blobs from the session ingest worker.
  * V2 sessions store their data in Durable Objects (SessionIngestDO) rather than R2.
- * This function calls the session ingest worker's delete endpoint for each session.
+ * This function calls the session ingest worker's delete endpoint for each session,
+ * processing sessions in concurrent batches for performance.
  */
 async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
   if (!SESSION_INGEST_WORKER_URL) {
@@ -171,37 +173,44 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
     // Generate a token for the user to authenticate with the session ingest worker
     const token = generateGdprDeletionToken(userId);
 
-    // Delete each session's Durable Object data via the session ingest worker
+    // Delete sessions in concurrent batches
     let successCount = 0;
     let failCount = 0;
 
-    for (const session of userV2Sessions) {
-      try {
-        const response = await fetch(
-          `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(session.session_id)}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+    for (let i = 0; i < userV2Sessions.length; i += V2_SESSION_DELETE_CONCURRENCY) {
+      const batch = userV2Sessions.slice(i, i + V2_SESSION_DELETE_CONCURRENCY);
 
-        if (response.ok || response.status === 404) {
-          // 404 is acceptable - the session may have already been deleted
-          successCount++;
-        } else {
+      const results = await Promise.allSettled(
+        batch.map(async session => {
+          const response = await fetch(
+            `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(session.session_id)}`,
+            {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (response.ok || response.status === 404) {
+            // 404 is acceptable - the session may have already been deleted
+            return;
+          }
+
           const errorText = await response.text().catch(() => 'Unknown error');
-          warnExceptInTest(
+          throw new Error(
             `Failed to delete v2 session ${session.session_id}: ${response.status} ${errorText}`
           );
+        })
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          successCount++;
+        } else {
+          warnExceptInTest(result.reason?.message ?? 'Unknown v2 session deletion error');
           failCount++;
         }
-      } catch (error) {
-        warnExceptInTest(
-          `Error deleting v2 session ${session.session_id}: ${error instanceof Error ? error.message : String(error)}`
-        );
-        failCount++;
       }
     }
 
@@ -219,16 +228,38 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
 }
 
 /**
- * Delete user from all external services (Stripe, Customer.io, R2 blob storage)
- * This function is designed to be resilient - if one service fails, it will continue with the others
+ * Clean up external services as part of user soft-delete.
+ *
+ * Removes the user from marketing systems (Customer.io) and deletes
+ * CLI session blobs from R2/Durable Objects (conversation data is PII).
+ *
+ * NOTE: The Stripe customer is intentionally preserved so that the
+ * billing link remains intact for financial record-keeping.
+ *
+ * All service deletions run concurrently via Promise.allSettled for performance.
+ * Each individual service handler is resilient - errors are caught and logged
+ * to Sentry but don't prevent other services from being cleaned up.
  */
-export async function deleteUserFromExternalServices(user: User): Promise<void> {
-  logExceptInTest(`Deleting user from external services: ${user.id}`);
+export async function softDeleteUserExternalServices(user: User): Promise<void> {
+  logExceptInTest(`Soft-deleting user from external services: ${user.id}`);
 
-  await safeDeleteStripeCustomer(user.stripe_customer_id);
-  await deleteUserFromCustomerIO(user.google_user_email);
-  await deleteCliSessionBlobs(user.id);
-  await deleteCliSessionV2Blobs(user.id);
+  const results = await Promise.allSettled([
+    deleteUserFromCustomerIO(user.google_user_email),
+    deleteCliSessionBlobs(user.id),
+    deleteCliSessionV2Blobs(user.id),
+  ]);
 
-  logExceptInTest(`Completed external service deletions for user: ${user.id}`);
+  // Log any unexpected top-level failures (individual handlers already catch their own errors)
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      const message = `Unexpected external service deletion failure for user ${user.id}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+      errorExceptInTest(message);
+      captureException(result.reason, {
+        tags: { source: 'external-services-soft-delete' },
+        extra: { userId: user.id },
+      });
+    }
+  }
+
+  logExceptInTest(`Completed external service soft-delete for user: ${user.id}`);
 }

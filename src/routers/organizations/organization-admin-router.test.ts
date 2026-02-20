@@ -35,7 +35,10 @@ describe('organization admin router', () => {
     beforeEach(async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 5_000_000 })
+        .set({
+          total_microdollars_acquired: 5_000_000,
+          microdollars_used: 0,
+        })
         .where(eq(organizations.id, testOrganization.id));
 
       await db
@@ -54,11 +57,16 @@ describe('organization admin router', () => {
       expect(result.amount_usd_nullified).toBe(5);
 
       const [updatedOrg] = await db
-        .select({ microdollars_balance: organizations.microdollars_balance })
+        .select({
+          total_microdollars_acquired: organizations.total_microdollars_acquired,
+          microdollars_used: organizations.microdollars_used,
+        })
         .from(organizations)
         .where(eq(organizations.id, testOrganization.id));
 
-      expect(updatedOrg.microdollars_balance).toBe(0);
+      expect(updatedOrg.total_microdollars_acquired - updatedOrg.microdollars_used).toBe(0);
+      // After nullification, total_microdollars_acquired should equal microdollars_used (zero balance)
+      expect(updatedOrg.total_microdollars_acquired).toBe(updatedOrg.microdollars_used);
     });
 
     it('should throw NOT_FOUND error when organization does not exist', async () => {
@@ -75,7 +83,7 @@ describe('organization admin router', () => {
     it('should throw BAD_REQUEST error when organization has no credits (balance = 0)', async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 0 })
+        .set({ total_microdollars_acquired: 0 })
         .where(eq(organizations.id, testOrganization.id));
 
       const caller = await createCallerForUser(adminUser.id);
@@ -90,7 +98,10 @@ describe('organization admin router', () => {
     it('should throw BAD_REQUEST error when organization has negative balance', async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: -1_000_000 })
+        .set({
+          total_microdollars_acquired: 0,
+          microdollars_used: 1_000_000,
+        })
         .where(eq(organizations.id, testOrganization.id));
 
       const caller = await createCallerForUser(adminUser.id);
@@ -199,7 +210,7 @@ describe('organization admin router', () => {
     it('should handle small balance amounts correctly', async () => {
       await db
         .update(organizations)
-        .set({ microdollars_balance: 1 })
+        .set({ total_microdollars_acquired: 1 })
         .where(eq(organizations.id, testOrganization.id));
 
       const caller = await createCallerForUser(adminUser.id);
@@ -220,6 +231,17 @@ describe('organization admin router', () => {
   });
 
   describe('grantCredit', () => {
+    beforeEach(async () => {
+      await db
+        .update(organizations)
+        .set({ total_microdollars_acquired: 0, microdollars_used: 0 })
+        .where(eq(organizations.id, testOrganization.id));
+
+      await db
+        .delete(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+    });
+
     it('should successfully grant positive credits', async () => {
       const caller = await createCallerForUser(adminUser.id);
       const amount = 10;
@@ -233,11 +255,18 @@ describe('organization admin router', () => {
       expect(result.amount_usd).toBe(amount);
 
       const [updatedOrg] = await db
-        .select({ microdollars_balance: organizations.microdollars_balance })
+        .select({
+          total_microdollars_acquired: organizations.total_microdollars_acquired,
+          microdollars_used: organizations.microdollars_used,
+        })
         .from(organizations)
         .where(eq(organizations.id, testOrganization.id));
 
-      expect(updatedOrg.microdollars_balance).toBe(amount * 1_000_000);
+      expect(updatedOrg.total_microdollars_acquired - updatedOrg.microdollars_used).toBe(
+        amount * 1_000_000
+      );
+      // total_microdollars_acquired should also increase by the grant amount
+      expect(updatedOrg.total_microdollars_acquired).toBe(amount * 1_000_000);
     });
 
     it('should successfully grant negative credits with description', async () => {
@@ -289,6 +318,213 @@ describe('organization admin router', () => {
           amount_usd: 0,
         })
       ).rejects.toThrow();
+    });
+
+    it('should store expiry_date on credit transaction', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const expiryDate = '2024-06-01T00:00:00.000Z';
+
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 10,
+        expiry_date: expiryDate,
+      });
+
+      const [txn] = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+
+      expect(txn).toBeDefined();
+      expect(new Date(txn.expiry_date!).toISOString()).toBe(expiryDate);
+      expect(txn.expiration_baseline_microdollars_used).toBe(0);
+    });
+
+    it('should store expiry from expiry_hours', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const beforeMs = Date.now();
+
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 5,
+        expiry_hours: 48,
+      });
+
+      const afterMs = Date.now();
+      const [txn] = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+
+      expect(txn.expiry_date).not.toBeNull();
+      const expiryMs = new Date(txn.expiry_date!).getTime();
+      // Should be ~48 hours from now (within the test execution window)
+      expect(expiryMs).toBeGreaterThanOrEqual(beforeMs + 48 * 3600 * 1000 - 1000);
+      expect(expiryMs).toBeLessThanOrEqual(afterMs + 48 * 3600 * 1000 + 1000);
+    });
+
+    it('should pick the earlier of expiry_date and expiry_hours', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      // Set expiry_date far in the future and expiry_hours to 1 hour from now
+      const farFuture = '2030-01-01T00:00:00.000Z';
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 5,
+        expiry_date: farFuture,
+        expiry_hours: 1,
+      });
+
+      const [txn] = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+
+      // expiry_hours (1h from now) is much earlier than 2030
+      const expiryMs = new Date(txn.expiry_date!).getTime();
+      expect(expiryMs).toBeLessThan(new Date(farFuture).getTime());
+      expect(expiryMs).toBeLessThan(Date.now() + 2 * 3600 * 1000);
+    });
+
+    it('should update next_credit_expiration_at on org', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const expiryDate = '2024-03-15T00:00:00.000Z';
+
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 10,
+        expiry_date: expiryDate,
+      });
+
+      const [updatedOrg] = await db
+        .select({ next_credit_expiration_at: organizations.next_credit_expiration_at })
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      expect(new Date(updatedOrg.next_credit_expiration_at!).toISOString()).toBe(expiryDate);
+    });
+
+    it('should keep earlier next_credit_expiration_at when granting later expiry', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      // First grant with earlier expiry
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 5,
+        expiry_date: '2024-02-01T00:00:00.000Z',
+      });
+
+      // Second grant with later expiry
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 5,
+        expiry_date: '2024-06-01T00:00:00.000Z',
+      });
+
+      const [updatedOrg] = await db
+        .select({ next_credit_expiration_at: organizations.next_credit_expiration_at })
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      // Should still be the earlier date
+      expect(new Date(updatedOrg.next_credit_expiration_at!).toISOString()).toBe(
+        '2024-02-01T00:00:00.000Z'
+      );
+    });
+
+    it('should ignore expiry params for negative grants', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: -5,
+        description: 'Debit with expiry attempt',
+        expiry_date: '2024-06-01T00:00:00.000Z',
+        expiry_hours: 24,
+      });
+
+      const [txn] = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+
+      expect(txn.expiry_date).toBeNull();
+      expect(txn.expiration_baseline_microdollars_used).toBeNull();
+    });
+
+    it('should set original_baseline_microdollars_used from org microdollars_used', async () => {
+      // Set up org with some usage
+      await db
+        .update(organizations)
+        .set({ microdollars_used: 2_000_000, total_microdollars_acquired: 5_000_000 })
+        .where(eq(organizations.id, testOrganization.id));
+
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 10,
+        expiry_date: '2024-06-01T00:00:00.000Z',
+      });
+
+      const [txn] = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+
+      expect(txn.original_baseline_microdollars_used).toBe(2_000_000);
+      expect(txn.expiration_baseline_microdollars_used).toBe(2_000_000);
+    });
+  });
+
+  describe('nullifyCredits — expiration state', () => {
+    beforeEach(async () => {
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 5_000_000,
+          microdollars_used: 0,
+          microdollars_balance: 5_000_000,
+          next_credit_expiration_at: '2024-06-01T00:00:00.000Z',
+        })
+        .where(eq(organizations.id, testOrganization.id));
+
+      await db
+        .delete(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+    });
+
+    it('should clear next_credit_expiration_at on nullification', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.admin.nullifyCredits({
+        organizationId: testOrganization.id,
+      });
+
+      const [updatedOrg] = await db
+        .select({
+          next_credit_expiration_at: organizations.next_credit_expiration_at,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      expect(updatedOrg.next_credit_expiration_at).toBeNull();
+    });
+
+    it('should set microdollars_balance to 0 on nullification', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.admin.nullifyCredits({
+        organizationId: testOrganization.id,
+      });
+
+      const [updatedOrg] = await db
+        .select({
+          microdollars_balance: organizations.microdollars_balance,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+
+      expect(updatedOrg.microdollars_balance).toBe(0);
     });
   });
 });

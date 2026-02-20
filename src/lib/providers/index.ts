@@ -46,6 +46,7 @@ export type Provider = {
   apiUrl: string;
   apiKey: string;
   hasGenerationEndpoint: boolean;
+  requiresResponseRewrite: boolean;
 };
 
 export const PROVIDERS = {
@@ -54,62 +55,70 @@ export const PROVIDERS = {
     apiUrl: 'https://openrouter.ai/api/v1',
     apiKey: getEnvVariable('OPENROUTER_API_KEY'),
     hasGenerationEndpoint: true,
+    requiresResponseRewrite: false,
   },
   GIGAPOTATO: {
     id: 'gigapotato',
     apiUrl: getEnvVariable('GIGAPOTATO_API_URL'),
     apiKey: getEnvVariable('GIGAPOTATO_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: true,
   },
   CORETHINK: {
     id: 'corethink',
     apiUrl: 'https://api.corethink.ai/v1/code',
     apiKey: getEnvVariable('CORETHINK_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: true,
   },
   INCEPTION: {
     id: 'inception',
     apiUrl: 'https://api.inceptionlabs.ai/v1',
     apiKey: getEnvVariable('INCEPTION_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
   MARTIAN: {
     id: 'martian',
     apiUrl: 'https://api.withmartian.com/v1',
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: true,
   },
   MISTRAL: {
     id: 'mistral',
     apiUrl: 'https://api.mistral.ai/v1',
     apiKey: getEnvVariable('MISTRAL_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
   MINIMAX: {
     id: 'minimax',
     apiUrl: 'https://api.minimax.io/v1',
     apiKey: getEnvVariable('MINIMAX_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
   STREAMLAKE: {
     id: 'streamlake',
     apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',
     apiKey: getEnvVariable('STREAMLAKE_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
-    // Vercel AI Gateway has the generation endpoint: https://vercel.com/docs/ai-gateway/usage#generation-lookup
-    // but it is slow: takes >1min for the generation to appear.
-    hasGenerationEndpoint: false,
+    hasGenerationEndpoint: true,
+    requiresResponseRewrite: false,
   },
   XAI: {
     id: 'x-ai',
     apiUrl: 'https://api.x.ai/v1',
     apiKey: getEnvVariable('XAI_API_KEY'),
     hasGenerationEndpoint: false,
+    requiresResponseRewrite: false,
   },
 } as const satisfies Record<string, Provider>;
 
@@ -117,7 +126,8 @@ export async function getProvider(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest,
   user: User | AnonymousUserContext,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  taskId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult | null; customLlm: CustomLlm | null }> {
   if (!isAnonymousContext(user)) {
     const modelProvider = inferUserByokProviderForModel(requestedModel);
@@ -143,6 +153,7 @@ export async function getProvider(
           apiUrl: customLlm.base_url,
           apiKey: customLlm.api_key,
           hasGenerationEndpoint: true,
+          requiresResponseRewrite: false,
         },
         userByok: null,
         customLlm,
@@ -150,14 +161,38 @@ export async function getProvider(
     }
   }
 
-  if (await shouldRouteToVercel(requestedModel, request, user.id)) {
+  if (await shouldRouteToVercel(requestedModel, request, taskId || user.id)) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, customLlm: null };
   }
 
   const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
+  const freeModelProvider = Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway);
+
+  if (kiloFreeModel && freeModelProvider?.id === 'martian') {
+    return {
+      provider: { ...freeModelProvider, id: 'custom', requiresResponseRewrite: false },
+      userByok: null,
+      customLlm: {
+        public_id: kiloFreeModel.public_id,
+        internal_id: kiloFreeModel.internal_id,
+        display_name: kiloFreeModel.display_name,
+        context_length: kiloFreeModel.context_length,
+        max_completion_tokens: kiloFreeModel.max_completion_tokens,
+        verbosity: null,
+        provider: 'openai', // xai doesn't support preserved reasoning currently: https://github.com/vercel/ai/issues/10542
+        organization_ids: [],
+        base_url: freeModelProvider.apiUrl,
+        api_key: freeModelProvider.apiKey,
+        reasoning_effort: null,
+        included_tools: null,
+        excluded_tools: null,
+        supports_image_input: kiloFreeModel.flags.includes('vision'),
+      },
+    };
+  }
+
   return {
-    provider:
-      Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway) ?? PROVIDERS.OPENROUTER,
+    provider: freeModelProvider ?? PROVIDERS.OPENROUTER,
     userByok: null,
     customLlm: null,
   };
@@ -247,7 +282,7 @@ export function applyProviderSpecificLogic(
   applyPreferredProvider(requestedModel, requestToMutate);
 
   if (isXaiModel(requestedModel)) {
-    applyXaiModelSettings(provider.id, requestToMutate, extraHeaders);
+    applyXaiModelSettings(requestToMutate, extraHeaders);
   }
 
   if (isGeminiModel(requestedModel)) {

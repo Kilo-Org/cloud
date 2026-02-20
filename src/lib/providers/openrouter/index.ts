@@ -8,6 +8,7 @@ import {
 import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloModel } from '@/lib/providers/kilo-free-model';
+import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
 import { getModelSettings, getVersionedModelSettings } from '@/lib/providers/recommended-models';
 import {
   KILO_AUTO_MODEL_COMPLETION_PRICE,
@@ -56,7 +57,8 @@ function enhancedModelList(models: OpenRouterModel[]) {
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
-        !kiloFreeModels.some(m => m.public_id === model.id && m.is_enabled)
+        !kiloFreeModels.some(m => m.public_id === model.id && m.is_enabled) &&
+        !isRateLimitedToDeath(model.id)
     )
     .concat(kiloFreeModels.filter(m => m.is_enabled).map(model => convertFromKiloModel(model)))
     .concat([autoModel])

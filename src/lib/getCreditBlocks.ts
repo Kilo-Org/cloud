@@ -1,11 +1,18 @@
-import type { CreditTransactionForBlocks, UserForLocalExpiration } from '@/lib/creditExpiration';
+import type { CreditTransactionForBlocks } from '@/lib/creditExpiration';
 import { computeExpiration } from '@/lib/creditExpiration';
 import { toNonNullish } from '@/lib/utils';
+
+type EntityForCreditBlocks = {
+  id: string;
+  microdollars_used: number;
+  total_microdollars_acquired: number;
+};
 
 export function getCreditBlocks(
   transactions: CreditTransactionForBlocks[],
   now: Date,
-  user: UserForLocalExpiration
+  entity: EntityForCreditBlocks,
+  kilo_user_id: string
 ) {
   const paidTransactionsCount = transactions.filter(
     t => t.amount_microdollars > 0 && !t.is_free
@@ -35,7 +42,12 @@ export function getCreditBlocks(
     now
   );
 
-  const expirationResult = computeExpiration(all_expiring_transactions, user, max_expiration_date);
+  const expirationResult = computeExpiration(
+    all_expiring_transactions,
+    entity,
+    max_expiration_date,
+    kilo_user_id
+  );
   const expiringById = new Map(all_expiring_transactions.map(t => [t.id, t]));
 
   const expiredWithBalance = expirationResult.newTransactions
@@ -52,7 +64,7 @@ export function getCreditBlocks(
       };
     })
     .filter(t => t.balance_mUsd > 0);
-  const totalBalance_mUsd = user.total_microdollars_acquired - user.microdollars_used;
+  const totalBalance_mUsd = entity.total_microdollars_acquired - entity.microdollars_used;
   const expiringBalance_mUsd = expiredWithBalance.reduce((sum, t) => sum + t.balance_mUsd, 0);
   const nonExpiringBalance_mUsd = totalBalance_mUsd - expiringBalance_mUsd;
   let prefixSumMusd = 0;

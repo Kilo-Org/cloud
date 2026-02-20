@@ -420,6 +420,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       // The callback URL includes reviewId in the path so cloud agent stays generic
       const sessionInputWithCallback = {
         ...this.state.sessionInput,
+        createdOnPlatform: 'code-review',
         callbackUrl: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`,
         callbackHeaders: {
           'X-Internal-Secret': this.env.INTERNAL_API_SECRET,

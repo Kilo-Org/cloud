@@ -6,10 +6,11 @@ import {
   organization_invitations,
   organization_memberships,
   kilocode_users,
+  cloud_agent_code_reviews,
 } from '@/db/schema';
 import type { User, Organization } from '@/db/schema';
 import * as z from 'zod';
-import { eq, isNull, and, or, ilike } from 'drizzle-orm';
+import { eq, isNull, and, or, ilike, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import {
   sendOssInviteNewUserEmail,
@@ -46,7 +47,7 @@ function escapeIlikePattern(str: string): string {
 function extractRepoNameFromUrl(githubUrl: string): string | null {
   try {
     const parsed = new URL(githubUrl);
-    if (!parsed.hostname.includes('github.com')) {
+    if (parsed.hostname !== 'github.com' && parsed.hostname !== 'www.github.com') {
       return null;
     }
     const pathParts = parsed.pathname.split('/').filter(Boolean);
@@ -151,6 +152,7 @@ async function processOssRow(
             oss_sponsorship_tier: tier,
             oss_monthly_credit_amount_microdollars: creditsMicrodollars,
             oss_credits_last_reset_at: creditsMicrodollars ? now.toISOString() : null,
+            oss_github_url: githubUrl,
           },
         })
         .returning();
@@ -266,7 +268,8 @@ export const ossSponsorshipRouter = createTRPCRouter({
         id: organizations.id,
         name: organizations.name,
         settings: organizations.settings,
-        microdollars_balance: organizations.microdollars_balance,
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        microdollars_used: organizations.microdollars_used,
         created_at: organizations.created_at,
       })
       .from(organizations)
@@ -355,20 +358,41 @@ export const ossSponsorshipRouter = createTRPCRouter({
         // Onboarding is complete if both GitHub and Code Reviews are set up
         const isOnboardingComplete = hasGitHubIntegration && hasCodeReviewsEnabled;
 
+        // Check for latest completed code review for this organization
+        const [latestCodeReview] = await db
+          .select({
+            completed_at: cloud_agent_code_reviews.completed_at,
+          })
+          .from(cloud_agent_code_reviews)
+          .where(
+            and(
+              eq(cloud_agent_code_reviews.owned_by_organization_id, org.id),
+              eq(cloud_agent_code_reviews.status, 'completed')
+            )
+          )
+          .orderBy(desc(cloud_agent_code_reviews.completed_at))
+          .limit(1);
+
+        const hasCompletedCodeReview = !!latestCodeReview;
+        const lastCodeReviewDate = latestCodeReview?.completed_at ?? null;
+
         return {
           email,
           hasKiloAccount,
           kiloUserId,
           organizationId: org.id,
           organizationName: org.name,
+          githubUrl: org.settings.oss_github_url ?? null,
           tier: org.settings.oss_sponsorship_tier ?? null,
           monthlyCreditsUsd: monthlyCredits ? monthlyCredits / 1_000_000 : null,
           lastResetAt: org.settings.oss_credits_last_reset_at ?? null,
-          currentBalanceUsd: org.microdollars_balance / 1_000_000,
+          currentBalanceUsd: (org.total_microdollars_acquired - org.microdollars_used) / 1_000_000,
           createdAt: org.created_at,
           hasGitHubIntegration,
           hasCodeReviewsEnabled,
           isOnboardingComplete,
+          hasCompletedCodeReview,
+          lastCodeReviewDate,
         };
       })
     );

@@ -28,7 +28,8 @@ export function OrganizationAdminCreditNullify({ organizationId }: { organizatio
   const [description, setDescription] = useState<string>('');
   const [isOpen, setIsOpen] = useState(false);
 
-  const currentBalance = organization?.microdollars_balance ?? 0;
+  const currentBalance =
+    (organization?.total_microdollars_acquired ?? 0) - (organization?.microdollars_used ?? 0);
   const currentBalanceUsd = currentBalance / 1_000_000;
   const hasCredits = currentBalance > 0;
 

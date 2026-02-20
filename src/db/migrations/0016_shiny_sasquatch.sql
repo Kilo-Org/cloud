@@ -1,0 +1,2 @@
+ALTER TABLE "deployments" ADD COLUMN "created_from" text;--> statement-breakpoint
+UPDATE "deployments" SET "created_from" = CASE WHEN "source_type" = 'app-builder' THEN 'app-builder' ELSE 'deploy' END;

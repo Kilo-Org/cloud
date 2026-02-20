@@ -56,6 +56,7 @@ import {
 } from '@/lib/kilo-pass/enums';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
+import type { Tool } from '@/lib/organizations/model-settings';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -175,6 +176,9 @@ export const kilocode_users = pgTable(
     is_bot: boolean().default(false).notNull(),
     default_model: text(),
     cohorts: jsonb().$type<Record<string, number>>().default({}).notNull(),
+    completed_welcome_form: boolean().default(false).notNull(),
+    linkedin_url: text(),
+    github_url: text(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
@@ -612,6 +616,7 @@ export const microdollar_usage_metadata = pgTable(
     editor_name_id: integer(),
     has_tools: boolean(),
     machine_id: text(),
+    feature_id: integer(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
@@ -714,6 +719,15 @@ export const editor_name = pgTable(
   table => [uniqueIndex('UQ_editor_name').on(table.editor_name)]
 );
 
+export const feature = pgTable(
+  'feature',
+  {
+    feature_id: serial().notNull().primaryKey(),
+    feature: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_feature').on(table.feature)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -758,6 +772,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   editor_name: text(),
   has_tools: boolean(),
   machine_id: text(),
+  feature: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -802,7 +817,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.cancelled,
     edit.editor_name,
     meta.has_tools,
-    meta.machine_id
+    meta.machine_id,
+    feat.feature
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -813,6 +829,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${http_user_agent} ua ON meta.http_user_agent_id = ua.http_user_agent_id
   LEFT JOIN ${finish_reason} frfr ON meta.finish_reason_id = frfr.finish_reason_id
   LEFT JOIN ${editor_name} edit ON meta.editor_name_id = edit.editor_name_id
+  LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
@@ -826,8 +843,12 @@ export const custom_llm = pgTable('custom_llm', {
   provider: text().notNull().$type<'anthropic' | 'openai' | 'xai'>(),
   base_url: text().notNull(),
   api_key: text().notNull(),
-  verbosity: text().$type<'low' | 'medium' | 'high'>(),
+  verbosity: text().$type<'low' | 'medium' | 'high' | 'max'>(),
   organization_ids: jsonb().notNull().$type<string[]>(),
+  reasoning_effort: text().$type<'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'>(),
+  included_tools: jsonb().$type<Tool[]>(),
+  excluded_tools: jsonb().$type<Tool[]>(),
+  supports_image_input: boolean(),
 });
 
 export type CustomLlm = typeof custom_llm.$inferSelect;
@@ -990,12 +1011,18 @@ export const organizations = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
-    microdollars_balance: bigint({ mode: 'number' })
-      .default(sql`'0'`)
-      .notNull(),
     microdollars_used: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
+    // Deprecated: balance is now computed as total_microdollars_acquired - microdollars_used.
+    // Kept in sync for rollback safety; will be removed in a future migration.
+    microdollars_balance: bigint({ mode: 'number' })
+      .default(sql`'0'`)
+      .notNull(),
+    total_microdollars_acquired: bigint({ mode: 'number' })
+      .default(sql`'0'`)
+      .notNull(),
+    next_credit_expiration_at: timestamp({ withTimezone: true, mode: 'string' }),
     stripe_customer_id: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     settings: jsonb().default({}).$type<OrganizationSettings>().notNull(),
@@ -1006,6 +1033,7 @@ export const organizations = pgTable(
     sso_domain: text(),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
+    company_domain: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
@@ -1411,6 +1439,7 @@ export const deployments = pgTable(
     last_deployed_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_build_id: uuid().notNull(),
     threat_status: text().$type<'pending_scan' | 'safe' | 'flagged'>(),
+    created_from: text().$type<'deploy' | 'app-builder'>(),
   },
   table => [
     index('idx_deployments_owned_by_user_id').on(table.owned_by_user_id),
@@ -2083,6 +2112,8 @@ export const cli_sessions_v2 = pgTable(
     organization_id: uuid().references(() => organizations.id, { onDelete: 'set null' }),
     cloud_agent_session_id: text(),
     created_on_platform: text().notNull().default('unknown'),
+    git_url: text(),
+    git_branch: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

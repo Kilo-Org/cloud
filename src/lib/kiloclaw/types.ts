@@ -35,6 +35,44 @@ export type KiloCodeConfigResponse = {
   kilocodeModels: KiloCodeModelEntry[] | null;
 };
 
+/** Input to PATCH /api/platform/channels */
+export type ChannelsPatchInput = {
+  channels: {
+    telegramBotToken?: EncryptedEnvelope | null;
+    discordBotToken?: EncryptedEnvelope | null;
+    slackBotToken?: EncryptedEnvelope | null;
+    slackAppToken?: EncryptedEnvelope | null;
+  };
+};
+
+/** Response from PATCH /api/platform/channels */
+export type ChannelsPatchResponse = {
+  telegram: boolean;
+  discord: boolean;
+  slackBot: boolean;
+  slackApp: boolean;
+};
+
+/** A pending channel pairing request (e.g. from Telegram DM) */
+export type PairingRequest = {
+  code: string;
+  id: string;
+  channel: string;
+  meta?: unknown;
+  createdAt?: string;
+};
+
+/** Response from GET /api/platform/pairing */
+export type PairingListResponse = {
+  requests: PairingRequest[];
+};
+
+/** Response from POST /api/platform/pairing/approve */
+export type PairingApproveResponse = {
+  success: boolean;
+  message: string;
+};
+
 /** Response from GET /api/platform/status and GET /api/kiloclaw/status */
 export type PlatformStatusResponse = {
   userId: string | null;
@@ -46,6 +84,7 @@ export type PlatformStatusResponse = {
   envVarCount: number;
   secretCount: number;
   channelCount: number;
+  flyAppName: string | null;
   flyMachineId: string | null;
   flyVolumeId: string | null;
   flyRegion: string | null;

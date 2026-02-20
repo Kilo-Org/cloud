@@ -30,6 +30,8 @@ import {
   baseInterruptSessionNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
+  baseAnswerQuestionNextSchema,
+  baseRejectQuestionNextSchema,
 } from '../cloud-agent-next-schemas';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -54,6 +56,14 @@ const InterruptSessionInput = baseInterruptSessionNextSchema.extend({
 });
 
 const GetSessionInput = baseGetSessionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const AnswerQuestionInput = baseAnswerQuestionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const RejectQuestionInput = baseRejectQuestionNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -226,6 +236,31 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.interruptSession(input.sessionId);
+    }),
+
+  answerQuestion: organizationMemberProcedure
+    .input(AnswerQuestionInput)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const authToken = generateApiToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.answerQuestion({
+        sessionId: input.sessionId,
+        questionId: input.questionId,
+        answers: input.answers,
+      });
+    }),
+
+  rejectQuestion: organizationMemberProcedure
+    .input(RejectQuestionInput)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const authToken = generateApiToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.rejectQuestion({
+        sessionId: input.sessionId,
+        questionId: input.questionId,
+      });
     }),
 
   /**

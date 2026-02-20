@@ -196,6 +196,40 @@ export async function createVolume(
   return resp.json();
 }
 
+/**
+ * Create a volume, walking a list of regions until one succeeds.
+ *
+ * Fly doesn't support meta-regions (us, eu) for volume creation, so callers
+ * must provide an explicit list of regions to try. On capacity-related 412
+ * errors, the next region is tried. Any other error is thrown immediately.
+ *
+ * The compute hint tells Fly what machine spec will attach to this volume,
+ * so it can pick a host with capacity for both.
+ */
+export async function createVolumeWithFallback(
+  config: FlyClientConfig,
+  request: Omit<CreateVolumeRequest, 'region'>,
+  regions: string[]
+): Promise<FlyVolume> {
+  if (regions.length === 0) {
+    throw new Error('createVolumeWithFallback: no regions provided');
+  }
+
+  let lastError: unknown;
+  for (const region of regions) {
+    try {
+      return await createVolume(config, { ...request, region });
+    } catch (err) {
+      lastError = err;
+      if (!isFlyInsufficientResources(err)) throw err;
+      console.warn(`[fly] Volume creation failed in ${region} (capacity), trying next region`);
+    }
+  }
+
+  // All regions exhausted
+  throw lastError;
+}
+
 export async function deleteVolume(config: FlyClientConfig, volumeId: string): Promise<void> {
   const resp = await flyFetch(config, `/volumes/${volumeId}`, {
     method: 'DELETE',
@@ -209,6 +243,67 @@ export async function deleteVolume(config: FlyClientConfig, volumeId: string): P
  */
 export function isFlyNotFound(err: unknown): boolean {
   return err instanceof FlyApiError && err.status === 404;
+}
+
+/**
+ * Status codes that Fly uses for capacity/resource exhaustion errors.
+ * - 412: "insufficient resources" when creating a machine with an existing volume
+ * - 409: "insufficient memory" when updating/starting a machine on a full host
+ */
+const CAPACITY_STATUS_CODES = [409, 412];
+
+/**
+ * Capacity-related markers in Fly error bodies. Matched case-insensitively
+ * against the JSON body fields (error, status) and raw body text.
+ *
+ * Confirmed from production:
+ * - 412: "insufficient resources to create new machine with existing volume 'vol_xxx'"
+ * - 409: "could not reserve resource for machine: insufficient memory available to fulfill request"
+ *
+ * Add new markers here when the unclassified warning log reveals new
+ * capacity error formats from Fly.
+ */
+const CAPACITY_MARKERS = ['insufficient resources', 'insufficient memory'];
+
+/**
+ * Check if a Fly API error is a capacity/resource exhaustion issue
+ * (host where a volume/machine lives has no room).
+ *
+ * Fly uses 412 for volume-pinned capacity issues and 409 for memory
+ * exhaustion on updateMachine. Both codes are also used for unrelated
+ * errors (precondition/version mismatches, conflicts), so we only
+ * trigger recovery when the body contains explicit capacity markers.
+ *
+ * Logs a warning for unclassified 409/412s so we can tune matching.
+ */
+export function isFlyInsufficientResources(err: unknown): boolean {
+  if (!(err instanceof FlyApiError) || !CAPACITY_STATUS_CODES.includes(err.status)) return false;
+
+  // Build a single lowercase string from all available signal sources
+  const searchText = `${err.message}\n${err.body}`.toLowerCase();
+
+  // Try to extract structured fields from JSON body
+  try {
+    const json = JSON.parse(err.body) as Record<string, unknown>;
+    if (typeof json.status === 'string') {
+      const status = json.status.toLowerCase();
+      if (CAPACITY_MARKERS.some(m => status.includes(m))) return true;
+    }
+    if (typeof json.error === 'string') {
+      const error = json.error.toLowerCase();
+      if (CAPACITY_MARKERS.some(m => error.includes(m))) return true;
+    }
+  } catch {
+    // Body isn't JSON — fall through to raw text matching
+  }
+
+  // Fall back to raw text matching across message + body
+  if (CAPACITY_MARKERS.some(m => searchText.includes(m))) return true;
+
+  // 409/412 but no capacity signal — likely a version/precondition/conflict issue.
+  // Log so we can tune matching if Fly introduces new capacity error formats.
+  console.warn(`[fly] Unclassified ${err.status} error (not treated as capacity):`, err.body);
+  return false;
 }
 
 /**
@@ -252,7 +347,7 @@ export async function execCommand(
   config: FlyClientConfig,
   machineId: string,
   command: string[],
-  timeout = 10
+  timeout = 60
 ): Promise<MachineExecResponse> {
   const body: MachineExecRequest = { command, timeout };
   const resp = await flyFetch(config, `/machines/${machineId}/exec`, {

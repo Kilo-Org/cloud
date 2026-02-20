@@ -12,7 +12,6 @@ const config: KnipConfig = {
     '@radix-ui/react-toggle',
 
     // Used in specific contexts or planned for future use
-    '@typeform/embed-react',
     '@uiw/react-json-view',
 
     // Used via plugins or extends (detected by custom compiler now)

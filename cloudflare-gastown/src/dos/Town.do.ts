@@ -198,6 +198,9 @@ export class TownDO extends DurableObject<Env> {
   // ── Rig Config (KV, per-rig — configuration needed for container dispatch) ──
 
   async configureRig(rigConfig: RigConfig): Promise<void> {
+    console.log(
+      `${TOWN_LOG} configureRig: rigId=${rigConfig.rigId} hasKilocodeToken=${!!rigConfig.kilocodeToken}`
+    );
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
 
     // Store kilocodeToken in town config so it's available to all agents
@@ -205,6 +208,7 @@ export class TownDO extends DurableObject<Env> {
     if (rigConfig.kilocodeToken) {
       const townConfig = await this.getTownConfig();
       if (!townConfig.kilocode_token) {
+        console.log(`${TOWN_LOG} configureRig: propagating kilocodeToken to town config`);
         await this.updateTownConfig({ kilocode_token: rigConfig.kilocodeToken });
       }
     }

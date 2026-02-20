@@ -14,12 +14,15 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   GitPullRequest,
   MessageSquare,
   FileX,
   HelpCircle,
   RotateCw,
   StopCircle,
+  Tag,
 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -72,11 +75,24 @@ const actionConfig: Record<
 > = {
   pr_created: { icon: GitPullRequest, label: 'PR Created' },
   comment_posted: { icon: MessageSquare, label: 'Comment Posted' },
-  closed_duplicate: { icon: FileX, label: 'Closed as Duplicate' },
+  closed_duplicate: { icon: FileX, label: 'Flagged as Duplicate' },
   needs_clarification: { icon: HelpCircle, label: 'Needs Clarification' },
 };
 
 const PAGE_SIZE = 10;
+
+/** Deterministic HSL color from a label name, for GitHub-style colored badges. */
+function labelColor(name: string): { bg: string; text: string } {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = ((hash % 360) + 360) % 360;
+  return {
+    bg: `hsl(${hue}, 55%, 25%)`,
+    text: `hsl(${hue}, 80%, 80%)`,
+  };
+}
 
 export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardProps) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,6 +102,7 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
   >(undefined);
   const [interruptingTicketId, setInterruptingTicketId] = useState<string | null>(null);
   const [retryingTicketId, setRetryingTicketId] = useState<string | null>(null);
+  const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set());
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -450,6 +467,56 @@ export function AutoTriageTicketsCard({ organizationId }: AutoTriageTicketsCardP
                         )}
                       </div>
                     )}
+
+                    {/* Issue Labels */}
+                    {ticket.issue_labels &&
+                      ticket.issue_labels.length > 0 &&
+                      (() => {
+                        const isExpanded = expandedLabels.has(ticket.id);
+                        const LabelChevron = isExpanded ? ChevronUp : ChevronDown;
+                        return (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedLabels(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(ticket.id)) next.delete(ticket.id);
+                                  else next.add(ticket.id);
+                                  return next;
+                                })
+                              }
+                              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+                            >
+                              <Tag className="h-3 w-3" />
+                              <span>
+                                {ticket.issue_labels.length} label
+                                {ticket.issue_labels.length !== 1 ? 's' : ''}
+                              </span>
+                              <LabelChevron className="h-3 w-3" />
+                            </button>
+                            {isExpanded && (
+                              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                {ticket.issue_labels.map(label => {
+                                  const color = labelColor(label);
+                                  return (
+                                    <span
+                                      key={label}
+                                      className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                      style={{
+                                        backgroundColor: color.bg,
+                                        color: color.text,
+                                      }}
+                                    >
+                                      {label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     {/* Action Taken */}
                     {actionInfo && (

@@ -60,6 +60,8 @@ export type UseCloudAgentStreamOptions = {
   onKiloSessionCreated?: (kiloSessionId: string) => void;
   /** Callback when session is confirmed initiated (first session_synced event) */
   onSessionInitiated?: () => void;
+  /** Callback when the agent asks a question */
+  onQuestionAsked?: () => void;
 };
 
 export type UseCloudAgentStreamReturn = {
@@ -96,6 +98,7 @@ export function useCloudAgentStream({
   onComplete,
   onKiloSessionCreated,
   onSessionInitiated,
+  onQuestionAsked,
 }: UseCloudAgentStreamOptions): UseCloudAgentStreamReturn {
   const trpcClient = useRawTRPCClient();
 
@@ -144,6 +147,7 @@ export function useCloudAgentStream({
   const onCompleteRef = useRef(onComplete);
   const onKiloSessionCreatedRef = useRef(onKiloSessionCreated);
   const onSessionInitiatedRef = useRef(onSessionInitiated);
+  const onQuestionAskedRef = useRef(onQuestionAsked);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -156,6 +160,10 @@ export function useCloudAgentStream({
   useEffect(() => {
     onSessionInitiatedRef.current = onSessionInitiated;
   }, [onSessionInitiated]);
+
+  useEffect(() => {
+    onQuestionAskedRef.current = onQuestionAsked;
+  }, [onQuestionAsked]);
 
   useEffect(() => {
     cloudAgentSessionIdRef.current = cloudAgentSessionIdProp ?? null;
@@ -299,6 +307,7 @@ export function useCloudAgentStream({
 
       onQuestionAsked: (requestId, callId) => {
         setQuestionRequestId({ callId, requestId });
+        onQuestionAskedRef.current?.();
       },
     }),
     [

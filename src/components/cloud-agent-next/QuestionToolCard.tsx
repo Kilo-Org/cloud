@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useAtomValue } from 'jotai';
-import { ChevronDown, Loader2, XCircle, Check, Send, X } from 'lucide-react';
+import { ChevronDown, Loader2, XCircle, Check, Send, X, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import {
@@ -111,15 +111,19 @@ function InteractiveQuestionContent({
   question,
   selectedLabels,
   customInput,
+  customSelected,
   onToggleOption,
   onCustomInputChange,
+  onToggleCustom,
   showHeader = true,
 }: {
   question: QuestionInfo;
   selectedLabels: string[];
   customInput: string;
+  customSelected: boolean;
   onToggleOption: (label: string) => void;
   onCustomInputChange: (value: string) => void;
+  onToggleCustom: () => void;
   showHeader?: boolean;
 }) {
   const isMultiple = question.multiple === true;
@@ -132,56 +136,87 @@ function InteractiveQuestionContent({
       )}
       <div className="text-sm font-medium">{question.question}</div>
 
-      {question.options && question.options.length > 0 && (
-        <div className="space-y-1.5">
-          {question.options.map((option, idx) => {
-            const isSelected = selectedLabels.includes(option.label);
-            return (
+      <div className="space-y-1.5">
+        {question.options?.map((option, idx) => {
+          const isSelected = selectedLabels.includes(option.label);
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => onToggleOption(option.label)}
+              className={cn(
+                'w-full rounded-md border px-3 py-2 text-left text-xs transition-colors',
+                isSelected
+                  ? 'bg-primary/15 border-primary/60 ring-primary/30 ring-1'
+                  : 'border-muted bg-muted/20 hover:bg-muted/40 hover:border-muted-foreground/30'
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                    isMultiple ? 'rounded' : 'rounded-full',
+                    isSelected
+                      ? 'bg-primary border-primary text-primary-foreground'
+                      : 'border-muted-foreground/40'
+                  )}
+                >
+                  {isSelected && <Check className="h-2.5 w-2.5" />}
+                </div>
+                <span className={cn('font-medium', isSelected && 'text-primary')}>
+                  {option.label}
+                </span>
+              </div>
+              {option.description && (
+                <div className="text-muted-foreground mt-1 pl-6">{option.description}</div>
+              )}
+            </button>
+          );
+        })}
+
+        {allowCustom && (
+          <div
+            role="button"
+            tabIndex={-1}
+            onClick={() => {
+              if (!customSelected) onToggleCustom();
+            }}
+            className={cn(
+              'w-full rounded-md border px-3 py-2 text-left text-xs transition-colors',
+              customSelected
+                ? 'bg-primary/15 border-primary/60 ring-primary/30 ring-1'
+                : 'border-muted bg-muted/20 hover:bg-muted/40 hover:border-muted-foreground/30'
+            )}
+          >
+            <div className="flex items-center gap-2">
               <button
-                key={idx}
                 type="button"
-                onClick={() => onToggleOption(option.label)}
+                onClick={e => {
+                  e.stopPropagation();
+                  onToggleCustom();
+                }}
                 className={cn(
-                  'w-full rounded-md border px-3 py-2 text-left text-xs transition-colors',
-                  isSelected
-                    ? 'bg-primary/15 border-primary/60 ring-primary/30 ring-1'
-                    : 'border-muted bg-muted/20 hover:bg-muted/40 hover:border-muted-foreground/30'
+                  'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                  isMultiple ? 'rounded' : 'rounded-full',
+                  customSelected
+                    ? 'bg-primary border-primary text-primary-foreground'
+                    : 'border-muted-foreground/40'
                 )}
               >
-                <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
-                      isMultiple ? 'rounded' : 'rounded-full',
-                      isSelected
-                        ? 'bg-primary border-primary text-primary-foreground'
-                        : 'border-muted-foreground/40'
-                    )}
-                  >
-                    {isSelected && <Check className="h-2.5 w-2.5" />}
-                  </div>
-                  <span className={cn('font-medium', isSelected && 'text-primary')}>
-                    {option.label}
-                  </span>
-                </div>
-                {option.description && (
-                  <div className="text-muted-foreground mt-1 pl-6">{option.description}</div>
-                )}
+                {customSelected && <Check className="h-2.5 w-2.5" />}
               </button>
-            );
-          })}
-        </div>
-      )}
-
-      {allowCustom && (
-        <input
-          type="text"
-          value={customInput}
-          onChange={e => onCustomInputChange(e.target.value)}
-          placeholder="Type your own answer..."
-          className="border-muted bg-background placeholder:text-muted-foreground/50 focus:border-primary/60 focus:ring-primary/30 w-full rounded-md border px-3 py-2 text-xs focus:ring-1 focus:outline-none"
-        />
-      )}
+              <input
+                type="text"
+                value={customInput}
+                onClick={e => e.stopPropagation()}
+                onChange={e => onCustomInputChange(e.target.value)}
+                placeholder="Type your own answer..."
+                className="placeholder:text-muted-foreground/50 min-w-0 flex-1 bg-transparent font-medium outline-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {isMultiple && (
         <div className="flex gap-2 text-[10px]">
@@ -222,7 +257,7 @@ function QuestionTab({
           : 'bg-muted/50 text-muted-foreground hover:bg-muted'
       )}
     >
-      {total > 1 ? `Q${index + 1}` : question.header || 'Question'}
+      {total > 1 ? question.header || `Q${index + 1}` : question.header || 'Question'}
       {hasAnswers && <Check className="ml-1 inline h-3 w-3" />}
     </button>
   );
@@ -238,6 +273,7 @@ export function QuestionToolCard({ toolPart }: QuestionToolCardProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<string[][]>(() => questions.map(() => []));
   const [customInputs, setCustomInputs] = useState<string[]>(() => questions.map(() => ''));
+  const [customSelected, setCustomSelected] = useState<boolean[]>(() => questions.map(() => false));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -265,47 +301,106 @@ export function QuestionToolCard({ toolPart }: QuestionToolCardProps) {
 
   const handleToggleOption = useCallback(
     (questionIndex: number, label: string) => {
+      const question = questions[questionIndex];
+      const isMultiple = question?.multiple === true;
+
       setSelectedAnswers(prev => {
         const updated = [...prev];
         const current = updated[questionIndex] ?? [];
-        const question = questions[questionIndex];
-        const isMultiple = question?.multiple === true;
 
         if (isMultiple) {
           updated[questionIndex] = current.includes(label)
             ? current.filter(l => l !== label)
             : [...current, label];
         } else {
-          // Single select: toggle off if already selected, otherwise replace
           updated[questionIndex] = current.includes(label) ? [] : [label];
         }
         return updated;
       });
+
+      // Single-select: picking an option deselects custom
+      if (!isMultiple) {
+        setCustomSelected(prev => {
+          const updated = [...prev];
+          updated[questionIndex] = false;
+          return updated;
+        });
+      }
     },
     [questions]
   );
 
-  const handleCustomInputChange = useCallback((questionIndex: number, value: string) => {
-    setCustomInputs(prev => {
-      const updated = [...prev];
-      updated[questionIndex] = value;
-      return updated;
-    });
-  }, []);
+  const handleToggleCustom = useCallback(
+    (questionIndex: number) => {
+      const question = questions[questionIndex];
+      const isMultiple = question?.multiple === true;
 
-  const hasAnyAnswer = selectedAnswers.some(
-    (labels, i) => labels.length > 0 || (customInputs[i] ?? '').trim().length > 0
+      setCustomSelected(prev => {
+        const updated = [...prev];
+        const wasSelected = updated[questionIndex] ?? false;
+        updated[questionIndex] = !wasSelected;
+        return updated;
+      });
+
+      // Single-select: selecting custom deselects options
+      if (!isMultiple) {
+        setSelectedAnswers(prev => {
+          const updated = [...prev];
+          updated[questionIndex] = [];
+          return updated;
+        });
+      }
+    },
+    [questions]
   );
+
+  const handleCustomInputChange = useCallback(
+    (questionIndex: number, value: string) => {
+      setCustomInputs(prev => {
+        const updated = [...prev];
+        updated[questionIndex] = value;
+        return updated;
+      });
+      // Auto-select custom when user types
+      if (value.length > 0) {
+        setCustomSelected(prev => {
+          if (prev[questionIndex]) return prev;
+          const updated = [...prev];
+          updated[questionIndex] = true;
+          return updated;
+        });
+        // Single-select: auto-selecting custom deselects options
+        const question = questions[questionIndex];
+        if (question?.multiple !== true) {
+          setSelectedAnswers(prev => {
+            if ((prev[questionIndex] ?? []).length === 0) return prev;
+            const updated = [...prev];
+            updated[questionIndex] = [];
+            return updated;
+          });
+        }
+      }
+    },
+    [questions]
+  );
+
+  /** Compute effective answers for a given question index */
+  const getEffectiveAnswers = useCallback(
+    (questionIndex: number) => {
+      const labels = selectedAnswers[questionIndex] ?? [];
+      const isCustom = customSelected[questionIndex] ?? false;
+      const custom = isCustom ? (customInputs[questionIndex] ?? '').trim() : '';
+      return custom ? [...labels, custom] : [...labels];
+    },
+    [selectedAnswers, customSelected, customInputs]
+  );
+
+  const hasAnyAnswer = questions.some((_, i) => getEffectiveAnswers(i).length > 0);
 
   const handleSubmit = useCallback(async () => {
     if (!requestId || !sessionId || isSubmitting) return;
 
-    // Build answers: for each question, combine selected labels + custom input
-    const answers: string[][] = questions.map((_, i) => {
-      const labels = selectedAnswers[i] ?? [];
-      const custom = (customInputs[i] ?? '').trim();
-      return custom ? [...labels, custom] : [...labels];
-    });
+    const answers: string[][] = questions.map((_, i) => getEffectiveAnswers(i));
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -332,8 +427,7 @@ export function QuestionToolCard({ toolPart }: QuestionToolCardProps) {
     sessionId,
     organizationId,
     questions,
-    selectedAnswers,
-    customInputs,
+    getEffectiveAnswers,
     isSubmitting,
     trpcClient,
   ]);
@@ -381,64 +475,120 @@ export function QuestionToolCard({ toolPart }: QuestionToolCardProps) {
                 <QuestionTab
                   key={idx}
                   question={q}
-                  answers={selectedAnswers[idx]}
+                  answers={getEffectiveAnswers(idx)}
                   isActive={activeTab === idx}
                   onClick={() => setActiveTab(idx)}
                   index={idx}
                   total={questionCount}
                 />
               ))}
+              {/* Confirm tab */}
+              <button
+                type="button"
+                onClick={() => setActiveTab(questionCount)}
+                className={cn(
+                  'shrink-0 rounded-md px-2 py-1 text-xs transition-colors',
+                  activeTab === questionCount
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                )}
+              >
+                Confirm
+              </button>
             </div>
           )}
 
           {/* Active question — interactive */}
-          {questions[activeTab] && (
+          {activeTab < questionCount && questions[activeTab] && (
             <InteractiveQuestionContent
               question={questions[activeTab]}
               selectedLabels={selectedAnswers[activeTab] ?? []}
               customInput={customInputs[activeTab] ?? ''}
+              customSelected={customSelected[activeTab] ?? false}
               onToggleOption={label => handleToggleOption(activeTab, label)}
               onCustomInputChange={value => handleCustomInputChange(activeTab, value)}
-              showHeader={questionCount > 1}
+              onToggleCustom={() => handleToggleCustom(activeTab)}
+              showHeader={false}
             />
+          )}
+
+          {/* Confirm tab — compact recap + submit */}
+          {questionCount > 1 && activeTab === questionCount && (
+            <div className="space-y-2">
+              <div className="text-muted-foreground text-xs font-medium">Review your answers</div>
+              {questions.map((q, idx) => {
+                const allAnswers = getEffectiveAnswers(idx);
+                const answered = allAnswers.length > 0;
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveTab(idx)}
+                    className={cn(
+                      'w-full rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors',
+                      answered
+                        ? 'border-muted bg-muted/20 hover:bg-muted/40'
+                        : 'border-yellow-500/40 bg-yellow-500/5 hover:bg-yellow-500/10'
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {answered ? (
+                        <Check className="h-3 w-3 shrink-0 text-green-500" />
+                      ) : (
+                        <AlertCircle className="h-3 w-3 shrink-0 text-yellow-500" />
+                      )}
+                      <span className="font-medium">{q.header || `Q${idx + 1}`}</span>
+                    </div>
+                    <div className="text-muted-foreground mt-0.5 truncate pl-[18px]">
+                      {answered ? allAnswers.join(', ') : 'No answer yet'}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           )}
 
           {/* Submit error */}
           {submitError && <div className="mt-2 text-xs text-red-500">{submitError}</div>}
 
-          {/* Action buttons */}
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!hasAnyAnswer || isSubmitting || !requestId}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                hasAnyAnswer && requestId && !isSubmitting
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed'
+          {/* Action buttons — single question: always visible; multi-question: only on Confirm tab */}
+          {(questionCount === 1 || activeTab === questionCount) && (
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!hasAnyAnswer || isSubmitting || !requestId}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                  hasAnyAnswer && requestId && !isSubmitting
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-muted text-muted-foreground cursor-not-allowed'
+                )}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Send className="h-3 w-3" />
+                )}
+                Submit
+              </button>
+              <button
+                type="button"
+                onClick={handleDismiss}
+                disabled={isSubmitting || !requestId}
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <X className="h-3 w-3" />
+                Dismiss
+              </button>
+              {!requestId && (
+                <span className="text-muted-foreground text-[10px]">
+                  Waiting for question ID...
+                </span>
               )}
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Send className="h-3 w-3" />
-              )}
-              Submit
-            </button>
-            <button
-              type="button"
-              onClick={handleDismiss}
-              disabled={isSubmitting || !requestId}
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <X className="h-3 w-3" />
-              Dismiss
-            </button>
-            {!requestId && (
-              <span className="text-muted-foreground text-[10px]">Waiting for question ID...</span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -480,11 +630,11 @@ export function QuestionToolCard({ toolPart }: QuestionToolCardProps) {
             </div>
           )}
 
-          {questions[activeTab] && (
+          {questions[activeTab < questionCount ? activeTab : 0] && (
             <CompletedQuestionContent
-              question={questions[activeTab]}
-              answers={completedAnswers[activeTab]}
-              showHeader={questionCount > 1}
+              question={questions[activeTab < questionCount ? activeTab : 0]}
+              answers={completedAnswers[activeTab < questionCount ? activeTab : 0]}
+              showHeader={false}
             />
           )}
 

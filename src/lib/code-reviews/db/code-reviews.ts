@@ -84,6 +84,10 @@ export async function updateCodeReviewStatus(
     errorMessage?: string;
     startedAt?: Date;
     completedAt?: Date;
+    model?: string;
+    totalTokensIn?: number;
+    totalTokensOut?: number;
+    totalCostMusd?: number;
   } = {}
 ): Promise<void> {
   try {
@@ -107,6 +111,18 @@ export async function updateCodeReviewStatus(
     }
     if (updates.completedAt !== undefined) {
       updateData.completed_at = updates.completedAt.toISOString();
+    }
+    if (updates.model !== undefined) {
+      updateData.model = updates.model;
+    }
+    if (updates.totalTokensIn !== undefined) {
+      updateData.total_tokens_in = updates.totalTokensIn;
+    }
+    if (updates.totalTokensOut !== undefined) {
+      updateData.total_tokens_out = updates.totalTokensOut;
+    }
+    if (updates.totalCostMusd !== undefined) {
+      updateData.total_cost_musd = updates.totalCostMusd;
     }
 
     // Auto-set timestamps based on status
@@ -308,6 +324,10 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
         error_message: null,
         started_at: null,
         completed_at: null,
+        model: null,
+        total_tokens_in: null,
+        total_tokens_out: null,
+        total_cost_musd: null,
         updated_at: new Date().toISOString(),
       })
       .where(eq(cloud_agent_code_reviews.id, reviewId));

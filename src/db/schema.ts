@@ -1979,6 +1979,12 @@ export const cloud_agent_code_reviews = pgTable(
     status: text().notNull().default('pending'), // 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
     error_message: text(),
 
+    // Usage tracking (populated on completion by orchestrator)
+    model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
+    total_tokens_in: integer(), // Total input tokens across all LLM calls
+    total_tokens_out: integer(), // Total output tokens across all LLM calls
+    total_cost_musd: integer(), // Total cost in microdollars (for consistency with microdollar_usage)
+
     // Timestamps
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
     completed_at: timestamp({ withTimezone: true, mode: 'string' }),

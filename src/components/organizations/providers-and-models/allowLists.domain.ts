@@ -199,6 +199,14 @@ export function toggleModelAllowed(params: {
     hadAllModelsInitially,
   } = params;
 
+  // Sentinel means "nothing allowed" (distinct from [] which means "all allowed")
+  if (draftModelAllowList.length === 1 && draftModelAllowList[0] === MODEL_ALLOW_NONE_SENTINEL) {
+    if (nextAllowed) {
+      return canonicalizeModelAllowList([modelId]);
+    }
+    return [MODEL_ALLOW_NONE_SENTINEL];
+  }
+
   if (draftModelAllowList.length === 0) {
     if (nextAllowed) {
       return [];
@@ -304,7 +312,7 @@ export function setAllModelsAllowed(params: {
       merged.add(id);
     }
 
-    // If we've now selected every model and started with all, return empty (= all allowed).
+    // If every concrete model ID is now in the set, wildcards are redundant — return empty (= all allowed).
     if (hadAllModelsInitially && allModelIds.every(id => merged.has(id))) {
       return [];
     }

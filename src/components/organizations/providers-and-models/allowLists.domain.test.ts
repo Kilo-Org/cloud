@@ -85,6 +85,30 @@ describe('allowLists.domain', () => {
     expect(next).toEqual([]);
   });
 
+  test('toggleModelAllowed(true) from sentinel state enables just that model', () => {
+    const next = toggleModelAllowed({
+      modelId: 'openai/gpt-4.1',
+      nextAllowed: true,
+      draftModelAllowList: [MODEL_ALLOW_NONE_SENTINEL],
+      allModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet'],
+      providerSlugsForModelId: ['openai'],
+      hadAllModelsInitially: true,
+    });
+    expect(next).toEqual(['openai/gpt-4.1']);
+  });
+
+  test('toggleModelAllowed(false) from sentinel state is a no-op', () => {
+    const next = toggleModelAllowed({
+      modelId: 'openai/gpt-4.1',
+      nextAllowed: false,
+      draftModelAllowList: [MODEL_ALLOW_NONE_SENTINEL],
+      allModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet'],
+      providerSlugsForModelId: ['openai'],
+      hadAllModelsInitially: true,
+    });
+    expect(next).toEqual([MODEL_ALLOW_NONE_SENTINEL]);
+  });
+
   test('setAllModelsAllowed(true) returns [] when hadAllModelsInitially and targeting all', () => {
     const next = setAllModelsAllowed({
       nextAllowed: true,

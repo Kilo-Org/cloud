@@ -42,7 +42,9 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
     : 'Remaining Credits';
   return (
     <>
-      {!user.completed_welcome_form && <WelcomeTypeformModal userEmail={user.google_user_email} kiloUserId={user.id} />}
+      {!user.completed_welcome_form && (
+        <WelcomeTypeformModal userEmail={user.google_user_email} kiloUserId={user.id} />
+      )}
       {/* NOTE: When making changes to this structure, make sure to also update the structure in the loading.tsx file */}
       <PageLayout title="Profile">
         <div className="flex w-full flex-col gap-4 lg:flex-row">

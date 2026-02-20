@@ -687,6 +687,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
+   * Run `openclaw doctor --fix --non-interactive` on the machine and return the output.
+   * Requires the machine to be running.
+   */
+  async runDoctor(): Promise<{ success: boolean; output: string }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { success: false, output: 'Instance is not running' };
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'doctor', '--fix', '--non-interactive'],
+      60
+    );
+
+    const output = result.stdout + (result.stderr ? '\n' + result.stderr : '');
+    return { success: result.exit_code === 0, output };
+  }
+
+  /**
    * Start the Fly Machine.
    */
   async start(userId?: string): Promise<void> {

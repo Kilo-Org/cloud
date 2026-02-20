@@ -1,11 +1,13 @@
 'use client';
 
-import { Play, RotateCw, Square } from 'lucide-react';
+import { useState } from 'react';
+import { Play, RotateCw, Square, Stethoscope } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { Button } from '@/components/ui/button';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { RunDoctorDialog } from './RunDoctorDialog';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
@@ -20,6 +22,7 @@ export function InstanceControls({
   const isRunning = status.status === 'running';
   const isStopped = status.status === 'stopped' || status.status === 'provisioned';
   const isDestroying = status.status === 'destroying';
+  const [doctorOpen, setDoctorOpen] = useState(false);
 
   return (
     <div>
@@ -71,9 +74,27 @@ export function InstanceControls({
           }}
         >
           <RotateCw className="h-4 w-4" />
-          {mutations.restartGateway.isPending ? 'Restarting...' : 'Restart Gateway'}
+          {mutations.restartGateway.isPending ? 'Redeploying...' : 'Redeploy'}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+          disabled={!isRunning || mutations.runDoctor.isPending || isDestroying}
+          onClick={() => {
+            posthog?.capture('claw_doctor_clicked', { instance_status: status.status });
+            setDoctorOpen(true);
+          }}
+        >
+          <Stethoscope className="h-4 w-4" />
+          OpenClaw Doctor
         </Button>
       </div>
+      <RunDoctorDialog
+        open={doctorOpen}
+        onOpenChange={setDoctorOpen}
+        mutation={mutations.runDoctor}
+      />
     </div>
   );
 }

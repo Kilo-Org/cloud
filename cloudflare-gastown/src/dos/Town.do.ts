@@ -63,7 +63,6 @@ import type {
   ReviewQueueEntry,
   AgentDoneInput,
   PrimeContext,
-  PatrolResult,
 } from '../types';
 import type { RigBeadEventRecord } from '../db/tables/rig-bead-events.table';
 import type { RigMoleculeRecord } from '../db/tables/rig-molecules.table';
@@ -402,7 +401,16 @@ export class TownDO extends DurableObject<Env> {
     input: { status: 'completed' | 'failed'; reason?: string }
   ): Promise<void> {
     await this.ensureInitialized();
-    reviewQueue.agentCompleted(this.sql, agentId, input);
+    // When agentId is empty (e.g. mayor completion callback without explicit ID),
+    // fall back to the mayor agent.
+    let resolvedAgentId = agentId;
+    if (!resolvedAgentId) {
+      const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
+      if (mayor) resolvedAgentId = mayor.id;
+    }
+    if (resolvedAgentId) {
+      reviewQueue.agentCompleted(this.sql, resolvedAgentId, input);
+    }
   }
 
   async createMolecule(beadId: string, formula: unknown): Promise<RigMoleculeRecord> {
@@ -903,7 +911,6 @@ export class TownDO extends DurableObject<Env> {
    */
   private async witnessPatrol(): Promise<void> {
     const townId = this.townId;
-    const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
     const guppThreshold = new Date(Date.now() - GUPP_THRESHOLD_MS).toISOString();
 
     const AgentPick = RigAgentRecord.pick({

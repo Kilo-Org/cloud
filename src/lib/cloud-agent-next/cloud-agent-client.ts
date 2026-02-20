@@ -201,6 +201,27 @@ export type GetSessionOutput = {
   version: number;
 };
 
+/** Input for getSessionEvents procedure */
+export type GetSessionEventsInput = {
+  cloudAgentSessionId: string;
+  eventTypes?: string[];
+  executionId?: string;
+  fromId?: number;
+  limit?: number;
+};
+
+/** Stored event from cloud-agent-next DO SQLite */
+export type StoredEvent = {
+  id: number;
+  execution_id: string;
+  session_id: string;
+  stream_event_type: string;
+  /** JSON stringified event data */
+  payload: string;
+  /** Unix timestamp in milliseconds */
+  timestamp: number;
+};
+
 /**
  * Input for updateSession procedure.
  * Updates a prepared (but not yet initiated) session.
@@ -318,6 +339,9 @@ type CloudAgentNextTRPCClient = {
   };
   getSession: {
     query: (input: GetSessionInput) => Promise<GetSessionOutput>;
+  };
+  getSessionEvents: {
+    query: (input: GetSessionEventsInput) => Promise<StoredEvent[]>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -453,6 +477,23 @@ export class CloudAgentNextClient {
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'getSession' },
         extra: { cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get stored execution events for a session.
+   * Used by server-side consumers (e.g. callback handlers) to retrieve
+   * execution events without a WebSocket connection.
+   */
+  async getSessionEvents(input: GetSessionEventsInput): Promise<StoredEvent[]> {
+    try {
+      return await this.client.getSessionEvents.query(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getSessionEvents' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId },
       });
       throw error;
     }

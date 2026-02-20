@@ -355,6 +355,43 @@ export const GetSessionOutput = z.object({
 export type GetSessionResponse = z.infer<typeof GetSessionOutput>;
 
 /**
+ * Input schema for getSessionEvents endpoint.
+ * Retrieves stored execution events for server-side consumers
+ * (e.g. callback handlers) without requiring a WebSocket connection.
+ */
+export const GetSessionEventsInput = z.object({
+  cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID'),
+  eventTypes: z
+    .array(z.string().min(1))
+    .optional()
+    .describe('Filter by event types (e.g. kilocode, output, error)'),
+  executionId: z.string().min(1).optional().describe('Filter by execution ID'),
+  fromId: z.number().int().min(0).optional().describe('Return events with ID > fromId (exclusive)'),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .default(500)
+    .describe('Max events to return (default 500, max 1000)'),
+});
+
+/**
+ * Output schema for getSessionEvents endpoint.
+ * Returns an array of stored events matching the SQLite row structure.
+ */
+export const StoredEventSchema = z.object({
+  id: z.number(),
+  execution_id: z.string(),
+  session_id: z.string(),
+  stream_event_type: z.string(),
+  payload: z.string(),
+  timestamp: z.number(),
+});
+
+export const GetSessionEventsOutput = z.array(StoredEventSchema);
+
+/**
  * Response schema for V2 execution endpoints.
  * Returns acknowledgment when execution has started.
  * Returns 409 Conflict if an execution is already in progress.

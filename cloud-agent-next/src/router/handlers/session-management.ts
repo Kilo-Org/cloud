@@ -19,7 +19,13 @@ import {
 } from '../../workspace.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure, publicProcedure } from '../auth.js';
-import { sessionIdSchema, GetSessionInput, GetSessionOutput } from '../schemas.js';
+import {
+  sessionIdSchema,
+  GetSessionInput,
+  GetSessionOutput,
+  GetSessionEventsInput,
+  GetSessionEventsOutput,
+} from '../schemas.js';
 import { computeExecutionHealth } from '../../core/execution.js';
 
 /**
@@ -539,6 +545,45 @@ export function createSessionManagementHandlers() {
               message: `Failed to read wrapper log file: ${errorMsg}`,
             });
           }
+        });
+      }),
+
+    /**
+     * Get stored execution events for a session.
+     *
+     * Used by server-side consumers (e.g. callback handlers) to retrieve
+     * execution events without requiring a WebSocket connection.
+     */
+    getSessionEvents: protectedProcedure
+      .input(GetSessionEventsInput)
+      .output(GetSessionEventsOutput)
+      .query(async ({ input, ctx }) => {
+        return withLogTags({ source: 'getSessionEvents' }, async () => {
+          const sessionId = input.cloudAgentSessionId as SessionId;
+          const { userId, env } = ctx;
+
+          logger.setTags({ userId, sessionId });
+          logger.info('Fetching session events');
+
+          const doKey = `${userId}:${sessionId}`;
+          const getStub = () =>
+            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+
+          const events = await withDORetry(
+            getStub,
+            stub =>
+              stub.queryEvents({
+                fromId: input.fromId,
+                executionIds: input.executionId ? [input.executionId] : undefined,
+                eventTypes: input.eventTypes,
+                limit: input.limit,
+              }),
+            'queryEvents'
+          );
+
+          logger.withFields({ eventCount: events.length }).info('Session events retrieved');
+
+          return events;
         });
       }),
 

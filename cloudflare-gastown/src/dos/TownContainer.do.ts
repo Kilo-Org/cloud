@@ -3,32 +3,24 @@ import { Container } from '@cloudflare/containers';
 const TC_LOG = '[TownContainer.do]';
 
 /**
- * Polling interval for relaying container events to WebSocket clients.
- * Fast enough for near-real-time UX, slow enough to avoid hammering the container.
- */
-const POLL_INTERVAL_MS = 500;
-
-/**
  * TownContainer — a Cloudflare Container per town.
  *
- * All agent processes (Mayor, Polecats, Refinery) for a town run as
- * Kilo CLI child processes inside this single container. The container
- * exposes a control server on port 8080 that the Rig DO / Hono routes
- * use to start/stop agents, send messages, and check health.
+ * All agent processes (Mayor, Polecats, Refinery) for a town run inside
+ * this container via the SDK. The container exposes:
+ * - HTTP control server on port 8080 (start/stop/message/status/merge)
+ * - WebSocket on /ws that multiplexes events from all agents
  *
- * The DO side (this class) handles container lifecycle; the control
- * server inside the container handles process management.
- *
- * For agent streaming, this DO accepts WebSocket connections from the
- * browser, polls the container's HTTP events endpoint, and relays
- * events to connected clients.
+ * This DO:
+ * - Manages container lifecycle (start/sleep/stop)
+ * - Connects to the container's /ws endpoint for event streaming
+ * - Accepts WebSocket connections from browser clients
+ * - Relays agent events from container → browser
  */
 export class TownContainerDO extends Container<Env> {
   defaultPort = 8080;
   sleepAfter = '30m';
 
-  // Inject URLs so the container's control server, completion reporter,
-  // and kilo serve processes can reach the worker API and LLM gateway.
+  // Only infra URLs needed at boot. User config comes per-request via X-Town-Config.
   envVars: Record<string, string> = {
     ...(this.env.GASTOWN_API_URL ? { GASTOWN_API_URL: this.env.GASTOWN_API_URL } : {}),
     ...(this.env.KILO_API_URL
@@ -39,29 +31,24 @@ export class TownContainerDO extends Container<Env> {
       : {}),
   };
 
-  // Active WebSocket sessions: agentId -> set of { ws, lastEventId }
-  private wsSessions = new Map<string, Set<{ ws: WebSocket; lastEventId: number }>>();
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  // Browser WebSocket clients: agentId → set of server-side WebSockets
+  private clientSubscriptions = new Map<string, Set<WebSocket>>();
+  // WebSocket connection to the container's /ws endpoint
+  private containerWs: WebSocket | null = null;
+  private containerWsConnecting = false;
 
   override onStart(): void {
     console.log(`${TC_LOG} container started for DO id=${this.ctx.id.toString()}`);
+    // Establish WS connection to container for event relay
+    void this.connectToContainerWs();
   }
 
   override onStop({ exitCode, reason }: { exitCode: number; reason: string }): void {
     console.log(
       `${TC_LOG} container stopped: exitCode=${exitCode} reason=${reason} id=${this.ctx.id.toString()}`
     );
-    this.stopPolling();
-    for (const sessions of this.wsSessions.values()) {
-      for (const session of sessions) {
-        try {
-          session.ws.close(1001, 'Container stopped');
-        } catch {
-          /* best effort */
-        }
-      }
-    }
-    this.wsSessions.clear();
+    this.disconnectContainerWs();
+    this.closeAllClients('Container stopped');
   }
 
   override onError(error: unknown): void {
@@ -75,167 +62,179 @@ export class TownContainerDO extends Container<Env> {
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Match the agent stream path (works with both full worker path and
-    // short container-relative path)
+    // WebSocket upgrade for agent streaming
+    // Matches both /agents/:id/stream (legacy) and /ws?agentId=:id (new)
     const streamMatch = url.pathname.match(/\/agents\/([^/]+)\/stream$/);
-
     if (streamMatch && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
-      return this.handleStreamWebSocket(streamMatch[1], url.searchParams.get('ticket'));
+      return this.handleClientWebSocket(streamMatch[1]);
+    }
+
+    // New multiplexed WS endpoint
+    if (url.pathname === '/ws' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      const agentId = url.searchParams.get('agentId');
+      return this.handleClientWebSocket(agentId);
     }
 
     return super.fetch(request);
   }
 
   /**
-   * Handle a WebSocket upgrade request for agent streaming.
-   * Creates a WebSocketPair, starts polling the container for events,
-   * and relays them to the connected client.
+   * Handle a WebSocket upgrade from a browser client.
+   * If agentId is provided, subscribes to that agent's events.
+   * If null, subscribes to all events.
    */
-  private handleStreamWebSocket(agentId: string, ticket: string | null): Response {
-    if (!ticket) {
-      return new Response(JSON.stringify({ error: 'Missing ticket' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
+  private handleClientWebSocket(agentId: string | null): Response {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
     server.accept();
-    console.log(`${TC_LOG} WS connected: agent=${agentId}`);
+    const subscriptionKey = agentId ?? '__all__';
+    console.log(`${TC_LOG} WS client connected: agent=${subscriptionKey}`);
 
-    // Track this session
-    let sessions = this.wsSessions.get(agentId);
+    let sessions = this.clientSubscriptions.get(subscriptionKey);
     if (!sessions) {
       sessions = new Set();
-      this.wsSessions.set(agentId, sessions);
+      this.clientSubscriptions.set(subscriptionKey, sessions);
     }
-    const session = { ws: server, lastEventId: 0 };
-    sessions.add(session);
+    sessions.add(server);
 
-    // Start polling if not already running
-    this.ensurePolling();
+    // Ensure container WS is connected for relay
+    void this.connectToContainerWs();
 
-    // Send historical backfill asynchronously
-    void this.backfillEvents(agentId, server, session);
-
-    // Handle client disconnect
-    server.addEventListener('close', event => {
-      console.log(`${TC_LOG} WS closed: agent=${agentId} code=${event.code}`);
-      sessions.delete(session);
-      if (sessions.size === 0) {
-        this.wsSessions.delete(agentId);
+    // Handle messages from client (subscribe/unsubscribe)
+    server.addEventListener('message', event => {
+      try {
+        const msg = JSON.parse(String(event.data));
+        if (msg.type === 'subscribe' && msg.agentId) {
+          // Add subscription for specific agent
+          let targetSessions = this.clientSubscriptions.get(msg.agentId);
+          if (!targetSessions) {
+            targetSessions = new Set();
+            this.clientSubscriptions.set(msg.agentId, targetSessions);
+          }
+          targetSessions.add(server);
+        }
+      } catch {
+        // Ignore malformed messages
       }
-      if (this.wsSessions.size === 0) {
-        this.stopPolling();
+    });
+
+    server.addEventListener('close', () => {
+      console.log(`${TC_LOG} WS client disconnected: agent=${subscriptionKey}`);
+      sessions.delete(server);
+      if (sessions.size === 0) this.clientSubscriptions.delete(subscriptionKey);
+      // Also remove from any other subscription sets
+      for (const [key, set] of this.clientSubscriptions) {
+        set.delete(server);
+        if (set.size === 0) this.clientSubscriptions.delete(key);
       }
     });
 
     server.addEventListener('error', event => {
-      console.error(`${TC_LOG} WS error: agent=${agentId}`, event);
+      console.error(`${TC_LOG} WS client error: agent=${subscriptionKey}`, event);
     });
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
   /**
-   * Send a historical backfill of all buffered events to a newly connected
-   * WebSocket client. Ensures late-joining clients see everything.
+   * Connect to the container's /ws endpoint for event relay.
+   * Events from the container are forwarded to subscribed browser clients.
    */
-  private async backfillEvents(
-    agentId: string,
-    ws: WebSocket,
-    session: { ws: WebSocket; lastEventId: number }
-  ): Promise<void> {
+  private async connectToContainerWs(): Promise<void> {
+    if (this.containerWs || this.containerWsConnecting) return;
+    this.containerWsConnecting = true;
+
     try {
-      // Send current agent status
-      const statusRes = await this.containerFetch(`http://container/agents/${agentId}/status`);
-      if (statusRes.ok) {
-        const status = (await statusRes.json()) as Record<string, unknown>;
-        ws.send(JSON.stringify({ event: 'agent.status', data: status }));
+      // containerFetch is provided by the Container base class
+      const res = await this.containerFetch('http://container/ws', {
+        headers: { Upgrade: 'websocket' },
+      });
+
+      const ws = res.webSocket;
+      if (!ws) {
+        console.warn(`${TC_LOG} Container /ws upgrade failed — no webSocket on response`);
+        return;
       }
 
-      // Fetch and send all buffered events
-      const eventsRes = await this.containerFetch(
-        `http://container/agents/${agentId}/events?after=0`
-      );
-      if (eventsRes.ok) {
-        const body = (await eventsRes.json()) as {
-          events: Array<{ id: number; event: string; data: unknown; timestamp: string }>;
-        };
-        if (body.events && body.events.length > 0) {
-          for (const evt of body.events) {
-            try {
-              ws.send(JSON.stringify({ event: evt.event, data: evt.data }));
-            } catch {
-              return; // WS closed during backfill
-            }
-          }
-          // Advance cursor past the backfill
-          session.lastEventId = body.events[body.events.length - 1].id;
-        }
-      }
-    } catch (err) {
-      console.error(`${TC_LOG} backfill error: agent=${agentId}`, err);
-    }
-  }
+      ws.accept();
+      this.containerWs = ws;
 
-  private ensurePolling(): void {
-    if (this.pollTimer) return;
-    this.pollTimer = setInterval(() => void this.pollEvents(), POLL_INTERVAL_MS);
-  }
+      ws.addEventListener('message', event => {
+        // Relay to subscribed browser clients
+        const frameStr = String(event.data);
+        try {
+          const frame = JSON.parse(frameStr);
+          const agentId = frame.agentId;
 
-  private stopPolling(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
-    }
-  }
-
-  /**
-   * Poll the container for new events for each agent with active WS sessions.
-   * Relays new events to all connected clients.
-   */
-  private async pollEvents(): Promise<void> {
-    for (const [agentId, sessions] of this.wsSessions) {
-      if (sessions.size === 0) continue;
-
-      // Find the minimum lastEventId across all sessions for this agent
-      let minLastId = Infinity;
-      for (const s of sessions) {
-        if (s.lastEventId < minLastId) minLastId = s.lastEventId;
-      }
-      if (minLastId === Infinity) minLastId = 0;
-
-      try {
-        const res = await this.containerFetch(
-          `http://container/agents/${agentId}/events?after=${minLastId}`
-        );
-        if (!res.ok) continue;
-
-        const body = (await res.json()) as {
-          events: Array<{ id: number; event: string; data: unknown; timestamp: string }>;
-        };
-        if (!body.events || body.events.length === 0) continue;
-
-        for (const evt of body.events) {
-          const msg = JSON.stringify({ event: evt.event, data: evt.data });
-          for (const session of sessions) {
-            if (evt.id > session.lastEventId) {
+          // Send to agent-specific subscribers
+          const agentClients = agentId ? this.clientSubscriptions.get(agentId) : undefined;
+          if (agentClients) {
+            for (const clientWs of agentClients) {
               try {
-                session.ws.send(msg);
-                session.lastEventId = evt.id;
+                clientWs.send(frameStr);
               } catch {
-                // WS likely closed; cleaned up by close handler
+                agentClients.delete(clientWs);
               }
             }
           }
+
+          // Send to wildcard subscribers
+          const allClients = this.clientSubscriptions.get('__all__');
+          if (allClients) {
+            for (const clientWs of allClients) {
+              try {
+                clientWs.send(frameStr);
+              } catch {
+                allClients.delete(clientWs);
+              }
+            }
+          }
+        } catch {
+          // Ignore malformed frames
         }
+      });
+
+      ws.addEventListener('close', () => {
+        console.log(`${TC_LOG} Container WS closed, will reconnect on next request`);
+        this.containerWs = null;
+      });
+
+      ws.addEventListener('error', event => {
+        console.error(`${TC_LOG} Container WS error:`, event);
+        this.containerWs = null;
+      });
+
+      console.log(`${TC_LOG} Connected to container /ws for event relay`);
+    } catch (err) {
+      console.warn(`${TC_LOG} Failed to connect to container /ws:`, err);
+    } finally {
+      this.containerWsConnecting = false;
+    }
+  }
+
+  private disconnectContainerWs(): void {
+    if (this.containerWs) {
+      try {
+        this.containerWs.close(1000, 'Container stopping');
       } catch {
-        // Container may be starting up or unavailable; skip this cycle
+        // Best-effort
+      }
+      this.containerWs = null;
+    }
+  }
+
+  private closeAllClients(reason: string): void {
+    for (const sessions of this.clientSubscriptions.values()) {
+      for (const ws of sessions) {
+        try {
+          ws.close(1001, reason);
+        } catch {
+          // Best-effort
+        }
       }
     }
+    this.clientSubscriptions.clear();
   }
 }
 

@@ -758,6 +758,13 @@ export class TownDO extends DurableObject<Env> {
 
     console.log(`${TOWN_LOG} alarm: fired for town=${townId}`);
 
+    // Proactive container health check — keeps the container warm
+    try {
+      await this.ensureContainerReady();
+    } catch (err) {
+      console.warn(`${TOWN_LOG} alarm: container health check failed`, err);
+    }
+
     try {
       await this.schedulePendingWork();
     } catch (err) {
@@ -1070,6 +1077,31 @@ export class TownDO extends DurableObject<Env> {
           `[Re-Escalation:${newSeverity}] rig=${esc.source_rig_id} ${esc.message}`
         ).catch(() => {});
       }
+    }
+  }
+
+  /**
+   * Proactive container + mayor startup.
+   * Pings the container to keep it warm and ensures the mayor agent is alive.
+   */
+  private async ensureContainerReady(): Promise<void> {
+    const townId = this.townId;
+    if (!townId) return;
+
+    try {
+      const container = getTownContainerStub(this.env, townId);
+      const res = await container.fetch('http://container/health');
+      if (!res.ok) return;
+
+      // Container is up — check if mayor needs starting
+      const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+      if (mayor && mayor.status === 'working') return; // Already running
+
+      // If there are rigs configured, the mayor should be running
+      const rigList = rigs.listRigs(this.sql);
+      if (rigList.length === 0) return; // No rigs, no mayor needed yet
+    } catch {
+      // Container is starting up or unavailable — alarm will retry
     }
   }
 

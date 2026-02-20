@@ -9,6 +9,7 @@ import {
   getUptime,
   stopAll,
   getAgentEvents,
+  registerEventSink,
 } from './process-manager';
 import { startHeartbeat, stopHeartbeat } from './heartbeat';
 import { mergeBranch } from './git-manager';
@@ -24,6 +25,26 @@ const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
 export const app = new Hono();
+
+// Apply town config from X-Town-Config header (sent by TownDO on every request)
+let currentTownConfig: Record<string, unknown> | null = null;
+
+/** Get the latest town config delivered via X-Town-Config header. */
+export function getCurrentTownConfig(): Record<string, unknown> | null {
+  return currentTownConfig;
+}
+
+app.use('*', async (c, next) => {
+  const configHeader = c.req.header('X-Town-Config');
+  if (configHeader) {
+    try {
+      currentTownConfig = JSON.parse(configHeader);
+    } catch {
+      // Ignore malformed config
+    }
+  }
+  await next();
+});
 
 // Log method, path, status, and duration for every request
 app.use('*', async (c, next) => {
@@ -261,7 +282,10 @@ app.onError((err, c) => {
 });
 
 /**
- * Start the control server using Bun.serve + Hono.
+ * Start the control server using Bun.serve + Hono, with WebSocket support.
+ *
+ * The /ws endpoint provides a multiplexed event stream for all agents.
+ * SDK events from process-manager are forwarded to all connected WS clients.
  */
 export function startControlServer(): void {
   const PORT = 8080;
@@ -284,9 +308,51 @@ export function startControlServer(): void {
   process.on('SIGTERM', () => void shutdown());
   process.on('SIGINT', () => void shutdown());
 
+  // Track connected WebSocket clients
+  const wsClients = new Set<import('bun').ServerWebSocket<unknown>>();
+
+  // Register an event sink that forwards all agent events to WS clients
+  registerEventSink((agentId, event, data) => {
+    const frame = JSON.stringify({
+      agentId,
+      type: event,
+      data,
+      timestamp: new Date().toISOString(),
+    });
+    for (const ws of wsClients) {
+      try {
+        ws.send(frame);
+      } catch {
+        wsClients.delete(ws);
+      }
+    }
+  });
+
   Bun.serve({
     port: PORT,
-    fetch: app.fetch,
+    fetch(req, server) {
+      // WebSocket upgrade for /ws
+      if (new URL(req.url).pathname === '/ws') {
+        const upgraded = server.upgrade(req);
+        if (upgraded) return undefined;
+        return new Response('WebSocket upgrade failed', { status: 400 });
+      }
+      // All other requests go through Hono
+      return app.fetch(req);
+    },
+    websocket: {
+      open(ws) {
+        wsClients.add(ws);
+        console.log(`[control-server] WebSocket connected (${wsClients.size} total)`);
+      },
+      message(_ws, _message) {
+        // No client→server messages expected; ignore
+      },
+      close(ws) {
+        wsClients.delete(ws);
+        console.log(`[control-server] WebSocket disconnected (${wsClients.size} total)`);
+      },
+    },
   });
 
   console.log(`Town container control server listening on port ${PORT}`);

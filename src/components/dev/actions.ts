@@ -12,8 +12,8 @@ export async function nuke(kiloUserId: string) {
       throw new Error(`User not found: ${kiloUserId}`);
     }
 
-    await deleteStripeCustomer(user.stripe_customer_id);
     await softDeleteUser(kiloUserId);
+    await deleteStripeCustomer(user.stripe_customer_id);
   } catch (error) {
     console.error('Error nuking account:', error);
     captureException(error, {

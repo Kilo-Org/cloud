@@ -23,8 +23,8 @@ export async function POST(
   }
 
   try {
-    await softDeleteUserExternalServices(user);
     await softDeleteUser(userId);
+    await softDeleteUserExternalServices(user);
   } catch (error) {
     if (error instanceof SoftDeletePreconditionError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

@@ -139,6 +139,22 @@ if (process.env.NODE_ENV === 'production') {
  */
 export const AGENT_ENV_VARS_PUBLIC_KEY = getEnvVariable('AGENT_ENV_VARS_PUBLIC_KEY') || '';
 
+// Gastown Service
+export const GASTOWN_SERVICE_URL =
+  getEnvVariable('GASTOWN_SERVICE_URL') ||
+  (process.env.NODE_ENV === 'production' ? 'https://gastown.kiloapps.io' : 'http://localhost:8787');
+export const GASTOWN_CF_ACCESS_CLIENT_ID = getEnvVariable('GASTOWN_CF_ACCESS_CLIENT_ID');
+export const GASTOWN_CF_ACCESS_CLIENT_SECRET = getEnvVariable('GASTOWN_CF_ACCESS_CLIENT_SECRET');
+
+if (process.env.NODE_ENV === 'production') {
+  if (!GASTOWN_CF_ACCESS_CLIENT_ID) {
+    throw new Error('GASTOWN_CF_ACCESS_CLIENT_ID is required in production');
+  }
+  if (!GASTOWN_CF_ACCESS_CLIENT_SECRET) {
+    throw new Error('GASTOWN_CF_ACCESS_CLIENT_SECRET is required in production');
+  }
+}
+
 // KiloClaw Worker
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
 export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';

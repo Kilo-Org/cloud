@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration - stripped down for vitest-pool-workers
+  "name": "gastown-test",
+  "main": "src/gastown.worker.ts",
+  "compatibility_date": "2026-01-27",
+  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "RIG", "class_name": "RigDO" },
+      { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
+      { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
+      { "name": "TOWN", "class_name": "TownDO" },
+      { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
+      { "name": "MAYOR", "class_name": "MayorDO" },
+    ],
+  },
+
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RigDO", "GastownUserDO", "AgentIdentityDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["TownContainerDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["MayorDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["TownDO"] },
+  ],
+
+  // Test secrets — plain text vars used in place of secrets_store_secrets
+  "vars": {
+    "GASTOWN_JWT_SECRET": "test-jwt-secret-must-be-at-least-32-chars-long",
+    "ENVIRONMENT": "development",
+    "CF_ACCESS_TEAM": "engineering-e11",
+    "CF_ACCESS_AUD": "f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809",
+    "GASTOWN_API_URL": "http://host.docker.internal:8787",
+  },
+}

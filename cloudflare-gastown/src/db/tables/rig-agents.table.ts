@@ -1,0 +1,41 @@
+import { z } from 'zod';
+import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
+
+const AgentRole = z.enum(['polecat', 'refinery', 'mayor', 'witness']);
+const AgentStatus = z.enum(['idle', 'working', 'blocked', 'dead']);
+
+export const RigAgentRecord = z.object({
+  id: z.string(),
+  role: AgentRole,
+  name: z.string(),
+  identity: z.string(),
+  status: AgentStatus,
+  current_hook_bead_id: z.string().nullable(),
+  dispatch_attempts: z.number().default(0),
+  last_activity_at: z.string().nullable(),
+  checkpoint: z
+    .string()
+    .nullable()
+    .transform(v => (v === null ? null : JSON.parse(v)))
+    .pipe(z.unknown()),
+  created_at: z.string(),
+});
+
+export type RigAgentRecord = z.output<typeof RigAgentRecord>;
+
+export const rig_agents = getTableFromZodSchema('rig_agents', RigAgentRecord);
+
+export function createTableRigAgents(): string {
+  return getCreateTableQueryFromTable(rig_agents, {
+    id: `text primary key`,
+    role: `text not null check(role in ('polecat', 'refinery', 'mayor', 'witness'))`,
+    name: `text not null`,
+    identity: `text not null unique`,
+    status: `text not null default 'idle' check(status in ('idle', 'working', 'blocked', 'dead'))`,
+    current_hook_bead_id: `text references rig_beads(id)`,
+    dispatch_attempts: `integer not null default 0`,
+    last_activity_at: `text`,
+    checkpoint: `text`,
+    created_at: `text not null`,
+  });
+}

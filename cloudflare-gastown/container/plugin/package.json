@@ -1,0 +1,13 @@
+{
+  "name": "opencode-gastown",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "OpenCode plugin exposing Gastown tools to agents",
+  "main": "index.ts",
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.1.64",
+    "@opencode-ai/sdk": "^1.1.64",
+    "zod": "^4.3.5"
+  }
+}

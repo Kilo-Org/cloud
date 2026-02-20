@@ -17,6 +17,8 @@ packages:
   - 'cloudflare-o11y'
   - 'cloudflare-git-token-service'
   - 'kiloclaw'
+  - 'cloudflare-gastown'
+  - 'cloudflare-gastown/plugin'
 
 ignoredBuiltDependencies:
   - '@sentry/cli'

@@ -432,7 +432,7 @@ importers:
     dependencies:
       '@cloudflare/sandbox':
         specifier: 0.6.7
-        version: 0.6.7
+        version: 0.6.7(@opencode-ai/sdk@1.1.64)
       '@octokit/auth-app':
         specifier: ^8.1.2
         version: 8.1.2
@@ -502,7 +502,7 @@ importers:
     dependencies:
       '@cloudflare/sandbox':
         specifier: 0.6.7
-        version: 0.6.7
+        version: 0.6.7(@opencode-ai/sdk@1.1.64)
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.9.0(typescript@5.9.3))(hono@4.11.7)
@@ -658,7 +658,7 @@ importers:
         version: 0.0.30
       '@cloudflare/sandbox':
         specifier: 0.6.7
-        version: 0.6.7
+        version: 0.6.7(@opencode-ai/sdk@1.1.64)
       '@cloudflare/workers-types':
         specifier: ^4.20251014.0
         version: 4.20251014.0
@@ -783,7 +783,7 @@ importers:
     devDependencies:
       '@cloudflare/sandbox':
         specifier: 0.6.9
-        version: 0.6.9
+        version: 0.6.9(@opencode-ai/sdk@1.1.64)
       '@cloudflare/workers-types':
         specifier: ^4.20260120.0
         version: 4.20260130.0
@@ -845,6 +845,46 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
+      wrangler:
+        specifier: ^4.61.0
+        version: 4.61.1(@cloudflare/workers-types@4.20260130.0)
+
+  cloudflare-gastown:
+    dependencies:
+      '@cloudflare/containers':
+        specifier: ^0.1.0
+        version: 0.1.0
+      hono:
+        specifier: ^4.11.4
+        version: 4.11.7
+      itty-time:
+        specifier: ^1.0.6
+        version: 1.0.6
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.6
+    devDependencies:
+      '@cloudflare/vitest-pool-workers':
+        specifier: ^0.12.8
+        version: 0.12.8(@cloudflare/workers-types@4.20260130.0)(@vitest/runner@4.0.18)(@vitest/snapshot@4.0.18)(vitest@3.2.4)
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
+      '@types/node':
+        specifier: ^22
+        version: 22.19.1
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20251019.1
+        version: 7.0.0-dev.20251019.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.1)(@vitest/ui@3.2.4)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1)
       wrangler:
         specifier: ^4.61.0
         version: 4.61.1(@cloudflare/workers-types@4.20260130.0)
@@ -2070,6 +2110,9 @@ packages:
 
   '@cloudflare/containers@0.0.30':
     resolution: {integrity: sha512-i148xBgmyn/pje82ZIyuTr/Ae0BT/YWwa1/GTJcw6DxEjUHAzZLaBCiX446U9OeuJ2rBh/L/9FIzxX5iYNt1AQ==}
+
+  '@cloudflare/containers@0.1.0':
+    resolution: {integrity: sha512-nuXnmkpJZzbjYdguRI2hB0sw1QCBMWdNuGDNQwEiJSLebtKRFpBt/d6AStGjp+8wGD2plPbd2U/mQerYF9kzJg==}
 
   '@cloudflare/kv-asset-handler@0.4.2':
     resolution: {integrity: sha512-SIOD2DxrRRwQ+jgzlXCqoEFiKOFqaPjhnNTGKXSRLvp1HiOvapLaFG2kEr9dYQTYe8rKrd9uvDUzmAITeNyaHQ==}
@@ -3346,6 +3389,9 @@ packages:
 
   '@octokit/types@16.0.0':
     resolution: {integrity: sha512-sKq+9r1Mm4efXW1FCk7hFSeJo4QKreL/tTbR0rz/qx/r1Oa2VV83LTA/H/MuCOX7uCIJmQVRKBcbmWoySjAnSg==}
+
+  '@opencode-ai/sdk@1.1.64':
+    resolution: {integrity: sha512-g+bZGx/86JlRTKyPWsD1oFu1SoENIHeKK4LhzWWFToPv4tpN3MSLVGSUsoTSi2XqSd9JzkfPBHPdTeFvqcbzMA==}
 
   '@opentelemetry/api-logs@0.208.0':
     resolution: {integrity: sha512-CjruKY9V6NMssL/T1kAFgzosF1v9o6oeN+aX5JB/C/xPNtmgIJqcXHG7fA82Ou1zCpWGl4lROQUKwUNE1pMCyg==}
@@ -8620,6 +8666,9 @@ packages:
     resolution: {integrity: sha512-H0dkQoCa3b2VEeKQBOxFph+JAbcrQdE7KC0UkqwpLmv2EC4P41QXP+rqo9wYodACiG5/WM5s9oDApTU8utwj9g==}
     engines: {node: '>= 0.4'}
 
+  itty-time@1.0.6:
+    resolution: {integrity: sha512-+P8IZaLLBtFv8hCkIjcymZOp4UJ+xW6bSlQsXGqrkmJh7vSiMFSlNne0mCYagEE0N7HDNR5jJBRxwN0oYv61Rw==}
+
   javascript-stringify@2.1.0:
     resolution: {integrity: sha512-JVAfqNPTvNq3sB/VHQJAFxN/sPgKnsKrCwyRt15zwNCdrMMJDdcEOdubuy+DuJYYdm0ox1J4uzEuYKkN+9yhVg==}
 
@@ -13607,15 +13656,21 @@ snapshots:
 
   '@cloudflare/containers@0.0.30': {}
 
+  '@cloudflare/containers@0.1.0': {}
+
   '@cloudflare/kv-asset-handler@0.4.2': {}
 
-  '@cloudflare/sandbox@0.6.7':
+  '@cloudflare/sandbox@0.6.7(@opencode-ai/sdk@1.1.64)':
     dependencies:
       '@cloudflare/containers': 0.0.30
+    optionalDependencies:
+      '@opencode-ai/sdk': 1.1.64
 
-  '@cloudflare/sandbox@0.6.9':
+  '@cloudflare/sandbox@0.6.9(@opencode-ai/sdk@1.1.64)':
     dependencies:
       '@cloudflare/containers': 0.0.30
+    optionalDependencies:
+      '@opencode-ai/sdk': 1.1.64
 
   '@cloudflare/unenv-preset@2.12.0(unenv@2.0.0-rc.24)(workerd@1.20260128.0)':
     dependencies:
@@ -14882,6 +14937,9 @@ snapshots:
   '@octokit/types@16.0.0':
     dependencies:
       '@octokit/openapi-types': 27.0.0
+
+  '@opencode-ai/sdk@1.1.64':
+    optional: true
 
   '@opentelemetry/api-logs@0.208.0':
     dependencies:
@@ -21139,6 +21197,8 @@ snapshots:
       get-proto: 1.0.1
       has-symbols: 1.1.0
       set-function-name: 2.0.2
+
+  itty-time@1.0.6: {}
 
   javascript-stringify@2.1.0: {}
 

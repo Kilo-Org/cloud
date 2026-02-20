@@ -25,6 +25,19 @@ const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
 export const app = new Hono();
 
+// Log method, path, status, and duration for every request
+app.use('*', async (c, next) => {
+  const start = performance.now();
+  const method = c.req.method;
+  const path = c.req.path;
+  console.log(`[control-server] --> ${method} ${path}`);
+  await next();
+  const duration = (performance.now() - start).toFixed(1);
+  const status = c.res.status;
+  const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'log';
+  console[level](`[control-server] <-- ${method} ${path} ${status} ${duration}ms`);
+});
+
 // GET /health
 app.get('/health', c => {
   const response: HealthResponse = {

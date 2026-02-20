@@ -1927,9 +1927,7 @@ export class RigDO extends DurableObject<Env> {
       }
 
       // Pass LLM gateway credentials so kilo serve can route inference calls
-      if (this.env.KILO_API_URL) {
-        envVars.KILO_API_URL = this.env.KILO_API_URL;
-      }
+      // (KILO_API_URL and KILO_OPENROUTER_BASE are set at container level via TownContainerDO.envVars)
       if (config.kilocodeToken) {
         envVars.KILOCODE_TOKEN = config.kilocodeToken;
       }
@@ -2128,9 +2126,7 @@ export class RigDO extends DurableObject<Env> {
       if (this.env.GASTOWN_API_URL) {
         envVars.GASTOWN_API_URL = this.env.GASTOWN_API_URL;
       }
-      if (this.env.KILO_API_URL) {
-        envVars.KILO_API_URL = this.env.KILO_API_URL;
-      }
+      // KILO_API_URL and KILO_OPENROUTER_BASE are set at container level via TownContainerDO.envVars
       if (config.kilocodeToken) {
         envVars.KILOCODE_TOKEN = config.kilocodeToken;
       }

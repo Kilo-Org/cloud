@@ -27,11 +27,17 @@ export class TownContainerDO extends Container<Env> {
   defaultPort = 8080;
   sleepAfter = '30m';
 
-  // Inject the gastown worker URL so the container's completion reporter
-  // and plugin can call back to the worker API.
-  envVars: Record<string, string> = this.env.GASTOWN_API_URL
-    ? { GASTOWN_API_URL: this.env.GASTOWN_API_URL }
-    : {};
+  // Inject URLs so the container's control server, completion reporter,
+  // and kilo serve processes can reach the worker API and LLM gateway.
+  envVars: Record<string, string> = {
+    ...(this.env.GASTOWN_API_URL ? { GASTOWN_API_URL: this.env.GASTOWN_API_URL } : {}),
+    ...(this.env.KILO_API_URL
+      ? {
+          KILO_API_URL: this.env.KILO_API_URL,
+          KILO_OPENROUTER_BASE: `${this.env.KILO_API_URL}/api`,
+        }
+      : {}),
+  };
 
   // Active WebSocket sessions: agentId -> set of { ws, lastEventId }
   private wsSessions = new Map<string, Set<{ ws: WebSocket; lastEventId: number }>>();

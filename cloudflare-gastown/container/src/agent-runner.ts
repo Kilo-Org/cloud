@@ -117,12 +117,9 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
 
   // Conditionally set config vars — only when a value is available from
   // the request or the container's own environment.
-  const conditionalKeys = [
-    'GASTOWN_API_URL',
-    'GASTOWN_SESSION_TOKEN',
-    'KILO_API_URL',
-    'KILOCODE_TOKEN',
-  ];
+  // (KILO_API_URL and KILO_OPENROUTER_BASE are set at the container level
+  // via TownContainerDO.envVars and inherited through process.env.)
+  const conditionalKeys = ['GASTOWN_API_URL', 'GASTOWN_SESSION_TOKEN', 'KILOCODE_TOKEN'];
   for (const key of conditionalKeys) {
     const value = resolveEnv(request, key);
     if (value) {

@@ -107,19 +107,13 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
+    {
+      title: 'Auto Triage',
+      icon: ListChecks,
+      url: '/auto-triage',
+    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          {
-            title: 'Auto Triage',
-            icon: ListChecks,
-            url: '/auto-triage',
-          },
-          {
-            title: 'Auto Fix',
-            icon: Wrench,
-            url: '/auto-fix',
-          },
-        ]
+      ? [{ title: 'Auto Fix', icon: Wrench, url: '/auto-fix' }]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [

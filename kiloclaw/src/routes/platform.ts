@@ -324,4 +324,26 @@ platform.get('/gateway-token', async c => {
   }
 });
 
+// GET /api/platform/volume-snapshots?userId=...
+// Returns the list of Fly volume snapshots for the user's instance.
+platform.get('/volume-snapshots', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  try {
+    const snapshots = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.listVolumeSnapshots(),
+      'listVolumeSnapshots'
+    );
+    return c.json({ snapshots });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] volume-snapshots failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
 export { platform };

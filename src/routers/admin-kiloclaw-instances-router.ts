@@ -6,7 +6,7 @@ import {
   markActiveInstanceDestroyed,
   restoreDestroyedInstance,
 } from '@/lib/kiloclaw/instance-registry';
-import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
+import type { PlatformStatusResponse, VolumeSnapshot } from '@/lib/kiloclaw/types';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { eq, and, or, desc, asc, ilike, isNull, isNotNull, sql, gte, type SQL } from 'drizzle-orm';
@@ -26,6 +26,10 @@ const GetInstanceSchema = z.object({
 
 const DestroyInstanceSchema = z.object({
   id: z.string().uuid(),
+});
+
+const VolumeSnapshotsSchema = z.object({
+  userId: z.string().min(1),
 });
 
 const StatsSchema = z.object({
@@ -265,6 +269,20 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       dailyChart,
     };
   }),
+
+  volumeSnapshots: adminProcedure
+    .input(VolumeSnapshotsSchema)
+    .query(async ({ input }): Promise<{ snapshots: VolumeSnapshot[] }> => {
+      try {
+        const client = new KiloClawInternalClient();
+        return await client.listVolumeSnapshots(input.userId);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: err instanceof Error ? err.message : 'Failed to fetch volume snapshots',
+        });
+      }
+    }),
 
   destroy: adminProcedure.input(DestroyInstanceSchema).mutation(async ({ input, ctx }) => {
     const [instance] = await db

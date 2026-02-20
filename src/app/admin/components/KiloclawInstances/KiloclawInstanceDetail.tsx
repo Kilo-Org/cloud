@@ -34,6 +34,7 @@ import {
   ExternalLink,
   Trash2,
   BarChart,
+  Camera,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -51,6 +52,14 @@ function formatAbsoluteTime(timestamp: string): string {
 function formatEpochTime(epoch: number | null): string {
   if (epoch === null) return '—';
   return new Date(epoch).toLocaleString();
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** i;
+  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 type DetailPageWrapperProps = {
@@ -127,6 +136,20 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
       },
     })
   );
+
+  const volumeId = data?.workerStatus?.flyVolumeId;
+  const snapshotsEnabled = data !== undefined && data.destroyed_at === null && !!volumeId;
+
+  const {
+    data: snapshotsData,
+    isLoading: snapshotsLoading,
+    error: snapshotsError,
+  } = useQuery({
+    ...trpc.admin.kiloclawInstances.volumeSnapshots.queryOptions({
+      userId: data?.user_id ?? '',
+    }),
+    enabled: snapshotsEnabled,
+  });
 
   if (isLoading) {
     return (
@@ -363,6 +386,102 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               ) : !data.workerStatusError ? (
                 <p className="text-muted-foreground text-sm">No worker status available</p>
               ) : null}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Volume Snapshots */}
+        {snapshotsEnabled && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Camera className="text-muted-foreground h-5 w-5" />
+                <div>
+                  <CardTitle>Volume Snapshots</CardTitle>
+                  <CardDescription>
+                    Fly automatic backups for volume{' '}
+                    {data.workerStatus?.flyAppName ? (
+                      <a
+                        href={`https://fly.io/apps/${data.workerStatus.flyAppName}/volumes/${volumeId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                      >
+                        {volumeId}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      volumeId
+                    )}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {snapshotsLoading && (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-muted-foreground text-sm">Loading snapshots...</span>
+                </div>
+              )}
+              {snapshotsError && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    {snapshotsError instanceof Error
+                      ? snapshotsError.message
+                      : 'Failed to load snapshots'}
+                  </AlertDescription>
+                </Alert>
+              )}
+              {snapshotsData && snapshotsData.snapshots.length === 0 && (
+                <p className="text-muted-foreground text-sm">No snapshots available yet.</p>
+              )}
+              {snapshotsData && snapshotsData.snapshots.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-muted-foreground border-b text-left text-xs">
+                        <th className="pr-4 pb-2">Created</th>
+                        <th className="pr-4 pb-2">Status</th>
+                        <th className="pr-4 pb-2">Size</th>
+                        <th className="pr-4 pb-2">Retention</th>
+                        <th className="pb-2">ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {snapshotsData.snapshots.map(snap => (
+                        <tr key={snap.id} className="border-b last:border-0">
+                          <td className="py-2 pr-4">
+                            {snap.created_at && !snap.created_at.startsWith('0001-') ? (
+                              <span title={formatAbsoluteTime(snap.created_at)}>
+                                {formatRelativeTime(snap.created_at)}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="py-2 pr-4">
+                            <Badge
+                              variant={snap.status === 'complete' ? 'default' : 'secondary'}
+                              className={snap.status === 'complete' ? 'bg-green-600' : ''}
+                            >
+                              {snap.status}
+                            </Badge>
+                          </td>
+                          <td className="py-2 pr-4">{formatBytes(snap.size)}</td>
+                          <td className="py-2 pr-4">
+                            {snap.retention_days ? `${snap.retention_days}d` : '—'}
+                          </td>
+                          <td className="py-2">
+                            <code className="text-xs">{snap.id}</code>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

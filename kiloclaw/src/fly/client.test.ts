@@ -4,6 +4,7 @@ import {
   isFlyNotFound,
   isFlyInsufficientResources,
   createVolumeWithFallback,
+  listVolumeSnapshots,
 } from './client';
 import type { FlyClientConfig } from './client';
 
@@ -249,5 +250,56 @@ describe('createVolumeWithFallback', () => {
 
     fetchSpy.mockRestore();
     warnSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// listVolumeSnapshots
+// ============================================================================
+
+describe('listVolumeSnapshots', () => {
+  it('returns snapshots array on success', async () => {
+    const snapshots = [
+      {
+        id: 'snap-1',
+        created_at: '2026-02-19T00:00:00Z',
+        digest: 'sha256:abc',
+        retention_days: 5,
+        size: 1048576,
+        status: 'complete',
+        volume_size: 10737418240,
+      },
+    ];
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(200, snapshots));
+
+    const result = await listVolumeSnapshots(fakeConfig, 'vol-123');
+
+    expect(result).toEqual(snapshots);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain('/volumes/vol-123/snapshots');
+    fetchSpy.mockRestore();
+  });
+
+  it('returns empty array when no snapshots exist', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(200, []));
+
+    const result = await listVolumeSnapshots(fakeConfig, 'vol-456');
+
+    expect(result).toEqual([]);
+    fetchSpy.mockRestore();
+  });
+
+  it('throws on Fly API error', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(404, { error: 'volume not found' }));
+
+    await expect(listVolumeSnapshots(fakeConfig, 'vol-gone')).rejects.toThrow('volume not found');
+    fetchSpy.mockRestore();
   });
 });

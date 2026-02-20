@@ -12,6 +12,7 @@ import type {
   FlyMachine,
   FlyMachineConfig,
   FlyVolume,
+  FlyVolumeSnapshot,
   CreateVolumeRequest,
   CreateMachineRequest,
   FlyWaitableState,
@@ -235,6 +236,15 @@ export async function deleteVolume(config: FlyClientConfig, volumeId: string): P
     method: 'DELETE',
   });
   await assertOk(resp, 'deleteVolume');
+}
+
+export async function listVolumeSnapshots(
+  config: FlyClientConfig,
+  volumeId: string
+): Promise<FlyVolumeSnapshot[]> {
+  const resp = await flyFetch(config, `/volumes/${volumeId}/snapshots`);
+  await assertOk(resp, 'listVolumeSnapshots');
+  return resp.json();
 }
 
 /**

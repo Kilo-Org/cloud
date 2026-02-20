@@ -49,6 +49,7 @@ vi.mock('../fly/client', async () => {
     deleteVolume: vi.fn(),
     getVolume: vi.fn(),
     listMachines: vi.fn().mockResolvedValue([]),
+    listVolumeSnapshots: vi.fn().mockResolvedValue([]),
   };
 });
 
@@ -1357,5 +1358,56 @@ describe('stop: error propagation', () => {
 
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeDefined();
+  });
+});
+
+// ============================================================================
+// listVolumeSnapshots
+// ============================================================================
+
+describe('listVolumeSnapshots', () => {
+  it('returns snapshots from Fly API when volume exists', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const snapshots = [
+      {
+        id: 'snap-1',
+        created_at: '2026-02-19T00:00:00Z',
+        digest: 'sha256:abc',
+        retention_days: 5,
+        size: 1048576,
+        status: 'complete',
+        volume_size: 10737418240,
+      },
+    ];
+    (flyClient.listVolumeSnapshots as Mock).mockResolvedValue(snapshots);
+
+    const result = await instance.listVolumeSnapshots();
+
+    expect(result).toEqual(snapshots);
+    expect(flyClient.listVolumeSnapshots).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'test-app' },
+      'vol-1'
+    );
+  });
+
+  it('returns empty array when no volume exists', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyVolumeId: null });
+
+    const result = await instance.listVolumeSnapshots();
+
+    expect(result).toEqual([]);
+    expect(flyClient.listVolumeSnapshots).not.toHaveBeenCalled();
+  });
+
+  it('returns empty array for unprovisioned instance', async () => {
+    const { instance } = createInstance();
+
+    const result = await instance.listVolumeSnapshots();
+
+    expect(result).toEqual([]);
+    expect(flyClient.listVolumeSnapshots).not.toHaveBeenCalled();
   });
 });

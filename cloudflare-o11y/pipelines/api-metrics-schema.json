@@ -8,6 +8,7 @@
 		{ "name": "user_byok", "type": "bool", "required": true },
 		{ "name": "ttfb_ms", "type": "int64", "required": true },
 		{ "name": "complete_request_ms", "type": "int64", "required": true },
-		{ "name": "status_code", "type": "int32", "required": true }
+		{ "name": "status_code", "type": "int32", "required": true },
+		{ "name": "created_at", "type": "int64", "required": true }
 	]
 }

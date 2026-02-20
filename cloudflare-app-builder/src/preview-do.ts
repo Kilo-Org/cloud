@@ -403,9 +403,7 @@ export class PreviewDO extends DurableObject<Env> {
             if (!checkoutResult.success) {
               throw new Error('Failed to clone repo');
             }
-            const pullResult = await sandbox.exec(
-              'cd /workspace && git reset --hard origin/main'
-            );
+            const pullResult = await sandbox.exec('cd /workspace && git reset --hard origin/main');
             if (!pullResult.success) {
               throw new Error('Failed to pull new changes');
             }

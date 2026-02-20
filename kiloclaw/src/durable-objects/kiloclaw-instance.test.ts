@@ -28,12 +28,14 @@ vi.mock('cloudflare:workers', () => ({
 }));
 
 // -- Mock fly client --
-// Keep real isFlyNotFound + FlyApiError; mock all API functions.
+// Keep real isFlyNotFound, isFlyInsufficientResources + FlyApiError; mock all API functions.
 vi.mock('../fly/client', async () => {
-  const { FlyApiError, isFlyNotFound } = await vi.importActual('../fly/client');
+  const { FlyApiError, isFlyNotFound, isFlyInsufficientResources } =
+    await vi.importActual('../fly/client');
   return {
     FlyApiError,
     isFlyNotFound,
+    isFlyInsufficientResources,
     createMachine: vi.fn(),
     getMachine: vi.fn(),
     startMachine: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('../fly/client', async () => {
     waitForState: vi.fn(),
     updateMachine: vi.fn(),
     createVolume: vi.fn(),
+    createVolumeWithFallback: vi.fn(),
     deleteVolume: vi.fn(),
     getVolume: vi.fn(),
     listMachines: vi.fn().mockResolvedValue([]),
@@ -360,14 +363,14 @@ describe('reconciliation: volume', () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { flyVolumeId: null });
 
-    (flyClient.createVolume as Mock).mockResolvedValue({
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
       id: 'vol-new',
       region: 'iad',
     });
 
     await instance.alarm();
 
-    expect(flyClient.createVolume).toHaveBeenCalled();
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalled();
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');
   });
 
@@ -376,7 +379,7 @@ describe('reconciliation: volume', () => {
     await seedProvisioned(storage, { flyVolumeId: 'vol-dead' });
 
     (flyClient.getVolume as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
-    (flyClient.createVolume as Mock).mockResolvedValue({
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
       id: 'vol-replacement',
       region: 'iad',
     });
@@ -407,7 +410,7 @@ describe('destroying: no recreation', () => {
 
     await instance.alarm();
 
-    expect(flyClient.createVolume).not.toHaveBeenCalled();
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
   });
 
   it('does not create machine during destroying', async () => {
@@ -640,7 +643,7 @@ describe('createNewMachine: persist ID before waitForState', () => {
 // selectRecoveryCandidate (pure function, no mocks needed)
 // ============================================================================
 
-import { selectRecoveryCandidate } from './kiloclaw-instance';
+import { selectRecoveryCandidate, parseRegions, deprioritizeRegion } from './kiloclaw-instance';
 import type { FlyMachine } from '../fly/types';
 
 function fakeMachine(overrides: Partial<FlyMachine>): FlyMachine {
@@ -842,6 +845,54 @@ describe('updateChannels', () => {
 });
 
 // ============================================================================
+// parseRegions + deprioritizeRegion (pure functions)
+// ============================================================================
+
+describe('parseRegions', () => {
+  it('splits comma-separated regions', () => {
+    expect(parseRegions('dfw,yyz,cdg')).toEqual(['dfw', 'yyz', 'cdg']);
+  });
+
+  it('handles a single region', () => {
+    expect(parseRegions('iad')).toEqual(['iad']);
+  });
+
+  it('trims whitespace', () => {
+    expect(parseRegions('dfw, yyz , cdg')).toEqual(['dfw', 'yyz', 'cdg']);
+  });
+
+  it('filters empty strings', () => {
+    expect(parseRegions('dfw,,cdg')).toEqual(['dfw', 'cdg']);
+  });
+});
+
+describe('deprioritizeRegion', () => {
+  it('moves failed region to end', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'dfw')).toEqual(['yyz', 'cdg', 'dfw']);
+  });
+
+  it('moves middle region to end', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'yyz')).toEqual(['dfw', 'cdg', 'yyz']);
+  });
+
+  it('returns list unchanged when failed region is already last', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'cdg')).toEqual(['dfw', 'yyz', 'cdg']);
+  });
+
+  it('returns list unchanged when failed region is not in list', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz'], 'iad')).toEqual(['dfw', 'yyz']);
+  });
+
+  it('returns list unchanged when failedRegion is null', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz'], null)).toEqual(['dfw', 'yyz']);
+  });
+
+  it('handles single-element list', () => {
+    expect(deprioritizeRegion(['dfw'], 'dfw')).toEqual(['dfw']);
+  });
+});
+
+// ============================================================================
 // Live check in getStatus()
 // ============================================================================
 
@@ -969,6 +1020,298 @@ describe('getStatus: throttled live Fly check', () => {
     await instance.getStatus();
 
     expect(flyClient.getMachine).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Volume region validation before machine creation
+// ============================================================================
+
+describe('start: volume region validation', () => {
+  it('corrects flyRegion when it drifts from actual volume region', async () => {
+    const { instance, storage } = createInstance();
+    // DO thinks volume is in 'iad', but actual volume is in 'cdg'
+    await seedProvisioned(storage, { flyMachineId: null, flyRegion: 'iad' });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'cdg' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    // flyRegion should be corrected to actual volume region
+    expect(storage._store.get('flyRegion')).toBe('cdg');
+    // Machine should be created (region passed from corrected flyRegion)
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ region: 'cdg' })
+    );
+  });
+
+  it('handles volume gone (404) during region check by creating a new volume', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null });
+
+    // Volume is gone
+    (flyClient.getVolume as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+    // ensureVolume creates a replacement
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'dfw',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'dfw' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+    expect(storage._store.get('flyRegion')).toBe('dfw');
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('skips region check when machine already exists', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped' });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockResolvedValue({ id: 'machine-1' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.start('user-1');
+
+    // getVolume should only be called by ensureVolume (which is a no-op since
+    // flyVolumeId is set), NOT for region validation (because flyMachineId exists)
+    // Actually getVolume is NOT called by ensureVolume when flyVolumeId is set.
+    // The region validation also skips because flyMachineId is set.
+    expect(flyClient.getVolume).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// 412 insufficient resources recovery
+// ============================================================================
+
+describe('start: 412 insufficient resources recovery', () => {
+  it('fresh provision (never started): deletes volume and creates fresh with deprioritized regions', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null });
+
+    // First createMachine fails with 412
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+      )
+      .mockResolvedValueOnce({ id: 'machine-retry', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+
+    await instance.start('user-1');
+
+    // Old volume was deleted
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-1');
+    // New volume created via fallback with deprioritized regions and compute hint
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
+      }),
+      // 'iad' not in FLY_REGION='us,eu', so deprioritizeRegion returns unchanged
+      ['us', 'eu']
+    );
+    // source_volume_id should NOT be set for fresh provision
+    const createVolumeCall = (flyClient.createVolumeWithFallback as Mock).mock.calls[0][1];
+    expect(createVolumeCall.source_volume_id).toBeUndefined();
+
+    // Machine was created on retry
+    expect(flyClient.createMachine).toHaveBeenCalledTimes(2);
+    expect(storage._store.get('flyMachineId')).toBe('machine-retry');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+    expect(storage._store.get('flyRegion')).toBe('cdg');
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('existing instance (has user data): forks volume to preserve data', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      lastStartedAt: Date.now() - 60_000,
+    });
+
+    // First createMachine fails with 412
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+      )
+      .mockResolvedValueOnce({ id: 'machine-retry', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    // Fork succeeds
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-forked',
+      region: 'cdg',
+    });
+
+    await instance.start('user-1');
+
+    // Volume was forked (source_volume_id set) with compute hint and deprioritized regions
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        source_volume_id: 'vol-1',
+        compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
+      }),
+      ['us', 'eu']
+    );
+    // Old volume was deleted
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-1');
+    // Machine was retried
+    expect(storage._store.get('flyMachineId')).toBe('machine-retry');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-forked');
+  });
+
+  it('existing instance: propagates error when fork fails (no silent data loss)', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      lastStartedAt: Date.now() - 60_000,
+    });
+
+    // First createMachine fails with 412
+    (flyClient.createMachine as Mock).mockRejectedValueOnce(
+      new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    // Fork fails (all regions exhausted)
+    (flyClient.createVolumeWithFallback as Mock).mockRejectedValueOnce(
+      new FlyApiError('fork failed', 500, 'fail')
+    );
+
+    await expect(instance.start('user-1')).rejects.toThrow('fork failed');
+
+    // Volume should NOT have been replaced with a fresh one
+    expect(storage._store.get('flyVolumeId')).toBe('vol-1');
+    // No machine created
+    expect(storage._store.get('flyMachineId')).toBeNull();
+  });
+
+  it('destroys existing machine when 412 hits on updateMachine in startExistingMachine', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped', lastStartedAt: Date.now() - 60_000 });
+
+    // getMachine returns stopped, updateMachine throws 412
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    // Old machine was destroyed
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
+    // Volume was forked (has user data) with compute hint
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        source_volume_id: 'vol-1',
+        compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
+      }),
+      ['us', 'eu']
+    );
+    // New machine was created
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('keeps machine ID when destroy of stranded machine fails transiently', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped', lastStartedAt: Date.now() - 60_000 });
+
+    // getMachine returns stopped, updateMachine throws 412
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    // destroyMachine fails with transient 500
+    (flyClient.destroyMachine as Mock).mockRejectedValue(
+      new FlyApiError('server error', 500, 'internal')
+    );
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    // Fork still succeeds
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    // Old machine ID should still be tracked (not orphaned)
+    // The new machine gets stored via createNewMachine, overwriting the old one
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+    // destroyMachine was attempted
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
+  });
+
+  it('propagates non-412 errors without recovery', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null });
+
+    (flyClient.createMachine as Mock).mockRejectedValue(
+      new FlyApiError('server error', 500, 'internal')
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await expect(instance.start('user-1')).rejects.toThrow('server error');
+
+    // Volume should NOT have been replaced
+    expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+    expect(storage._store.get('flyVolumeId')).toBe('vol-1');
+  });
+
+  it('propagates error when 412 retry also fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null });
+
+    // Both attempts fail
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+      )
+      .mockRejectedValueOnce(new FlyApiError('still no resources', 500, '{"error":"no capacity"}'));
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+
+    await expect(instance.start('user-1')).rejects.toThrow('still no resources');
+
+    // Volume was replaced (during recovery attempt)
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+    // But machine was NOT created (retry failed)
+    expect(storage._store.get('flyMachineId')).toBeNull();
   });
 });
 

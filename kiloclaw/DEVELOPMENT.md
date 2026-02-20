@@ -102,10 +102,10 @@ user-provided encrypted secrets and channel tokens are silently skipped.
 
 ### Development Flags
 
-| Variable              | Description                                                                                         |
-| --------------------- | --------------------------------------------------------------------------------------------------- |
-| `DEV_MODE`            | Set to `true` to skip JWT auth and enable `allowInsecureAuth` in the container. **Local dev only.** |
-| `WORKER_ENV`          | Set to `production` to enforce JWT `env` claim matching. When unset, env validation is skipped.     |
+| Variable     | Description                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------- |
+| `DEV_MODE`   | Set to `true` to skip JWT auth and enable `allowInsecureAuth` in the container. **Local dev only.** |
+| `WORKER_ENV` | Set to `production` to enforce JWT `env` claim matching. When unset, env validation is skipped.     |
 
 ### Optional
 

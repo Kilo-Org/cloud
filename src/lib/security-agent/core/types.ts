@@ -316,4 +316,6 @@ export type SyncResult = {
   created: number;
   updated: number;
   errors: number;
+  /** Repos that returned 404 from GitHub (deleted/transferred) */
+  staleRepos: string[];
 };

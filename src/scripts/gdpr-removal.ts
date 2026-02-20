@@ -1,7 +1,7 @@
 import { closeAllDrizzleConnections } from '@/lib/drizzle';
-import { deleteUserFromExternalServices } from '@/lib/external-services';
+import { softDeleteUserExternalServices } from '@/lib/external-services';
 import { shutdownPosthog } from '@/lib/posthog';
-import { deleteUserDatabaseRecords, findUserById } from '@/lib/user';
+import { softDeleteUser, findUserById } from '@/lib/user';
 
 async function run(kiloUserId: string): Promise<void> {
   if (!kiloUserId) {
@@ -16,13 +16,15 @@ async function run(kiloUserId: string): Promise<void> {
   }
 
   console.log(
-    `Deleting account for user ID: ${user.id} (${user.google_user_email}, ${user.stripe_customer_id})`
+    `Soft-deleting account for user ID: ${user.id} (${user.google_user_email}, ${user.stripe_customer_id})`
   );
 
-  await deleteUserFromExternalServices(user);
-  await deleteUserDatabaseRecords(kiloUserId);
+  await softDeleteUserExternalServices(user);
+  await softDeleteUser(kiloUserId);
 
-  console.log(`Account for user ID ${user.id} deleted successfully`);
+  console.log(
+    `Account for user ID ${user.id} soft-deleted successfully (PII removed, Stripe link preserved)`
+  );
 }
 
 run(process.argv[2])

@@ -1,8 +1,6 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { db } from '@/lib/drizzle';
 import {
-  microdollar_usage,
-  microdollar_usage_metadata,
   payment_methods,
   kilocode_users,
   user_auth_provider,
@@ -16,14 +14,18 @@ import {
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
+  organization_audit_logs,
   free_model_usage,
   organizations,
+  user_feedback,
+  user_admin_notes,
+  magic_link_tokens,
+  stytch_fingerprints,
 } from '@/db/schema';
 import { eq, count } from 'drizzle-orm';
-import { deleteUserDatabaseRecords, findUserById, findUsersByIds } from './user';
+import { softDeleteUser, SoftDeletePreconditionError, findUserById, findUsersByIds } from './user';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { insertUsageWithOverrides } from '@/tests/helpers/microdollar-usage.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
 import {
@@ -37,8 +39,6 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
     await db.delete(user_auth_provider);
-    await db.delete(microdollar_usage_metadata);
-    await db.delete(microdollar_usage);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
@@ -47,332 +47,67 @@ describe('User', () => {
     await db.delete(enrichment_data);
     await db.delete(referral_code_usages);
     await db.delete(referral_codes);
+    await db.delete(organization_audit_logs);
     await db.delete(organization_user_usage);
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
     await db.delete(free_model_usage);
+    await db.delete(user_feedback);
+    await db.delete(user_admin_notes);
+    await db.delete(magic_link_tokens);
+    await db.delete(stytch_fingerprints);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
 
-  describe('deleteUserDatabaseRecords', () => {
-    it('should delete all records for a specific user', async () => {
-      const user1 = await insertTestUser();
-      const user2 = await insertTestUser();
-      const user3 = await insertTestUser();
-
-      // Create MicrodollarUsage records (also creates microdollar_usage_metadata)
-      await insertUsageWithOverrides({ kilo_user_id: user1.id });
-      await insertUsageWithOverrides({ kilo_user_id: user1.id });
-      await insertUsageWithOverrides({ kilo_user_id: user2.id });
-      await insertUsageWithOverrides({ kilo_user_id: user3.id });
-
-      // Create PaymentMethod records
-      const pm1a = createTestPaymentMethod(user1.id);
-      const pm1b = createTestPaymentMethod(user1.id);
-      const pm2a = createTestPaymentMethod(user2.id);
-      const pm3a = createTestPaymentMethod(user3.id);
-
-      await db.insert(payment_methods).values([pm1a, pm1b, pm2a, pm3a]);
-
-      // Verify initial state
-      expect((await db.select({ count: count() }).from(kilocode_users))[0].count).toBe(3);
-      expect(
-        await db
-          .select({ count: count() })
-          .from(microdollar_usage)
-          .then((r: { count: number }[]) => r[0].count)
-      ).toBe(4);
-      expect((await db.select({ count: count() }).from(payment_methods))[0].count).toBe(4);
-
-      await deleteUserDatabaseRecords(user1.id);
-
-      expect(await findUserById(user1.id)).toBe(undefined);
-      expect(
-        await db.query.microdollar_usage.findMany({
-          where: eq(microdollar_usage.kilo_user_id, user1.id),
-        })
-      ).toHaveLength(0);
-
-      expect(
-        await db.query.payment_methods.findMany({
-          where: eq(payment_methods.user_id, user1.id),
-        })
-      ).toHaveLength(0);
-
-      // Verify other users' records remain
-      expect(
-        await db
-          .select({ count: count() })
-          .from(kilocode_users)
-          .then(r => r[0].count)
-      ).toBe(2);
-      expect(
-        await db
-          .select({ count: count() })
-          .from(microdollar_usage)
-          .then(r => r[0].count)
-      ).toBe(2);
-      expect(await findUserById(user2.id)).not.toBeNull();
-      expect(await findUserById(user3.id)).not.toBeNull();
-      expect(
-        await db
-          .select()
-          .from(microdollar_usage)
-          .where(eq(microdollar_usage.kilo_user_id, user2.id))
-      ).toHaveLength(1);
-      expect(
-        await db
-          .select()
-          .from(microdollar_usage)
-          .where(eq(microdollar_usage.kilo_user_id, user3.id))
-      ).toHaveLength(1);
-
-      expect(
-        await db.select().from(payment_methods).where(eq(payment_methods.user_id, user2.id))
-      ).toHaveLength(1);
-      expect(
-        await db.select().from(payment_methods).where(eq(payment_methods.user_id, user3.id))
-      ).toHaveLength(1);
-    });
-
-    it('should handle deletion of non-existent user gracefully', async () => {
-      const user1 = await insertTestUser();
-      await insertUsageWithOverrides({ kilo_user_id: user1.id });
-
-      // Verify initial state
-      expect(
-        await db
-          .select({ count: count() })
-          .from(kilocode_users)
-          .then(r => r[0].count)
-      ).toBe(1);
-      expect(
-        await db
-          .select({ count: count() })
-          .from(microdollar_usage)
-          .then(r => r[0].count)
-      ).toBe(1);
-
-      // Try to delete non-existent user
-      await expect(deleteUserDatabaseRecords('non-existent-user')).resolves.not.toThrow();
-
-      // Verify existing data is unchanged
-      expect(
-        await db
-          .select({ count: count() })
-          .from(kilocode_users)
-          .then(r => r[0].count)
-      ).toBe(1);
-      expect(
-        await db
-          .select({ count: count() })
-          .from(microdollar_usage)
-          .then(r => r[0].count)
-      ).toBe(1);
-      expect(await findUserById(user1.id)).not.toBeUndefined();
-    });
-
-    it('should delete user with no related records', async () => {
-      const user1 = await insertTestUser();
-
-      // Verify initial state
-      expect(
-        await db
-          .select({ count: count() })
-          .from(kilocode_users)
-          .then(r => r[0].count)
-      ).toBe(1);
-      expect(
-        await db
-          .select({ count: count() })
-          .from(microdollar_usage)
-          .then((r: { count: number }[]) => r[0].count)
-      ).toBe(0);
-      expect((await db.select({ count: count() }).from(payment_methods))[0].count).toBe(0);
-
-      // Delete the user
-      await deleteUserDatabaseRecords(user1.id);
-
-      // Verify user is deleted
-      expect(
-        await db
-          .select({ count: count() })
-          .from(kilocode_users)
-          .then(r => r[0].count)
-      ).toBe(0);
-      expect(await findUserById(user1.id)).toBe(undefined);
-    });
-
-    it('should delete user with only some types of related records', async () => {
-      const user1 = await insertTestUser();
-      const user2 = await insertTestUser();
-
-      // User1 has only MicrodollarUsage and PaymentMethod records
-      await insertUsageWithOverrides({ kilo_user_id: user1.id });
-      const pm1 = createTestPaymentMethod(user1.id);
-      await db.insert(payment_methods).values(pm1);
-
-      expect(
-        await db
-          .select({ count: count() })
-          .from(kilocode_users)
-          .then(r => r[0].count)
-      ).toBe(2);
-      expect(
-        await db
-          .select({ count: count() })
-          .from(microdollar_usage)
-          .then((r: { count: number }[]) => r[0].count)
-      ).toBe(1);
-      expect((await db.select({ count: count() }).from(payment_methods))[0].count).toBe(1);
-
-      await deleteUserDatabaseRecords(user1.id);
-
-      expect(await findUserById(user1.id)).toBe(undefined);
-      expect(
-        await db.query.microdollar_usage.findMany({
-          where: eq(microdollar_usage.kilo_user_id, user1.id),
-        })
-      ).toHaveLength(0);
-      expect(
-        await db.query.payment_methods.findMany({
-          where: eq(payment_methods.user_id, user1.id),
-        })
-      ).toHaveLength(0);
-
-      expect(
-        await db
-          .select({ count: count() })
-          .from(kilocode_users)
-          .then(r => r[0].count)
-      ).toBe(1);
-      expect(await findUserById(user2.id)).not.toBeUndefined();
-    });
-
-    it('should delete user with Kilo Pass subscription and issuance items', async () => {
-      const user1 = await insertTestUser();
-      const user2 = await insertTestUser();
-
-      // Create a credit transaction for user1 (linked to Kilo Pass issuance)
-      const creditTxId = randomUUID();
-      await db.insert(credit_transactions).values({
-        id: creditTxId,
-        kilo_user_id: user1.id,
-        amount_microdollars: 19_000_000,
-        is_free: false,
-        description: 'Kilo Pass base credits',
-        credit_category: 'kilo_pass_base',
+  describe('softDeleteUser', () => {
+    it('should anonymize the user row and preserve it', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'real-email@example.com',
+        google_user_name: 'Real Name',
+        google_user_image_url: 'https://example.com/avatar.png',
+        linkedin_url: 'https://linkedin.com/in/testuser',
+        github_url: 'https://github.com/testuser',
+        is_admin: true,
       });
 
-      // Create a credit transaction for user2 (should not be affected)
-      const user2CreditTxId = randomUUID();
-      await db.insert(credit_transactions).values({
-        id: user2CreditTxId,
-        kilo_user_id: user2.id,
-        amount_microdollars: 5_000_000,
-        is_free: false,
-        description: 'User 2 credits',
-      });
+      await softDeleteUser(user.id);
 
-      // Create Kilo Pass subscription
-      const subId = randomUUID();
-      await db.insert(kilo_pass_subscriptions).values({
-        id: subId,
-        kilo_user_id: user1.id,
-        stripe_subscription_id: `sub_test_${randomUUID()}`,
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      });
-
-      // Create issuance
-      const issuanceId = randomUUID();
-      await db.insert(kilo_pass_issuances).values({
-        id: issuanceId,
-        kilo_pass_subscription_id: subId,
-        issue_month: '2025-01-01',
-        source: KiloPassIssuanceSource.StripeInvoice,
-        stripe_invoice_id: `inv_test_${randomUUID()}`,
-      });
-
-      // Create issuance item with RESTRICT FK to credit_transactions
-      await db.insert(kilo_pass_issuance_items).values({
-        kilo_pass_issuance_id: issuanceId,
-        kind: KiloPassIssuanceItemKind.Base,
-        credit_transaction_id: creditTxId,
-        amount_usd: 19,
-      });
-
-      // Verify initial state
-      expect((await db.select({ count: count() }).from(kilo_pass_issuance_items))[0].count).toBe(1);
-      expect((await db.select({ count: count() }).from(credit_transactions))[0].count).toBe(2);
-
-      // This would fail with the old implementation due to kilo_pass_issuance_items
-      // RESTRICT FK on credit_transactions.id
-      await deleteUserDatabaseRecords(user1.id);
-
-      // Verify user1 and all related records are deleted
-      expect(await findUserById(user1.id)).toBe(undefined);
-      expect((await db.select({ count: count() }).from(kilo_pass_issuance_items))[0].count).toBe(0);
-      expect((await db.select({ count: count() }).from(kilo_pass_issuances))[0].count).toBe(0);
-      expect((await db.select({ count: count() }).from(kilo_pass_subscriptions))[0].count).toBe(0);
-      expect(
-        await db
-          .select({ count: count() })
-          .from(credit_transactions)
-          .where(eq(credit_transactions.kilo_user_id, user1.id))
-          .then(r => r[0].count)
-      ).toBe(0);
-
-      // Verify user2's records are untouched
-      expect(await findUserById(user2.id)).toBeDefined();
-      expect(
-        await db
-          .select({ count: count() })
-          .from(credit_transactions)
-          .where(eq(credit_transactions.kilo_user_id, user2.id))
-          .then(r => r[0].count)
-      ).toBe(1);
+      const softDeleted = await findUserById(user.id);
+      expect(softDeleted).toBeDefined();
+      expect(softDeleted!.google_user_email).toBe(`deleted+${user.id}@deleted.invalid`);
+      expect(softDeleted!.google_user_name).toBe('Deleted User');
+      expect(softDeleted!.google_user_image_url).toBe('');
+      expect(softDeleted!.hosted_domain).toBeNull();
+      expect(softDeleted!.linkedin_url).toBeNull();
+      expect(softDeleted!.github_url).toBeNull();
+      expect(softDeleted!.api_token_pepper).toBeNull();
+      expect(softDeleted!.default_model).toBeNull();
+      expect(softDeleted!.blocked_reason).toBe('soft-deleted');
+      expect(softDeleted!.auto_top_up_enabled).toBe(false);
+      expect(softDeleted!.completed_welcome_form).toBe(false);
+      expect(softDeleted!.is_admin).toBe(false);
+      // Stripe customer ID should be preserved
+      expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
     });
 
-    it('should delete microdollar_usage_metadata alongside microdollar_usage', async () => {
-      const user1 = await insertTestUser();
-      const user2 = await insertTestUser();
+    it('should delete auth providers', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'google',
+        provider_account_id: `google-${user.id}`,
+        email: user.google_user_email,
+        avatar_url: user.google_user_image_url,
+      });
 
-      // insertUsageWithOverrides creates both microdollar_usage and microdollar_usage_metadata
-      await insertUsageWithOverrides({ kilo_user_id: user1.id });
-      await insertUsageWithOverrides({ kilo_user_id: user2.id });
+      await softDeleteUser(user.id);
 
-      // Verify both tables have records
-      expect((await db.select({ count: count() }).from(microdollar_usage))[0].count).toBe(2);
-      expect((await db.select({ count: count() }).from(microdollar_usage_metadata))[0].count).toBe(
-        2
-      );
-
-      await deleteUserDatabaseRecords(user1.id);
-
-      // User1's records should be gone from both tables
-      expect(
-        await db
-          .select({ count: count() })
-          .from(microdollar_usage)
-          .where(eq(microdollar_usage.kilo_user_id, user1.id))
-          .then(r => r[0].count)
-      ).toBe(0);
-      // Metadata rows for user1 should also be gone (they share the same id)
-      expect((await db.select({ count: count() }).from(microdollar_usage_metadata))[0].count).toBe(
-        1
-      );
-
-      // User2's records should remain
-      expect(
-        await db
-          .select({ count: count() })
-          .from(microdollar_usage)
-          .where(eq(microdollar_usage.kilo_user_id, user2.id))
-          .then(r => r[0].count)
-      ).toBe(1);
+      const providers = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, user.id));
+      expect(providers).toHaveLength(0);
     });
 
     it('should delete enrichment_data for the user', async () => {
@@ -384,9 +119,7 @@ describe('User', () => {
         { user_id: user2.id, github_enrichment_data: { login: 'testuser2' } },
       ]);
 
-      expect((await db.select({ count: count() }).from(enrichment_data))[0].count).toBe(2);
-
-      await deleteUserDatabaseRecords(user1.id);
+      await softDeleteUser(user1.id);
 
       expect(
         await db
@@ -404,7 +137,25 @@ describe('User', () => {
       ).toBe(1);
     });
 
-    it('should delete referral codes and usages for the user', async () => {
+    it('should delete admin notes about the user', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_admin_notes).values({
+        kilo_user_id: user.id,
+        note_content: 'Some admin note',
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_admin_notes)
+          .where(eq(user_admin_notes.kilo_user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+    });
+
+    it('should delete referral codes but keep referral_code_usages', async () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
 
@@ -419,7 +170,7 @@ describe('User', () => {
         code: 'USER1CODE',
       });
 
-      await deleteUserDatabaseRecords(user1.id);
+      await softDeleteUser(user1.id);
 
       // User1's referral code should be deleted
       expect(
@@ -430,8 +181,8 @@ describe('User', () => {
           .then(r => r[0].count)
       ).toBe(0);
 
-      // Referral usage involving user1 should be deleted
-      expect((await db.select({ count: count() }).from(referral_code_usages))[0].count).toBe(0);
+      // Referral usage should be preserved (references the now-anonymized user)
+      expect((await db.select({ count: count() }).from(referral_code_usages))[0].count).toBe(1);
 
       // User2's referral code should remain
       expect(
@@ -443,11 +194,10 @@ describe('User', () => {
       ).toBe(1);
     });
 
-    it('should delete organization memberships and usage data for the user', async () => {
+    it('should delete organization memberships and usage data', async () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
 
-      // Create a minimal organization directly
       const orgId = randomUUID();
       await db.insert(organizations).values({
         id: orgId,
@@ -457,7 +207,6 @@ describe('User', () => {
         plan: 'enterprise',
       });
 
-      // Add both users as members
       await db.insert(organization_memberships).values([
         {
           organization_id: orgId,
@@ -473,7 +222,6 @@ describe('User', () => {
         },
       ]);
 
-      // Add usage limits and usage tracking
       await db.insert(organization_user_limits).values({
         organization_id: orgId,
         kilo_user_id: user1.id,
@@ -489,7 +237,7 @@ describe('User', () => {
         microdollar_usage: 5_000_000,
       });
 
-      await deleteUserDatabaseRecords(user1.id);
+      await softDeleteUser(user1.id);
 
       // User1's membership and usage data should be gone
       expect(
@@ -510,22 +258,265 @@ describe('User', () => {
           .where(eq(organization_memberships.kilo_user_id, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
+
+      // User1 row should still exist (soft-deleted)
+      expect(await findUserById(user1.id)).toBeDefined();
     });
 
-    it('should delete free_model_usage for the user', async () => {
-      const user1 = await insertTestUser();
+    it('should anonymize organization audit logs', async () => {
+      const user = await insertTestUser();
+      const orgId = randomUUID();
+      await db.insert(organizations).values({
+        id: orgId,
+        name: 'Test Org',
+        stripe_customer_id: `stripe-org-${orgId}`,
+        plan: 'teams',
+      });
+
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.user.accept_invite',
+        actor_id: user.id,
+        actor_email: user.google_user_email,
+        actor_name: user.google_user_name,
+        message: 'User joined org',
+      });
+
+      await softDeleteUser(user.id);
+
+      const logs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.actor_id, user.id));
+      expect(logs).toHaveLength(1);
+      expect(logs[0].actor_email).toBeNull();
+      expect(logs[0].actor_name).toBeNull();
+      expect(logs[0].actor_id).toBe(user.id); // actor_id preserved for reference
+      expect(logs[0].message).toBe('User joined org'); // message preserved
+    });
+
+    it('should soft-delete and anonymize payment methods', async () => {
+      const user = await insertTestUser();
+      const pm = createTestPaymentMethod(user.id);
+      await db.insert(payment_methods).values({ ...pm, name: 'John Doe', address_city: 'NYC' });
+
+      await softDeleteUser(user.id);
+
+      const pms = await db
+        .select()
+        .from(payment_methods)
+        .where(eq(payment_methods.user_id, user.id));
+      expect(pms).toHaveLength(1);
+      expect(pms[0].deleted_at).not.toBeNull();
+      expect(pms[0].name).toBeNull();
+      expect(pms[0].address_city).toBeNull();
+      // stripe_fingerprint preserved for fraud detection
+      expect(pms[0].stripe_fingerprint).toBe(pm.stripe_fingerprint);
+    });
+
+    it('should nullify user_feedback FK', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_feedback).values({
+        kilo_user_id: user.id,
+        feedback_text: 'Great product!',
+      });
+
+      await softDeleteUser(user.id);
+
+      const feedback = await db.select().from(user_feedback);
+      expect(feedback).toHaveLength(1);
+      expect(feedback[0].kilo_user_id).toBeNull();
+      expect(feedback[0].feedback_text).toBe('Great product!');
+    });
+
+    it('should nullify free_model_usage FK', async () => {
+      const user = await insertTestUser();
 
       await db.insert(free_model_usage).values([
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: user1.id },
+        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: user.id },
         { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: null },
       ]);
 
-      expect((await db.select({ count: count() }).from(free_model_usage))[0].count).toBe(2);
+      await softDeleteUser(user.id);
 
-      await deleteUserDatabaseRecords(user1.id);
+      // User's free model usage should have kilo_user_id nulled, anonymous record untouched
+      const usages = await db.select().from(free_model_usage);
+      expect(usages).toHaveLength(2);
+      expect(usages.every(u => u.kilo_user_id === null)).toBe(true);
+    });
 
-      // User1's free model usage should be gone, anonymous record remains
-      expect((await db.select({ count: count() }).from(free_model_usage))[0].count).toBe(1);
+    it('should preserve credit transactions', async () => {
+      const user = await insertTestUser();
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        amount_microdollars: 5_000_000,
+        is_free: false,
+        description: 'Test credits',
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(credit_transactions)
+          .where(eq(credit_transactions.kilo_user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should preserve Kilo Pass subscriptions and issuance chain', async () => {
+      const user = await insertTestUser();
+
+      const creditTxId = randomUUID();
+      await db.insert(credit_transactions).values({
+        id: creditTxId,
+        kilo_user_id: user.id,
+        amount_microdollars: 19_000_000,
+        is_free: false,
+        description: 'Kilo Pass base credits',
+        credit_category: 'kilo_pass_base',
+      });
+
+      const subId = randomUUID();
+      await db.insert(kilo_pass_subscriptions).values({
+        id: subId,
+        kilo_user_id: user.id,
+        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+      });
+
+      const issuanceId = randomUUID();
+      await db.insert(kilo_pass_issuances).values({
+        id: issuanceId,
+        kilo_pass_subscription_id: subId,
+        issue_month: '2025-01-01',
+        source: KiloPassIssuanceSource.StripeInvoice,
+        stripe_invoice_id: `inv_test_${randomUUID()}`,
+      });
+
+      await db.insert(kilo_pass_issuance_items).values({
+        kilo_pass_issuance_id: issuanceId,
+        kind: KiloPassIssuanceItemKind.Base,
+        credit_transaction_id: creditTxId,
+        amount_usd: 19,
+      });
+
+      await softDeleteUser(user.id);
+
+      // All Kilo Pass records should be preserved
+      expect((await db.select({ count: count() }).from(kilo_pass_subscriptions))[0].count).toBe(1);
+      expect((await db.select({ count: count() }).from(kilo_pass_issuances))[0].count).toBe(1);
+      expect((await db.select({ count: count() }).from(kilo_pass_issuance_items))[0].count).toBe(1);
+      expect((await db.select({ count: count() }).from(credit_transactions))[0].count).toBe(1);
+    });
+
+    it('should preserve stytch_fingerprints for abuse detection', async () => {
+      const user = await insertTestUser();
+      await db.insert(stytch_fingerprints).values({
+        kilo_user_id: user.id,
+        visitor_fingerprint: 'vf_test',
+        browser_fingerprint: 'bf_test',
+        hardware_fingerprint: 'hf_test',
+        network_fingerprint: 'nf_test',
+        verdict_action: 'ALLOW',
+        detected_device_type: 'DESKTOP',
+        is_authentic_device: true,
+        status_code: 200,
+        fingerprint_data: {},
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(stytch_fingerprints)
+          .where(eq(stytch_fingerprints.kilo_user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should throw SoftDeletePreconditionError for active subscription', async () => {
+      const user = await insertTestUser();
+      await db.insert(kilo_pass_subscriptions).values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancel_at_period_end: false,
+      });
+
+      await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
+      // User should not be modified
+      const userAfter = await findUserById(user.id);
+      expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
+    it('should allow soft-delete when subscription is pending cancellation', async () => {
+      const user = await insertTestUser();
+      await db.insert(kilo_pass_subscriptions).values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancel_at_period_end: true, // Pending cancellation
+      });
+
+      await expect(softDeleteUser(user.id)).resolves.not.toThrow();
+
+      const softDeleted = await findUserById(user.id);
+      expect(softDeleted!.blocked_reason).toBe('soft-deleted');
+    });
+
+    it('should handle soft-delete of non-existent user gracefully', async () => {
+      const user = await insertTestUser();
+
+      await expect(softDeleteUser('non-existent-user')).resolves.not.toThrow();
+
+      // Existing user should be unchanged
+      expect(await findUserById(user.id)).toBeDefined();
+    });
+
+    it('should not affect other users', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      const pm2 = createTestPaymentMethod(user2.id);
+      await db.insert(payment_methods).values(pm2);
+
+      await softDeleteUser(user1.id);
+
+      // User2 should be completely untouched
+      const user2After = await findUserById(user2.id);
+      expect(user2After).toBeDefined();
+      expect(user2After!.google_user_email).toBe(user2.google_user_email);
+
+      const user2Pms = await db
+        .select()
+        .from(payment_methods)
+        .where(eq(payment_methods.user_id, user2.id));
+      expect(user2Pms).toHaveLength(1);
+      expect(user2Pms[0].deleted_at).toBeNull();
+    });
+
+    it('should delete magic_link_tokens by original email', async () => {
+      const user = await insertTestUser({ google_user_email: 'magic@example.com' });
+
+      const futureDate = new Date(Date.now() + 1000 * 60 * 60).toISOString();
+      await db.insert(magic_link_tokens).values({
+        token_hash: 'test-token-hash',
+        email: 'magic@example.com',
+        expires_at: futureDate,
+      });
+
+      await softDeleteUser(user.id);
+
+      expect((await db.select({ count: count() }).from(magic_link_tokens))[0].count).toBe(0);
     });
   });
 

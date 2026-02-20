@@ -29,6 +29,8 @@ import {
   baseInterruptSessionNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
+  baseAnswerQuestionNextSchema,
+  baseRejectQuestionNextSchema,
 } from './cloud-agent-next-schemas';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -181,6 +183,24 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.interruptSession(input.sessionId);
+    }),
+
+  answerQuestion: baseProcedure
+    .input(baseAnswerQuestionNextSchema)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const authToken = generateApiToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.answerQuestion(input);
+    }),
+
+  rejectQuestion: baseProcedure
+    .input(baseRejectQuestionNextSchema)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const authToken = generateApiToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.rejectQuestion(input);
     }),
 
   /**

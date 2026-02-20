@@ -8,11 +8,13 @@ import { router } from './router/auth.js';
 import { createSessionManagementHandlers } from './router/handlers/session-management.js';
 import { createSessionPrepareHandlers } from './router/handlers/session-prepare.js';
 import { createSessionExecutionV2Handlers } from './router/handlers/session-execution.js';
+import { createSessionQuestionHandlers } from './router/handlers/session-questions.js';
 
 export const appRouter = router({
   ...createSessionManagementHandlers(),
   ...createSessionPrepareHandlers(),
   ...createSessionExecutionV2Handlers(),
+  ...createSessionQuestionHandlers(),
 });
 
 export type AppRouter = typeof appRouter;

@@ -241,6 +241,17 @@ export type InterruptResult = {
   message: string;
 };
 
+export type AnswerQuestionInput = {
+  sessionId: string;
+  questionId: string;
+  answers: string[][];
+};
+
+export type RejectQuestionInput = {
+  sessionId: string;
+  questionId: string;
+};
+
 /** Output from health procedure */
 export type HealthOutput = {
   status: string;
@@ -320,6 +331,12 @@ type CloudAgentNextTRPCClient = {
   };
   sendMessageV2: {
     mutate: (input: SendMessageInput) => Promise<InitiateSessionOutput>;
+  };
+  answerQuestion: {
+    mutate: (input: AnswerQuestionInput) => Promise<{ success: boolean }>;
+  };
+  rejectQuestion: {
+    mutate: (input: RejectQuestionInput) => Promise<{ success: boolean }>;
   };
 };
 
@@ -543,6 +560,30 @@ export class CloudAgentNextClient {
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'sendMessage' },
         extra: { input },
+      });
+      throw error;
+    }
+  }
+
+  async answerQuestion(input: AnswerQuestionInput): Promise<{ success: boolean }> {
+    try {
+      return await this.client.answerQuestion.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'answerQuestion' },
+        extra: { sessionId: input.sessionId, questionId: input.questionId },
+      });
+      throw error;
+    }
+  }
+
+  async rejectQuestion(input: RejectQuestionInput): Promise<{ success: boolean }> {
+    try {
+      return await this.client.rejectQuestion.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'rejectQuestion' },
+        extra: { sessionId: input.sessionId, questionId: input.questionId },
       });
       throw error;
     }

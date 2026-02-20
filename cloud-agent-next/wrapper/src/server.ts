@@ -72,7 +72,7 @@ type AnswerPermissionBody = {
 
 type AnswerQuestionBody = {
   questionId: string;
-  answers: string[];
+  answers: string[][];
 };
 
 type RejectQuestionBody = {

@@ -363,7 +363,7 @@ describe('WrapperClient', () => {
       );
       const client = new WrapperClient({ session, port: defaultPort });
 
-      const result = await client.answerQuestion('q_123', ['Yes']);
+      const result = await client.answerQuestion('q_123', [['Yes']]);
 
       expect(result.success).toBe(true);
     });
@@ -374,7 +374,7 @@ describe('WrapperClient', () => {
       );
       const client = new WrapperClient({ session, port: defaultPort });
 
-      await client.answerQuestion('q_456', ['Option A', 'Option B']);
+      await client.answerQuestion('q_456', [['Option A', 'Option B']]);
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('/job/answer-question');

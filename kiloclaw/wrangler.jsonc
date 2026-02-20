@@ -69,7 +69,7 @@
     "FLY_REGISTRY_APP": "kiloclaw-machines", // Shared Docker image registry
     "FLY_ORG_SLUG": "kilo-679", // Org for creating per-user Fly apps
     "FLY_IMAGE_TAG": "latest",
-    "FLY_REGION": "us,eu",
+    "FLY_REGION": "dfw,yyz,cdg",
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
   },
   // Secrets (set via wrangler secret put):

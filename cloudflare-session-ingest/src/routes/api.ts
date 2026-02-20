@@ -231,6 +231,10 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
     ? (mergedChanges.get('platform') ?? null)
     : undefined;
   const orgId = mergedChanges.has('orgId') ? (mergedChanges.get('orgId') ?? null) : undefined;
+  const gitUrl = mergedChanges.has('gitUrl') ? (mergedChanges.get('gitUrl') ?? null) : undefined;
+  const gitBranch = mergedChanges.has('gitBranch')
+    ? (mergedChanges.get('gitBranch') ?? null)
+    : undefined;
 
   let hasSessionUpdate = false;
   let sessionUpdate = db.updateTable('cli_sessions_v2');
@@ -245,6 +249,14 @@ api.post('/session/:sessionId/ingest', zodJsonValidator(ingestSessionSchema), as
   if (orgId !== undefined) {
     hasSessionUpdate = true;
     sessionUpdate = sessionUpdate.set({ organization_id: orgId });
+  }
+  if (gitUrl !== undefined) {
+    hasSessionUpdate = true;
+    sessionUpdate = sessionUpdate.set({ git_url: gitUrl });
+  }
+  if (gitBranch !== undefined) {
+    hasSessionUpdate = true;
+    sessionUpdate = sessionUpdate.set({ git_branch: gitBranch });
   }
 
   if (hasSessionUpdate) {

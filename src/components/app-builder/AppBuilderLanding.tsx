@@ -821,7 +821,7 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
           onSubmit={handleSubmit}
           messageUuid={messageUuid}
           organizationId={organizationId}
-          placeholder="Describe the app you want to build... Be specific about features, design, and functionality."
+          placeholder="Type your idea and we'll bring it to life..."
           disabled={isBlocked || !model}
           isSubmitting={isSubmitting}
           onImagesChange={handleImagesChange}

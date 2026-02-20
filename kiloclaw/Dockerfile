@@ -4,7 +4,7 @@ FROM debian:bookworm-slim
 ENV NODE_VERSION=22.13.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       ca-certificates curl git xz-utils \
+       ca-certificates curl git xz-utils gosu \
     && ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \
          amd64) NODE_ARCH="x64" ;; \
@@ -28,28 +28,33 @@ RUN npm install -g pnpm
 RUN npm install -g openclaw@2026.2.9 \
     && openclaw --version
 
+# Create non-root user for runtime
+RUN useradd -r -s /bin/false -d /root openclaw
+
 # Create OpenClaw directories
 # When a Fly Volume is mounted at /root, these dirs persist across restarts.
 RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd \
-    && mkdir -p /root/clawd/skills
+    && mkdir -p /root/clawd/skills \
+    && chown -R openclaw:openclaw /root
 
 # Copy startup script
-# Build cache bust: 2026-02-18-v45-channel-pairing
+# Build cache bust: 2026-02-18-v46-discord-slack-plugins
 RUN echo "4"
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 RUN chmod +x /usr/local/bin/start-openclaw.sh
-RUN ls -l /usr/local/bin/start-openclaw.sh \
-    && head -n 1 /usr/local/bin/start-openclaw.sh | cat -v \
-    && od -An -t x1 -N 4 /usr/local/bin/start-openclaw.sh \
-    && ls -l /bin/bash
+
+# Copy entrypoint shim (runs as root, then drops to openclaw user)
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Copy custom skills
-COPY skills/ /root/clawd/skills/
+COPY --chown=openclaw:openclaw skills/ /root/clawd/skills/
 
 # Expose the gateway port
 EXPOSE 18789
 
-# Entrypoint: start the OpenClaw gateway
+# Entrypoint: fix volume ownership, drop to non-root, start OpenClaw gateway
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/usr/local/bin/start-openclaw.sh"]

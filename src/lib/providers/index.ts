@@ -126,7 +126,8 @@ export async function getProvider(
   requestedModel: string,
   request: OpenRouterChatCompletionRequest,
   user: User | AnonymousUserContext,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  taskId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult | null; customLlm: CustomLlm | null }> {
   if (!isAnonymousContext(user)) {
     const modelProvider = inferUserByokProviderForModel(requestedModel);
@@ -160,7 +161,7 @@ export async function getProvider(
     }
   }
 
-  if (await shouldRouteToVercel(requestedModel, request, user.id)) {
+  if (await shouldRouteToVercel(requestedModel, request, taskId || user.id)) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, customLlm: null };
   }
 
@@ -182,6 +183,10 @@ export async function getProvider(
         organization_ids: [],
         base_url: freeModelProvider.apiUrl,
         api_key: freeModelProvider.apiKey,
+        reasoning_effort: null,
+        included_tools: null,
+        excluded_tools: null,
+        supports_image_input: kiloFreeModel.flags.includes('vision'),
       },
     };
   }

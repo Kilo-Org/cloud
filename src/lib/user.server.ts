@@ -714,15 +714,32 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   );
 }
 
-export async function getUserFromAuthOrRedirect(loggedOutRedirectUrl: string): Promise<User> {
+export async function getUserFromAuthOrRedirect(
+  loggedOutRedirectUrl = '/users/sign_in'
+): Promise<User> {
   const { user } = await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true });
   if (!user) {
-    redirect(loggedOutRedirectUrl);
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
   if (user.blocked_reason) {
     redirect('/account-blocked');
   }
   return user;
+}
+
+export async function signInUrlWithCallbackPath(): Promise<string> {
+  return appendCallbackPath('/users/sign_in');
+}
+
+async function appendCallbackPath(url: string): Promise<string> {
+  if (url.includes('callbackPath')) return url;
+  const headersList = await headers();
+  const pathname = headersList.get('x-pathname');
+  if (pathname && pathname !== '/') {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
+  }
+  return url;
 }
 
 function authError(status: number, error: string, kiloUserId: string) {

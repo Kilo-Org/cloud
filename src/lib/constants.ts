@@ -48,3 +48,6 @@ export const FREE_MODEL_MAX_REQUESTS_PER_WINDOW = 200;
 
 // Stripe publishable key (client-side, inlined at build time)
 export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+
+export const PROMOTION_MAX_REQUESTS = 400;
+export const PROMOTION_WINDOW_HOURS = 24;

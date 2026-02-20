@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Eye, EyeOff, Save, Square, X } from 'lucide-react';
+import { AlertTriangle, Save, Square, X } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
@@ -10,12 +10,132 @@ import { useKiloClawConfig } from '@/hooks/useKiloClaw';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
+import { ChannelTokenInput } from './ChannelTokenInput';
+import { CHANNELS, CHANNEL_TYPES, type ChannelDefinition } from './channel-config';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
+
+function ChannelSection({
+  channel,
+  configured,
+  mutations,
+  channelsDirty,
+  setChannelsDirty,
+}: {
+  channel: ChannelDefinition;
+  configured: boolean;
+  mutations: ClawMutations;
+  channelsDirty: boolean;
+  setChannelsDirty: (v: boolean) => void;
+}) {
+  const [tokens, setTokens] = useState<Record<string, string>>({});
+  const isSaving = mutations.patchChannels.isPending;
+  const Icon = channel.icon;
+
+  function setToken(key: string, value: string) {
+    setTokens(prev => ({ ...prev, [key]: value }));
+  }
+
+  function hasAllTokensFilled() {
+    return channel.fields.every(f => tokens[f.key]?.trim());
+  }
+
+  function handleSave() {
+    if (!hasAllTokensFilled()) {
+      if (channel.fields.length > 1) {
+        toast.error(`All token fields are required for ${channel.label}.`);
+      } else {
+        toast.error('Enter a token or use Remove to clear it.');
+      }
+      return;
+    }
+
+    const patch: Record<string, string> = {};
+    for (const field of channel.fields) {
+      patch[field.key] = tokens[field.key].trim();
+    }
+
+    mutations.patchChannels.mutate(patch, {
+      onSuccess: () => {
+        toast.success(
+          `${channel.label} token${channel.fields.length > 1 ? 's' : ''} saved. Restart to apply.`
+        );
+        setTokens({});
+        setChannelsDirty(true);
+      },
+      onError: err => toast.error(`Failed to save: ${err.message}`),
+    });
+  }
+
+  function handleRemove() {
+    const patch: Record<string, null> = {};
+    for (const field of channel.fields) {
+      patch[field.key] = null;
+    }
+
+    mutations.patchChannels.mutate(patch, {
+      onSuccess: () => {
+        toast.success(
+          `${channel.label} token${channel.fields.length > 1 ? 's' : ''} removed. Restart to apply.`
+        );
+        setTokens({});
+        setChannelsDirty(true);
+      },
+      onError: err => toast.error(`Failed to remove: ${err.message}`),
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4" />
+        <Label className="shrink-0">{channel.label}</Label>
+        <span className="text-muted-foreground text-xs">
+          {configured ? 'Configured' : 'Not configured'}
+        </span>
+      </div>
+
+      {channel.fields.map(field => (
+        <div key={field.key} className="flex items-center gap-2">
+          {channel.fields.length > 1 && (
+            <Label htmlFor={`settings-${field.key}`} className="w-20 shrink-0 text-xs">
+              {field.label}
+            </Label>
+          )}
+          <ChannelTokenInput
+            id={`settings-${field.key}`}
+            placeholder={configured ? field.placeholderConfigured : field.placeholder}
+            value={tokens[field.key] ?? ''}
+            onChange={v => setToken(field.key, v)}
+            disabled={isSaving}
+            className="flex-1"
+          />
+        </div>
+      ))}
+
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={handleSave} disabled={isSaving || !hasAllTokensFilled()}>
+          <Save className="h-4 w-4" />
+          {isSaving ? 'Saving...' : 'Save'}
+        </Button>
+        {configured && (
+          <Button variant="outline" size="sm" onClick={handleRemove} disabled={isSaving}>
+            <X className="h-4 w-4" />
+            Remove
+          </Button>
+        )}
+      </div>
+
+      <p className="text-muted-foreground text-xs">
+        {channel.help}
+        {channelsDirty && ' Restart the instance for changes to take effect.'}
+      </p>
+    </div>
+  );
+}
 
 export function SettingsTab({
   status,
@@ -28,6 +148,7 @@ export function SettingsTab({
   const { data: config } = useKiloClawConfig();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
   const [confirmDestroy, setConfirmDestroy] = useState(false);
+  const [channelsDirty, setChannelsDirty] = useState(false);
 
   const modelOptions = useMemo<ModelOption[]>(
     () => (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
@@ -39,49 +160,16 @@ export function SettingsTab({
     modelOptions
   );
 
-  const [telegramBotToken, setTelegramBotToken] = useState('');
-  const [showToken, setShowToken] = useState(false);
-  const [channelsDirty, setChannelsDirty] = useState(false);
-
   const isSaving = mutations.patchConfig.isPending;
-  const isSavingChannels = mutations.patchChannels.isPending;
   const isDestroying = status.status === 'destroying';
   const isRunning = status.status === 'running';
 
-  const telegramConfigured = config?.channels?.telegram ?? false;
-
-  function handleSaveChannels() {
-    const trimmed = telegramBotToken.trim();
-    if (!trimmed) {
-      toast.error('Enter a bot token or use Remove to clear it.');
-      return;
-    }
-    mutations.patchChannels.mutate(
-      { telegramBotToken: trimmed },
-      {
-        onSuccess: () => {
-          toast.success('Telegram token saved. Restart to apply.');
-          setTelegramBotToken('');
-          setChannelsDirty(true);
-        },
-        onError: err => toast.error(`Failed to save: ${err.message}`),
-      }
-    );
-  }
-
-  function handleRemoveTelegram() {
-    mutations.patchChannels.mutate(
-      { telegramBotToken: null },
-      {
-        onSuccess: () => {
-          toast.success('Telegram token removed. Restart to apply.');
-          setTelegramBotToken('');
-          setChannelsDirty(true);
-        },
-        onError: err => toast.error(`Failed to remove: ${err.message}`),
-      }
-    );
-  }
+  const channelStatus = config?.channels ?? {
+    telegram: false,
+    discord: false,
+    slackBot: false,
+    slackApp: false,
+  };
 
   function handleSave() {
     posthog?.capture('claw_save_config_clicked', {
@@ -149,76 +237,17 @@ export function SettingsTab({
           configured in the OpenClaw Control UI after connecting.
         </p>
 
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="settings-telegram-token" className="w-32 shrink-0">
-              Telegram
-            </Label>
-            <span className="text-muted-foreground text-xs">
-              {telegramConfigured ? 'Configured' : 'Not configured'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Input
-                id="settings-telegram-token"
-                type="text"
-                placeholder={
-                  telegramConfigured ? 'Enter new token to replace' : '123456:ABC-DEF...'
-                }
-                value={telegramBotToken}
-                onChange={e => setTelegramBotToken(e.target.value)}
-                disabled={isSavingChannels}
-                data-1p-ignore
-                autoComplete="off"
-                className="pr-9"
-                style={
-                  showToken ? undefined : ({ WebkitTextSecurity: 'disc' } as React.CSSProperties)
-                }
-              />
-              <button
-                type="button"
-                onClick={() => setShowToken(v => !v)}
-                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
-                tabIndex={-1}
-              >
-                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <Button
-              size="sm"
-              onClick={handleSaveChannels}
-              disabled={isSavingChannels || !telegramBotToken.trim()}
-            >
-              <Save className="h-4 w-4" />
-              {isSavingChannels ? 'Saving...' : 'Save'}
-            </Button>
-            {telegramConfigured && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRemoveTelegram}
-                disabled={isSavingChannels}
-              >
-                <X className="h-4 w-4" />
-                Remove
-              </Button>
-            )}
-          </div>
-
-          <p className="text-muted-foreground text-xs">
-            Get a token from{' '}
-            <a
-              href="https://t.me/BotFather"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              @BotFather
-            </a>
-            .{channelsDirty && ' Restart the instance for changes to take effect.'}
-          </p>
+        <div className="space-y-6">
+          {CHANNEL_TYPES.map(type => (
+            <ChannelSection
+              key={type}
+              channel={CHANNELS[type]}
+              configured={CHANNELS[type].configuredCheck(channelStatus)}
+              mutations={mutations}
+              channelsDirty={channelsDirty}
+              setChannelsDirty={setChannelsDirty}
+            />
+          ))}
         </div>
       </div>
 

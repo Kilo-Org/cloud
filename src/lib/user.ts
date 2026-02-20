@@ -393,7 +393,7 @@ export class SoftDeletePreconditionError extends Error {
  * - referral_codes (user's own code)
  * - magic_link_tokens (email-based)
  * - organization_memberships (removed from all orgs)
- * - organization_invitations (sent by user)
+ * - organization_invitations (sent by user + addressed to user's email)
  * - organization_user_limits/usage
  * - organization_audit_logs (actor PII nulled)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
@@ -410,28 +410,29 @@ export async function softDeleteUser(userId: string) {
   const user = await findUserById(userId);
   if (!user) return; // Nothing to do for non-existent user
 
-  // ── Precondition checks ──────────────────────────────────────────────
-  const activeSubscriptions = await db
-    .select({ id: kilo_pass_subscriptions.id })
-    .from(kilo_pass_subscriptions)
-    .where(
-      and(
-        eq(kilo_pass_subscriptions.kilo_user_id, userId),
-        eq(kilo_pass_subscriptions.status, 'active'),
-        eq(kilo_pass_subscriptions.cancel_at_period_end, false)
-      )
-    );
-
-  if (activeSubscriptions.length > 0) {
-    throw new SoftDeletePreconditionError(
-      `User ${userId} has an active Kilo Pass subscription. Cancel the subscription before deleting the account.`
-    );
-  }
-
-  // Grab the original email before we anonymize — needed for magic_link_tokens cleanup
+  // Grab the original email before we anonymize — needed for cleanup of
+  // magic_link_tokens and organization_invitations addressed to this user.
   const originalEmail = user.google_user_email;
 
   await db.transaction(async tx => {
+    // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
+    const activeSubscriptions = await tx
+      .select({ id: kilo_pass_subscriptions.id })
+      .from(kilo_pass_subscriptions)
+      .where(
+        and(
+          eq(kilo_pass_subscriptions.kilo_user_id, userId),
+          eq(kilo_pass_subscriptions.status, 'active'),
+          eq(kilo_pass_subscriptions.cancel_at_period_end, false)
+        )
+      );
+
+    if (activeSubscriptions.length > 0) {
+      throw new SoftDeletePreconditionError(
+        `User ${userId} has an active Kilo Pass subscription. Cancel the subscription before deleting the account.`
+      );
+    }
+
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx
       .update(kilocode_users)
@@ -444,7 +445,7 @@ export async function softDeleteUser(userId: string) {
         github_url: null,
         api_token_pepper: null,
         default_model: null,
-        blocked_reason: 'soft-deleted',
+        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
         auto_top_up_enabled: false,
         completed_welcome_form: false,
         cohorts: {},
@@ -463,9 +464,13 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(organization_memberships)
       .where(eq(organization_memberships.kilo_user_id, userId));
+    // Delete invitations sent BY this user and invitations sent TO this user's email
     await tx
       .delete(organization_invitations)
       .where(eq(organization_invitations.invited_by, userId));
+    await tx
+      .delete(organization_invitations)
+      .where(eq(organization_invitations.email, originalEmail));
     await tx
       .delete(organization_user_limits)
       .where(eq(organization_user_limits.kilo_user_id, userId));

@@ -15,6 +15,7 @@ import {
   organization_user_limits,
   organization_user_usage,
   organization_audit_logs,
+  organization_invitations,
   free_model_usage,
   organizations,
   user_feedback,
@@ -48,6 +49,7 @@ describe('User', () => {
     await db.delete(referral_code_usages);
     await db.delete(referral_codes);
     await db.delete(organization_audit_logs);
+    await db.delete(organization_invitations);
     await db.delete(organization_user_usage);
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
@@ -83,7 +85,7 @@ describe('User', () => {
       expect(softDeleted!.github_url).toBeNull();
       expect(softDeleted!.api_token_pepper).toBeNull();
       expect(softDeleted!.default_model).toBeNull();
-      expect(softDeleted!.blocked_reason).toBe('soft-deleted');
+      expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
       expect(softDeleted!.auto_top_up_enabled).toBe(false);
       expect(softDeleted!.completed_welcome_form).toBe(false);
       expect(softDeleted!.is_admin).toBe(false);
@@ -261,6 +263,60 @@ describe('User', () => {
 
       // User1 row should still exist (soft-deleted)
       expect(await findUserById(user1.id)).toBeDefined();
+    });
+
+    it('should delete organization invitations sent by and addressed to the user', async () => {
+      const user1 = await insertTestUser({ google_user_email: 'invitee@example.com' });
+      const user2 = await insertTestUser();
+
+      const orgId = randomUUID();
+      await db.insert(organizations).values({
+        id: orgId,
+        name: 'Test Org',
+        stripe_customer_id: `stripe-org-${orgId}`,
+        plan: 'teams',
+      });
+
+      const futureDate = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
+
+      // Invitation sent BY user1
+      await db.insert(organization_invitations).values({
+        organization_id: orgId,
+        email: 'someone@example.com',
+        role: 'member',
+        invited_by: user1.id,
+        token: 'token-from-user1',
+        expires_at: futureDate,
+      });
+
+      // Invitation sent TO user1's email (user1 is the invitee)
+      await db.insert(organization_invitations).values({
+        organization_id: orgId,
+        email: 'invitee@example.com',
+        role: 'member',
+        invited_by: user2.id,
+        token: 'token-to-user1',
+        expires_at: futureDate,
+      });
+
+      // Invitation for user2 (should not be affected)
+      await db.insert(organization_invitations).values({
+        organization_id: orgId,
+        email: user2.google_user_email,
+        role: 'member',
+        invited_by: user2.id,
+        token: 'token-for-user2',
+        expires_at: futureDate,
+      });
+
+      expect((await db.select({ count: count() }).from(organization_invitations))[0].count).toBe(3);
+
+      await softDeleteUser(user1.id);
+
+      // Both invitations involving user1 should be deleted
+      const remaining = await db.select().from(organization_invitations);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].email).toBe(user2.google_user_email);
     });
 
     it('should anonymize organization audit logs', async () => {
@@ -470,7 +526,7 @@ describe('User', () => {
       await expect(softDeleteUser(user.id)).resolves.not.toThrow();
 
       const softDeleted = await findUserById(user.id);
-      expect(softDeleted!.blocked_reason).toBe('soft-deleted');
+      expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
     });
 
     it('should handle soft-delete of non-existent user gracefully', async () => {

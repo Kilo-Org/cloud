@@ -38,6 +38,12 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills \
     && chown -R openclaw:openclaw /root
 
+# Grant openclaw user write access to npm global directories
+# so runtime `npm install -g` (e.g. skill installs) works as non-root
+RUN chown -R openclaw:openclaw /usr/local/lib/node_modules \
+    && chown -R openclaw:openclaw /usr/local/bin \
+    && chown -R openclaw:openclaw /usr/local/etc
+
 # Copy startup script
 # Build cache bust: 2026-02-18-v46-discord-slack-plugins
 RUN echo "4"

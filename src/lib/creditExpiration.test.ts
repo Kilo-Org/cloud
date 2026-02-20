@@ -889,8 +889,6 @@ describe('processLocalExpirations', () => {
   };
 
   it('simultaneous expiry of two credit grants with interleaved usage resets balance to zero', async () => {
-    jest.setSystemTime(new Date('2026-01-01 00:00:00+00'));
-
     let user = await insertMigratedTestUser({});
 
     await insertCreditTransaction(user.id, {
@@ -900,8 +898,6 @@ describe('processLocalExpirations', () => {
       expiration_baseline_microdollars_used: 0,
       description: '$20 welcome credits',
     });
-
-    jest.setSystemTime(new Date('2024-01-02 00:00:00+00'));
 
     await accrueUsage(user.id, 2);
 
@@ -924,9 +920,8 @@ describe('processLocalExpirations', () => {
 
     user = await refetchUser(user.id);
 
-    jest.setSystemTime(new Date('2026-01-05 00:00:00+00'));
-
-    await processLocalExpirations(user, new Date());
+    const now = new Date('2026-01-05T00:00:00Z');
+    await processLocalExpirations(user, now);
 
     user = await refetchUser(user.id);
 

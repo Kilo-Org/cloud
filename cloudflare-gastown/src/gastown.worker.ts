@@ -86,12 +86,11 @@ import {
   handleAcknowledgeEscalation,
 } from './handlers/town-escalations.handler';
 
-export { RigDO } from './dos/Rig.do';
 export { GastownUserDO } from './dos/GastownUser.do';
 export { AgentIdentityDO } from './dos/AgentIdentity.do';
 export { TownDO } from './dos/Town.do';
 export { TownContainerDO } from './dos/TownContainer.do';
-export { MayorDO } from './dos/Mayor.do';
+export { AgentDO } from './dos/Agent.do';
 
 export type GastownEnv = {
   Bindings: Env;

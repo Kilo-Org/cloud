@@ -162,19 +162,13 @@ export default function OrganizationAppSidebar({
           },
         ]
       : []),
+    {
+      title: 'Auto Triage',
+      icon: ListChecks,
+      url: `/organizations/${organizationId}/auto-triage`,
+    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          {
-            title: 'Auto Triage',
-            icon: ListChecks,
-            url: `/organizations/${organizationId}/auto-triage`,
-          },
-          {
-            title: 'Auto Fix',
-            icon: Wrench,
-            url: `/organizations/${organizationId}/auto-fix`,
-          },
-        ]
+      ? [{ title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` }]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [

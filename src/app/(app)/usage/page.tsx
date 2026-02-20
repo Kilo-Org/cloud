@@ -30,6 +30,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 type UsageData = {
   date: string;
   model?: string;
+  feature?: string | null;
   total_cost: number;
   request_count: number;
   total_input_tokens: number;
@@ -369,6 +370,11 @@ export default function UsagePage() {
         ]
       : []),
     {
+      key: 'feature',
+      label: 'Feature',
+      render: (value: unknown) => (value as string) || '—',
+    },
+    {
       key: 'cost',
       label: 'Cost',
       render: value => formatDollars(fromMicrodollars(value as number)),
@@ -396,9 +402,10 @@ export default function UsagePage() {
   ];
 
   const tableData: UsageTableRow[] = usageData.usage.map(item => ({
-    id: `${item.date}-${item.model || 'all'}`,
+    id: `${item.date}-${item.model || 'all'}-${item.feature || 'none'}`,
     date: item.date,
     ...(groupByModel && { model: item.model }),
+    feature: item.feature || null,
     cost: item.total_cost,
     requests: item.request_count,
     inputTokens: item.total_input_tokens,

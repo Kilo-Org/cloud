@@ -254,7 +254,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const taskId = request.headers.get('X-KiloCode-TaskId') ?? undefined;
+  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const { provider, userByok, customLlm } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
@@ -322,6 +322,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
     botId,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
+    session_id: taskId ?? null,
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);

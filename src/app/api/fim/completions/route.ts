@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
 
   // Extract properties for usage context
   const tokenEstimates = estimateFimTokens(requestBody);
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
     user_byok: !!userByok,
     has_tools: false,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
+    session_id: taskId ?? null,
   };
 
   setTag('ui.ai_model', fimModel_withOpenRouterStyleProviderPrefix);

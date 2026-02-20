@@ -3,6 +3,7 @@ import { debugSaveProxyResponseStream } from '../debugUtils';
 import { fetchWithBackoff } from '../fetchWithBackoff';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type {
+  MessageWithReasoning,
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
 } from '@/lib/providers/openrouter/types';
@@ -40,6 +41,7 @@ import { isAnonymousContext } from '@/lib/anonymous';
 import { isOpenAiModel } from '@/lib/providers/openai';
 import { applyQwenModelSettings, isQwenModel } from '@/lib/providers/qwen';
 import type { ProviderId } from '@/lib/providers/provider-id';
+import { ReasoningDetailType } from '@/lib/custom-llm/reasoning-details';
 
 export type Provider = {
   id: ProviderId;
@@ -255,6 +257,46 @@ function applyPreferredProvider(
     requestToMutate.provider = { order: [preferredProvider] };
   } else if (!requestToMutate.provider.order) {
     requestToMutate.provider.order = [preferredProvider];
+  }
+}
+
+export function isModernOpenCodeBasedClient(headers: { http_user_agent: string | null }) {
+  return headers.http_user_agent === 'opencode-kilo-provider';
+}
+
+export function isLegacyRooBasedClient(headers: { http_user_agent: string | null }) {
+  return headers.http_user_agent?.startsWith('Kilo-Code/') === true;
+}
+
+export function fixDuplicatedReasoning(requestToMutate: OpenRouterChatCompletionRequest) {
+  // workaround for several bugs in @openrouter/ai-sdk-provider v1 where it duplicates or doesn't merge reasoning correctly
+  for (const msg of requestToMutate.messages ?? []) {
+    if (msg.role !== 'assistant') {
+      continue;
+    }
+    const msgWithReasoning = msg as MessageWithReasoning;
+    if (!msgWithReasoning.reasoning_details || msgWithReasoning.reasoning_details.length <= 1) {
+      continue;
+    }
+    // it appears the last item is correct
+    const lastEncryptedItem = msgWithReasoning.reasoning_details.findLast(
+      rd => rd.type === ReasoningDetailType.Encrypted
+    );
+    const lastSignedItem = msgWithReasoning.reasoning_details.findLast(
+      rd => rd.type === ReasoningDetailType.Text && rd.signature
+    );
+    const lastTextItem = msgWithReasoning.reasoning_details.findLast(
+      rd => rd.type === ReasoningDetailType.Text
+    );
+    const prevailingItem = lastEncryptedItem ?? lastSignedItem ?? lastTextItem;
+    if (!prevailingItem) {
+      continue;
+    }
+    console.debug(
+      '[fixDuplicatedReasoning] removing all but one item',
+      msgWithReasoning.reasoning_details
+    );
+    msgWithReasoning.reasoning_details = [prevailingItem];
   }
 }
 

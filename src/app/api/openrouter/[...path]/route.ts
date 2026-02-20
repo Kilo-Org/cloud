@@ -5,7 +5,14 @@ import { generateProviderSpecificHash } from '@/lib/providerHash';
 import { extractPromptInfo, type MicrodollarUsageContext } from '@/lib/processUsage';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
-import { applyProviderSpecificLogic, getProvider, openRouterRequest } from '@/lib/providers';
+import {
+  applyProviderSpecificLogic,
+  fixDuplicatedReasoning,
+  getProvider,
+  isLegacyRooBasedClient,
+  isModernOpenCodeBasedClient,
+  openRouterRequest,
+} from '@/lib/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -384,6 +391,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     repairTools(requestBodyParsed);
   }
 
+  if (isModernOpenCodeBasedClient(fraudHeaders)) {
+    fixDuplicatedReasoning(requestBodyParsed);
+  }
+
   const toolsAvailable = getToolsAvailable(requestBodyParsed.tools);
   const toolsUsed = getToolsUsed(requestBodyParsed.messages);
 
@@ -397,11 +408,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const response = customLlm
-    ? await customLlmRequest(
-        customLlm,
-        requestBodyParsed,
-        !!fraudHeaders.http_user_agent?.startsWith('Kilo-Code/')
-      )
+    ? await customLlmRequest(customLlm, requestBodyParsed, isLegacyRooBasedClient(fraudHeaders))
     : await openRouterRequest({
         path,
         search: url.search,

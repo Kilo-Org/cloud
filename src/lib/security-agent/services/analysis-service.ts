@@ -730,6 +730,7 @@ export async function startSecurityAnalysis(params: {
       prompt,
       mode: 'code',
       model,
+      createdOnPlatform: 'security-agent',
     });
 
     const owner: SecurityReviewOwner = organizationId ? { organizationId } : { userId: user.id };

@@ -6,9 +6,9 @@ describe('generateProviderSpecificHash', () => {
 
   it('should generate different hashes for different providers', () => {
     const openRouterHash = generateProviderSpecificHash(testUserId, PROVIDERS.OPENROUTER);
-    const grokHash = generateProviderSpecificHash(testUserId, PROVIDERS.XAI);
+    const vercelHash = generateProviderSpecificHash(testUserId, PROVIDERS.VERCEL_AI_GATEWAY);
 
-    expect(openRouterHash).not.toBe(grokHash);
+    expect(openRouterHash).not.toBe(vercelHash);
   });
 
   it('should generate consistent hashes for the same provider and user', () => {
@@ -26,7 +26,7 @@ describe('generateProviderSpecificHash', () => {
   });
 
   it('should return a base64 encoded string', () => {
-    const hash = generateProviderSpecificHash(testUserId, PROVIDERS.XAI);
+    const hash = generateProviderSpecificHash(testUserId, PROVIDERS.VERCEL_AI_GATEWAY);
 
     // Base64 pattern check
     expect(hash).toMatch(/^[A-Za-z0-9+/]+=*$/);

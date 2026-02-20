@@ -19,7 +19,8 @@ RUN apt-get update && \
 # explicitly install the platform-specific binary package alongside the CLI.
 # Also install @kilocode/plugin globally so repo-local tools (e.g.
 # .opencode/tool/*.ts) can resolve it without a local node_modules.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64 @kilocode/plugin
+RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64 @kilocode/plugin && \
+    ln -s "$(which kilo)" /usr/local/bin/opencode
 
 # Create workspace directories
 RUN mkdir -p /workspace/rigs /app

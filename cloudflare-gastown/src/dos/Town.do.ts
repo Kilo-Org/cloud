@@ -143,8 +143,15 @@ export class TownDO extends DurableObject<Env> {
     );
   }
 
+  private _townId: string | null = null;
+
   private get townId(): string {
-    return this.ctx.id.name ?? '';
+    // ctx.id.name is populated when the DO is accessed via idFromName().
+    // Cache it in a field since it's used frequently.
+    if (this._townId === null) {
+      this._townId = this.ctx.id.name ?? this.ctx.id.toString();
+    }
+    return this._townId;
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -518,14 +525,39 @@ export class TownDO extends DurableObject<Env> {
   async getMayorStatus(): Promise<{
     configured: boolean;
     townId: string;
-    agent: Agent | null;
+    session: {
+      agentId: string;
+      sessionId: string;
+      status: 'idle' | 'active' | 'starting';
+      lastActivityAt: string;
+    } | null;
   }> {
     await this.ensureInitialized();
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+
+    // Map agent status to the session status the frontend expects
+    const mapStatus = (agentStatus: string): 'idle' | 'active' | 'starting' => {
+      switch (agentStatus) {
+        case 'working':
+          return 'active';
+        case 'blocked':
+          return 'active';
+        default:
+          return 'idle';
+      }
+    };
+
     return {
       configured: true,
       townId: this.townId,
-      agent: mayor,
+      session: mayor
+        ? {
+            agentId: mayor.id,
+            sessionId: mayor.id, // No separate session concept — use agentId
+            status: mapStatus(mayor.status),
+            lastActivityAt: mayor.last_activity_at ?? mayor.created_at,
+          }
+        : null,
     };
   }
 

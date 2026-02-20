@@ -9,7 +9,7 @@ import {
   opus_46_free_slackbot_model,
 } from '@/lib/providers/anthropic';
 import { corethink_free_model } from '@/lib/providers/corethink';
-import { giga_potato_model } from '@/lib/providers/gigapotato';
+import { giga_potato_model, giga_potato_thinking_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m25_free_model } from '@/lib/providers/minimax';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
@@ -23,7 +23,8 @@ export const preferredModels = [
   KILO_AUTO_MODEL_ID,
   minimax_m25_free_model.is_enabled ? minimax_m25_free_model.public_id : 'minimax/minimax-m2.5',
   zai_glm5_free_model.is_enabled ? zai_glm5_free_model.public_id : 'z-ai/glm-5',
-  giga_potato_model.public_id,
+  giga_potato_model.is_enabled ? giga_potato_model.public_id : null,
+  giga_potato_thinking_model.is_enabled ? giga_potato_thinking_model.public_id : null,
   'arcee-ai/trinity-large-preview:free',
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
@@ -34,7 +35,7 @@ export const preferredModels = [
   'google/gemini-3-flash-preview',
   'moonshotai/kimi-k2.5',
   'x-ai/grok-code-fast-1',
-];
+].filter(Boolean) as string[];
 
 export function getFirstFreeModel() {
   return preferredModels.find(m => isFreeModel(m)) ?? PRIMARY_DEFAULT_MODEL;
@@ -60,6 +61,7 @@ export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {
 export const kiloFreeModels = [
   corethink_free_model,
   giga_potato_model,
+  giga_potato_thinking_model,
   minimax_m21_free_model,
   minimax_m25_free_model,
   opus_46_free_slackbot_model,

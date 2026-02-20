@@ -132,6 +132,9 @@ export const TownConfigSchema = z.object({
     })
     .default({}),
 
+  /** Kilo API token for LLM gateway authentication */
+  kilocode_token: z.string().optional(),
+
   /** Default LLM model for new agent sessions */
   default_model: z.string().optional(),
 

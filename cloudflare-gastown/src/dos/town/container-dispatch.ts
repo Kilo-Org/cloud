@@ -159,7 +159,9 @@ export async function startAgentInContainer(
     }
 
     if (token) envVars.GASTOWN_SESSION_TOKEN = token;
-    if (params.kilocodeToken) envVars.KILOCODE_TOKEN = params.kilocodeToken;
+    // kilocodeToken: prefer rig-level, fall back to town config
+    const kilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
+    if (kilocodeToken) envVars.KILOCODE_TOKEN = kilocodeToken;
 
     const containerConfig = await buildContainerConfig(storage, env);
     const container = getTownContainerStub(env, params.townId);
@@ -246,7 +248,8 @@ export async function startMergeInContainer(
     }
     if (token) envVars.GASTOWN_SESSION_TOKEN = token;
     if (env.GASTOWN_API_URL) envVars.GASTOWN_API_URL = env.GASTOWN_API_URL;
-    if (params.kilocodeToken) envVars.KILOCODE_TOKEN = params.kilocodeToken;
+    const mergeKilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
+    if (mergeKilocodeToken) envVars.KILOCODE_TOKEN = mergeKilocodeToken;
 
     const containerConfig = await buildContainerConfig(storage, env);
     const container = getTownContainerStub(env, params.townId);

@@ -76,6 +76,7 @@ export async function buildContainerConfig(
     env_vars: config.env_vars,
     default_model: config.default_model ?? 'anthropic/claude-sonnet-4.6',
     git_auth: config.git_auth,
+    kilocode_token: config.kilocode_token,
     kilo_api_url: env.KILO_API_URL ?? '',
     gastown_api_url: env.GASTOWN_API_URL ?? '',
   };

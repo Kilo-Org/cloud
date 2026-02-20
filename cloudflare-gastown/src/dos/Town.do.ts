@@ -199,6 +199,15 @@ export class TownDO extends DurableObject<Env> {
 
   async configureRig(rigConfig: RigConfig): Promise<void> {
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
+
+    // Store kilocodeToken in town config so it's available to all agents
+    // (including the mayor) without needing a rig config lookup.
+    if (rigConfig.kilocodeToken) {
+      const townConfig = await this.getTownConfig();
+      if (!townConfig.kilocode_token) {
+        await this.updateTownConfig({ kilocode_token: rigConfig.kilocodeToken });
+      }
+    }
   }
 
   async getRigConfig(rigId: string): Promise<RigConfig | null> {

@@ -232,18 +232,17 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     (modelId: string, nextAllowed: boolean) => {
       if (!canEdit) return;
 
-      // If trying to enable a model, check if it has any enabled providers
+      // If trying to enable a model, check if it has any enabled providers.
+      // A missing index entry (no known providers) is treated the same as having none enabled.
       if (nextAllowed) {
         const providersForModel = selectors.modelProvidersIndex.get(modelId);
-        if (providersForModel) {
-          const hasEnabledProvider = [...providersForModel].some(providerSlug =>
-            enabledProviderSlugs.has(providerSlug)
-          );
-          if (!hasEnabledProvider) {
-            // No enabled providers - open the model details dialog instead
-            actions.setInfoModelId(modelId);
-            return;
-          }
+        const hasEnabledProvider =
+          providersForModel !== undefined &&
+          [...providersForModel].some(providerSlug => enabledProviderSlugs.has(providerSlug));
+        if (!hasEnabledProvider) {
+          // No enabled providers - open the model details dialog instead
+          actions.setInfoModelId(modelId);
+          return;
         }
       }
 

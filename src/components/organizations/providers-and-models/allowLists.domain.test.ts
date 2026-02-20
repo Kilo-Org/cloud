@@ -260,4 +260,65 @@ describe('allowLists.domain', () => {
     // shared/model-1 is also from openai, so it's NOT orphaned
     expect(orphaned).toEqual(['cerebras/llama-70b']);
   });
+
+  test('computeModelsOnlyFromProvider treats empty allow list as "all models"', () => {
+    const modelProvidersIndex = buildModelProvidersIndex([
+      {
+        slug: 'cerebras',
+        models: [
+          { slug: 'cerebras/llama-70b', endpoint: {} },
+          { slug: 'shared/model-1', endpoint: {} },
+        ],
+      },
+      {
+        slug: 'openai',
+        models: [{ slug: 'shared/model-1', endpoint: {} }],
+      },
+    ]);
+
+    const orphaned = computeModelsOnlyFromProvider({
+      providerSlug: 'cerebras',
+      draftModelAllowList: [],
+      draftProviderAllowList: ['cerebras', 'openai'],
+      allProviderSlugsWithEndpoints: ['cerebras', 'openai'],
+      modelProvidersIndex,
+    });
+
+    // All models are implicitly allowed; cerebras/llama-70b has no remaining enabled provider
+    expect(orphaned).toEqual(['cerebras/llama-70b']);
+  });
+
+  test('toggleProviderEnabled(disable) removes orphaned models when model allow list is empty', () => {
+    const modelProvidersIndex = buildModelProvidersIndex([
+      {
+        slug: 'cerebras',
+        models: [
+          { slug: 'cerebras/llama-70b', endpoint: {} },
+          { slug: 'shared/model-1', endpoint: {} },
+        ],
+      },
+      {
+        slug: 'openai',
+        models: [
+          { slug: 'openai/gpt-4.1', endpoint: {} },
+          { slug: 'shared/model-1', endpoint: {} },
+        ],
+      },
+    ]);
+
+    const { nextModelAllowList, nextProviderAllowList } = toggleProviderEnabled({
+      providerSlug: 'cerebras',
+      nextEnabled: false,
+      draftProviderAllowList: ['cerebras', 'openai'],
+      draftModelAllowList: [],
+      allProviderSlugsWithEndpoints: ['cerebras', 'openai'],
+      hadAllProvidersInitially: false,
+      modelProvidersIndex,
+    });
+
+    // cerebras/llama-70b is only from cerebras and must be excluded
+    // shared/model-1 and openai/gpt-4.1 remain available via openai
+    expect(nextModelAllowList.sort()).toEqual(['openai/gpt-4.1', 'shared/model-1']);
+    expect(nextProviderAllowList).toEqual(['openai']);
+  });
 });

@@ -94,11 +94,12 @@ export function computeAllowedModelIds(
   draftModelAllowList: ReadonlyArray<string>,
   openRouterModels: ReadonlyArray<OpenRouterModelSlugSnapshot>,
   openRouterProviders: OpenRouterProviderModelsSnapshot,
-  enabledProviderSlugs?: ReadonlySet<string>
+  enabledProviderSlugs?: ReadonlySet<string>,
+  modelProvidersIndex?: Map<string, Set<string>>
 ): Set<string> {
   const allowed = new Set<string>();
-  const modelProvidersIndex = enabledProviderSlugs
-    ? buildModelProvidersIndex(openRouterProviders)
+  const resolvedModelProvidersIndex = enabledProviderSlugs
+    ? (modelProvidersIndex ?? buildModelProvidersIndex(openRouterProviders))
     : null;
 
   if (draftModelAllowList.length === 0) {
@@ -106,8 +107,8 @@ export function computeAllowedModelIds(
       const normalizedModelId = normalizeModelId(model.slug);
 
       // If enabledProviderSlugs is provided, filter models without enabled providers
-      if (enabledProviderSlugs && modelProvidersIndex) {
-        const providersForModel = modelProvidersIndex.get(normalizedModelId);
+      if (enabledProviderSlugs && resolvedModelProvidersIndex) {
+        const providersForModel = resolvedModelProvidersIndex.get(normalizedModelId);
         if (!providersForModel) continue; // Exclude models with unknown providers
         let hasEnabledProvider = false;
         for (const providerSlug of providersForModel) {
@@ -139,8 +140,8 @@ export function computeAllowedModelIds(
 
     // If enabledProviderSlugs is provided, also check that at least one provider
     // offering this model is enabled
-    if (enabledProviderSlugs && modelProvidersIndex) {
-      const providersForModel = modelProvidersIndex.get(normalizedModelId);
+    if (enabledProviderSlugs && resolvedModelProvidersIndex) {
+      const providersForModel = resolvedModelProvidersIndex.get(normalizedModelId);
       if (!providersForModel) continue; // Exclude models with unknown providers
       let hasEnabledProvider = false;
       for (const providerSlug of providersForModel) {
@@ -189,18 +190,27 @@ export function computeModelsOnlyFromProvider(params: {
 
   const orphanedModels: string[] = [];
 
-  // Collect all model IDs to check, expanding wildcards to concrete models
+  // Collect all model IDs to check, expanding wildcards to concrete models.
+  // An empty allow list means "all models allowed", so check every known model.
   const modelIdsToCheck = new Set<string>();
-  for (const entry of draftModelAllowList) {
-    if (entry.endsWith('/*')) {
-      const providerPrefix = entry.slice(0, -2);
-      for (const [modelId, providers] of modelProvidersIndex) {
-        if (providers.has(providerPrefix)) {
-          modelIdsToCheck.add(modelId);
+  if (draftModelAllowList.length === 0) {
+    for (const modelId of modelProvidersIndex.keys()) {
+      modelIdsToCheck.add(modelId);
+    }
+  } else {
+    for (const entry of draftModelAllowList) {
+      if (entry.endsWith('/*')) {
+        const providerPrefix = entry.slice(0, -2);
+        for (const [modelId, providers] of modelProvidersIndex) {
+          // Expand by provider-membership OR namespace prefix, mirroring the two wildcard
+          // match paths in isModelAllowedProviderAwareClient.
+          if (providers.has(providerPrefix) || modelId.startsWith(`${providerPrefix}/`)) {
+            modelIdsToCheck.add(modelId);
+          }
         }
+      } else {
+        modelIdsToCheck.add(normalizeModelId(entry));
       }
-    } else {
-      modelIdsToCheck.add(normalizeModelId(entry));
     }
   }
 
@@ -249,17 +259,28 @@ export function toggleProviderEnabled(params: {
     if (nextModelAllowList.length !== 0) {
       // Remove provider wildcard
       nextModelAllowList = nextModelAllowList.filter(entry => entry !== `${providerSlug}/*`);
+    }
 
-      // Remove models that would have zero enabled providers
-      if (modelProvidersIndex) {
-        const orphanedModels = computeModelsOnlyFromProvider({
-          providerSlug,
-          draftModelAllowList: nextModelAllowList,
-          draftProviderAllowList,
-          allProviderSlugsWithEndpoints,
-          modelProvidersIndex,
-        });
-        if (orphanedModels.length > 0) {
+    // Remove models that would have zero enabled providers.
+    // This must also run when the model allow list is empty ("allow all"), because
+    // computeModelsOnlyFromProvider treats an empty list as "all models in the index".
+    if (modelProvidersIndex) {
+      const orphanedModels = computeModelsOnlyFromProvider({
+        providerSlug,
+        draftModelAllowList: nextModelAllowList,
+        draftProviderAllowList,
+        allProviderSlugsWithEndpoints,
+        modelProvidersIndex,
+      });
+      if (orphanedModels.length > 0) {
+        if (nextModelAllowList.length === 0) {
+          // Materialise the implicit "all models" list, then exclude the orphaned ones.
+          // This transitions the allow list from "allow all" to "allow all except orphans".
+          const orphanedSet = new Set(orphanedModels);
+          nextModelAllowList = [...modelProvidersIndex.keys()].filter(
+            modelId => !orphanedSet.has(modelId)
+          );
+        } else {
           const orphanedSet = new Set(orphanedModels);
           nextModelAllowList = nextModelAllowList.filter(entry => {
             if (entry.endsWith('/*')) return true;

@@ -13,7 +13,8 @@ import { fetchAllDependabotAlerts } from '../github/dependabot-api';
 import { hasSecurityReviewPermissions } from '../github/permissions';
 import { parseDependabotAlerts } from '../parsers/dependabot-parser';
 import { upsertSecurityFinding } from '../db/security-findings';
-import { getSecurityAgentConfig } from '../db/security-config';
+import { getSecurityAgentConfig, getSecurityAgentConfigWithStatus } from '../db/security-config';
+import { upsertAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
   getSlaForSeverity,
   calculateSlaDueAt,
@@ -24,6 +25,7 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { sentryLogger } from '@/lib/utils.server';
 
 const log = sentryLogger('security-agent:sync', 'info');
+const warn = sentryLogger('security-agent:sync', 'warning');
 const logError = sentryLogger('security-agent:sync', 'error');
 
 /**
@@ -59,6 +61,7 @@ export async function syncDependabotAlertsForRepo(params: {
     created: 0,
     updated: 0,
     errors: 0,
+    staleRepos: [],
   };
 
   try {
@@ -69,7 +72,20 @@ export async function syncDependabotAlertsForRepo(params: {
     }
 
     // Fetch all alerts from Dependabot
-    const alerts = await fetchAllDependabotAlerts(installationId, repoOwner, repoName);
+    const fetchResult = await fetchAllDependabotAlerts(installationId, repoOwner, repoName);
+
+    if (fetchResult.status === 'repo_not_found') {
+      warn(`Repository ${repoFullName} no longer exists, marking as stale`);
+      result.staleRepos.push(repoFullName);
+      return result;
+    }
+
+    if (fetchResult.status === 'alerts_disabled') {
+      log(`Dependabot alerts disabled for ${repoFullName}, skipping`);
+      return result;
+    }
+
+    const alerts = fetchResult.alerts;
     log(`Fetched ${alerts.length} alerts from GitHub for ${repoFullName}`);
 
     // Parse alerts to our internal format
@@ -128,8 +144,9 @@ export async function syncDependabotAlertsForRepo(params: {
 }
 
 /**
- * Sync Dependabot alerts for all repositories of an owner
- * If all repositories fail to sync, throws the first error encountered
+ * Sync Dependabot alerts for all repositories of an owner.
+ * If all repositories fail to sync, throws the first error encountered.
+ * Stale repos (404 from GitHub) are collected and returned for pruning.
  */
 export async function syncAllReposForOwner(params: {
   owner: SecurityReviewOwner;
@@ -144,6 +161,7 @@ export async function syncAllReposForOwner(params: {
     created: 0,
     updated: 0,
     errors: 0,
+    staleRepos: [],
   };
 
   // Track the first error encountered to throw if all repos fail
@@ -163,6 +181,7 @@ export async function syncAllReposForOwner(params: {
       totalResult.created += result.created;
       totalResult.updated += result.updated;
       totalResult.errors += result.errors;
+      totalResult.staleRepos.push(...result.staleRepos);
       successfulRepos++;
     } catch (error) {
       totalResult.errors++;
@@ -182,29 +201,26 @@ export async function syncAllReposForOwner(params: {
   return totalResult;
 }
 
+type EnabledSecurityReviewConfig = {
+  owner: SecurityReviewOwner;
+  platformIntegrationId: string;
+  installationId: string;
+  repositories: string[];
+  /** Maps repo full_name to its numeric ID for pruning stale repos from selected_repository_ids */
+  repoNameToId: Map<string, number>;
+};
+
 /**
  * Get all enabled security review configurations with their integrations
  */
-export async function getEnabledSecurityReviewConfigs(): Promise<
-  Array<{
-    owner: SecurityReviewOwner;
-    platformIntegrationId: string;
-    installationId: string;
-    repositories: string[];
-  }>
-> {
+export async function getEnabledSecurityReviewConfigs(): Promise<EnabledSecurityReviewConfig[]> {
   // Get all enabled security_review configs
   const configs = await db
     .select()
     .from(agent_configs)
     .where(and(eq(agent_configs.agent_type, 'security_scan'), eq(agent_configs.is_enabled, true)));
 
-  const results: Array<{
-    owner: SecurityReviewOwner;
-    platformIntegrationId: string;
-    installationId: string;
-    repositories: string[];
-  }> = [];
+  const results: EnabledSecurityReviewConfig[] = [];
 
   for (const config of configs) {
     // Validate owner - database constraint ensures one is set, but TypeScript doesn't know
@@ -255,6 +271,9 @@ export async function getEnabledSecurityReviewConfigs(): Promise<
       continue;
     }
 
+    // Build name-to-id mapping for stale repo pruning
+    const repoNameToId = new Map(allRepositories.map(r => [r.full_name, r.id]));
+
     // Parse the security agent config to get repository selection settings
     const securityConfig = config.config as {
       repository_selection_mode?: 'all' | 'selected';
@@ -290,10 +309,65 @@ export async function getEnabledSecurityReviewConfigs(): Promise<
       platformIntegrationId: integration.id,
       installationId: integration.platform_installation_id,
       repositories: selectedRepos,
+      repoNameToId,
     });
   }
 
   return results;
+}
+
+const SECURITY_SCAN_AGENT_TYPE = 'security_scan';
+const SECURITY_SCAN_PLATFORM = 'github';
+
+/**
+ * Remove stale repos (deleted/transferred on GitHub) from the agent config's
+ * selected_repository_ids. Only applies when repository_selection_mode is 'selected'.
+ */
+async function pruneStaleReposFromConfig(
+  owner: SecurityReviewOwner,
+  staleRepoNames: string[],
+  repoNameToId: Map<string, number>
+): Promise<void> {
+  if (staleRepoNames.length === 0) return;
+
+  const staleIds = new Set(
+    staleRepoNames.map(name => repoNameToId.get(name)).filter((id): id is number => id != null)
+  );
+  if (staleIds.size === 0) return;
+
+  const agentOwner = toAgentConfigOwner(owner);
+  const configWithStatus = await getSecurityAgentConfigWithStatus(agentOwner);
+  if (!configWithStatus) return;
+
+  const { config, isEnabled } = configWithStatus;
+
+  // Only prune when using 'selected' mode with explicit repo IDs
+  if (
+    config.repository_selection_mode !== 'selected' ||
+    !config.selected_repository_ids ||
+    config.selected_repository_ids.length === 0
+  ) {
+    return;
+  }
+
+  const prunedIds = config.selected_repository_ids.filter(id => !staleIds.has(id));
+  if (prunedIds.length === config.selected_repository_ids.length) return;
+
+  const prunedRepoNames = staleRepoNames.filter(name => repoNameToId.has(name));
+  const removedCount = config.selected_repository_ids.length - prunedIds.length;
+  warn(
+    `Pruning ${removedCount} stale repo(s) from security config: ${prunedRepoNames.join(', ')}`,
+    { owner }
+  );
+
+  await upsertAgentConfigForOwner({
+    owner: agentOwner,
+    agentType: SECURITY_SCAN_AGENT_TYPE,
+    platform: SECURITY_SCAN_PLATFORM,
+    config: { ...config, selected_repository_ids: prunedIds },
+    isEnabled,
+    createdBy: 'system-sync-prune',
+  });
 }
 
 /**
@@ -319,6 +393,23 @@ export async function runFullSync(): Promise<{
       const result = await syncAllReposForOwner(config);
       totalSynced += result.synced;
       totalErrors += result.errors;
+
+      // Prune stale repos from config so they won't be retried on future syncs
+      if (result.staleRepos.length > 0) {
+        try {
+          await pruneStaleReposFromConfig(config.owner, result.staleRepos, config.repoNameToId);
+        } catch (pruneError) {
+          logError('Failed to prune stale repos from config', {
+            error: pruneError,
+            staleRepos: result.staleRepos,
+            owner: config.owner,
+          });
+          captureException(pruneError, {
+            tags: { operation: 'runFullSync', step: 'pruneStaleRepos' },
+            extra: { owner: config.owner, staleRepos: result.staleRepos },
+          });
+        }
+      }
     } catch (error) {
       totalErrors++;
       captureException(error, {

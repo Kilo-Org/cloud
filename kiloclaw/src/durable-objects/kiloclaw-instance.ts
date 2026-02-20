@@ -595,7 +595,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyConfig,
       flyMachineId,
       ['/usr/bin/env', 'HOME=/root', 'node', '/usr/local/bin/openclaw-pairing-list.js'],
-      20
+      60
     );
 
     const empty = {
@@ -663,7 +663,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyConfig,
       flyMachineId,
       ['/usr/bin/env', 'HOME=/root', 'openclaw', 'pairing', 'approve', channel, code, '--notify'],
-      15
+      60
     );
 
     const success = result.exit_code === 0;

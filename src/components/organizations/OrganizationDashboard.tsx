@@ -122,6 +122,7 @@ export function OrganizationDashboard({ organizationId, role, topupAmount }: Pro
           <NewOrganizationWelcomeHeader
             organizationId={organizationId}
             organizationName={organizationData.name}
+            plan={organizationData.plan}
             onDismiss={handleDismissNewOrgWelcome}
           />
         )}

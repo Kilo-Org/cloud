@@ -6,6 +6,7 @@
 import git from '@ashishkumar472/cf-git';
 import { MemFS } from './memfs';
 import { logger, formatError } from '../utils/logger';
+import { resolveHeadSymref, formatPacketLine } from './git-protocol-utils';
 import type { RepositoryBuildOptions } from '../types';
 
 export class GitCloneService {
@@ -58,12 +59,22 @@ export class GitCloneService {
         branches = [];
       }
 
+      // Determine symref target for HEAD
+      const symrefTarget = await resolveHeadSymref(fs, branches);
+
       // Git HTTP protocol: info/refs response format
       let response = '001e# service=git-upload-pack\n0000';
 
-      // HEAD ref with capabilities
-      const headLine = `${head} HEAD\0side-band-64k thin-pack ofs-delta agent=git/isomorphic-git\n`;
-      response += this.formatPacketLine(headLine);
+      // HEAD ref with capabilities (symref first per convention)
+      const capabilities = [
+        ...(symrefTarget ? [`symref=HEAD:${symrefTarget}`] : []),
+        'side-band-64k',
+        'thin-pack',
+        'ofs-delta',
+        'agent=git/isomorphic-git',
+      ].join(' ');
+      const headLine = `${head} HEAD\0${capabilities}\n`;
+      response += formatPacketLine(headLine);
 
       // Branch refs
       for (const branch of branches) {
@@ -73,7 +84,7 @@ export class GitCloneService {
             dir: '/',
             ref: `refs/heads/${branch}`,
           });
-          response += this.formatPacketLine(`${oid} refs/heads/${branch}\n`);
+          response += formatPacketLine(`${oid} refs/heads/${branch}\n`);
         } catch (err) {
           logger.warn('Failed to resolve branch ref', { branch, ...formatError(err) });
         }
@@ -201,15 +212,6 @@ export class GitCloneService {
     } catch (err) {
       logger.warn('Failed to read tree', { treeOid, ...formatError(err) });
     }
-  }
-
-  /**
-   * Format git packet line (4-byte hex length + data)
-   */
-  private static formatPacketLine(data: string): string {
-    const length = data.length + 4;
-    const hexLength = length.toString(16).padStart(4, '0');
-    return hexLength + data;
   }
 
   /**

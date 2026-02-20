@@ -148,13 +148,23 @@ function createFakeEnv() {
 function createInstance(
   storage = createFakeStorage(),
   env = createFakeEnv()
-): { instance: KiloClawInstance; storage: ReturnType<typeof createFakeStorage> } {
-  const ctx = { storage } as unknown;
+): {
+  instance: KiloClawInstance;
+  storage: ReturnType<typeof createFakeStorage>;
+  waitUntilPromises: Promise<unknown>[];
+} {
+  const waitUntilPromises: Promise<unknown>[] = [];
+  const ctx = {
+    storage,
+    waitUntil: (p: Promise<unknown>) => {
+      waitUntilPromises.push(p);
+    },
+  } as unknown;
   const instance = new KiloClawInstance(
     ctx as ConstructorParameters<typeof KiloClawInstance>[0],
     env as ConstructorParameters<typeof KiloClawInstance>[1]
   );
-  return { instance, storage };
+  return { instance, storage, waitUntilPromises };
 }
 
 /** Seed DO storage with a provisioned instance and trigger loadState. */
@@ -883,6 +893,137 @@ describe('deprioritizeRegion', () => {
 });
 
 // ============================================================================
+// Live check in getStatus()
+// ============================================================================
+
+describe('getStatus: throttled live Fly check', () => {
+  it('confirms running when Fly says started', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'started', config: {} });
+
+    const result = await instance.getStatus();
+
+    // Fire-and-forget: wait for the background check to complete
+    await Promise.all(waitUntilPromises);
+
+    expect(result.status).toBe('running');
+    expect(flyClient.getMachine).toHaveBeenCalledTimes(1);
+  });
+
+  it('flips to stopped in-memory when Fly says stopped', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped', config: {} });
+
+    // First call: fires the live check (fire-and-forget), returns cached 'running'
+    const result1 = await instance.getStatus();
+    await Promise.all(waitUntilPromises);
+
+    // Status was updated in-memory by the background check
+    // Second call should return 'stopped' (and not fire another check since status != running)
+    const result2 = await instance.getStatus();
+
+    expect(result1.status).toBe('running'); // fire-and-forget: first call returns cached
+    expect(result2.status).toBe('stopped'); // next call sees updated in-memory state
+    // No persistence — alarm loop owns that
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('leaves status as running for transitional states (starting)', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'starting', config: {} });
+
+    await instance.getStatus();
+    await Promise.all(waitUntilPromises);
+
+    // Second call: status should still be running
+    const result = await instance.getStatus();
+    expect(result.status).toBe('running');
+  });
+
+  it('leaves status as running for transitional states (stopping)', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopping', config: {} });
+
+    await instance.getStatus();
+    await Promise.all(waitUntilPromises);
+
+    const result = await instance.getStatus();
+    expect(result.status).toBe('running');
+  });
+
+  it('flips to stopped on 404 (machine gone)', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+
+    await instance.getStatus();
+    await Promise.all(waitUntilPromises);
+
+    const result = await instance.getStatus();
+    expect(result.status).toBe('stopped');
+    // No persistence
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('preserves cached status on transient Fly error', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('timeout', 503, 'retry'));
+
+    await instance.getStatus();
+    await Promise.all(waitUntilPromises);
+
+    const result = await instance.getStatus();
+    expect(result.status).toBe('running');
+  });
+
+  it('respects throttle — does not call Fly within window', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'started', config: {} });
+
+    // First call triggers live check
+    await instance.getStatus();
+    await Promise.all(waitUntilPromises);
+    expect(flyClient.getMachine).toHaveBeenCalledTimes(1);
+
+    // Second call within throttle window — should NOT call Fly again
+    await instance.getStatus();
+    await Promise.all(waitUntilPromises);
+    expect(flyClient.getMachine).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire live check when status is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped', flyMachineId: 'machine-1' });
+
+    await instance.getStatus();
+
+    expect(flyClient.getMachine).not.toHaveBeenCalled();
+  });
+
+  it('does not fire live check when flyMachineId is null', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyMachineId: null });
+
+    await instance.getStatus();
+
+    expect(flyClient.getMachine).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
 // Volume region validation before machine creation
 // ============================================================================
 
@@ -1171,5 +1312,50 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');
     // But machine was NOT created (retry failed)
     expect(storage._store.get('flyMachineId')).toBeNull();
+  });
+});
+
+// ============================================================================
+// stop() error handling
+// ============================================================================
+
+describe('stop: error propagation', () => {
+  it('propagates non-404 Fly errors', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.stopMachineAndWait as Mock).mockRejectedValue(
+      new FlyApiError('server error', 500, 'internal')
+    );
+
+    await expect(instance.stop()).rejects.toThrow('server error');
+
+    // Status should NOT have been written to stopped
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('treats 404 as success (machine already gone)', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.stopMachineAndWait as Mock).mockRejectedValue(
+      new FlyApiError('not found', 404, '{}')
+    );
+
+    await instance.stop();
+
+    expect(storage._store.get('status')).toBe('stopped');
+  });
+
+  it('succeeds when Fly stop completes normally', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.stopMachineAndWait as Mock).mockResolvedValue(undefined);
+
+    await instance.stop();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('lastStoppedAt')).toBeDefined();
   });
 });

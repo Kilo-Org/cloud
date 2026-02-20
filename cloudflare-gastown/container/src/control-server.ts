@@ -41,11 +41,25 @@ app.post('/agents/start', async c => {
   const body = await c.req.json().catch(() => null);
   const parsed = StartAgentRequest.safeParse(body);
   if (!parsed.success) {
+    console.error('[control-server] /agents/start: invalid request body', parsed.error.issues);
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
 
-  const agent = await runAgent(parsed.data);
-  return c.json(agent, 201);
+  console.log(
+    `[control-server] /agents/start: role=${parsed.data.role} name=${parsed.data.name} rigId=${parsed.data.rigId} agentId=${parsed.data.agentId}`
+  );
+
+  try {
+    const agent = await runAgent(parsed.data);
+    console.log(
+      `[control-server] /agents/start: success agentId=${agent.agentId} port=${agent.serverPort} session=${agent.sessionId}`
+    );
+    return c.json(agent, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[control-server] /agents/start: FAILED for ${parsed.data.name}: ${message}`);
+    return c.json({ error: message }, 500);
+  }
 });
 
 // POST /agents/:agentId/stop

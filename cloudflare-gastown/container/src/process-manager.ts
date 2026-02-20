@@ -117,8 +117,12 @@ export async function startAgent(
 
   try {
     // 1. Ensure kilo serve is running for this workdir
+    console.log(
+      `[startAgent] Active agents: ${agents.size}, active servers: ${activeServerCount()}`
+    );
     const port = await ensureServer(workdir, env);
     agent.serverPort = port;
+    console.log(`[startAgent] kilo serve ready on port ${port} for agent ${request.agentId}`);
 
     // 2. Create a session on the server
     const client = createKiloClient(port);
@@ -152,6 +156,9 @@ export async function startAgent(
         // just means "done with this turn," not "task finished." Only rig agents
         // (polecat, etc.) should exit on idle.
         if (isCompletionEvent(evt, { persistent: request.role === 'mayor' })) {
+          console.log(
+            `[startAgent] Completion detected for agent ${request.agentId} (${request.name}) role=${request.role} event=${evt.event}`
+          );
           agent.status = 'exited';
           agent.exitReason = 'completed';
           bufferAgentEvent(request.agentId, {
@@ -166,6 +173,9 @@ export async function startAgent(
         agent.lastActivityAt = new Date().toISOString();
       },
       onClose: reason => {
+        console.log(
+          `[startAgent] SSE closed for agent ${request.agentId} (${request.name}) role=${request.role} reason=${reason} currentStatus=${agent.status}`
+        );
         if (agent.status === 'running') {
           agent.status = 'failed';
           agent.exitReason = `SSE stream closed: ${reason}`;
@@ -275,10 +285,18 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
     throw new Error(`Agent ${agentId} is not running (status: ${agent.status})`);
   }
 
+  console.log(
+    `[sendMessage] agentId=${agentId} port=${agent.serverPort} session=${agent.sessionId} status=${agent.status} role=${agent.role} messageCount=${agent.messageCount}`
+  );
+
   const client = createKiloClient(agent.serverPort);
   await client.sendPromptAsync(agent.sessionId, { prompt });
   agent.messageCount++;
   agent.lastActivityAt = new Date().toISOString();
+
+  console.log(
+    `[sendMessage] sent successfully to agent ${agentId}, messageCount=${agent.messageCount}`
+  );
 }
 
 /**

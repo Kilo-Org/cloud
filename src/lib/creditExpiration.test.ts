@@ -873,6 +873,9 @@ describe('processLocalExpirations', () => {
       .update(kilocode_users)
       .set({
         total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${amount_microdollars}`,
+        ...(opts.expiry_date && {
+          next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${opts.expiry_date}), ${opts.expiry_date})`,
+        }),
       })
       .where(eq(kilocode_users.id, userId));
 

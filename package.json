@@ -25,7 +25,7 @@
     "prepare": "sh -c '[ \"$HUSKY\" = 0 ] && git config --unset core.hooksPath || husky'",
     "preinstall": "npx only-allow pnpm",
     "node": "node",
-    "script": "IS_SCRIPT=true vercel env run --environment=production -- tsx --tsconfig tsconfig.scripts.json",
+    "script": "IS_SCRIPT=true tsx --tsconfig tsconfig.scripts.json",
     "script:run": "tsx --tsconfig tsconfig.scripts.json src/scripts/index",
     "db:empty-database": "tsx --tsconfig tsconfig.scripts.json src/db/empty-database.ts",
     "drizzle": "drizzle-kit",

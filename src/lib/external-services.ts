@@ -1,7 +1,6 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
 
-import { safeDeleteStripeCustomer } from './stripe-client';
 import { captureException } from '@sentry/nextjs';
 import type { User } from '@/db/schema';
 import { db } from '@/lib/drizzle';
@@ -229,17 +228,22 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
 }
 
 /**
- * Delete user from all external services (Stripe, Customer.io, R2 blob storage).
+ * Clean up external services as part of user soft-delete.
+ *
+ * Removes the user from marketing systems (Customer.io) and deletes
+ * CLI session blobs from R2/Durable Objects (conversation data is PII).
+ *
+ * NOTE: The Stripe customer is intentionally preserved so that the
+ * billing link remains intact for financial record-keeping.
  *
  * All service deletions run concurrently via Promise.allSettled for performance.
  * Each individual service handler is resilient - errors are caught and logged
  * to Sentry but don't prevent other services from being cleaned up.
  */
-export async function deleteUserFromExternalServices(user: User): Promise<void> {
-  logExceptInTest(`Deleting user from external services: ${user.id}`);
+export async function softDeleteUserExternalServices(user: User): Promise<void> {
+  logExceptInTest(`Soft-deleting user from external services: ${user.id}`);
 
   const results = await Promise.allSettled([
-    safeDeleteStripeCustomer(user.stripe_customer_id),
     deleteUserFromCustomerIO(user.google_user_email),
     deleteCliSessionBlobs(user.id),
     deleteCliSessionV2Blobs(user.id),
@@ -251,11 +255,11 @@ export async function deleteUserFromExternalServices(user: User): Promise<void> 
       const message = `Unexpected external service deletion failure for user ${user.id}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
       errorExceptInTest(message);
       captureException(result.reason, {
-        tags: { source: 'external-services-deletion' },
+        tags: { source: 'external-services-soft-delete' },
         extra: { userId: user.id },
       });
     }
   }
 
-  logExceptInTest(`Completed external service deletions for user: ${user.id}`);
+  logExceptInTest(`Completed external service soft-delete for user: ${user.id}`);
 }

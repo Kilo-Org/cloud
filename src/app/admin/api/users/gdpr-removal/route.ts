@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
-import { deleteUserFromExternalServices } from '@/lib/external-services';
-import { deleteUserDatabaseRecords, findUserById } from '@/lib/user';
+import { softDeleteUserExternalServices } from '@/lib/external-services';
+import { softDeleteUser, SoftDeletePreconditionError, findUserById } from '@/lib/user';
 
 export async function POST(
   request: NextRequest
@@ -22,11 +22,18 @@ export async function POST(
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  await deleteUserFromExternalServices(user);
-  await deleteUserDatabaseRecords(userId);
+  try {
+    await softDeleteUser(userId);
+    await softDeleteUserExternalServices(user);
+  } catch (error) {
+    if (error instanceof SoftDeletePreconditionError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({
     success: true,
-    message: `All data for user ${user.google_user_email} has been permanently deleted`,
+    message: `Account for user ${userId} has been soft-deleted and PII removed`,
   });
 }

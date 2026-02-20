@@ -1426,7 +1426,7 @@ export class RigDO extends DurableObject<Env> {
     return this.registerAgent({ role, name, identity });
   }
 
-  /** Count agents of a given role (all statuses). */
+  /** Count active agents of a given role (excludes dead/failed). */
   private countAgentsByRole(role: string): number {
     const rows = [
       ...query(
@@ -1434,6 +1434,7 @@ export class RigDO extends DurableObject<Env> {
         /* sql */ `
           SELECT COUNT(*) as cnt FROM ${rig_agents}
           WHERE ${rig_agents.columns.role} = ?
+            AND ${rig_agents.columns.status} NOT IN ('dead', 'failed')
         `,
         [role]
       ),
@@ -1894,6 +1895,8 @@ export class RigDO extends DurableObject<Env> {
       beadTitle: string;
       beadBody: string;
       checkpoint: unknown;
+      /** Override the default system prompt for this role (e.g., refinery with gate-specific instructions) */
+      systemPromptOverride?: string;
     }
   ): Promise<boolean> {
     console.log(
@@ -1957,13 +1960,15 @@ export class RigDO extends DurableObject<Env> {
           identity: params.identity,
           prompt,
           model: RigDO.modelForRole(params.role),
-          systemPrompt: RigDO.systemPromptForRole({
-            role: params.role,
-            identity: params.identity,
-            agentName: params.agentName,
-            rigId,
-            townId: config.townId,
-          }),
+          systemPrompt:
+            params.systemPromptOverride ??
+            RigDO.systemPromptForRole({
+              role: params.role,
+              identity: params.identity,
+              agentName: params.agentName,
+              rigId,
+              townId: config.townId,
+            }),
           gitUrl: config.gitUrl,
           branch: RigDO.branchForAgent(params.agentName, params.beadId),
           defaultBranch: config.defaultBranch,
@@ -2053,6 +2058,7 @@ export class RigDO extends DurableObject<Env> {
       beadTitle: prompt,
       beadBody: `Quality gates: ${gates.join(', ')}\nBranch: ${entry.branch}\nTarget: ${config.defaultBranch}`,
       checkpoint: null,
+      systemPromptOverride: systemPrompt,
     });
 
     if (!started) {

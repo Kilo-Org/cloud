@@ -84,12 +84,22 @@ export class TownDO extends DurableObject<Env> {
   async updateTownConfig(update: TownConfigUpdate): Promise<TownConfig> {
     const current = await this.getTownConfig();
 
-    // Top-level: replace when provided. env_vars is fully replaced (not merged)
-    // so the UI can delete variables by omitting them.
+    // env_vars: full replacement semantics so the UI can delete variables by
+    // omitting them. However, masked values (starting with "****") from the
+    // server's masking layer must be preserved — replace them with the
+    // current stored value to avoid overwriting secrets with masked placeholders.
+    let resolvedEnvVars = current.env_vars;
+    if (update.env_vars) {
+      resolvedEnvVars = {};
+      for (const [key, value] of Object.entries(update.env_vars)) {
+        resolvedEnvVars[key] = value.startsWith('****') ? (current.env_vars[key] ?? value) : value;
+      }
+    }
+
     const merged: TownConfig = {
       ...current,
       ...update,
-      env_vars: update.env_vars ?? current.env_vars,
+      env_vars: resolvedEnvVars,
       git_auth: { ...current.git_auth, ...(update.git_auth ?? {}) },
       refinery:
         update.refinery !== undefined
@@ -496,20 +506,30 @@ export class TownDO extends DurableObject<Env> {
     await this.ensureInitialized();
     const threshold = new Date(Date.now() - STALE_ESCALATION_THRESHOLD_MS).toISOString();
 
-    const staleRows = [
+    const candidateRows = [
       ...query(
         this.sql,
         /* sql */ `
           SELECT * FROM ${town_escalations}
           WHERE ${town_escalations.columns.acknowledged} = 0
-            AND ${town_escalations.columns.created_at} < ?
             AND ${town_escalations.columns.re_escalation_count} < ?
         `,
-        [threshold, MAX_RE_ESCALATIONS]
+        [MAX_RE_ESCALATIONS]
       ),
     ];
 
-    const stale = TownEscalationRecord.array().parse(staleRows);
+    const candidates = TownEscalationRecord.array().parse(candidateRows);
+
+    // Filter to escalations old enough for their NEXT re-escalation.
+    // Each bump requires an additional STALE_ESCALATION_THRESHOLD_MS interval,
+    // so bump N requires (N+1) * threshold age. This prevents all 3 bumps
+    // from firing within minutes once the first threshold is crossed.
+    const nowMs = Date.now();
+    const stale = candidates.filter(esc => {
+      const ageMs = nowMs - new Date(esc.created_at).getTime();
+      const requiredAgeMs = (esc.re_escalation_count + 1) * STALE_ESCALATION_THRESHOLD_MS;
+      return ageMs >= requiredAgeMs;
+    });
     if (stale.length === 0) return;
 
     for (const esc of stale) {

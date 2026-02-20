@@ -812,6 +812,14 @@ export class TownDO extends DurableObject<Env> {
       return;
     }
 
+    // If the town has no rigs, it's either not yet configured or was deleted.
+    // Don't spin up containers or do work — just stop re-arming.
+    const rigList = rigs.listRigs(this.sql);
+    if (rigList.length === 0) {
+      console.log(`${TOWN_LOG} alarm: no rigs configured for town=${townId}; not re-arming`);
+      return;
+    }
+
     console.log(`${TOWN_LOG} alarm: fired for town=${townId}`);
 
     // Proactive container health check — keeps the container warm

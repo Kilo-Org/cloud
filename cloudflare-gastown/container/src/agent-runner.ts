@@ -2,6 +2,7 @@ import type { Config } from '@kilocode/sdk';
 import { writeFile } from 'node:fs/promises';
 import { cloneRepo, createWorktree } from './git-manager';
 import { startAgent } from './process-manager';
+import { getCurrentTownConfig } from './control-server';
 import type { ManagedAgent, StartAgentRequest } from './types';
 
 /**
@@ -124,6 +125,18 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     const value = resolveEnv(request, key);
     if (value) {
       env[key] = value;
+    }
+  }
+
+  // Fall back to X-Town-Config for KILOCODE_TOKEN if not in request or process.env
+  if (!env.KILOCODE_TOKEN) {
+    const townConfig = getCurrentTownConfig();
+    const tokenFromConfig =
+      townConfig && typeof townConfig.kilocode_token === 'string'
+        ? townConfig.kilocode_token
+        : undefined;
+    if (tokenFromConfig) {
+      env.KILOCODE_TOKEN = tokenFromConfig;
     }
   }
 

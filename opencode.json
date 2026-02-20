@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [],
+  "mcp": {
+    "cloudflare-docs": {
+      "type": "remote",
+      "url": "https://docs.mcp.cloudflare.com/mcp",
+      "enabled": true
+    },
+    "browsermcp": {
+      "type": "local",
+      "command": ["npx", "@browsermcp/mcp@latest"]
+    }
+  }
+}

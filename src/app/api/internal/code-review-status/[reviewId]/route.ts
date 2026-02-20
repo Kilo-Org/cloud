@@ -46,15 +46,20 @@ const StatusUpdatePayloadSchema = z.object({
 });
 
 /**
- * Read a review's usage data, retrying once after a short delay if missing.
+ * Read a review's usage data, polling with exponential backoff if not yet available.
  * Handles the race between the orchestrator's usage report and the cloud agent's completion callback.
  */
 async function getReviewUsageData(reviewId: string) {
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 200;
+
   let review = await getCodeReviewById(reviewId);
-  if (review && !review.model) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
+
+  for (let attempt = 0; attempt < MAX_RETRIES && review && !review.model; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, BASE_DELAY_MS * 2 ** attempt));
     review = await getCodeReviewById(reviewId);
   }
+
   return {
     model: review?.model ?? null,
     tokensIn: review?.total_tokens_in ?? null,

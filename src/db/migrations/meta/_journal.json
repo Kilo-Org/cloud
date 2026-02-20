@@ -148,6 +148,13 @@
       "when": 1771507192123,
       "tag": "0020_lucky_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1771581271902,
+      "tag": "0021_orange_maggott",
+      "breakpoints": true
     }
   ]
 }

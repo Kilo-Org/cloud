@@ -286,6 +286,12 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
   { key: 'id', title: 'ID', render: row => row.id, visible: false },
   { key: 'message_id', title: 'Message ID', render: row => row.message_id ?? '', visible: false },
   {
+    key: 'session_id',
+    title: 'Session',
+    render: row => row.session_id || 'N/A',
+    visible: false,
+  },
+  {
     key: 'upstream_id',
     title: 'Upstream ID',
     render: row => row.upstream_id || 'N/A',

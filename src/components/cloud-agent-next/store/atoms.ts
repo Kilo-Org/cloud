@@ -132,6 +132,7 @@ export const clearMessagesAtom = atom(null, (_get, set) => {
   set(errorAtom, null);
   set(messagesMapAtom, new Map());
   set(partsMapAtom, new Map());
+  set(questionRequestIdsAtom, new Map());
 });
 
 // ============================================================================
@@ -297,19 +298,6 @@ export const addUserMessageAtom = atom(
     set(partsMapAtom, partsMap);
   }
 );
-
-/**
- * Clear all streaming state atoms.
- * Resets messagesMapAtom, partsMapAtom, childSessionsMapAtom, and sessionStatusAtom to initial state.
- */
-export const clearStreamingStateAtom = atom(null, (_get, set) => {
-  set(messagesMapAtom, new Map());
-  set(partsMapAtom, new Map());
-  set(childSessionsMapAtom, new Map());
-  set(questionRequestIdsAtom, new Map());
-  set(sessionOrganizationIdAtom, null);
-  set(sessionStatusAtom, { type: 'idle' });
-});
 
 /**
  * Update a message in a child session.

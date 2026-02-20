@@ -1464,18 +1464,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const regions = deprioritizeRegion(allRegions, oldRegion);
     const compute = guestFromSize(this.machineSize);
 
-    // Destroy existing machine if any — it's stuck on the constrained host
+    // Destroy existing machine if any — it's stuck on the constrained host.
+    // Only clear flyMachineId on confirmed deletion (success or 404).
+    // On transient failures, keep the ID so reconciliation can retry cleanup.
     if (this.flyMachineId) {
+      let machineGone = false;
       try {
         await fly.destroyMachine(flyConfig, this.flyMachineId);
         reconcileLog(reason, 'destroy_stranded_machine', { machine_id: this.flyMachineId });
+        machineGone = true;
       } catch (err) {
-        if (!fly.isFlyNotFound(err)) {
+        if (fly.isFlyNotFound(err)) {
+          machineGone = true;
+        } else {
           console.warn('[DO] Failed to destroy stranded machine:', err);
         }
       }
-      this.flyMachineId = null;
-      await this.ctx.storage.put(storageUpdate({ flyMachineId: null }));
+      if (machineGone) {
+        this.flyMachineId = null;
+        await this.ctx.storage.put(storageUpdate({ flyMachineId: null }));
+      }
     }
 
     if (hasUserData) {

@@ -1099,6 +1099,38 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(storage._store.get('status')).toBe('running');
   });
 
+  it('keeps machine ID when destroy of stranded machine fails transiently', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped', lastStartedAt: Date.now() - 60_000 });
+
+    // getMachine returns stopped, updateMachine throws 412
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    // destroyMachine fails with transient 500
+    (flyClient.destroyMachine as Mock).mockRejectedValue(
+      new FlyApiError('server error', 500, 'internal')
+    );
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    // Fork still succeeds
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    // Old machine ID should still be tracked (not orphaned)
+    // The new machine gets stored via createNewMachine, overwriting the old one
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+    // destroyMachine was attempted
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
+  });
+
   it('propagates non-412 errors without recovery', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { flyMachineId: null });

@@ -43,6 +43,7 @@ export const RigSchema = z.object({
   name: z.string(),
   git_url: z.string(),
   default_branch: z.string(),
+  platform_integration_id: z.string().nullable().optional().default(null),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -211,6 +212,7 @@ export async function createRig(
     git_url: string;
     default_branch: string;
     kilocode_token?: string;
+    platform_integration_id?: string;
   }
 ): Promise<Rig> {
   const body = await gastownFetch(`/api/users/${userId}/rigs`, {
@@ -380,6 +382,50 @@ export async function listTownEvents(
   const path = `/api/users/${userId}/towns/${townId}/events${qs ? `?${qs}` : ''}`;
   const body = await gastownFetch(path);
   return parseSuccessData(body, TaggedBeadEventSchema.array());
+}
+
+// ── Town Configuration ────────────────────────────────────────────────────
+
+export const TownConfigSchema = z.object({
+  env_vars: z.record(z.string(), z.string()),
+  git_auth: z.object({
+    github_token: z.string().optional(),
+    gitlab_token: z.string().optional(),
+    gitlab_instance_url: z.string().optional(),
+  }),
+  default_model: z.string().optional(),
+  max_polecats_per_rig: z.number().optional(),
+  refinery: z
+    .object({
+      gates: z.array(z.string()),
+      auto_merge: z.boolean(),
+      require_clean_merge: z.boolean(),
+    })
+    .optional(),
+  alarm_interval_active: z.number().optional(),
+  alarm_interval_idle: z.number().optional(),
+  container: z
+    .object({
+      sleep_after_minutes: z.number().optional(),
+    })
+    .optional(),
+});
+export type TownConfigClient = z.output<typeof TownConfigSchema>;
+
+export async function getTownConfig(townId: string): Promise<TownConfigClient> {
+  const body = await gastownFetch(`/api/towns/${townId}/config`);
+  return parseSuccessData(body, TownConfigSchema);
+}
+
+export async function updateTownConfig(
+  townId: string,
+  update: Partial<TownConfigClient>
+): Promise<TownConfigClient> {
+  const body = await gastownFetch(`/api/towns/${townId}/config`, {
+    method: 'PATCH',
+    body: JSON.stringify(update),
+  });
+  return parseSuccessData(body, TownConfigSchema);
 }
 
 // ── Container operations (via Town Container DO) ──────────────────────────

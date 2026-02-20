@@ -74,6 +74,17 @@ import {
   handleMayorSendMail,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
+import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
+import {
+  handleGetMoleculeCurrentStep,
+  handleAdvanceMoleculeStep,
+  handleCreateMolecule,
+} from './handlers/rig-molecules.handler';
+import { handleCreateConvoy, handleOnBeadClosed } from './handlers/town-convoys.handler';
+import {
+  handleListEscalations,
+  handleAcknowledgeEscalation,
+} from './handlers/town-escalations.handler';
 
 export { RigDO } from './dos/Rig.do';
 export { GastownUserDO } from './dos/GastownUser.do';
@@ -186,6 +197,16 @@ app.post('/api/rigs/:rigId/review-queue/:entryId/complete', c =>
 
 app.get('/api/rigs/:rigId/events', c => handleListBeadEvents(c, c.req.param()));
 
+// ── Molecules ────────────────────────────────────────────────────────────
+
+app.post('/api/rigs/:rigId/molecules', c => handleCreateMolecule(c, c.req.param()));
+app.get('/api/rigs/:rigId/agents/:agentId/molecule/current', c =>
+  handleGetMoleculeCurrentStep(c, c.req.param())
+);
+app.post('/api/rigs/:rigId/agents/:agentId/molecule/advance', c =>
+  handleAdvanceMoleculeStep(c, c.req.param())
+);
+
 // ── Escalations ─────────────────────────────────────────────────────────
 
 app.post('/api/rigs/:rigId/escalations', c => handleCreateEscalation(c, c.req.param()));
@@ -202,6 +223,23 @@ app.get('/api/users/:userId/rigs/:rigId', c => handleGetRig(c, c.req.param()));
 app.get('/api/users/:userId/towns/:townId/rigs', c => handleListRigs(c, c.req.param()));
 app.delete('/api/users/:userId/towns/:townId', c => handleDeleteTown(c, c.req.param()));
 app.delete('/api/users/:userId/rigs/:rigId', c => handleDeleteRig(c, c.req.param()));
+
+// ── Town Convoys ─────────────────────────────────────────────────────────
+
+app.post('/api/towns/:townId/convoys', c => handleCreateConvoy(c, c.req.param()));
+app.post('/api/towns/:townId/convoys/bead-closed', c => handleOnBeadClosed(c, c.req.param()));
+
+// ── Town Escalations ─────────────────────────────────────────────────────
+
+app.get('/api/towns/:townId/escalations', c => handleListEscalations(c, c.req.param()));
+app.post('/api/towns/:townId/escalations/:escalationId/acknowledge', c =>
+  handleAcknowledgeEscalation(c, c.req.param())
+);
+
+// ── Town Configuration ──────────────────────────────────────────────────
+
+app.get('/api/towns/:townId/config', c => handleGetTownConfig(c, c.req.param()));
+app.patch('/api/towns/:townId/config', c => handleUpdateTownConfig(c, c.req.param()));
 
 // ── Town Events ─────────────────────────────────────────────────────────
 

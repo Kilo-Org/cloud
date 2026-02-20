@@ -30,6 +30,47 @@ function validateGitUrl(url: string): void {
 }
 
 /**
+ * Inject authentication token into a git URL.
+ * Supports GitHub (x-access-token) and GitLab (oauth2) token formats.
+ * If no token is available, returns the original URL unchanged.
+ *
+ * Security note: The authenticated URL is passed as a CLI argument to
+ * `git clone`, making the token visible in the process list. This is
+ * acceptable because the container is single-tenant (one town per container)
+ * and only runs Gastown agent processes. For agent push/fetch operations
+ * after clone, the credential-store helper configured in agent-runner.ts
+ * is used instead.
+ */
+function authenticateGitUrl(gitUrl: string, envVars?: Record<string, string>): string {
+  if (!envVars) return gitUrl;
+
+  const token = envVars.GIT_TOKEN ?? envVars.GITHUB_TOKEN;
+  const gitlabToken = envVars.GITLAB_TOKEN;
+
+  if (!token && !gitlabToken) return gitUrl;
+
+  try {
+    const url = new URL(gitUrl);
+
+    if (gitlabToken && (url.hostname.includes('gitlab') || envVars.GITLAB_INSTANCE_URL)) {
+      url.username = 'oauth2';
+      url.password = gitlabToken;
+      return url.toString();
+    }
+
+    if (token) {
+      url.username = 'x-access-token';
+      url.password = token;
+      return url.toString();
+    }
+  } catch {
+    // git@ URLs or other formats — return as-is
+  }
+
+  return gitUrl;
+}
+
+/**
  * Validate a branch name — block control characters and shell metacharacters.
  */
 function validateBranchName(branch: string, label: string): void {
@@ -98,13 +139,19 @@ function worktreeDir(rigId: string, branch: string): string {
 /**
  * Clone a git repo for the given rig (shared across all agents in the rig).
  * If the repo is already cloned, fetches latest instead.
+ * When envVars contains GIT_TOKEN/GITLAB_TOKEN, constructs authenticated URLs.
  */
-export async function cloneRepo(options: CloneOptions): Promise<string> {
+export async function cloneRepo(
+  options: CloneOptions & { envVars?: Record<string, string> }
+): Promise<string> {
   validateGitUrl(options.gitUrl);
   validateBranchName(options.defaultBranch, 'defaultBranch');
   const dir = repoDir(options.rigId);
+  const authUrl = authenticateGitUrl(options.gitUrl, options.envVars);
 
   if (await pathExists(join(dir, '.git'))) {
+    // Update the remote URL in case the token changed
+    await exec('git', ['remote', 'set-url', 'origin', authUrl], dir).catch(() => {});
     await exec('git', ['fetch', '--all', '--prune'], dir);
     console.log(`Fetched latest for rig ${options.rigId}`);
     return dir;
@@ -116,15 +163,8 @@ export async function cloneRepo(options: CloneOptions): Promise<string> {
   }
 
   await mkdir(dir, { recursive: true });
-  await exec('git', [
-    'clone',
-    '--no-checkout',
-    '--branch',
-    options.defaultBranch,
-    options.gitUrl,
-    dir,
-  ]);
-  console.log(`Cloned ${options.gitUrl} for rig ${options.rigId}`);
+  await exec('git', ['clone', '--no-checkout', '--branch', options.defaultBranch, authUrl, dir]);
+  console.log(`Cloned repo for rig ${options.rigId}`);
   return dir;
 }
 
@@ -204,6 +244,7 @@ export async function mergeBranch(options: {
   branch: string;
   targetBranch: string;
   gitUrl: string;
+  envVars?: Record<string, string>;
 }): Promise<MergeOutcome> {
   validatePathSegment(options.rigId, 'rigId');
   validateBranchName(options.branch, 'branch');
@@ -211,6 +252,7 @@ export async function mergeBranch(options: {
   validateGitUrl(options.gitUrl);
 
   const repo = repoDir(options.rigId);
+  const authUrl = authenticateGitUrl(options.gitUrl, options.envVars);
 
   // Ensure repo exists and is up to date
   if (!(await pathExists(join(repo, '.git')))) {
@@ -218,8 +260,11 @@ export async function mergeBranch(options: {
       rigId: options.rigId,
       gitUrl: options.gitUrl,
       defaultBranch: options.targetBranch,
+      envVars: options.envVars,
     });
   } else {
+    // Update remote URL for fresh token
+    await exec('git', ['remote', 'set-url', 'origin', authUrl], repo).catch(() => {});
     await exec('git', ['fetch', '--all', '--prune'], repo);
   }
 

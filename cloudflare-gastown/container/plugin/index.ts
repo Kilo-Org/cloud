@@ -1,4 +1,4 @@
-import type { Plugin } from '@opencode-ai/plugin';
+import type { Plugin } from '@kilocode/plugin';
 import { createClientFromEnv, createMayorClientFromEnv, GastownApiError } from './client';
 import { createTools } from './tools';
 import { createMayorTools } from './mayor-tools';

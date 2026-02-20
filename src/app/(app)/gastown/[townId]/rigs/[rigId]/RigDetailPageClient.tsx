@@ -31,8 +31,14 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
 
   const queryClient = useQueryClient();
   const rigQuery = useQuery(trpc.gastown.getRig.queryOptions({ rigId }));
-  const beadsQuery = useQuery(trpc.gastown.listBeads.queryOptions({ rigId }));
-  const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));
+  const beadsQuery = useQuery({
+    ...trpc.gastown.listBeads.queryOptions({ rigId }),
+    refetchInterval: 8_000,
+  });
+  const agentsQuery = useQuery({
+    ...trpc.gastown.listAgents.queryOptions({ rigId }),
+    refetchInterval: 5_000,
+  });
 
   const rig = rigQuery.data;
 

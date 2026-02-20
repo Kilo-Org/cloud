@@ -70,6 +70,7 @@ export const gastownRouter = createTRPCRouter({
         name: z.string().min(1).max(64),
         gitUrl: z.string().url(),
         defaultBranch: z.string().default('main'),
+        platformIntegrationId: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -93,6 +94,7 @@ export const gastownRouter = createTRPCRouter({
           git_url: input.gitUrl,
           default_branch: input.defaultBranch,
           kilocode_token: kilocodeToken,
+          platform_integration_id: input.platformIntegrationId,
         })
       );
     }),
@@ -186,7 +188,7 @@ export const gastownRouter = createTRPCRouter({
       z.object({
         townId: z.string().uuid(),
         message: z.string().min(1),
-        model: z.string().default('kilo/auto'),
+        model: z.string().default('anthropic/claude-sonnet-4.6'),
         // rigId kept for backward compat but no longer used for routing
         rigId: z.string().uuid().optional(),
       })
@@ -259,6 +261,33 @@ export const gastownRouter = createTRPCRouter({
       const fullUrl = `${wsProtocol}//${baseUrl.host}${ticket.url}`;
 
       return { ...ticket, url: fullUrl };
+    }),
+
+  // ── Town Configuration ──────────────────────────────────────────────────
+
+  getTownConfig: baseProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      return withGastownError(() => gastown.getTownConfig(input.townId));
+    }),
+
+  updateTownConfig: baseProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        config: gastown.TownConfigSchema.partial(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      return withGastownError(() => gastown.updateTownConfig(input.townId, input.config));
     }),
 
   // ── Events ─────────────────────────────────────────────────────────────

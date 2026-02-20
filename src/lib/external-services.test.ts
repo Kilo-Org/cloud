@@ -1,14 +1,9 @@
 import { db } from '@/lib/drizzle';
 import { cliSessions, sharedCliSessions, cli_sessions_v2, kilocode_users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { deleteUserFromExternalServices } from './external-services';
+import { softDeleteUserExternalServices } from './external-services';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@/db/schema';
-
-// Mock the external dependencies
-jest.mock('./stripe-client', () => ({
-  safeDeleteStripeCustomer: jest.fn().mockResolvedValue(undefined),
-}));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -55,7 +50,7 @@ describe('external-services', () => {
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
-  describe('deleteUserFromExternalServices', () => {
+  describe('softDeleteUserExternalServices', () => {
     it('should delete CLI session blobs when user has sessions', async () => {
       const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
 
@@ -82,7 +77,7 @@ describe('external-services', () => {
         })
         .returning();
 
-      await deleteUserFromExternalServices(testUser);
+      await softDeleteUserExternalServices(testUser);
 
       // Verify deleteBlobs was called for each session
       expect(deleteBlobs).toHaveBeenCalledTimes(2);
@@ -135,7 +130,7 @@ describe('external-services', () => {
         })
         .returning();
 
-      await deleteUserFromExternalServices(testUser);
+      await softDeleteUserExternalServices(testUser);
 
       // Verify deleteBlobs was called for shared sessions
       expect(deleteBlobs).toHaveBeenCalledWith(sharedSession1.share_id, [
@@ -158,7 +153,7 @@ describe('external-services', () => {
         created_on_platform: 'vscode',
       });
 
-      await deleteUserFromExternalServices(testUser);
+      await softDeleteUserExternalServices(testUser);
 
       // deleteBlobs should not be called for sessions without blobs
       expect(deleteBlobs).not.toHaveBeenCalled();
@@ -181,7 +176,7 @@ describe('external-services', () => {
         })
         .returning();
 
-      await deleteUserFromExternalServices(testUser);
+      await softDeleteUserExternalServices(testUser);
 
       // Verify only the existing blobs are included
       expect(deleteBlobs).toHaveBeenCalledWith(session.session_id, [
@@ -190,9 +185,8 @@ describe('external-services', () => {
       ]);
     });
 
-    it('should continue with other deletions if CLI session blob deletion fails', async () => {
+    it('should continue with other services if CLI session blob deletion fails', async () => {
       const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
-      const { safeDeleteStripeCustomer } = await import('./stripe-client');
       const { captureException } = await import('@sentry/nextjs');
 
       // Mock deleteBlobs to throw an error
@@ -207,35 +201,30 @@ describe('external-services', () => {
       });
 
       // Should not throw
-      await expect(deleteUserFromExternalServices(testUser)).resolves.not.toThrow();
+      await expect(softDeleteUserExternalServices(testUser)).resolves.not.toThrow();
 
       // Verify error was captured
       expect(captureException).toHaveBeenCalled();
-
-      // Verify other services were still called
-      expect(safeDeleteStripeCustomer).toHaveBeenCalled();
     });
 
     it('should handle user with no CLI sessions', async () => {
       const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
-      const { safeDeleteStripeCustomer } = await import('./stripe-client');
 
-      await deleteUserFromExternalServices(testUser);
+      await softDeleteUserExternalServices(testUser);
 
       // deleteBlobs should not be called
       expect(deleteBlobs).not.toHaveBeenCalled();
-
-      // Other services should still be called
-      expect(safeDeleteStripeCustomer).toHaveBeenCalled();
     });
 
-    it('should call all external services concurrently', async () => {
-      const { safeDeleteStripeCustomer } = await import('./stripe-client');
+    it('should not call Stripe deletion (Stripe link is preserved)', async () => {
+      await softDeleteUserExternalServices(testUser);
 
-      await deleteUserFromExternalServices(testUser);
-
-      // Verify Stripe service was called
-      expect(safeDeleteStripeCustomer).toHaveBeenCalledWith(testUser.stripe_customer_id);
+      // Verify no calls to Stripe endpoints (only Customer.io and session worker calls)
+      const fetchCalls = (global.fetch as jest.Mock).mock.calls;
+      const stripeCalls = fetchCalls.filter((call: [string, RequestInit]) =>
+        call[0].includes('api.stripe.com')
+      );
+      expect(stripeCalls.length).toBe(0);
     });
 
     describe('v2 session blob deletion', () => {
@@ -257,7 +246,7 @@ describe('external-services', () => {
           status: 200,
         });
 
-        await deleteUserFromExternalServices(testUser);
+        await softDeleteUserExternalServices(testUser);
 
         // Verify fetch was called for each v2 session (plus Customer.io call)
         const fetchCalls = (global.fetch as jest.Mock).mock.calls;
@@ -291,12 +280,10 @@ describe('external-services', () => {
         });
 
         // Should not throw
-        await expect(deleteUserFromExternalServices(testUser)).resolves.not.toThrow();
+        await expect(softDeleteUserExternalServices(testUser)).resolves.not.toThrow();
       });
 
       it('should continue with other deletions if v2 session deletion fails', async () => {
-        const { safeDeleteStripeCustomer } = await import('./stripe-client');
-
         await db.insert(cli_sessions_v2).values({
           session_id: 'ses_failtest123456789012',
           kilo_user_id: testUser.id,
@@ -315,14 +302,11 @@ describe('external-services', () => {
         });
 
         // Should not throw
-        await expect(deleteUserFromExternalServices(testUser)).resolves.not.toThrow();
-
-        // Other services should still be called
-        expect(safeDeleteStripeCustomer).toHaveBeenCalled();
+        await expect(softDeleteUserExternalServices(testUser)).resolves.not.toThrow();
       });
 
       it('should handle user with no v2 CLI sessions', async () => {
-        await deleteUserFromExternalServices(testUser);
+        await softDeleteUserExternalServices(testUser);
 
         // Verify no v2 session deletion calls were made
         const fetchCalls = (global.fetch as jest.Mock).mock.calls;

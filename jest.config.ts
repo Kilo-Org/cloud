@@ -1,4 +1,3 @@
-/* eslint-disable n/no-process-env */
 import type { Config } from 'jest';
 
 const config: Config = {

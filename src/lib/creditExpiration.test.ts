@@ -3,7 +3,7 @@ import { credit_transactions as creditTransactionsTable, kilocode_users } from '
 import { computeExpiration, processLocalExpirations } from './creditExpiration';
 import { db } from '@/lib/drizzle';
 import { defineTestUser } from '@/tests/helpers/user.helper';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 const makeTransaction = (
@@ -828,6 +828,109 @@ describe('processLocalExpirations', () => {
     // After shift: B's range is 7M-12M (baseline 7M + amount 5M)
     // User at 8M, so 1M used from B, 4M expired
     expect(expirationB!.amount_microdollars).toBe(-4_000_000);
+  });
+
+  /**
+   * Helper: refetch user from DB (needed after mutations to get latest state).
+   */
+  const refetchUser = async (userId: string) => {
+    const user = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, userId),
+    });
+    return user!;
+  };
+
+  /**
+   * Helper: insert a credit transaction directly into the DB.
+   * Allows full control over baseline values, unlike grantCreditForCategory.
+   */
+  const insertCreditTransaction = async (
+    userId: string,
+    opts: {
+      amount_usd: number;
+      expiry_date: string | null;
+      original_baseline_microdollars_used: number;
+      expiration_baseline_microdollars_used?: number;
+      description: string;
+    }
+  ) => {
+    const id = randomUUID();
+    const amount_microdollars = opts.amount_usd * 1_000_000;
+    const [txn] = await db
+      .insert(creditTransactionsTable)
+      .values({
+        id,
+        kilo_user_id: userId,
+        amount_microdollars,
+        is_free: true,
+        expiry_date: opts.expiry_date,
+        expiration_baseline_microdollars_used: opts.expiration_baseline_microdollars_used,
+        original_baseline_microdollars_used: opts.original_baseline_microdollars_used,
+        description: opts.description,
+      })
+      .returning();
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${amount_microdollars}`,
+      })
+      .where(eq(kilocode_users.id, userId));
+
+    return txn;
+  };
+
+  const accrueUsage = async (userId: string, amount_usd: number) => {
+    await db
+      .update(kilocode_users)
+      .set({
+        microdollars_used: sql`${kilocode_users.microdollars_used} + ${amount_usd * 1_000_000}`,
+      })
+      .where(eq(kilocode_users.id, userId));
+  };
+
+  it('simultaneous expiry of two credit grants with interleaved usage resets balance to zero', async () => {
+    jest.setSystemTime(new Date('2026-01-01 00:00:00+00'));
+
+    let user = await insertMigratedTestUser({});
+
+    await insertCreditTransaction(user.id, {
+      amount_usd: 20,
+      expiry_date: null,
+      original_baseline_microdollars_used: 0, // granted when user had $0 usage
+      expiration_baseline_microdollars_used: 0,
+      description: '$20 welcome credits',
+    });
+
+    jest.setSystemTime(new Date('2024-01-02 00:00:00+00'));
+
+    await accrueUsage(user.id, 2);
+
+    await insertCreditTransaction(user.id, {
+      amount_usd: 100,
+      expiry_date: '2026-01-04T00:00:00Z',
+      original_baseline_microdollars_used: 2_000_000,
+      expiration_baseline_microdollars_used: 2_000_000,
+      description: 'Vibe eng $100',
+    });
+    await insertCreditTransaction(user.id, {
+      amount_usd: 5,
+      expiry_date: null,
+      original_baseline_microdollars_used: 2_000_000,
+      expiration_baseline_microdollars_used: 20_000_000,
+      description: 'in-app survey $5',
+    });
+
+    await accrueUsage(user.id, 2);
+
+    user = await refetchUser(user.id);
+
+    jest.setSystemTime(new Date('2026-01-05 00:00:00+00'));
+
+    await processLocalExpirations(user, new Date());
+
+    user = await refetchUser(user.id);
+
+    expect(user.total_microdollars_acquired / 1_000_000).toBe(23);
   });
 
   it('zero-amount expirations are created and do not affect balance', async () => {

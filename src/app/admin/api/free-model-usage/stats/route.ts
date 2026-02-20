@@ -50,17 +50,20 @@ export async function GET(
       sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'`
     );
 
-  // Get per-IP stats to find IPs at limits
-  const perIpStats = await db
+  // Count IPs at or above the rate limit threshold using a SQL subquery
+  const ipsAtLimitResult = await db
     .select({
-      ip_address: free_model_usage.ip_address,
-      request_count: sql<number>`COUNT(*)`,
+      count: sql<number>`COUNT(*)`,
     })
-    .from(free_model_usage)
-    .where(
-      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'`
-    )
-    .groupBy(free_model_usage.ip_address);
+    .from(
+      sql`(
+        SELECT ${free_model_usage.ip_address}
+        FROM ${free_model_usage}
+        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'
+        GROUP BY ${free_model_usage.ip_address}
+        HAVING COUNT(*) >= ${FREE_MODEL_MAX_REQUESTS_PER_WINDOW}
+      ) sub`
+    );
 
   // Get stats for the last 24 hours
   const dailyResult = await db
@@ -85,15 +88,7 @@ export async function GET(
 
   const windowUniqueIps = bigIntToNumber(windowStats.unique_ips);
   const windowTotalRequests = bigIntToNumber(windowStats.total_requests);
-
-  // Count IPs at or near limits
-  let ipsAtRequestLimit = 0;
-  for (const ip of perIpStats) {
-    const requestCount = bigIntToNumber(ip.request_count);
-    if (requestCount >= FREE_MODEL_MAX_REQUESTS_PER_WINDOW) {
-      ipsAtRequestLimit++;
-    }
-  }
+  const ipsAtRequestLimit = bigIntToNumber(ipsAtLimitResult[0]?.count ?? 0);
 
   return NextResponse.json({
     // Current window stats

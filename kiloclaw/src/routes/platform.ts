@@ -217,6 +217,25 @@ platform.post('/pairing/approve', async c => {
   }
 });
 
+// POST /api/platform/doctor
+platform.post('/doctor', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const doctor = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.runDoctor(),
+      'runDoctor'
+    );
+    return c.json(doctor, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] doctor failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
 // POST /api/platform/start
 platform.post('/start', async c => {
   const result = await parseBody(c, UserIdRequestSchema);

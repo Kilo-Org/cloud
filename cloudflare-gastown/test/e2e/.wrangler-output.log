@@ -1,0 +1,121 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mUnrecognised WRANGLER_LOG value "/users/john/projects/professional/kilo/cloud/cloudflare-gastown/test/e2e/.wrangler-output.log", expected "none" | "error" | "warn" | "info" | "log" | "debug", defaulting to "log"...[0m
+
+
+
+ ⛅️ wrangler 4.61.1 (update available 4.67.0)
+─────────────────────────────────────────────
+Your Worker has access to the following bindings:
+Binding                                                                                Resource                  Mode
+env.GASTOWN_USER (GastownUserDO)                                                       Durable Object            local
+env.AGENT_IDENTITY (AgentIdentityDO)                                                   Durable Object            local
+env.TOWN (TownDO)                                                                      Durable Object            local
+env.TOWN_CONTAINER (TownContainerDO)                                                   Durable Object            local
+env.AGENT (AgentDO)                                                                    Durable Object            local
+env.GASTOWN_JWT_SECRET (342a86d9e3a94da698e82d0c6e2a36f0/GASTOWN_JWT_SECRET_PROD)      Secrets Store Secret      local
+env.ENVIRONMENT ("development")                                                        Environment Variable      local
+env.CF_ACCESS_TEAM ("engineering-e11")                                                 Environment Variable      local
+env.CF_ACCESS_AUD ("f30e3fd893df52fa3ffc50fbdb5ee6a4f1116...")                         Environment Variable      local
+env.KILO_API_URL ("http://host.docker.internal:3000")                                  Environment Variable      local
+env.GASTOWN_API_URL ("(hidden)")                                                       Environment Variable      local
+
+The following containers are available:
+- gastown-dev-TownContainerDO (/Users/john/projects/professional/kilo/cloud/cloudflare-gastown/container/Dockerfile.dev)
+
+⎔ Preparing container image(s)...
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.49kB done
+#1 WARN: FromPlatformFlagConstDisallowed: FROM --platform flag should not use constant value "linux/arm64" (line 1)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/oven/bun:1-slim
+#2 DONE 0.3s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 758B done
+#4 DONE 0.0s
+
+#5 [ 1/10] FROM docker.io/oven/bun:1-slim@sha256:8ca06c7812d9050ccc4b80799685f395d6a0d051d3b7207dfd120e2b437b1ec9
+#5 resolve docker.io/oven/bun:1-slim@sha256:8ca06c7812d9050ccc4b80799685f395d6a0d051d3b7207dfd120e2b437b1ec9 done
+#5 DONE 0.0s
+
+#6 [ 6/10] RUN cd /opt/gastown-plugin && npm install --omit=dev &&     mkdir -p /root/.config/kilo/plugins &&     ln -s /opt/gastown-plugin/index.ts /root/.config/kilo/plugins/gastown.ts
+#6 CACHED
+
+#7 [ 8/10] COPY package.json bun.lock ./
+#7 CACHED
+
+#8 [ 7/10] WORKDIR /app
+#8 CACHED
+
+#9 [ 9/10] RUN bun install --frozen-lockfile --production
+#9 CACHED
+
+#10 [ 5/10] COPY plugin/ /opt/gastown-plugin/
+#10 CACHED
+
+#11 [ 4/10] RUN mkdir -p /workspace/rigs /app
+#11 CACHED
+
+#12 [ 2/10] RUN apt-get update &&     apt-get install -y --no-install-recommends git curl ca-certificates &&     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&     apt-get install -y --no-install-recommends nodejs &&     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg       -o /usr/share/keyrings/githubcli-archive-keyring.gpg &&     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"       > /etc/apt/sources.list.d/github-cli.list &&     apt-get update &&     apt-get install -y --no-install-recommends gh &&     apt-get clean &&     rm -rf /var/lib/apt/lists/*
+#12 CACHED
+
+#13 [ 3/10] RUN npm install -g @kilocode/cli @kilocode/cli-linux-arm64 @kilocode/cli-linux-arm64-musl &&     ln -s "$(which kilo)" /usr/local/bin/opencode
+#13 CACHED
+
+#14 [10/10] COPY src/ ./src/
+#14 CACHED
+
+#15 exporting to image
+#15 exporting layers done
+#15 exporting manifest sha256:ea7360f5ebb29d8aa3a556c7a07b26b8b58b9769dc8db5bc622db611ffa95dd1 done
+#15 exporting config sha256:f0537e5f1c59519f10805e116629a0f08d819c16f87dafd9c907274b065eec25 done
+#15 naming to docker.io/cloudflare-dev/towncontainerdo:212e8576 done
+#15 DONE 0.0s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - FromPlatformFlagConstDisallowed: FROM --platform flag should not use constant value "linux/arm64" (line 1)
+⎔ Container image(s) ready
+⎔ Starting local server...
+[wrangler:info] Ready on http://localhost:9787
+[gastown-worker] --> GET /health
+[gastown-worker] <-- GET /health 200 (0ms)
+[wrangler:info] GET /health 200 OK (1278ms)
+[gastown-worker] --> POST /api/users/e2e-user-1771630473/towns
+[GastownUser.do] createTown: id=24d3f773-42c7-4bd4-b26c-0c4b804a4aab name=Single-Container-Town owner=e2e-user-1771630473
+[GastownUser.do] createTown: created town id=24d3f773-42c7-4bd4-b26c-0c4b804a4aab
+[gastown-worker] <-- POST /api/users/e2e-user-1771630473/towns 201 (5ms)
+[wrangler:info] POST /api/users/e2e-user-1771630473/towns 201 Created (6ms)
+[gastown-worker] --> POST /api/users/e2e-user-1771630473/rigs
+[towns.handler] handleCreateRig: userId=e2e-user-1771630473 town_id=24d3f773-42c7-4bd4-b26c-0c4b804a4aab name=single-rig git_url=https://github.com/test/repo.git
+[GastownUser.do] createRig: town_id=24d3f773-42c7-4bd4-b26c-0c4b804a4aab name=single-rig git_url=https://github.com/test/repo.git default_branch=main integration=none
+[GastownUser.do] createRig: created rig id=d91bcd5e-c297-445a-9e08-5dac04ef3616
+[towns.handler] handleCreateRig: rig created id=d91bcd5e-c297-445a-9e08-5dac04ef3616, now configuring Rig DO
+[Town.do] configureRig: rigId=d91bcd5e-c297-445a-9e08-5dac04ef3616 hasKilocodeToken=true
+[Town.do] configureRig: propagating kilocodeToken to town config
+[Town.do] updateTownConfig: saved config with 0 env vars
+[towns.handler] handleCreateRig: Town DO configured and rig registered
+[gastown-worker] <-- POST /api/users/e2e-user-1771630473/rigs 201 (4ms)
+[wrangler:info] POST /api/users/e2e-user-1771630473/rigs 201 Created (5ms)
+[gastown-worker] --> POST /api/towns/24d3f773-42c7-4bd4-b26c-0c4b804a4aab/mayor/message
+[mayor.handler] handleSendMayorMessage: townId=24d3f773-42c7-4bd4-b26c-0c4b804a4aab message="Test single container"
+Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
+Port 8080 is ready
+[TownContainer.do] container started for DO id=a29d8d0e5d55dbe19e630379c23884c8f3dbdd4c3dbad8648f1c3e607bf2f04a
+[TownContainer.do] Connected to container /ws for event relay
+[Town.do] startAgentInContainer: agentId=7e6832be-2f85-4e52-9057-6b3329b64ccb role=mayor name=mayor
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mFailed to resolve GASTOWN_JWT_SECRET[0m
+
+
+[gastown-worker] <-- POST /api/towns/24d3f773-42c7-4bd4-b26c-0c4b804a4aab/mayor/message 200 (6133ms)
+[wrangler:info] POST /api/towns/24d3f773-42c7-4bd4-b26c-0c4b804a4aab/mayor/message 200 OK (6135ms)
+[gastown-worker] --> POST /api/towns/24d3f773-42c7-4bd4-b26c-0c4b804a4aab/mayor/message
+[mayor.handler] handleSendMayorMessage: townId=24d3f773-42c7-4bd4-b26c-0c4b804a4aab message="Second message"
+[gastown-worker] <-- POST /api/towns/24d3f773-42c7-4bd4-b26c-0c4b804a4aab/mayor/message 200 (25ms)
+[wrangler:info] POST /api/towns/24d3f773-42c7-4bd4-b26c-0c4b804a4aab/mayor/message 200 OK (27ms)
+🪵  Logs were written to "/Users/john/Library/Preferences/.wrangler/logs/wrangler-2026-02-20_23-34-31_154.log"

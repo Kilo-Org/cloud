@@ -1,6 +1,10 @@
-import { credit_transactions } from '@/db/schema';
+import type { credit_transactions } from '@/db/schema';
 import { credit_transactions as creditTransactionsTable, kilocode_users } from '@/db/schema';
-import { computeExpiration, processLocalExpirations } from './creditExpiration';
+import {
+  computeExpiration,
+  processLocalExpirations,
+  retroactivelyExpireCredit,
+} from './creditExpiration';
 import { db } from '@/lib/drizzle';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 import { eq, sql } from 'drizzle-orm';
@@ -830,6 +834,62 @@ describe('processLocalExpirations', () => {
     expect(expirationB!.amount_microdollars).toBe(-4_000_000);
   });
 
+  it('zero-amount expirations are created and do not affect balance', async () => {
+    // Scenario: User has fully consumed credits before expiration
+    // Should create a zero-amount expiration transaction and not affect balance
+    const initialAcquired = 5_000_000; // $5
+    const initialUsed = 3_000_000; // $3 (more than the $1 credit, so it's fully consumed)
+    const user = await insertMigratedTestUser({
+      microdollars_used: initialUsed,
+      total_microdollars_acquired: initialAcquired,
+      next_credit_expiration_at: '2024-01-10T00:00:00Z',
+    });
+
+    const initialId = randomUUID();
+    // Add a credit that will expire with zero amount (fully consumed)
+    await db.insert(creditTransactionsTable).values({
+      kilo_user_id: user.id,
+      amount_microdollars: 1_000_000, // $1
+      is_free: true,
+      expiry_date: '2024-01-10T00:00:00Z',
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      id: initialId,
+      description: 'Fully consumed credits',
+    });
+
+    const now = new Date('2024-01-15');
+    const result = await processLocalExpirations(user, now);
+
+    expect(result).not.toBeNull();
+
+    // Verify zero-amount expiration transaction was created
+    const expirationTxns = await db
+      .select()
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
+
+    expect(expirationTxns).toHaveLength(1);
+    expect(expirationTxns[0].amount_microdollars).toBe(0); // Zero amount
+    expect(expirationTxns[0].original_transaction_id).toBe(initialId);
+
+    // Verify user balance is unchanged (zero-amount expiration)
+    const updatedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+
+    // Balance should still be: acquired - used = $5 - $3 = $2
+    // The zero-amount expiration should not change total_microdollars_acquired
+    expect(updatedUser?.total_microdollars_acquired).toBe(initialAcquired);
+    expect(updatedUser?.microdollars_used).toBe(initialUsed);
+
+    const balance =
+      (updatedUser!.total_microdollars_acquired - updatedUser!.microdollars_used) / 1_000_000;
+    expect(balance).toBe(2); // $2 balance
+  });
+});
+
+describe('retroactivelyExpireCredit', () => {
   /**
    * Helper: refetch user from DB (needed after mutations to get latest state).
    */
@@ -892,7 +952,7 @@ describe('processLocalExpirations', () => {
   };
 
   it('simultaneous expiry of two credit grants with interleaved usage resets balance to zero', async () => {
-    let user = await insertMigratedTestUser({});
+    let [user] = await db.insert(kilocode_users).values(defineTestUser()).returning();
 
     await insertCreditTransaction(user.id, {
       amount_usd: 20,
@@ -931,17 +991,11 @@ describe('processLocalExpirations', () => {
     expect(user.microdollars_used / 1_000_000).toBe(4);
 
     // Retroactively expire credits
-    await db
-      .update(creditTransactionsTable)
-      .set({
-        expiry_date: '2026-01-06T00:00:00Z',
-        expiration_baseline_microdollars_used: 2_000_000,
-      })
-      .where(eq(credit_transactions.id, txn.id));
-    await db
-      .update(kilocode_users)
-      .set({ next_credit_expiration_at: '2026-01-06T00:00:00Z' })
-      .where(eq(kilocode_users.id, user.id));
+    await retroactivelyExpireCredit({
+      userId: user.id,
+      transactionId: txn.id,
+      expiryDate: new Date('2026-01-06T00:00:00Z'),
+    });
 
     user = await refetchUser(user.id);
 
@@ -952,59 +1006,5 @@ describe('processLocalExpirations', () => {
 
     expect(user.total_microdollars_acquired / 1_000_000).toBe(22);
     expect(user.microdollars_used / 1_000_000).toBe(4);
-  });
-
-  it('zero-amount expirations are created and do not affect balance', async () => {
-    // Scenario: User has fully consumed credits before expiration
-    // Should create a zero-amount expiration transaction and not affect balance
-    const initialAcquired = 5_000_000; // $5
-    const initialUsed = 3_000_000; // $3 (more than the $1 credit, so it's fully consumed)
-    const user = await insertMigratedTestUser({
-      microdollars_used: initialUsed,
-      total_microdollars_acquired: initialAcquired,
-      next_credit_expiration_at: '2024-01-10T00:00:00Z',
-    });
-
-    const initialId = randomUUID();
-    // Add a credit that will expire with zero amount (fully consumed)
-    await db.insert(creditTransactionsTable).values({
-      kilo_user_id: user.id,
-      amount_microdollars: 1_000_000, // $1
-      is_free: true,
-      expiry_date: '2024-01-10T00:00:00Z',
-      expiration_baseline_microdollars_used: 0,
-      original_baseline_microdollars_used: 0,
-      id: initialId,
-      description: 'Fully consumed credits',
-    });
-
-    const now = new Date('2024-01-15');
-    const result = await processLocalExpirations(user, now);
-
-    expect(result).not.toBeNull();
-
-    // Verify zero-amount expiration transaction was created
-    const expirationTxns = await db
-      .select()
-      .from(creditTransactionsTable)
-      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
-
-    expect(expirationTxns).toHaveLength(1);
-    expect(expirationTxns[0].amount_microdollars).toBe(0); // Zero amount
-    expect(expirationTxns[0].original_transaction_id).toBe(initialId);
-
-    // Verify user balance is unchanged (zero-amount expiration)
-    const updatedUser = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, user.id),
-    });
-
-    // Balance should still be: acquired - used = $5 - $3 = $2
-    // The zero-amount expiration should not change total_microdollars_acquired
-    expect(updatedUser?.total_microdollars_acquired).toBe(initialAcquired);
-    expect(updatedUser?.microdollars_used).toBe(initialUsed);
-
-    const balance =
-      (updatedUser!.total_microdollars_acquired - updatedUser!.microdollars_used) / 1_000_000;
-    expect(balance).toBe(2); // $2 balance
   });
 });

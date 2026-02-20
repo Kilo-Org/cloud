@@ -224,6 +224,139 @@ export async function processLocalExpirations(
   return { total_microdollars_acquired: new_total_microdollars_acquired };
 }
 
+/**
+ * Retroactively set an expiry date on a credit transaction that previously had none.
+ *
+ * When prior expirations claimed usage that overlaps with this credit's range,
+ * the baseline needs to be shifted to avoid double-counting. This function
+ * replays `computeExpiration` from original baselines to compute correct shifts.
+ *
+ * After calling this, run `processLocalExpirations` to create the expiration entries.
+ */
+export async function retroactivelyExpireCredit(args: {
+  userId: string;
+  transactionId: string;
+  expiryDate?: Date;
+}) {
+  const { userId, transactionId, expiryDate = new Date() } = args;
+  const expiryDateStr = expiryDate.toISOString();
+
+  // Set the expiry date on the target transaction
+  const updateResult = await db
+    .update(creditTransactionsTable)
+    .set({ expiry_date: expiryDateStr })
+    .where(
+      and(
+        eq(creditTransactionsTable.id, transactionId),
+        eq(creditTransactionsTable.kilo_user_id, userId)
+      )
+    );
+
+  if (updateResult.rowCount === 0) {
+    throw new Error(`Transaction ${transactionId} not found for user ${userId}`);
+  }
+
+  // Update next_credit_expiration_at to the earlier of current and new expiry
+  await db
+    .update(kilocode_users)
+    .set({
+      next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${expiryDateStr}), ${expiryDateStr})`,
+    })
+    .where(eq(kilocode_users.id, userId));
+
+  // Recompute expiration baselines to account for prior expirations
+  await recomputeExpirationBaselines(userId);
+}
+
+const EXPIRATION_CATEGORIES = ['credits_expired', 'orb_credit_expired', 'orb_credit_voided'];
+
+/**
+ * Recompute expiration_baseline_microdollars_used for all non-yet-expired credit blocks.
+ *
+ * Replays `computeExpiration` from original baselines up to the latest already-processed
+ * expiration date, which correctly shifts baselines for credits that overlap with
+ * already-expired credits.
+ */
+async function recomputeExpirationBaselines(userId: string) {
+  const user = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.id, userId),
+    columns: { id: true, microdollars_used: true },
+  });
+  if (!user) throw new Error(`User ${userId} not found`);
+
+  const allTxns = await db
+    .select({
+      id: creditTransactionsTable.id,
+      amount_microdollars: creditTransactionsTable.amount_microdollars,
+      expiry_date: creditTransactionsTable.expiry_date,
+      original_baseline_microdollars_used:
+        creditTransactionsTable.original_baseline_microdollars_used,
+      expiration_baseline_microdollars_used:
+        creditTransactionsTable.expiration_baseline_microdollars_used,
+      description: creditTransactionsTable.description,
+      is_free: creditTransactionsTable.is_free,
+      credit_category: creditTransactionsTable.credit_category,
+      original_transaction_id: creditTransactionsTable.original_transaction_id,
+    })
+    .from(creditTransactionsTable)
+    .where(
+      and(
+        eq(creditTransactionsTable.kilo_user_id, userId),
+        isNull(creditTransactionsTable.organization_id)
+      )
+    );
+
+  // Identify which blocks have already been expired
+  const alreadyExpiredIds = new Set(
+    allTxns
+      .filter(t => EXPIRATION_CATEGORIES.includes(t.credit_category ?? ''))
+      .map(t => t.original_transaction_id)
+  );
+
+  // Get all original blocks with expiry dates (not expiration entries)
+  const expiringBlocks = allTxns.filter(
+    t => t.expiry_date != null && !EXPIRATION_CATEGORIES.includes(t.credit_category ?? '')
+  );
+
+  if (expiringBlocks.length === 0) return;
+
+  // Reset baselines to original for replay
+  const blocksForReplay: ExpiringTransaction[] = expiringBlocks.map(t => ({
+    id: t.id,
+    amount_microdollars: t.amount_microdollars,
+    expiration_baseline_microdollars_used: t.original_baseline_microdollars_used ?? 0,
+    expiry_date: t.expiry_date,
+    description: t.description,
+    is_free: t.is_free,
+  }));
+
+  // Replay up to the latest already-processed expiration date
+  const replayNow = expiringBlocks
+    .filter(
+      (t): t is typeof t & { expiry_date: string } =>
+        alreadyExpiredIds.has(t.id) && t.expiry_date != null
+    )
+    .map(t => new Date(t.expiry_date))
+    .reduce((max, d) => (d > max ? d : max), new Date(0));
+
+  const result = computeExpiration(blocksForReplay, user, replayNow, userId);
+
+  // Update baselines for blocks that haven't been expired yet
+  for (const block of expiringBlocks) {
+    if (alreadyExpiredIds.has(block.id)) continue;
+
+    const newBaseline =
+      result.newBaselines.get(block.id) ?? block.original_baseline_microdollars_used ?? 0;
+
+    if (newBaseline !== block.expiration_baseline_microdollars_used) {
+      await db
+        .update(creditTransactionsTable)
+        .set({ expiration_baseline_microdollars_used: newBaseline })
+        .where(eq(creditTransactionsTable.id, block.id));
+    }
+  }
+}
+
 export async function fetchExpiringTransactionsForOrganization(
   organizationId: string,
   fromDb: typeof db = db

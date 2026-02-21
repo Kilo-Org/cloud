@@ -15,6 +15,7 @@ import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -46,6 +47,7 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
+  const showTermsTooltip = !flow.termsAccepted;
 
   // Show minimal loading state while checking localStorage for returning user hint
   // This prevents flash of "new user" UI before switching to "returning user" UI
@@ -315,19 +317,38 @@ export function SignInForm({
                   </div>
                   <div className="mx-auto max-w-md space-y-4">
                     {/* OAuth provider buttons - Google first */}
-                    <AuthProviderButtons
-                      providers={OAuthProviderIds}
-                      onProviderClick={flow.handleOAuthClick}
-                      disabled={!flow.termsAccepted}
-                    />
-
-                    <SignInButton
-                      onClick={flow.handleShowEmailInput}
-                      disabled={!flow.termsAccepted}
-                    >
-                      <Mail />
-                      Continue with Email
-                    </SignInButton>
+                    {showTermsTooltip ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex w-full flex-col gap-4">
+                              <AuthProviderButtons
+                                providers={OAuthProviderIds}
+                                onProviderClick={flow.handleOAuthClick}
+                                disabled={true}
+                              />
+                              <SignInButton onClick={flow.handleShowEmailInput} disabled={true}>
+                                <Mail />
+                                Continue with Email
+                              </SignInButton>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Agree to ToS to continue</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <>
+                        <AuthProviderButtons
+                          providers={OAuthProviderIds}
+                          onProviderClick={flow.handleOAuthClick}
+                          disabled={false}
+                        />
+                        <SignInButton onClick={flow.handleShowEmailInput} disabled={false}>
+                          <Mail />
+                          Continue with Email
+                        </SignInButton>
+                      </>
+                    )}
                   </div>
 
                   {/* Divider */}

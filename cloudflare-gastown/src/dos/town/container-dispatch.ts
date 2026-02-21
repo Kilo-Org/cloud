@@ -184,7 +184,7 @@ export async function startAgentInContainer(
           beadBody: params.beadBody,
           checkpoint: params.checkpoint,
         }),
-        model: params.townConfig.default_model ?? 'anthropic/claude-sonnet-4.6',
+        model: params.townConfig.default_model ?? 'anthropic/claude-sonnet-4',
         systemPrompt:
           params.systemPromptOverride ??
           systemPromptForRole({

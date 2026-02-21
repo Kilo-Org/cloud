@@ -288,19 +288,12 @@ export async function startAgent(
     void subscribeToEvents(client, agent, request);
 
     // 4. Send the initial prompt
-    // Model string is "provider/model" (e.g. "anthropic/claude-sonnet-4.6").
-    // Split into providerID and modelID for the SDK.
+    // The model string is an OpenRouter-style ID like "anthropic/claude-sonnet-4".
+    // The kilo provider (which wraps OpenRouter) takes the FULL model string as modelID.
+    // providerID is always 'kilo' since we route through the Kilo gateway.
     let modelParam: { providerID: string; modelID: string } | undefined;
     if (request.model) {
-      const slashIdx = request.model.indexOf('/');
-      if (slashIdx > 0) {
-        modelParam = {
-          providerID: request.model.slice(0, slashIdx),
-          modelID: request.model.slice(slashIdx + 1),
-        };
-      } else {
-        modelParam = { providerID: 'kilo', modelID: request.model };
-      }
+      modelParam = { providerID: 'kilo', modelID: request.model };
     }
 
     await client.session.prompt({

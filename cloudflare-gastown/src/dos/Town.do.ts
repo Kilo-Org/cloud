@@ -121,6 +121,10 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async initializeDatabase(): Promise<void> {
+    // Load persisted town ID if available
+    const storedId = await this.ctx.storage.get<string>('town:id');
+    if (storedId) this._townId = storedId;
+
     // Rig-scoped tables (formerly in Rig DO)
     beads.initBeadTables(this.sql);
     agents.initAgentTables(this.sql);
@@ -146,12 +150,20 @@ export class TownDO extends DurableObject<Env> {
   private _townId: string | null = null;
 
   private get townId(): string {
-    // ctx.id.name is populated when the DO is accessed via idFromName().
-    // Cache it in a field since it's used frequently.
-    if (this._townId === null) {
-      this._townId = this.ctx.id.name ?? this.ctx.id.toString();
-    }
-    return this._townId;
+    // ctx.id.name should be the town UUID (set via idFromName in getTownDOStub).
+    // In some runtimes (local dev) .name is undefined. We persist the ID
+    // in KV on first access so it survives across requests.
+    return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
+  }
+
+  /**
+   * Explicitly set the town ID. Called by configureRig or any handler
+   * that knows the real town UUID, so that subsequent internal calls
+   * (alarm, sendMayorMessage) use the correct ID for container stubs.
+   */
+  async setTownId(townId: string): Promise<void> {
+    this._townId = townId;
+    await this.ctx.storage.put('town:id', townId);
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -201,6 +213,10 @@ export class TownDO extends DurableObject<Env> {
     console.log(
       `${TOWN_LOG} configureRig: rigId=${rigConfig.rigId} hasKilocodeToken=${!!rigConfig.kilocodeToken}`
     );
+    // Persist the real town UUID so alarm/internal calls use the correct ID
+    if (rigConfig.townId) {
+      await this.setTownId(rigConfig.townId);
+    }
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
 
     // Store kilocodeToken in town config so it's available to all agents

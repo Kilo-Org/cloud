@@ -45,12 +45,42 @@ export function unregisterEventSink(
   eventSinks.delete(sink);
 }
 
+// ── Event buffer for HTTP polling ─────────────────────────────────────
+// The TownContainerDO polls GET /agents/:id/events?after=N to get events
+// because containerFetch doesn't support WebSocket upgrades.
+type BufferedEvent = { id: number; event: string; data: unknown; timestamp: string };
+const MAX_BUFFERED_EVENTS = 2000;
+const agentEventBuffers = new Map<string, BufferedEvent[]>();
+let nextEventId = 1;
+
+function bufferAgentEvent(agentId: string, event: string, data: unknown): void {
+  let buf = agentEventBuffers.get(agentId);
+  if (!buf) {
+    buf = [];
+    agentEventBuffers.set(agentId, buf);
+  }
+  buf.push({ id: nextEventId++, event, data, timestamp: new Date().toISOString() });
+  if (buf.length > MAX_BUFFERED_EVENTS) {
+    buf.splice(0, buf.length - MAX_BUFFERED_EVENTS);
+  }
+}
+
+export function getAgentEvents(agentId: string, afterId = 0): BufferedEvent[] {
+  const buf = agentEventBuffers.get(agentId);
+  if (!buf) return [];
+  return buf.filter(e => e.id > afterId);
+}
+
 function broadcastEvent(agentId: string, event: string, data: unknown): void {
+  // Always buffer for HTTP polling (TownContainerDO polls /agents/:id/events)
+  bufferAgentEvent(agentId, event, data);
+
+  // Also send to WebSocket sinks if any are connected
   for (const sink of eventSinks) {
     try {
       sink(agentId, event, data);
-    } catch {
-      // Best-effort
+    } catch (err) {
+      console.warn(`${MANAGER_LOG} broadcastEvent: sink error`, err);
     }
   }
 }
@@ -110,13 +140,24 @@ async function subscribeToEvents(
   eventAbortControllers.set(agent.agentId, controller);
 
   try {
+    console.log(`${MANAGER_LOG} Subscribing to events for agent ${agent.agentId}...`);
     const result = await client.event.subscribe();
+    console.log(
+      `${MANAGER_LOG} event.subscribe() returned: hasStream=${!!result.stream} keys=${Object.keys(result).join(',')}`
+    );
     if (!result.stream) {
       console.warn(`${MANAGER_LOG} No event stream returned for agent ${agent.agentId}`);
       return;
     }
 
+    let eventCount = 0;
     for await (const event of result.stream) {
+      eventCount++;
+      if (eventCount <= 3 || eventCount % 50 === 0) {
+        console.log(
+          `${MANAGER_LOG} Event #${eventCount} for agent ${agent.agentId}: type=${event.type}`
+        );
+      }
       if (controller.signal.aborted) break;
 
       // Filter by session
@@ -359,10 +400,4 @@ export async function stopAll(): Promise<void> {
     instance.server.close();
   }
   sdkInstances.clear();
-}
-
-// Legacy: getAgentEvents is no longer needed since events flow via WebSocket.
-// Keep a stub for backward compatibility during migration.
-export function getAgentEvents(_agentId: string, _afterId = 0): unknown[] {
-  return [];
 }

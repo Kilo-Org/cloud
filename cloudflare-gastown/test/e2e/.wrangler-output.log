@@ -44,25 +44,25 @@ The following containers are available:
 #5 resolve docker.io/oven/bun:1-slim@sha256:8ca06c7812d9050ccc4b80799685f395d6a0d051d3b7207dfd120e2b437b1ec9 done
 #5 DONE 0.0s
 
-#6 [ 3/10] RUN npm install -g @kilocode/cli @kilocode/cli-linux-arm64 @kilocode/cli-linux-arm64-musl &&     ln -s "$(which kilo)" /usr/local/bin/opencode
+#6 [ 4/10] RUN mkdir -p /workspace/rigs /app
 #6 CACHED
 
-#7 [ 5/10] COPY plugin/ /opt/gastown-plugin/
+#7 [ 8/10] COPY package.json bun.lock ./
 #7 CACHED
 
-#8 [ 6/10] RUN cd /opt/gastown-plugin && npm install --omit=dev &&     mkdir -p /root/.config/kilo/plugins &&     ln -s /opt/gastown-plugin/index.ts /root/.config/kilo/plugins/gastown.ts
+#8 [ 2/10] RUN apt-get update &&     apt-get install -y --no-install-recommends git curl ca-certificates &&     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&     apt-get install -y --no-install-recommends nodejs &&     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg       -o /usr/share/keyrings/githubcli-archive-keyring.gpg &&     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"       > /etc/apt/sources.list.d/github-cli.list &&     apt-get update &&     apt-get install -y --no-install-recommends gh &&     apt-get clean &&     rm -rf /var/lib/apt/lists/*
 #8 CACHED
 
-#9 [ 4/10] RUN mkdir -p /workspace/rigs /app
+#9 [ 6/10] RUN cd /opt/gastown-plugin && npm install --omit=dev &&     mkdir -p /root/.config/kilo/plugins &&     ln -s /opt/gastown-plugin/index.ts /root/.config/kilo/plugins/gastown.ts
 #9 CACHED
 
-#10 [ 2/10] RUN apt-get update &&     apt-get install -y --no-install-recommends git curl ca-certificates &&     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&     apt-get install -y --no-install-recommends nodejs &&     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg       -o /usr/share/keyrings/githubcli-archive-keyring.gpg &&     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"       > /etc/apt/sources.list.d/github-cli.list &&     apt-get update &&     apt-get install -y --no-install-recommends gh &&     apt-get clean &&     rm -rf /var/lib/apt/lists/*
+#10 [ 7/10] WORKDIR /app
 #10 CACHED
 
-#11 [ 7/10] WORKDIR /app
+#11 [ 3/10] RUN npm install -g @kilocode/cli @kilocode/cli-linux-arm64 @kilocode/cli-linux-arm64-musl &&     ln -s "$(which kilo)" /usr/local/bin/opencode
 #11 CACHED
 
-#12 [ 8/10] COPY package.json bun.lock ./
+#12 [ 5/10] COPY plugin/ /opt/gastown-plugin/
 #12 CACHED
 
 #13 [ 9/10] RUN bun install --frozen-lockfile --production
@@ -73,9 +73,9 @@ The following containers are available:
 
 #15 exporting to image
 #15 exporting layers done
-#15 exporting manifest sha256:6656ee138a2ca9d93bca2a03b0cf4d9494dc8079ea0eac1955a7e7e6ac77e8e1 done
-#15 exporting config sha256:5c1b1be5a93d4105d20a7ed1dde2d4b24a7c6b29f292d04dcd0e68531ba9de41 done
-#15 naming to docker.io/cloudflare-dev/towncontainerdo:ad78ede1 done
+#15 exporting manifest sha256:11c86f9000477e76dc399ac628c0bc0e175d2942fe571c3187e4f40fd36c96d2 done
+#15 exporting config sha256:7f9a17878393871fd19c7c23cc4178ab5f61edc40dcd90b1504590d194cacdca done
+#15 naming to docker.io/cloudflare-dev/towncontainerdo:8306994c done
 #15 DONE 0.0s
 
  [33m1 warning found (use docker --debug to expand):
@@ -84,626 +84,48 @@ The following containers are available:
 ⎔ Starting local server...
 [wrangler:info] Ready on http://localhost:9787
 [gastown-worker] --> GET /health
-[gastown-worker] <-- GET /health 200 (1ms)
-[wrangler:info] GET /health 200 OK (932ms)
-[gastown-worker] --> GET /health
 [gastown-worker] <-- GET /health 200 (0ms)
-[wrangler:info] GET /health 200 OK (1ms)
-[gastown-worker] --> GET /nonexistent
-[gastown-worker] <-- GET /nonexistent 404 (1ms)
-[wrangler:info] GET /nonexistent 404 Not Found (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631719-4796/towns
-[GastownUser.do] createTown: id=bdfd63c7-08f0-42f8-972f-d5caa7b11cdd name=E2E-Town owner=e2e-user-1771631719-4796
-[GastownUser.do] createTown: created town id=bdfd63c7-08f0-42f8-972f-d5caa7b11cdd
-[gastown-worker] <-- POST /api/users/e2e-user-1771631719-4796/towns 201 (5ms)
-[wrangler:info] POST /api/users/e2e-user-1771631719-4796/towns 201 Created (5ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631719-4796/towns
-[gastown-worker] <-- GET /api/users/e2e-user-1771631719-4796/towns 200 (0ms)
-[wrangler:info] GET /api/users/e2e-user-1771631719-4796/towns 200 OK (1ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631719-4796/towns/bdfd63c7-08f0-42f8-972f-d5caa7b11cdd
-[gastown-worker] <-- GET /api/users/e2e-user-1771631719-4796/towns/bdfd63c7-08f0-42f8-972f-d5caa7b11cdd 200 (0ms)
-[wrangler:info] GET /api/users/e2e-user-1771631719-4796/towns/bdfd63c7-08f0-42f8-972f-d5caa7b11cdd 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631719-12007/towns
-[GastownUser.do] createTown: id=7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5 name=Token-Town owner=e2e-user-1771631719-12007
-[GastownUser.do] createTown: created town id=7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5
-[gastown-worker] <-- POST /api/users/e2e-user-1771631719-12007/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631719-12007/towns 201 Created (3ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631719-12007/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631719-12007 town_id=7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5 name=token-rig git_url=https://github.com/test/repo.git
-[GastownUser.do] createRig: town_id=7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5 name=token-rig git_url=https://github.com/test/repo.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=7ff1db38-80e8-49d3-9096-947537745a29
-[towns.handler] handleCreateRig: rig created id=7ff1db38-80e8-49d3-9096-947537745a29, now configuring Rig DO
-[Town.do] configureRig: rigId=7ff1db38-80e8-49d3-9096-947537745a29 hasKilocodeToken=true
+[wrangler:info] GET /health 200 OK (1129ms)
+[gastown-worker] --> POST /api/users/e2e-user-1771633380-12404/towns
+[GastownUser.do] createTown: id=db2477fa-05e6-42d0-b797-b3a47a11d4e5 name=WS-Events-Town owner=e2e-user-1771633380-12404
+[GastownUser.do] createTown: created town id=db2477fa-05e6-42d0-b797-b3a47a11d4e5
+[gastown-worker] <-- POST /api/users/e2e-user-1771633380-12404/towns 201 (10ms)
+[wrangler:info] POST /api/users/e2e-user-1771633380-12404/towns 201 Created (11ms)
+[gastown-worker] --> POST /api/users/e2e-user-1771633380-12404/rigs
+[towns.handler] handleCreateRig: userId=e2e-user-1771633380-12404 town_id=db2477fa-05e6-42d0-b797-b3a47a11d4e5 name=ws-rig git_url=https://github.com/test/repo.git
+[GastownUser.do] createRig: town_id=db2477fa-05e6-42d0-b797-b3a47a11d4e5 name=ws-rig git_url=https://github.com/test/repo.git default_branch=main integration=none
+[GastownUser.do] createRig: created rig id=420755aa-7e1b-4ed3-8431-aec42837e823
+[towns.handler] handleCreateRig: rig created id=420755aa-7e1b-4ed3-8431-aec42837e823, now configuring Rig DO
+[Town.do] configureRig: rigId=420755aa-7e1b-4ed3-8431-aec42837e823 hasKilocodeToken=true
 [Town.do] configureRig: propagating kilocodeToken to town config
 [Town.do] updateTownConfig: saved config with 0 env vars
 [towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631719-12007/rigs 201 (4ms)
-[wrangler:info] POST /api/users/e2e-user-1771631719-12007/rigs 201 Created (6ms)
-[gastown-worker] --> GET /api/towns/7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5/config
-[gastown-worker] <-- GET /api/towns/7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5/config 200 (1ms)
-[wrangler:info] GET /api/towns/7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5/config 200 OK (2ms)
-[gastown-worker] --> GET /api/towns/7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5/mayor/status
-[gastown-worker] <-- GET /api/towns/7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5/mayor/status 200 (0ms)
-[wrangler:info] GET /api/towns/7c9d8d6f-ffee-484a-a4f2-6a81cd80aac5/mayor/status 200 OK (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631720-11949/towns
-[GastownUser.do] createTown: id=3bad463f-986e-422d-9ba1-d9f826b14961 name=Mayor-Token-Town owner=e2e-user-1771631720-11949
-[GastownUser.do] createTown: created town id=3bad463f-986e-422d-9ba1-d9f826b14961
-[gastown-worker] <-- POST /api/users/e2e-user-1771631720-11949/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631720-11949/towns 201 Created (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631720-11949/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631720-11949 town_id=3bad463f-986e-422d-9ba1-d9f826b14961 name=mayor-rig git_url=https://github.com/test/repo.git
-[GastownUser.do] createRig: town_id=3bad463f-986e-422d-9ba1-d9f826b14961 name=mayor-rig git_url=https://github.com/test/repo.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=db244f98-3ec4-44d0-9e13-e55fdd7f8e76
-[towns.handler] handleCreateRig: rig created id=db244f98-3ec4-44d0-9e13-e55fdd7f8e76, now configuring Rig DO
-[Town.do] configureRig: rigId=db244f98-3ec4-44d0-9e13-e55fdd7f8e76 hasKilocodeToken=true
-[Town.do] configureRig: propagating kilocodeToken to town config
-[Town.do] updateTownConfig: saved config with 0 env vars
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631720-11949/rigs 201 (5ms)
-[wrangler:info] POST /api/users/e2e-user-1771631720-11949/rigs 201 Created (6ms)
-[gastown-worker] --> GET /api/towns/3bad463f-986e-422d-9ba1-d9f826b14961/config
-[gastown-worker] <-- GET /api/towns/3bad463f-986e-422d-9ba1-d9f826b14961/config 200 (0ms)
-[wrangler:info] GET /api/towns/3bad463f-986e-422d-9ba1-d9f826b14961/config 200 OK (1ms)
-[gastown-worker] --> POST /api/towns/3bad463f-986e-422d-9ba1-d9f826b14961/mayor/message
-[mayor.handler] handleSendMayorMessage: townId=3bad463f-986e-422d-9ba1-d9f826b14961 message="Hello from E2E test"
+[gastown-worker] <-- POST /api/users/e2e-user-1771633380-12404/rigs 201 (5ms)
+[wrangler:info] POST /api/users/e2e-user-1771633380-12404/rigs 201 Created (5ms)
+[gastown-worker] --> POST /api/towns/db2477fa-05e6-42d0-b797-b3a47a11d4e5/mayor/message
+[mayor.handler] handleSendMayorMessage: townId=db2477fa-05e6-42d0-b797-b3a47a11d4e5 message="Say hello world in one sentence"
 Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
 Port 8080 is ready
-[TownContainer.do] container started for DO id=1a583eb5e5ce04ef6b9a8269d3ed3b3fa528e1869eb45b1d63d35332550df794
-[Town.do] startAgentInContainer: agentId=7d25d4dc-ddfe-4e04-b4a8-c8d9a4e23fdb role=mayor name=mayor
+[TownContainer.do] container started for DO id=9f80e66f1acfacea057df7cd8160f25d2f65210261cb2e35587306bdb626fa47
+[Town.do] startAgentInContainer: agentId=6bda5846-3a78-4b46-a0d8-b4bcf375fccd role=mayor name=mayor
 [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mFailed to resolve GASTOWN_JWT_SECRET[0m
 
 
-[TownContainer.do] Connected to container /ws for event relay
-[gastown-worker] <-- POST /api/towns/3bad463f-986e-422d-9ba1-d9f826b14961/mayor/message 200 (6534ms)
-[wrangler:info] POST /api/towns/3bad463f-986e-422d-9ba1-d9f826b14961/mayor/message 200 OK (6535ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631732-1780/towns
-[GastownUser.do] createTown: id=043e291c-d042-44c7-84d4-153470d6db4b name=Single-Container-Town owner=e2e-user-1771631732-1780
-[GastownUser.do] createTown: created town id=043e291c-d042-44c7-84d4-153470d6db4b
-[gastown-worker] <-- POST /api/users/e2e-user-1771631732-1780/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631732-1780/towns 201 Created (3ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631732-1780/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631732-1780 town_id=043e291c-d042-44c7-84d4-153470d6db4b name=single-rig git_url=https://github.com/test/repo.git
-[GastownUser.do] createRig: town_id=043e291c-d042-44c7-84d4-153470d6db4b name=single-rig git_url=https://github.com/test/repo.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=e912ca0d-8626-4d1f-9712-6ff1defb31ae
-[towns.handler] handleCreateRig: rig created id=e912ca0d-8626-4d1f-9712-6ff1defb31ae, now configuring Rig DO
-[Town.do] configureRig: rigId=e912ca0d-8626-4d1f-9712-6ff1defb31ae hasKilocodeToken=true
-[Town.do] configureRig: propagating kilocodeToken to town config
-[Town.do] updateTownConfig: saved config with 0 env vars
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631732-1780/rigs 201 (3ms)
-[wrangler:info] POST /api/users/e2e-user-1771631732-1780/rigs 201 Created (4ms)
-[gastown-worker] --> POST /api/towns/043e291c-d042-44c7-84d4-153470d6db4b/mayor/message
-[mayor.handler] handleSendMayorMessage: townId=043e291c-d042-44c7-84d4-153470d6db4b message="Test single container"
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-Port 8080 is ready
-[TownContainer.do] container started for DO id=b00829f4d0717acfc6c23a005e1eefaaa127fc9270490e8c4bd03617a983694e
-[Town.do] startAgentInContainer: agentId=7891f557-18b7-4ec8-890c-a2226c5b8e17 role=mayor name=mayor
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mFailed to resolve GASTOWN_JWT_SECRET[0m
-
-
-[TownContainer.do] Connected to container /ws for event relay
-[gastown-worker] <-- POST /api/towns/043e291c-d042-44c7-84d4-153470d6db4b/mayor/message 200 (5824ms)
-[wrangler:info] POST /api/towns/043e291c-d042-44c7-84d4-153470d6db4b/mayor/message 200 OK (5825ms)
-[Town.do] alarm: fired for town=4b03737ee6754bf0a810bf568cbe4663a6df8d66c6f10a85feedbbf9f10f94a7
-[gastown-worker] --> POST /api/towns/043e291c-d042-44c7-84d4-153470d6db4b/mayor/message
-[mayor.handler] handleSendMayorMessage: townId=043e291c-d042-44c7-84d4-153470d6db4b message="Second message"
-[gastown-worker] <-- POST /api/towns/043e291c-d042-44c7-84d4-153470d6db4b/mayor/message 200 (20ms)
-[wrangler:info] POST /api/towns/043e291c-d042-44c7-84d4-153470d6db4b/mayor/message 200 OK (20ms)
-[Town.do] alarm: fired for town=46b7adc2d5d9d1e49f354396438d7893ffdd81a81472dd19088b34e13ceb6b94
-[gastown-worker] --> POST /api/users/e2e-user-1771631753-3463/towns
-[GastownUser.do] createTown: id=bd03a103-18de-45ba-b84b-ad0cb0ab7069 name=Mayor-Status-Town owner=e2e-user-1771631753-3463
-[GastownUser.do] createTown: created town id=bd03a103-18de-45ba-b84b-ad0cb0ab7069
-[gastown-worker] <-- POST /api/users/e2e-user-1771631753-3463/towns 201 (1ms)
-[wrangler:info] POST /api/users/e2e-user-1771631753-3463/towns 201 Created (3ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631753-3463/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631753-3463 town_id=bd03a103-18de-45ba-b84b-ad0cb0ab7069 name=status-rig git_url=https://github.com/test/repo.git
-[GastownUser.do] createRig: town_id=bd03a103-18de-45ba-b84b-ad0cb0ab7069 name=status-rig git_url=https://github.com/test/repo.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=068d2521-2132-48ee-83bc-6260b7b0ffec
-[towns.handler] handleCreateRig: rig created id=068d2521-2132-48ee-83bc-6260b7b0ffec, now configuring Rig DO
-[Town.do] configureRig: rigId=068d2521-2132-48ee-83bc-6260b7b0ffec hasKilocodeToken=true
-[Town.do] configureRig: propagating kilocodeToken to town config
-[Town.do] updateTownConfig: saved config with 0 env vars
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631753-3463/rigs 201 (4ms)
-[wrangler:info] POST /api/users/e2e-user-1771631753-3463/rigs 201 Created (4ms)
-[gastown-worker] --> GET /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/status
-[gastown-worker] <-- GET /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/status 200 (1ms)
-[wrangler:info] GET /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/status 200 OK (2ms)
-[gastown-worker] --> POST /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/message
-[mayor.handler] handleSendMayorMessage: townId=bd03a103-18de-45ba-b84b-ad0cb0ab7069 message="Status test"
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-Port 8080 is ready
-[TownContainer.do] container started for DO id=e930c58bc5df77afbc395a493cdb05148922466d6f367207723e39aded392dd1
-[TownContainer.do] Connected to container /ws for event relay
-[Town.do] startAgentInContainer: agentId=dea0a0db-1600-48b7-b41c-02eaab5e292b role=mayor name=mayor
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mFailed to resolve GASTOWN_JWT_SECRET[0m
-
-
-[Town.do] alarm: fired for town=4b03737ee6754bf0a810bf568cbe4663a6df8d66c6f10a85feedbbf9f10f94a7
-[gastown-worker] <-- POST /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/message 200 (5902ms)
-[wrangler:info] POST /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/message 200 OK (5903ms)
-[gastown-worker] --> GET /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/status
-[gastown-worker] <-- GET /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/status 200 (1ms)
-[wrangler:info] GET /api/towns/bd03a103-18de-45ba-b84b-ad0cb0ab7069/mayor/status 200 OK (3ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631761-19974/towns
-[GastownUser.do] createTown: id=0ee12290-9a8a-4271-b305-b1b8e6f21ab6 name=List-Rigs-Town owner=e2e-user-1771631761-19974
-[GastownUser.do] createTown: created town id=0ee12290-9a8a-4271-b305-b1b8e6f21ab6
-[gastown-worker] <-- POST /api/users/e2e-user-1771631761-19974/towns 201 (1ms)
-[wrangler:info] POST /api/users/e2e-user-1771631761-19974/towns 201 Created (2ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631761-19974/towns/0ee12290-9a8a-4271-b305-b1b8e6f21ab6/rigs
-[gastown-worker] <-- GET /api/users/e2e-user-1771631761-19974/towns/0ee12290-9a8a-4271-b305-b1b8e6f21ab6/rigs 200 (1ms)
-[wrangler:info] GET /api/users/e2e-user-1771631761-19974/towns/0ee12290-9a8a-4271-b305-b1b8e6f21ab6/rigs 200 OK (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631761-19974/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631761-19974 town_id=0ee12290-9a8a-4271-b305-b1b8e6f21ab6 name=rig-a git_url=https://github.com/a/a.git
-[GastownUser.do] createRig: town_id=0ee12290-9a8a-4271-b305-b1b8e6f21ab6 name=rig-a git_url=https://github.com/a/a.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=62b5e7c4-cedd-493d-930a-3597b8169063
-[towns.handler] handleCreateRig: rig created id=62b5e7c4-cedd-493d-930a-3597b8169063, now configuring Rig DO
-[Town.do] configureRig: rigId=62b5e7c4-cedd-493d-930a-3597b8169063 hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631761-19974/rigs 201 (4ms)
-[wrangler:info] POST /api/users/e2e-user-1771631761-19974/rigs 201 Created (5ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631761-19974/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631761-19974 town_id=0ee12290-9a8a-4271-b305-b1b8e6f21ab6 name=rig-b git_url=https://github.com/b/b.git
-[GastownUser.do] createRig: town_id=0ee12290-9a8a-4271-b305-b1b8e6f21ab6 name=rig-b git_url=https://github.com/b/b.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=436f0037-718d-4aff-894c-c2bb62bc5efa
-[towns.handler] handleCreateRig: rig created id=436f0037-718d-4aff-894c-c2bb62bc5efa, now configuring Rig DO
-[Town.do] configureRig: rigId=436f0037-718d-4aff-894c-c2bb62bc5efa hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631761-19974/rigs 201 (1ms)
-[wrangler:info] POST /api/users/e2e-user-1771631761-19974/rigs 201 Created (2ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631761-19974/towns/0ee12290-9a8a-4271-b305-b1b8e6f21ab6/rigs
-[gastown-worker] <-- GET /api/users/e2e-user-1771631761-19974/towns/0ee12290-9a8a-4271-b305-b1b8e6f21ab6/rigs 200 (0ms)
-[wrangler:info] GET /api/users/e2e-user-1771631761-19974/towns/0ee12290-9a8a-4271-b305-b1b8e6f21ab6/rigs 200 OK (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631761-20824/towns
-[GastownUser.do] createTown: id=79da2b86-7f72-4919-a80d-a0f7ff1ed42f name=Config-Town owner=e2e-user-1771631761-20824
-[GastownUser.do] createTown: created town id=79da2b86-7f72-4919-a80d-a0f7ff1ed42f
-[gastown-worker] <-- POST /api/users/e2e-user-1771631761-20824/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631761-20824/towns 201 Created (2ms)
-[gastown-worker] --> GET /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config
-[gastown-worker] <-- GET /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config 200 (2ms)
-[wrangler:info] GET /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config 200 OK (3ms)
-[gastown-worker] --> PATCH /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config
-[Town.do] updateTownConfig: saved config with 1 env vars
-[town-config.handler] handleUpdateTownConfig: town=79da2b86-7f72-4919-a80d-a0f7ff1ed42f updated config
-[gastown-worker] <-- PATCH /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config 200 (2ms)
-[wrangler:info] PATCH /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config 200 OK (2ms)
-[gastown-worker] --> GET /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config
-[gastown-worker] <-- GET /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config 200 (0ms)
-[wrangler:info] GET /api/towns/79da2b86-7f72-4919-a80d-a0f7ff1ed42f/config 200 OK (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-26218/towns
-[GastownUser.do] createTown: id=5d9726cf-7904-47fb-ad23-c1125ff846c9 name=Delete-Town owner=e2e-user-1771631762-26218
-[GastownUser.do] createTown: created town id=5d9726cf-7904-47fb-ad23-c1125ff846c9
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-26218/towns 201 (1ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-26218/towns 201 Created (3ms)
-[gastown-worker] --> DELETE /api/users/e2e-user-1771631762-26218/towns/5d9726cf-7904-47fb-ad23-c1125ff846c9
-[Town.do] destroy: clearing all storage and alarms
-[towns.handler] handleDeleteTown: Town DO destroyed for town 5d9726cf-7904-47fb-ad23-c1125ff846c9
-[gastown-worker] <-- DELETE /api/users/e2e-user-1771631762-26218/towns/5d9726cf-7904-47fb-ad23-c1125ff846c9 200 (3ms)
-[wrangler:info] DELETE /api/users/e2e-user-1771631762-26218/towns/5d9726cf-7904-47fb-ad23-c1125ff846c9 200 OK (5ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631762-26218/towns/5d9726cf-7904-47fb-ad23-c1125ff846c9
-[gastown-worker] <-- GET /api/users/e2e-user-1771631762-26218/towns/5d9726cf-7904-47fb-ad23-c1125ff846c9 404 (0ms)
-[wrangler:info] GET /api/users/e2e-user-1771631762-26218/towns/5d9726cf-7904-47fb-ad23-c1125ff846c9 404 Not Found (1ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631762-26218/towns
-[gastown-worker] <-- GET /api/users/e2e-user-1771631762-26218/towns 200 (0ms)
-[wrangler:info] GET /api/users/e2e-user-1771631762-26218/towns 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-19800/towns
-[GastownUser.do] createTown: id=68ec6ab0-46bf-4081-acd0-6f1965576751 name=Del-Rig-Town owner=e2e-user-1771631762-19800
-[GastownUser.do] createTown: created town id=68ec6ab0-46bf-4081-acd0-6f1965576751
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-19800/towns 201 (1ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-19800/towns 201 Created (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-19800/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631762-19800 town_id=68ec6ab0-46bf-4081-acd0-6f1965576751 name=del-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=68ec6ab0-46bf-4081-acd0-6f1965576751 name=del-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=2c470a0a-78c9-4dc4-aaf1-fe2e8c093579
-[towns.handler] handleCreateRig: rig created id=2c470a0a-78c9-4dc4-aaf1-fe2e8c093579, now configuring Rig DO
-[Town.do] configureRig: rigId=2c470a0a-78c9-4dc4-aaf1-fe2e8c093579 hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-19800/rigs 201 (3ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-19800/rigs 201 Created (4ms)
-[gastown-worker] --> DELETE /api/users/e2e-user-1771631762-19800/rigs/2c470a0a-78c9-4dc4-aaf1-fe2e8c093579
-[gastown-worker] <-- DELETE /api/users/e2e-user-1771631762-19800/rigs/2c470a0a-78c9-4dc4-aaf1-fe2e8c093579 200 (1ms)
-[wrangler:info] DELETE /api/users/e2e-user-1771631762-19800/rigs/2c470a0a-78c9-4dc4-aaf1-fe2e8c093579 200 OK (2ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631762-19800/towns/68ec6ab0-46bf-4081-acd0-6f1965576751/rigs
-[gastown-worker] <-- GET /api/users/e2e-user-1771631762-19800/towns/68ec6ab0-46bf-4081-acd0-6f1965576751/rigs 200 (0ms)
-[wrangler:info] GET /api/users/e2e-user-1771631762-19800/towns/68ec6ab0-46bf-4081-acd0-6f1965576751/rigs 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-17016/towns
-[GastownUser.do] createTown: id=f38c05fd-0cc1-49ee-8988-06e82c25770a name=Bead-Town owner=e2e-user-1771631762-17016
-[GastownUser.do] createTown: created town id=f38c05fd-0cc1-49ee-8988-06e82c25770a
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-17016/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-17016/towns 201 Created (3ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-17016/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631762-17016 town_id=f38c05fd-0cc1-49ee-8988-06e82c25770a name=bead-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=f38c05fd-0cc1-49ee-8988-06e82c25770a name=bead-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=fa059214-ed07-4352-821a-a8ee19e285c2
-[towns.handler] handleCreateRig: rig created id=fa059214-ed07-4352-821a-a8ee19e285c2, now configuring Rig DO
-[Town.do] configureRig: rigId=fa059214-ed07-4352-821a-a8ee19e285c2 hasKilocodeToken=true
-[Town.do] configureRig: propagating kilocodeToken to town config
-[Town.do] updateTownConfig: saved config with 0 env vars
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-17016/rigs 201 (3ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-17016/rigs 201 Created (5ms)
-[gastown-worker] --> POST /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads
-[rig-beads.handler] handleCreateBead: rigId=fa059214-ed07-4352-821a-a8ee19e285c2 type=issue title="E2E test bead" assignee=none
-[rig-beads.handler] handleCreateBead: created bead {"id":"741d949e-f6ff-4fc4-9b2f-115d0162b1d6","type":"issue","status":"open","title":"E2E test bead","body":"Test body","assignee_agent_id":null,"convoy_id":null,"molecule_id":null,"priority":"high","l
-[gastown-worker] <-- POST /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads 201 (1ms)
-[wrangler:info] POST /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads 201 Created (2ms)
-[gastown-worker] --> GET /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads
-[gastown-worker] <-- GET /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads 200 (0ms)
-[wrangler:info] GET /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads 200 OK (1ms)
-[gastown-worker] --> GET /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads/741d949e-f6ff-4fc4-9b2f-115d0162b1d6
-[gastown-worker] <-- GET /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads/741d949e-f6ff-4fc4-9b2f-115d0162b1d6 200 (0ms)
-[wrangler:info] GET /api/rigs/fa059214-ed07-4352-821a-a8ee19e285c2/beads/741d949e-f6ff-4fc4-9b2f-115d0162b1d6 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-31496/towns
-[GastownUser.do] createTown: id=31641629-cb60-4682-ba4a-25737fda6957 name=Agent-Town owner=e2e-user-1771631762-31496
-[GastownUser.do] createTown: created town id=31641629-cb60-4682-ba4a-25737fda6957
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-31496/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-31496/towns 201 Created (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-31496/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631762-31496 town_id=31641629-cb60-4682-ba4a-25737fda6957 name=agent-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=31641629-cb60-4682-ba4a-25737fda6957 name=agent-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=c803940a-30bc-4f84-b0d1-cbb686bd5396
-[towns.handler] handleCreateRig: rig created id=c803940a-30bc-4f84-b0d1-cbb686bd5396, now configuring Rig DO
-[Town.do] configureRig: rigId=c803940a-30bc-4f84-b0d1-cbb686bd5396 hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-31496/rigs 201 (3ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-31496/rigs 201 Created (5ms)
-[gastown-worker] --> POST /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents
-[gastown-worker] <-- POST /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents 201 (1ms)
-[wrangler:info] POST /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents 201 Created (2ms)
-[gastown-worker] --> GET /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents
-[gastown-worker] <-- GET /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents 200 (1ms)
-[wrangler:info] GET /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents 200 OK (2ms)
-[gastown-worker] --> GET /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents/1112dd0f-2718-4dff-b77d-b223ab7e9408
-[gastown-worker] <-- GET /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents/1112dd0f-2718-4dff-b77d-b223ab7e9408 200 (1ms)
-[wrangler:info] GET /api/rigs/c803940a-30bc-4f84-b0d1-cbb686bd5396/agents/1112dd0f-2718-4dff-b77d-b223ab7e9408 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-12299/towns
-[GastownUser.do] createTown: id=17083640-f382-4ada-a980-4092db7f490c name=Sling-Town owner=e2e-user-1771631762-12299
-[GastownUser.do] createTown: created town id=17083640-f382-4ada-a980-4092db7f490c
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-12299/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-12299/towns 201 Created (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-12299/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631762-12299 town_id=17083640-f382-4ada-a980-4092db7f490c name=sling-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=17083640-f382-4ada-a980-4092db7f490c name=sling-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=e86d5d46-ccfb-4c3d-9403-78e94ca3f912
-[towns.handler] handleCreateRig: rig created id=e86d5d46-ccfb-4c3d-9403-78e94ca3f912, now configuring Rig DO
-[Town.do] configureRig: rigId=e86d5d46-ccfb-4c3d-9403-78e94ca3f912 hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-12299/rigs 201 (3ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-12299/rigs 201 Created (3ms)
-[gastown-worker] --> POST /api/rigs/e86d5d46-ccfb-4c3d-9403-78e94ca3f912/sling
-[rig-beads.handler] handleSlingBead: rigId=e86d5d46-ccfb-4c3d-9403-78e94ca3f912 title="Slung bead" metadata=undefined
-[rig-beads.handler] handleSlingBead: completed, result={"bead":{"id":"7e2c76f8-b41c-43c5-a455-b2263d4f7922","type":"issue","status":"in_progress","title":"Slung bead","body":"Do something","assignee_agent_id":"b83c9f87-6e4a-4770-aa25-25fc08af8dac","convoy_id":null,"molecule_id":null,"priority":"medium","labels":[],"metadata":{},"created_at":"2026-02-20T
-[gastown-worker] <-- POST /api/rigs/e86d5d46-ccfb-4c3d-9403-78e94ca3f912/sling 201 (1ms)
-[wrangler:info] POST /api/rigs/e86d5d46-ccfb-4c3d-9403-78e94ca3f912/sling 201 Created (2ms)
-[gastown-worker] --> GET /api/rigs/e86d5d46-ccfb-4c3d-9403-78e94ca3f912/agents/b83c9f87-6e4a-4770-aa25-25fc08af8dac
-[gastown-worker] <-- GET /api/rigs/e86d5d46-ccfb-4c3d-9403-78e94ca3f912/agents/b83c9f87-6e4a-4770-aa25-25fc08af8dac 200 (0ms)
-[wrangler:info] GET /api/rigs/e86d5d46-ccfb-4c3d-9403-78e94ca3f912/agents/b83c9f87-6e4a-4770-aa25-25fc08af8dac 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-23145/towns
-[GastownUser.do] createTown: id=b5cbfb0e-b805-436f-b60e-4b2c3a320d1a name=Hook-Town owner=e2e-user-1771631762-23145
-[GastownUser.do] createTown: created town id=b5cbfb0e-b805-436f-b60e-4b2c3a320d1a
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-23145/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-23145/towns 201 Created (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-23145/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631762-23145 town_id=b5cbfb0e-b805-436f-b60e-4b2c3a320d1a name=hook-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=b5cbfb0e-b805-436f-b60e-4b2c3a320d1a name=hook-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=6e6529c8-a220-45b2-9c75-af13674f6669
-[towns.handler] handleCreateRig: rig created id=6e6529c8-a220-45b2-9c75-af13674f6669, now configuring Rig DO
-[Town.do] configureRig: rigId=6e6529c8-a220-45b2-9c75-af13674f6669 hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-23145/rigs 201 (3ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-23145/rigs 201 Created (4ms)
-[gastown-worker] --> POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents
-[gastown-worker] <-- POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents 201 (0ms)
-[wrangler:info] POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents 201 Created (2ms)
-[gastown-worker] --> POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/beads
-[rig-beads.handler] handleCreateBead: rigId=6e6529c8-a220-45b2-9c75-af13674f6669 type=issue title="Hook bead" assignee=none
-[rig-beads.handler] handleCreateBead: created bead {"id":"4d37dea9-3fb8-419d-8687-7ccfc5767486","type":"issue","status":"open","title":"Hook bead","body":null,"assignee_agent_id":null,"convoy_id":null,"molecule_id":null,"priority":"medium","labels":[]
-[gastown-worker] <-- POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/beads 201 (1ms)
-[wrangler:info] POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/beads 201 Created (2ms)
-[gastown-worker] --> POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc/hook
-[rig-agents.handler] handleHookBead: rigId=6e6529c8-a220-45b2-9c75-af13674f6669 agentId=e98efd4b-b7ba-4e37-9e6b-babe455950fc beadId=4d37dea9-3fb8-419d-8687-7ccfc5767486
-[rig-agents.handler] handleHookBead: hooked successfully
-[gastown-worker] <-- POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc/hook 200 (1ms)
-[wrangler:info] POST /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc/hook 200 OK (1ms)
-[gastown-worker] --> GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc
-[gastown-worker] <-- GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc 200 (0ms)
-[wrangler:info] GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc 200 OK (1ms)
-[gastown-worker] --> GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/beads/4d37dea9-3fb8-419d-8687-7ccfc5767486
-[gastown-worker] <-- GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/beads/4d37dea9-3fb8-419d-8687-7ccfc5767486 200 (0ms)
-[wrangler:info] GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/beads/4d37dea9-3fb8-419d-8687-7ccfc5767486 200 OK (1ms)
-[gastown-worker] --> DELETE /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc/hook
-[gastown-worker] <-- DELETE /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc/hook 200 (1ms)
-[wrangler:info] DELETE /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc/hook 200 OK (2ms)
-[gastown-worker] --> GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc
-[gastown-worker] <-- GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc 200 (0ms)
-[wrangler:info] GET /api/rigs/6e6529c8-a220-45b2-9c75-af13674f6669/agents/e98efd4b-b7ba-4e37-9e6b-babe455950fc 200 OK (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-13034/towns
-[GastownUser.do] createTown: id=02c001f2-5f84-496b-9836-faaded0e7d43 name=Mail-Town owner=e2e-user-1771631762-13034
-[GastownUser.do] createTown: created town id=02c001f2-5f84-496b-9836-faaded0e7d43
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-13034/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-13034/towns 201 Created (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631762-13034/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631762-13034 town_id=02c001f2-5f84-496b-9836-faaded0e7d43 name=mail-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=02c001f2-5f84-496b-9836-faaded0e7d43 name=mail-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=356cfad3-a570-4385-8c44-ac382b06f3ff
-[towns.handler] handleCreateRig: rig created id=356cfad3-a570-4385-8c44-ac382b06f3ff, now configuring Rig DO
-[Town.do] configureRig: rigId=356cfad3-a570-4385-8c44-ac382b06f3ff hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631762-13034/rigs 201 (4ms)
-[wrangler:info] POST /api/users/e2e-user-1771631762-13034/rigs 201 Created (5ms)
-[gastown-worker] --> POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents
-[gastown-worker] <-- POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents 201 (0ms)
-[wrangler:info] POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents 201 Created (2ms)
-[gastown-worker] --> POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents
-[gastown-worker] <-- POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents 201 (1ms)
-[wrangler:info] POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents 201 Created (2ms)
-[gastown-worker] --> POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/mail
-[gastown-worker] <-- POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/mail 201 (1ms)
-[wrangler:info] POST /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/mail 201 Created (2ms)
-[gastown-worker] --> GET /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents/ea47979a-cc32-49ab-9155-3ce3a1419809/mail
-[gastown-worker] <-- GET /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents/ea47979a-cc32-49ab-9155-3ce3a1419809/mail 200 (1ms)
-[wrangler:info] GET /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents/ea47979a-cc32-49ab-9155-3ce3a1419809/mail 200 OK (2ms)
-[gastown-worker] --> GET /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents/ea47979a-cc32-49ab-9155-3ce3a1419809/mail
-[gastown-worker] <-- GET /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents/ea47979a-cc32-49ab-9155-3ce3a1419809/mail 200 (0ms)
-[wrangler:info] GET /api/rigs/356cfad3-a570-4385-8c44-ac382b06f3ff/agents/ea47979a-cc32-49ab-9155-3ce3a1419809/mail 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631763-1106/towns
-[GastownUser.do] createTown: id=d3901a1b-2f3e-4c89-a8ba-840ee795853e name=Events-Town owner=e2e-user-1771631763-1106
-[GastownUser.do] createTown: created town id=d3901a1b-2f3e-4c89-a8ba-840ee795853e
-[gastown-worker] <-- POST /api/users/e2e-user-1771631763-1106/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631763-1106/towns 201 Created (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631763-1106/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631763-1106 town_id=d3901a1b-2f3e-4c89-a8ba-840ee795853e name=ev-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=d3901a1b-2f3e-4c89-a8ba-840ee795853e name=ev-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=6f15f75b-2ad5-4b4d-8069-0113f4b2b587
-[towns.handler] handleCreateRig: rig created id=6f15f75b-2ad5-4b4d-8069-0113f4b2b587, now configuring Rig DO
-[Town.do] configureRig: rigId=6f15f75b-2ad5-4b4d-8069-0113f4b2b587 hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631763-1106/rigs 201 (3ms)
-[wrangler:info] POST /api/users/e2e-user-1771631763-1106/rigs 201 Created (4ms)
-[gastown-worker] --> POST /api/rigs/6f15f75b-2ad5-4b4d-8069-0113f4b2b587/sling
-[rig-beads.handler] handleSlingBead: rigId=6f15f75b-2ad5-4b4d-8069-0113f4b2b587 title="Event bead" metadata=undefined
-[rig-beads.handler] handleSlingBead: completed, result={"bead":{"id":"d023ef98-38ca-467c-8770-5da75daa9ce0","type":"issue","status":"in_progress","title":"Event bead","body":null,"assignee_agent_id":"7275b277-bd26-4b67-9c45-682c23b33dfa","convoy_id":null,"molecule_id":null,"priority":"medium","labels":[],"metadata":{},"created_at":"2026-02-20T23:56:03.2
-[gastown-worker] <-- POST /api/rigs/6f15f75b-2ad5-4b4d-8069-0113f4b2b587/sling 201 (2ms)
-[wrangler:info] POST /api/rigs/6f15f75b-2ad5-4b4d-8069-0113f4b2b587/sling 201 Created (4ms)
-[gastown-worker] --> GET /api/rigs/6f15f75b-2ad5-4b4d-8069-0113f4b2b587/events
-[gastown-worker] <-- GET /api/rigs/6f15f75b-2ad5-4b4d-8069-0113f4b2b587/events 200 (1ms)
-[wrangler:info] GET /api/rigs/6f15f75b-2ad5-4b4d-8069-0113f4b2b587/events 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631763-1048/towns
-[GastownUser.do] createTown: id=6c4b979e-dd92-4972-9639-bc3e19cfc3fb name=Town-Alpha owner=e2e-user-1771631763-1048
-[GastownUser.do] createTown: created town id=6c4b979e-dd92-4972-9639-bc3e19cfc3fb
-[gastown-worker] <-- POST /api/users/e2e-user-1771631763-1048/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631763-1048/towns 201 Created (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631763-1048/towns
-[GastownUser.do] createTown: id=eb8872b5-b8cb-4f03-9b0e-d38513e78236 name=Town-Beta owner=e2e-user-1771631763-1048
-[GastownUser.do] createTown: created town id=eb8872b5-b8cb-4f03-9b0e-d38513e78236
-[gastown-worker] <-- POST /api/users/e2e-user-1771631763-1048/towns 201 (1ms)
-[wrangler:info] POST /api/users/e2e-user-1771631763-1048/towns 201 Created (2ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631763-1048/towns
-[gastown-worker] <-- GET /api/users/e2e-user-1771631763-1048/towns 200 (0ms)
-[wrangler:info] GET /api/users/e2e-user-1771631763-1048/towns 200 OK (2ms)
-[gastown-worker] --> DELETE /api/users/e2e-user-1771631763-1048/towns/6c4b979e-dd92-4972-9639-bc3e19cfc3fb
-[Town.do] destroy: clearing all storage and alarms
-[towns.handler] handleDeleteTown: Town DO destroyed for town 6c4b979e-dd92-4972-9639-bc3e19cfc3fb
-[gastown-worker] <-- DELETE /api/users/e2e-user-1771631763-1048/towns/6c4b979e-dd92-4972-9639-bc3e19cfc3fb 200 (3ms)
-[wrangler:info] DELETE /api/users/e2e-user-1771631763-1048/towns/6c4b979e-dd92-4972-9639-bc3e19cfc3fb 200 OK (3ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631763-1048/towns/eb8872b5-b8cb-4f03-9b0e-d38513e78236
-[gastown-worker] <-- GET /api/users/e2e-user-1771631763-1048/towns/eb8872b5-b8cb-4f03-9b0e-d38513e78236 200 (1ms)
-[wrangler:info] GET /api/users/e2e-user-1771631763-1048/towns/eb8872b5-b8cb-4f03-9b0e-d38513e78236 200 OK (1ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631763-1048/towns
-[gastown-worker] <-- GET /api/users/e2e-user-1771631763-1048/towns 200 (1ms)
-[wrangler:info] GET /api/users/e2e-user-1771631763-1048/towns 200 OK (1ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631763-9168/towns
-[GastownUser.do] createTown: id=c714d3d5-c430-4386-902a-7b5f157c4c4e name=EnvVar-Town owner=e2e-user-1771631763-9168
-[GastownUser.do] createTown: created town id=c714d3d5-c430-4386-902a-7b5f157c4c4e
-[gastown-worker] <-- POST /api/users/e2e-user-1771631763-9168/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631763-9168/towns 201 Created (2ms)
-[gastown-worker] --> PATCH /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/config
-[Town.do] updateTownConfig: saved config with 2 env vars
-[town-config.handler] handleUpdateTownConfig: town=c714d3d5-c430-4386-902a-7b5f157c4c4e updated config
-[gastown-worker] <-- PATCH /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/config 200 (3ms)
-[wrangler:info] PATCH /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/config 200 OK (4ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631763-9168/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631763-9168 town_id=c714d3d5-c430-4386-902a-7b5f157c4c4e name=envvar-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=c714d3d5-c430-4386-902a-7b5f157c4c4e name=envvar-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=c33392c8-1e58-4cb9-b295-9739db95b82e
-[towns.handler] handleCreateRig: rig created id=c33392c8-1e58-4cb9-b295-9739db95b82e, now configuring Rig DO
-[Town.do] configureRig: rigId=c33392c8-1e58-4cb9-b295-9739db95b82e hasKilocodeToken=true
-[Town.do] configureRig: propagating kilocodeToken to town config
-[Town.do] updateTownConfig: saved config with 2 env vars
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631763-9168/rigs 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631763-9168/rigs 201 Created (2ms)
-[gastown-worker] --> POST /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/mayor/message
-[mayor.handler] handleSendMayorMessage: townId=c714d3d5-c430-4386-902a-7b5f157c4c4e message="env var test"
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-Port 8080 is ready
-[TownContainer.do] container started for DO id=f7fe4ba92fc534cf7c8271df85e9362e7190349329676045f3748fa8f1733940
-[Town.do] startAgentInContainer: agentId=5906cbef-0b62-409c-91fb-9c59b78e8d0d role=mayor name=mayor
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mFailed to resolve GASTOWN_JWT_SECRET[0m
-
-
-[TownContainer.do] Connected to container /ws for event relay
-[Town.do] alarm: fired for town=46b7adc2d5d9d1e49f354396438d7893ffdd81a81472dd19088b34e13ceb6b94
-[gastown-worker] <-- POST /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/mayor/message 200 (6917ms)
-[wrangler:info] POST /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/mayor/message 200 OK (6918ms)
-[Town.do] alarm: fired for town=4b03737ee6754bf0a810bf568cbe4663a6df8d66c6f10a85feedbbf9f10f94a7
-[gastown-worker] --> GET /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/config
-[gastown-worker] <-- GET /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/config 200 (1ms)
-[wrangler:info] GET /api/towns/c714d3d5-c430-4386-902a-7b5f157c4c4e/config 200 OK (2ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631773-14891/towns
-[GastownUser.do] createTown: id=4e450fa6-0fcb-4fa4-b193-9f89f5189e80 name=Escalation-Town owner=e2e-user-1771631773-14891
-[GastownUser.do] createTown: created town id=4e450fa6-0fcb-4fa4-b193-9f89f5189e80
-[gastown-worker] <-- POST /api/users/e2e-user-1771631773-14891/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631773-14891/towns 201 Created (3ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631773-14891/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631773-14891 town_id=4e450fa6-0fcb-4fa4-b193-9f89f5189e80 name=esc-rig git_url=https://github.com/t/r.git
-[GastownUser.do] createRig: town_id=4e450fa6-0fcb-4fa4-b193-9f89f5189e80 name=esc-rig git_url=https://github.com/t/r.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=79267f7f-c85f-462a-934b-b10b2b1d6f27
-[towns.handler] handleCreateRig: rig created id=79267f7f-c85f-462a-934b-b10b2b1d6f27, now configuring Rig DO
-[Town.do] configureRig: rigId=79267f7f-c85f-462a-934b-b10b2b1d6f27 hasKilocodeToken=false
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631773-14891/rigs 201 (3ms)
-[wrangler:info] POST /api/users/e2e-user-1771631773-14891/rigs 201 Created (4ms)
-[gastown-worker] --> POST /api/rigs/79267f7f-c85f-462a-934b-b10b2b1d6f27/escalations
-[gastown-worker] <-- POST /api/rigs/79267f7f-c85f-462a-934b-b10b2b1d6f27/escalations 201 (1ms)
-[wrangler:info] POST /api/rigs/79267f7f-c85f-462a-934b-b10b2b1d6f27/escalations 201 Created (2ms)
-[gastown-worker] --> GET /api/towns/4e450fa6-0fcb-4fa4-b193-9f89f5189e80/escalations
-[gastown-worker] <-- GET /api/towns/4e450fa6-0fcb-4fa4-b193-9f89f5189e80/escalations 200 (0ms)
-[wrangler:info] GET /api/towns/4e450fa6-0fcb-4fa4-b193-9f89f5189e80/escalations 200 OK (2ms)
-[gastown-worker] --> GET /api/rigs/79267f7f-c85f-462a-934b-b10b2b1d6f27/beads
-[gastown-worker] <-- GET /api/rigs/79267f7f-c85f-462a-934b-b10b2b1d6f27/beads 200 (0ms)
-[wrangler:info] GET /api/rigs/79267f7f-c85f-462a-934b-b10b2b1d6f27/beads 200 OK (1ms)
-[TownContainer.do] container stopped: exitCode=137 reason=exit id=1a583eb5e5ce04ef6b9a8269d3ed3b3fa528e1869eb45b1d63d35332550df794
-[TownContainer.do] container stopped: exitCode=137 reason=exit id=b00829f4d0717acfc6c23a005e1eefaaa127fc9270490e8c4bd03617a983694e
-[TownContainer.do] container stopped: exitCode=137 reason=exit id=e930c58bc5df77afbc395a493cdb05148922466d6f367207723e39aded392dd1
-[TownContainer.do] container stopped: exitCode=137 reason=exit id=f7fe4ba92fc534cf7c8271df85e9362e7190349329676045f3748fa8f1733940
-[Town.do] alarm: fired for town=6f0496130e2a3b85177adfae5e64e1cf4060be1e96334e7e518049f39a84a692
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[TownContainer.do] container error: [Error: Container exited with unexpected exit code: 137] {[0m
-
-    exitCode: 137
-  } id=e930c58bc5df77afbc395a493cdb05148922466d6f367207723e39aded392dd1
-
-
-Port 8080 is ready
-[TownContainer.do] container started for DO id=e930c58bc5df77afbc395a493cdb05148922466d6f367207723e39aded392dd1
-[TownContainer.do] container stopped: exitCode=137 reason=exit id=e930c58bc5df77afbc395a493cdb05148922466d6f367207723e39aded392dd1
-[gastown-worker] --> POST /api/users/e2e-user-1771631773-30279/towns
-[GastownUser.do] createTown: id=90ecf301-b78c-415e-a061-10eeffb924e9 name=Full-E2E-Town owner=e2e-user-1771631773-30279
-[GastownUser.do] createTown: created town id=90ecf301-b78c-415e-a061-10eeffb924e9
-[gastown-worker] <-- POST /api/users/e2e-user-1771631773-30279/towns 201 (2ms)
-[wrangler:info] POST /api/users/e2e-user-1771631773-30279/towns 201 Created (4ms)
-[gastown-worker] --> PATCH /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/config
-[Town.do] updateTownConfig: saved config with 1 env vars
-[town-config.handler] handleUpdateTownConfig: town=90ecf301-b78c-415e-a061-10eeffb924e9 updated config
-[gastown-worker] <-- PATCH /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/config 200 (3ms)
-[wrangler:info] PATCH /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/config 200 OK (4ms)
-[gastown-worker] --> POST /api/users/e2e-user-1771631773-30279/rigs
-[towns.handler] handleCreateRig: userId=e2e-user-1771631773-30279 town_id=90ecf301-b78c-415e-a061-10eeffb924e9 name=e2e-rig git_url=https://github.com/test/e2e.git
-[GastownUser.do] createRig: town_id=90ecf301-b78c-415e-a061-10eeffb924e9 name=e2e-rig git_url=https://github.com/test/e2e.git default_branch=main integration=none
-[GastownUser.do] createRig: created rig id=950147ca-3a20-49ff-9df0-b55524b29768
-[towns.handler] handleCreateRig: rig created id=950147ca-3a20-49ff-9df0-b55524b29768, now configuring Rig DO
-[Town.do] configureRig: rigId=950147ca-3a20-49ff-9df0-b55524b29768 hasKilocodeToken=true
-[Town.do] configureRig: propagating kilocodeToken to town config
-[Town.do] updateTownConfig: saved config with 1 env vars
-[towns.handler] handleCreateRig: Town DO configured and rig registered
-[gastown-worker] <-- POST /api/users/e2e-user-1771631773-30279/rigs 201 (1ms)
-[wrangler:info] POST /api/users/e2e-user-1771631773-30279/rigs 201 Created (2ms)
-[gastown-worker] --> GET /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/config
-[gastown-worker] <-- GET /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/config 200 (0ms)
-[wrangler:info] GET /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/config 200 OK (1ms)
-[gastown-worker] --> POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads
-[rig-beads.handler] handleCreateBead: rigId=950147ca-3a20-49ff-9df0-b55524b29768 type=issue title="Build login page" assignee=none
-[rig-beads.handler] handleCreateBead: created bead {"id":"baaaf439-4a27-400e-a5f0-b6ef072aafa6","type":"issue","status":"open","title":"Build login page","body":null,"assignee_agent_id":null,"convoy_id":null,"molecule_id":null,"priority":"high","label
-[gastown-worker] <-- POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads 201 (3ms)
-[wrangler:info] POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads 201 Created (3ms)
-[gastown-worker] --> POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads
-[rig-beads.handler] handleCreateBead: rigId=950147ca-3a20-49ff-9df0-b55524b29768 type=issue title="Fix sidebar CSS" assignee=none
-[rig-beads.handler] handleCreateBead: created bead {"id":"1d0ba089-fa1c-4225-a481-ab829ee6f9aa","type":"issue","status":"open","title":"Fix sidebar CSS","body":null,"assignee_agent_id":null,"convoy_id":null,"molecule_id":null,"priority":"medium","labe
-[gastown-worker] <-- POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads 201 (0ms)
-[wrangler:info] POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads 201 Created (2ms)
-[gastown-worker] --> POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents
-[gastown-worker] <-- POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents 201 (1ms)
-[wrangler:info] POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents 201 Created (1ms)
-[gastown-worker] --> POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents/a962e6c9-29a4-4775-a99e-dfb02f703fab/hook
-[rig-agents.handler] handleHookBead: rigId=950147ca-3a20-49ff-9df0-b55524b29768 agentId=a962e6c9-29a4-4775-a99e-dfb02f703fab beadId=baaaf439-4a27-400e-a5f0-b6ef072aafa6
-[rig-agents.handler] handleHookBead: hooked successfully
-[gastown-worker] <-- POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents/a962e6c9-29a4-4775-a99e-dfb02f703fab/hook 200 (1ms)
-[wrangler:info] POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents/a962e6c9-29a4-4775-a99e-dfb02f703fab/hook 200 OK (2ms)
-[gastown-worker] --> GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads/baaaf439-4a27-400e-a5f0-b6ef072aafa6
-[gastown-worker] <-- GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads/baaaf439-4a27-400e-a5f0-b6ef072aafa6 200 (0ms)
-[wrangler:info] GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/beads/baaaf439-4a27-400e-a5f0-b6ef072aafa6 200 OK (1ms)
-[gastown-worker] --> POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/sling
-[rig-beads.handler] handleSlingBead: rigId=950147ca-3a20-49ff-9df0-b55524b29768 title="Urgent hotfix" metadata=undefined
-[rig-beads.handler] handleSlingBead: completed, result={"bead":{"id":"a572ccca-621b-442d-b40a-b08696b4bf2b","type":"issue","status":"in_progress","title":"Urgent hotfix","body":null,"assignee_agent_id":"e221811a-e5ad-4339-ac35-2c40f4d2ebba","convoy_id":null,"molecule_id":null,"priority":"medium","labels":[],"metadata":{},"created_at":"2026-02-20T23:56:1
-[gastown-worker] <-- POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/sling 201 (1ms)
-[wrangler:info] POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/sling 201 Created (1ms)
-[gastown-worker] --> POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/mail
-[gastown-worker] <-- POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/mail 201 (1ms)
-[wrangler:info] POST /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/mail 201 Created (1ms)
-[gastown-worker] --> GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/events
-[gastown-worker] <-- GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/events 200 (0ms)
-[wrangler:info] GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/events 200 OK (1ms)
-[gastown-worker] --> POST /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/mayor/message
-[mayor.handler] handleSendMayorMessage: townId=90ecf301-b78c-415e-a061-10eeffb924e9 message="What is the status of our project?"
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-Port 8080 is ready
-[TownContainer.do] container started for DO id=c26e639cff47f969c999217a1c2f17e082d3355050e66ce6e6098bdd9cd179fb
-[Town.do] startAgentInContainer: agentId=3e18e57e-c3bc-4a90-bde3-f8f8e953551f role=mayor name=mayor
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mFailed to resolve GASTOWN_JWT_SECRET[0m
-
-
-[TownContainer.do] Connected to container /ws for event relay
-[Town.do] alarm: fired for town=f50c65cdbe5012be3486cf229109c23ee19d333e9b60b181cecf4813533b74e7
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-[Town.do] alarm: fired for town=4a3628383cede8aad74d65ef5a835531cb3d016702f81f03b924475f06ed2c55
-Port 8080 is ready
-[TownContainer.do] container started for DO id=8b2474c54cdae9c2c97d540ea19b41530efd6f85f89f9be7289386307afa4081
-[TownContainer.do] Connected to container /ws for event relay
-[Town.do] startAgentInContainer: agentId=b83c9f87-6e4a-4770-aa25-25fc08af8dac role=polecat name=Toast
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mFailed to resolve GASTOWN_JWT_SECRET[0m
-
-
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[Town.do] startAgentInContainer: error response: {"error":"git clone --no-checkout --branch main https://github.com/t/r.git /workspace/rigs/e86d5d46-ccfb-4c3d-9403-78e94ca3f912/repo failed: Cloning into '/workspace/rigs/e86d5d46-ccfb-4c3d-9403-78e94ca3f912/repo'...\nfatal: could not read Username for 'https://github.com': No such device or address\n"}[0m
-
-
-[Town.do] alarm: fired for town=0a484d8f05358065f4caff85ff8872e49e999112ebab05f1fa27faf021cc98fd
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-Port 8080 is ready
-[TownContainer.do] container started for DO id=4f9f931b775db07b8735c1246c9bed516214631093ba132b96ec9a922ac3e334
-[Town.do] startAgentInContainer: agentId=7275b277-bd26-4b67-9c45-682c23b33dfa role=polecat name=Toast
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mFailed to resolve GASTOWN_JWT_SECRET[0m
-
-
-[TownContainer.do] Connected to container /ws for event relay
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[Town.do] startAgentInContainer: error response: {"error":"git clone --no-checkout --branch main https://github.com/t/r.git /workspace/rigs/6f15f75b-2ad5-4b4d-8069-0113f4b2b587/repo failed: Cloning into '/workspace/rigs/6f15f75b-2ad5-4b4d-8069-0113f4b2b587/repo'...\nfatal: could not read Username for 'https://github.com': No such device or address\n"}[0m
-
-
-[gastown-worker] <-- POST /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/mayor/message 200 (5716ms)
-[wrangler:info] POST /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/mayor/message 200 OK (5716ms)
-[Town.do] alarm: fired for town=46b7adc2d5d9d1e49f354396438d7893ffdd81a81472dd19088b34e13ceb6b94
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[TownContainer.do] container error: [Error: Container exited with unexpected exit code: 137] {[0m
-
-    exitCode: 137
-  } id=b00829f4d0717acfc6c23a005e1eefaaa127fc9270490e8c4bd03617a983694e
-
-
-[Town.do] alarm: fired for town=3328134adda7ee293c05b5a9960ff510a58f0a180f21ff58bcea60baa221abdd
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[TownContainer.do] container error: [Error: Container exited with unexpected exit code: 137] {[0m
-
-    exitCode: 137
-  } id=f7fe4ba92fc534cf7c8271df85e9362e7190349329676045f3748fa8f1733940
-
-
-Port 8080 is ready
-[TownContainer.do] container started for DO id=f7fe4ba92fc534cf7c8271df85e9362e7190349329676045f3748fa8f1733940
-[TownContainer.do] container stopped: exitCode=137 reason=exit id=f7fe4ba92fc534cf7c8271df85e9362e7190349329676045f3748fa8f1733940
-[Town.do] alarm: fired for town=4b03737ee6754bf0a810bf568cbe4663a6df8d66c6f10a85feedbbf9f10f94a7
-Error checking if container is ready: connect(): Connection refused: container port not found. Make sure you exposed the port in your container definition.
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[TownContainer.do] container error: [Error: Container exited with unexpected exit code: 137] {[0m
-
-    exitCode: 137
-  } id=1a583eb5e5ce04ef6b9a8269d3ed3b3fa528e1869eb45b1d63d35332550df794
-
-
-Error checking 8080: The operation was aborted
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[TownContainer.do] container error: Error: Container crashed while checking for ports, did you start the container and setup the entrypoint correctly?[0m
-
-      at TownContainerDO.waitForPort (file:///Users/john/projects/professional/kilo/cloud/node_modules/.pnpm/@cloudflare+containers@0.1.0/node_modules/@cloudflare/containers/src/lib/container.ts:474:15)
-      at async TownContainerDO.startAndWaitForPorts (file:///Users/john/projects/professional/kilo/cloud/node_modules/.pnpm/@cloudflare+containers@0.1.0/node_modules/@cloudflare/containers/src/lib/container.ts:415:19)
-      at async TownContainerDO.containerFetch (file:///Users/john/projects/professional/kilo/cloud/node_modules/.pnpm/@cloudflare+containers@0.1.0/node_modules/@cloudflare/containers/src/lib/container.ts:693:9)
-      at async TownContainerDO.fetch (file:///Users/john/projects/professional/kilo/cloud/node_modules/.pnpm/@cloudflare+containers@0.1.0/node_modules/@cloudflare/containers/src/lib/container.ts:762:12) id=b00829f4d0717acfc6c23a005e1eefaaa127fc9270490e8c4bd03617a983694e
-
-
-[gastown-worker] --> GET /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/mayor/status
-[gastown-worker] <-- GET /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/mayor/status 200 (1ms)
-[wrangler:info] GET /api/towns/90ecf301-b78c-415e-a061-10eeffb924e9/mayor/status 200 OK (2ms)
-[gastown-worker] --> GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents
-[gastown-worker] <-- GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents 200 (0ms)
-[wrangler:info] GET /api/rigs/950147ca-3a20-49ff-9df0-b55524b29768/agents 200 OK (1ms)
-[gastown-worker] --> GET /api/users/e2e-user-1771631773-30279/towns/90ecf301-b78c-415e-a061-10eeffb924e9/events
-[gastown-worker] <-- GET /api/users/e2e-user-1771631773-30279/towns/90ecf301-b78c-415e-a061-10eeffb924e9/events 200 (0ms)
-[wrangler:info] GET /api/users/e2e-user-1771631773-30279/towns/90ecf301-b78c-415e-a061-10eeffb924e9/events 200 OK (1ms)
-🪵  Logs were written to "/Users/john/Library/Preferences/.wrangler/logs/wrangler-2026-02-20_23-55-16_903.log"
+[gastown-worker] <-- POST /api/towns/db2477fa-05e6-42d0-b797-b3a47a11d4e5/mayor/message 200 (6362ms)
+[wrangler:info] POST /api/towns/db2477fa-05e6-42d0-b797-b3a47a11d4e5/mayor/message 200 OK (6363ms)
+[Town.do] alarm: fired for town=db2477fa-05e6-42d0-b797-b3a47a11d4e5
+[gastown-worker] WS upgrade: townId=db2477fa-05e6-42d0-b797-b3a47a11d4e5 agentId=6bda5846-3a78-4b46-a0d8-b4bcf375fccd
+[TownContainer.do] WS connected: agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd
+[TownContainer.do] Started event polling via alarm (500ms)
+[wrangler:info] GET /api/towns/db2477fa-05e6-42d0-b797-b3a47a11d4e5/container/agents/6bda5846-3a78-4b46-a0d8-b4bcf375fccd/stream 101 Switching Protocols (5ms)
+[TownContainer.do] WS client subscribed to agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd
+[TownContainer.do] poll: agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd after=18 events=0
+[TownContainer.do] poll: agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd after=18 events=0
+[TownContainer.do] poll: agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd after=18 events=0
+[TownContainer.do] poll: agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd after=18 events=0
+[TownContainer.do] poll: agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd after=18 events=0
+[TownContainer.do] poll: agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd after=18 events=1
+[Town.do] alarm: fired for town=db2477fa-05e6-42d0-b797-b3a47a11d4e5
+[TownContainer.do] WS closed: agent=6bda5846-3a78-4b46-a0d8-b4bcf375fccd code=1005
+[TownContainer.do] Stopped event polling
+🪵  Logs were written to "/Users/john/Library/Preferences/.wrangler/logs/wrangler-2026-02-21_00-22-58_434.log"

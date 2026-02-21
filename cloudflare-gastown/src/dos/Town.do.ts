@@ -228,6 +228,17 @@ export class TownDO extends DurableObject<Env> {
         await this.updateTownConfig({ kilocode_token: rigConfig.kilocodeToken });
       }
     }
+
+    // Proactively start the container so it's warm when the user sends
+    // their first message. The alarm also keeps it warm on subsequent ticks.
+    console.log(`${TOWN_LOG} configureRig: proactively starting container`);
+    await this.armAlarmIfNeeded();
+    try {
+      const container = getTownContainerStub(this.env, this.townId);
+      await container.fetch('http://container/health');
+    } catch {
+      // Container may take a moment to start — the alarm will retry
+    }
   }
 
   async getRigConfig(rigId: string): Promise<RigConfig | null> {
@@ -535,6 +546,7 @@ export class TownDO extends DurableObject<Env> {
       // Start a new mayor session
       const townConfig = await this.getTownConfig();
       const rigConfig = await this.getMayorRigConfig();
+      const kilocodeToken = await this.resolveKilocodeToken();
 
       await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
         townId,
@@ -550,7 +562,7 @@ export class TownDO extends DurableObject<Env> {
         checkpoint: null,
         gitUrl: rigConfig?.gitUrl ?? '',
         defaultBranch: rigConfig?.defaultBranch ?? 'main',
-        kilocodeToken: rigConfig?.kilocodeToken,
+        kilocodeToken,
         townConfig,
       });
 
@@ -606,6 +618,29 @@ export class TownDO extends DurableObject<Env> {
     const rigList = rigs.listRigs(this.sql);
     if (rigList.length === 0) return null;
     return this.getRigConfig(rigList[0].id);
+  }
+
+  /**
+   * Resolve the kilocode token from any available source.
+   * Checks: town config → all rig configs (in order).
+   */
+  private async resolveKilocodeToken(): Promise<string | undefined> {
+    // 1. Town config (preferred — single source of truth)
+    const townConfig = await this.getTownConfig();
+    if (townConfig.kilocode_token) return townConfig.kilocode_token;
+
+    // 2. Scan all rig configs for a token
+    const rigList = rigs.listRigs(this.sql);
+    for (const rig of rigList) {
+      const rc = await this.getRigConfig(rig.id);
+      if (rc?.kilocodeToken) {
+        // Propagate to town config for next time
+        await this.updateTownConfig({ kilocode_token: rc.kilocodeToken });
+        return rc.kilocodeToken;
+      }
+    }
+
+    return undefined;
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -956,6 +991,7 @@ export class TownDO extends DurableObject<Env> {
         continue;
       }
 
+      const kilocodeToken = await this.resolveKilocodeToken();
       const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
         townId: this.townId,
         rigId,
@@ -970,7 +1006,7 @@ export class TownDO extends DurableObject<Env> {
         checkpoint: agent.checkpoint,
         gitUrl: rigConfig.gitUrl,
         defaultBranch: rigConfig.defaultBranch,
-        kilocodeToken: rigConfig.kilocodeToken,
+        kilocodeToken,
         townConfig,
       });
 
@@ -1167,12 +1203,26 @@ export class TownDO extends DurableObject<Env> {
 
   /**
    * Proactive container health check.
-   * Only pings the container if there's been recent activity (active agents
-   * or pending work). This avoids waking sleeping containers for idle towns.
+   * Pings the container if there's active work OR if the container was
+   * recently started (within the first few minutes after rig configuration).
    */
   private async ensureContainerReady(): Promise<void> {
-    // Only keep the container warm if there are active/pending agents
-    if (!this.hasActiveWork()) return;
+    const hasRigs = rigs.listRigs(this.sql).length > 0;
+    if (!hasRigs) return;
+
+    // Always keep container warm if there's active work
+    // Also keep it warm for the first 5 minutes after a rig is configured
+    // (the container may still be warming up for the user's first interaction)
+    const hasWork = this.hasActiveWork();
+    if (!hasWork) {
+      const rigList = rigs.listRigs(this.sql);
+      const newestRigAge = rigList.reduce((min, r) => {
+        const age = Date.now() - new Date(r.created_at).getTime();
+        return Math.min(min, age);
+      }, Infinity);
+      const isRecentlyConfigured = newestRigAge < 5 * 60_000;
+      if (!isRecentlyConfigured) return;
+    }
 
     const townId = this.townId;
     if (!townId) return;

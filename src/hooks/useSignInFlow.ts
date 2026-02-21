@@ -61,6 +61,7 @@ export type SignInFlowReturn = {
   pendingSignIn: AuthProviderId | null;
   turnstileError: boolean;
   termsAccepted: boolean;
+  termsError: string;
 
   // Handlers
   handleEmailChange: (value: string) => void;
@@ -174,6 +175,7 @@ export function useSignInFlow({
   );
 
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState('');
 
   // Store pending SSO orgId in ref instead of window object
   const pendingSSOOrgIdRef = useRef<string | null>(null);
@@ -349,6 +351,11 @@ export function useSignInFlow({
 
   const handleOAuthClick = useCallback(
     async (provider: AuthProviderId) => {
+      if (!termsAccepted) {
+        setTermsError('Please accept the Terms & Conditions to continue.');
+        return;
+      }
+
       setPendingSignIn(provider);
 
       // If clicking email provider but we don't have their email, show email input instead of Turnstile
@@ -369,7 +376,7 @@ export function useSignInFlow({
       setTurnstileError(false);
       setShowTurnstile(true);
     },
-    [email, isSignUp]
+    [email, isSignUp, termsAccepted]
   );
 
   const handleSSOContinue = useCallback(async (orgId: string) => {
@@ -572,9 +579,13 @@ export function useSignInFlow({
   }, []);
 
   const handleShowEmailInput = useCallback(() => {
+    if (!termsAccepted) {
+      setTermsError('Please accept the Terms & Conditions to continue.');
+      return;
+    }
     setShowEmailInput(true);
     setPendingSignIn('email');
-  }, []);
+  }, [termsAccepted]);
 
   const handleToggleOtherMethods = useCallback(() => {
     setShowOtherMethods(prev => !prev);
@@ -582,6 +593,9 @@ export function useSignInFlow({
 
   const handleTermsAcceptedChange = useCallback((accepted: boolean) => {
     setTermsAccepted(accepted);
+    if (accepted) {
+      setTermsError('');
+    }
   }, []);
 
   const handleClearHint = useCallback(() => {
@@ -623,6 +637,7 @@ export function useSignInFlow({
     pendingSignIn,
     turnstileError,
     termsAccepted,
+    termsError,
     handleEmailChange,
     handleEmailSubmit,
     handleOAuthClick,

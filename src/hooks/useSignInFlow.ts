@@ -389,13 +389,21 @@ export function useSignInFlow({
     [email, isSignUp, termsAccepted]
   );
 
-  const handleSSOContinue = useCallback(async (orgId: string) => {
-    setTurnstileError(false);
-    setShowTurnstile(true);
-    setPendingSignIn('workos');
-    // Store orgId temporarily for turnstile success handler
-    pendingSSOOrgIdRef.current = orgId;
-  }, []);
+  const handleSSOContinue = useCallback(
+    async (orgId: string) => {
+      if (!termsAccepted) {
+        setTermsError('Please accept the Terms & Conditions to continue.');
+        return;
+      }
+
+      setTurnstileError(false);
+      setShowTurnstile(true);
+      setPendingSignIn('workos');
+      // Store orgId temporarily for turnstile success handler
+      pendingSSOOrgIdRef.current = orgId;
+    },
+    [termsAccepted]
+  );
 
   const handleSendMagicLink = useCallback(async () => {
     if (!email.trim()) {

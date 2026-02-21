@@ -641,6 +641,7 @@ export async function prepareLegacySession(
     autoCommit: true,
     setupCommands: ['bun install'],
     kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
+    createdOnPlatform: 'app-builder',
   });
 
   // Step 2: Initiate the prepared session (consumes the prompt stored in step 1)

@@ -90,6 +90,22 @@ export type PlatformStatusResponse = {
   flyRegion: string | null;
 };
 
+/** A Fly volume snapshot. */
+export type VolumeSnapshot = {
+  id: string;
+  created_at: string;
+  digest: string;
+  retention_days: number;
+  size: number;
+  status: string;
+  volume_size: number;
+};
+
+/** Response from GET /api/platform/volume-snapshots */
+export type VolumeSnapshotsResponse = {
+  snapshots: VolumeSnapshot[];
+};
+
 /** Response from GET /api/kiloclaw/config */
 export type UserConfigResponse = {
   envVarKeys: string[];
@@ -103,6 +119,12 @@ export type UserConfigResponse = {
     slackBot: boolean;
     slackApp: boolean;
   };
+};
+
+/** Response from POST /api/platform/doctor */
+export type DoctorResponse = {
+  success: boolean;
+  output: string;
 };
 
 /** Response from POST /api/admin/gateway/restart */

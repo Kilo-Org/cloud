@@ -48,7 +48,12 @@ import {
   LIVE_CHECK_THROTTLE_MS,
 } from '../config';
 import type { FlyClientConfig } from '../fly/client';
-import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
+import type {
+  FlyMachineConfig,
+  FlyMachine,
+  FlyMachineState,
+  FlyVolumeSnapshot,
+} from '../fly/types';
 import * as fly from '../fly/client';
 import { appNameFromUserId } from '../fly/apps';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../utils/env-encryption';
@@ -146,7 +151,7 @@ function guestFromSize(machineSize: MachineSize | null): FlyMachineConfig['guest
   return {
     cpus: machineSize.cpus,
     memory_mb: machineSize.memory_mb,
-    cpu_kind: machineSize.cpu_kind,
+    cpu_kind: machineSize.cpu_kind ?? 'shared',
   };
 }
 
@@ -595,7 +600,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyConfig,
       flyMachineId,
       ['/usr/bin/env', 'HOME=/root', 'node', '/usr/local/bin/openclaw-pairing-list.js'],
-      20
+      60
     );
 
     const empty = {
@@ -663,7 +668,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyConfig,
       flyMachineId,
       ['/usr/bin/env', 'HOME=/root', 'openclaw', 'pairing', 'approve', channel, code, '--notify'],
-      15
+      60
     );
 
     const success = result.exit_code === 0;
@@ -679,6 +684,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       success,
       message: success ? 'Pairing approved' : result.stderr || result.stdout || 'Approval failed',
     };
+  }
+
+  /**
+   * Run `openclaw doctor --fix --non-interactive` on the machine and return the output.
+   * Requires the machine to be running.
+   */
+  async runDoctor(): Promise<{ success: boolean; output: string }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { success: false, output: 'Instance is not running' };
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'doctor', '--fix', '--non-interactive'],
+      60
+    );
+
+    const output = result.stdout + (result.stderr ? '\n' + result.stderr : '');
+    return { success: result.exit_code === 0, output };
   }
 
   /**
@@ -967,6 +997,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       channels: this.channels ?? undefined,
       machineSize: this.machineSize ?? undefined,
     };
+  }
+
+  async listVolumeSnapshots(): Promise<FlyVolumeSnapshot[]> {
+    await this.loadState();
+    if (!this.flyVolumeId) return [];
+    const flyConfig = this.getFlyConfig();
+    return fly.listVolumeSnapshots(flyConfig, this.flyVolumeId);
   }
 
   // ========================================================================

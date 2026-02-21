@@ -10,6 +10,8 @@ import type {
   ChannelsPatchResponse,
   PairingListResponse,
   PairingApproveResponse,
+  VolumeSnapshotsResponse,
+  DoctorResponse,
 } from './types';
 
 /**
@@ -102,6 +104,10 @@ export class KiloClawInternalClient {
     });
   }
 
+  async listVolumeSnapshots(userId: string): Promise<VolumeSnapshotsResponse> {
+    return this.request(`/api/platform/volume-snapshots?userId=${encodeURIComponent(userId)}`);
+  }
+
   async listPairingRequests(userId: string, refresh = false): Promise<PairingListResponse> {
     const params = new URLSearchParams({ userId });
     if (refresh) params.set('refresh', 'true');
@@ -116,6 +122,13 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/pairing/approve', {
       method: 'POST',
       body: JSON.stringify({ userId, channel, code }),
+    });
+  }
+
+  async runDoctor(userId: string): Promise<DoctorResponse> {
+    return this.request('/api/platform/doctor', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
     });
   }
 }

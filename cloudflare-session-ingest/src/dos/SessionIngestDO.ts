@@ -211,7 +211,9 @@ export class SessionIngestDO extends DurableObject<Env> {
     this.initSchema();
 
     const rows = this.sql
-      .exec('SELECT item_id, item_type, item_data FROM ingest_items ORDER BY id')
+      .exec(
+        "SELECT item_id, item_type, item_data FROM ingest_items WHERE item_type != 'session_diff' ORDER BY id"
+      )
       .toArray() as Array<{ item_id: string; item_type: string; item_data: string }>;
 
     const items: IngestBatch = [];
@@ -259,7 +261,9 @@ export class SessionIngestDO extends DurableObject<Env> {
       .exec<{
         item_type: string;
         item_data: string;
-      }>('SELECT item_type, item_data FROM ingest_items')
+      }>(
+        "SELECT item_id, item_type, item_data FROM ingest_items WHERE item_type != 'session_diff' ORDER BY id"
+      )
       .toArray();
 
     // Skip emission if the session has no meaningful data

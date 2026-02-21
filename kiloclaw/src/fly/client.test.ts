@@ -4,6 +4,7 @@ import {
   isFlyNotFound,
   isFlyInsufficientResources,
   createVolumeWithFallback,
+  listVolumeSnapshots,
 } from './client';
 import type { FlyClientConfig } from './client';
 
@@ -52,6 +53,27 @@ describe('isFlyInsufficientResources', () => {
     expect(isFlyInsufficientResources(err)).toBe(true);
   });
 
+  // -- Confirmed production 409 payload --
+
+  it('matches production 409 payload: insufficient memory on updateMachine', () => {
+    const body =
+      '{"error":"aborted: could not reserve resource for machine: insufficient memory available to fulfill request"}';
+    const err = new FlyApiError(`Fly API updateMachine failed (409): ${body}`, 409, body);
+    expect(isFlyInsufficientResources(err)).toBe(true);
+  });
+
+  // -- Non-capacity 409s: must NOT trigger recovery --
+
+  it('returns false for non-capacity 409 conflicts', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const body = '{"error":"conflict: machine is already being updated"}';
+    const err = new FlyApiError(`Fly API failed (409): ${body}`, 409, body);
+    expect(isFlyInsufficientResources(err)).toBe(false);
+
+    warnSpy.mockRestore();
+  });
+
   // -- Version/precondition 412s: must NOT trigger recovery --
 
   it('returns false for version/precondition 412s', () => {
@@ -72,7 +94,7 @@ describe('isFlyInsufficientResources', () => {
     warnSpy.mockRestore();
   });
 
-  // -- Unclassified 412: should return false and warn --
+  // -- Unclassified 409/412: should return false and warn --
 
   it('returns false and logs warning for unclassified 412', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -87,9 +109,22 @@ describe('isFlyInsufficientResources', () => {
     warnSpy.mockRestore();
   });
 
-  // -- Non-412 and non-FlyApiError --
+  it('returns false and logs warning for unclassified 409', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const body = '{"error":"some unknown 409 reason"}';
+    const err = new FlyApiError(`Fly API failed (409): ${body}`, 409, body);
 
-  it('returns false for non-412 status', () => {
+    expect(isFlyInsufficientResources(err)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[fly] Unclassified 409 error (not treated as capacity):',
+      body
+    );
+    warnSpy.mockRestore();
+  });
+
+  // -- Other status codes and non-FlyApiError --
+
+  it('returns false for other status codes', () => {
     expect(isFlyInsufficientResources(new FlyApiError('not found', 404, '{}'))).toBe(false);
     expect(isFlyInsufficientResources(new FlyApiError('server error', 500, '{}'))).toBe(false);
   });
@@ -215,5 +250,56 @@ describe('createVolumeWithFallback', () => {
 
     fetchSpy.mockRestore();
     warnSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// listVolumeSnapshots
+// ============================================================================
+
+describe('listVolumeSnapshots', () => {
+  it('returns snapshots array on success', async () => {
+    const snapshots = [
+      {
+        id: 'snap-1',
+        created_at: '2026-02-19T00:00:00Z',
+        digest: 'sha256:abc',
+        retention_days: 5,
+        size: 1048576,
+        status: 'complete',
+        volume_size: 10737418240,
+      },
+    ];
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(200, snapshots));
+
+    const result = await listVolumeSnapshots(fakeConfig, 'vol-123');
+
+    expect(result).toEqual(snapshots);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain('/volumes/vol-123/snapshots');
+    fetchSpy.mockRestore();
+  });
+
+  it('returns empty array when no snapshots exist', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(200, []));
+
+    const result = await listVolumeSnapshots(fakeConfig, 'vol-456');
+
+    expect(result).toEqual([]);
+    fetchSpy.mockRestore();
+  });
+
+  it('throws on Fly API error', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(404, { error: 'volume not found' }));
+
+    await expect(listVolumeSnapshots(fakeConfig, 'vol-gone')).rejects.toThrow('volume not found');
+    fetchSpy.mockRestore();
   });
 });

@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-02-20',
+    description:
+      'Added OpenClaw Doctor: run diagnostics and auto-fix from the dashboard. Renamed "Restart Gateway" to "Redeploy" to reflect actual behavior.',
+    category: 'feature',
+    deployHint: null,
+  },
+  {
     date: '2026-02-19',
     description: 'Added Discord and Slack channel configuration',
     category: 'feature',

@@ -55,7 +55,8 @@ export function validateGitSource<T extends { githubRepo?: unknown; gitUrl?: unk
 ): boolean {
   const hasGithubRepo = !!data.githubRepo;
   const hasGitUrl = !!data.gitUrl;
-  return (hasGithubRepo || hasGitUrl) && !(hasGithubRepo && hasGitUrl);
+  // Allow zero or one git source (pure prompt sessions need no repo); reject only when both are provided
+  return !(hasGithubRepo && hasGitUrl);
 }
 
 /**

@@ -6,7 +6,7 @@
  */
 
 type SessionInput = {
-  githubRepo: string;
+  githubRepo?: string;
   kilocodeOrganizationId?: string;
   prompt: string;
   mode: 'ask' | 'code';
@@ -16,6 +16,7 @@ type SessionInput = {
   upstreamBranch?: string;
   callbackUrl?: string;
   callbackHeaders?: Record<string, string>;
+  createdOnPlatform?: string;
 };
 
 export class CloudAgentClient {

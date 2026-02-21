@@ -108,6 +108,21 @@ export type SimilarTicket = {
   repoFullName: string;
 };
 
+/**
+ * Raw candidates returned by the Next.js check-duplicates endpoint.
+ * No duplicate decision is made here — the worker does that via LLM.
+ */
+export type DuplicateCandidates = {
+  similarTickets: SimilarTicket[];
+};
+
+export type DuplicateVerificationResult = {
+  isDuplicate: boolean;
+  duplicateOfIssueNumber: number | null;
+  reasoning: string;
+  confidence: number;
+};
+
 export interface DuplicateResult {
   isDuplicate: boolean;
   duplicateOfTicketId: string | null;
@@ -115,6 +130,13 @@ export interface DuplicateResult {
   reasoning?: string;
   similarTickets?: SimilarTicket[];
 }
+
+export const duplicateVerificationResultSchema = z.object({
+  isDuplicate: z.boolean(),
+  duplicateOfIssueNumber: z.number().nullable(),
+  reasoning: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+});
 
 /**
  * Zod schemas for validation

@@ -681,22 +681,24 @@ export class SessionService {
       );
     }
 
-    // Checkout branch before running setup commands
-    if (upstreamBranch) {
-      // For upstream branches, use manageBranch (need to verify exists remotely)
-      await manageBranch(session, context.workspacePath, context.branchName, true);
-    } else {
-      // For session branches on initiate, create directly (can't exist remotely with UUID-based name)
-      logger.withTags({ branchName: context.branchName }).info('Creating session branch');
-      const result = await session.exec(
-        `cd ${context.workspacePath} && git checkout -b '${context.branchName}'`
-      );
-      if (result.exitCode !== 0) {
-        throw new Error(
-          `Failed to create session branch ${context.branchName}: ${result.stderr || result.stdout}`
+    // Checkout branch before running setup commands (only when a repo was cloned)
+    if (githubRepo || gitUrl) {
+      if (upstreamBranch) {
+        // For upstream branches, use manageBranch (need to verify exists remotely)
+        await manageBranch(session, context.workspacePath, context.branchName, true);
+      } else {
+        // For session branches on initiate, create directly (can't exist remotely with UUID-based name)
+        logger.withTags({ branchName: context.branchName }).info('Creating session branch');
+        const result = await session.exec(
+          `cd ${context.workspacePath} && git checkout -b '${context.branchName}'`
         );
+        if (result.exitCode !== 0) {
+          throw new Error(
+            `Failed to create session branch ${context.branchName}: ${result.stderr || result.stdout}`
+          );
+        }
+        logger.withTags({ branchName: context.branchName }).info('Successfully created branch');
       }
-      logger.withTags({ branchName: context.branchName }).info('Successfully created branch');
     }
 
     // Run setup commands after branch checkout

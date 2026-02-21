@@ -11,6 +11,20 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
+
+const USER_FRIENDLY_ERROR =
+  'Something went wrong. Please try again or contact support if the problem persists.';
+
+function friendlyErrorMessage(error: { message?: string }): string {
+  const msg = error.message;
+  if (!msg) return USER_FRIENDLY_ERROR;
+  const isSystemError =
+    /stack|sql|postgres|drizzle|prisma|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|500|Internal Server Error|violates|constraint|fatal|Cannot read propert/i.test(
+      msg
+    );
+  if (isSystemError) return USER_FRIENDLY_ERROR;
+  return msg;
+}
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
@@ -94,7 +108,7 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
       },
       onError: error => {
         toast.error('Failed to toggle auto triage', {
-          description: error.message,
+          description: friendlyErrorMessage(error),
         });
       },
     })
@@ -108,7 +122,7 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
       },
       onError: error => {
         toast.error('Failed to save configuration', {
-          description: error.message,
+          description: friendlyErrorMessage(error),
         });
       },
     })
@@ -124,7 +138,7 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
       },
       onError: error => {
         toast.error('Failed to toggle auto triage', {
-          description: error.message,
+          description: friendlyErrorMessage(error),
         });
       },
     })
@@ -138,7 +152,7 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
       },
       onError: error => {
         toast.error('Failed to save configuration', {
-          description: error.message,
+          description: friendlyErrorMessage(error),
         });
       },
     })

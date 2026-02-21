@@ -9,8 +9,7 @@
  * 2. Generate embedding using Mistral
  * 3. Store embedding in Milvus (if not already stored)
  * 4. Search Milvus for similar tickets
- * 5. Optionally verify with LLM (Claude)
- * 6. Return duplicate result
+ * 5. Return similarity candidates — the caller (worker) decides via LLM reasoning
  *
  * URL: POST /api/internal/triage/check-duplicates
  * Protected by internal API secret
@@ -44,10 +43,11 @@ type SimilarTicket = {
   repoFullName: string;
 };
 
+/**
+ * Similarity candidates returned to the caller.
+ * The final duplicate decision is made by the worker via LLM reasoning.
+ */
 type CheckDuplicatesResponse = {
-  isDuplicate: boolean;
-  duplicateOfTicketId: string | null;
-  similarityScore: number | null;
   similarTickets: SimilarTicket[];
 };
 
@@ -234,33 +234,8 @@ export async function POST(req: NextRequest) {
       topSimilarity: similarTickets[0]?.similarity || 0,
     });
 
-    // Determine if duplicate based on similarity threshold
-    // For now, we use a simple threshold approach
-    // In the future, we could add LLM verification for high-similarity matches
-    const isDuplicate = similarTickets.length > 0 && similarTickets[0].similarity >= 0.9;
-
-    const response: CheckDuplicatesResponse = {
-      isDuplicate,
-      duplicateOfTicketId: isDuplicate ? similarTickets[0].ticketId : null,
-      similarityScore: isDuplicate ? similarTickets[0].similarity : null,
-      similarTickets,
-    };
-
-    // If duplicate found, update ticket status
-    if (isDuplicate) {
-      await updateTriageTicketStatus(ticketId, 'actioned', {
-        isDuplicate: true,
-        duplicateOfTicketId: similarTickets[0].ticketId,
-        similarityScore: similarTickets[0].similarity,
-        actionTaken: 'closed_duplicate',
-      });
-
-      logExceptInTest('[check-duplicates] Marked ticket as duplicate', {
-        ticketId,
-        duplicateOf: similarTickets[0].ticketId,
-        similarity: similarTickets[0].similarity,
-      });
-    }
+    // Return candidates to the worker — it applies LLM reasoning to decide
+    const response: CheckDuplicatesResponse = { similarTickets };
 
     return NextResponse.json(response);
   } catch (error) {

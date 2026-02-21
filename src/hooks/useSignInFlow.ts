@@ -9,7 +9,10 @@ import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import { useSignInHint, type SignInHint } from '@/hooks/useSignInHint';
 import { emailSchema, validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { sendMagicLink } from '@/lib/auth/send-magic-link';
+import { safeLocalStorage } from '@/lib/localStorage';
 import type { SSOOrganizationsResponse } from '@/lib/schemas/sso-organizations';
+
+const TERMS_ACCEPTED_KEY = 'terms_accepted';
 
 export type FlowState = 'landing' | 'provider-select' | 'magic-link-sent' | 'redirecting';
 export type Tier = 'returning' | 'new' | 'invite';
@@ -176,6 +179,13 @@ export function useSignInFlow({
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsError, setTermsError] = useState('');
+
+  // Restore terms acceptance from localStorage after mount to avoid hydration mismatch
+  useEffect(() => {
+    if (safeLocalStorage.getItem(TERMS_ACCEPTED_KEY) === 'true') {
+      setTermsAccepted(true);
+    }
+  }, []);
 
   // Store pending SSO orgId in ref instead of window object
   const pendingSSOOrgIdRef = useRef<string | null>(null);
@@ -593,6 +603,7 @@ export function useSignInFlow({
 
   const handleTermsAcceptedChange = useCallback((accepted: boolean) => {
     setTermsAccepted(accepted);
+    safeLocalStorage.setItem(TERMS_ACCEPTED_KEY, String(accepted));
     if (accepted) {
       setTermsError('');
     }

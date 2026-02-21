@@ -378,7 +378,10 @@ export function startControlServer(): void {
           `[control-server] WebSocket connected: agent=${agentFilter} (${wsClients.size} total)`
         );
 
-        // Send backfill of buffered events for this agent
+        // Send in-memory backfill for this session's events.
+        // This covers late-joining clients within the same container lifecycle.
+        // For historical events after container restarts, clients query the
+        // AgentDO via the worker's GET /agents/:id/events endpoint.
         if (ws.data.agentId) {
           const events = getAgentEvents(ws.data.agentId, 0);
           for (const evt of events) {
@@ -394,11 +397,6 @@ export function startControlServer(): void {
             } catch {
               break;
             }
-          }
-          if (events.length > 0) {
-            console.log(
-              `[control-server] WebSocket backfilled ${events.length} events for agent=${ws.data.agentId}`
-            );
           }
         }
       },

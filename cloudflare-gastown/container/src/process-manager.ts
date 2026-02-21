@@ -72,16 +72,37 @@ export function getAgentEvents(agentId: string, afterId = 0): BufferedEvent[] {
 }
 
 function broadcastEvent(agentId: string, event: string, data: unknown): void {
-  // Always buffer for HTTP polling (TownContainerDO polls /agents/:id/events)
+  // Buffer in-memory for WebSocket backfill of late-joining clients
   bufferAgentEvent(agentId, event, data);
 
-  // Also send to WebSocket sinks if any are connected
+  // Send to WebSocket sinks (live streaming to browser)
   for (const sink of eventSinks) {
     try {
       sink(agentId, event, data);
     } catch (err) {
       console.warn(`${MANAGER_LOG} broadcastEvent: sink error`, err);
     }
+  }
+
+  // Persist to AgentDO via the worker (fire-and-forget)
+  const agent = agents.get(agentId);
+  if (agent?.gastownApiUrl && agent.gastownSessionToken) {
+    // POST to the worker's agent-events endpoint for persistent storage
+    fetch(`${agent.gastownApiUrl}/api/rigs/_/agent-events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${agent.gastownSessionToken}`,
+        'X-Town-Id': agent.townId ?? '',
+      },
+      body: JSON.stringify({
+        agent_id: agentId,
+        event_type: event,
+        data,
+      }),
+    }).catch(() => {
+      // Best-effort persistence — don't block live streaming
+    });
   }
 }
 
@@ -267,11 +288,26 @@ export async function startAgent(
     void subscribeToEvents(client, agent, request);
 
     // 4. Send the initial prompt
+    // Model string is "provider/model" (e.g. "anthropic/claude-sonnet-4.6").
+    // Split into providerID and modelID for the SDK.
+    let modelParam: { providerID: string; modelID: string } | undefined;
+    if (request.model) {
+      const slashIdx = request.model.indexOf('/');
+      if (slashIdx > 0) {
+        modelParam = {
+          providerID: request.model.slice(0, slashIdx),
+          modelID: request.model.slice(slashIdx + 1),
+        };
+      } else {
+        modelParam = { providerID: 'kilo', modelID: request.model };
+      }
+    }
+
     await client.session.prompt({
       path: { id: sessionId },
       body: {
         parts: [{ type: 'text', text: request.prompt }],
-        ...(request.model ? { model: { providerID: 'kilo', modelID: request.model } } : {}),
+        ...(modelParam ? { model: modelParam } : {}),
         ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
       },
     });

@@ -229,6 +229,20 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
+    // Persist the KILOCODE_TOKEN directly on the TownContainerDO so it's
+    // in the container's OS environment (process.env). This is the most
+    // reliable path — doesn't depend on X-Town-Config or request body envVars.
+    const token = rigConfig.kilocodeToken ?? (await this.resolveKilocodeToken());
+    if (token) {
+      try {
+        const container = getTownContainerStub(this.env, this.townId);
+        await container.setEnvVar('KILOCODE_TOKEN', token);
+        console.log(`${TOWN_LOG} configureRig: stored KILOCODE_TOKEN on TownContainerDO`);
+      } catch (err) {
+        console.warn(`${TOWN_LOG} configureRig: failed to store token on container DO:`, err);
+      }
+    }
+
     // Proactively start the container so it's warm when the user sends
     // their first message. The alarm also keeps it warm on subsequent ticks.
     console.log(`${TOWN_LOG} configureRig: proactively starting container`);
@@ -547,6 +561,16 @@ export class TownDO extends DurableObject<Env> {
       const townConfig = await this.getTownConfig();
       const rigConfig = await this.getMayorRigConfig();
       const kilocodeToken = await this.resolveKilocodeToken();
+
+      // Ensure the container has the token in its OS env
+      if (kilocodeToken) {
+        try {
+          const containerStub = getTownContainerStub(this.env, townId);
+          await containerStub.setEnvVar('KILOCODE_TOKEN', kilocodeToken);
+        } catch {
+          // Best effort
+        }
+      }
 
       await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
         townId,

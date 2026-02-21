@@ -1,5 +1,5 @@
 import type { SharedSessionSnapshot } from './client';
-import { extractLastAssistantMessage } from './client';
+import { extractLastAssistantMessage, fetchSessionExport } from './client';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -137,14 +137,6 @@ describe('extractLastAssistantMessage', () => {
 // ---------------------------------------------------------------------------
 
 describe('fetchSessionExport', () => {
-  // Dynamic import to ensure mocks are set up first
-  let fetchSessionExport: typeof import('./client').fetchSessionExport;
-
-  beforeAll(async () => {
-    const mod = await import('./client');
-    fetchSessionExport = mod.fetchSessionExport;
-  });
-
   beforeEach(() => {
     mockFetch.mockReset();
     mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');

@@ -16,7 +16,7 @@ jest.mock('@/lib/config.server', () => ({
 const mockGenerateInternalServiceToken = jest.fn().mockReturnValue('mock-jwt-token');
 
 jest.mock('@/lib/tokens', () => ({
-  generateInternalServiceToken: (...args: unknown[]) => mockGenerateInternalServiceToken(...args),
+  generateInternalServiceToken: mockGenerateInternalServiceToken,
 }));
 
 // Must be set before importing fetchSessionExport (which reads the global)

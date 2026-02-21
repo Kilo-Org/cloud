@@ -102,6 +102,11 @@ function IdentifyUser() {
       if (currentAnonymousId && currentAnonymousId !== session.user.email) {
         posthog.alias(session.user.email, currentAnonymousId);
       }
+      // Re-fetch feature flags now that the user is identified.
+      // Without this, flags evaluated for the anonymous ID remain cached,
+      // so user-targeted flags (e.g. kiloclaw) would stay false until
+      // the next natural reload.
+      posthog.reloadFeatureFlags();
     } else if (status === 'unauthenticated' && previousStatus === 'authenticated') {
       // Reset PostHog identification only when transitioning from authenticated to unauthenticated (logout)
       posthog.reset();

@@ -6,7 +6,7 @@
  */
 
 import * as z from 'zod';
-import type { CloudAgentCodeReview } from '@/db/schema';
+import type { CodeReviewWithCostAndModel } from '@/lib/code-reviews/db/code-reviews';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 
 // ============================================================================
@@ -236,7 +236,7 @@ export type TriggerReviewParams = z.infer<typeof TriggerReviewParamsSchema>;
  * Response type for list code reviews
  */
 export type ListCodeReviewsResponse = {
-  reviews: CloudAgentCodeReview[];
+  reviews: CodeReviewWithCostAndModel[];
   total: number;
   hasMore: boolean;
 };

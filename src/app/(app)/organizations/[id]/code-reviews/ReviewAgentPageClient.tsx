@@ -264,7 +264,7 @@ export function ReviewAgentPageClient({
                   <ListChecks className="h-4 w-4" />
                   <AlertTitle>No Jobs Yet</AlertTitle>
                   <AlertDescription>
-                    Connect GitLab and configure your review settings to see code review jobs here.
+                    Connect GitLab and configure your review settings to see processed reviews here.
                   </AlertDescription>
                 </Alert>
               )}

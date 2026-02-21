@@ -18,12 +18,28 @@ import {
   ChevronRight,
   RotateCcw,
   Ban,
+  DollarSign,
+  Cpu,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { CodeReviewStreamView } from './CodeReviewStreamView';
+
+function formatCostFromMicrodollars(microdollars: number): string {
+  const dollars = microdollars / 1_000_000;
+  if (dollars < 0.01) {
+    return '<$0.01';
+  }
+  return `$${dollars.toFixed(2)}`;
+}
+
+function formatModelName(model: string): string {
+  // Strip provider prefix (e.g. "anthropic/claude-sonnet-4-20250514" -> "claude-sonnet-4-20250514")
+  const lastSlash = model.lastIndexOf('/');
+  return lastSlash >= 0 ? model.slice(lastSlash + 1) : model;
+}
 
 type Platform = 'github' | 'gitlab';
 
@@ -159,7 +175,7 @@ export function CodeReviewJobsCard({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Code Review Jobs</CardTitle>
+          <CardTitle>Processed Reviews</CardTitle>
           <CardDescription>Loading...</CardDescription>
         </CardHeader>
       </Card>
@@ -180,13 +196,13 @@ export function CodeReviewJobsCard({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <GitPullRequest className="h-5 w-5" />
-            Code Review Jobs
+            Processed Reviews
           </CardTitle>
           <CardDescription>No code reviews yet</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-sm">
-            Code review jobs will appear here when {prLabel} are reviewed.
+            Processed reviews will appear here when {prLabel} are reviewed.
           </p>
         </CardContent>
       </Card>
@@ -198,7 +214,7 @@ export function CodeReviewJobsCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <GitPullRequest className="h-5 w-5" />
-          Code Review Jobs
+          Processed Reviews
         </CardTitle>
         <CardDescription>
           {total > 0 ? (
@@ -292,6 +308,24 @@ export function CodeReviewJobsCard({
                         </span>
                       )}
                     </div>
+
+                    {/* Cost & Model */}
+                    {(review.total_cost_microdollars != null || review.model) && (
+                      <div className="text-muted-foreground flex items-center gap-3 text-xs">
+                        {review.total_cost_microdollars != null && (
+                          <span className="inline-flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            {formatCostFromMicrodollars(review.total_cost_microdollars)}
+                          </span>
+                        )}
+                        {review.model && (
+                          <span className="inline-flex items-center gap-1">
+                            <Cpu className="h-3 w-3" />
+                            {formatModelName(review.model)}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Error Message */}
                     {review.error_message && (

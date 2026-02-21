@@ -63,6 +63,13 @@ function usage(): never {
   process.exit(1);
 }
 
+const BATCH_SIZE = 20;
+const DELAY_BETWEEN_BATCHES_MS = 200;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function run(): Promise<void> {
   const args = process.argv.slice(2);
   const confirm = args.includes('--confirm');
@@ -96,10 +103,19 @@ async function run(): Promise<void> {
     throw new Error('NEXT_PUBLIC_POSTHOG_KEY environment variable is required');
   }
 
+  let errorCount = 0;
+
   const posthog = new PostHog(apiKey, {
     host: POSTHOG_INGESTION_HOST,
-    flushAt: 1,
+    flushAt: BATCH_SIZE,
     flushInterval: 0,
+    fetchRetryCount: 3,
+    fetchRetryDelay: 1000,
+  });
+
+  posthog.on('error', (err: unknown) => {
+    errorCount++;
+    console.error(`  [PostHog error #${errorCount}]`, err);
   });
 
   let sent = 0;
@@ -112,14 +128,26 @@ async function run(): Promise<void> {
       },
     });
     sent++;
-    if (sent % 100 === 0) {
+
+    // Throttle: after each batch, flush and pause to avoid rate limits
+    if (sent % BATCH_SIZE === 0) {
+      await posthog.flush();
       console.log(`  sent ${sent}/${emails.length}...`);
+      await sleep(DELAY_BETWEEN_BATCHES_MS);
     }
   }
 
-  console.log(`Flushing ${sent} update(s)...`);
+  console.log(`Flushing remaining update(s)...`);
   await posthog.shutdown();
-  console.log(`Done. Set "${propertyName}" = true on ${sent} person(s).`);
+
+  if (errorCount > 0) {
+    console.error(
+      `\nCompleted with ${errorCount} error(s). Some updates may not have been applied.`
+    );
+    process.exitCode = 1;
+  } else {
+    console.log(`Done. Set "${propertyName}" = true on ${sent} person(s).`);
+  }
 }
 
 run().then(

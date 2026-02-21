@@ -550,6 +550,10 @@ export class TownDO extends DurableObject<Env> {
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
+    console.log(
+      `${TOWN_LOG} sendMayorMessage: townId=${townId} mayorId=${mayor.id} containerStatus=${containerStatus.status} isAlive=${isAlive}`
+    );
+
     let sessionStatus: 'idle' | 'active' | 'starting';
 
     if (isAlive) {

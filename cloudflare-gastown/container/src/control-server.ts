@@ -314,19 +314,26 @@ export function startControlServer(): void {
   process.on('SIGTERM', () => void shutdown());
   process.on('SIGINT', () => void shutdown());
 
-  // Track connected WebSocket clients
-  const wsClients = new Set<import('bun').ServerWebSocket<unknown>>();
+  // Track connected WebSocket clients with optional agent filter
+  type WSClient = import('bun').ServerWebSocket<{ agentId: string | null }>;
+  const wsClients = new Set<WSClient>();
 
-  // Register an event sink that forwards all agent events to WS clients
+  // Agent stream URL patterns (the container receives the full path from the worker)
+  const AGENT_STREAM_RE = /\/agents\/([^/]+)\/stream$/;
+
+  // Register an event sink that forwards agent events to WS clients
   registerEventSink((agentId, event, data) => {
     const frame = JSON.stringify({
       agentId,
-      type: event,
+      event,
       data,
       timestamp: new Date().toISOString(),
     });
     for (const ws of wsClients) {
       try {
+        // If the client subscribed to a specific agent, only send that agent's events
+        const filter = ws.data.agentId;
+        if (filter && filter !== agentId) continue;
         ws.send(frame);
       } catch {
         wsClients.delete(ws);
@@ -334,25 +341,78 @@ export function startControlServer(): void {
     }
   });
 
-  Bun.serve({
+  Bun.serve<{ agentId: string | null }>({
     port: PORT,
     fetch(req, server) {
-      // WebSocket upgrade for /ws
-      if (new URL(req.url).pathname === '/ws') {
-        const upgraded = server.upgrade(req);
-        if (upgraded) return undefined;
-        return new Response('WebSocket upgrade failed', { status: 400 });
+      const url = new URL(req.url);
+      const pathname = url.pathname;
+
+      // WebSocket upgrade: match /ws OR /agents/:id/stream (with any prefix)
+      const isWsUpgrade = req.headers.get('upgrade')?.toLowerCase() === 'websocket';
+      if (isWsUpgrade) {
+        let agentId: string | null = null;
+
+        if (pathname === '/ws') {
+          agentId = url.searchParams.get('agentId');
+        } else {
+          const match = pathname.match(AGENT_STREAM_RE);
+          if (match) agentId = match[1];
+        }
+
+        // Accept upgrade if the path matches any WS pattern
+        if (pathname === '/ws' || AGENT_STREAM_RE.test(pathname)) {
+          const upgraded = server.upgrade(req, { data: { agentId } });
+          if (upgraded) return undefined;
+          return new Response('WebSocket upgrade failed', { status: 400 });
+        }
       }
+
       // All other requests go through Hono
       return app.fetch(req);
     },
     websocket: {
       open(ws) {
         wsClients.add(ws);
-        console.log(`[control-server] WebSocket connected (${wsClients.size} total)`);
+        const agentFilter = ws.data.agentId ?? 'all';
+        console.log(
+          `[control-server] WebSocket connected: agent=${agentFilter} (${wsClients.size} total)`
+        );
+
+        // Send backfill of buffered events for this agent
+        if (ws.data.agentId) {
+          const events = getAgentEvents(ws.data.agentId, 0);
+          for (const evt of events) {
+            try {
+              ws.send(
+                JSON.stringify({
+                  agentId: ws.data.agentId,
+                  event: evt.event,
+                  data: evt.data,
+                  timestamp: evt.timestamp,
+                })
+              );
+            } catch {
+              break;
+            }
+          }
+          if (events.length > 0) {
+            console.log(
+              `[control-server] WebSocket backfilled ${events.length} events for agent=${ws.data.agentId}`
+            );
+          }
+        }
       },
-      message(_ws, _message) {
-        // No client→server messages expected; ignore
+      message(ws, message) {
+        // Handle subscribe messages from client
+        try {
+          const msg = JSON.parse(String(message));
+          if (msg.type === 'subscribe' && msg.agentId) {
+            ws.data.agentId = msg.agentId;
+            console.log(`[control-server] WebSocket subscribed to agent=${msg.agentId}`);
+          }
+        } catch {
+          // Ignore
+        }
       },
       close(ws) {
         wsClients.delete(ws);

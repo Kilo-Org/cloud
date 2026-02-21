@@ -163,6 +163,10 @@ export async function startAgentInContainer(
     const kilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
     if (kilocodeToken) envVars.KILOCODE_TOKEN = kilocodeToken;
 
+    console.log(
+      `${TOWN_LOG} startAgentInContainer: envVars built: keys=[${Object.keys(envVars).join(',')}] hasJwt=${!!token} hasKilocodeToken=${!!kilocodeToken} paramToken=${!!params.kilocodeToken} configToken=${!!params.townConfig.kilocode_token}`
+    );
+
     const containerConfig = await buildContainerConfig(storage, env);
     const container = getTownContainerStub(env, params.townId);
 

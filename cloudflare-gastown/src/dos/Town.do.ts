@@ -562,6 +562,10 @@ export class TownDO extends DurableObject<Env> {
       const rigConfig = await this.getMayorRigConfig();
       const kilocodeToken = await this.resolveKilocodeToken();
 
+      console.log(
+        `${TOWN_LOG} sendMayorMessage: townId=${townId} hasRigConfig=${!!rigConfig} hasKilocodeToken=${!!kilocodeToken} townConfigToken=${!!townConfig.kilocode_token} rigConfigToken=${!!rigConfig?.kilocodeToken}`
+      );
+
       // Ensure the container has the token in its OS env
       if (kilocodeToken) {
         try {

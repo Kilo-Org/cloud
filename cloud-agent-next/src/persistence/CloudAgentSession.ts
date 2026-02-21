@@ -20,7 +20,6 @@ import {
   createLeaseQueries,
   type ExecutionQueries,
   type EventQueries,
-  type EventQueryFilters,
   type LeaseQueries,
   type LeaseAcquireError,
 } from '../session/queries/index.js';
@@ -1128,15 +1127,6 @@ export class CloudAgentSession extends DurableObject {
    */
   async getActiveExecutionId(): Promise<ExecutionId | null> {
     return this.executionQueries.getActiveExecutionId();
-  }
-
-  /**
-   * Query stored events by filters.
-   * Used by server-side consumers (e.g. callback handlers) to retrieve
-   * execution events without a WebSocket connection.
-   */
-  queryEvents(filters: EventQueryFilters): StoredEvent[] {
-    return this.eventQueries.findByFilters(filters);
   }
 
   /**

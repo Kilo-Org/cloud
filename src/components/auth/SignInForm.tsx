@@ -16,6 +16,36 @@ import { OAuthProviderIds, ProdNonSSOAuthProviders } from '@/lib/auth/provider-m
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
+function TermsCheckbox({
+  checked,
+  onCheckedChange,
+  error,
+}: {
+  checked: boolean;
+  onCheckedChange: (accepted: boolean) => void;
+  error: string;
+}) {
+  return (
+    <div className="mx-auto mt-4 max-w-md">
+      <div className="flex items-center space-x-2">
+        <Checkbox id="termsAccepted" checked={checked} onCheckedChange={onCheckedChange} />
+        <Label htmlFor="termsAccepted" className="text-muted-foreground text-sm">
+          By checking this box, I am agreeing to the{' '}
+          <a
+            href="https://kilo.ai/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline"
+          >
+            Terms & Conditions
+          </a>
+        </Label>
+      </div>
+      {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+    </div>
+  );
+}
+
 type SignInFormProps = {
   searchParams: Record<string, string>;
   error?: string;
@@ -208,6 +238,12 @@ export function SignInForm({
                   </div>
                 );
               })()}
+
+              <TermsCheckbox
+                checked={flow.termsAccepted}
+                onCheckedChange={flow.handleTermsAcceptedChange}
+                error={flow.termsError}
+              />
             </>
           )}
 
@@ -248,6 +284,11 @@ export function SignInForm({
                       Continue to Single Sign-On
                     </SignInButton>
                   </div>
+                  <TermsCheckbox
+                    checked={flow.termsAccepted}
+                    onCheckedChange={flow.handleTermsAcceptedChange}
+                    error={flow.termsError}
+                  />
                   <button
                     onClick={flow.handleClearInvite}
                     className="text-muted-foreground mt-6 cursor-pointer text-sm hover:underline"
@@ -295,40 +336,24 @@ export function SignInForm({
               ) : (
                 // Provider buttons view (initial state)
                 <>
-                  <div className="mb-4 flex items-center space-x-2">
-                    <Checkbox
-                      id="termsAccepted"
-                      checked={flow.termsAccepted}
-                      onCheckedChange={flow.handleTermsAcceptedChange}
-                    />
-                    <Label htmlFor="termsAccepted" className="text-muted-foreground text-sm">
-                      By checking this box, I am agreeing to the{' '}
-                      <a
-                        href="https://kilo.ai/terms"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
-                        Terms & Conditions
-                      </a>
-                    </Label>
-                  </div>
                   <div className="mx-auto max-w-md space-y-4">
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
                       providers={OAuthProviderIds}
                       onProviderClick={flow.handleOAuthClick}
-                      disabled={!flow.termsAccepted}
                     />
 
-                    <SignInButton
-                      onClick={flow.handleShowEmailInput}
-                      disabled={!flow.termsAccepted}
-                    >
+                    <SignInButton onClick={flow.handleShowEmailInput}>
                       <Mail />
                       Continue with Email
                     </SignInButton>
                   </div>
+
+                  <TermsCheckbox
+                    checked={flow.termsAccepted}
+                    onCheckedChange={flow.handleTermsAcceptedChange}
+                    error={flow.termsError}
+                  />
 
                   {/* Divider */}
                   <div className="mx-auto my-6 max-w-md">

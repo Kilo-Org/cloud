@@ -9,7 +9,10 @@ import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import { useSignInHint, type SignInHint } from '@/hooks/useSignInHint';
 import { emailSchema, validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { sendMagicLink } from '@/lib/auth/send-magic-link';
+import { safeLocalStorage } from '@/lib/localStorage';
 import type { SSOOrganizationsResponse } from '@/lib/schemas/sso-organizations';
+
+const TERMS_ACCEPTED_KEY = 'terms_accepted';
 
 export type FlowState = 'landing' | 'provider-select' | 'magic-link-sent' | 'redirecting';
 export type Tier = 'returning' | 'new' | 'invite';
@@ -61,6 +64,7 @@ export type SignInFlowReturn = {
   pendingSignIn: AuthProviderId | null;
   turnstileError: boolean;
   termsAccepted: boolean;
+  termsError: string;
 
   // Handlers
   handleEmailChange: (value: string) => void;
@@ -174,6 +178,14 @@ export function useSignInFlow({
   );
 
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState('');
+
+  // Restore terms acceptance from localStorage after mount to avoid hydration mismatch
+  useEffect(() => {
+    if (safeLocalStorage.getItem(TERMS_ACCEPTED_KEY) === 'true') {
+      setTermsAccepted(true);
+    }
+  }, []);
 
   // Store pending SSO orgId in ref instead of window object
   const pendingSSOOrgIdRef = useRef<string | null>(null);
@@ -349,6 +361,11 @@ export function useSignInFlow({
 
   const handleOAuthClick = useCallback(
     async (provider: AuthProviderId) => {
+      if (!termsAccepted) {
+        setTermsError('Please accept the Terms & Conditions to continue.');
+        return;
+      }
+
       setPendingSignIn(provider);
 
       // If clicking email provider but we don't have their email, show email input instead of Turnstile
@@ -369,16 +386,24 @@ export function useSignInFlow({
       setTurnstileError(false);
       setShowTurnstile(true);
     },
-    [email, isSignUp]
+    [email, isSignUp, termsAccepted]
   );
 
-  const handleSSOContinue = useCallback(async (orgId: string) => {
-    setTurnstileError(false);
-    setShowTurnstile(true);
-    setPendingSignIn('workos');
-    // Store orgId temporarily for turnstile success handler
-    pendingSSOOrgIdRef.current = orgId;
-  }, []);
+  const handleSSOContinue = useCallback(
+    async (orgId: string) => {
+      if (!termsAccepted) {
+        setTermsError('Please accept the Terms & Conditions to continue.');
+        return;
+      }
+
+      setTurnstileError(false);
+      setShowTurnstile(true);
+      setPendingSignIn('workos');
+      // Store orgId temporarily for turnstile success handler
+      pendingSSOOrgIdRef.current = orgId;
+    },
+    [termsAccepted]
+  );
 
   const handleSendMagicLink = useCallback(async () => {
     if (!email.trim()) {
@@ -572,9 +597,13 @@ export function useSignInFlow({
   }, []);
 
   const handleShowEmailInput = useCallback(() => {
+    if (!termsAccepted) {
+      setTermsError('Please accept the Terms & Conditions to continue.');
+      return;
+    }
     setShowEmailInput(true);
     setPendingSignIn('email');
-  }, []);
+  }, [termsAccepted]);
 
   const handleToggleOtherMethods = useCallback(() => {
     setShowOtherMethods(prev => !prev);
@@ -582,6 +611,10 @@ export function useSignInFlow({
 
   const handleTermsAcceptedChange = useCallback((accepted: boolean) => {
     setTermsAccepted(accepted);
+    safeLocalStorage.setItem(TERMS_ACCEPTED_KEY, String(accepted));
+    if (accepted) {
+      setTermsError('');
+    }
   }, []);
 
   const handleClearHint = useCallback(() => {
@@ -623,6 +656,7 @@ export function useSignInFlow({
     pendingSignIn,
     turnstileError,
     termsAccepted,
+    termsError,
     handleEmailChange,
     handleEmailSubmit,
     handleOAuthClick,

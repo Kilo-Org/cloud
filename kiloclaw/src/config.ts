@@ -5,6 +5,9 @@
 /** Port that the OpenClaw gateway listens on inside the Fly Machine */
 export const OPENCLAW_PORT = 18789;
 
+/** Internal loopback port for the OpenClaw gateway process (behind controller) */
+export const OPENCLAW_INTERNAL_PORT = 3001;
+
 /** Maximum time to wait for the machine to reach 'started' state.
  *  Fly's /wait endpoint caps at 60s (spec.json:1538). */
 export const STARTUP_TIMEOUT_SECONDS = 60;

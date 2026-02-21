@@ -47,11 +47,22 @@ export type FlyMachineMount = {
   name?: string;
 };
 
+export type FlyMachineCheck = {
+  type: 'http' | 'tcp';
+  port: number;
+  interval?: string;
+  timeout?: string;
+  grace_period?: string;
+  method?: string;
+  path?: string;
+};
+
 export type FlyMachineConfig = {
   image: string;
   env?: Record<string, string>;
   guest?: FlyMachineGuest;
   services?: FlyMachineService[];
+  checks?: Record<string, FlyMachineCheck>;
   mounts?: FlyMachineMount[];
   metadata?: Record<string, string>;
   auto_destroy?: boolean;

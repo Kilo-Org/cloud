@@ -4,7 +4,7 @@
 # 1. Decrypts KILOCLAW_ENC_* environment variables (if encryption key is present)
 # 2. Runs openclaw onboard --non-interactive to configure from env vars (first run only)
 # 3. Patches config for features onboard doesn't cover (channels, gateway auth)
-# 4. Starts the gateway
+# 4. Starts the controller (which supervises the gateway)
 
 set -e
 
@@ -158,10 +158,9 @@ config.gateway = config.gateway || {};
 config.channels = config.channels || {};
 
 // Gateway configuration
-config.gateway.port = 18789;
+config.gateway.port = 3001;
 config.gateway.mode = 'local';
-// Set bind to loopback so agent tools connect via 127.0.0.1 (auto-approved for pairing).
-// The actual server bind is controlled by --bind lan on the command line, not this config.
+// Bind to loopback only. External traffic is handled by the controller proxy.
 config.gateway.bind = 'loopback';
 
 if (process.env.OPENCLAW_GATEWAY_TOKEN) {
@@ -313,20 +312,18 @@ console.log('Configuration patched successfully');
 EOFPATCH
 
 # ============================================================
-# START GATEWAY
+# START CONTROLLER
 # ============================================================
-echo "Starting OpenClaw Gateway..."
-echo "Gateway will be available on port 18789"
+echo 'Starting KiloClaw controller...'
 
-rm -f /tmp/openclaw-gateway.lock 2>/dev/null || true
-rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
+# Build gateway args as a JSON array (safe quoting through node serialization).
+KILOCLAW_GATEWAY_ARGS=$(node -e "
+  const args = ['--port', '3001', '--verbose', '--allow-unconfigured', '--bind', 'loopback'];
+  if (process.env.OPENCLAW_GATEWAY_TOKEN) {
+    args.push('--token', process.env.OPENCLAW_GATEWAY_TOKEN);
+  }
+  console.log(JSON.stringify(args));
+")
+export KILOCLAW_GATEWAY_ARGS
 
-echo "Dev mode: ${OPENCLAW_DEV_MODE:-false}"
-
-if [ -n "$OPENCLAW_GATEWAY_TOKEN" ]; then
-    echo "Starting gateway with token auth..."
-    exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan --token "$OPENCLAW_GATEWAY_TOKEN"
-else
-    echo "Starting gateway with device pairing (no token)..."
-    exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan
-fi
+exec node /usr/local/bin/kiloclaw-controller.js

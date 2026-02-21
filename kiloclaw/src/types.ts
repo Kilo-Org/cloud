@@ -38,6 +38,7 @@ export type KiloClawEnv = {
 
   // OpenClaw gateway configuration
   OPENCLAW_ALLOWED_ORIGINS?: string;
+  REQUIRE_PROXY_TOKEN?: string;
 };
 
 /**

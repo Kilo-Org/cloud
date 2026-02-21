@@ -3,6 +3,7 @@ import {
   FlyApiError,
   isFlyNotFound,
   isFlyInsufficientResources,
+  createMachine,
   createVolumeWithFallback,
   listVolumeSnapshots,
 } from './client';
@@ -137,6 +138,59 @@ describe('isFlyInsufficientResources', () => {
     expect(isFlyInsufficientResources('string')).toBe(false);
     expect(isFlyInsufficientResources(null)).toBe(false);
     expect(isFlyInsufficientResources(undefined)).toBe(false);
+  });
+});
+
+describe('createMachine', () => {
+  it('passes checks through to Fly createMachine request body', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'machine-1',
+          name: 'm',
+          state: 'created',
+          region: 'iad',
+          instance_id: 'inst',
+          config: {},
+          created_at: '2026-02-21T00:00:00.000Z',
+          updated_at: '2026-02-21T00:00:00.000Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    await createMachine(
+      fakeConfig,
+      {
+        image: 'registry.fly.io/test:latest',
+        checks: {
+          controller: {
+            type: 'http',
+            port: 18789,
+            method: 'GET',
+            path: '/health',
+            interval: '30s',
+            timeout: '5s',
+          },
+        },
+      },
+      { region: 'iad' }
+    );
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string) as {
+      config: { checks?: Record<string, unknown> };
+    };
+    expect(body.config.checks).toEqual({
+      controller: {
+        type: 'http',
+        port: 18789,
+        method: 'GET',
+        path: '/health',
+        interval: '30s',
+        timeout: '5s',
+      },
+    });
+    fetchSpy.mockRestore();
   });
 });
 

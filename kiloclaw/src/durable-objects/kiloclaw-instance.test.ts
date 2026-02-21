@@ -622,6 +622,37 @@ describe('createNewMachine: persist ID before waitForState', () => {
     expect(idAtWaitTime).toBe('machine-fresh');
   });
 
+  it('includes Fly HTTP health check config in machine create request', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped', flyMachineId: null });
+
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-health-check',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.start('user-1');
+
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        checks: {
+          controller: {
+            type: 'http',
+            port: 18789,
+            method: 'GET',
+            path: '/health',
+            interval: '30s',
+            timeout: '5s',
+          },
+        },
+      }),
+      expect.anything()
+    );
+  });
+
   it('preserves machine ID in storage even if waitForState fails', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'stopped', flyMachineId: null });

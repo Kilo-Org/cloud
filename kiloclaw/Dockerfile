@@ -28,6 +28,17 @@ RUN npm install -g pnpm
 RUN npm install -g openclaw@2026.2.9 \
     && openclaw --version
 
+# Install pinned Bun (build-time only) and compile the controller bundle.
+ARG BUN_VERSION=1.2.4
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+ENV PATH="/root/.bun/bin:$PATH"
+
+COPY controller/ /tmp/controller-build/
+RUN cd /tmp/controller-build \
+    && bun install --frozen-lockfile \
+    && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
+    && rm -rf /tmp/controller-build
+
 # Create OpenClaw directories
 # When a Fly Volume is mounted at /root, these dirs persist across restarts.
 RUN mkdir -p /root/.openclaw \
@@ -35,7 +46,7 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy startup script
-# Build cache bust: 2026-02-18-v46-discord-slack-plugins
+# Build cache bust: 2026-02-21-v47-controller-phase1
 RUN echo "4"
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
@@ -51,5 +62,5 @@ COPY skills/ /root/clawd/skills/
 # Expose the gateway port
 EXPOSE 18789
 
-# Entrypoint: start the OpenClaw gateway
+# Entrypoint: start the KiloClaw controller daemon
 CMD ["/usr/local/bin/start-openclaw.sh"]

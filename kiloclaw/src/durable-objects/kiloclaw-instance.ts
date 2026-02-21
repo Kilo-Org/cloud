@@ -138,6 +138,16 @@ function buildMachineConfig(
         autostop: 'off',
       },
     ],
+    checks: {
+      controller: {
+        type: 'http',
+        port: OPENCLAW_PORT,
+        method: 'GET',
+        path: '/health',
+        interval: '30s',
+        timeout: '5s',
+      },
+    },
     mounts: flyVolumeId ? [{ volume: flyVolumeId, path: '/root' }] : [],
     metadata: {
       [METADATA_KEY_USER_ID]: identity.userId,

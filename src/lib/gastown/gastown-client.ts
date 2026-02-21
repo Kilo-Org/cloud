@@ -135,6 +135,14 @@ async function gastownFetch(path: string, init?: RequestInit): Promise<unknown> 
   const url = `${GASTOWN_SERVICE_URL}${path}`;
   const method = init?.method ?? 'GET';
   console.log(`${CLIENT_LOG} ${method} ${url}`);
+  if (init?.body && typeof init.body === 'string') {
+    try {
+      const bodyKeys = Object.keys(JSON.parse(init.body));
+      console.log(`${CLIENT_LOG} ${method} ${path} bodyKeys=[${bodyKeys.join(',')}]`);
+    } catch {
+      // not JSON
+    }
+  }
   if (init?.body) {
     const safeBody =
       typeof init.body === 'string'

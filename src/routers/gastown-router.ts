@@ -86,6 +86,9 @@ export const gastownRouter = createTRPCRouter({
       const kilocodeToken = generateApiToken(ctx.user, undefined, {
         expiresIn: TOKEN_EXPIRY.thirtyDays,
       });
+      console.log(
+        `[gastown-router] createRig: generating kilocodeToken for user=${ctx.user.id} tokenLength=${kilocodeToken?.length ?? 0}`
+      );
 
       return withGastownError(() =>
         gastown.createRig(ctx.user.id, {

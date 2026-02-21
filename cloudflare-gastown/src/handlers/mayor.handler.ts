@@ -48,6 +48,8 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
   );
 
   const town = getTownDOStub(c.env, params.townId);
+  // Ensure the TownDO knows its real UUID (ctx.id.name is unreliable in local dev)
+  await town.setTownId(params.townId);
   const result = await town.sendMayorMessage(parsed.data.message);
   return c.json(resSuccess(result), 200);
 }
@@ -58,6 +60,7 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
  */
 export async function handleGetMayorStatus(c: Context<GastownEnv>, params: { townId: string }) {
   const town = getTownDOStub(c.env, params.townId);
+  await town.setTownId(params.townId);
   const status = await town.getMayorStatus();
   return c.json(resSuccess(status), 200);
 }

@@ -66,7 +66,7 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
     );
   }
   console.log(
-    `${TOWNS_LOG} handleCreateRig: userId=${params.userId} town_id=${parsed.data.town_id} name=${parsed.data.name} git_url=${parsed.data.git_url}`
+    `${TOWNS_LOG} handleCreateRig: userId=${params.userId} town_id=${parsed.data.town_id} name=${parsed.data.name} git_url=${parsed.data.git_url} hasKilocodeToken=${!!parsed.data.kilocode_token}`
   );
 
   const townDO = getGastownUserStub(c.env, params.userId);

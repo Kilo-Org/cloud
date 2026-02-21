@@ -1,9 +1,8 @@
 import 'server-only';
 
-import jwt from 'jsonwebtoken';
 import { captureException } from '@sentry/nextjs';
-import { SESSION_INGEST_WORKER_URL, NEXTAUTH_SECRET } from '@/lib/config.server';
-import { JWT_TOKEN_VERSION } from '@/lib/tokens';
+import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { generateInternalServiceToken } from '@/lib/tokens';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,21 +45,6 @@ export type SharedSessionSnapshot = {
 };
 
 // ---------------------------------------------------------------------------
-// Token generation
-// ---------------------------------------------------------------------------
-
-/**
- * Generate a short-lived JWT for authenticating with the session-ingest service.
- * Uses the same shared NEXTAUTH_SECRET that the ingest worker verifies.
- */
-function generateIngestToken(userId: string): string {
-  return jwt.sign({ kiloUserId: userId, version: JWT_TOKEN_VERSION }, NEXTAUTH_SECRET, {
-    algorithm: 'HS256',
-    expiresIn: '1h',
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Session export fetch
 // ---------------------------------------------------------------------------
 
@@ -82,7 +66,7 @@ export async function fetchSessionExport(
     throw new Error('SESSION_INGEST_WORKER_URL not configured');
   }
 
-  const token = generateIngestToken(userId);
+  const token = generateInternalServiceToken(userId);
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
 
   const response = await fetch(url, {

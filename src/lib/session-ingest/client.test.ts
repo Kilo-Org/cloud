@@ -11,11 +11,12 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
-  NEXTAUTH_SECRET: 'test-secret-key',
 }));
 
+const mockGenerateInternalServiceToken = jest.fn().mockReturnValue('mock-jwt-token');
+
 jest.mock('@/lib/tokens', () => ({
-  JWT_TOKEN_VERSION: 3,
+  generateInternalServiceToken: (...args: unknown[]) => mockGenerateInternalServiceToken(...args),
 }));
 
 // Must be set before importing fetchSessionExport (which reads the global)
@@ -146,6 +147,7 @@ describe('fetchSessionExport', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
+    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('should return parsed snapshot on 200 response', async () => {
@@ -224,9 +226,7 @@ describe('fetchSessionExport', () => {
     );
   });
 
-  it('should generate JWT with correct payload', async () => {
-    const jwt = await import('jsonwebtoken');
-
+  it('should generate token for the correct userId', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -235,14 +235,25 @@ describe('fetchSessionExport', () => {
 
     await fetchSessionExport('ses_abc123', 'user_test_456');
 
-    // Extract the token from the Authorization header
-    const callArgs = mockFetch.mock.calls[0];
-    const authHeader = callArgs[1].headers.Authorization as string;
-    const token = authHeader.replace('Bearer ', '');
+    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+  });
 
-    // Verify the token payload
-    const decoded = jwt.verify(token, 'test-secret-key') as Record<string, unknown>;
-    expect(decoded.kiloUserId).toBe('user_test_456');
-    expect(decoded.version).toBe(3);
+  it('should use the generated token in the Authorization header', async () => {
+    mockGenerateInternalServiceToken.mockReturnValue('custom-test-token');
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(makeSnapshot([])),
+    });
+
+    await fetchSessionExport('ses_abc123', 'user_123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer custom-test-token' },
+      })
+    );
   });
 });

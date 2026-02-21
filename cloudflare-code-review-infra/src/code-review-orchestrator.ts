@@ -36,6 +36,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   /** Flag to signal stream processing to stop when cancelled */
   private cancelled = false;
 
+  /** Accumulated usage data from LLM API calls */
+  private totalTokensIn = 0;
+  private totalTokensOut = 0;
+  private totalCost = 0;
+  private model: string | undefined;
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
   }
@@ -91,6 +97,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     if (storedState) {
       this.state = storedState;
+
+      // Restore usage accumulators from persisted state so they survive DO eviction
+      if (storedState.model) this.model = storedState.model;
+      if (storedState.totalTokensIn) this.totalTokensIn = storedState.totalTokensIn;
+      if (storedState.totalTokensOut) this.totalTokensOut = storedState.totalTokensOut;
+      if (storedState.totalCost) this.totalCost = storedState.totalCost;
     }
   }
 
@@ -235,6 +247,58 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   }
 
   /**
+   * Report accumulated LLM usage data to Next.js backend.
+   * Called after SSE stream processing completes, before cloud agent callback.
+   */
+  private async reportUsage(): Promise<void> {
+    if (!this.model && this.totalTokensIn === 0 && this.totalTokensOut === 0) {
+      return; // No usage data to report
+    }
+
+    try {
+      const url = `${this.env.API_URL}/api/internal/code-review-usage/${this.state.reviewId}`;
+      const payload = {
+        model: this.model,
+        totalTokensIn: this.totalTokensIn,
+        totalTokensOut: this.totalTokensOut,
+        totalCost: this.totalCost,
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[CodeReviewOrchestrator] Failed to report usage:', {
+          reviewId: this.state.reviewId,
+          status: response.status,
+          error: errorText,
+        });
+      } else {
+        console.log('[CodeReviewOrchestrator] Usage reported', {
+          reviewId: this.state.reviewId,
+          model: this.model,
+          totalTokensIn: this.totalTokensIn,
+          totalTokensOut: this.totalTokensOut,
+          totalCost: this.totalCost,
+        });
+      }
+    } catch (error) {
+      // Non-blocking — usage reporting failure should not affect review completion
+      console.error('[CodeReviewOrchestrator] Error reporting usage:', {
+        reviewId: this.state.reviewId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
    * RPC method: Start the review.
    */
   async start(params: {
@@ -289,6 +353,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       cliSessionId: this.state.cliSessionId,
       startedAt: this.state.startedAt,
       completedAt: this.state.completedAt,
+      model: this.state.model,
+      totalTokensIn: this.state.totalTokensIn,
+      totalTokensOut: this.state.totalTokensOut,
+      totalCost: this.state.totalCost,
       errorMessage: this.state.errorMessage,
     };
   }
@@ -533,8 +601,17 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         status: this.state.status,
         totalExecutionTimeMs,
         totalExecutionTime: `${minutes}m ${seconds}s`,
+        model: this.model,
+        totalTokensIn: this.totalTokensIn,
+        totalTokensOut: this.totalTokensOut,
+        totalCost: this.totalCost,
         timestamp: new Date().toISOString(),
       });
+
+      // Report accumulated usage to Next.js backend
+      // This runs before the cloud agent callback fires 'completed',
+      // so usage data is persisted before the comment update is triggered.
+      await this.reportUsage();
     }
   }
 
@@ -645,6 +722,27 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
                   logData.tokensIn = event.payload.metadata.tokensIn;
                   logData.tokensOut = event.payload.metadata.tokensOut;
                   logData.cost = event.payload.metadata.cost;
+
+                  // Capture model from the first LLM call (intentionally ignoring subsequent
+                  // calls that may use different models — the primary review model is what matters)
+                  if (!this.model && typeof event.payload.metadata.model === 'string') {
+                    this.model = event.payload.metadata.model;
+                  }
+                  if (typeof event.payload.metadata.tokensIn === 'number') {
+                    this.totalTokensIn += event.payload.metadata.tokensIn;
+                  }
+                  if (typeof event.payload.metadata.tokensOut === 'number') {
+                    this.totalTokensOut += event.payload.metadata.tokensOut;
+                  }
+                  if (typeof event.payload.metadata.cost === 'number') {
+                    this.totalCost += event.payload.metadata.cost;
+                  }
+
+                  // Sync usage data to persistent state so it survives DO eviction
+                  this.state.model = this.model;
+                  this.state.totalTokensIn = this.totalTokensIn;
+                  this.state.totalTokensOut = this.totalTokensOut;
+                  this.state.totalCost = this.totalCost;
                 }
 
                 // Add CLI session ID for session_created events

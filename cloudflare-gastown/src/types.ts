@@ -187,6 +187,8 @@ export const TownConfigSchema = z.object({
       github_token: z.string().optional(),
       gitlab_token: z.string().optional(),
       gitlab_instance_url: z.string().optional(),
+      /** Platform integration ID used to refresh tokens (stored for token refresh) */
+      platform_integration_id: z.string().optional(),
     })
     .default({}),
 

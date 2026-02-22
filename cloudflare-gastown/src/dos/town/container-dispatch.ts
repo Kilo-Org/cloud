@@ -250,6 +250,9 @@ export async function startMergeInContainer(
     if (params.townConfig.git_auth?.gitlab_token) {
       envVars.GITLAB_TOKEN = params.townConfig.git_auth.gitlab_token;
     }
+    if (params.townConfig.git_auth?.gitlab_instance_url) {
+      envVars.GITLAB_INSTANCE_URL = params.townConfig.git_auth.gitlab_instance_url;
+    }
     if (token) envVars.GASTOWN_SESSION_TOKEN = token;
     if (env.GASTOWN_API_URL) envVars.GASTOWN_API_URL = env.GASTOWN_API_URL;
     const mergeKilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;

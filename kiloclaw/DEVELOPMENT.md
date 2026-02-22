@@ -45,6 +45,31 @@ pnpm deploy           # wrangler deploy
 Run `pnpm types` after changing `wrangler.jsonc` to regenerate the TypeScript
 binding types.
 
+## Controller Smoke Tests (Docker)
+
+These scripts validate the machine-side Node controller introduced for KiloClaw.
+
+Build the image first from `kiloclaw/`:
+
+```bash
+docker build --progress=plain -t kiloclaw:controller .
+```
+
+Then run one of:
+
+- `bash scripts/controller-smoke-test.sh`
+  - Fastest check. Runs the controller binary directly as the container entrypoint.
+  - Use this when iterating on controller auth/proxy behavior.
+- `bash scripts/controller-entrypoint-smoke-test.sh`
+  - Runs the default image CMD (`start-openclaw.sh`) and validates the full startup path.
+  - Use this when changing startup script, env patching, or Docker wiring.
+- `bash scripts/controller-proxy-auth-smoke-test.sh`
+  - Validates proxy enforcement semantics end-to-end:
+    no token -> `401`, correct proxy token -> pass-through.
+  - Use this when changing proxy token logic or route/auth ordering.
+
+All scripts support overrides via env vars (`IMAGE`, `PORT`, `TOKEN`).
+
 ## Environment Variables
 
 All secrets are configured in `.dev.vars` for local development and via

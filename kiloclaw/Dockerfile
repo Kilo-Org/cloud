@@ -4,7 +4,7 @@ FROM debian:bookworm-slim
 ENV NODE_VERSION=22.13.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       ca-certificates curl git xz-utils \
+       ca-certificates curl git xz-utils unzip \
     && ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \
          amd64) NODE_ARCH="x64" ;; \

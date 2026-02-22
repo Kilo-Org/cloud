@@ -24,6 +24,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { KiloClawEnv } from '../types';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
+import { deriveGatewayToken } from '../auth/gateway-token';
 import { createDatabaseConnection, InstanceStore } from '../db';
 import { buildEnvVars } from '../gateway/env';
 import {
@@ -59,6 +60,28 @@ import { appNameFromUserId } from '../fly/apps';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../utils/env-encryption';
 
 type InstanceStatus = PersistedState['status'];
+
+type GatewayProcessStatus = {
+  state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
+  pid: number | null;
+  uptime: number;
+  restarts: number;
+  lastExit: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    at: string;
+  } | null;
+};
+
+class GatewayControllerError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'GatewayControllerError';
+    this.status = status;
+  }
+}
 
 // Derived from PersistedStateSchema -- single source of truth for DO KV keys.
 const STORAGE_KEYS = Object.keys(PersistedStateSchema.shape);
@@ -138,6 +161,17 @@ function buildMachineConfig(
         autostop: 'off',
       },
     ],
+    checks: {
+      controller: {
+        type: 'http',
+        port: OPENCLAW_PORT,
+        method: 'GET',
+        path: '/_kilo/health',
+        interval: '30s',
+        timeout: '5s',
+        grace_period: '60s',
+      },
+    },
     mounts: flyVolumeId ? [{ volume: flyVolumeId, path: '/root' }] : [],
     metadata: {
       [METADATA_KEY_USER_ID]: identity.userId,
@@ -1004,6 +1038,99 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.flyVolumeId) return [];
     const flyConfig = this.getFlyConfig();
     return fly.listVolumeSnapshots(flyConfig, this.flyVolumeId);
+  }
+
+  private requireGatewayControllerContext(): {
+    appName: string;
+    machineId: string;
+    sandboxId: string;
+  } {
+    if (!this.sandboxId) {
+      throw new GatewayControllerError(404, 'Instance not provisioned');
+    }
+    if (!this.flyMachineId) {
+      throw new GatewayControllerError(409, 'Instance has no machine ID');
+    }
+
+    const appName = this.flyAppName ?? this.env.FLY_APP_NAME;
+    if (!appName) {
+      throw new GatewayControllerError(503, 'No Fly app name for this instance');
+    }
+
+    return {
+      appName,
+      machineId: this.flyMachineId,
+      sandboxId: this.sandboxId,
+    };
+  }
+
+  private async callGatewayController<T>(path: string, method: 'GET' | 'POST'): Promise<T> {
+    const { appName, machineId, sandboxId } = this.requireGatewayControllerContext();
+
+    if (!this.env.GATEWAY_TOKEN_SECRET) {
+      throw new GatewayControllerError(503, 'GATEWAY_TOKEN_SECRET is not configured');
+    }
+
+    const gatewayToken = await deriveGatewayToken(sandboxId, this.env.GATEWAY_TOKEN_SECRET);
+    const url = `https://${appName}.fly.dev${path}`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${gatewayToken}`,
+          Accept: 'application/json',
+          'fly-force-instance-id': machineId,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new GatewayControllerError(503, `Gateway controller request failed: ${message}`);
+    }
+
+    const rawBody = await response.text();
+    let body: unknown = null;
+    if (rawBody.length > 0) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        body = { error: rawBody };
+      }
+    }
+
+    if (!response.ok) {
+      const errorMessage =
+        typeof body === 'object' &&
+        body !== null &&
+        'error' in body &&
+        typeof (body as { error?: unknown }).error === 'string'
+          ? (body as { error: string }).error
+          : `Gateway controller request failed (${response.status})`;
+      throw new GatewayControllerError(response.status, errorMessage);
+    }
+
+    return (body ?? {}) as T;
+  }
+
+  async getGatewayProcessStatus(): Promise<GatewayProcessStatus> {
+    await this.loadState();
+    return this.callGatewayController<GatewayProcessStatus>('/_kilo/gateway/status', 'GET');
+  }
+
+  async startGatewayProcess(): Promise<{ ok: boolean }> {
+    await this.loadState();
+    return this.callGatewayController<{ ok: boolean }>('/_kilo/gateway/start', 'POST');
+  }
+
+  async stopGatewayProcess(): Promise<{ ok: boolean }> {
+    await this.loadState();
+    return this.callGatewayController<{ ok: boolean }>('/_kilo/gateway/stop', 'POST');
+  }
+
+  async restartGatewayProcess(): Promise<{ ok: boolean }> {
+    await this.loadState();
+    return this.callGatewayController<{ ok: boolean }>('/_kilo/gateway/restart', 'POST');
   }
 
   // ========================================================================

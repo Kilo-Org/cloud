@@ -217,6 +217,18 @@ describe('buildEnvVars', () => {
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBeUndefined();
   });
 
+  it('passes REQUIRE_PROXY_TOKEN from worker env when configured', async () => {
+    const env = createMockEnv({ REQUIRE_PROXY_TOKEN: 'true' });
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    expect(result.env.REQUIRE_PROXY_TOKEN).toBe('true');
+  });
+
+  it('defaults REQUIRE_PROXY_TOKEN to false when unset', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    expect(result.env.REQUIRE_PROXY_TOKEN).toBe('false');
+  });
+
   // ─── Reserved system vars (Layer 5) ──────────────────────────────────
 
   it('reserved system vars cannot be overridden by user config', async () => {

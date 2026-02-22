@@ -149,6 +149,21 @@ pnpm types            # regenerate worker-configuration.d.ts (run after changing
 pnpm start            # wrangler dev
 ```
 
+## Controller Smoke Scripts
+
+When working on machine-side controller behavior, use the Docker smoke scripts in
+`scripts/` (build image first: `docker build -t kiloclaw:controller .`):
+
+- `scripts/controller-smoke-test.sh`
+  - Direct controller binary startup (`node /usr/local/bin/kiloclaw-controller.js`).
+  - Best for quick auth/proxy sanity checks.
+- `scripts/controller-entrypoint-smoke-test.sh`
+  - Default CMD path (`start-openclaw.sh`) with config patching and controller launch.
+  - Best for startup/Docker integration changes.
+- `scripts/controller-proxy-auth-smoke-test.sh`
+  - Confirms proxy-token enforcement semantics (`401` without token, pass-through with token).
+  - Best for proxy auth and routing-order validation.
+
 ## Change Checklist
 
 Before submitting any change:

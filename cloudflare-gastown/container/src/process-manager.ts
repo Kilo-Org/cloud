@@ -88,18 +88,21 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
   const agent = agents.get(agentId);
   if (agent?.gastownApiUrl && agent.gastownSessionToken) {
     // POST to the worker's agent-events endpoint for persistent storage
-    fetch(`${agent.gastownApiUrl}/api/towns/${agent.townId ?? '_'}/rigs/_/agent-events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${agent.gastownSessionToken}`,
-      },
-      body: JSON.stringify({
-        agent_id: agentId,
-        event_type: event,
-        data,
-      }),
-    }).catch(() => {
+    fetch(
+      `${agent.gastownApiUrl}/api/towns/${agent.townId ?? '_'}/rigs/${agent.rigId ?? '_'}/agent-events`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${agent.gastownSessionToken}`,
+        },
+        body: JSON.stringify({
+          agent_id: agentId,
+          event_type: event,
+          data,
+        }),
+      }
+    ).catch(() => {
       // Best-effort persistence — don't block live streaming
     });
   }

@@ -2431,6 +2431,10 @@ The architecture is fundamentally sound. The DO-as-scheduler, container-as-runti
 - Infra
   - Mint tokens from within the gastown service itself using the jwt secret
   - Make the whole UI live in the gastown service, use SolidJS so that integrating with kilo's existing web UI's is easier
+  - Make some tool calls unnecessary
+    - On every message to the mayor, we can preload rigs and add them to the system prompt
+    - I'm sure we can pretty much do this on any message to the mayor
+    - We still need to keep these tools so the mayor knows that it may need to refresh its knowledge
 - Feature
   - Mayor should be a persistent chat interface across the town
     - Perhaps we use xterm.js to just use the cli

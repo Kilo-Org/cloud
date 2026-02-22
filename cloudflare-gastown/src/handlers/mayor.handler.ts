@@ -51,7 +51,7 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
   // Ensure the TownDO knows its real UUID (ctx.id.name is unreliable in local dev)
   // TODO: This should only be done on town creation. Why are we doing it here?
   await town.setTownId(params.townId);
-  const result = await town.sendMayorMessage(parsed.data.message);
+  const result = await town.sendMayorMessage(parsed.data.message, parsed.data.model);
   return c.json(resSuccess(result), 200);
 }
 

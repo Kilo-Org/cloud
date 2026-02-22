@@ -75,7 +75,6 @@ const IDLE_ALARM_INTERVAL_MS = 5 * 60_000; // 5m when idle
 const STALE_THRESHOLD_MS = 10 * 60_000; // 10 min
 const GUPP_THRESHOLD_MS = 30 * 60_000; // 30 min
 const MAX_DISPATCH_ATTEMPTS = 5;
-const DEFAULT_MAX_POLECATS = 5;
 
 // Escalation constants
 const STALE_ESCALATION_THRESHOLD_MS = 4 * 60 * 60 * 1000;
@@ -195,6 +194,7 @@ export class TownDO extends DurableObject<Env> {
   async removeRig(rigId: string): Promise<void> {
     await this.ensureInitialized();
     rigs.removeRig(this.sql, rigId);
+    await this.ctx.storage.delete(`rig:${rigId}:config`);
   }
 
   async listRigs(): Promise<rigs.RigRecord[]> {
@@ -223,7 +223,7 @@ export class TownDO extends DurableObject<Env> {
     // (including the mayor) without needing a rig config lookup.
     if (rigConfig.kilocodeToken) {
       const townConfig = await this.getTownConfig();
-      if (!townConfig.kilocode_token) {
+      if (!townConfig.kilocode_token || townConfig.kilocode_token !== rigConfig.kilocodeToken) {
         console.log(`${TOWN_LOG} configureRig: propagating kilocodeToken to town config`);
         await this.updateTownConfig({ kilocode_token: rigConfig.kilocodeToken });
       }
@@ -443,7 +443,7 @@ export class TownDO extends DurableObject<Env> {
 
   async completeReviewWithResult(input: {
     entry_id: string;
-    status: 'merged' | 'failed';
+    status: 'merged' | 'failed' | 'conflict';
     message?: string;
     commit_sha?: string;
   }): Promise<void> {
@@ -500,6 +500,7 @@ export class TownDO extends DurableObject<Env> {
     title: string;
     body?: string;
     priority?: string;
+    metadata?: Record<string, unknown>;
   }): Promise<{ bead: Bead; agent: Agent }> {
     await this.ensureInitialized();
 
@@ -509,6 +510,7 @@ export class TownDO extends DurableObject<Env> {
       body: input.body,
       priority: (input.priority as 'low' | 'medium' | 'high' | 'critical') ?? 'medium',
       rig_id: input.rigId,
+      metadata: input.metadata,
     });
 
     const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
@@ -531,7 +533,8 @@ export class TownDO extends DurableObject<Env> {
    * The mayor is tracked as an agent with role='mayor'.
    */
   async sendMayorMessage(
-    message: string
+    message: string,
+    model?: string
   ): Promise<{ agentId: string; sessionStatus: 'idle' | 'active' | 'starting' }> {
     await this.ensureInitialized();
     const townId = this.townId;
@@ -1300,6 +1303,17 @@ export class TownDO extends DurableObject<Env> {
 
   async destroy(): Promise<void> {
     console.log(`${TOWN_LOG} destroy: clearing all storage and alarms`);
+
+    // Destroy all agent DOs before wiping town storage
+    try {
+      const allAgents = agents.listAgents(this.sql);
+      await Promise.allSettled(
+        allAgents.map(agent => getAgentDOStub(this.env, agent.id).destroy())
+      );
+    } catch {
+      // Best-effort — continue with cleanup even if agent destruction fails
+    }
+
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
   }

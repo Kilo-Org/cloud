@@ -321,6 +321,8 @@ export async function startAgent(
   } catch (err) {
     agent.status = 'failed';
     agent.exitReason = err instanceof Error ? err.message : String(err);
+    const instance = sdkInstances.get(workdir);
+    if (instance) instance.sessionCount--;
     throw err;
   }
 }

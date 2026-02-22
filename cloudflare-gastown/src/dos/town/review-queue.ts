@@ -15,7 +15,7 @@ import {
 import { rig_agents } from '../../db/tables/rig-agents.table';
 import { rig_beads } from '../../db/tables/rig-beads.table';
 import { query } from '../../util/query.util';
-import { logBeadEvent, getBead, closeBead, updateBeadStatus } from './beads';
+import { logBeadEvent, getBead, closeBead, updateBeadStatus, createBead } from './beads';
 import { getAgent, unhookBead, hookBead } from './agents';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput } from '../../types';
 
@@ -73,6 +73,7 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
     beadId: input.bead_id,
     agentId: input.agent_id,
     eventType: 'review_submitted',
+    newValue: input.branch,
     metadata: { branch: input.branch },
   });
 }
@@ -137,12 +138,14 @@ export function completeReviewWithResult(
   sql: SqlStorage,
   input: {
     entry_id: string;
-    status: 'merged' | 'failed';
+    status: 'merged' | 'failed' | 'conflict';
     message?: string;
     commit_sha?: string;
   }
 ): void {
-  completeReview(sql, input.entry_id, input.status);
+  // On conflict, mark the review entry as failed and create an escalation bead
+  const resolvedStatus = input.status === 'conflict' ? 'failed' : input.status;
+  completeReview(sql, input.entry_id, resolvedStatus);
 
   // Find the review entry to get bead/agent IDs
   const entryRows = [
@@ -168,6 +171,20 @@ export function completeReviewWithResult(
 
   if (input.status === 'merged') {
     closeBead(sql, entry.bead_id, entry.agent_id);
+  } else if (input.status === 'conflict') {
+    // Create an escalation bead so the conflict is visible and actionable
+    createBead(sql, {
+      type: 'escalation',
+      title: `Merge conflict: ${input.message ?? entry.branch}`,
+      body: input.message,
+      priority: 'high',
+      metadata: {
+        source_bead_id: entry.bead_id,
+        source_agent_id: entry.agent_id,
+        branch: entry.branch,
+        conflict: true,
+      },
+    });
   }
 }
 

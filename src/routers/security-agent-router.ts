@@ -39,6 +39,7 @@ import {
 } from '@/lib/security-agent/services/auto-dismiss-service';
 import { dismissDependabotAlert } from '@/lib/security-agent/github/dependabot-api';
 import { getGitHubTokenForUser } from '@/lib/cloud-agent/github-integration-helpers';
+import { rethrowAsPaymentRequired } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import {
   SaveSecurityConfigInputSchema,
@@ -668,15 +669,20 @@ export const securityAgentRouter = createTRPCRouter({
       model = config?.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL;
     }
 
-    const result = await startSecurityAnalysis({
-      findingId: input.findingId,
-      user: ctx.user,
-      githubRepo: finding.repo_full_name,
-      githubToken,
-      model,
-      forceSandbox: input.forceSandbox,
-      // Personal user - no organizationId
-    });
+    let result;
+    try {
+      result = await startSecurityAnalysis({
+        findingId: input.findingId,
+        user: ctx.user,
+        githubRepo: finding.repo_full_name,
+        githubToken,
+        model,
+        forceSandbox: input.forceSandbox,
+        // Personal user - no organizationId
+      });
+    } catch (error) {
+      rethrowAsPaymentRequired(error);
+    }
 
     if (!result.started) {
       throw new TRPCError({

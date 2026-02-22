@@ -221,8 +221,7 @@ export function CodeReviewJobsCard({
             };
             const StatusIcon = statusInfo.icon;
             const isExpanded = expandedReviewId === review.id;
-            const canShowStream =
-              review.session_id && ['running', 'queued'].includes(review.status);
+            const canShowStream = ['running', 'queued'].includes(review.status);
 
             return (
               <div key={review.id} className="space-y-2">
@@ -372,9 +371,8 @@ export function CodeReviewJobsCard({
                 </div>
 
                 {/* Streaming View (Expanded) */}
-                {isExpanded && canShowStream && review.session_id && (
+                {isExpanded && canShowStream && (
                   <CodeReviewStreamView
-                    sessionId={review.session_id}
                     reviewId={review.id}
                     onComplete={() => {
                       // Refetch reviews when complete

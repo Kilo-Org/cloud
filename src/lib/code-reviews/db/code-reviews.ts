@@ -84,6 +84,7 @@ export async function updateCodeReviewStatus(
     errorMessage?: string;
     startedAt?: Date;
     completedAt?: Date;
+    useCloudAgentNext?: boolean;
   } = {}
 ): Promise<void> {
   try {
@@ -108,7 +109,9 @@ export async function updateCodeReviewStatus(
     if (updates.completedAt !== undefined) {
       updateData.completed_at = updates.completedAt.toISOString();
     }
-
+    if (updates.useCloudAgentNext !== undefined) {
+      updateData.use_cloud_agent_next = updates.useCloudAgentNext;
+    }
     // Auto-set timestamps based on status
     if (status === 'running' && !updates.startedAt) {
       updateData.started_at = new Date().toISOString();

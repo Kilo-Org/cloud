@@ -6,10 +6,14 @@
  *
  * Architecture:
  * - POST /review - Create and start a code review (returns 202 immediately)
+ * - GET /reviews/:reviewId/events - Get events for a review (SSE flow only)
+ * - POST /reviews/:reviewId/cancel - Cancel a running review
  * - GET /health - Health check endpoint
  *
  * Features:
- * - Durable Objects maintain long-lived SSE connections
+ * - Durable Objects support two execution modes (feature-flagged):
+ *   - Default: cloud-agent SSE streaming (initiateSessionAsync)
+ *   - cloud-agent-next: prepareSession + initiateFromKilocodeSessionV2 with callback
  * - Concurrency control handled in Next.js (dispatch logic)
  * - Fire-and-forget from Next.js dispatch
  */
@@ -98,12 +102,13 @@ app.post('/review', async (c: Context<HonoEnv>) => {
         sessionInput: body.sessionInput,
         owner: body.owner,
         skipBalanceCheck: body.skipBalanceCheck,
+        useCloudAgentNext: body.useCloudAgentNext,
       }),
     'start'
   );
 
   // Fire-and-forget: trigger review execution via HTTP context (no 15-min wall time limit)
-  // This runs the SSE stream processing without blocking the response
+  // Routes to cloud-agent SSE or cloud-agent-next based on useCloudAgentNext flag
   c.executionCtx.waitUntil(
     withDORetry(
       () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
@@ -132,7 +137,7 @@ app.post('/review', async (c: Context<HonoEnv>) => {
   return c.json(response, 202);
 });
 
-// Route: GET /reviews/:reviewId/events
+// Route: GET /reviews/:reviewId/events (used by SSE/cloud-agent flow for event polling)
 app.get('/reviews/:reviewId/events', async (c: Context<HonoEnv>) => {
   const reviewId = c.req.param('reviewId');
 

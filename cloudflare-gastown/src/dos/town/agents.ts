@@ -8,7 +8,7 @@
 import { beads, BeadRecord, AgentBeadRecord } from '../../db/tables/beads.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
-import { logBeadEvent, getBead } from './beads';
+import { logBeadEvent, getBead, deleteBead } from './beads';
 import { readAndDeliverMail } from './mail';
 import type {
   RegisterAgentInput,
@@ -211,17 +211,8 @@ export function deleteAgent(sql: SqlStorage, agentId: string): void {
     [now(), agentId]
   );
 
-  // Delete mail beads where this agent is sender or recipient (via labels)
-  // Mail beads reference agents in their metadata, but we clean up directly
-  // since the FK is via assignee_agent_bead_id for received mail.
-
-  // Delete agent_metadata first (FK to beads)
-  query(sql, /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.bead_id} = ?`, [
-    agentId,
-  ]);
-
-  // Delete the agent bead itself
-  query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} = ?`, [agentId]);
+  // deleteBead cascades to agent_metadata, bead_events, bead_dependencies, etc.
+  deleteBead(sql, agentId);
 }
 
 // ── Hooks (GUPP) ────────────────────────────────────────────────────

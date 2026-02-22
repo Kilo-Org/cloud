@@ -213,12 +213,7 @@ export function completeReviewWithResult(
   });
 
   if (input.status === 'merged') {
-    // Find and close the source bead from metadata
-    const sourceBeadRow = getBead(sql, entry.bead_id);
-    const sourceBead = sourceBeadRow?.metadata?.source_bead_id;
-    if (typeof sourceBead === 'string') {
-      closeBead(sql, sourceBead, entry.agent_id);
-    }
+    closeBead(sql, entry.bead_id, entry.agent_id);
   } else if (input.status === 'conflict') {
     // Create an escalation bead so the conflict is visible and actionable
     createBead(sql, {

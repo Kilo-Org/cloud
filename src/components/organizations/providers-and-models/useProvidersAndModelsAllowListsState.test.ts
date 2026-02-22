@@ -4,6 +4,7 @@ import {
   providersAndModelsAllowListsReducer,
   type ProvidersAndModelsAllowListsState,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
+import { buildModelProvidersIndex } from '@/components/organizations/providers-and-models/allowLists.domain';
 
 describe('providersAndModelsAllowListsReducer', () => {
   test('init -> toggle -> reset returns to initial', () => {
@@ -50,11 +51,17 @@ describe('providersAndModelsAllowListsReducer', () => {
       throw new Error('expected ready state');
     }
 
+    const modelProvidersIndex = buildModelProvidersIndex([
+      { slug: 'openai', models: [] },
+      { slug: 'anthropic', models: [] },
+    ]);
+
     state = providersAndModelsAllowListsReducer(state, {
       type: 'TOGGLE_PROVIDER',
       providerSlug: 'openai',
       nextEnabled: false,
       allProviderSlugsWithEndpoints: ['openai', 'anthropic'],
+      modelProvidersIndex,
     });
 
     state = providersAndModelsAllowListsReducer(state, { type: 'MARK_SAVED' });

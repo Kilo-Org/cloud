@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import {
   useOrganizationWithMembers,
@@ -19,6 +19,7 @@ import { ModelsTab } from '@/components/organizations/providers-and-models/Model
 import { ProvidersTab } from '@/components/organizations/providers-and-models/ProvidersTab';
 import { ModelDetailsDialog } from '@/components/organizations/providers-and-models/ModelDetailsDialog';
 import { ProviderDetailsDialog } from '@/components/organizations/providers-and-models/ProviderDetailsDialog';
+import { DisableProviderConfirmDialog } from '@/components/organizations/providers-and-models/DisableProviderConfirmDialog';
 import type {
   ModelRow,
   ProviderModelRow,
@@ -30,6 +31,7 @@ import {
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { preferredModels } from '@/lib/models';
+import { computeModelsOnlyFromProvider } from '@/components/organizations/providers-and-models/allowLists.domain';
 
 type Props = {
   organizationId: string;
@@ -109,6 +111,12 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     openRouterProviders,
   });
 
+  const [pendingProviderDisable, setPendingProviderDisable] = useState<{
+    providerSlug: string;
+    providerDisplayName: string;
+    modelsToRemove: Array<{ modelId: string; modelName: string }>;
+  } | null>(null);
+
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
@@ -161,17 +169,86 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const handleToggleProviderEnabled = useCallback(
     (providerSlug: string, nextEnabled: boolean) => {
       if (!canEdit) return;
-      actions.toggleProvider({ providerSlug, nextEnabled });
+      if (state.status !== 'ready') return;
+
+      // If enabling, just toggle directly
+      if (nextEnabled) {
+        actions.toggleProvider({ providerSlug, nextEnabled });
+        return;
+      }
+
+      // If disabling, check if any models would be orphaned
+      const orphanedModelIds = computeModelsOnlyFromProvider({
+        providerSlug,
+        draftModelAllowList: state.draftModelAllowList,
+        draftProviderAllowList: state.draftProviderAllowList,
+        allProviderSlugsWithEndpoints: selectors.allProviderSlugsWithEndpoints,
+        modelProvidersIndex: selectors.modelProvidersIndex,
+      });
+
+      // Filter to only include models that are currently enabled (have at least one enabled provider)
+      // This prevents showing models that are already disabled in the confirmation dialog
+      const currentlyEnabledOrphanedModelIds = orphanedModelIds.filter(modelId =>
+        allowedModelIds.has(modelId)
+      );
+
+      if (currentlyEnabledOrphanedModelIds.length === 0) {
+        // No currently enabled models would be orphaned, proceed directly
+        actions.toggleProvider({ providerSlug, nextEnabled });
+        return;
+      }
+
+      // Find provider display name and model details
+      const provider = openRouterProviders.find(p => p.slug === providerSlug);
+      const providerDisplayName = provider?.displayName ?? providerSlug;
+
+      const modelsToRemove = currentlyEnabledOrphanedModelIds
+        .map(modelId => {
+          const model = openRouterModels.find(m => normalizeModelId(m.slug) === modelId);
+          return model ? { modelId, modelName: model.name } : { modelId, modelName: modelId };
+        })
+        .sort((a, b) => a.modelName.localeCompare(b.modelName));
+
+      // Show confirmation dialog
+      setPendingProviderDisable({
+        providerSlug,
+        providerDisplayName,
+        modelsToRemove,
+      });
     },
-    [actions, canEdit]
+    [
+      actions,
+      allowedModelIds,
+      canEdit,
+      openRouterModels,
+      openRouterProviders,
+      selectors.allProviderSlugsWithEndpoints,
+      selectors.modelProvidersIndex,
+      state,
+    ]
   );
 
   const handleToggleModelAllowed = useCallback(
     (modelId: string, nextAllowed: boolean) => {
       if (!canEdit) return;
+
+      // If trying to enable a model, check if it has any enabled providers.
+      // A missing index entry (no known providers) is treated the same as having none enabled.
+      if (nextAllowed) {
+        const providersForModel = selectors.modelProvidersIndex.get(modelId);
+        const hasEnabledProvider =
+          providersForModel !== undefined &&
+          [...providersForModel].some(providerSlug => enabledProviderSlugs.has(providerSlug));
+        if (!hasEnabledProvider) {
+          // No enabled providers - open the model details dialog instead
+          actions.setInfoModelId(modelId);
+          return;
+        }
+      }
+
       actions.toggleModel({ modelId, nextAllowed });
     },
-    [actions, canEdit]
+    [actions, canEdit, enabledProviderSlugs, selectors.modelProvidersIndex]
   );
 
   const handleToggleAllowFutureModelsForProvider = useCallback(
@@ -540,6 +617,22 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           onToggleAllowFutureModelsForProvider={handleToggleAllowFutureModelsForProvider}
           onToggleModelAllowed={handleToggleModelAllowed}
           onClose={() => actions.setInfoProviderSlug(null)}
+        />
+
+        <DisableProviderConfirmDialog
+          open={pendingProviderDisable !== null}
+          providerDisplayName={pendingProviderDisable?.providerDisplayName ?? ''}
+          modelsToRemove={pendingProviderDisable?.modelsToRemove ?? []}
+          onConfirm={() => {
+            if (pendingProviderDisable) {
+              actions.toggleProvider({
+                providerSlug: pendingProviderDisable.providerSlug,
+                nextEnabled: false,
+              });
+              setPendingProviderDisable(null);
+            }
+          }}
+          onCancel={() => setPendingProviderDisable(null)}
         />
 
         <ModelSelectionStatusBar

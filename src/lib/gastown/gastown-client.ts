@@ -87,7 +87,7 @@ export const AgentSchema = z.object({
   status: z.enum(['idle', 'working', 'blocked', 'dead']),
   current_hook_bead_id: z.string().nullable(),
   dispatch_attempts: z.number().default(0),
-  last_activity_at: z.string(),
+  last_activity_at: z.string().nullable(),
   checkpoint: z.unknown().optional(),
   created_at: z.string(),
 });
@@ -378,8 +378,8 @@ export const BeadEventSchema = z.object({
 export type BeadEvent = z.output<typeof BeadEventSchema>;
 
 export const TaggedBeadEventSchema = BeadEventSchema.extend({
-  rig_id: z.string(),
-  rig_name: z.string(),
+  rig_id: z.string().optional(),
+  rig_name: z.string().optional(),
 });
 export type TaggedBeadEvent = z.output<typeof TaggedBeadEventSchema>;
 

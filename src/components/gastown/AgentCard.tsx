@@ -13,7 +13,7 @@ type Agent = {
   identity: string;
   status: string;
   current_hook_bead_id: string | null;
-  last_activity_at: string;
+  last_activity_at: string | null;
   checkpoint?: unknown;
   created_at: string;
 };
@@ -79,7 +79,9 @@ export function AgentCard({ agent, isSelected, onSelect, onDelete }: AgentCardPr
         )}
         <div className="mt-1 flex items-center justify-between">
           <p className="text-xs text-white/40">
-            Active {formatDistanceToNow(new Date(agent.last_activity_at), { addSuffix: true })}
+            {agent.last_activity_at
+              ? `Active ${formatDistanceToNow(new Date(agent.last_activity_at), { addSuffix: true })}`
+              : 'No activity yet'}
           </p>
           {onDelete && (
             <button

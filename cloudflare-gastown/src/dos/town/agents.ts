@@ -51,6 +51,15 @@ function now(): string {
   return new Date().toISOString();
 }
 
+function parseCheckpoint(raw: unknown): unknown {
+  if (raw === null || raw === undefined) return null;
+  try {
+    return JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Parse a joined bead + agent_metadata row into an Agent object.
  * The SQL query aliases bead columns and agent_metadata columns into
@@ -68,10 +77,7 @@ function parseAgent(row: Record<string, unknown>): Agent {
       row.current_hook_bead_id === null ? null : String(row.current_hook_bead_id),
     dispatch_attempts: Number(row.dispatch_attempts ?? 0),
     last_activity_at: row.last_activity_at === null ? null : String(row.last_activity_at),
-    checkpoint:
-      row.checkpoint === null || row.checkpoint === undefined
-        ? null
-        : JSON.parse(String(row.checkpoint)),
+    checkpoint: parseCheckpoint(row.checkpoint),
     created_at: String(row.created_at),
   };
 }

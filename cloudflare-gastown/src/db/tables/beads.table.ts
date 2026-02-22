@@ -24,8 +24,14 @@ export const BeadRecord = z.object({
   parent_bead_id: z.string().nullable(),
   assignee_agent_bead_id: z.string().nullable(),
   priority: BeadPriority,
-  labels: z.string().transform(v => JSON.parse(v) as string[]),
-  metadata: z.string().transform(v => JSON.parse(v) as Record<string, unknown>),
+  labels: z
+    .string()
+    .transform(v => JSON.parse(v))
+    .pipe(z.array(z.string())),
+  metadata: z
+    .string()
+    .transform(v => JSON.parse(v))
+    .pipe(z.record(z.string(), z.unknown())),
   created_by: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),

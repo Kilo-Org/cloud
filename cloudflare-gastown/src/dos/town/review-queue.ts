@@ -53,7 +53,7 @@ function parseReviewEntry(row: Record<string, unknown>): ReviewQueueEntry {
             : 'failed',
     summary: row.body === null ? null : String(row.body),
     created_at: String(row.created_at),
-    processed_at: row.updated_at === row.created_at ? null : String(row.updated_at as string),
+    processed_at: row.updated_at === row.created_at ? null : String(row.updated_at),
   };
 }
 
@@ -365,7 +365,7 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
       [
         stepId,
         'issue',
-        i === 0 ? 'open' : 'open',
+        'open',
         typeof step === 'object' && step !== null && 'title' in step
           ? String((step as Record<string, unknown>).title)
           : `Step ${i + 1}`,

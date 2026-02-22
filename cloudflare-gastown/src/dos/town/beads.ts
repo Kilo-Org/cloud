@@ -203,6 +203,18 @@ export function closeBead(sql: SqlStorage, beadId: string, agentId: string): Bea
 }
 
 export function deleteBead(sql: SqlStorage, beadId: string): void {
+  // Recursively delete child beads (e.g. molecule steps) before the parent
+  const children = [
+    ...query(
+      sql,
+      /* sql */ `SELECT ${beads.columns.bead_id} FROM ${beads} WHERE ${beads.columns.parent_bead_id} = ?`,
+      [beadId]
+    ),
+  ];
+  for (const child of children) {
+    deleteBead(sql, String((child as Record<string, unknown>).bead_id));
+  }
+
   // Unhook any agent assigned to this bead
   query(
     sql,

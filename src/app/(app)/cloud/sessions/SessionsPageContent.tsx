@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Search, Cloud, Terminal, Puzzle, Bot } from 'lucide-react';
-import type { SessionsListItem, SessionsListProps } from '@/components/cloud-agent/SessionsList';
+import type { SessionsListItem } from '@/components/cloud-agent/SessionsList';
 import { SessionsList } from '@/components/cloud-agent/SessionsList';
 import { extractRepoFromGitUrl } from '@/components/cloud-agent/store/db-session-atoms';
 import {
@@ -52,8 +52,8 @@ export function SessionsPageContent() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<PlatformFilterValue>('all');
   const [includeSubSessions, setIncludeSubSessions] = useState(false);
-  type SessionsListItemWithSource = SessionsListItem & { source: 'v1' | 'v2' };
-  const [selectedSession, setSelectedSession] = useState<SessionsListItemWithSource | null>(null);
+  type SessionWithSource = SessionsListItem & { source: 'v1' | 'v2' };
+  const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Debounce search query (300ms delay)
@@ -107,7 +107,7 @@ export function SessionsPageContent() {
     created_on_platform: string;
     cloud_agent_session_id: string | null;
     source: 'v1' | 'v2';
-  }): SessionsListItemWithSource => {
+  }): SessionWithSource => {
     const repository = extractRepoFromGitUrl(session.git_url) ?? null;
     const prompt = session.title || 'Untitled';
 
@@ -129,12 +129,9 @@ export function SessionsPageContent() {
 
   const isLoading = isSearching ? isSearchLoading : isListLoading;
 
-  const handleSessionClick: SessionsListProps['onSessionClick'] = session => {
-    const enriched = sessions.find(s => s.sessionId === session.sessionId);
-    if (enriched) {
-      setSelectedSession(enriched);
-      setIsDialogOpen(true);
-    }
+  const handleSessionClick = (session: SessionWithSource) => {
+    setSelectedSession(session);
+    setIsDialogOpen(true);
   };
 
   const content = (

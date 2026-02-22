@@ -11,13 +11,17 @@ export type SessionsListItem = Pick<
   'sessionId' | 'createdAt' | 'createdOnPlatform' | 'prompt' | 'mode'
 > & { repository: string | null };
 
-export type SessionsListProps = {
-  sessions: SessionsListItem[];
+export type SessionsListProps<T extends SessionsListItem = SessionsListItem> = {
+  sessions: T[];
   organizationId?: string;
-  onSessionClick?: (session: SessionsListItem) => void;
+  onSessionClick?: (session: T) => void;
 };
 
-export function SessionsList({ sessions, organizationId, onSessionClick }: SessionsListProps) {
+export function SessionsList<T extends SessionsListItem>({
+  sessions,
+  organizationId,
+  onSessionClick,
+}: SessionsListProps<T>) {
   if (sessions.length === 0) {
     return (
       <Card>

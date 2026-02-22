@@ -209,7 +209,7 @@ export async function finalizeAnalysis(
  * Start analysis for a security finding using three-tier approach.
  *
  * Tier 1 (Quick Triage): Always runs first. Direct LLM call to analyze metadata.
- * Tier 2 (Sandbox Analysis): Only runs if triage says it's needed OR forceSandbox is true.
+ * Tier 2 (Sandbox Analysis): Controlled by analysisMode — always in 'deep', never in 'shallow', triage-driven in 'auto'.
  * Tier 3 (Structured Extraction): Extracts structured fields from raw markdown output.
  */
 export async function startSecurityAnalysis(params: {
@@ -218,7 +218,6 @@ export async function startSecurityAnalysis(params: {
   githubRepo: string;
   githubToken?: string;
   model?: string;
-  forceSandbox?: boolean;
   analysisMode?: AnalysisMode;
   organizationId?: string;
 }): Promise<{ started: boolean; error?: string; triageOnly?: boolean }> {
@@ -228,7 +227,6 @@ export async function startSecurityAnalysis(params: {
     githubRepo,
     githubToken,
     model = 'anthropic/claude-sonnet-4',
-    forceSandbox = false,
     analysisMode = 'auto',
     organizationId,
   } = params;
@@ -266,7 +264,6 @@ export async function startSecurityAnalysis(params: {
       organizationId,
       findingId,
       model,
-      forceSandbox,
     });
 
     const tier1Start = performance.now();
@@ -305,8 +302,7 @@ export async function startSecurityAnalysis(params: {
 
     // Decide whether to run sandbox analysis based on analysis mode
     const runSandbox =
-      analysisMode === 'deep' || // Deep mode: always run sandbox
-      (analysisMode !== 'shallow' && (forceSandbox || triage.needsSandboxAnalysis)); // Auto mode: respect triage; Shallow mode: never
+      analysisMode === 'deep' || (analysisMode === 'auto' && triage.needsSandboxAnalysis);
 
     if (!runSandbox) {
       // =========================================================================

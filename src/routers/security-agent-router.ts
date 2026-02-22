@@ -622,7 +622,7 @@ export const securityAgentRouter = createTRPCRouter({
    * Starts LLM analysis for a security finding using three-tier approach.
    *
    * Tier 1 (Quick Triage): Always runs first. Direct LLM call to analyze metadata.
-   * Tier 2 (Sandbox Analysis): Only runs if triage says it's needed OR forceSandbox is true.
+   * Tier 2 (Sandbox Analysis): Controlled by analysisMode — always in 'deep', never in 'shallow', triage-driven in 'auto'.
    * Tier 3 (Extraction): Extracts structured fields from sandbox analysis.
    *
    * Returns immediately - analysis runs in background.
@@ -682,7 +682,6 @@ export const securityAgentRouter = createTRPCRouter({
         githubRepo: finding.repo_full_name,
         githubToken,
         model,
-        forceSandbox: input.forceSandbox,
         analysisMode,
         // Personal user - no organizationId
       });

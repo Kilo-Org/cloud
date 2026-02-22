@@ -708,7 +708,6 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
           githubRepo: finding.repo_full_name,
           githubToken,
           model,
-          forceSandbox: input.forceSandbox,
           analysisMode,
           organizationId: input.organizationId,
         });

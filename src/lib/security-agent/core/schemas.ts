@@ -49,6 +49,11 @@ export const RepositorySelectionModeSchema = z.enum(['all', 'selected']);
 export const AutoDismissConfidenceThresholdSchema = z.enum(['high', 'medium', 'low']);
 
 /**
+ * Analysis mode enum
+ */
+export const AnalysisModeSchema = z.enum(['auto', 'shallow', 'deep']);
+
+/**
  * Save security config input schema
  */
 export const SaveSecurityConfigInputSchema = z.object({
@@ -60,6 +65,8 @@ export const SaveSecurityConfigInputSchema = z.object({
   repositorySelectionMode: RepositorySelectionModeSchema.optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   modelSlug: z.string().optional(),
+  // Analysis mode configuration
+  analysisMode: AnalysisModeSchema.optional(),
   // Auto-dismiss configuration
   autoDismissEnabled: z.boolean().optional(),
   autoDismissConfidenceThreshold: AutoDismissConfidenceThresholdSchema.optional(),

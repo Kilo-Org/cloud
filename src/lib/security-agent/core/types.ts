@@ -50,6 +50,20 @@ export type SecurityFindingAnalysisStatus =
   (typeof SecurityFindingAnalysisStatus)[keyof typeof SecurityFindingAnalysisStatus];
 
 /**
+ * Analysis mode for the security agent pipeline
+ */
+export const AnalysisMode = {
+  /** Default: triage first, sandbox only if triage recommends it */
+  AUTO: 'auto',
+  /** Triage only — never runs sandbox analysis */
+  SHALLOW: 'shallow',
+  /** Always force sandbox analysis, skip triage recommendation */
+  DEEP: 'deep',
+} as const;
+
+export type AnalysisMode = (typeof AnalysisMode)[keyof typeof AnalysisMode];
+
+/**
  * Zod schema for SecurityAgentConfig
  */
 export const SecurityAgentConfigSchema = z.object({
@@ -61,6 +75,8 @@ export const SecurityAgentConfigSchema = z.object({
   repository_selection_mode: z.enum(['all', 'selected']).default('all'),
   selected_repository_ids: z.array(z.number()).optional(),
   model_slug: z.string().optional(),
+  // Analysis mode: auto (default), shallow (triage only), deep (always sandbox)
+  analysis_mode: z.enum(['auto', 'shallow', 'deep']).default('auto'),
   // Auto-dismiss configuration (off by default)
   auto_dismiss_enabled: z.boolean().default(false),
   auto_dismiss_confidence_threshold: z.enum(['high', 'medium', 'low']).default('high'),

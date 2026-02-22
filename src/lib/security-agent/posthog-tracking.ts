@@ -27,6 +27,7 @@ type SecurityAgentEnabledEvent = BaseSecurityAgentEvent & {
 
 type SecurityAgentConfigSavedEvent = BaseSecurityAgentEvent & {
   autoSyncEnabled?: boolean;
+  analysisMode?: string;
   autoDismissEnabled?: boolean;
   autoDismissConfidenceThreshold?: string;
   modelSlug?: string;

@@ -309,4 +309,159 @@ describe('analysis-service', () => {
       error: 'Sandbox unavailable',
     });
   });
+
+  describe('analysis_mode', () => {
+    const findingId = 'finding-mode-test';
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+
+    const mockFinding = {
+      id: findingId,
+      analysis_status: 'new',
+      repo_full_name: 'acme/repo',
+      package_name: 'lodash',
+      package_ecosystem: 'npm',
+      severity: 'high',
+      dependency_scope: 'runtime',
+      cve_id: 'CVE-2021-12345',
+      ghsa_id: 'GHSA-xxxx-yyyy-zzzz',
+      title: 'Prototype Pollution in lodash',
+      description: 'A detailed description of the vulnerability',
+      vulnerable_version_range: '< 4.17.21',
+      patched_version: '4.17.21',
+      manifest_path: 'package.json',
+    };
+
+    const baseParams = {
+      findingId,
+      user,
+      githubRepo: 'acme/repo',
+      githubToken: 'gh-token',
+      model: 'anthropic/claude-sonnet-4' as const,
+    };
+
+    beforeEach(() => {
+      mockGetSecurityFindingById.mockResolvedValue(
+        mockFinding as Awaited<ReturnType<typeof mockGetSecurityFindingById>>
+      );
+      mockUpdateAnalysisStatus.mockResolvedValue(undefined);
+      mockGenerateApiToken.mockReturnValue('test-token');
+      mockInitiateSessionStream.mockReturnValue((async function* () {})());
+    });
+
+    it('auto mode: runs sandbox when triage recommends it', async () => {
+      mockTriageSecurityFinding.mockResolvedValue({
+        needsSandboxAnalysis: true,
+        needsSandboxReasoning: 'Runtime dependency with high severity',
+        suggestedAction: 'analyze_codebase',
+        confidence: 'high',
+        triageAt: new Date().toISOString(),
+      });
+
+      const result = await startSecurityAnalysis({
+        ...baseParams,
+        analysisMode: 'auto',
+      });
+
+      expect(result.started).toBe(true);
+      expect(result.triageOnly).toBe(false);
+      expect(mockTriageSecurityFinding).toHaveBeenCalled();
+      expect(mockInitiateSessionStream).toHaveBeenCalled();
+    });
+
+    it('auto mode: skips sandbox when triage says not needed', async () => {
+      mockTriageSecurityFinding.mockResolvedValue({
+        needsSandboxAnalysis: false,
+        needsSandboxReasoning: 'Dev dependency, low risk',
+        suggestedAction: 'dismiss',
+        confidence: 'high',
+        triageAt: new Date().toISOString(),
+      });
+
+      const result = await startSecurityAnalysis({
+        ...baseParams,
+        analysisMode: 'auto',
+      });
+
+      expect(result.started).toBe(true);
+      expect(result.triageOnly).toBe(true);
+      expect(mockTriageSecurityFinding).toHaveBeenCalled();
+      expect(mockInitiateSessionStream).not.toHaveBeenCalled();
+    });
+
+    it('shallow mode: never runs sandbox even when triage recommends it', async () => {
+      mockTriageSecurityFinding.mockResolvedValue({
+        needsSandboxAnalysis: true,
+        needsSandboxReasoning: 'Runtime dependency with high severity',
+        suggestedAction: 'analyze_codebase',
+        confidence: 'high',
+        triageAt: new Date().toISOString(),
+      });
+
+      const result = await startSecurityAnalysis({
+        ...baseParams,
+        analysisMode: 'shallow',
+      });
+
+      expect(result.started).toBe(true);
+      expect(result.triageOnly).toBe(true);
+      expect(mockTriageSecurityFinding).toHaveBeenCalled();
+      expect(mockInitiateSessionStream).not.toHaveBeenCalled();
+    });
+
+    it('shallow mode: never runs sandbox even with forceSandbox', async () => {
+      mockTriageSecurityFinding.mockResolvedValue({
+        needsSandboxAnalysis: false,
+        needsSandboxReasoning: 'Dev dependency',
+        suggestedAction: 'dismiss',
+        confidence: 'high',
+        triageAt: new Date().toISOString(),
+      });
+
+      const result = await startSecurityAnalysis({
+        ...baseParams,
+        analysisMode: 'shallow',
+        forceSandbox: true,
+      });
+
+      expect(result.started).toBe(true);
+      expect(result.triageOnly).toBe(true);
+      expect(mockInitiateSessionStream).not.toHaveBeenCalled();
+    });
+
+    it('deep mode: always runs sandbox even when triage says not needed', async () => {
+      mockTriageSecurityFinding.mockResolvedValue({
+        needsSandboxAnalysis: false,
+        needsSandboxReasoning: 'Dev dependency, low risk',
+        suggestedAction: 'dismiss',
+        confidence: 'high',
+        triageAt: new Date().toISOString(),
+      });
+
+      const result = await startSecurityAnalysis({
+        ...baseParams,
+        analysisMode: 'deep',
+      });
+
+      expect(result.started).toBe(true);
+      expect(result.triageOnly).toBe(false);
+      expect(mockTriageSecurityFinding).toHaveBeenCalled();
+      expect(mockInitiateSessionStream).toHaveBeenCalled();
+    });
+
+    it('defaults to auto mode when analysisMode is not specified', async () => {
+      mockTriageSecurityFinding.mockResolvedValue({
+        needsSandboxAnalysis: false,
+        needsSandboxReasoning: 'Dev dependency',
+        suggestedAction: 'dismiss',
+        confidence: 'high',
+        triageAt: new Date().toISOString(),
+      });
+
+      const result = await startSecurityAnalysis(baseParams);
+
+      expect(result.started).toBe(true);
+      expect(result.triageOnly).toBe(true);
+      expect(mockInitiateSessionStream).not.toHaveBeenCalled();
+    });
+  });
 });

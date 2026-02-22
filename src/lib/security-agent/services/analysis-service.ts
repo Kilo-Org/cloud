@@ -19,7 +19,7 @@ import {
 import { generateApiToken } from '@/lib/tokens';
 import { getSecurityFindingById } from '../db/security-findings';
 import { updateAnalysisStatus } from '../db/security-analysis';
-import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
+import type { AnalysisMode, SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
 import type { User, SecurityFinding } from '@/db/schema';
 import {
   trackSecurityAgentAnalysisStarted,
@@ -219,6 +219,7 @@ export async function startSecurityAnalysis(params: {
   githubToken?: string;
   model?: string;
   forceSandbox?: boolean;
+  analysisMode?: AnalysisMode;
   organizationId?: string;
 }): Promise<{ started: boolean; error?: string; triageOnly?: boolean }> {
   const {
@@ -228,6 +229,7 @@ export async function startSecurityAnalysis(params: {
     githubToken,
     model = 'anthropic/claude-sonnet-4',
     forceSandbox = false,
+    analysisMode = 'auto',
     organizationId,
   } = params;
 
@@ -301,8 +303,10 @@ export async function startSecurityAnalysis(params: {
       },
     });
 
-    // Decide whether to run sandbox analysis
-    const runSandbox = forceSandbox || triage.needsSandboxAnalysis;
+    // Decide whether to run sandbox analysis based on analysis mode
+    const runSandbox =
+      analysisMode === 'deep' || // Deep mode: always run sandbox
+      (analysisMode !== 'shallow' && (forceSandbox || triage.needsSandboxAnalysis)); // Auto mode: respect triage; Shallow mode: never
 
     if (!runSandbox) {
       // =========================================================================

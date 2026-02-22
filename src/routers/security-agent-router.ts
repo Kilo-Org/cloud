@@ -112,6 +112,8 @@ export const securityAgentRouter = createTRPCRouter({
         repositorySelectionMode: 'selected' as const,
         selectedRepositoryIds: [] as number[],
         modelSlug: DEFAULT_SECURITY_AGENT_MODEL,
+        // Analysis mode default
+        analysisMode: 'auto' as const,
         // Auto-dismiss defaults (off by default)
         autoDismissEnabled: false,
         autoDismissConfidenceThreshold: 'high' as const,
@@ -128,6 +130,8 @@ export const securityAgentRouter = createTRPCRouter({
       repositorySelectionMode: result.config.repository_selection_mode || 'selected',
       selectedRepositoryIds: result.config.selected_repository_ids || [],
       modelSlug: result.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL,
+      // Analysis mode configuration
+      analysisMode: result.config.analysis_mode ?? 'auto',
       // Auto-dismiss configuration
       autoDismissEnabled: result.config.auto_dismiss_enabled ?? false,
       autoDismissConfidenceThreshold: result.config.auto_dismiss_confidence_threshold ?? 'high',
@@ -153,6 +157,8 @@ export const securityAgentRouter = createTRPCRouter({
           repository_selection_mode: input.repositorySelectionMode,
           selected_repository_ids: input.selectedRepositoryIds,
           model_slug: input.modelSlug,
+          // Analysis mode configuration
+          analysis_mode: input.analysisMode,
           // Auto-dismiss configuration
           auto_dismiss_enabled: input.autoDismissEnabled,
           auto_dismiss_confidence_threshold: input.autoDismissConfidenceThreshold,
@@ -164,6 +170,7 @@ export const securityAgentRouter = createTRPCRouter({
         distinctId: ctx.user.id,
         userId: ctx.user.id,
         autoSyncEnabled: input.autoSyncEnabled,
+        analysisMode: input.analysisMode,
         autoDismissEnabled: input.autoDismissEnabled,
         autoDismissConfidenceThreshold: input.autoDismissConfidenceThreshold,
         modelSlug: input.modelSlug,
@@ -662,12 +669,10 @@ export const securityAgentRouter = createTRPCRouter({
       });
     }
 
-    // Get model from input or fall back to configured model
-    let model = input.model;
-    if (!model) {
-      const config = await getSecurityAgentConfigWithStatus(owner);
-      model = config?.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL;
-    }
+    // Get model and analysis mode from input or fall back to configured values
+    const config = await getSecurityAgentConfigWithStatus(owner);
+    const model = input.model || config?.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL;
+    const analysisMode = config?.config.analysis_mode ?? 'auto';
 
     let result;
     try {
@@ -678,6 +683,7 @@ export const securityAgentRouter = createTRPCRouter({
         githubToken,
         model,
         forceSandbox: input.forceSandbox,
+        analysisMode,
         // Personal user - no organizationId
       });
     } catch (error) {

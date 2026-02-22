@@ -55,10 +55,24 @@ startSecurityAnalysis()
   → Callback handler (new internal API route):
       → Validates secret header
       → On 'completed': fetch session export from ingest service using kiloSessionId,
-        extract last assistant message text, run Tier 3
+        extract last assistant message text (raw markdown),
+        write raw markdown to `analysis` field in security_findings table,
+        run Tier 3
       → On 'failed'/'interrupted': mark analysis failed
-      → Store analysis, attempt auto-dismiss
+      → Store structured analysis, attempt auto-dismiss
 ```
+
+### Critical requirement: populating the `analysis` field
+
+The old cloud-agent flow's `processAnalysisStream()` fetches the raw markdown content from the R2 blob on stream completion and writes it to the `analysis` column in the `security_findings` table. **This `analysis` field is what powers the summary shown to users when they click on an auto-dismissed security finding** — without it, dismissed findings appear with no explanation.
+
+The migration to cloud-agent-next replaces the SSE stream with a callback-based pattern, but this introduces a gap: the callback handler must explicitly ensure the `analysis` field gets populated with the markdown analysis content after cloud-agent-next completes its work. Specifically:
+
+1. When the callback fires with `status: 'completed'`, the handler fetches the session export from the ingest service and extracts the last assistant message (raw markdown).
+2. This raw markdown content **must** be written to the `analysis` field in the `security_findings` table — this is the user-facing analysis summary.
+3. The Tier 3 structured extraction (`extractSandboxAnalysis()`) then runs on this same content to produce the structured `isExploitable` / `severity` / `explanation` fields, but the raw markdown in `analysis` is what the UI displays.
+
+This requirement is addressed in Phase 2.2 step 4a below.
 
 ### Architecture decision: session-ingest vs cloud-agent-next for result retrieval
 
@@ -233,9 +247,10 @@ When status is `'completed'`:
 2. Extract `kiloSessionId` from the callback payload (confirmed present for prepared sessions)
 3. Call `fetchSessionExport(kiloSessionId, userId)` to get the session snapshot from the ingest service
 4. Call `extractLastAssistantMessage(snapshot)` to get the raw markdown result
+   - a. **Write the raw markdown to the `analysis` field** in the `security_findings` table. This is critical — the `analysis` field is what the UI displays when a user clicks on an auto-dismissed finding to see the summary. The old flow populated this via `processAnalysisStream()`; the callback handler must do the equivalent. Use `updateAnalysisStatus(findingId, 'running', { analysis: rawMarkdown })` or a direct DB update to persist the raw content before proceeding to Tier 3.
 5. If no result found, retry up to 3 times with 5s delay (handles timing race where ingest hasn't finished processing yet)
-6. Run Tier 3: `extractSandboxAnalysis()` — unchanged from current code
-7. Store the structured analysis via `updateAnalysisStatus(findingId, 'completed', { analysis })`
+6. Run Tier 3: `extractSandboxAnalysis()` on the raw markdown — unchanged from current code
+7. Store the structured analysis via `updateAnalysisStatus(findingId, 'completed', { analysis })` — this merges the Tier 3 structured fields (isExploitable, severity, explanation) into the analysis JSON alongside the raw markdown already written in step 4a
 8. Attempt auto-dismiss if `isExploitable === false`
 9. Track PostHog completion event
 
@@ -437,6 +452,8 @@ The `cli_session_id` field in `security_findings` currently stores the old cli s
 
 5. **Backwards compatibility of session links:** Old findings analyzed before the migration will still have old-format session IDs in `cli_session_id`. The `/cloud/chat` page already handles both formats (line 14 of `page.tsx` checks `isNewSession`), so old links continue working.
 
+6. **`analysis` field must be populated (migration gap):** The old flow's `processAnalysisStream()` writes the raw markdown analysis content to the `analysis` field in `security_findings` on stream completion. This field powers the user-facing summary shown when clicking on an auto-dismissed finding. The callback-based flow must explicitly replicate this — the callback handler in Phase 2.2 (step 4a) writes the raw markdown from the ingest service export to the `analysis` field before running Tier 3. If this step is missed, auto-dismissed findings will have no visible explanation in the UI.
+
 ---
 
 ## PR and Deployment Strategy
@@ -474,7 +491,8 @@ This is the critical PR. It switches the security agent from old cloud-agent to 
 1. Trigger an analysis on a finding that requires sandbox analysis (either via `forceSandbox: true` or a finding that triage routes to Tier 2)
 2. Confirm the callback endpoint receives the completion notification
 3. Confirm the result is extracted from the ingest service and stored correctly
-4. Confirm the "View agent session" link in the UI opens the correct cloud-agent-next chat view
+4. Confirm the `analysis` field in `security_findings` contains the raw markdown content (this powers the user-facing summary for auto-dismissed findings)
+5. Confirm the "View agent session" link in the UI opens the correct cloud-agent-next chat view
 
 ### Deployment order
 

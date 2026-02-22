@@ -45,6 +45,7 @@ type SecurityAgentSyncEvent = BaseSecurityAgentEvent & {
 type SecurityAgentAnalysisStartedEvent = BaseSecurityAgentEvent & {
   findingId: string;
   model: string;
+  analysisMode?: string;
 };
 
 type SecurityAgentAnalysisCompletedEvent = BaseSecurityAgentEvent & {

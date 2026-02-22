@@ -1,10 +1,12 @@
 /**
  * Agent CRUD, hook management (GUPP), and name allocation for the Town DO.
+ *
+ * After the beads-centric refactor (#441), agents are beads with type='agent'
+ * joined with agent_metadata for operational state.
  */
 
-import { rig_agents, RigAgentRecord, createTableRigAgents } from '../../db/tables/rig-agents.table';
-import { rig_beads, RigBeadRecord } from '../../db/tables/rig-beads.table';
-import { rig_mail, RigMailRecord } from '../../db/tables/rig-mail.table';
+import { beads, BeadRecord } from '../../db/tables/beads.table';
+import { agent_metadata, AgentMetadataRecord } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
 import { logBeadEvent, getBead } from './beads';
 import type {
@@ -14,6 +16,7 @@ import type {
   AgentRole,
   PrimeContext,
   Bead,
+  Mail,
 } from '../../types';
 
 // Polecat name pool (20 names, used in allocation order)
@@ -48,44 +51,96 @@ function now(): string {
   return new Date().toISOString();
 }
 
-export function initAgentTables(sql: SqlStorage): void {
-  query(sql, createTableRigAgents(), []);
+/**
+ * Parse a joined bead + agent_metadata row into an Agent object.
+ * The SQL query aliases bead columns and agent_metadata columns into
+ * a flat row that we reconstruct here.
+ */
+function parseAgent(row: Record<string, unknown>): Agent {
+  return {
+    id: String(row.bead_id),
+    rig_id: row.rig_id === null ? null : String(row.rig_id),
+    role: AgentMetadataRecord.shape.role.parse(row.role),
+    name: String(row.title),
+    identity: String(row.identity),
+    status: AgentMetadataRecord.shape.status.parse(row.status),
+    current_hook_bead_id:
+      row.current_hook_bead_id === null ? null : String(row.current_hook_bead_id),
+    dispatch_attempts: Number(row.dispatch_attempts ?? 0),
+    last_activity_at: row.last_activity_at === null ? null : String(row.last_activity_at),
+    checkpoint:
+      row.checkpoint === null || row.checkpoint === undefined
+        ? null
+        : JSON.parse(String(row.checkpoint)),
+    created_at: String(row.created_at),
+  };
+}
+
+/** SQL fragment for joining beads + agent_metadata */
+const AGENT_JOIN = /* sql */ `
+  SELECT ${beads.bead_id}, ${beads.rig_id}, ${beads.title}, ${beads.created_at},
+         ${agent_metadata.role}, ${agent_metadata.identity},
+         ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+         ${agent_metadata.dispatch_attempts}, ${agent_metadata.last_activity_at},
+         ${agent_metadata.checkpoint}
+  FROM ${beads}
+  INNER JOIN ${agent_metadata} ON ${beads.bead_id} = ${agent_metadata.bead_id}
+`;
+
+export function initAgentTables(_sql: SqlStorage): void {
+  // Agent tables are now initialized in beads.initBeadTables()
+  // (beads table + agent_metadata satellite)
 }
 
 export function registerAgent(sql: SqlStorage, input: RegisterAgentInput): Agent {
   const id = generateId();
   const timestamp = now();
 
+  // Create the agent bead
   query(
     sql,
     /* sql */ `
-      INSERT INTO ${rig_agents} (
-        ${rig_agents.columns.id},
-        ${rig_agents.columns.rig_id},
-        ${rig_agents.columns.role},
-        ${rig_agents.columns.name},
-        ${rig_agents.columns.identity},
-        ${rig_agents.columns.status},
-        ${rig_agents.columns.current_hook_bead_id},
-        ${rig_agents.columns.dispatch_attempts},
-        ${rig_agents.columns.last_activity_at},
-        ${rig_agents.columns.checkpoint},
-        ${rig_agents.columns.created_at}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO ${beads} (
+        ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
+        ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
+        ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
+        ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
+        ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
+        ${beads.columns.closed_at}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       id,
-      input.rig_id ?? null,
-      input.role,
+      'agent',
+      'open',
       input.name,
-      input.identity,
-      'idle',
       null,
-      0,
+      input.rig_id ?? null,
       null,
+      null,
+      'medium',
+      '[]',
+      '{}',
       null,
       timestamp,
+      timestamp,
+      null,
     ]
+  );
+
+  // Create the agent_metadata satellite row
+  query(
+    sql,
+    /* sql */ `
+      INSERT INTO ${agent_metadata} (
+        ${agent_metadata.columns.bead_id}, ${agent_metadata.columns.role},
+        ${agent_metadata.columns.identity}, ${agent_metadata.columns.container_process_id},
+        ${agent_metadata.columns.status}, ${agent_metadata.columns.current_hook_bead_id},
+        ${agent_metadata.columns.dispatch_attempts}, ${agent_metadata.columns.checkpoint},
+        ${agent_metadata.columns.last_activity_at}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [id, input.role, input.identity, null, 'idle', null, 0, null, null]
   );
 
   const agent = getAgent(sql, id);
@@ -94,25 +149,17 @@ export function registerAgent(sql: SqlStorage, input: RegisterAgentInput): Agent
 }
 
 export function getAgent(sql: SqlStorage, agentId: string): Agent | null {
-  const rows = [
-    ...query(sql, /* sql */ `SELECT * FROM ${rig_agents} WHERE ${rig_agents.columns.id} = ?`, [
-      agentId,
-    ]),
-  ];
+  const rows = [...query(sql, /* sql */ `${AGENT_JOIN} WHERE ${beads.bead_id} = ?`, [agentId])];
   if (rows.length === 0) return null;
-  return RigAgentRecord.parse(rows[0]);
+  return parseAgent(rows[0] as Record<string, unknown>);
 }
 
 export function getAgentByIdentity(sql: SqlStorage, identity: string): Agent | null {
   const rows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT * FROM ${rig_agents} WHERE ${rig_agents.columns.identity} = ?`,
-      [identity]
-    ),
+    ...query(sql, /* sql */ `${AGENT_JOIN} WHERE ${agent_metadata.identity} = ?`, [identity]),
   ];
   if (rows.length === 0) return null;
-  return RigAgentRecord.parse(rows[0]);
+  return parseAgent(rows[0] as Record<string, unknown>);
 }
 
 export function listAgents(sql: SqlStorage, filter?: AgentFilter): Agent[] {
@@ -120,11 +167,11 @@ export function listAgents(sql: SqlStorage, filter?: AgentFilter): Agent[] {
     ...query(
       sql,
       /* sql */ `
-        SELECT * FROM ${rig_agents}
-        WHERE (? IS NULL OR ${rig_agents.columns.role} = ?)
-          AND (? IS NULL OR ${rig_agents.columns.status} = ?)
-          AND (? IS NULL OR ${rig_agents.columns.rig_id} = ?)
-        ORDER BY ${rig_agents.columns.created_at} ASC
+        ${AGENT_JOIN}
+        WHERE (? IS NULL OR ${agent_metadata.role} = ?)
+          AND (? IS NULL OR ${agent_metadata.status} = ?)
+          AND (? IS NULL OR ${beads.rig_id} = ?)
+        ORDER BY ${beads.created_at} ASC
       `,
       [
         filter?.role ?? null,
@@ -136,46 +183,48 @@ export function listAgents(sql: SqlStorage, filter?: AgentFilter): Agent[] {
       ]
     ),
   ];
-  return RigAgentRecord.array().parse(rows);
+  return rows.map(r => parseAgent(r as Record<string, unknown>));
 }
 
 export function updateAgentStatus(sql: SqlStorage, agentId: string, status: string): void {
   query(
     sql,
     /* sql */ `
-      UPDATE ${rig_agents}
-      SET ${rig_agents.columns.status} = ?
-      WHERE ${rig_agents.columns.id} = ?
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.status} = ?
+      WHERE ${agent_metadata.columns.bead_id} = ?
     `,
     [status, agentId]
   );
 }
 
 export function deleteAgent(sql: SqlStorage, agentId: string): void {
-  // Clean up mail referencing this agent
+  // Unassign beads that reference this agent
   query(
     sql,
     /* sql */ `
-      DELETE FROM ${rig_mail}
-      WHERE ${rig_mail.columns.from_agent_id} = ? OR ${rig_mail.columns.to_agent_id} = ?
-    `,
-    [agentId, agentId]
-  );
-
-  // Unassign beads
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${rig_beads}
-      SET ${rig_beads.columns.assignee_agent_id} = NULL,
-          ${rig_beads.columns.status} = 'open',
-          ${rig_beads.columns.updated_at} = ?
-      WHERE ${rig_beads.columns.assignee_agent_id} = ?
+      UPDATE ${beads}
+      SET ${beads.columns.assignee_agent_bead_id} = NULL,
+          ${beads.columns.status} = 'open',
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.columns.assignee_agent_bead_id} = ?
     `,
     [now(), agentId]
   );
 
-  query(sql, /* sql */ `DELETE FROM ${rig_agents} WHERE ${rig_agents.columns.id} = ?`, [agentId]);
+  // Delete mail beads where this agent is sender or recipient (via labels)
+  // Mail beads reference agents in their metadata, but we clean up directly
+  // since the FK is via assignee_agent_bead_id for received mail.
+
+  // Delete agent_metadata first (FK to beads)
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.columns.bead_id} = ?`,
+    [agentId]
+  );
+
+  // Delete the agent bead itself
+  query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.columns.bead_id} = ?`, [agentId]);
 }
 
 // ── Hooks (GUPP) ────────────────────────────────────────────────────
@@ -200,12 +249,12 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
   query(
     sql,
     /* sql */ `
-      UPDATE ${rig_agents}
-      SET ${rig_agents.columns.current_hook_bead_id} = ?,
-          ${rig_agents.columns.status} = 'idle',
-          ${rig_agents.columns.dispatch_attempts} = 0,
-          ${rig_agents.columns.last_activity_at} = ?
-      WHERE ${rig_agents.columns.id} = ?
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.current_hook_bead_id} = ?,
+          ${agent_metadata.columns.status} = 'idle',
+          ${agent_metadata.columns.dispatch_attempts} = 0,
+          ${agent_metadata.columns.last_activity_at} = ?
+      WHERE ${agent_metadata.columns.bead_id} = ?
     `,
     [beadId, now(), agentId]
   );
@@ -213,11 +262,11 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
   query(
     sql,
     /* sql */ `
-      UPDATE ${rig_beads}
-      SET ${rig_beads.columns.status} = 'in_progress',
-          ${rig_beads.columns.assignee_agent_id} = ?,
-          ${rig_beads.columns.updated_at} = ?
-      WHERE ${rig_beads.columns.id} = ?
+      UPDATE ${beads}
+      SET ${beads.columns.status} = 'in_progress',
+          ${beads.columns.assignee_agent_bead_id} = ?,
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.columns.bead_id} = ?
     `,
     [agentId, now(), beadId]
   );
@@ -239,10 +288,10 @@ export function unhookBead(sql: SqlStorage, agentId: string): void {
   query(
     sql,
     /* sql */ `
-      UPDATE ${rig_agents}
-      SET ${rig_agents.columns.current_hook_bead_id} = NULL,
-          ${rig_agents.columns.status} = 'idle'
-      WHERE ${rig_agents.columns.id} = ?
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.current_hook_bead_id} = NULL,
+          ${agent_metadata.columns.status} = 'idle'
+      WHERE ${agent_metadata.columns.bead_id} = ?
     `,
     [agentId]
   );
@@ -268,14 +317,15 @@ export function allocatePolecatName(sql: SqlStorage, rigId: string): string {
     ...query(
       sql,
       /* sql */ `
-        SELECT ${rig_agents.columns.name} FROM ${rig_agents}
-        WHERE ${rig_agents.columns.role} = 'polecat'
-          AND ${rig_agents.columns.rig_id} = ?
+        SELECT ${beads.title} FROM ${beads}
+        INNER JOIN ${agent_metadata} ON ${beads.bead_id} = ${agent_metadata.bead_id}
+        WHERE ${agent_metadata.role} = 'polecat'
+          AND ${beads.rig_id} = ?
       `,
       [rigId]
     ),
   ];
-  const usedNames = new Set(usedRows.map(r => String(r.name)));
+  const usedNames = new Set(usedRows.map(r => String((r as Record<string, unknown>).title)));
 
   for (const name of POLECAT_NAME_POOL) {
     if (!usedNames.has(name)) return name;
@@ -308,16 +358,16 @@ export function getOrCreateAgent(
       ...query(
         sql,
         /* sql */ `
-          SELECT * FROM ${rig_agents}
-          WHERE ${rig_agents.columns.role} = 'polecat'
-            AND ${rig_agents.columns.status} = 'idle'
-            AND ${rig_agents.columns.current_hook_bead_id} IS NULL
+          ${AGENT_JOIN}
+          WHERE ${agent_metadata.role} = 'polecat'
+            AND ${agent_metadata.status} = 'idle'
+            AND ${agent_metadata.current_hook_bead_id} IS NULL
           LIMIT 1
         `,
         []
       ),
     ];
-    if (idle.length > 0) return RigAgentRecord.parse(idle[0]);
+    if (idle.length > 0) return parseAgent(idle[0] as Record<string, unknown>);
   }
 
   // Create a new agent
@@ -335,36 +385,67 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
 
   const hookedBead = agent.current_hook_bead_id ? getBead(sql, agent.current_hook_bead_id) : null;
 
-  // Undelivered mail
+  // Undelivered mail: message beads assigned to this agent that are still open
   const mailRows = [
     ...query(
       sql,
       /* sql */ `
-        SELECT * FROM ${rig_mail}
-        WHERE ${rig_mail.columns.to_agent_id} = ?
-          AND ${rig_mail.columns.delivered} = 0
-        ORDER BY ${rig_mail.columns.created_at} ASC
+        SELECT * FROM ${beads}
+        WHERE ${beads.columns.type} = 'message'
+          AND ${beads.columns.assignee_agent_bead_id} = ?
+          AND ${beads.columns.status} = 'open'
+        ORDER BY ${beads.columns.created_at} ASC
       `,
       [agentId]
     ),
   ];
-  const undeliveredMail = RigMailRecord.array().parse(mailRows);
+  const mailBeads = BeadRecord.array().parse(mailRows);
+  const undeliveredMail: Mail[] = mailBeads.map(mb => ({
+    id: mb.bead_id,
+    from_agent_id: String(mb.metadata?.from_agent_id ?? mb.created_by ?? ''),
+    to_agent_id: agentId,
+    subject: mb.title,
+    body: mb.body ?? '',
+    delivered: false,
+    created_at: mb.created_at,
+    delivered_at: null,
+  }));
+
+  // Mark mail as delivered (close the message beads)
+  if (mailBeads.length > 0) {
+    const timestamp = now();
+    for (const mb of mailBeads) {
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.status} = 'closed',
+              ${beads.columns.closed_at} = ?,
+              ${beads.columns.updated_at} = ?
+          WHERE ${beads.columns.bead_id} = ?
+        `,
+        [timestamp, timestamp, mb.bead_id]
+      );
+    }
+  }
 
   // Open beads (for context awareness, scoped to agent's rig)
   const openBeadRows = [
     ...query(
       sql,
       /* sql */ `
-        SELECT * FROM ${rig_beads}
-        WHERE ${rig_beads.columns.status} IN ('open', 'in_progress')
-          AND (${rig_beads.columns.rig_id} IS NULL OR ${rig_beads.columns.rig_id} = ?)
-        ORDER BY ${rig_beads.columns.created_at} DESC
+        SELECT * FROM ${beads}
+        WHERE ${beads.columns.status} IN ('open', 'in_progress')
+          AND ${beads.columns.type} != 'agent'
+          AND ${beads.columns.type} != 'message'
+          AND (${beads.columns.rig_id} IS NULL OR ${beads.columns.rig_id} = ?)
+        ORDER BY ${beads.columns.created_at} DESC
         LIMIT 20
       `,
       [agent.rig_id]
     ),
   ];
-  const openBeads = RigBeadRecord.array().parse(openBeadRows);
+  const openBeads = BeadRecord.array().parse(openBeadRows);
 
   return {
     agent,
@@ -381,9 +462,9 @@ export function writeCheckpoint(sql: SqlStorage, agentId: string, data: unknown)
   query(
     sql,
     /* sql */ `
-      UPDATE ${rig_agents}
-      SET ${rig_agents.columns.checkpoint} = ?
-      WHERE ${rig_agents.columns.id} = ?
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.checkpoint} = ?
+      WHERE ${agent_metadata.columns.bead_id} = ?
     `,
     [serialized, agentId]
   );
@@ -400,9 +481,9 @@ export function touchAgent(sql: SqlStorage, agentId: string): void {
   query(
     sql,
     /* sql */ `
-      UPDATE ${rig_agents}
-      SET ${rig_agents.columns.last_activity_at} = ?
-      WHERE ${rig_agents.columns.id} = ?
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.last_activity_at} = ?
+      WHERE ${agent_metadata.columns.bead_id} = ?
     `,
     [now(), agentId]
   );

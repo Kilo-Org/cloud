@@ -6,8 +6,8 @@ export default defineConfig({
     name: 'unit',
     globals: true,
     environment: 'node',
-    include: ['src/**/*.test.ts', 'test/unit/**/*.test.ts'],
-    exclude: ['test/integration/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'test/unit/**/*.test.ts', 'container/plugin/**/*.test.ts'],
+    exclude: ['test/integration/**/*.test.ts', '**/node_modules/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -5,18 +5,19 @@
  * rigs, agents, beads, mail, review queues, molecules, bead events,
  * convoys, escalations, and configuration.
  *
+ * After the beads-centric refactor (#441), all object types are unified
+ * into the beads table with satellite metadata tables. Separate tables
+ * for mail, molecules, review queue, convoys, and escalations are eliminated.
+ *
  * Agent events (high-volume SSE/streaming data) are delegated to per-agent
  * AgentDOs to stay within the 10GB DO SQLite limit.
- *
- * The Rig DO and Mayor DO are eliminated. The mayor is tracked as a
- * regular agent row with role='mayor'.
  */
 
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 
 // Sub-modules (plain functions, not classes — per coding style)
-import * as beads from './town/beads';
+import * as beadOps from './town/beads';
 import * as agents from './town/agents';
 import * as mail from './town/mail';
 import * as reviewQueue from './town/review-queue';
@@ -24,25 +25,15 @@ import * as config from './town/config';
 import * as rigs from './town/rigs';
 import * as dispatch from './town/container-dispatch';
 
-// Table imports for convoys + escalations (kept inline since they're small)
+// Table imports for beads-centric operations
+import { beads } from '../db/tables/beads.table';
+import { agent_metadata } from '../db/tables/agent-metadata.table';
 import {
-  town_convoys,
-  TownConvoyRecord,
-  createTableTownConvoys,
-} from '../db/tables/town-convoys.table';
-import {
-  town_convoy_beads,
-  createTableTownConvoyBeads,
-} from '../db/tables/town-convoy-beads.table';
-import {
-  createTableTownEscalations,
-  town_escalations,
-  TownEscalationRecord,
-} from '../db/tables/town-escalations.table';
-import { rig_agents, RigAgentRecord } from '../db/tables/rig-agents.table';
-import { rig_beads, RigBeadRecord } from '../db/tables/rig-beads.table';
-import { rig_review_queue } from '../db/tables/rig-review-queue.table';
-import { rig_mail } from '../db/tables/rig-mail.table';
+  escalation_metadata,
+  EscalationMetadataRecord,
+} from '../db/tables/escalation-metadata.table';
+import { convoy_metadata, ConvoyMetadataRecord } from '../db/tables/convoy-metadata.table';
+import { bead_dependencies } from '../db/tables/bead-dependencies.table';
 import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
@@ -64,16 +55,15 @@ import type {
   ReviewQueueEntry,
   AgentDoneInput,
   PrimeContext,
+  Molecule,
+  BeadEventRecord,
 } from '../types';
-import type { RigBeadEventRecord } from '../db/tables/rig-bead-events.table';
-import type { RigMoleculeRecord } from '../db/tables/rig-molecules.table';
 
 const TOWN_LOG = '[Town.do]';
 
 // Alarm intervals
 const ACTIVE_ALARM_INTERVAL_MS = 15_000; // 15s when agents are active
 const IDLE_ALARM_INTERVAL_MS = 5 * 60_000; // 5m when idle
-const STALE_THRESHOLD_MS = 10 * 60_000; // 10 min
 const GUPP_THRESHOLD_MS = 30 * 60_000; // 30 min
 const MAX_DISPATCH_ATTEMPTS = 5;
 
@@ -100,6 +90,79 @@ type RigConfig = {
   kilocodeToken?: string;
 };
 
+// ── Escalation helper type (bead + escalation_metadata) ─────────────
+type EscalationEntry = {
+  id: string;
+  source_rig_id: string;
+  source_agent_id: string | null;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  category: string | null;
+  message: string;
+  acknowledged: number;
+  re_escalation_count: number;
+  created_at: string;
+  acknowledged_at: string | null;
+};
+
+function parseEscalation(row: Record<string, unknown>): EscalationEntry {
+  return {
+    id: String(row.bead_id),
+    source_rig_id: String(row.rig_id ?? ''),
+    source_agent_id: row.created_by === null ? null : String(row.created_by),
+    severity: EscalationMetadataRecord.shape.severity.parse(row.severity),
+    category: row.category === null ? null : String(row.category),
+    message: String(row.body ?? row.title ?? ''),
+    acknowledged: Number(row.acknowledged ?? 0),
+    re_escalation_count: Number(row.re_escalation_count ?? 0),
+    created_at: String(row.created_at),
+    acknowledged_at: row.acknowledged_at === null ? null : String(row.acknowledged_at),
+  };
+}
+
+// ── Convoy helper type (bead + convoy_metadata) ─────────────────────
+type ConvoyEntry = {
+  id: string;
+  title: string;
+  status: 'active' | 'landed';
+  total_beads: number;
+  closed_beads: number;
+  created_by: string | null;
+  created_at: string;
+  landed_at: string | null;
+};
+
+function parseConvoy(row: Record<string, unknown>): ConvoyEntry {
+  return {
+    id: String(row.bead_id),
+    title: String(row.title),
+    status: row.bead_status === 'closed' ? 'landed' : 'active',
+    total_beads: Number(row.total_beads ?? 0),
+    closed_beads: Number(row.closed_beads ?? 0),
+    created_by: row.created_by === null ? null : String(row.created_by),
+    created_at: String(row.created_at),
+    landed_at: row.landed_at === null ? null : String(row.landed_at),
+  };
+}
+
+const CONVOY_JOIN = /* sql */ `
+  SELECT ${beads.bead_id}, ${beads.title}, ${beads.status} AS bead_status,
+         ${beads.created_by}, ${beads.created_at},
+         ${convoy_metadata.total_beads}, ${convoy_metadata.closed_beads},
+         ${convoy_metadata.landed_at}
+  FROM ${beads}
+  INNER JOIN ${convoy_metadata} ON ${beads.bead_id} = ${convoy_metadata.bead_id}
+`;
+
+const ESCALATION_JOIN = /* sql */ `
+  SELECT ${beads.bead_id}, ${beads.rig_id}, ${beads.title}, ${beads.body},
+         ${beads.created_by}, ${beads.created_at},
+         ${escalation_metadata.severity}, ${escalation_metadata.category},
+         ${escalation_metadata.acknowledged}, ${escalation_metadata.re_escalation_count},
+         ${escalation_metadata.acknowledged_at}
+  FROM ${beads}
+  INNER JOIN ${escalation_metadata} ON ${beads.bead_id} = ${escalation_metadata.bead_id}
+`;
+
 export class TownDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private initPromise: Promise<void> | null = null;
@@ -125,34 +188,23 @@ export class TownDO extends DurableObject<Env> {
     const storedId = await this.ctx.storage.get<string>('town:id');
     if (storedId) this._townId = storedId;
 
-    // Rig-scoped tables (formerly in Rig DO)
-    beads.initBeadTables(this.sql);
+    // All tables are now initialized via beads.initBeadTables():
+    // beads, bead_events, bead_dependencies, agent_metadata, review_metadata,
+    // escalation_metadata, convoy_metadata
+    beadOps.initBeadTables(this.sql);
+
+    // These are no-ops now but kept for clarity
     agents.initAgentTables(this.sql);
     mail.initMailTables(this.sql);
     reviewQueue.initReviewQueueTables(this.sql);
 
     // Rig registry
     rigs.initRigTables(this.sql);
-
-    // Town-scoped tables
-    query(this.sql, createTableTownConvoys(), []);
-    query(this.sql, createTableTownConvoyBeads(), []);
-    query(this.sql, createTableTownEscalations(), []);
-
-    // Composite PK for convoy_beads
-    query(
-      this.sql,
-      /* sql */ `CREATE UNIQUE INDEX IF NOT EXISTS idx_town_convoy_beads_pk ON ${town_convoy_beads}(${town_convoy_beads.columns.convoy_id}, ${town_convoy_beads.columns.bead_id})`,
-      []
-    );
   }
 
   private _townId: string | null = null;
 
   private get townId(): string {
-    // ctx.id.name should be the town UUID (set via idFromName in getTownDOStub).
-    // In some runtimes (local dev) .name is undefined. We persist the ID
-    // in KV on first access so it survives across requests.
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
   }
 
@@ -196,12 +248,19 @@ export class TownDO extends DurableObject<Env> {
     await this.ensureInitialized();
     rigs.removeRig(this.sql, rigId);
     await this.ctx.storage.delete(`rig:${rigId}:config`);
-    query(this.sql, /* sql */ `DELETE FROM ${rig_agents} WHERE ${rig_agents.columns.rig_id} = ?`, [
-      rigId,
-    ]);
-    query(this.sql, /* sql */ `DELETE FROM ${rig_beads} WHERE ${rig_beads.columns.rig_id} = ?`, [
-      rigId,
-    ]);
+    // Delete agents belonging to this rig
+    query(
+      this.sql,
+      /* sql */ `
+        DELETE FROM ${agent_metadata}
+        WHERE ${agent_metadata.columns.bead_id} IN (
+          SELECT ${beads.columns.bead_id} FROM ${beads}
+          WHERE ${beads.columns.type} = 'agent' AND ${beads.columns.rig_id} = ?
+        )
+      `,
+      [rigId]
+    );
+    query(this.sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.columns.rig_id} = ?`, [rigId]);
   }
 
   async listRigs(): Promise<rigs.RigRecord[]> {
@@ -220,14 +279,11 @@ export class TownDO extends DurableObject<Env> {
     console.log(
       `${TOWN_LOG} configureRig: rigId=${rigConfig.rigId} hasKilocodeToken=${!!rigConfig.kilocodeToken}`
     );
-    // Persist the real town UUID so alarm/internal calls use the correct ID
     if (rigConfig.townId) {
       await this.setTownId(rigConfig.townId);
     }
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
 
-    // Store kilocodeToken in town config so it's available to all agents
-    // (including the mayor) without needing a rig config lookup.
     if (rigConfig.kilocodeToken) {
       const townConfig = await this.getTownConfig();
       if (!townConfig.kilocode_token || townConfig.kilocode_token !== rigConfig.kilocodeToken) {
@@ -236,9 +292,6 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    // Persist the KILOCODE_TOKEN directly on the TownContainerDO so it's
-    // in the container's OS environment (process.env). This is the most
-    // reliable path — doesn't depend on X-Town-Config or request body envVars.
     const token = rigConfig.kilocodeToken ?? (await this.resolveKilocodeToken());
     if (token) {
       try {
@@ -250,8 +303,6 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    // Proactively start the container so it's warm when the user sends
-    // their first message. The alarm also keeps it warm on subsequent ticks.
     console.log(`${TOWN_LOG} configureRig: proactively starting container`);
     await this.armAlarmIfNeeded();
     try {
@@ -272,26 +323,41 @@ export class TownDO extends DurableObject<Env> {
 
   async createBead(input: CreateBeadInput): Promise<Bead> {
     await this.ensureInitialized();
-    return beads.createBead(this.sql, input);
+    return beadOps.createBead(this.sql, input);
   }
 
   async getBeadAsync(beadId: string): Promise<Bead | null> {
     await this.ensureInitialized();
-    return beads.getBead(this.sql, beadId);
+    return beadOps.getBead(this.sql, beadId);
   }
 
   async listBeads(filter: BeadFilter): Promise<Bead[]> {
     await this.ensureInitialized();
-    return beads.listBeads(this.sql, filter);
+    return beadOps.listBeads(this.sql, filter);
   }
 
   async updateBeadStatus(beadId: string, status: string, agentId: string): Promise<Bead> {
     await this.ensureInitialized();
-    const bead = beads.updateBeadStatus(this.sql, beadId, status, agentId);
+    const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId);
 
-    // If closed and has convoy, notify
-    if (status === 'closed' && bead.convoy_id) {
-      this.onBeadClosed({ convoyId: bead.convoy_id, beadId }).catch(() => {});
+    // If closed and part of a convoy (via bead_dependencies), notify
+    if (status === 'closed') {
+      const convoyRows = [
+        ...query(
+          this.sql,
+          /* sql */ `
+            SELECT ${bead_dependencies.depends_on_bead_id}
+            FROM ${bead_dependencies}
+            WHERE ${bead_dependencies.bead_id} = ?
+              AND ${bead_dependencies.dependency_type} = 'tracks'
+          `,
+          [beadId]
+        ),
+      ];
+      for (const row of convoyRows) {
+        const convoyId = String((row as Record<string, unknown>).depends_on_bead_id);
+        this.onBeadClosed({ convoyId, beadId }).catch(() => {});
+      }
     }
 
     return bead;
@@ -303,16 +369,16 @@ export class TownDO extends DurableObject<Env> {
 
   async deleteBead(beadId: string): Promise<void> {
     await this.ensureInitialized();
-    beads.deleteBead(this.sql, beadId);
+    beadOps.deleteBead(this.sql, beadId);
   }
 
   async listBeadEvents(options: {
     beadId?: string;
     since?: string;
     limit?: number;
-  }): Promise<RigBeadEventRecord[]> {
+  }): Promise<BeadEventRecord[]> {
     await this.ensureInitialized();
-    return beads.listBeadEvents(this.sql, options);
+    return beadOps.listBeadEvents(this.sql, options);
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -347,7 +413,6 @@ export class TownDO extends DurableObject<Env> {
   async deleteAgent(agentId: string): Promise<void> {
     await this.ensureInitialized();
     agents.deleteAgent(this.sql, agentId);
-    // Clean up agent event storage
     try {
       const agentDO = getAgentDOStub(this.env, agentId);
       await agentDO.destroy();
@@ -469,8 +534,6 @@ export class TownDO extends DurableObject<Env> {
     input: { status: 'completed' | 'failed'; reason?: string }
   ): Promise<void> {
     await this.ensureInitialized();
-    // When agentId is empty (e.g. mayor completion callback without explicit ID),
-    // fall back to the mayor agent.
     let resolvedAgentId = agentId;
     if (!resolvedAgentId) {
       const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
@@ -481,19 +544,19 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
-  async createMolecule(beadId: string, formula: unknown): Promise<RigMoleculeRecord> {
+  async createMolecule(beadId: string, formula: unknown): Promise<Molecule> {
     await this.ensureInitialized();
     return reviewQueue.createMolecule(this.sql, beadId, formula);
   }
 
   async getMoleculeCurrentStep(
     agentId: string
-  ): Promise<{ molecule: RigMoleculeRecord; step: unknown } | null> {
+  ): Promise<{ molecule: Molecule; step: unknown } | null> {
     await this.ensureInitialized();
     return reviewQueue.getMoleculeCurrentStep(this.sql, agentId);
   }
 
-  async advanceMoleculeStep(agentId: string, summary: string): Promise<RigMoleculeRecord | null> {
+  async advanceMoleculeStep(agentId: string, summary: string): Promise<Molecule | null> {
     await this.ensureInitialized();
     return reviewQueue.advanceMoleculeStep(this.sql, agentId, summary);
   }
@@ -511,7 +574,7 @@ export class TownDO extends DurableObject<Env> {
   }): Promise<{ bead: Bead; agent: Agent }> {
     await this.ensureInitialized();
 
-    const createdBead = beads.createBead(this.sql, {
+    const createdBead = beadOps.createBead(this.sql, {
       type: 'issue',
       title: input.title,
       body: input.body,
@@ -521,10 +584,10 @@ export class TownDO extends DurableObject<Env> {
     });
 
     const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
-    agents.hookBead(this.sql, agent.id, createdBead.id);
+    agents.hookBead(this.sql, agent.id, createdBead.bead_id);
 
     // Re-read bead and agent after hook (hookBead updates both)
-    const bead = beads.getBead(this.sql, createdBead.id) ?? createdBead;
+    const bead = beadOps.getBead(this.sql, createdBead.bead_id) ?? createdBead;
     const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
 
     await this.armAlarmIfNeeded();
@@ -535,10 +598,6 @@ export class TownDO extends DurableObject<Env> {
   // Mayor (just another agent)
   // ══════════════════════════════════════════════════════════════════
 
-  /**
-   * Send a message to the mayor agent. Creates the mayor if it doesn't exist.
-   * The mayor is tracked as an agent with role='mayor'.
-   */
   async sendMayorMessage(
     message: string,
     model?: string
@@ -546,7 +605,6 @@ export class TownDO extends DurableObject<Env> {
     await this.ensureInitialized();
     const townId = this.townId;
 
-    // Find or create the mayor agent
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
     if (!mayor) {
       const identity = `mayor-${townId.slice(0, 8)}`;
@@ -557,7 +615,6 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    // Check if mayor session is alive in container
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
@@ -567,16 +624,11 @@ export class TownDO extends DurableObject<Env> {
 
     let sessionStatus: 'idle' | 'active' | 'starting';
 
-    // TODO: If we start the container early, then isAlive will be true and we won't get the all the configs
-    // BUT also TODO, we're supposed to be sending configs on each request to any agent anyway
     if (isAlive) {
-      // Send follow-up message
       const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, message);
       sessionStatus = sent ? 'active' : 'idle';
     } else {
-      // Start a new mayor session
       const townConfig = await this.getTownConfig();
-      // TODO: What is a Mayor Rig Config?
       const rigConfig = await this.getMayorRigConfig();
       const kilocodeToken = await this.resolveKilocodeToken();
 
@@ -584,7 +636,6 @@ export class TownDO extends DurableObject<Env> {
         `${TOWN_LOG} sendMayorMessage: townId=${townId} hasRigConfig=${!!rigConfig} hasKilocodeToken=${!!kilocodeToken} townConfigToken=${!!townConfig.kilocode_token} rigConfigToken=${!!rigConfig?.kilocodeToken}`
       );
 
-      // Ensure the container has the token in its OS env
       if (kilocodeToken) {
         try {
           const containerStub = getTownContainerStub(this.env, townId);
@@ -637,12 +688,11 @@ export class TownDO extends DurableObject<Env> {
     await this.ensureInitialized();
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
 
-    // Map agent status to the session status the frontend expects
     const mapStatus = (agentStatus: string): 'idle' | 'active' | 'starting' => {
       switch (agentStatus) {
         case 'working':
           return 'active';
-        case 'blocked':
+        case 'stalled':
           return 'active';
         default:
           return 'idle';
@@ -655,7 +705,7 @@ export class TownDO extends DurableObject<Env> {
       session: mayor
         ? {
             agentId: mayor.id,
-            sessionId: mayor.id, // No separate session concept — use agentId
+            sessionId: mayor.id,
             status: mapStatus(mayor.status),
             lastActivityAt: mayor.last_activity_at ?? mayor.created_at,
           }
@@ -664,27 +714,19 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async getMayorRigConfig(): Promise<RigConfig | null> {
-    // Mayor uses the first rig's config for git URL and credentials
     const rigList = rigs.listRigs(this.sql);
     if (rigList.length === 0) return null;
     return this.getRigConfig(rigList[0].id);
   }
 
-  /**
-   * Resolve the kilocode token from any available source.
-   * Checks: town config → all rig configs (in order).
-   */
   private async resolveKilocodeToken(): Promise<string | undefined> {
-    // 1. Town config (preferred — single source of truth)
     const townConfig = await this.getTownConfig();
     if (townConfig.kilocode_token) return townConfig.kilocode_token;
 
-    // 2. Scan all rig configs for a token
     const rigList = rigs.listRigs(this.sql);
     for (const rig of rigList) {
       const rc = await this.getRigConfig(rig.id);
       if (rc?.kilocodeToken) {
-        // Propagate to town config for next time
         await this.updateTownConfig({ kilocode_token: rc.kilocodeToken });
         return rc.kilocodeToken;
       }
@@ -694,14 +736,14 @@ export class TownDO extends DurableObject<Env> {
   }
 
   // ══════════════════════════════════════════════════════════════════
-  // Convoys
+  // Convoys (beads with type='convoy' + convoy_metadata + bead_dependencies)
   // ══════════════════════════════════════════════════════════════════
 
   async createConvoy(input: {
     title: string;
     beads: Array<{ bead_id: string; rig_id: string }>;
     created_by?: string;
-  }): Promise<TownConvoyRecord> {
+  }): Promise<ConvoyEntry> {
     await this.ensureInitialized();
     const parsed = z
       .object({
@@ -714,38 +756,62 @@ export class TownDO extends DurableObject<Env> {
     const convoyId = generateId();
     const timestamp = now();
 
+    // Create the convoy bead
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${town_convoys} (
-          ${town_convoys.columns.id}, ${town_convoys.columns.title},
-          ${town_convoys.columns.status}, ${town_convoys.columns.total_beads},
-          ${town_convoys.columns.closed_beads}, ${town_convoys.columns.created_by},
-          ${town_convoys.columns.created_at}, ${town_convoys.columns.landed_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ${beads} (
+          ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
+          ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
+          ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
+          ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
+          ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
+          ${beads.columns.closed_at}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         convoyId,
+        'convoy',
+        'open',
         parsed.title,
-        'active',
-        parsed.beads.length,
-        0,
+        null,
+        null,
+        null,
+        null,
+        'medium',
+        JSON.stringify(['gt:convoy']),
+        '{}',
         parsed.created_by ?? null,
+        timestamp,
         timestamp,
         null,
       ]
     );
 
+    // Create convoy_metadata
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${convoy_metadata} (
+          ${convoy_metadata.columns.bead_id}, ${convoy_metadata.columns.total_beads},
+          ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at}
+        ) VALUES (?, ?, ?, ?)
+      `,
+      [convoyId, parsed.beads.length, 0, null]
+    );
+
+    // Track beads via bead_dependencies
     for (const bead of parsed.beads) {
       query(
         this.sql,
         /* sql */ `
-          INSERT INTO ${town_convoy_beads} (
-            ${town_convoy_beads.columns.convoy_id}, ${town_convoy_beads.columns.bead_id},
-            ${town_convoy_beads.columns.rig_id}, ${town_convoy_beads.columns.status}
-          ) VALUES (?, ?, ?, ?)
+          INSERT INTO ${bead_dependencies} (
+            ${bead_dependencies.columns.bead_id},
+            ${bead_dependencies.columns.depends_on_bead_id},
+            ${bead_dependencies.columns.dependency_type}
+          ) VALUES (?, ?, ?)
         `,
-        [convoyId, bead.bead_id, bead.rig_id, 'open']
+        [bead.bead_id, convoyId, 'tracks']
       );
     }
 
@@ -754,99 +820,106 @@ export class TownDO extends DurableObject<Env> {
     return convoy;
   }
 
-  async onBeadClosed(input: {
-    convoyId: string;
-    beadId: string;
-  }): Promise<TownConvoyRecord | null> {
+  async onBeadClosed(input: { convoyId: string; beadId: string }): Promise<ConvoyEntry | null> {
     await this.ensureInitialized();
 
-    query(
-      this.sql,
-      /* sql */ `
-        UPDATE ${town_convoy_beads}
-        SET ${town_convoy_beads.columns.status} = ?
-        WHERE ${town_convoy_beads.columns.convoy_id} = ? AND ${town_convoy_beads.columns.bead_id} = ?
-          AND ${town_convoy_beads.columns.status} != ?
-      `,
-      ['closed', input.convoyId, input.beadId, 'closed']
-    );
-
+    // Count closed tracked beads
     const closedRows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT COUNT(1) AS count FROM ${town_convoy_beads} WHERE ${town_convoy_beads.columns.convoy_id} = ? AND ${town_convoy_beads.columns.status} = ?`,
-        [input.convoyId, 'closed']
+        /* sql */ `
+          SELECT COUNT(1) AS count FROM ${bead_dependencies}
+          INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
+          WHERE ${bead_dependencies.depends_on_bead_id} = ?
+            AND ${bead_dependencies.dependency_type} = 'tracks'
+            AND ${beads.status} = 'closed'
+        `,
+        [input.convoyId]
       ),
     ];
     const closedCount = z.object({ count: z.number() }).parse(closedRows[0] ?? { count: 0 }).count;
 
     query(
       this.sql,
-      /* sql */ `UPDATE ${town_convoys} SET ${town_convoys.columns.closed_beads} = ? WHERE ${town_convoys.columns.id} = ?`,
+      /* sql */ `
+        UPDATE ${convoy_metadata}
+        SET ${convoy_metadata.columns.closed_beads} = ?
+        WHERE ${convoy_metadata.columns.bead_id} = ?
+      `,
       [closedCount, input.convoyId]
     );
 
     const convoy = this.getConvoy(input.convoyId);
     if (convoy && convoy.status === 'active' && convoy.closed_beads >= convoy.total_beads) {
+      const timestamp = now();
       query(
         this.sql,
-        /* sql */ `UPDATE ${town_convoys} SET ${town_convoys.columns.status} = ?, ${town_convoys.columns.landed_at} = ? WHERE ${town_convoys.columns.id} = ?`,
-        ['landed', now(), input.convoyId]
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.status} = 'closed', ${beads.columns.closed_at} = ?, ${beads.columns.updated_at} = ?
+          WHERE ${beads.columns.bead_id} = ?
+        `,
+        [timestamp, timestamp, input.convoyId]
+      );
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${convoy_metadata}
+          SET ${convoy_metadata.columns.landed_at} = ?
+          WHERE ${convoy_metadata.columns.bead_id} = ?
+        `,
+        [timestamp, input.convoyId]
       );
       return this.getConvoy(input.convoyId);
     }
     return convoy;
   }
 
-  private getConvoy(convoyId: string): TownConvoyRecord | null {
+  private getConvoy(convoyId: string): ConvoyEntry | null {
     const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT * FROM ${town_convoys} WHERE ${town_convoys.columns.id} = ?`,
-        [convoyId]
-      ),
+      ...query(this.sql, /* sql */ `${CONVOY_JOIN} WHERE ${beads.bead_id} = ?`, [convoyId]),
     ];
     if (rows.length === 0) return null;
-    return TownConvoyRecord.parse(rows[0]);
+    return parseConvoy(rows[0] as Record<string, unknown>);
   }
 
   // ══════════════════════════════════════════════════════════════════
-  // Escalations
+  // Escalations (beads with type='escalation' + escalation_metadata)
   // ══════════════════════════════════════════════════════════════════
 
-  async acknowledgeEscalation(escalationId: string): Promise<TownEscalationRecord | null> {
+  async acknowledgeEscalation(escalationId: string): Promise<EscalationEntry | null> {
     await this.ensureInitialized();
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${town_escalations}
-        SET ${town_escalations.columns.acknowledged} = 1, ${town_escalations.columns.acknowledged_at} = ?
-        WHERE ${town_escalations.columns.id} = ? AND ${town_escalations.columns.acknowledged} = 0
+        UPDATE ${escalation_metadata}
+        SET ${escalation_metadata.columns.acknowledged} = 1, ${escalation_metadata.columns.acknowledged_at} = ?
+        WHERE ${escalation_metadata.columns.bead_id} = ? AND ${escalation_metadata.columns.acknowledged} = 0
       `,
       [now(), escalationId]
     );
     return this.getEscalation(escalationId);
   }
 
-  async listEscalations(filter?: { acknowledged?: boolean }): Promise<TownEscalationRecord[]> {
+  async listEscalations(filter?: { acknowledged?: boolean }): Promise<EscalationEntry[]> {
     await this.ensureInitialized();
     const rows =
       filter?.acknowledged !== undefined
         ? [
             ...query(
               this.sql,
-              /* sql */ `SELECT * FROM ${town_escalations} WHERE ${town_escalations.columns.acknowledged} = ? ORDER BY ${town_escalations.columns.created_at} DESC LIMIT 100`,
+              /* sql */ `${ESCALATION_JOIN} WHERE ${escalation_metadata.acknowledged} = ? ORDER BY ${beads.created_at} DESC LIMIT 100`,
               [filter.acknowledged ? 1 : 0]
             ),
           ]
         : [
             ...query(
               this.sql,
-              /* sql */ `SELECT * FROM ${town_escalations} ORDER BY ${town_escalations.columns.created_at} DESC LIMIT 100`,
+              /* sql */ `${ESCALATION_JOIN} ORDER BY ${beads.created_at} DESC LIMIT 100`,
               []
             ),
           ];
-    return TownEscalationRecord.array().parse(rows);
+    return rows.map(r => parseEscalation(r as Record<string, unknown>));
   }
 
   async routeEscalation(input: {
@@ -856,35 +929,57 @@ export class TownDO extends DurableObject<Env> {
     severity: 'low' | 'medium' | 'high' | 'critical';
     category?: string;
     message: string;
-  }): Promise<TownEscalationRecord> {
+  }): Promise<EscalationEntry> {
     await this.ensureInitialized();
-    const id = generateId();
+    const beadId = generateId();
+    const timestamp = now();
+
+    // Create the escalation bead
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${town_escalations} (
-          ${town_escalations.columns.id}, ${town_escalations.columns.source_rig_id},
-          ${town_escalations.columns.source_agent_id}, ${town_escalations.columns.severity},
-          ${town_escalations.columns.category}, ${town_escalations.columns.message},
-          ${town_escalations.columns.acknowledged}, ${town_escalations.columns.re_escalation_count},
-          ${town_escalations.columns.created_at}, ${town_escalations.columns.acknowledged_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ${beads} (
+          ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
+          ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
+          ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
+          ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
+          ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
+          ${beads.columns.closed_at}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
-        id,
-        input.source_rig_id,
-        input.source_agent_id ?? null,
-        input.severity,
-        input.category ?? null,
+        beadId,
+        'escalation',
+        'open',
+        `Escalation: ${input.message.slice(0, 100)}`,
         input.message,
-        0,
-        0,
-        now(),
+        input.source_rig_id,
+        null,
+        null,
+        input.severity === 'critical' ? 'critical' : input.severity === 'high' ? 'high' : 'medium',
+        JSON.stringify(['gt:escalation', `severity:${input.severity}`]),
+        '{}',
+        input.source_agent_id ?? null,
+        timestamp,
+        timestamp,
         null,
       ]
     );
 
-    const escalation = this.getEscalation(id);
+    // Create escalation_metadata
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${escalation_metadata} (
+          ${escalation_metadata.columns.bead_id}, ${escalation_metadata.columns.severity},
+          ${escalation_metadata.columns.category}, ${escalation_metadata.columns.acknowledged},
+          ${escalation_metadata.columns.re_escalation_count}, ${escalation_metadata.columns.acknowledged_at}
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [beadId, input.severity, input.category ?? null, 0, 0, null]
+    );
+
+    const escalation = this.getEscalation(beadId);
     if (!escalation) throw new Error('Failed to create escalation');
 
     // Notify mayor for medium+ severity
@@ -897,16 +992,12 @@ export class TownDO extends DurableObject<Env> {
     return escalation;
   }
 
-  private getEscalation(escalationId: string): TownEscalationRecord | null {
+  private getEscalation(escalationId: string): EscalationEntry | null {
     const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT * FROM ${town_escalations} WHERE ${town_escalations.columns.id} = ?`,
-        [escalationId]
-      ),
+      ...query(this.sql, /* sql */ `${ESCALATION_JOIN} WHERE ${beads.bead_id} = ?`, [escalationId]),
     ];
     if (rows.length === 0) return null;
-    return TownEscalationRecord.parse(rows[0]);
+    return parseEscalation(rows[0] as Record<string, unknown>);
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -923,10 +1014,6 @@ export class TownDO extends DurableObject<Env> {
 
     console.log(`${TOWN_LOG} alarm: fired for town=${townId}`);
 
-    // Only proactively wake the container if rigs are configured.
-    // Without rigs there's no git repo to work with, so no point keeping
-    // the container warm. On-demand starts (sendMayorMessage, slingBead)
-    // still work regardless.
     const hasRigs = rigs.listRigs(this.sql).length > 0;
     if (hasRigs) {
       try {
@@ -967,21 +1054,21 @@ export class TownDO extends DurableObject<Env> {
     const activeAgentRows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${rig_agents} WHERE ${rig_agents.columns.status} IN ('working', 'blocked')`,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.columns.status} IN ('working', 'stalled')`,
         []
       ),
     ];
     const pendingBeadRows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${rig_agents} WHERE ${rig_agents.columns.status} = 'idle' AND ${rig_agents.columns.current_hook_bead_id} IS NOT NULL`,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.columns.status} = 'idle' AND ${agent_metadata.columns.current_hook_bead_id} IS NOT NULL`,
         []
       ),
     ];
     const pendingReviewRows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${rig_review_queue} WHERE ${rig_review_queue.columns.status} IN ('pending', 'running')`,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.columns.type} = 'merge_request' AND ${beads.columns.status} IN ('open', 'in_progress')`,
         []
       ),
     ];
@@ -999,11 +1086,37 @@ export class TownDO extends DurableObject<Env> {
     const rows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT * FROM ${rig_agents} WHERE ${rig_agents.columns.status} = 'idle' AND ${rig_agents.columns.current_hook_bead_id} IS NOT NULL`,
+        /* sql */ `
+          SELECT ${beads.bead_id}, ${beads.rig_id}, ${beads.title}, ${beads.created_at},
+                 ${agent_metadata.role}, ${agent_metadata.identity},
+                 ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+                 ${agent_metadata.dispatch_attempts}, ${agent_metadata.last_activity_at},
+                 ${agent_metadata.checkpoint}
+          FROM ${beads}
+          INNER JOIN ${agent_metadata} ON ${beads.bead_id} = ${agent_metadata.bead_id}
+          WHERE ${agent_metadata.status} = 'idle' AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
+        `,
         []
       ),
     ];
-    const pendingAgents = RigAgentRecord.array().parse(rows);
+    const pendingAgents: Agent[] = rows.map(r => {
+      const row = r as Record<string, unknown>;
+      return {
+        id: String(row.bead_id),
+        rig_id: row.rig_id === null ? null : String(row.rig_id),
+        role: String(row.role) as Agent['role'],
+        name: String(row.title),
+        identity: String(row.identity),
+        status: String(row.status) as Agent['status'],
+        current_hook_bead_id:
+          row.current_hook_bead_id === null ? null : String(row.current_hook_bead_id),
+        dispatch_attempts: Number(row.dispatch_attempts ?? 0),
+        last_activity_at: row.last_activity_at === null ? null : String(row.last_activity_at),
+        checkpoint: row.checkpoint === null ? null : JSON.parse(String(row.checkpoint)),
+        created_at: String(row.created_at),
+      };
+    });
+
     console.log(`${TOWN_LOG} schedulePendingWork: found ${pendingAgents.length} pending agents`);
     if (pendingAgents.length === 0) return;
 
@@ -1011,24 +1124,21 @@ export class TownDO extends DurableObject<Env> {
     const kilocodeToken = await this.resolveKilocodeToken();
     const rigList = rigs.listRigs(this.sql);
 
-    // Build dispatch tasks for all pending agents, then run in parallel
     const dispatchTasks: Array<() => Promise<void>> = [];
 
     for (const agent of pendingAgents) {
       const beadId = agent.current_hook_bead_id;
       if (!beadId) continue;
-      const bead = beads.getBead(this.sql, beadId);
+      const bead = beadOps.getBead(this.sql, beadId);
       if (!bead) continue;
 
-      // Circuit breaker
       const attempts = agent.dispatch_attempts + 1;
       if (attempts > MAX_DISPATCH_ATTEMPTS) {
-        beads.updateBeadStatus(this.sql, beadId, 'failed', agent.id);
+        beadOps.updateBeadStatus(this.sql, beadId, 'failed', agent.id);
         agents.unhookBead(this.sql, agent.id);
         continue;
       }
 
-      // Use the agent's rig_id to get the correct rig config
       const rigId = agent.rig_id ?? rigList[0]?.id ?? '';
       const rigConfig = rigId ? await this.getRigConfig(rigId) : null;
 
@@ -1043,11 +1153,9 @@ export class TownDO extends DurableObject<Env> {
         continue;
       }
 
-      // Increment dispatch attempts (after rigConfig check so we don't
-      // burn attempts when config is simply missing)
       query(
         this.sql,
-        /* sql */ `UPDATE ${rig_agents} SET ${rig_agents.columns.dispatch_attempts} = ? WHERE ${rig_agents.columns.id} = ?`,
+        /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.dispatch_attempts} = ? WHERE ${agent_metadata.columns.bead_id} = ?`,
         [attempts, agent.id]
       );
 
@@ -1073,14 +1181,13 @@ export class TownDO extends DurableObject<Env> {
         if (started) {
           query(
             this.sql,
-            /* sql */ `UPDATE ${rig_agents} SET ${rig_agents.columns.status} = 'working', ${rig_agents.columns.dispatch_attempts} = 0, ${rig_agents.columns.last_activity_at} = ? WHERE ${rig_agents.columns.id} = ?`,
+            /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.status} = 'working', ${agent_metadata.columns.dispatch_attempts} = 0, ${agent_metadata.columns.last_activity_at} = ? WHERE ${agent_metadata.columns.bead_id} = ?`,
             [now(), agent.id]
           );
         }
       });
     }
 
-    // Dispatch all agents in parallel
     if (dispatchTasks.length > 0) {
       await Promise.allSettled(dispatchTasks.map(fn => fn()));
     }
@@ -1093,50 +1200,62 @@ export class TownDO extends DurableObject<Env> {
     const townId = this.townId;
     const guppThreshold = new Date(Date.now() - GUPP_THRESHOLD_MS).toISOString();
 
-    const AgentPick = RigAgentRecord.pick({
-      id: true,
-      current_hook_bead_id: true,
-      last_activity_at: true,
-    });
-    const workingAgents = AgentPick.array().parse([
+    const workingAgents = [
       ...query(
         this.sql,
-        /* sql */ `SELECT ${rig_agents.columns.id}, ${rig_agents.columns.current_hook_bead_id}, ${rig_agents.columns.last_activity_at} FROM ${rig_agents} WHERE ${rig_agents.columns.status} IN ('working', 'blocked')`,
+        /* sql */ `
+          SELECT ${agent_metadata.bead_id}, ${agent_metadata.current_hook_bead_id}, ${agent_metadata.last_activity_at}
+          FROM ${agent_metadata}
+          WHERE ${agent_metadata.status} IN ('working', 'stalled')
+        `,
         []
       ),
-    ]);
+    ];
 
-    for (const working of workingAgents) {
-      const containerInfo = await dispatch.checkAgentContainerStatus(this.env, townId, working.id);
+    for (const row of workingAgents) {
+      const working = row as Record<string, unknown>;
+      const agentId = String(working.bead_id);
+      const hookBeadId =
+        working.current_hook_bead_id === null ? null : String(working.current_hook_bead_id);
+      const lastActivity =
+        working.last_activity_at === null ? null : String(working.last_activity_at);
+
+      const containerInfo = await dispatch.checkAgentContainerStatus(this.env, townId, agentId);
 
       if (containerInfo.status === 'not_found' || containerInfo.status === 'exited') {
         if (containerInfo.exitReason === 'completed') {
-          reviewQueue.agentCompleted(this.sql, working.id, { status: 'completed' });
+          reviewQueue.agentCompleted(this.sql, agentId, { status: 'completed' });
           continue;
         }
-        // Reset to idle for re-dispatch
         query(
           this.sql,
-          /* sql */ `UPDATE ${rig_agents} SET ${rig_agents.columns.status} = 'idle', ${rig_agents.columns.last_activity_at} = ? WHERE ${rig_agents.columns.id} = ?`,
-          [now(), working.id]
+          /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.status} = 'idle', ${agent_metadata.columns.last_activity_at} = ? WHERE ${agent_metadata.columns.bead_id} = ?`,
+          [now(), agentId]
         );
         continue;
       }
 
       // GUPP violation check
-      if (working.last_activity_at && working.last_activity_at < guppThreshold) {
-        const MailId = z.object({ id: z.string() });
-        const existingGupp = MailId.array().parse([
+      if (lastActivity && lastActivity < guppThreshold) {
+        // Check for existing GUPP mail
+        const existingGupp = [
           ...query(
             this.sql,
-            /* sql */ `SELECT ${rig_mail.columns.id} FROM ${rig_mail} WHERE ${rig_mail.columns.to_agent_id} = ? AND ${rig_mail.columns.subject} = 'GUPP_CHECK' AND ${rig_mail.columns.delivered} = 0 LIMIT 1`,
-            [working.id]
+            /* sql */ `
+              SELECT ${beads.bead_id} FROM ${beads}
+              WHERE ${beads.columns.type} = 'message'
+                AND ${beads.columns.assignee_agent_bead_id} = ?
+                AND ${beads.columns.title} = 'GUPP_CHECK'
+                AND ${beads.columns.status} = 'open'
+              LIMIT 1
+            `,
+            [agentId]
           ),
-        ]);
+        ];
         if (existingGupp.length === 0) {
           mail.sendMail(this.sql, {
             from_agent_id: 'witness',
-            to_agent_id: working.id,
+            to_agent_id: agentId,
             subject: 'GUPP_CHECK',
             body: 'You have had work hooked for 30+ minutes with no activity. Are you stuck? If so, call gt_escalate.',
           });
@@ -1154,7 +1273,6 @@ export class TownDO extends DurableObject<Env> {
     const entry = reviewQueue.popReviewQueue(this.sql);
     if (!entry) return;
 
-    // OPEN QUESTION: Same as schedulePendingWork — need rig_id on agents or review_queue
     const rigList = rigs.listRigs(this.sql);
     const rigId = rigList[0]?.id ?? '';
     const rigConfig = await this.getRigConfig(rigId);
@@ -1167,7 +1285,6 @@ export class TownDO extends DurableObject<Env> {
     const gates = townConfig.refinery?.gates ?? [];
 
     if (gates.length > 0) {
-      // Dispatch refinery agent
       const refineryAgent = agents.getOrCreateAgent(this.sql, 'refinery', rigId, this.townId);
 
       const { buildRefinerySystemPrompt } = await import('../prompts/refinery-system.prompt');
@@ -1204,7 +1321,6 @@ export class TownDO extends DurableObject<Env> {
 
       if (!started) {
         agents.unhookBead(this.sql, refineryAgent.id);
-        // Fallback to deterministic merge
         await this.triggerDeterministicMerge(rigConfig, entry, townConfig);
       }
     } else {
@@ -1238,13 +1354,13 @@ export class TownDO extends DurableObject<Env> {
    * Bump severity of stale unacknowledged escalations.
    */
   private async reEscalateStaleEscalations(): Promise<void> {
-    const candidates = TownEscalationRecord.array().parse([
+    const candidates = [
       ...query(
         this.sql,
-        /* sql */ `SELECT * FROM ${town_escalations} WHERE ${town_escalations.columns.acknowledged} = 0 AND ${town_escalations.columns.re_escalation_count} < ?`,
+        /* sql */ `${ESCALATION_JOIN} WHERE ${escalation_metadata.acknowledged} = 0 AND ${escalation_metadata.re_escalation_count} < ?`,
         [MAX_RE_ESCALATIONS]
       ),
-    ]);
+    ].map(r => parseEscalation(r as Record<string, unknown>));
 
     const nowMs = Date.now();
     for (const esc of candidates) {
@@ -1258,7 +1374,12 @@ export class TownDO extends DurableObject<Env> {
       const newSeverity = SEVERITY_ORDER[currentIdx + 1];
       query(
         this.sql,
-        /* sql */ `UPDATE ${town_escalations} SET ${town_escalations.columns.severity} = ?, ${town_escalations.columns.re_escalation_count} = ${town_escalations.columns.re_escalation_count} + 1 WHERE ${town_escalations.columns.id} = ?`,
+        /* sql */ `
+          UPDATE ${escalation_metadata}
+          SET ${escalation_metadata.columns.severity} = ?,
+              ${escalation_metadata.columns.re_escalation_count} = ${escalation_metadata.columns.re_escalation_count} + 1
+          WHERE ${escalation_metadata.columns.bead_id} = ?
+        `,
         [newSeverity, esc.id]
       );
 
@@ -1270,18 +1391,10 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
-  /**
-   * Proactive container health check.
-   * Pings the container if there's active work OR if the container was
-   * recently started (within the first few minutes after rig configuration).
-   */
   private async ensureContainerReady(): Promise<void> {
     const hasRigs = rigs.listRigs(this.sql).length > 0;
     if (!hasRigs) return;
 
-    // Always keep container warm if there's active work
-    // Also keep it warm for the first 5 minutes after a rig is configured
-    // (the container may still be warming up for the user's first interaction)
     const hasWork = this.hasActiveWork();
     if (!hasWork) {
       const rigList = rigs.listRigs(this.sql);
@@ -1320,14 +1433,13 @@ export class TownDO extends DurableObject<Env> {
   async destroy(): Promise<void> {
     console.log(`${TOWN_LOG} destroy: clearing all storage and alarms`);
 
-    // Destroy all agent DOs before wiping town storage
     try {
       const allAgents = agents.listAgents(this.sql);
       await Promise.allSettled(
         allAgents.map(agent => getAgentDOStub(this.env, agent.id).destroy())
       );
     } catch {
-      // Best-effort — continue with cleanup even if agent destruction fails
+      // Best-effort
     }
 
     await this.ctx.storage.deleteAlarm();

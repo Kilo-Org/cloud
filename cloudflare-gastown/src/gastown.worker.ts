@@ -86,12 +86,11 @@ import {
   handleAcknowledgeEscalation,
 } from './handlers/town-escalations.handler';
 
-export { RigDO } from './dos/Rig.do';
 export { GastownUserDO } from './dos/GastownUser.do';
 export { AgentIdentityDO } from './dos/AgentIdentity.do';
 export { TownDO } from './dos/Town.do';
 export { TownContainerDO } from './dos/TownContainer.do';
-export { MayorDO } from './dos/Mayor.do';
+export { AgentDO } from './dos/Agent.do';
 
 export type GastownEnv = {
   Bindings: Env;
@@ -134,82 +133,110 @@ app.get('/', c => c.html(dashboardHtml()));
 app.get('/health', c => c.json({ status: 'ok' }));
 
 // ── Auth ────────────────────────────────────────────────────────────────
-// Applied at /api/rigs/:rigId/* so the rigId param is in scope for JWT validation.
-// Skipped in development to allow the dashboard and local tooling to work without JWTs.
+// All rig routes live under /api/towns/:townId/rigs/:rigId so the townId
+// is always available from the URL path. Auth middleware skipped in dev.
 
-app.use('/api/rigs/:rigId/*', async (c, next) =>
+app.use('/api/towns/:townId/rigs/:rigId/*', async (c, next) =>
   c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
 );
 
 // ── Beads ───────────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/beads', c => handleCreateBead(c, c.req.param()));
-app.get('/api/rigs/:rigId/beads', c => handleListBeads(c, c.req.param()));
-app.get('/api/rigs/:rigId/beads/:beadId', c => handleGetBead(c, c.req.param()));
-app.patch('/api/rigs/:rigId/beads/:beadId/status', c => handleUpdateBeadStatus(c, c.req.param()));
-app.post('/api/rigs/:rigId/beads/:beadId/close', c => handleCloseBead(c, c.req.param()));
-app.post('/api/rigs/:rigId/sling', c => handleSlingBead(c, c.req.param()));
-app.delete('/api/rigs/:rigId/beads/:beadId', c => handleDeleteBead(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/beads', c => handleCreateBead(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/beads', c => handleListBeads(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/beads/:beadId', c => handleGetBead(c, c.req.param()));
+app.patch('/api/towns/:townId/rigs/:rigId/beads/:beadId/status', c =>
+  handleUpdateBeadStatus(c, c.req.param())
+);
+app.post('/api/towns/:townId/rigs/:rigId/beads/:beadId/close', c =>
+  handleCloseBead(c, c.req.param())
+);
+app.post('/api/towns/:townId/rigs/:rigId/sling', c => handleSlingBead(c, c.req.param()));
+app.delete('/api/towns/:townId/rigs/:rigId/beads/:beadId', c => handleDeleteBead(c, c.req.param()));
 
 // ── Agents ──────────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
-app.get('/api/rigs/:rigId/agents', c => handleListAgents(c, c.req.param()));
-app.post('/api/rigs/:rigId/agents/get-or-create', c => handleGetOrCreateAgent(c, c.req.param()));
-app.get('/api/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
-app.delete('/api/rigs/:rigId/agents/:agentId', c => handleDeleteAgent(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/agents', c => handleListAgents(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/agents/get-or-create', c =>
+  handleGetOrCreateAgent(c, c.req.param())
+);
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
+app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId', c =>
+  handleDeleteAgent(c, c.req.param())
+);
 
 // Dashboard-accessible agent events (before agentOnlyMiddleware so the
 // frontend can query events without an agent JWT)
-app.get('/api/rigs/:rigId/agents/:agentId/events', c => handleGetAgentEvents(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/events', c =>
+  handleGetAgentEvents(c, c.req.param())
+);
 
 // Agent-scoped routes — agentOnlyMiddleware enforces JWT agentId match
-app.use('/api/rigs/:rigId/agents/:agentId/*', async (c, next) =>
+app.use('/api/towns/:townId/rigs/:rigId/agents/:agentId/*', async (c, next) =>
   c.env.ENVIRONMENT === 'development' ? next() : agentOnlyMiddleware(c, next)
 );
-app.post('/api/rigs/:rigId/agents/:agentId/hook', c => handleHookBead(c, c.req.param()));
-app.delete('/api/rigs/:rigId/agents/:agentId/hook', c => handleUnhookBead(c, c.req.param()));
-app.get('/api/rigs/:rigId/agents/:agentId/prime', c => handlePrime(c, c.req.param()));
-app.post('/api/rigs/:rigId/agents/:agentId/done', c => handleAgentDone(c, c.req.param()));
-app.post('/api/rigs/:rigId/agents/:agentId/completed', c => handleAgentCompleted(c, c.req.param()));
-app.post('/api/rigs/:rigId/agents/:agentId/checkpoint', c =>
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/hook', c =>
+  handleHookBead(c, c.req.param())
+);
+app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/hook', c =>
+  handleUnhookBead(c, c.req.param())
+);
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/prime', c => handlePrime(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/done', c =>
+  handleAgentDone(c, c.req.param())
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/completed', c =>
+  handleAgentCompleted(c, c.req.param())
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/checkpoint', c =>
   handleWriteCheckpoint(c, c.req.param())
 );
-app.get('/api/rigs/:rigId/agents/:agentId/mail', c => handleCheckMail(c, c.req.param()));
-app.post('/api/rigs/:rigId/agents/:agentId/heartbeat', c => handleHeartbeat(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/mail', c =>
+  handleCheckMail(c, c.req.param())
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/heartbeat', c =>
+  handleHeartbeat(c, c.req.param())
+);
 
 // ── Agent Events ─────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/agent-events', c => handleAppendAgentEvent(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/agent-events', c =>
+  handleAppendAgentEvent(c, c.req.param())
+);
 
 // ── Mail ────────────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/mail', c => handleSendMail(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/mail', c => handleSendMail(c, c.req.param()));
 
 // ── Review Queue ────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/review-queue', c => handleSubmitToReviewQueue(c, c.req.param()));
-app.post('/api/rigs/:rigId/review-queue/:entryId/complete', c =>
+app.post('/api/towns/:townId/rigs/:rigId/review-queue', c =>
+  handleSubmitToReviewQueue(c, c.req.param())
+);
+app.post('/api/towns/:townId/rigs/:rigId/review-queue/:entryId/complete', c =>
   handleCompleteReview(c, c.req.param())
 );
 
 // ── Bead Events ─────────────────────────────────────────────────────────
 
-app.get('/api/rigs/:rigId/events', c => handleListBeadEvents(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/events', c => handleListBeadEvents(c, c.req.param()));
 
 // ── Molecules ────────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/molecules', c => handleCreateMolecule(c, c.req.param()));
-app.get('/api/rigs/:rigId/agents/:agentId/molecule/current', c =>
+app.post('/api/towns/:townId/rigs/:rigId/molecules', c => handleCreateMolecule(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/molecule/current', c =>
   handleGetMoleculeCurrentStep(c, c.req.param())
 );
-app.post('/api/rigs/:rigId/agents/:agentId/molecule/advance', c =>
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/molecule/advance', c =>
   handleAdvanceMoleculeStep(c, c.req.param())
 );
 
 // ── Escalations ─────────────────────────────────────────────────────────
 
-app.post('/api/rigs/:rigId/escalations', c => handleCreateEscalation(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/escalations', c =>
+  handleCreateEscalation(c, c.req.param())
+);
 
 // ── Towns & Rigs ────────────────────────────────────────────────────────
 // Town DO instances are keyed by owner_user_id. The userId path param routes

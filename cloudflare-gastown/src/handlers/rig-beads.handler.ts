@@ -1,9 +1,9 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
-import { getRigDOStub } from '../dos/Rig.do';
+import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { getEnforcedAgentId } from '../middleware/auth.middleware';
+import { getEnforcedAgentId, getTownId } from '../middleware/auth.middleware';
 import { BeadType, BeadPriority, BeadStatus } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
@@ -43,8 +43,10 @@ export async function handleCreateBead(c: Context<GastownEnv>, params: { rigId: 
   console.log(
     `${HANDLER_LOG} handleCreateBead: rigId=${params.rigId} type=${parsed.data.type} title="${parsed.data.title?.slice(0, 80)}" assignee=${parsed.data.assignee_agent_id ?? 'none'}`
   );
-  const rig = getRigDOStub(c.env, params.rigId);
-  const bead = await rig.createBead(parsed.data);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const bead = await town.createBead({ ...parsed.data, rig_id: params.rigId });
   console.log(
     `${HANDLER_LOG} handleCreateBead: created bead ${JSON.stringify(bead).slice(0, 200)}`
   );
@@ -68,12 +70,15 @@ export async function handleListBeads(c: Context<GastownEnv>, params: { rigId: s
     return c.json(resError('Invalid status or type filter'), 400);
   }
 
-  const rig = getRigDOStub(c.env, params.rigId);
-  const beads = await rig.listBeads({
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const beads = await town.listBeads({
     status: status?.data,
     type: type?.data,
     assignee_agent_id: c.req.query('assignee_agent_id'),
     convoy_id: c.req.query('convoy_id'),
+    rig_id: params.rigId,
     limit: limit?.data,
     offset: offset?.data,
   });
@@ -84,8 +89,10 @@ export async function handleGetBead(
   c: Context<GastownEnv>,
   params: { rigId: string; beadId: string }
 ) {
-  const rig = getRigDOStub(c.env, params.rigId);
-  const bead = await rig.getBeadAsync(params.beadId);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const bead = await town.getBeadAsync(params.beadId);
   if (!bead) return c.json(resError('Bead not found'), 404);
   return c.json(resSuccess(bead));
 }
@@ -105,8 +112,10 @@ export async function handleUpdateBeadStatus(
   if (enforced && enforced !== parsed.data.agent_id) {
     return c.json(resError('agent_id does not match authenticated agent'), 403);
   }
-  const rig = getRigDOStub(c.env, params.rigId);
-  const bead = await rig.updateBeadStatus(params.beadId, parsed.data.status, parsed.data.agent_id);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const bead = await town.updateBeadStatus(params.beadId, parsed.data.status, parsed.data.agent_id);
   return c.json(resSuccess(bead));
 }
 
@@ -125,8 +134,10 @@ export async function handleCloseBead(
   if (enforced && enforced !== parsed.data.agent_id) {
     return c.json(resError('agent_id does not match authenticated agent'), 403);
   }
-  const rig = getRigDOStub(c.env, params.rigId);
-  const bead = await rig.closeBead(params.beadId, parsed.data.agent_id);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const bead = await town.closeBead(params.beadId, parsed.data.agent_id);
   return c.json(resSuccess(bead));
 }
 
@@ -148,8 +159,10 @@ export async function handleSlingBead(c: Context<GastownEnv>, params: { rigId: s
   console.log(
     `${HANDLER_LOG} handleSlingBead: rigId=${params.rigId} title="${parsed.data.title?.slice(0, 80)}" metadata=${JSON.stringify(parsed.data.metadata)}`
   );
-  const rig = getRigDOStub(c.env, params.rigId);
-  const result = await rig.slingBead(parsed.data);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const result = await town.slingBead({ ...parsed.data, rigId: params.rigId });
   console.log(
     `${HANDLER_LOG} handleSlingBead: completed, result=${JSON.stringify(result).slice(0, 300)}`
   );
@@ -160,8 +173,11 @@ export async function handleDeleteBead(
   c: Context<GastownEnv>,
   params: { rigId: string; beadId: string }
 ) {
-  const rig = getRigDOStub(c.env, params.rigId);
-  const deleted = await rig.deleteBead(params.beadId);
-  if (!deleted) return c.json(resError('Bead not found'), 404);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const bead = await town.getBeadAsync(params.beadId);
+  if (!bead) return c.json(resError('Bead not found'), 404);
+  await town.deleteBead(params.beadId);
   return c.json(resSuccess({ deleted: true }));
 }

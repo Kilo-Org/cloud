@@ -93,6 +93,8 @@ export type ManagedAgent = {
   gastownSessionToken: string | null;
   /** Override the default completion callback URL (for agents not backed by a Rig DO) */
   completionCallbackUrl: string | null;
+  /** Model ID used for this agent's sessions (e.g. "anthropic/claude-sonnet-4.6") */
+  model: string | null;
 };
 
 export type AgentStatusResponse = {

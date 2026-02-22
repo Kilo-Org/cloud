@@ -9,6 +9,7 @@ import {
   getUptime,
   stopAll,
   getAgentEvents,
+  registerEventSink,
 } from './process-manager';
 import { startHeartbeat, stopHeartbeat } from './heartbeat';
 import { mergeBranch } from './git-manager';
@@ -24,6 +25,32 @@ const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
 export const app = new Hono();
+
+// Apply town config from X-Town-Config header (sent by TownDO on every request)
+let currentTownConfig: Record<string, unknown> | null = null;
+
+/** Get the latest town config delivered via X-Town-Config header. */
+export function getCurrentTownConfig(): Record<string, unknown> | null {
+  return currentTownConfig;
+}
+
+app.use('*', async (c, next) => {
+  const configHeader = c.req.header('X-Town-Config');
+  if (configHeader) {
+    try {
+      const parsed = JSON.parse(configHeader);
+      currentTownConfig = parsed;
+      const hasToken =
+        typeof parsed.kilocode_token === 'string' && parsed.kilocode_token.length > 0;
+      console.log(
+        `[control-server] X-Town-Config received: hasKilocodeToken=${hasToken} keys=${Object.keys(parsed).join(',')}`
+      );
+    } catch {
+      console.warn('[control-server] X-Town-Config header malformed');
+    }
+  }
+  await next();
+});
 
 // Log method, path, status, and duration for every request
 app.use('*', async (c, next) => {
@@ -261,7 +288,10 @@ app.onError((err, c) => {
 });
 
 /**
- * Start the control server using Bun.serve + Hono.
+ * Start the control server using Bun.serve + Hono, with WebSocket support.
+ *
+ * The /ws endpoint provides a multiplexed event stream for all agents.
+ * SDK events from process-manager are forwarded to all connected WS clients.
  */
 export function startControlServer(): void {
   const PORT = 8080;
@@ -284,9 +314,109 @@ export function startControlServer(): void {
   process.on('SIGTERM', () => void shutdown());
   process.on('SIGINT', () => void shutdown());
 
-  Bun.serve({
+  // Track connected WebSocket clients with optional agent filter
+  type WSClient = import('bun').ServerWebSocket<{ agentId: string | null }>;
+  const wsClients = new Set<WSClient>();
+
+  // Agent stream URL patterns (the container receives the full path from the worker)
+  const AGENT_STREAM_RE = /\/agents\/([^/]+)\/stream$/;
+
+  // Register an event sink that forwards agent events to WS clients
+  registerEventSink((agentId, event, data) => {
+    const frame = JSON.stringify({
+      agentId,
+      event,
+      data,
+      timestamp: new Date().toISOString(),
+    });
+    for (const ws of wsClients) {
+      try {
+        // If the client subscribed to a specific agent, only send that agent's events
+        const filter = ws.data.agentId;
+        if (filter && filter !== agentId) continue;
+        ws.send(frame);
+      } catch {
+        wsClients.delete(ws);
+      }
+    }
+  });
+
+  Bun.serve<{ agentId: string | null }>({
     port: PORT,
-    fetch: app.fetch,
+    fetch(req, server) {
+      const url = new URL(req.url);
+      const pathname = url.pathname;
+
+      // WebSocket upgrade: match /ws OR /agents/:id/stream (with any prefix)
+      const isWsUpgrade = req.headers.get('upgrade')?.toLowerCase() === 'websocket';
+      if (isWsUpgrade) {
+        let agentId: string | null = null;
+
+        if (pathname === '/ws') {
+          agentId = url.searchParams.get('agentId');
+        } else {
+          const match = pathname.match(AGENT_STREAM_RE);
+          if (match) agentId = match[1];
+        }
+
+        // Accept upgrade if the path matches any WS pattern
+        if (pathname === '/ws' || AGENT_STREAM_RE.test(pathname)) {
+          const upgraded = server.upgrade(req, { data: { agentId } });
+          if (upgraded) return undefined;
+          return new Response('WebSocket upgrade failed', { status: 400 });
+        }
+      }
+
+      // All other requests go through Hono
+      return app.fetch(req);
+    },
+    websocket: {
+      open(ws) {
+        wsClients.add(ws);
+        const agentFilter = ws.data.agentId ?? 'all';
+        console.log(
+          `[control-server] WebSocket connected: agent=${agentFilter} (${wsClients.size} total)`
+        );
+
+        // Send in-memory backfill for this session's events.
+        // This covers late-joining clients within the same container lifecycle.
+        // For historical events after container restarts, clients query the
+        // AgentDO via the worker's GET /agents/:id/events endpoint.
+        if (ws.data.agentId) {
+          const events = getAgentEvents(ws.data.agentId, 0);
+          for (const evt of events) {
+            try {
+              ws.send(
+                JSON.stringify({
+                  agentId: ws.data.agentId,
+                  event: evt.event,
+                  data: evt.data,
+                  timestamp: evt.timestamp,
+                })
+              );
+            } catch {
+              break;
+            }
+          }
+        }
+      },
+      message(ws, message) {
+        // Handle subscribe messages from client
+        try {
+          const msg = JSON.parse(String(message));
+          if (msg.type === 'subscribe' && msg.agentId) {
+            ws.data.agentId = msg.agentId;
+            console.log(`[control-server] WebSocket subscribed to agent=${msg.agentId}`);
+          }
+        } catch {
+          // Ignore
+        }
+      },
+      close(ws) {
+        wsClients.delete(ws);
+        console.log(`[control-server] WebSocket disconnected (${wsClients.size} total)`);
+      },
+    },
   });
 
   console.log(`Town container control server listening on port ${PORT}`);

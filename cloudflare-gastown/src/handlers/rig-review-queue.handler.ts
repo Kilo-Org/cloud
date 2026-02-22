@@ -1,9 +1,9 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
-import { getRigDOStub } from '../dos/Rig.do';
+import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { getEnforcedAgentId } from '../middleware/auth.middleware';
+import { getEnforcedAgentId, getTownId } from '../middleware/auth.middleware';
 import type { GastownEnv } from '../gastown.worker';
 
 const SubmitToReviewQueueBody = z.object({
@@ -26,13 +26,15 @@ export async function handleSubmitToReviewQueue(c: Context<GastownEnv>, params: 
   if (enforced && enforced !== parsed.data.agent_id) {
     return c.json(resError('agent_id does not match authenticated agent'), 403);
   }
-  const rig = getRigDOStub(c.env, params.rigId);
-  await rig.submitToReviewQueue(parsed.data);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  await town.submitToReviewQueue(parsed.data);
   return c.json(resSuccess({ submitted: true }), 201);
 }
 
 const CompleteReviewBody = z.object({
-  status: z.enum(['merged', 'conflict']),
+  status: z.enum(['merged', 'failed']),
   message: z.string(),
   commit_sha: z.string().optional(),
 });
@@ -48,8 +50,10 @@ export async function handleCompleteReview(
       400
     );
   }
-  const rig = getRigDOStub(c.env, params.rigId);
-  await rig.completeReviewWithResult({
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  await town.completeReviewWithResult({
     entry_id: params.entryId,
     ...parsed.data,
   });

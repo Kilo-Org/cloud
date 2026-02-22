@@ -95,13 +95,13 @@ describe('Heartbeat Endpoint', () => {
   });
 });
 
-describe('Rig DO — touchAgentHeartbeat', () => {
+describe('Town DO — touchAgentHeartbeat', () => {
   it('should update agent last_activity_at via RPC', async () => {
-    const id = `rig-${crypto.randomUUID()}`;
-    const rig = env.RIG.get(env.RIG.idFromName(id));
+    const id = `town-${crypto.randomUUID()}`;
+    const town = env.TOWN.get(env.TOWN.idFromName(id));
 
     // Register agent
-    const agent = await rig.registerAgent({
+    const agent = await town.registerAgent({
       role: 'polecat',
       name: 'heartbeat-test',
       identity: 'hb-test-1',
@@ -111,10 +111,10 @@ describe('Rig DO — touchAgentHeartbeat', () => {
     await new Promise(r => setTimeout(r, 10));
 
     // Touch via heartbeat
-    await rig.touchAgentHeartbeat(agent.id);
+    await town.touchAgentHeartbeat(agent.id);
 
     // Verify updated
-    const updated = await rig.getAgentAsync(agent.id);
+    const updated = await town.getAgentAsync(agent.id);
     expect(updated).not.toBeNull();
     expect(updated!.last_activity_at).not.toBe(initialActivity);
   });

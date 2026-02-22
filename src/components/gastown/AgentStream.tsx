@@ -33,7 +33,9 @@ function toStreamEntry(
   data: Record<string, unknown>,
   nextId: () => number
 ): StreamEntry | null {
-  const props = data.properties as Record<string, unknown> | undefined;
+  // The WebSocket frame sends event data directly in `data` (not wrapped in `properties`).
+  // Support both: new format (data.part, data.info) and legacy (data.properties.part).
+  const props = (data.properties as Record<string, unknown> | undefined) ?? data;
   const ts = new Date();
 
   // Text / reasoning / tool parts — the main LLM output.
@@ -118,6 +120,16 @@ function toStreamEntry(
   if (event === 'error' || event === 'payment_required' || event === 'insufficient_funds') {
     const errorMsg = props && typeof props.error === 'string' ? props.error : event;
     return { id: nextId(), kind: 'error', content: errorMsg, timestamp: ts };
+  }
+  if (event === 'session.error') {
+    const errData = props?.error as Record<string, unknown> | undefined;
+    const errMsg =
+      errData && typeof errData.data === 'object' && errData.data
+        ? String((errData.data as Record<string, unknown>).message ?? 'Unknown error')
+        : typeof errData?.name === 'string'
+          ? errData.name
+          : 'Session error';
+    return { id: nextId(), kind: 'error', content: errMsg, timestamp: ts };
   }
 
   return null;

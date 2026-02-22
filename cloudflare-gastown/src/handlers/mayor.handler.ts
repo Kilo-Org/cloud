@@ -1,19 +1,11 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import type { GastownEnv } from '../gastown.worker';
-import { getMayorDOStub } from '../dos/Mayor.do';
-import { resSuccess, resError } from '../util/res.util';
+import { getTownDOStub } from '../dos/Town.do';
+import { resSuccess } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 
 const MAYOR_HANDLER_LOG = '[mayor.handler]';
-
-const ConfigureMayorBody = z.object({
-  townId: z.string().min(1),
-  userId: z.string().min(1),
-  kilocodeToken: z.string().optional(),
-  gitUrl: z.string().min(1),
-  defaultBranch: z.string().min(1),
-});
 
 const SendMayorMessageBody = z.object({
   message: z.string().min(1),
@@ -31,21 +23,8 @@ const MayorCompletedBody = z.object({
  * Configure the MayorDO for a town. Called when a rig is created.
  */
 export async function handleConfigureMayor(c: Context<GastownEnv>, params: { townId: string }) {
-  const body = await parseJsonBody(c);
-  const parsed = ConfigureMayorBody.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
-      400
-    );
-  }
-
-  console.log(
-    `${MAYOR_HANDLER_LOG} handleConfigureMayor: townId=${params.townId} userId=${parsed.data.userId}`
-  );
-
-  const mayor = getMayorDOStub(c.env, params.townId);
-  await mayor.configureMayor({ ...parsed.data, townId: params.townId });
+  // No-op: the mayor auto-configures on first message via TownDO.
+  console.log(`${MAYOR_HANDLER_LOG} handleConfigureMayor: no-op for townId=${params.townId}`);
   return c.json(resSuccess({ configured: true }), 200);
 }
 
@@ -68,8 +47,11 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
     `${MAYOR_HANDLER_LOG} handleSendMayorMessage: townId=${params.townId} message="${parsed.data.message.slice(0, 80)}"`
   );
 
-  const mayor = getMayorDOStub(c.env, params.townId);
-  const result = await mayor.sendMessage(parsed.data.message, parsed.data.model);
+  const town = getTownDOStub(c.env, params.townId);
+  // Ensure the TownDO knows its real UUID (ctx.id.name is unreliable in local dev)
+  // TODO: This should only be done on town creation. Why are we doing it here?
+  await town.setTownId(params.townId);
+  const result = await town.sendMayorMessage(parsed.data.message, parsed.data.model);
   return c.json(resSuccess(result), 200);
 }
 
@@ -78,8 +60,9 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
  * Get the mayor's session status.
  */
 export async function handleGetMayorStatus(c: Context<GastownEnv>, params: { townId: string }) {
-  const mayor = getMayorDOStub(c.env, params.townId);
-  const status = await mayor.getMayorStatus();
+  const town = getTownDOStub(c.env, params.townId);
+  await town.setTownId(params.townId);
+  const status = await town.getMayorStatus();
   return c.json(resSuccess(status), 200);
 }
 
@@ -102,11 +85,11 @@ export async function handleMayorCompleted(c: Context<GastownEnv>, params: { tow
     `${MAYOR_HANDLER_LOG} handleMayorCompleted: townId=${params.townId} status=${parsed.data.status}`
   );
 
-  const mayor = getMayorDOStub(c.env, params.townId);
-  // The completion reporter sends agentId in the URL path for Rig DO,
-  // but for MayorDO we get it from the session — pass a placeholder.
-  // The MayorDO.agentCompleted validates it against the active session.
-  await mayor.agentCompleted(parsed.data.agentId ?? '', parsed.data.status, parsed.data.reason);
+  const town = getTownDOStub(c.env, params.townId);
+  await town.agentCompleted(parsed.data.agentId ?? '', {
+    status: parsed.data.status,
+    reason: parsed.data.reason,
+  });
   return c.json(resSuccess({ acknowledged: true }), 200);
 }
 
@@ -115,8 +98,8 @@ export async function handleMayorCompleted(c: Context<GastownEnv>, params: { tow
  * Tear down the mayor session and clear all state.
  */
 export async function handleDestroyMayor(c: Context<GastownEnv>, params: { townId: string }) {
-  console.log(`${MAYOR_HANDLER_LOG} handleDestroyMayor: townId=${params.townId}`);
-  const mayor = getMayorDOStub(c.env, params.townId);
-  await mayor.destroy();
+  console.log(`${MAYOR_HANDLER_LOG} handleDestroyMayor: destroying townId=${params.townId}`);
+  const town = getTownDOStub(c.env, params.townId);
+  await town.destroy();
   return c.json(resSuccess({ destroyed: true }), 200);
 }

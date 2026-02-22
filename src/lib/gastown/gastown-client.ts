@@ -87,7 +87,7 @@ export const AgentSchema = z.object({
   status: z.enum(['idle', 'working', 'blocked', 'dead']),
   current_hook_bead_id: z.string().nullable(),
   dispatch_attempts: z.number().default(0),
-  last_activity_at: z.string(),
+  last_activity_at: z.string().nullable(),
   checkpoint: z.unknown().optional(),
   created_at: z.string(),
 });
@@ -135,6 +135,14 @@ async function gastownFetch(path: string, init?: RequestInit): Promise<unknown> 
   const url = `${GASTOWN_SERVICE_URL}${path}`;
   const method = init?.method ?? 'GET';
   console.log(`${CLIENT_LOG} ${method} ${url}`);
+  if (init?.body && typeof init.body === 'string') {
+    try {
+      const bodyKeys = Object.keys(JSON.parse(init.body));
+      console.log(`${CLIENT_LOG} ${method} ${path} bodyKeys=[${bodyKeys.join(',')}]`);
+    } catch {
+      // not JSON
+    }
+  }
   if (init?.body) {
     const safeBody =
       typeof init.body === 'string'
@@ -148,7 +156,10 @@ async function gastownFetch(path: string, init?: RequestInit): Promise<unknown> 
   const startTime = Date.now();
   const response = await fetch(url, {
     ...init,
-    headers: { ...getHeaders(), ...init?.headers },
+    headers: {
+      ...getHeaders(),
+      ...init?.headers,
+    },
   });
   const elapsed = Date.now() - startTime;
 
@@ -235,6 +246,7 @@ export async function listRigs(userId: string, townId: string): Promise<Rig[]> {
 // ── Bead operations (via Rig DO) ──────────────────────────────────────────
 
 export async function createBead(
+  townId: string,
   rigId: string,
   input: {
     type: string;
@@ -246,7 +258,7 @@ export async function createBead(
     assignee_agent_id?: string;
   }
 ): Promise<Bead> {
-  const body = await gastownFetch(`/api/rigs/${rigId}/beads`, {
+  const body = await gastownFetch(`/api/towns/${townId}/rigs/${rigId}/beads`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -260,21 +272,26 @@ const SlingResultSchema = z.object({
 export type SlingResult = z.output<typeof SlingResultSchema>;
 
 export async function slingBead(
+  townId: string,
   rigId: string,
   input: { title: string; body?: string; metadata?: Record<string, unknown> }
 ): Promise<SlingResult> {
-  const body = await gastownFetch(`/api/rigs/${rigId}/sling`, {
+  const body = await gastownFetch(`/api/towns/${townId}/rigs/${rigId}/sling`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
   return parseSuccessData(body, SlingResultSchema);
 }
 
-export async function listBeads(rigId: string, filter?: { status?: string }): Promise<Bead[]> {
+export async function listBeads(
+  townId: string,
+  rigId: string,
+  filter?: { status?: string }
+): Promise<Bead[]> {
   const params = new URLSearchParams();
   if (filter?.status) params.set('status', filter.status);
   const qs = params.toString();
-  const path = `/api/rigs/${rigId}/beads${qs ? `?${qs}` : ''}`;
+  const path = `/api/towns/${townId}/rigs/${rigId}/beads${qs ? `?${qs}` : ''}`;
   const body = await gastownFetch(path);
   return parseSuccessData(body, BeadSchema.array());
 }
@@ -282,31 +299,41 @@ export async function listBeads(rigId: string, filter?: { status?: string }): Pr
 // ── Agent operations (via Rig DO) ─────────────────────────────────────────
 
 export async function registerAgent(
+  townId: string,
   rigId: string,
   input: { role: string; name: string; identity: string }
 ): Promise<Agent> {
-  const body = await gastownFetch(`/api/rigs/${rigId}/agents`, {
+  const body = await gastownFetch(`/api/towns/${townId}/rigs/${rigId}/agents`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
   return parseSuccessData(body, AgentSchema);
 }
 
-export async function listAgents(rigId: string): Promise<Agent[]> {
-  const body = await gastownFetch(`/api/rigs/${rigId}/agents`);
+export async function listAgents(townId: string, rigId: string): Promise<Agent[]> {
+  const body = await gastownFetch(`/api/towns/${townId}/rigs/${rigId}/agents`);
   return parseSuccessData(body, AgentSchema.array());
 }
 
-export async function getOrCreateAgent(rigId: string, role: string): Promise<Agent> {
-  const body = await gastownFetch(`/api/rigs/${rigId}/agents/get-or-create`, {
+export async function getOrCreateAgent(
+  townId: string,
+  rigId: string,
+  role: string
+): Promise<Agent> {
+  const body = await gastownFetch(`/api/towns/${townId}/rigs/${rigId}/agents/get-or-create`, {
     method: 'POST',
     body: JSON.stringify({ role }),
   });
   return parseSuccessData(body, AgentSchema);
 }
 
-export async function hookBead(rigId: string, agentId: string, beadId: string): Promise<void> {
-  await gastownFetch(`/api/rigs/${rigId}/agents/${agentId}/hook`, {
+export async function hookBead(
+  townId: string,
+  rigId: string,
+  agentId: string,
+  beadId: string
+): Promise<void> {
+  await gastownFetch(`/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/hook`, {
     method: 'POST',
     body: JSON.stringify({ bead_id: beadId }),
   });
@@ -322,12 +349,12 @@ export async function deleteRig(userId: string, rigId: string): Promise<void> {
   await gastownFetch(`/api/users/${userId}/rigs/${rigId}`, { method: 'DELETE' });
 }
 
-export async function deleteBead(rigId: string, beadId: string): Promise<void> {
-  await gastownFetch(`/api/rigs/${rigId}/beads/${beadId}`, { method: 'DELETE' });
+export async function deleteBead(townId: string, rigId: string, beadId: string): Promise<void> {
+  await gastownFetch(`/api/towns/${townId}/rigs/${rigId}/beads/${beadId}`, { method: 'DELETE' });
 }
 
-export async function deleteAgent(rigId: string, agentId: string): Promise<void> {
-  await gastownFetch(`/api/rigs/${rigId}/agents/${agentId}`, { method: 'DELETE' });
+export async function deleteAgent(townId: string, rigId: string, agentId: string): Promise<void> {
+  await gastownFetch(`/api/towns/${townId}/rigs/${rigId}/agents/${agentId}`, { method: 'DELETE' });
 }
 
 // ── Event operations ──────────────────────────────────────────────────────
@@ -351,12 +378,13 @@ export const BeadEventSchema = z.object({
 export type BeadEvent = z.output<typeof BeadEventSchema>;
 
 export const TaggedBeadEventSchema = BeadEventSchema.extend({
-  rig_id: z.string(),
-  rig_name: z.string(),
+  rig_id: z.string().optional(),
+  rig_name: z.string().optional(),
 });
 export type TaggedBeadEvent = z.output<typeof TaggedBeadEventSchema>;
 
 export async function listBeadEvents(
+  townId: string,
   rigId: string,
   options?: { beadId?: string; since?: string; limit?: number }
 ): Promise<BeadEvent[]> {
@@ -365,7 +393,7 @@ export async function listBeadEvents(
   if (options?.since) params.set('since', options.since);
   if (options?.limit) params.set('limit', String(options.limit));
   const qs = params.toString();
-  const path = `/api/rigs/${rigId}/events${qs ? `?${qs}` : ''}`;
+  const path = `/api/towns/${townId}/rigs/${rigId}/events${qs ? `?${qs}` : ''}`;
   const body = await gastownFetch(path);
   return parseSuccessData(body, BeadEventSchema.array());
 }
@@ -393,6 +421,8 @@ export const TownConfigSchema = z.object({
     gitlab_token: z.string().optional(),
     gitlab_instance_url: z.string().optional(),
   }),
+  kilocode_token: z.string().optional(),
+  owner_user_id: z.string().optional(),
   default_model: z.string().optional(),
   max_polecats_per_rig: z.number().optional(),
   refinery: z

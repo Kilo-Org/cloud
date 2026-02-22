@@ -44,7 +44,21 @@ export const gastownRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return withGastownError(() => gastown.createTown(ctx.user.id, input.name));
+      const town = await withGastownError(() => gastown.createTown(ctx.user.id, input.name));
+
+      // Store the user's API token on the town config so the mayor can
+      // authenticate with the Kilo gateway without needing a rig.
+      const kilocodeToken = generateApiToken(ctx.user, undefined, {
+        expiresIn: TOKEN_EXPIRY.thirtyDays,
+      });
+      await withGastownError(() =>
+        gastown.updateTownConfig(town.id, {
+          kilocode_token: kilocodeToken,
+          owner_user_id: ctx.user.id,
+        })
+      );
+
+      return town;
     }),
 
   listTowns: baseProcedure.query(async ({ ctx }) => {
@@ -86,6 +100,9 @@ export const gastownRouter = createTRPCRouter({
       const kilocodeToken = generateApiToken(ctx.user, undefined, {
         expiresIn: TOKEN_EXPIRY.thirtyDays,
       });
+      console.log(
+        `[gastown-router] createRig: generating kilocodeToken for user=${ctx.user.id} tokenLength=${kilocodeToken?.length ?? 0}`
+      );
 
       return withGastownError(() =>
         gastown.createRig(ctx.user.id, {
@@ -115,8 +132,8 @@ export const gastownRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
       const [agents, beads] = await Promise.all([
-        withGastownError(() => gastown.listAgents(rig.id)),
-        withGastownError(() => gastown.listBeads(rig.id, { status: 'in_progress' })),
+        withGastownError(() => gastown.listAgents(rig.town_id, rig.id)),
+        withGastownError(() => gastown.listBeads(rig.town_id, rig.id, { status: 'in_progress' })),
       ]);
       return { ...rig, agents, beads };
     }),
@@ -132,8 +149,10 @@ export const gastownRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       // Verify the user owns the rig (getRig will 404 if wrong user)
-      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
-      return withGastownError(() => gastown.listBeads(input.rigId, { status: input.status }));
+      const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      return withGastownError(() =>
+        gastown.listBeads(rig.town_id, rig.id, { status: input.status })
+      );
     }),
 
   // ── Agents ──────────────────────────────────────────────────────────────
@@ -141,8 +160,8 @@ export const gastownRouter = createTRPCRouter({
   listAgents: baseProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
-      return withGastownError(() => gastown.listAgents(input.rigId));
+      const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      return withGastownError(() => gastown.listAgents(rig.town_id, rig.id));
     }),
 
   // ── Work Assignment ─────────────────────────────────────────────────────
@@ -167,7 +186,7 @@ export const gastownRouter = createTRPCRouter({
       // Atomic sling: creates bead, assigns/creates polecat, hooks them,
       // and arms the alarm — all in a single Rig DO call to avoid TOCTOU races.
       const result = await withGastownError(() =>
-        gastown.slingBead(rig.id, {
+        gastown.slingBead(rig.town_id, rig.id, {
           title: input.title,
           body: input.body,
           metadata: { model: input.model, slung_by: ctx.user.id },
@@ -302,9 +321,9 @@ export const gastownRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
       return withGastownError(() =>
-        gastown.listBeadEvents(input.rigId, {
+        gastown.listBeadEvents(rig.town_id, rig.id, {
           beadId: input.beadId,
           since: input.since,
           limit: input.limit,
@@ -355,15 +374,15 @@ export const gastownRouter = createTRPCRouter({
     .input(z.object({ rigId: z.string().uuid(), beadId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the caller owns this rig before deleting
-      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
-      await withGastownError(() => gastown.deleteBead(input.rigId, input.beadId));
+      const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      await withGastownError(() => gastown.deleteBead(rig.town_id, rig.id, input.beadId));
     }),
 
   deleteAgent: baseProcedure
     .input(z.object({ rigId: z.string().uuid(), agentId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the caller owns this rig before deleting
-      await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
-      await withGastownError(() => gastown.deleteAgent(input.rigId, input.agentId));
+      const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
+      await withGastownError(() => gastown.deleteAgent(rig.town_id, rig.id, input.agentId));
     }),
 });

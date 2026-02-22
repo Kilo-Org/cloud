@@ -2,6 +2,7 @@ import type { Config } from '@kilocode/sdk';
 import { writeFile } from 'node:fs/promises';
 import { cloneRepo, createWorktree } from './git-manager';
 import { startAgent } from './process-manager';
+import { getCurrentTownConfig } from './control-server';
 import type { ManagedAgent, StartAgentRequest } from './types';
 
 /**
@@ -18,13 +19,20 @@ function resolveEnv(request: StartAgentRequest, key: string): string | undefined
  * the Kilo LLM gateway. Mirrors the pattern in cloud-agent-next's
  * session-service.ts getSaferEnvVars().
  */
-function buildKiloConfigContent(kilocodeToken: string): string {
+function buildKiloConfigContent(kilocodeToken: string, model?: string): string {
+  const resolvedModel = model ?? 'anthropic/claude-sonnet-4.6';
   return JSON.stringify({
     provider: {
       kilo: {
         options: {
           apiKey: kilocodeToken,
           kilocodeToken,
+        },
+        // Explicitly register models so the kilo server doesn't reject them
+        // before routing to the gateway. The gateway handles actual validation.
+        models: {
+          [resolvedModel]: {},
+          'anthropic/claude-haiku-4.5': {},
         },
       },
     },
@@ -33,7 +41,7 @@ function buildKiloConfigContent(kilocodeToken: string): string {
     // openai/gpt-5-nano which doesn't exist in the kilo provider,
     // causing ProviderModelNotFoundError that kills the entire prompt loop.
     small_model: 'anthropic/claude-haiku-4.5',
-    model: 'anthropic/claude-sonnet-4.6',
+    model: resolvedModel,
     // Override the title agent to use a valid model (same as small_model).
     // kilo serve v1.0.23 resolves title model independently and the
     // small_model fallback doesn't prevent ProviderModelNotFoundError.
@@ -108,6 +116,7 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     GASTOWN_AGENT_ID: request.agentId,
     GASTOWN_RIG_ID: request.rigId,
     GASTOWN_TOWN_ID: request.townId,
+    GASTOWN_AGENT_ROLE: request.role,
 
     GIT_AUTHOR_NAME: `${request.name} (gastown)`,
     GIT_AUTHOR_EMAIL: `${request.name}@gastown.local`,
@@ -127,11 +136,26 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     }
   }
 
+  // Fall back to X-Town-Config for KILOCODE_TOKEN if not in request or process.env
+  if (!env.KILOCODE_TOKEN) {
+    const townConfig = getCurrentTownConfig();
+    const tokenFromConfig =
+      townConfig && typeof townConfig.kilocode_token === 'string'
+        ? townConfig.kilocode_token
+        : undefined;
+    console.log(
+      `[buildAgentEnv] KILOCODE_TOKEN fallback: townConfig=${townConfig ? 'present' : 'null'} hasToken=${!!tokenFromConfig} requestEnvKeys=${Object.keys(request.envVars ?? {}).join(',')}`
+    );
+    if (tokenFromConfig) {
+      env.KILOCODE_TOKEN = tokenFromConfig;
+    }
+  }
+
   // Build KILO_CONFIG_CONTENT so kilo serve can authenticate LLM calls.
   // Must also set OPENCODE_CONFIG_CONTENT — kilo serve checks both names.
   const kilocodeToken = env.KILOCODE_TOKEN;
   if (kilocodeToken) {
-    const configJson = buildKiloConfigContent(kilocodeToken);
+    const configJson = buildKiloConfigContent(kilocodeToken, request.model);
     env.KILO_CONFIG_CONTENT = configJson;
     env.OPENCODE_CONFIG_CONTENT = configJson;
     console.log(`[buildAgentEnv] KILO_CONFIG_CONTENT set (model=${JSON.parse(configJson).model})`);

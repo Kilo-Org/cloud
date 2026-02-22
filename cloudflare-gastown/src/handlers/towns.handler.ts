@@ -1,8 +1,7 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import { getGastownUserStub } from '../dos/GastownUser.do';
-import { getRigDOStub } from '../dos/Rig.do';
-import { getMayorDOStub } from '../dos/Mayor.do';
+import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
@@ -67,18 +66,18 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
     );
   }
   console.log(
-    `${TOWNS_LOG} handleCreateRig: userId=${params.userId} town_id=${parsed.data.town_id} name=${parsed.data.name} git_url=${parsed.data.git_url}`
+    `${TOWNS_LOG} handleCreateRig: userId=${params.userId} town_id=${parsed.data.town_id} name=${parsed.data.name} git_url=${parsed.data.git_url} hasKilocodeToken=${!!parsed.data.kilocode_token}`
   );
 
   const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.createRig(parsed.data);
   console.log(`${TOWNS_LOG} handleCreateRig: rig created id=${rig.id}, now configuring Rig DO`);
 
-  // Configure the Rig DO with its metadata so it can dispatch work to the container.
+  // Configure the Town DO with rig metadata and register the rig.
   // If this fails, roll back the rig creation to avoid an orphaned record.
   try {
-    const rigDO = getRigDOStub(c.env, rig.id);
-    await rigDO.configureRig({
+    const townDOStub = getTownDOStub(c.env, parsed.data.town_id);
+    await townDOStub.configureRig({
       rigId: rig.id,
       townId: parsed.data.town_id,
       gitUrl: parsed.data.git_url,
@@ -86,31 +85,20 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
       userId: params.userId,
       kilocodeToken: parsed.data.kilocode_token,
     });
-    console.log(`${TOWNS_LOG} handleCreateRig: Rig DO configured successfully`);
+    await townDOStub.addRig({
+      rigId: rig.id,
+      name: parsed.data.name,
+      gitUrl: parsed.data.git_url,
+      defaultBranch: parsed.data.default_branch,
+    });
+    console.log(`${TOWNS_LOG} handleCreateRig: Town DO configured and rig registered`);
   } catch (err) {
     console.error(
-      `${TOWNS_LOG} handleCreateRig: configureRig FAILED for rig ${rig.id}, rolling back:`,
+      `${TOWNS_LOG} handleCreateRig: Town DO configure FAILED for rig ${rig.id}, rolling back:`,
       err
     );
     await townDO.deleteRig(rig.id);
     return c.json(resError('Failed to configure rig'), 500);
-  }
-
-  // Configure the MayorDO for this town (idempotent — updates config if already set).
-  // The mayor needs the rig's git config to start a container agent.
-  try {
-    const mayorDO = getMayorDOStub(c.env, parsed.data.town_id);
-    await mayorDO.configureMayor({
-      townId: parsed.data.town_id,
-      userId: params.userId,
-      kilocodeToken: parsed.data.kilocode_token,
-      gitUrl: parsed.data.git_url,
-      defaultBranch: parsed.data.default_branch,
-    });
-    console.log(`${TOWNS_LOG} handleCreateRig: MayorDO configured for town ${parsed.data.town_id}`);
-  } catch (err) {
-    // Non-fatal: the mayor can be configured later via the API
-    console.error(`${TOWNS_LOG} handleCreateRig: MayorDO configure failed (non-fatal):`, err);
   }
 
   return c.json(resSuccess(rig), 201);
@@ -141,24 +129,13 @@ export async function handleDeleteTown(
 ) {
   const townDO = getGastownUserStub(c.env, params.userId);
 
-  // Destroy all Rig DOs before deleting the town to cancel orphaned alarms
-  const rigs = await townDO.listRigs(params.townId);
-  for (const rig of rigs) {
-    try {
-      const rigDO = getRigDOStub(c.env, rig.id);
-      await rigDO.destroy();
-    } catch (err) {
-      console.error(`${TOWNS_LOG} handleDeleteTown: failed to destroy Rig DO ${rig.id}:`, err);
-    }
-  }
-
-  // Destroy the MayorDO for this town (stops session, clears state)
+  // Destroy the Town DO (handles all rigs, agents, and mayor cleanup)
   try {
-    const mayorDO = getMayorDOStub(c.env, params.townId);
-    await mayorDO.destroy();
-    console.log(`${TOWNS_LOG} handleDeleteTown: MayorDO destroyed for town ${params.townId}`);
+    const townDOStub = getTownDOStub(c.env, params.townId);
+    await townDOStub.destroy();
+    console.log(`${TOWNS_LOG} handleDeleteTown: Town DO destroyed for town ${params.townId}`);
   } catch (err) {
-    console.error(`${TOWNS_LOG} handleDeleteTown: failed to destroy MayorDO:`, err);
+    console.error(`${TOWNS_LOG} handleDeleteTown: failed to destroy Town DO:`, err);
   }
 
   const deleted = await townDO.deleteTown(params.townId);
@@ -170,16 +147,19 @@ export async function handleDeleteRig(
   c: Context<GastownEnv>,
   params: { userId: string; rigId: string }
 ) {
-  const townDO = getGastownUserStub(c.env, params.userId);
-  const deleted = await townDO.deleteRig(params.rigId);
+  const userDO = getGastownUserStub(c.env, params.userId);
+  const rig = await userDO.getRigAsync(params.rigId);
+  if (!rig) return c.json(resError('Rig not found'), 404);
+
+  const deleted = await userDO.deleteRig(params.rigId);
   if (!deleted) return c.json(resError('Rig not found'), 404);
 
-  // Clean up the Rig DO (cancel alarms, delete storage)
+  // Remove the rig from the Town DO
   try {
-    const rigDO = getRigDOStub(c.env, params.rigId);
-    await rigDO.destroy();
+    const townDOStub = getTownDOStub(c.env, rig.town_id);
+    await townDOStub.removeRig(params.rigId);
   } catch (err) {
-    console.error(`${TOWNS_LOG} handleDeleteRig: failed to destroy Rig DO ${params.rigId}:`, err);
+    console.error(`${TOWNS_LOG} handleDeleteRig: failed to remove rig from Town DO:`, err);
   }
 
   return c.json(resSuccess({ deleted: true }));

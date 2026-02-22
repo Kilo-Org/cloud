@@ -7,6 +7,7 @@ const BeadPriority = z.enum(['low', 'medium', 'high', 'critical']);
 
 export const RigBeadRecord = z.object({
   id: z.string(),
+  rig_id: z.string().nullable(),
   type: BeadType,
   status: BeadStatus,
   title: z.string(),
@@ -29,6 +30,7 @@ export const rig_beads = getTableFromZodSchema('rig_beads', RigBeadRecord);
 export function createTableRigBeads(): string {
   return getCreateTableQueryFromTable(rig_beads, {
     id: `text primary key`,
+    rig_id: `text`,
     type: `text not null check(type in ('issue', 'message', 'escalation', 'merge_request'))`,
     status: `text not null default 'open' check(status in ('open', 'in_progress', 'closed', 'failed'))`,
     title: `text not null`,

@@ -1,8 +1,9 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
-import { getRigDOStub } from '../dos/Rig.do';
-import { resSuccess } from '../util/res.util';
+import { getTownDOStub } from '../dos/Town.do';
+import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
+import { getTownId } from '../middleware/auth.middleware';
 import { BeadPriority } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
@@ -21,13 +22,16 @@ export async function handleCreateEscalation(c: Context<GastownEnv>, params: { r
       400
     );
   }
-  const rig = getRigDOStub(c.env, params.rigId);
-  const bead = await rig.createBead({
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const bead = await town.createBead({
     type: 'escalation',
     title: parsed.data.title,
     body: parsed.data.body,
     priority: parsed.data.priority,
     metadata: parsed.data.metadata,
+    rig_id: params.rigId,
   });
   return c.json(resSuccess(bead), 201);
 }

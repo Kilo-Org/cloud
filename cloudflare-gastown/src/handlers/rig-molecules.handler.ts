@@ -1,16 +1,19 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
-import { getRigDOStub } from '../dos/Rig.do';
+import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
+import { getTownId } from '../middleware/auth.middleware';
 import type { GastownEnv } from '../gastown.worker';
 
 export async function handleGetMoleculeCurrentStep(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }
 ) {
-  const rig = getRigDOStub(c.env, params.rigId);
-  const step = await rig.getMoleculeCurrentStep(params.agentId);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const step = await town.getMoleculeCurrentStep(params.agentId);
   if (!step) return c.json(resError('No active molecule for this agent'), 404);
   return c.json(resSuccess(step));
 }
@@ -32,8 +35,10 @@ export async function handleAdvanceMoleculeStep(
     );
   }
 
-  const rig = getRigDOStub(c.env, params.rigId);
-  const result = await rig.advanceMoleculeStep(params.agentId, parsed.data.summary);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const result = await town.advanceMoleculeStep(params.agentId, parsed.data.summary);
   return c.json(resSuccess(result));
 }
 
@@ -61,7 +66,9 @@ export async function handleCreateMolecule(c: Context<GastownEnv>, params: { rig
     );
   }
 
-  const rig = getRigDOStub(c.env, params.rigId);
-  const mol = await rig.createMolecule(parsed.data.bead_id, parsed.data.formula);
+  const townId = getTownId(c);
+  if (!townId) return c.json(resError('Missing townId'), 400);
+  const town = getTownDOStub(c.env, townId);
+  const mol = await town.createMolecule(parsed.data.bead_id, parsed.data.formula);
   return c.json(resSuccess(mol), 201);
 }

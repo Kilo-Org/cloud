@@ -28,6 +28,11 @@ FLY_REGION=us,eu
 # In dev, use "latest" or run scripts/push-dev.sh which sets a timestamped tag.
 # In production, pin to a version (e.g., v40, sha-abc1234).
 FLY_IMAGE_TAG=latest
+# OpenClaw version (must match the openclaw@x.x.x version in the Dockerfile).
+# Used by the worker to self-register the version → image tag mapping in KV,
+# enabling per-user version tracking. Without this, version tracking fields
+# will be null and instances fall back to FLY_IMAGE_TAG directly.
+OPENCLAW_VERSION=2026.2.9
 
 # Legacy fallback for existing instances without per-user apps.
 # New instances get per-user apps (acct-{hash}) created automatically.

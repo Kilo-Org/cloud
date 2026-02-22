@@ -19,6 +19,7 @@ import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform } from './ro
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
+import { registerVersionIfNeeded } from './lib/image-version';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
@@ -412,5 +413,23 @@ app.all('*', async c => {
 });
 
 export default {
-  fetch: app.fetch,
+  fetch(request: Request, env: KiloClawEnv, ctx: ExecutionContext) {
+    // Self-register the current OpenClaw version in KV on deploy.
+    // Runs after the response is sent. If the very first request after deploy
+    // is a provision(), the KV write races with resolveLatestVersion() —
+    // provision may see the previous latest (or null) and fall back to
+    // FLY_IMAGE_TAG, which is already correct for the new deploy. This is benign.
+    if (env.OPENCLAW_VERSION && env.FLY_IMAGE_TAG) {
+      ctx.waitUntil(
+        registerVersionIfNeeded(
+          env.KV_CLAW_CACHE,
+          env.OPENCLAW_VERSION,
+          'default', // variant hardcoded day 1
+          env.FLY_IMAGE_TAG
+        )
+      );
+    }
+
+    return app.fetch(request, env, ctx);
+  },
 };

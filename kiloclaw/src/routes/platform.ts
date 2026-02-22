@@ -15,6 +15,11 @@ import {
   ChannelsPatchSchema,
 } from '../schemas/instance-config';
 import type { ModelEntry } from '../schemas/instance-config';
+import {
+  ImageVersionEntrySchema,
+  imageVersionKey,
+  imageVersionLatestKey,
+} from '../schemas/image-version';
 import { z } from 'zod';
 import { withDORetry } from '../util/do-retry';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -363,6 +368,47 @@ platform.get('/volume-snapshots', async c => {
     console.error('[platform] volume-snapshots failed:', message);
     return c.json({ error: message }, 500);
   }
+});
+
+// POST /api/platform/publish-image-version
+// Manual fallback for publishing/correcting version entries.
+// Primary registration path is worker self-registration on deploy.
+const PublishImageVersionSchema = z.object({
+  openclawVersion: z.string().min(1),
+  variant: z.string().min(1).default('default'),
+  imageTag: z.string().min(1),
+  imageDigest: z.string().nullable().optional(),
+});
+
+platform.post('/publish-image-version', async c => {
+  const result = await parseBody(c, PublishImageVersionSchema);
+  if ('error' in result) return result.error;
+
+  const { openclawVersion, variant, imageTag, imageDigest } = result.data;
+
+  const entry = {
+    openclawVersion,
+    variant,
+    imageTag,
+    imageDigest: imageDigest ?? null,
+    publishedAt: new Date().toISOString(),
+  };
+
+  // Validate against schema
+  const parsed = ImageVersionEntrySchema.safeParse(entry);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid version entry', details: parsed.error.flatten() }, 400);
+  }
+
+  // Write both the versioned key and the latest key (both store the full entry)
+  const serialized = JSON.stringify(parsed.data);
+  await Promise.all([
+    c.env.KV_CLAW_CACHE.put(imageVersionKey(openclawVersion, variant), serialized),
+    c.env.KV_CLAW_CACHE.put(imageVersionLatestKey(variant), serialized),
+  ]);
+
+  console.log('[platform] Published image version:', openclawVersion, variant, '→', imageTag);
+  return c.json({ ok: true, ...parsed.data }, 201);
 });
 
 export { platform };

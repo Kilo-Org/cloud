@@ -15,9 +15,9 @@ export default async function OrganizationSecurityAgentPage({ params }: PageProp
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization, isGlobalAdmin }) => (
+      render={({ organization }) => (
         <PageContainer>
-          <SecurityAgentPageClient organizationId={organization.id} isAdmin={isGlobalAdmin} />
+          <SecurityAgentPageClient organizationId={organization.id} />
         </PageContainer>
       )}
     />

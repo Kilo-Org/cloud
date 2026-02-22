@@ -1,6 +1,5 @@
 import { SecurityAgentPageClient } from '@/components/security-agent';
 import { PageContainer } from '@/components/layouts/PageContainer';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 
 export const metadata = {
   title: 'Security Agent | Kilo Code',
@@ -8,11 +7,9 @@ export const metadata = {
 };
 
 export default async function SecurityAgentPage() {
-  const user = await getUserFromAuthOrRedirect('/users/sign_in');
-
   return (
     <PageContainer>
-      <SecurityAgentPageClient isAdmin={user.is_admin} />
+      <SecurityAgentPageClient />
     </PageContainer>
   );
 }

@@ -1,7 +1,13 @@
 import http from 'node:http';
 import { Readable } from 'node:stream';
 import { Hono } from 'hono';
-import { createHttpProxy, handleWebSocketUpgrade } from './proxy';
+import {
+  DEFAULT_MAX_WS_CONNS,
+  DEFAULT_WS_HANDSHAKE_TIMEOUT_MS,
+  DEFAULT_WS_IDLE_TIMEOUT_MS,
+  createHttpProxy,
+  handleWebSocketUpgrade,
+} from './proxy';
 import { createSupervisor } from './supervisor';
 import { registerHealthRoute } from './routes/health';
 import { registerGatewayRoutes } from './routes/gateway';
@@ -11,6 +17,9 @@ export type RuntimeConfig = {
   expectedToken: string;
   requireProxyToken: boolean;
   gatewayArgs: string[];
+  wsIdleTimeoutMs: number;
+  wsHandshakeTimeoutMs: number;
+  maxWsConnections: number;
 };
 
 function parseBoolean(value: string | undefined): boolean {
@@ -33,6 +42,15 @@ function parseGatewayArgs(value: string | undefined): string[] {
   return parsed;
 }
 
+function parsePositiveInt(value: string | undefined, fallback: number, label: string): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${label} must be a positive integer`);
+  }
+  return parsed;
+}
+
 export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   const expectedToken = env.OPENCLAW_GATEWAY_TOKEN;
   if (!expectedToken) {
@@ -44,6 +62,17 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     expectedToken,
     requireProxyToken: parseBoolean(env.REQUIRE_PROXY_TOKEN),
     gatewayArgs: parseGatewayArgs(env.KILOCLAW_GATEWAY_ARGS),
+    wsIdleTimeoutMs: parsePositiveInt(
+      env.WS_IDLE_TIMEOUT_MS,
+      DEFAULT_WS_IDLE_TIMEOUT_MS,
+      'WS_IDLE_TIMEOUT_MS'
+    ),
+    wsHandshakeTimeoutMs: parsePositiveInt(
+      env.WS_HANDSHAKE_TIMEOUT_MS,
+      DEFAULT_WS_HANDSHAKE_TIMEOUT_MS,
+      'WS_HANDSHAKE_TIMEOUT_MS'
+    ),
+    maxWsConnections: parsePositiveInt(env.MAX_WS_CONNS, DEFAULT_MAX_WS_CONNS, 'MAX_WS_CONNS'),
   };
 }
 
@@ -105,10 +134,15 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     });
   });
 
+  const wsState = { activeConnections: 0 };
   server.on('upgrade', (req, socket, head) => {
     handleWebSocketUpgrade(req, socket, head, {
       expectedToken: config.expectedToken,
       requireProxyToken: config.requireProxyToken,
+      wsIdleTimeoutMs: config.wsIdleTimeoutMs,
+      wsHandshakeTimeoutMs: config.wsHandshakeTimeoutMs,
+      maxWsConnections: config.maxWsConnections,
+      wsState,
     });
   });
 
@@ -117,7 +151,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   await new Promise<void>(resolve => {
     server.listen(config.port, '0.0.0.0', () => {
       console.log(
-        `[controller] Listening on :${config.port} requireProxyToken=${config.requireProxyToken}`
+        `[controller] Listening on :${config.port} requireProxyToken=${config.requireProxyToken} wsIdleTimeoutMs=${config.wsIdleTimeoutMs} wsHandshakeTimeoutMs=${config.wsHandshakeTimeoutMs} maxWsConnections=${config.maxWsConnections}`
       );
       resolve();
     });

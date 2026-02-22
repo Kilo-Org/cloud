@@ -77,6 +77,8 @@ describe('HTTP proxy', () => {
 
 type FakeClientRequest = EventEmitter & {
   end: () => void;
+  setTimeout: (timeoutMs: number, callback?: () => void) => void;
+  destroy: () => void;
   on: (event: string, listener: (...args: unknown[]) => void) => FakeClientRequest;
 };
 
@@ -91,10 +93,17 @@ function createIncomingMessage(headers: Record<string, string>): http.IncomingMe
 class FakeSocket extends EventEmitter {
   written: string[] = [];
   destroyed = false;
+  timeoutMs: number | null = null;
+  timeoutCallback: (() => void) | null = null;
   pipe = vi.fn((dest: unknown) => dest);
   write = vi.fn((chunk: Buffer | string) => {
     this.written.push(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk);
     return true;
+  });
+  setTimeout = vi.fn((timeoutMs: number, callback?: () => void) => {
+    this.timeoutMs = timeoutMs;
+    this.timeoutCallback = callback ?? null;
+    return this;
   });
   destroy = vi.fn(() => {
     this.destroyed = true;
@@ -124,6 +133,13 @@ describe('WebSocket proxy', () => {
 
     const backendReq = new EventEmitter() as FakeClientRequest;
     let forwardedHeaders: http.OutgoingHttpHeaders | readonly string[] | undefined;
+    let handshakeTimeout: (() => void) | undefined;
+    backendReq.setTimeout = vi.fn((_timeoutMs: number, callback?: () => void) => {
+      if (callback) {
+        handshakeTimeout = callback;
+      }
+    });
+    backendReq.destroy = vi.fn(() => undefined);
     backendReq.end = () => {
       const backendRes = new EventEmitter() as http.IncomingMessage;
       (backendRes as { statusCode?: number }).statusCode = 101;
@@ -151,9 +167,57 @@ describe('WebSocket proxy', () => {
     expect((clientSocket as unknown as FakeSocket).written.join('')).toContain('HTTP/1.1 101');
     expect(backendSocket.written.join('')).toContain('client-head');
     expect((clientSocket as unknown as FakeSocket).written.join('')).toContain('backend-head');
+    expect((clientSocket as unknown as FakeSocket).timeoutMs).toBeGreaterThan(0);
+    expect(backendSocket.timeoutMs).toBeGreaterThan(0);
+    expect(handshakeTimeout).toBeDefined();
     const forwarded = forwardedHeaders as http.OutgoingHttpHeaders | undefined;
     expect(forwarded?.['x-kiloclaw-proxy-token']).toBeUndefined();
     expect((clientSocket as unknown as FakeSocket).pipe).toHaveBeenCalledWith(backendSocket);
     expect(backendSocket.pipe).toHaveBeenCalledWith(clientSocket);
+  });
+
+  it('rejects upgrade when max websocket connections are reached', () => {
+    const req = createIncomingMessage({ 'x-kiloclaw-proxy-token': 'token-1' });
+    const socket = new FakeSocket() as unknown as Duplex;
+
+    handleWebSocketUpgrade(req, socket, Buffer.alloc(0), {
+      expectedToken: 'token-1',
+      requireProxyToken: true,
+      maxWsConnections: 100,
+      wsState: { activeConnections: 100 },
+    });
+
+    expect((socket as unknown as FakeSocket).written.join('')).toContain('HTTP/1.1 503');
+    expect((socket as unknown as FakeSocket).destroyed).toBe(true);
+  });
+
+  it('returns 502 and releases slot on websocket handshake timeout', () => {
+    const req = createIncomingMessage({ 'x-kiloclaw-proxy-token': 'token-1' });
+    const socket = new FakeSocket() as unknown as Duplex;
+    const wsState = { activeConnections: 0 };
+
+    const backendReq = new EventEmitter() as FakeClientRequest;
+    let timeoutCallback: (() => void) | undefined;
+    backendReq.setTimeout = vi.fn((_timeoutMs: number, callback?: () => void) => {
+      timeoutCallback = callback;
+    });
+    backendReq.destroy = vi.fn(() => undefined);
+    backendReq.end = vi.fn(() => undefined);
+
+    vi.spyOn(http, 'request').mockReturnValue(backendReq as never);
+
+    handleWebSocketUpgrade(req, socket, Buffer.alloc(0), {
+      expectedToken: 'token-1',
+      requireProxyToken: true,
+      wsHandshakeTimeoutMs: 1,
+      wsState,
+    });
+
+    expect(wsState.activeConnections).toBe(1);
+    timeoutCallback?.();
+
+    expect((socket as unknown as FakeSocket).written.join('')).toContain('HTTP/1.1 502');
+    expect((socket as unknown as FakeSocket).destroyed).toBe(true);
+    expect(wsState.activeConnections).toBe(0);
   });
 });

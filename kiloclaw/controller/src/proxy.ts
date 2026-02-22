@@ -3,11 +3,21 @@ import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import type { Context } from 'hono';
 
+export const DEFAULT_WS_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+export const DEFAULT_WS_HANDSHAKE_TIMEOUT_MS = 5 * 1000;
+export const DEFAULT_MAX_WS_CONNS = 100;
+
 export type ProxyOptions = {
   expectedToken: string;
   requireProxyToken: boolean;
   backendHost?: string;
   backendPort?: number;
+  wsIdleTimeoutMs?: number;
+  wsHandshakeTimeoutMs?: number;
+  maxWsConnections?: number;
+  wsState?: {
+    activeConnections: number;
+  };
 };
 
 function getHeaderToken(header: string | string[] | undefined): string | undefined {
@@ -77,6 +87,18 @@ function socketWriteBadGateway(socket: Duplex): void {
   socket.destroy();
 }
 
+function socketWriteServiceUnavailable(socket: Duplex): void {
+  socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+  socket.destroy();
+}
+
+function setDuplexTimeout(socket: Duplex, timeoutMs: number, onTimeout: () => void): void {
+  const timeoutCapable = socket as unknown as {
+    setTimeout?: (timeout: number, callback?: () => void) => void;
+  };
+  timeoutCapable.setTimeout?.(timeoutMs, onTimeout);
+}
+
 export function handleWebSocketUpgrade(
   req: IncomingMessage,
   socket: Duplex,
@@ -85,12 +107,28 @@ export function handleWebSocketUpgrade(
 ): void {
   const backendHost = options.backendHost ?? '127.0.0.1';
   const backendPort = options.backendPort ?? 3001;
+  const wsIdleTimeoutMs = options.wsIdleTimeoutMs ?? DEFAULT_WS_IDLE_TIMEOUT_MS;
+  const wsHandshakeTimeoutMs = options.wsHandshakeTimeoutMs ?? DEFAULT_WS_HANDSHAKE_TIMEOUT_MS;
+  const maxWsConnections = options.maxWsConnections ?? DEFAULT_MAX_WS_CONNS;
+  const wsState = options.wsState ?? { activeConnections: 0 };
   const token = getHeaderToken(req.headers['x-kiloclaw-proxy-token']);
 
   if (!hasValidProxyToken(token, options.requireProxyToken, options.expectedToken)) {
     socketWriteUnauthorized(socket);
     return;
   }
+  if (wsState.activeConnections >= maxWsConnections) {
+    socketWriteServiceUnavailable(socket);
+    return;
+  }
+
+  wsState.activeConnections += 1;
+  let releasedConnection = false;
+  const releaseConnection = () => {
+    if (releasedConnection) return;
+    releasedConnection = true;
+    wsState.activeConnections = Math.max(0, wsState.activeConnections - 1);
+  };
 
   const forwardedHeaders = { ...req.headers };
   delete forwardedHeaders['x-kiloclaw-proxy-token'];
@@ -102,8 +140,26 @@ export function handleWebSocketUpgrade(
     method: req.method,
     headers: forwardedHeaders,
   });
+  backendReq.setTimeout(wsHandshakeTimeoutMs, () => {
+    socketWriteBadGateway(socket);
+    backendReq.destroy();
+    releaseConnection();
+  });
 
   backendReq.on('upgrade', (backendRes, backendSocket, backendHead) => {
+    backendReq.setTimeout(0);
+    setDuplexTimeout(socket, wsIdleTimeoutMs, () => socket.destroy());
+    backendSocket.setTimeout(wsIdleTimeoutMs, () => backendSocket.destroy());
+
+    let tunnelClosed = false;
+    const closeTunnel = () => {
+      if (tunnelClosed) return;
+      tunnelClosed = true;
+      socket.destroy();
+      backendSocket.destroy();
+      releaseConnection();
+    };
+
     let rawResponse = `HTTP/1.1 ${backendRes.statusCode ?? 101} ${
       backendRes.statusMessage ?? 'Switching Protocols'
     }\r\n`;
@@ -123,13 +179,24 @@ export function handleWebSocketUpgrade(
     socket.pipe(backendSocket);
     backendSocket.pipe(socket);
 
-    socket.on('error', () => backendSocket.destroy());
-    backendSocket.on('error', () => socket.destroy());
-    socket.on('close', () => backendSocket.destroy());
-    backendSocket.on('close', () => socket.destroy());
+    socket.on('error', () => closeTunnel());
+    backendSocket.on('error', () => closeTunnel());
+    socket.on('close', () => closeTunnel());
+    backendSocket.on('close', () => closeTunnel());
   });
 
   backendReq.on('response', backendRes => {
+    backendReq.setTimeout(0);
+    setDuplexTimeout(socket, wsIdleTimeoutMs, () => socket.destroy());
+
+    let closed = false;
+    const closeResponse = () => {
+      if (closed) return;
+      closed = true;
+      socket.destroy();
+      releaseConnection();
+    };
+
     let rawResponse = `HTTP/1.1 ${backendRes.statusCode ?? 502} ${
       backendRes.statusMessage ?? 'Bad Gateway'
     }\r\n`;
@@ -140,11 +207,14 @@ export function handleWebSocketUpgrade(
     socket.write(rawResponse);
     backendRes.pipe(socket);
     backendRes.on('end', () => socket.end());
+    backendRes.on('close', () => closeResponse());
+    socket.on('close', () => closeResponse());
   });
 
   backendReq.on('error', error => {
     console.error('[controller] WebSocket proxy backend error:', error);
     socketWriteBadGateway(socket);
+    releaseConnection();
   });
 
   backendReq.end();

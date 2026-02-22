@@ -106,6 +106,10 @@ export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBA
 // Posts deploy threat alerts to a dedicated Slack channel.
 // Expected to be a Slack Incoming Webhook URL.
 export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THREAT_WEBHOOK_URL');
+// Bot token + channel for internal Kilo feedback notifications via chat.postMessage.
+// The bot token must have the chat:write scope.
+export const SLACK_FEEDBACK_BOT_TOKEN = getEnvVariable('SLACK_FEEDBACK_BOT_TOKEN');
+export const SLACK_FEEDBACK_CHANNEL_ID = getEnvVariable('SLACK_FEEDBACK_CHANNEL_ID');
 export const ENABLE_MILVUS_DUAL_WRITE = true;
 
 // AI Attribution Service

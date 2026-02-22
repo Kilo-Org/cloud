@@ -6,7 +6,7 @@ import { app_builder_feedback } from '@/db/schema';
 import { getProjectWithOwnershipCheck } from '@/lib/app-builder/app-builder-service';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import * as z from 'zod';
-import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
+import { notifyAppBuilderFeedback } from '@/lib/feedback/app-builder-feedback-slack';
 import type { Owner } from '@/lib/integrations/core/types';
 
 const recentMessageSchema = z.object({
@@ -57,47 +57,9 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
         .returning({ id: app_builder_feedback.id });
 
       // Best-effort Slack notification
-      if (SLACK_USER_FEEDBACK_WEBHOOK_URL) {
-        const adminLink = `https://app.kilo.ai/admin/app-builder/${input.project_id}`;
-        const trimmedFeedback = input.feedback_text.trim();
-        const wasTruncated = trimmedFeedback.length > 500;
-        const feedbackText = trimmedFeedback.slice(0, 500) + (wasTruncated ? '...' : '');
-
-        fetch(SLACK_USER_FEEDBACK_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: 'New App Builder feedback',
-            unfurl_links: false,
-            unfurl_media: false,
-            blocks: [
-              {
-                type: 'header',
-                text: {
-                  type: 'plain_text',
-                  text: 'New App Builder feedback :hammer_and_wrench:',
-                },
-              },
-              {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `<${adminLink}|View project>`,
-                },
-              },
-              {
-                type: 'section',
-                text: {
-                  type: 'plain_text',
-                  text: feedbackText,
-                },
-              },
-            ],
-          }),
-        }).catch(error => {
-          console.error('[AppBuilderFeedback] Failed to post to Slack webhook', error);
-        });
-      }
+      notifyAppBuilderFeedback(input.project_id, input.feedback_text).catch(error => {
+        console.error('[AppBuilderFeedback] Failed to post to Slack', error);
+      });
 
       return inserted;
     }),

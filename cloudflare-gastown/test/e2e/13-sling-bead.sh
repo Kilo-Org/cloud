@@ -16,7 +16,7 @@ assert_status "201" "create rig"
 RIG_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 
 echo "  Slinging bead..."
-api_post "/api/rigs/${RIG_ID}/sling" '{"title":"Slung bead","body":"Do something","priority":"high"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/sling" '{"title":"Slung bead","body":"Do something","priority":"high"}'
 assert_status "201" "sling bead"
 assert_json_exists "$HTTP_BODY" ".data.bead.id" "slung bead should have id"
 assert_json_exists "$HTTP_BODY" ".data.agent.id" "slung bead should have agent"
@@ -28,7 +28,7 @@ echo "  Slung bead=${BEAD_ID} → agent=${AGENT_ID}"
 
 # Verify agent is hooked to the bead
 echo "  Checking agent hook..."
-api_get "/api/rigs/${RIG_ID}/agents/${AGENT_ID}"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/agents/${AGENT_ID}"
 assert_status "200" "get agent"
 assert_json "$HTTP_BODY" ".data.current_hook_bead_id" "$BEAD_ID" "agent should be hooked to bead"
 

@@ -31,6 +31,7 @@ export async function handleCreateEscalation(c: Context<GastownEnv>, params: { r
     body: parsed.data.body,
     priority: parsed.data.priority,
     metadata: parsed.data.metadata,
+    rig_id: params.rigId,
   });
   return c.json(resSuccess(bead), 201);
 }

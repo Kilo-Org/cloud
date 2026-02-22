@@ -45,7 +45,7 @@ export async function handleRegisterAgent(c: Context<GastownEnv>, params: { rigI
   const townId = getTownId(c);
   if (!townId) return c.json(resError('Missing townId'), 400);
   const town = getTownDOStub(c.env, townId);
-  const agent = await town.registerAgent(parsed.data);
+  const agent = await town.registerAgent({ ...parsed.data, rig_id: params.rigId });
   return c.json(resSuccess(agent), 201);
 }
 

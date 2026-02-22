@@ -13,12 +13,12 @@ RIG_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 
 # Sling a bead (creates bead + hooks agent → generates 'created' and 'hooked' events)
 echo "  Slinging bead..."
-api_post "/api/rigs/${RIG_ID}/sling" '{"title":"Event bead"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/sling" '{"title":"Event bead"}'
 assert_status "201" "sling"
 BEAD_ID=$(echo "$HTTP_BODY" | jq -r '.data.bead.id')
 
 echo "  Fetching bead events..."
-api_get "/api/rigs/${RIG_ID}/events"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/events"
 assert_status "200" "bead events"
 EVENT_COUNT=$(echo "$HTTP_BODY" | jq '.data | length')
 echo "  Events: ${EVENT_COUNT}"

@@ -12,7 +12,7 @@ api_post "/api/users/${USER_ID}/rigs" "$(jq -n --arg t "$TOWN_ID" '{town_id: $t,
 RIG_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 
 echo "  Creating escalation bead..."
-api_post "/api/rigs/${RIG_ID}/escalations" '{"title":"Agent stuck","body":"Stuck for 30 min","priority":"high"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/escalations" '{"title":"Agent stuck","body":"Stuck for 30 min","priority":"high"}'
 assert_status "201" "create escalation"
 ESC_BEAD_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 assert_json "$HTTP_BODY" ".data.type" "escalation" "type should be escalation"
@@ -25,7 +25,7 @@ assert_status "200" "list escalations"
 # The bead we created above is in the beads table, not the escalations table
 
 echo "  Listing beads to find escalation..."
-api_get "/api/rigs/${RIG_ID}/beads"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/beads"
 assert_status "200" "list beads"
 ESC_COUNT=$(echo "$HTTP_BODY" | jq '[.data[] | select(.type == "escalation")] | length')
 assert_eq "$ESC_COUNT" "1" "should have 1 escalation bead"

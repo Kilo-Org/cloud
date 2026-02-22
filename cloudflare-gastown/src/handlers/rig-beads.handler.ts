@@ -46,7 +46,7 @@ export async function handleCreateBead(c: Context<GastownEnv>, params: { rigId: 
   const townId = getTownId(c);
   if (!townId) return c.json(resError('Missing townId'), 400);
   const town = getTownDOStub(c.env, townId);
-  const bead = await town.createBead(parsed.data);
+  const bead = await town.createBead({ ...parsed.data, rig_id: params.rigId });
   console.log(
     `${HANDLER_LOG} handleCreateBead: created bead ${JSON.stringify(bead).slice(0, 200)}`
   );

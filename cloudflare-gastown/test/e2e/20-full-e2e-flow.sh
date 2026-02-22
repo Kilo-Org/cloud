@@ -36,39 +36,39 @@ assert_json "$HTTP_BODY" ".data.kilocode_token" "$FAKE_TOKEN" "token in town con
 echo "  Token confirmed in town config"
 
 echo "  ═══ Step 5: Create beads ═══"
-api_post "/api/rigs/${RIG_ID}/beads" '{"type":"issue","title":"Build login page","priority":"high"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/beads" '{"type":"issue","title":"Build login page","priority":"high"}'
 assert_status "201" "create bead 1"
 BEAD1_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 
-api_post "/api/rigs/${RIG_ID}/beads" '{"type":"issue","title":"Fix sidebar CSS","priority":"medium"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/beads" '{"type":"issue","title":"Fix sidebar CSS","priority":"medium"}'
 assert_status "201" "create bead 2"
 
 echo "  ═══ Step 6: Register agent and hook to bead ═══"
-api_post "/api/rigs/${RIG_ID}/agents" '{"role":"polecat","name":"E2E-Polecat","identity":"e2e-pc-1"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/agents" '{"role":"polecat","name":"E2E-Polecat","identity":"e2e-pc-1"}'
 assert_status "201" "register agent"
 AGENT_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 
-api_post "/api/rigs/${RIG_ID}/agents/${AGENT_ID}/hook" "{\"bead_id\":\"${BEAD1_ID}\"}"
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/agents/${AGENT_ID}/hook" "{\"bead_id\":\"${BEAD1_ID}\"}"
 assert_status "200" "hook agent"
 
 # Verify bead is in_progress
-api_get "/api/rigs/${RIG_ID}/beads/${BEAD1_ID}"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/beads/${BEAD1_ID}"
 assert_json "$HTTP_BODY" ".data.status" "in_progress" "bead should be in_progress"
 
 echo "  ═══ Step 7: Sling a bead (atomic) ═══"
-api_post "/api/rigs/${RIG_ID}/sling" '{"title":"Urgent hotfix"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/sling" '{"title":"Urgent hotfix"}'
 assert_status "201" "sling"
 SLUNG_BEAD=$(echo "$HTTP_BODY" | jq -r '.data.bead.id')
 SLUNG_AGENT=$(echo "$HTTP_BODY" | jq -r '.data.agent.id')
 echo "  Slung bead=${SLUNG_BEAD} → agent=${SLUNG_AGENT}"
 
 echo "  ═══ Step 8: Send mail between agents ═══"
-api_post "/api/rigs/${RIG_ID}/mail" "$(jq -n --arg from "$AGENT_ID" --arg to "$SLUNG_AGENT" \
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/mail" "$(jq -n --arg from "$AGENT_ID" --arg to "$SLUNG_AGENT" \
   '{from_agent_id: $from, to_agent_id: $to, subject: "coordination", body: "Can you check sidebar?"}')"
 assert_status "201" "send mail"
 
 echo "  ═══ Step 9: Check events were generated ═══"
-api_get "/api/rigs/${RIG_ID}/events"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/events"
 assert_status "200" "get events"
 EVENT_COUNT=$(echo "$HTTP_BODY" | jq '.data | length')
 echo "  Events generated: ${EVENT_COUNT}"
@@ -125,7 +125,7 @@ if [[ "$FOUND_TOKEN" != "true" ]]; then
 fi
 
 echo "  ═══ Step 14: List all agents in the rig ═══"
-api_get "/api/rigs/${RIG_ID}/agents"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/agents"
 assert_status "200" "list agents"
 TOTAL_AGENTS=$(echo "$HTTP_BODY" | jq '.data | length')
 echo "  Total agents: ${TOTAL_AGENTS}"

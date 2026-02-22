@@ -20,7 +20,7 @@ RIG_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 CURRENT_TOWN_ID="$TOWN_ID"
 
 echo "  Creating bead..."
-api_post "/api/rigs/${RIG_ID}/beads" '{"type":"issue","title":"E2E test bead","body":"Test body","priority":"high"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/beads" '{"type":"issue","title":"E2E test bead","body":"Test body","priority":"high"}'
 assert_status "201" "create bead"
 assert_json_exists "$HTTP_BODY" ".data.id" "bead should have id"
 assert_json "$HTTP_BODY" ".data.title" "E2E test bead" "bead title"
@@ -29,13 +29,13 @@ BEAD_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 echo "  Bead: ${BEAD_ID}"
 
 echo "  Listing beads..."
-api_get "/api/rigs/${RIG_ID}/beads"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/beads"
 assert_status "200" "list beads"
 BEAD_COUNT=$(echo "$HTTP_BODY" | jq '.data | length')
 assert_eq "$BEAD_COUNT" "1" "should have 1 bead"
 
 echo "  Getting bead by ID..."
-api_get "/api/rigs/${RIG_ID}/beads/${BEAD_ID}"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/beads/${BEAD_ID}"
 assert_status "200" "get bead"
 assert_json "$HTTP_BODY" ".data.id" "$BEAD_ID" "bead id should match"
 

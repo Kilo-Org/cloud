@@ -53,28 +53,29 @@ TRPC_CREATE_TOWN=$(curl -sf -b "$COOKIE_JAR" \
   "${NEXTJS_URL}/api/trpc/gastown.createTown?batch=1" 2>/dev/null || echo "{}")
 echo "  tRPC createTown response: ${TRPC_CREATE_TOWN:0:200}"
 
-TOWN_ID=$(echo "$TRPC_CREATE_TOWN" | jq -r '.[0].result.data.json.id // empty' 2>/dev/null)
-if [[ -z "$TOWN_ID" ]]; then
+TOWN_ID=$(echo "$TRPC_CREATE_TOWN" | jq -r '.[0].result.data.json.id // "NONE"' 2>/dev/null || echo "NONE")
+if [[ "$TOWN_ID" == "NONE" || "$TOWN_ID" == "null" || -z "$TOWN_ID" ]]; then
   echo "  Failed to create town via tRPC. Response: ${TRPC_CREATE_TOWN:0:500}"
   echo "  This may be an auth issue — fake user login may not work via curl."
   echo ""
   echo "  ═══ Fallback: Test token flow via direct API ═══"
-  # Create directly on wrangler to verify the worker-side flow works
+  # Create directly on the test wrangler to verify the worker-side flow works
+  FALLBACK_URL="${BASE_URL}"
   USER_ID="trpc-fallback-$(date +%s)-${RANDOM}"
   TOKEN="trpc-test-token-$(date +%s)"
   
   TOWN_BODY=$(curl -sf -X POST -H 'Content-Type: application/json' \
     -d '{"name":"Direct-Token-Town"}' \
-    "${WRANGLER_URL}/api/users/${USER_ID}/towns")
+    "${FALLBACK_URL}/api/users/${USER_ID}/towns")
   TOWN_ID=$(echo "$TOWN_BODY" | jq -r '.data.id')
   echo "  Direct town: ${TOWN_ID}"
   
   RIG_BODY=$(curl -sf -X POST -H 'Content-Type: application/json' \
     -d "{\"town_id\":\"${TOWN_ID}\",\"name\":\"direct-rig\",\"git_url\":\"https://github.com/t/r.git\",\"default_branch\":\"main\",\"kilocode_token\":\"${TOKEN}\"}" \
-    "${WRANGLER_URL}/api/users/${USER_ID}/rigs")
+    "${FALLBACK_URL}/api/users/${USER_ID}/rigs")
   echo "  Direct rig: $(echo "$RIG_BODY" | jq -r '.data.id')"
   
-  CONFIG=$(curl -sf "${WRANGLER_URL}/api/towns/${TOWN_ID}/config")
+  CONFIG=$(curl -sf "${FALLBACK_URL}/api/towns/${TOWN_ID}/config")
   CONFIG_TOKEN=$(echo "$CONFIG" | jq -r '.data.kilocode_token // "NONE"')
   echo "  Direct config token: ${CONFIG_TOKEN}"
   

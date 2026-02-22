@@ -16,7 +16,7 @@ assert_status "201" "create rig"
 RIG_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 
 echo "  Registering agent..."
-api_post "/api/rigs/${RIG_ID}/agents" '{"role":"polecat","name":"TestPolecat","identity":"test-polecat-1"}'
+api_post "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/agents" '{"role":"polecat","name":"TestPolecat","identity":"test-polecat-1"}'
 assert_status "201" "register agent"
 assert_json "$HTTP_BODY" ".data.role" "polecat" "agent role"
 assert_json "$HTTP_BODY" ".data.name" "TestPolecat" "agent name"
@@ -25,13 +25,13 @@ AGENT_ID=$(echo "$HTTP_BODY" | jq -r '.data.id')
 echo "  Agent: ${AGENT_ID}"
 
 echo "  Listing agents..."
-api_get "/api/rigs/${RIG_ID}/agents"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/agents"
 assert_status "200" "list agents"
 AGENT_COUNT=$(echo "$HTTP_BODY" | jq '.data | length')
 assert_eq "$AGENT_COUNT" "1" "should have 1 agent"
 
 echo "  Getting agent by ID..."
-api_get "/api/rigs/${RIG_ID}/agents/${AGENT_ID}"
+api_get "/api/towns/${TOWN_ID}/rigs/${RIG_ID}/agents/${AGENT_ID}"
 assert_status "200" "get agent"
 assert_json "$HTTP_BODY" ".data.id" "$AGENT_ID" "agent id"
 

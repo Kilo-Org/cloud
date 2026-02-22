@@ -5,6 +5,7 @@ import { db } from '@/lib/drizzle';
 import { sql, type SQL } from 'drizzle-orm';
 import { cliSessions, cli_sessions_v2 } from '@/db/schema';
 import { KNOWN_PLATFORMS } from '@/routers/cli-sessions-router';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 const PAGE_SIZE = 10;
 
@@ -136,6 +137,10 @@ export const unifiedSessionsRouter = createTRPCRouter({
   list: baseProcedure.input(ListSessionsInputSchema).query(async ({ ctx, input }) => {
     const { cursor, limit, createdOnPlatform, orderBy, organizationId, includeSubSessions } = input;
 
+    if (organizationId) {
+      await ensureOrganizationAccess(ctx, organizationId);
+    }
+
     const scopeOpts = {
       userId: ctx.user.id,
       createdOnPlatform,
@@ -195,6 +200,10 @@ export const unifiedSessionsRouter = createTRPCRouter({
     const { search_string, limit, offset, createdOnPlatform, organizationId, includeSubSessions } =
       input;
 
+    if (organizationId) {
+      await ensureOrganizationAccess(ctx, organizationId);
+    }
+
     const scopeOpts = {
       userId: ctx.user.id,
       createdOnPlatform,
@@ -205,12 +214,15 @@ export const unifiedSessionsRouter = createTRPCRouter({
     const v1Where = buildScopeFragments('cli_sessions', scopeOpts);
     const v2Where = buildScopeFragments('cli_sessions_v2', scopeOpts);
 
+    // Escape ILIKE wildcard characters so literal %, _ in user input are matched exactly
+    const escaped = search_string.replace(/[%_]/g, '\\$&');
+
     // Search filter: ILIKE on title and session_id::text
     v1Where.push(
-      sql`(${cliSessions.title} ILIKE ${`%${search_string}%`} OR ${cliSessions.session_id}::text ILIKE ${`%${search_string}%`})`
+      sql`(${cliSessions.title} ILIKE ${`%${escaped}%`} OR ${cliSessions.session_id}::text ILIKE ${`%${escaped}%`})`
     );
     v2Where.push(
-      sql`(COALESCE(${cli_sessions_v2.title}, '') ILIKE ${`%${search_string}%`} OR ${cli_sessions_v2.session_id}::text ILIKE ${`%${search_string}%`})`
+      sql`(COALESCE(${cli_sessions_v2.title}, '') ILIKE ${`%${escaped}%`} OR ${cli_sessions_v2.session_id}::text ILIKE ${`%${escaped}%`})`
     );
 
     const unionQuery = sql`

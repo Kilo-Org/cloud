@@ -15,8 +15,10 @@ import { security_findings } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { trackSecurityAgentAutoDismiss } from '../posthog-tracking';
-import { updateSecurityFindingStatus } from '../db/security-findings';
+import { updateSecurityFindingStatus, getSecurityFindingById } from '../db/security-findings';
 import { getSecurityAgentConfig } from '../db/security-config';
+import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { dismissDependabotAlert } from '../github/dependabot-api';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
 import { sentryLogger } from '@/lib/utils.server';
@@ -53,6 +55,73 @@ export async function dismissFinding(
     ignoredReason: params.reason,
     ignoredBy: params.dismissedBy || `auto-dismiss: ${params.comment}`,
   });
+}
+
+/**
+ * Write back a dismissal to Dependabot on GitHub.
+ * Fetches the finding and integration data, then calls the Dependabot API.
+ * Errors are logged but not thrown — a failed writeback should not break the auto-dismiss flow.
+ */
+export async function writebackDependabotDismissal(
+  findingId: string,
+  owner: Owner,
+  dismissedComment: string
+): Promise<void> {
+  const finding = await getSecurityFindingById(findingId);
+  if (!finding || finding.source !== 'dependabot') {
+    return;
+  }
+
+  const alertNumber = parseInt(finding.source_id, 10);
+  if (isNaN(alertNumber)) {
+    return;
+  }
+
+  const [repoOwner, repoName] = finding.repo_full_name.split('/');
+  if (!repoOwner || !repoName) {
+    logError('Invalid repo_full_name for Dependabot writeback', {
+      findingId,
+      repoFullName: finding.repo_full_name,
+    });
+    return;
+  }
+
+  const integration = await getIntegrationForOwner(owner, 'github');
+  const installationId = integration?.platform_installation_id;
+  if (!installationId) {
+    log('Skipping Dependabot writeback — no GitHub installation ID', { findingId });
+    return;
+  }
+
+  await dismissDependabotAlert(
+    installationId,
+    repoOwner,
+    repoName,
+    alertNumber,
+    'not_used',
+    `[Kilo Code auto-dismiss] ${dismissedComment}`
+  );
+
+  log('Wrote back Dependabot dismissal', { findingId, alertNumber });
+}
+
+/**
+ * Safely attempt Dependabot writeback, catching and logging any errors.
+ */
+async function safeWritebackDependabotDismissal(
+  findingId: string,
+  owner: Owner,
+  dismissedComment: string
+): Promise<void> {
+  try {
+    await writebackDependabotDismissal(findingId, owner, dismissedComment);
+  } catch (error) {
+    logError('Dependabot writeback failed', { findingId, error });
+    captureException(error, {
+      tags: { operation: 'writebackDependabotDismissal' },
+      extra: { findingId },
+    });
+  }
 }
 
 /**
@@ -99,6 +168,12 @@ export async function maybeAutoDismissAnalysis(options: {
       dismissedBy: 'auto-sandbox',
     });
 
+    await safeWritebackDependabotDismissal(
+      findingId,
+      ownerConverted,
+      analysis.sandboxAnalysis.exploitabilityReasoning
+    );
+
     log('Auto-dismissed finding (sandbox)', {
       correlationId,
       findingId,
@@ -133,6 +208,12 @@ export async function maybeAutoDismissAnalysis(options: {
         comment: triage.needsSandboxReasoning,
         dismissedBy: 'auto-triage',
       });
+
+      await safeWritebackDependabotDismissal(
+        findingId,
+        ownerConverted,
+        triage.needsSandboxReasoning
+      );
 
       log('Auto-dismissed finding (triage)', {
         correlationId,
@@ -239,6 +320,11 @@ export async function autoDismissEligibleFindings(
         comment: triage.needsSandboxReasoning,
         dismissedBy: 'auto-triage-bulk',
       });
+      await safeWritebackDependabotDismissal(
+        finding.id,
+        ownerConverted,
+        triage.needsSandboxReasoning
+      );
       dismissed++;
     } catch (error) {
       logError('Error dismissing finding', { findingId: finding.id, error });

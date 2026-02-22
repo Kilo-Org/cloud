@@ -146,6 +146,7 @@ function buildMachineConfig(
         path: '/health',
         interval: '30s',
         timeout: '5s',
+        grace_period: '60s',
       },
     },
     mounts: flyVolumeId ? [{ volume: flyVolumeId, path: '/root' }] : [],

@@ -1,5 +1,4 @@
 import type { SharedSessionSnapshot } from './client';
-import { extractLastAssistantMessage, fetchSessionExport } from './client';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -13,15 +12,22 @@ jest.mock('@/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
 }));
 
-const mockGenerateInternalServiceToken = jest.fn().mockReturnValue('mock-jwt-token');
-
 jest.mock('@/lib/tokens', () => ({
-  generateInternalServiceToken: mockGenerateInternalServiceToken,
+  generateInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
 }));
 
 // Must be set before importing fetchSessionExport (which reads the global)
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
+
+// Import after mocks are set up (jest.mock is hoisted, but this makes intent clear)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { generateInternalServiceToken } = require('@/lib/tokens') as {
+  generateInternalServiceToken: jest.Mock;
+};
+const mockGenerateInternalServiceToken = generateInternalServiceToken;
+
+import { extractLastAssistantMessage, fetchSessionExport } from './client';
 
 // ---------------------------------------------------------------------------
 // Helpers

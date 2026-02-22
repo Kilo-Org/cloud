@@ -116,6 +116,7 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     GASTOWN_AGENT_ID: request.agentId,
     GASTOWN_RIG_ID: request.rigId,
     GASTOWN_TOWN_ID: request.townId,
+    GASTOWN_AGENT_ROLE: request.role,
 
     GIT_AUTHOR_NAME: `${request.name} (gastown)`,
     GIT_AUTHOR_EMAIL: `${request.name}@gastown.local`,

@@ -51,12 +51,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Extract the OpenClaw version from the Dockerfile so the worker can
+      # self-register the version → image tag mapping in KV on first request.
+      - name: Extract OpenClaw version
+        id: openclaw-version
+        run: |
+          VERSION=$(sed -n 's/.*openclaw@\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' kiloclaw/Dockerfile | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Failed to extract OpenClaw version from Dockerfile"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       # Deploy CF Worker with the commit SHA as the image tag.
       # --var overrides the default FLY_IMAGE_TAG in wrangler.jsonc,
       # so new machine creates/restarts use the exact image from this build.
+      # OPENCLAW_VERSION enables worker self-registration of the version in KV.
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: kiloclaw
-          command: deploy --var FLY_IMAGE_TAG:${{ github.sha }}
+          command: deploy --var FLY_IMAGE_TAG:${{ github.sha }} --var OPENCLAW_VERSION:${{ steps.openclaw-version.outputs.version }}

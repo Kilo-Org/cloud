@@ -57,6 +57,7 @@ import type {
 import * as fly from '../fly/client';
 import { appNameFromUserId } from '../fly/apps';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../utils/env-encryption';
+import { resolveLatestVersion } from '../lib/image-version';
 
 type InstanceStatus = PersistedState['status'];
 
@@ -110,12 +111,19 @@ function nextAlarmTime(status: InstanceStatus): number {
 
 export const METADATA_KEY_USER_ID = 'kiloclaw_user_id';
 export const METADATA_KEY_SANDBOX_ID = 'kiloclaw_sandbox_id';
+export const METADATA_KEY_OPENCLAW_VERSION = 'kiloclaw_openclaw_version';
+export const METADATA_KEY_IMAGE_VARIANT = 'kiloclaw_image_variant';
 
 // ============================================================================
 // Machine config builder
 // ============================================================================
 
-type MachineIdentity = { userId: string; sandboxId: string };
+type MachineIdentity = {
+  userId: string;
+  sandboxId: string;
+  openclawVersion: string | null;
+  imageVariant: string | null;
+};
 
 function buildMachineConfig(
   registryApp: string,
@@ -142,6 +150,10 @@ function buildMachineConfig(
     metadata: {
       [METADATA_KEY_USER_ID]: identity.userId,
       [METADATA_KEY_SANDBOX_ID]: identity.sandboxId,
+      ...(identity.openclawVersion && {
+        [METADATA_KEY_OPENCLAW_VERSION]: identity.openclawVersion,
+      }),
+      ...(identity.imageVariant && { [METADATA_KEY_IMAGE_VARIANT]: identity.imageVariant }),
     },
   };
 }
@@ -281,6 +293,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private pendingDestroyMachineId: string | null = null;
   private pendingDestroyVolumeId: string | null = null;
   private lastMetadataRecoveryAt: number | null = null;
+  private openclawVersion: string | null = null;
+  private imageVariant: string | null = null;
+  private trackedImageTag: string | null = null;
 
   // In-memory only (not persisted to SQLite) — throttles live Fly checks in getStatus()
   private lastLiveCheckAt: number | null = null;
@@ -318,6 +333,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.pendingDestroyMachineId = s.pendingDestroyMachineId;
       this.pendingDestroyVolumeId = s.pendingDestroyVolumeId;
       this.lastMetadataRecoveryAt = s.lastMetadataRecoveryAt;
+      this.openclawVersion = s.openclawVersion;
+      this.imageVariant = s.imageVariant;
+      this.trackedImageTag = s.trackedImageTag;
     } else {
       const hasAnyData = entries.size > 0;
       if (hasAnyData) {
@@ -382,6 +400,20 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       console.log('[DO] Created Fly Volume:', volume.id, 'region:', volume.region);
     }
 
+    // Resolve the latest registered version on every provision (including re-provision).
+    // If the registry isn't populated yet, fields stay null → fallback to FLY_IMAGE_TAG.
+    const variant = 'default'; // hardcoded day 1; future: from config or provision request
+    const latest = await resolveLatestVersion(this.env.KV_CLAW_CACHE, variant);
+    if (latest) {
+      this.openclawVersion = latest.openclawVersion;
+      this.imageVariant = latest.variant;
+      this.trackedImageTag = latest.imageTag;
+    } else {
+      this.openclawVersion = null;
+      this.imageVariant = null;
+      this.trackedImageTag = null;
+    }
+
     const configFields = {
       userId,
       sandboxId,
@@ -396,9 +428,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       machineSize: config.machineSize ?? this.machineSize ?? null,
     } satisfies Partial<PersistedState>;
 
+    const versionFields = {
+      openclawVersion: this.openclawVersion,
+      imageVariant: this.imageVariant,
+      trackedImageTag: this.trackedImageTag,
+    };
+
     const update = isNew
       ? storageUpdate({
           ...configFields,
+          ...versionFields,
           provisionedAt: Date.now(),
           lastStartedAt: null,
           lastStoppedAt: null,
@@ -410,7 +449,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           pendingDestroyMachineId: null,
           pendingDestroyVolumeId: null,
         })
-      : storageUpdate(configFields);
+      : storageUpdate({ ...configFields, ...versionFields });
 
     await this.ctx.storage.put(update);
 
@@ -788,8 +827,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
     const guest = guestFromSize(this.machineSize);
-    const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
-    const identity = { userId: this.userId, sandboxId: this.sandboxId };
+    const imageTag = this.resolveImageTag();
+    const identity = {
+      userId: this.userId,
+      sandboxId: this.sandboxId,
+      openclawVersion: this.openclawVersion,
+      imageVariant: this.imageVariant,
+    };
     const machineConfig = buildMachineConfig(
       this.getRegistryApp(),
       imageTag,
@@ -951,6 +995,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyMachineId: string | null;
     flyVolumeId: string | null;
     flyRegion: string | null;
+    openclawVersion: string | null;
+    imageVariant: string | null;
+    trackedImageTag: string | null;
   }> {
     await this.loadState();
 
@@ -981,6 +1028,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyMachineId: this.flyMachineId,
       flyVolumeId: this.flyVolumeId,
       flyRegion: this.flyRegion,
+      openclawVersion: this.openclawVersion,
+      imageVariant: this.imageVariant,
+      trackedImageTag: this.trackedImageTag,
     };
   }
 
@@ -1023,8 +1073,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
       const guest = guestFromSize(this.machineSize);
-      const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
-      const identity = { userId: this.userId ?? '', sandboxId: this.sandboxId ?? '' };
+      const imageTag = this.resolveImageTag();
+      const identity = {
+        userId: this.userId ?? '',
+        sandboxId: this.sandboxId ?? '',
+        openclawVersion: this.openclawVersion,
+        imageVariant: this.imageVariant,
+      };
       const machineConfig = buildMachineConfig(
         this.getRegistryApp(),
         imageTag,
@@ -1484,6 +1539,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.pendingDestroyMachineId = null;
     this.pendingDestroyVolumeId = null;
     this.lastMetadataRecoveryAt = null;
+    this.openclawVersion = null;
+    this.imageVariant = null;
+    this.trackedImageTag = null;
     this.loaded = false;
 
     return true;
@@ -1492,6 +1550,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // ========================================================================
   // Infrastructure helpers
   // ========================================================================
+
+  /**
+   * Resolve the Docker image tag for this instance.
+   * Reads from DO state only — no KV on the hot path.
+   * Falls back to FLY_IMAGE_TAG for instances provisioned before tracking was enabled.
+   */
+  private resolveImageTag(): string {
+    if (this.trackedImageTag) {
+      return this.trackedImageTag;
+    }
+    // Fallback for instances provisioned before tracking was enabled
+    return this.env.FLY_IMAGE_TAG ?? 'latest';
+  }
 
   /**
    * Shared Docker image registry app name.
@@ -1773,6 +1844,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           healthCheckFailCount: 0,
           pendingDestroyMachineId: null,
           pendingDestroyVolumeId: null,
+          openclawVersion: null,
+          imageVariant: null,
+          trackedImageTag: null,
         })
       );
 
@@ -1794,6 +1868,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.pendingDestroyMachineId = null;
       this.pendingDestroyVolumeId = null;
       this.lastMetadataRecoveryAt = null;
+      this.openclawVersion = null;
+      this.imageVariant = null;
+      this.trackedImageTag = null;
       this.loaded = true;
 
       console.log('[DO] Restored from Postgres: sandboxId =', instance.sandboxId);

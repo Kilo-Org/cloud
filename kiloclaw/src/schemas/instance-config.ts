@@ -127,6 +127,10 @@ export const PersistedStateSchema = z.object({
   // Cooldown: last time we attempted metadata-based machine recovery from Fly.
   // Prevents hammering listMachines on every alarm when there's genuinely nothing.
   lastMetadataRecoveryAt: z.number().nullable().default(null),
+  // Image version tracking: records what version/variant/tag a user was provisioned with
+  openclawVersion: z.string().nullable().default(null),
+  imageVariant: z.string().nullable().default(null),
+  trackedImageTag: z.string().nullable().default(null),
 });
 
 export type PersistedState = z.infer<typeof PersistedStateSchema>;

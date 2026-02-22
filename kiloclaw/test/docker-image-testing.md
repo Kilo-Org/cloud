@@ -187,6 +187,13 @@ The `push-dev.sh` script builds for linux/amd64 and pushes to a Fly app's regist
 It reads `FLY_APP_NAME` from `.dev.vars` (defaults to `kiloclaw-dev`) and updates
 `FLY_IMAGE_TAG` in `.dev.vars` so the worker uses the new tag on next machine create.
 
+> **Version tracking:** Make sure `OPENCLAW_VERSION` is set in `.dev.vars` to match
+> the `openclaw@x.x.x` version in the Dockerfile (see `.dev.vars.example`). This
+> enables the worker to self-register the version → image tag mapping in KV, so
+> provisioned instances track which OpenClaw version they're running. Without it,
+> version tracking fields will be null (instances still work via `FLY_IMAGE_TAG` fallback).
+> Update this value whenever you bump the OpenClaw version in the Dockerfile.
+
 ```bash
 # Authenticate Docker with Fly registry (also in prerequisites, but tokens expire per session)
 fly auth docker

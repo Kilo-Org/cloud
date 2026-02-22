@@ -989,6 +989,7 @@ export class TownDO extends DurableObject<Env> {
       ),
     ];
     const pendingAgents = RigAgentRecord.array().parse(rows);
+    console.log(`${TOWN_LOG} schedulePendingWork: found ${pendingAgents.length} pending agents`);
     if (pendingAgents.length === 0) return;
 
     const townConfig = await this.getTownConfig();
@@ -1021,6 +1022,10 @@ export class TownDO extends DurableObject<Env> {
       // Use the agent's rig_id to get the correct rig config
       const rigId = agent.rig_id ?? rigs.listRigs(this.sql)[0]?.id ?? '';
       const rigConfig = rigId ? await this.getRigConfig(rigId) : null;
+
+      console.log(
+        `${TOWN_LOG} schedulePendingWork: agent=${agent.name}(${agent.id}) rig_id=${agent.rig_id ?? 'null'} resolved_rig=${rigId} hasConfig=${!!rigConfig}`
+      );
 
       if (!rigConfig) {
         console.warn(

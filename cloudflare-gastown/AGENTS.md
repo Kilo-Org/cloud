@@ -23,7 +23,10 @@
 - Use the type-safe `query()` helper from `util/query.util.ts` for all SQL queries.
 - Prefix SQL template strings with `/* sql */` for syntax highlighting and to signal intent, e.g. `query(this.sql, /* sql */ \`SELECT ...\`, [...])`.
 - Format queries for human readability: use multi-line strings with one clause per line (`SELECT`, `FROM`, `WHERE`, `SET`, etc.).
-- Reference tables and columns via the table interpolator objects exported from `db/tables/*.table.ts` (created with `getTableFromZodSchema` from `util/table.ts`). Never use raw table/column name strings in queries.
+- Reference tables and columns via the table interpolator objects exported from `db/tables/*.table.ts` (created with `getTableFromZodSchema` from `util/table.ts`). Never use raw table/column name strings in queries. The interpolator has three access patterns — use the right one for context:
+  - `${beads}` → bare table name. Use for `FROM`, `INSERT INTO`, `DELETE FROM`.
+  - `${beads.columns.status}` → bare column name. Use for `SET` clauses and `INSERT` column lists where the table is already implied.
+  - `${beads.status}` → qualified `table.column`. Use for `SELECT`, `WHERE`, `JOIN ON`, `ORDER BY`, and anywhere a column could be ambiguous.
 - Prefer static queries over dynamically constructed ones. Move conditional logic into the query itself using SQL constructs like `COALESCE`, `CASE`, `NULLIF`, or `WHERE (? IS NULL OR col = ?)` patterns so the full query is always visible as a single readable string.
 - Always parse query results with the Zod `Record` schemas from `db/tables/*.table.ts`. Never use ad-hoc `as Record<string, unknown>` casts or `String(row.col)` to extract fields — use `.pick()` for partial selects and `.array()` for lists, e.g. `BeadRecord.pick({ bead_id: true }).array().parse(rows)`. This keeps row parsing type-safe and co-located with the schema definition.
 - When a column has a SQL `CHECK` constraint that restricts it to a set of values (i.e. an enum), mirror that in the Record schema using `z.enum()` rather than `z.string()`, e.g. `role: z.enum(['polecat', 'refinery', 'mayor', 'witness'])`.

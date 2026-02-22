@@ -253,14 +253,14 @@ export class TownDO extends DurableObject<Env> {
       this.sql,
       /* sql */ `
         DELETE FROM ${agent_metadata}
-        WHERE ${agent_metadata.columns.bead_id} IN (
-          SELECT ${beads.columns.bead_id} FROM ${beads}
-          WHERE ${beads.columns.type} = 'agent' AND ${beads.columns.rig_id} = ?
+        WHERE ${agent_metadata.bead_id} IN (
+          SELECT ${beads.bead_id} FROM ${beads}
+          WHERE ${beads.type} = 'agent' AND ${beads.rig_id} = ?
         )
       `,
       [rigId]
     );
-    query(this.sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.columns.rig_id} = ?`, [rigId]);
+    query(this.sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.rig_id} = ?`, [rigId]);
   }
 
   async listRigs(): Promise<rigs.RigRecord[]> {
@@ -844,7 +844,7 @@ export class TownDO extends DurableObject<Env> {
       /* sql */ `
         UPDATE ${convoy_metadata}
         SET ${convoy_metadata.columns.closed_beads} = ?
-        WHERE ${convoy_metadata.columns.bead_id} = ?
+        WHERE ${convoy_metadata.bead_id} = ?
       `,
       [closedCount, input.convoyId]
     );
@@ -857,7 +857,7 @@ export class TownDO extends DurableObject<Env> {
         /* sql */ `
           UPDATE ${beads}
           SET ${beads.columns.status} = 'closed', ${beads.columns.closed_at} = ?, ${beads.columns.updated_at} = ?
-          WHERE ${beads.columns.bead_id} = ?
+          WHERE ${beads.bead_id} = ?
         `,
         [timestamp, timestamp, input.convoyId]
       );
@@ -866,7 +866,7 @@ export class TownDO extends DurableObject<Env> {
         /* sql */ `
           UPDATE ${convoy_metadata}
           SET ${convoy_metadata.columns.landed_at} = ?
-          WHERE ${convoy_metadata.columns.bead_id} = ?
+          WHERE ${convoy_metadata.bead_id} = ?
         `,
         [timestamp, input.convoyId]
       );
@@ -894,7 +894,7 @@ export class TownDO extends DurableObject<Env> {
       /* sql */ `
         UPDATE ${escalation_metadata}
         SET ${escalation_metadata.columns.acknowledged} = 1, ${escalation_metadata.columns.acknowledged_at} = ?
-        WHERE ${escalation_metadata.columns.bead_id} = ? AND ${escalation_metadata.columns.acknowledged} = 0
+        WHERE ${escalation_metadata.bead_id} = ? AND ${escalation_metadata.acknowledged} = 0
       `,
       [now(), escalationId]
     );
@@ -1054,21 +1054,21 @@ export class TownDO extends DurableObject<Env> {
     const activeAgentRows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.columns.status} IN ('working', 'stalled')`,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.status} IN ('working', 'stalled')`,
         []
       ),
     ];
     const pendingBeadRows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.columns.status} = 'idle' AND ${agent_metadata.columns.current_hook_bead_id} IS NOT NULL`,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.status} = 'idle' AND ${agent_metadata.current_hook_bead_id} IS NOT NULL`,
         []
       ),
     ];
     const pendingReviewRows = [
       ...query(
         this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.columns.type} = 'merge_request' AND ${beads.columns.status} IN ('open', 'in_progress')`,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.type} = 'merge_request' AND ${beads.status} IN ('open', 'in_progress')`,
         []
       ),
     ];
@@ -1155,7 +1155,7 @@ export class TownDO extends DurableObject<Env> {
 
       query(
         this.sql,
-        /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.dispatch_attempts} = ? WHERE ${agent_metadata.columns.bead_id} = ?`,
+        /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.dispatch_attempts} = ? WHERE ${agent_metadata.bead_id} = ?`,
         [attempts, agent.id]
       );
 
@@ -1181,7 +1181,7 @@ export class TownDO extends DurableObject<Env> {
         if (started) {
           query(
             this.sql,
-            /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.status} = 'working', ${agent_metadata.columns.dispatch_attempts} = 0, ${agent_metadata.columns.last_activity_at} = ? WHERE ${agent_metadata.columns.bead_id} = ?`,
+            /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.status} = 'working', ${agent_metadata.columns.dispatch_attempts} = 0, ${agent_metadata.columns.last_activity_at} = ? WHERE ${agent_metadata.bead_id} = ?`,
             [now(), agent.id]
           );
         }
@@ -1229,7 +1229,7 @@ export class TownDO extends DurableObject<Env> {
         }
         query(
           this.sql,
-          /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.status} = 'idle', ${agent_metadata.columns.last_activity_at} = ? WHERE ${agent_metadata.columns.bead_id} = ?`,
+          /* sql */ `UPDATE ${agent_metadata} SET ${agent_metadata.columns.status} = 'idle', ${agent_metadata.columns.last_activity_at} = ? WHERE ${agent_metadata.bead_id} = ?`,
           [now(), agentId]
         );
         continue;
@@ -1243,10 +1243,10 @@ export class TownDO extends DurableObject<Env> {
             this.sql,
             /* sql */ `
               SELECT ${beads.bead_id} FROM ${beads}
-              WHERE ${beads.columns.type} = 'message'
-                AND ${beads.columns.assignee_agent_bead_id} = ?
-                AND ${beads.columns.title} = 'GUPP_CHECK'
-                AND ${beads.columns.status} = 'open'
+              WHERE ${beads.type} = 'message'
+                AND ${beads.assignee_agent_bead_id} = ?
+                AND ${beads.title} = 'GUPP_CHECK'
+                AND ${beads.status} = 'open'
               LIMIT 1
             `,
             [agentId]
@@ -1378,7 +1378,7 @@ export class TownDO extends DurableObject<Env> {
           UPDATE ${escalation_metadata}
           SET ${escalation_metadata.columns.severity} = ?,
               ${escalation_metadata.columns.re_escalation_count} = ${escalation_metadata.columns.re_escalation_count} + 1
-          WHERE ${escalation_metadata.columns.bead_id} = ?
+          WHERE ${escalation_metadata.bead_id} = ?
         `,
         [newSeverity, esc.id]
       );

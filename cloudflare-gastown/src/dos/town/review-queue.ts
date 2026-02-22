@@ -150,7 +150,7 @@ export function popReviewQueue(sql: SqlStorage): ReviewQueueEntry | null {
       UPDATE ${beads}
       SET ${beads.columns.status} = 'in_progress',
           ${beads.columns.updated_at} = ?
-      WHERE ${beads.columns.bead_id} = ?
+      WHERE ${beads.bead_id} = ?
     `,
     [now(), entry.id]
   );
@@ -172,7 +172,7 @@ export function completeReview(
       SET ${beads.columns.status} = ?,
           ${beads.columns.updated_at} = ?,
           ${beads.columns.closed_at} = ?
-      WHERE ${beads.columns.bead_id} = ?
+      WHERE ${beads.bead_id} = ?
     `,
     [beadStatus, timestamp, beadStatus === 'closed' ? timestamp : null, entryId]
   );
@@ -244,9 +244,9 @@ export function recoverStuckReviews(sql: SqlStorage): void {
       UPDATE ${beads}
       SET ${beads.columns.status} = 'open',
           ${beads.columns.updated_at} = ?
-      WHERE ${beads.columns.type} = 'merge_request'
-        AND ${beads.columns.status} = 'in_progress'
-        AND ${beads.columns.updated_at} < ?
+      WHERE ${beads.type} = 'merge_request'
+        AND ${beads.status} = 'in_progress'
+        AND ${beads.updated_at} < ?
     `,
     [now(), timeout]
   );
@@ -295,7 +295,7 @@ export function agentCompleted(
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.status} = 'idle',
           ${agent_metadata.columns.dispatch_attempts} = 0
-      WHERE ${agent_metadata.columns.bead_id} = ?
+      WHERE ${agent_metadata.bead_id} = ?
     `,
     [agentId]
   );
@@ -405,8 +405,8 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
     sql,
     /* sql */ `
       UPDATE ${beads}
-      SET ${beads.columns.metadata} = json_set(${beads.columns.metadata}, '$.molecule_bead_id', ?)
-      WHERE ${beads.columns.bead_id} = ?
+      SET ${beads.columns.metadata} = json_set(${beads.metadata}, '$.molecule_bead_id', ?)
+      WHERE ${beads.bead_id} = ?
     `,
     [id, beadId]
   );
@@ -454,8 +454,8 @@ function getStepBeads(sql: SqlStorage, moleculeId: string): BeadRecord[] {
       sql,
       /* sql */ `
         SELECT * FROM ${beads}
-        WHERE ${beads.columns.parent_bead_id} = ?
-        ORDER BY ${beads.columns.created_at} ASC
+        WHERE ${beads.parent_bead_id} = ?
+        ORDER BY ${beads.created_at} ASC
       `,
       [moleculeId]
     ),
@@ -510,7 +510,7 @@ export function advanceMoleculeStep(
         SET ${beads.columns.status} = 'closed',
             ${beads.columns.closed_at} = ?,
             ${beads.columns.updated_at} = ?
-        WHERE ${beads.columns.bead_id} = ?
+        WHERE ${beads.bead_id} = ?
       `,
       [timestamp, timestamp, currentStepBead.bead_id]
     );
@@ -531,7 +531,7 @@ export function advanceMoleculeStep(
         SET ${beads.columns.status} = 'closed',
             ${beads.columns.closed_at} = ?,
             ${beads.columns.updated_at} = ?
-        WHERE ${beads.columns.bead_id} = ?
+        WHERE ${beads.bead_id} = ?
       `,
       [timestamp, timestamp, molecule.id]
     );

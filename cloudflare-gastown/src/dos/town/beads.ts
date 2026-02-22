@@ -117,7 +117,7 @@ export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {
 
 export function getBead(sql: SqlStorage, beadId: string): Bead | null {
   const rows = [
-    ...query(sql, /* sql */ `SELECT * FROM ${beads} WHERE ${beads.columns.bead_id} = ?`, [beadId]),
+    ...query(sql, /* sql */ `SELECT * FROM ${beads} WHERE ${beads.bead_id} = ?`, [beadId]),
   ];
   if (rows.length === 0) return null;
   return BeadRecord.parse(rows[0]);
@@ -132,12 +132,12 @@ export function listBeads(sql: SqlStorage, filter: BeadFilter): Bead[] {
       sql,
       /* sql */ `
         SELECT * FROM ${beads}
-        WHERE (? IS NULL OR ${beads.columns.status} = ?)
-          AND (? IS NULL OR ${beads.columns.type} = ?)
-          AND (? IS NULL OR ${beads.columns.assignee_agent_bead_id} = ?)
-          AND (? IS NULL OR ${beads.columns.parent_bead_id} = ?)
-          AND (? IS NULL OR ${beads.columns.rig_id} = ?)
-        ORDER BY ${beads.columns.created_at} DESC
+        WHERE (? IS NULL OR ${beads.status} = ?)
+          AND (? IS NULL OR ${beads.type} = ?)
+          AND (? IS NULL OR ${beads.assignee_agent_bead_id} = ?)
+          AND (? IS NULL OR ${beads.parent_bead_id} = ?)
+          AND (? IS NULL OR ${beads.rig_id} = ?)
+        ORDER BY ${beads.created_at} DESC
         LIMIT ? OFFSET ?
       `,
       [
@@ -180,7 +180,7 @@ export function updateBeadStatus(
       SET ${beads.columns.status} = ?,
           ${beads.columns.updated_at} = ?,
           ${beads.columns.closed_at} = ?
-      WHERE ${beads.columns.bead_id} = ?
+      WHERE ${beads.bead_id} = ?
     `,
     [status, timestamp, closedAt, beadId]
   );
@@ -209,7 +209,7 @@ export function deleteBead(sql: SqlStorage, beadId: string): void {
     .parse([
       ...query(
         sql,
-        /* sql */ `SELECT ${beads.columns.bead_id} FROM ${beads} WHERE ${beads.columns.parent_bead_id} = ?`,
+        /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} = ?`,
         [beadId]
       ),
     ]);
@@ -224,7 +224,7 @@ export function deleteBead(sql: SqlStorage, beadId: string): void {
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.current_hook_bead_id} = NULL,
           ${agent_metadata.columns.status} = 'idle'
-      WHERE ${agent_metadata.columns.current_hook_bead_id} = ?
+      WHERE ${agent_metadata.current_hook_bead_id} = ?
     `,
     [beadId]
   );
@@ -232,37 +232,29 @@ export function deleteBead(sql: SqlStorage, beadId: string): void {
   // Delete dependencies referencing this bead
   query(
     sql,
-    /* sql */ `DELETE FROM ${bead_dependencies} WHERE ${bead_dependencies.columns.bead_id} = ? OR ${bead_dependencies.columns.depends_on_bead_id} = ?`,
+    /* sql */ `DELETE FROM ${bead_dependencies} WHERE ${bead_dependencies.bead_id} = ? OR ${bead_dependencies.depends_on_bead_id} = ?`,
     [beadId, beadId]
   );
 
-  query(sql, /* sql */ `DELETE FROM ${bead_events} WHERE ${bead_events.columns.bead_id} = ?`, [
+  query(sql, /* sql */ `DELETE FROM ${bead_events} WHERE ${bead_events.bead_id} = ?`, [beadId]);
+
+  // Delete satellite metadata if present
+  query(sql, /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.bead_id} = ?`, [
+    beadId,
+  ]);
+  query(sql, /* sql */ `DELETE FROM ${review_metadata} WHERE ${review_metadata.bead_id} = ?`, [
+    beadId,
+  ]);
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${escalation_metadata} WHERE ${escalation_metadata.bead_id} = ?`,
+    [beadId]
+  );
+  query(sql, /* sql */ `DELETE FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} = ?`, [
     beadId,
   ]);
 
-  // Delete satellite metadata if present
-  query(
-    sql,
-    /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.columns.bead_id} = ?`,
-    [beadId]
-  );
-  query(
-    sql,
-    /* sql */ `DELETE FROM ${review_metadata} WHERE ${review_metadata.columns.bead_id} = ?`,
-    [beadId]
-  );
-  query(
-    sql,
-    /* sql */ `DELETE FROM ${escalation_metadata} WHERE ${escalation_metadata.columns.bead_id} = ?`,
-    [beadId]
-  );
-  query(
-    sql,
-    /* sql */ `DELETE FROM ${convoy_metadata} WHERE ${convoy_metadata.columns.bead_id} = ?`,
-    [beadId]
-  );
-
-  query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.columns.bead_id} = ?`, [beadId]);
+  query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} = ?`, [beadId]);
 }
 
 // ── Bead Events ─────────────────────────────────────────────────────
@@ -319,9 +311,9 @@ export function listBeadEvents(
       sql,
       /* sql */ `
         SELECT * FROM ${bead_events}
-        WHERE (? IS NULL OR ${bead_events.columns.bead_id} = ?)
-          AND (? IS NULL OR ${bead_events.columns.created_at} > ?)
-        ORDER BY ${bead_events.columns.created_at} DESC
+        WHERE (? IS NULL OR ${bead_events.bead_id} = ?)
+          AND (? IS NULL OR ${bead_events.created_at} > ?)
+        ORDER BY ${bead_events.created_at} DESC
         LIMIT ?
       `,
       [

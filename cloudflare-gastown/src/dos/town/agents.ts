@@ -198,7 +198,7 @@ export function updateAgentStatus(sql: SqlStorage, agentId: string, status: stri
     /* sql */ `
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.status} = ?
-      WHERE ${agent_metadata.columns.bead_id} = ?
+      WHERE ${agent_metadata.bead_id} = ?
     `,
     [status, agentId]
   );
@@ -213,7 +213,7 @@ export function deleteAgent(sql: SqlStorage, agentId: string): void {
       SET ${beads.columns.assignee_agent_bead_id} = NULL,
           ${beads.columns.status} = 'open',
           ${beads.columns.updated_at} = ?
-      WHERE ${beads.columns.assignee_agent_bead_id} = ?
+      WHERE ${beads.assignee_agent_bead_id} = ?
     `,
     [now(), agentId]
   );
@@ -223,14 +223,12 @@ export function deleteAgent(sql: SqlStorage, agentId: string): void {
   // since the FK is via assignee_agent_bead_id for received mail.
 
   // Delete agent_metadata first (FK to beads)
-  query(
-    sql,
-    /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.columns.bead_id} = ?`,
-    [agentId]
-  );
+  query(sql, /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.bead_id} = ?`, [
+    agentId,
+  ]);
 
   // Delete the agent bead itself
-  query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.columns.bead_id} = ?`, [agentId]);
+  query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} = ?`, [agentId]);
 }
 
 // ── Hooks (GUPP) ────────────────────────────────────────────────────
@@ -260,7 +258,7 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
           ${agent_metadata.columns.status} = 'idle',
           ${agent_metadata.columns.dispatch_attempts} = 0,
           ${agent_metadata.columns.last_activity_at} = ?
-      WHERE ${agent_metadata.columns.bead_id} = ?
+      WHERE ${agent_metadata.bead_id} = ?
     `,
     [beadId, now(), agentId]
   );
@@ -272,7 +270,7 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
       SET ${beads.columns.status} = 'in_progress',
           ${beads.columns.assignee_agent_bead_id} = ?,
           ${beads.columns.updated_at} = ?
-      WHERE ${beads.columns.bead_id} = ?
+      WHERE ${beads.bead_id} = ?
     `,
     [agentId, now(), beadId]
   );
@@ -297,7 +295,7 @@ export function unhookBead(sql: SqlStorage, agentId: string): void {
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.current_hook_bead_id} = NULL,
           ${agent_metadata.columns.status} = 'idle'
-      WHERE ${agent_metadata.columns.bead_id} = ?
+      WHERE ${agent_metadata.bead_id} = ?
     `,
     [agentId]
   );
@@ -401,10 +399,10 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
       sql,
       /* sql */ `
         SELECT * FROM ${beads}
-        WHERE ${beads.columns.type} = 'message'
-          AND ${beads.columns.assignee_agent_bead_id} = ?
-          AND ${beads.columns.status} = 'open'
-        ORDER BY ${beads.columns.created_at} ASC
+        WHERE ${beads.type} = 'message'
+          AND ${beads.assignee_agent_bead_id} = ?
+          AND ${beads.status} = 'open'
+        ORDER BY ${beads.created_at} ASC
       `,
       [agentId]
     ),
@@ -432,7 +430,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
           SET ${beads.columns.status} = 'closed',
               ${beads.columns.closed_at} = ?,
               ${beads.columns.updated_at} = ?
-          WHERE ${beads.columns.bead_id} = ?
+          WHERE ${beads.bead_id} = ?
         `,
         [timestamp, timestamp, mb.bead_id]
       );
@@ -445,11 +443,11 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
       sql,
       /* sql */ `
         SELECT * FROM ${beads}
-        WHERE ${beads.columns.status} IN ('open', 'in_progress')
-          AND ${beads.columns.type} != 'agent'
-          AND ${beads.columns.type} != 'message'
-          AND (${beads.columns.rig_id} IS NULL OR ${beads.columns.rig_id} = ?)
-        ORDER BY ${beads.columns.created_at} DESC
+        WHERE ${beads.status} IN ('open', 'in_progress')
+          AND ${beads.type} != 'agent'
+          AND ${beads.type} != 'message'
+          AND (${beads.rig_id} IS NULL OR ${beads.rig_id} = ?)
+        ORDER BY ${beads.created_at} DESC
         LIMIT 20
       `,
       [agent.rig_id]
@@ -474,7 +472,7 @@ export function writeCheckpoint(sql: SqlStorage, agentId: string, data: unknown)
     /* sql */ `
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.checkpoint} = ?
-      WHERE ${agent_metadata.columns.bead_id} = ?
+      WHERE ${agent_metadata.bead_id} = ?
     `,
     [serialized, agentId]
   );
@@ -493,7 +491,7 @@ export function touchAgent(sql: SqlStorage, agentId: string): void {
     /* sql */ `
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.last_activity_at} = ?
-      WHERE ${agent_metadata.columns.bead_id} = ?
+      WHERE ${agent_metadata.bead_id} = ?
     `,
     [now(), agentId]
   );

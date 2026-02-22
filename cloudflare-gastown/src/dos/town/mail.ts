@@ -85,10 +85,10 @@ export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
       sql,
       /* sql */ `
         SELECT * FROM ${beads}
-        WHERE ${beads.columns.type} = 'message'
-          AND ${beads.columns.assignee_agent_bead_id} = ?
-          AND ${beads.columns.status} = 'open'
-        ORDER BY ${beads.columns.created_at} ASC
+        WHERE ${beads.type} = 'message'
+          AND ${beads.assignee_agent_bead_id} = ?
+          AND ${beads.status} = 'open'
+        ORDER BY ${beads.created_at} ASC
       `,
       [agentId]
     ),
@@ -118,7 +118,7 @@ export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
           SET ${beads.columns.status} = 'closed',
               ${beads.columns.closed_at} = ?,
               ${beads.columns.updated_at} = ?
-          WHERE ${beads.columns.bead_id} = ?
+          WHERE ${beads.bead_id} = ?
         `,
         [timestamp, timestamp, mb.bead_id]
       );

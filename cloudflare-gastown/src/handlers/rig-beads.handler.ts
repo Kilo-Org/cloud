@@ -176,6 +176,8 @@ export async function handleDeleteBead(
   const townId = getTownId(c);
   if (!townId) return c.json(resError('Missing townId'), 400);
   const town = getTownDOStub(c.env, townId);
+  const bead = await town.getBeadAsync(params.beadId);
+  if (!bead) return c.json(resError('Bead not found'), 404);
   await town.deleteBead(params.beadId);
   return c.json(resSuccess({ deleted: true }));
 }

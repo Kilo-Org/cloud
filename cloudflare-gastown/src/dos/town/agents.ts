@@ -190,9 +190,11 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
   // Already hooked to this bead — idempotent
   if (agent.current_hook_bead_id === beadId) return;
 
-  // Agent already has a different hook — unhook first
+  // Agent already has a different hook — caller must unhook first
   if (agent.current_hook_bead_id) {
-    unhookBead(sql, agentId);
+    throw new Error(
+      `Agent ${agentId} is already hooked to bead ${agent.current_hook_bead_id}. Unhook first.`
+    );
   }
 
   query(

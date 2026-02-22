@@ -68,7 +68,23 @@ export class AgentDO extends DurableObject<Env> {
 
     // Return the last inserted rowid
     const rows = [...this.sql.exec('SELECT last_insert_rowid() as id')];
-    return Number(rows[0]?.id ?? 0);
+    const insertedId = Number(rows[0]?.id ?? 0);
+
+    // Prune old events if count exceeds 10000
+    query(
+      this.sql,
+      /* sql */ `
+        DELETE FROM ${rig_agent_events}
+        WHERE ${rig_agent_events.columns.id} NOT IN (
+          SELECT ${rig_agent_events.columns.id} FROM ${rig_agent_events}
+          ORDER BY ${rig_agent_events.columns.id} DESC
+          LIMIT 10000
+        )
+      `,
+      []
+    );
+
+    return insertedId;
   }
 
   /**

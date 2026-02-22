@@ -240,8 +240,7 @@ export async function startMergeInContainer(
       agentId: params.agentId,
       rigId: params.rigId,
       townId: params.townId,
-      // TODO: Why is userId ''?
-      userId: '',
+      userId: params.townConfig.owner_user_id ?? '',
     });
 
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };

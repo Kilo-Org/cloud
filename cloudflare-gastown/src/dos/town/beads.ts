@@ -203,6 +203,11 @@ export function deleteBead(sql: SqlStorage, beadId: string): void {
     [beadId]
   );
 
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${rig_bead_events} WHERE ${rig_bead_events.columns.bead_id} = ?`,
+    [beadId]
+  );
   query(sql, /* sql */ `DELETE FROM ${rig_beads} WHERE ${rig_beads.columns.id} = ?`, [beadId]);
 }
 

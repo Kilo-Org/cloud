@@ -47,6 +47,7 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
+import { BeadPriority } from '../types';
 import type {
   TownConfig,
   TownConfigUpdate,
@@ -508,7 +509,7 @@ export class TownDO extends DurableObject<Env> {
       type: 'issue',
       title: input.title,
       body: input.body,
-      priority: (input.priority as 'low' | 'medium' | 'high' | 'critical') ?? 'medium',
+      priority: BeadPriority.catch('medium').parse(input.priority ?? 'medium'),
       rig_id: input.rigId,
       metadata: input.metadata,
     });
@@ -587,7 +588,7 @@ export class TownDO extends DurableObject<Env> {
         }
       }
 
-      await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
+      const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
         townId,
         rigId: `mayor-${townId}`,
         userId: townConfig.owner_user_id ?? rigConfig?.userId ?? '',
@@ -605,8 +606,12 @@ export class TownDO extends DurableObject<Env> {
         townConfig,
       });
 
-      agents.updateAgentStatus(this.sql, mayor.id, 'working');
-      sessionStatus = 'starting';
+      if (started) {
+        agents.updateAgentStatus(this.sql, mayor.id, 'working');
+        sessionStatus = 'starting';
+      } else {
+        sessionStatus = 'idle';
+      }
     }
 
     await this.armAlarmIfNeeded();
@@ -998,6 +1003,7 @@ export class TownDO extends DurableObject<Env> {
 
     const townConfig = await this.getTownConfig();
     const kilocodeToken = await this.resolveKilocodeToken();
+    const rigList = rigs.listRigs(this.sql);
 
     // Build dispatch tasks for all pending agents, then run in parallel
     const dispatchTasks: Array<() => Promise<void>> = [];
@@ -1024,7 +1030,7 @@ export class TownDO extends DurableObject<Env> {
       );
 
       // Use the agent's rig_id to get the correct rig config
-      const rigId = agent.rig_id ?? rigs.listRigs(this.sql)[0]?.id ?? '';
+      const rigId = agent.rig_id ?? rigList[0]?.id ?? '';
       const rigConfig = rigId ? await this.getRigConfig(rigId) : null;
 
       console.log(

@@ -131,6 +131,8 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         repositorySelectionMode: 'selected' as const,
         selectedRepositoryIds: [] as number[],
         modelSlug: DEFAULT_SECURITY_AGENT_MODEL,
+        // Analysis mode default
+        analysisMode: 'auto' as const,
         // Auto-dismiss defaults (off by default)
         autoDismissEnabled: false,
         autoDismissConfidenceThreshold: 'high' as const,
@@ -147,6 +149,8 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
       repositorySelectionMode: result.config.repository_selection_mode || 'selected',
       selectedRepositoryIds: result.config.selected_repository_ids || [],
       modelSlug: result.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL,
+      // Analysis mode configuration
+      analysisMode: result.config.analysis_mode ?? 'auto',
       // Auto-dismiss configuration
       autoDismissEnabled: result.config.auto_dismiss_enabled ?? false,
       autoDismissConfidenceThreshold: result.config.auto_dismiss_confidence_threshold ?? 'high',
@@ -172,6 +176,8 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
           repository_selection_mode: input.repositorySelectionMode,
           selected_repository_ids: input.selectedRepositoryIds,
           model_slug: input.modelSlug,
+          // Analysis mode configuration
+          analysis_mode: input.analysisMode,
           // Auto-dismiss configuration
           auto_dismiss_enabled: input.autoDismissEnabled,
           auto_dismiss_confidence_threshold: input.autoDismissConfidenceThreshold,
@@ -184,6 +190,7 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         userId: ctx.user.id,
         organizationId: input.organizationId,
         autoSyncEnabled: input.autoSyncEnabled,
+        analysisMode: input.analysisMode,
         autoDismissEnabled: input.autoDismissEnabled,
         autoDismissConfidenceThreshold: input.autoDismissConfidenceThreshold,
         modelSlug: input.modelSlug,
@@ -688,36 +695,33 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         });
       }
 
-      // Get model from input or fall back to configured model
-      let model = input.model;
-      if (!model) {
-        const config = await getSecurityAgentConfigWithStatus(owner);
-        model = config?.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL;
-      }
+      // Get model and analysis mode from input or fall back to configured values
+      const config = await getSecurityAgentConfigWithStatus(owner);
+      const model = input.model || config?.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL;
+      const analysisMode = config?.config.analysis_mode ?? 'auto';
 
-      let result;
       try {
-        result = await startSecurityAnalysis({
+        const result = await startSecurityAnalysis({
           findingId: input.findingId,
           user: ctx.user,
           githubRepo: finding.repo_full_name,
           githubToken,
           model,
-          forceSandbox: input.forceSandbox,
+          analysisMode,
           organizationId: input.organizationId,
         });
+
+        if (!result.started) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: result.error || 'Failed to start analysis',
+          });
+        }
+
+        return { success: true, triageOnly: result.triageOnly };
       } catch (error) {
         rethrowAsPaymentRequired(error);
       }
-
-      if (!result.started) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: result.error || 'Failed to start analysis',
-        });
-      }
-
-      return { success: true, triageOnly: result.triageOnly };
     }),
 
   /**

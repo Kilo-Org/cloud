@@ -476,6 +476,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
         modelSlug: string;
+        analysisMode: 'auto' | 'shallow' | 'deep';
         autoDismissEnabled: boolean;
         autoDismissConfidenceThreshold: 'high' | 'medium' | 'low';
       }
@@ -490,6 +491,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
           repositorySelectionMode: config.repositorySelectionMode,
           selectedRepositoryIds: config.selectedRepositoryIds,
           modelSlug: config.modelSlug,
+          analysisMode: config.analysisMode,
           autoDismissEnabled: config.autoDismissEnabled,
           autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
         });
@@ -502,6 +504,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
           repositorySelectionMode: config.repositorySelectionMode,
           selectedRepositoryIds: config.selectedRepositoryIds,
           modelSlug: config.modelSlug,
+          analysisMode: config.analysisMode,
           autoDismissEnabled: config.autoDismissEnabled,
           autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
         });
@@ -824,6 +827,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
               repositorySelectionMode={configData?.repositorySelectionMode ?? 'selected'}
               selectedRepositoryIds={configData?.selectedRepositoryIds ?? []}
               modelSlug={configData?.modelSlug ?? ''}
+              analysisMode={configData?.analysisMode ?? 'auto'}
               autoDismissEnabled={configData?.autoDismissEnabled ?? false}
               autoDismissConfidenceThreshold={configData?.autoDismissConfidenceThreshold ?? 'high'}
               repositories={allRepositories}

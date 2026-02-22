@@ -60,7 +60,7 @@ export async function dismissFinding(
 /**
  * Write back a dismissal to Dependabot on GitHub.
  * Fetches the finding and integration data, then calls the Dependabot API.
- * Errors are logged but not thrown — a failed writeback should not break the auto-dismiss flow.
+ * May throw on API or DB errors — use safeWritebackDependabotDismissal when failures should be non-fatal.
  */
 export async function writebackDependabotDismissal(
   findingId: string,

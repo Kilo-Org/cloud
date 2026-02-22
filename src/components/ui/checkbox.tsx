@@ -4,11 +4,33 @@ import * as React from 'react';
 
 interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
   checked?: boolean;
+  indeterminate?: boolean;
   onCheckedChange?: (checked: boolean) => void;
 }
 
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, checked, onCheckedChange, onChange, ...props }, ref) => {
+  ({ className, checked, indeterminate, onCheckedChange, onChange, ...props }, ref) => {
+    const internalRef = React.useRef<HTMLInputElement | null>(null);
+
+    const callbackRef = React.useCallback(
+      (node: HTMLInputElement | null) => {
+        internalRef.current = node;
+        if (typeof ref === 'function') {
+          ref(node);
+        } else if (ref) {
+          ref.current = node;
+        }
+      },
+      [ref]
+    );
+
+    React.useEffect(() => {
+      const element = internalRef.current;
+      if (element) {
+        element.indeterminate = indeterminate ?? false;
+      }
+    }, [indeterminate]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       onCheckedChange?.(e.target.checked);
       onChange?.(e);
@@ -17,7 +39,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
     return (
       <input
         type="checkbox"
-        ref={ref}
+        ref={callbackRef}
         checked={checked}
         onChange={handleChange}
         className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 ${className || ''}`}

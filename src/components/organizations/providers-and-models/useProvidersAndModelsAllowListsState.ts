@@ -7,6 +7,7 @@ import {
   computeAllowedModelIds,
   computeAllProviderSlugsWithEndpoints,
   computeEnabledProviderSlugs,
+  setAllModelsAllowed,
   sortUniqueStrings,
   stringListsEqual,
   toggleAllowFutureModelsForProvider,
@@ -68,6 +69,12 @@ export type ProvidersAndModelsAllowListsAction =
       nextAllowed: boolean;
       allModelIds: ReadonlyArray<string>;
       providerSlugsForModelId: ReadonlyArray<string> | undefined;
+    }
+  | {
+      type: 'SET_ALL_MODELS_ALLOWED';
+      targetModelIds: ReadonlyArray<string>;
+      nextAllowed: boolean;
+      allModelIds: ReadonlyArray<string>;
     }
   | {
       type: 'TOGGLE_PROVIDER_WILDCARD';
@@ -192,6 +199,21 @@ export function providersAndModelsAllowListsReducer(
       };
     }
 
+    case 'SET_ALL_MODELS_ALLOWED': {
+      if (state.status !== 'ready') return state;
+      const nextModelAllowList = setAllModelsAllowed({
+        nextAllowed: action.nextAllowed,
+        targetModelIds: action.targetModelIds,
+        draftModelAllowList: state.draftModelAllowList,
+        allModelIds: action.allModelIds,
+        hadAllModelsInitially: state.initialModelAllowList.length === 0,
+      });
+      return {
+        ...state,
+        draftModelAllowList: nextModelAllowList,
+      };
+    }
+
     case 'TOGGLE_PROVIDER_WILDCARD': {
       if (state.status !== 'ready') return state;
 
@@ -273,6 +295,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     }) => void;
     toggleProvider: (params: { providerSlug: string; nextEnabled: boolean }) => void;
     toggleModel: (params: { modelId: string; nextAllowed: boolean }) => void;
+    setAllModelsAllowed: (params: { modelIds: string[]; nextAllowed: boolean }) => void;
     toggleProviderWildcard: (params: { providerSlug: string; nextAllowed: boolean }) => void;
     resetToInitial: () => void;
     markSaved: () => void;
@@ -381,6 +404,18 @@ export function useProvidersAndModelsAllowListsState(params: {
     [allModelIds, modelProvidersIndex]
   );
 
+  const setAllModelsAllowedAction = useCallback(
+    (input: { modelIds: string[]; nextAllowed: boolean }) => {
+      dispatch({
+        type: 'SET_ALL_MODELS_ALLOWED',
+        targetModelIds: input.modelIds,
+        nextAllowed: input.nextAllowed,
+        allModelIds,
+      });
+    },
+    [allModelIds]
+  );
+
   const toggleProviderWildcard = useCallback(
     (input: { providerSlug: string; nextAllowed: boolean }) => {
       dispatch({
@@ -417,6 +452,7 @@ export function useProvidersAndModelsAllowListsState(params: {
       initFromServer,
       toggleProvider,
       toggleModel,
+      setAllModelsAllowed: setAllModelsAllowedAction,
       toggleProviderWildcard,
       resetToInitial: () => dispatch({ type: 'RESET_TO_INITIAL' }),
       markSaved: () => dispatch({ type: 'MARK_SAVED' }),
@@ -436,7 +472,7 @@ export function useProvidersAndModelsAllowListsState(params: {
       setInfoProviderSlug: (value: string | null) =>
         dispatch({ type: 'SET_INFO_PROVIDER_SLUG', value }),
     }),
-    [initFromServer, toggleModel, toggleProvider, toggleProviderWildcard]
+    [initFromServer, setAllModelsAllowedAction, toggleModel, toggleProvider, toggleProviderWildcard]
   );
 
   return {

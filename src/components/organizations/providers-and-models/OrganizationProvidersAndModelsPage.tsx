@@ -29,6 +29,7 @@ import {
   useProvidersAndModelsAllowListsState,
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
+import { sanitizeModelAllowListForPersistence } from '@/components/organizations/providers-and-models/allowLists.domain';
 import { preferredModels } from '@/lib/models';
 
 type Props = {
@@ -174,6 +175,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     [actions, canEdit]
   );
 
+  const handleSetAllModelsAllowed = useCallback(
+    (modelIds: string[], nextAllowed: boolean) => {
+      if (!canEdit) return;
+      actions.setAllModelsAllowed({ modelIds, nextAllowed });
+    },
+    [actions, canEdit]
+  );
+
   const handleToggleAllowFutureModelsForProvider = useCallback(
     (providerSlug: string, nextAllowed: boolean) => {
       if (!canEdit) return;
@@ -194,7 +203,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     try {
       await updateOrganizationSettings.mutateAsync({
         organizationId,
-        model_allow_list: state.draftModelAllowList,
+        model_allow_list: sanitizeModelAllowListForPersistence(state.draftModelAllowList),
         provider_allow_list: state.draftProviderAllowList,
       });
 
@@ -471,7 +480,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               allowedModelIds={allowedModelIds}
               enabledProviderSlugs={enabledProviderSlugs}
               filteredModelRows={filteredModelRows}
+              totalModelCount={modelRows.length}
               onToggleModelAllowed={handleToggleModelAllowed}
+              onSetAllModelsAllowed={handleSetAllModelsAllowed}
               onOpenModelDetails={actions.setInfoModelId}
             />
           </TabsContent>

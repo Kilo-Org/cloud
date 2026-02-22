@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,9 @@ export function ModelsTab({
   allowedModelIds,
   enabledProviderSlugs,
   filteredModelRows,
+  totalModelCount,
   onToggleModelAllowed,
+  onSetAllModelsAllowed,
   onOpenModelDetails,
 }: {
   isLoading: boolean;
@@ -27,9 +30,31 @@ export function ModelsTab({
   allowedModelIds: ReadonlySet<string>;
   enabledProviderSlugs: ReadonlySet<string>;
   filteredModelRows: ReadonlyArray<ModelRow>;
+  totalModelCount: number;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
+  onSetAllModelsAllowed: (modelIds: string[], nextAllowed: boolean) => void;
   onOpenModelDetails: (modelId: string) => void;
 }) {
+  const selectAllCheckboxState = useMemo(() => {
+    if (filteredModelRows.length === 0) {
+      return { checked: false, indeterminate: false };
+    }
+
+    let allowedCount = 0;
+    for (const row of filteredModelRows) {
+      if (allowedModelIds.has(row.modelId)) {
+        allowedCount++;
+      }
+    }
+
+    if (allowedCount === 0) {
+      return { checked: false, indeterminate: false };
+    }
+    if (allowedCount === filteredModelRows.length) {
+      return { checked: true, indeterminate: false };
+    }
+    return { checked: false, indeterminate: true };
+  }, [filteredModelRows, allowedModelIds]);
   return (
     <div className="flex flex-col gap-y-4">
       <p className="text-muted-foreground text-sm">
@@ -58,7 +83,19 @@ export function ModelsTab({
 
           <div className="rounded-lg border">
             <div className="bg-muted/50 flex items-center justify-between gap-4 border-b px-4 py-3">
-              <div className="text-sm font-medium">Models</div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Checkbox
+                  checked={selectAllCheckboxState.checked}
+                  indeterminate={selectAllCheckboxState.indeterminate}
+                  disabled={!canEdit || totalModelCount === 0 || filteredModelRows.length === 0}
+                  onCheckedChange={nextChecked => {
+                    const modelIds = filteredModelRows.map(r => r.modelId);
+                    onSetAllModelsAllowed(modelIds, Boolean(nextChecked));
+                  }}
+                  aria-label="Select all models"
+                />
+                Models
+              </label>
               <div className="text-muted-foreground text-xs">
                 {allowedModelIds.size} allowed • {filteredModelRows.length} shown
               </div>

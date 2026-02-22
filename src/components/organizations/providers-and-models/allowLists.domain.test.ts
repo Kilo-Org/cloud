@@ -4,6 +4,9 @@ import {
   canonicalizeModelAllowList,
   computeAllowedModelIds,
   computeEnabledProviderSlugs,
+  MODEL_ALLOW_NONE_SENTINEL,
+  sanitizeModelAllowListForPersistence,
+  setAllModelsAllowed,
   toggleAllowFutureModelsForProvider,
   toggleModelAllowed,
   toggleProviderEnabled,
@@ -80,5 +83,140 @@ describe('allowLists.domain', () => {
     });
 
     expect(next).toEqual([]);
+  });
+
+  test('toggleModelAllowed(true) from sentinel state enables just that model', () => {
+    const next = toggleModelAllowed({
+      modelId: 'openai/gpt-4.1',
+      nextAllowed: true,
+      draftModelAllowList: [MODEL_ALLOW_NONE_SENTINEL],
+      allModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet'],
+      providerSlugsForModelId: ['openai'],
+      hadAllModelsInitially: true,
+    });
+    expect(next).toEqual(['openai/gpt-4.1']);
+  });
+
+  test('toggleModelAllowed(false) from sentinel state is a no-op', () => {
+    const next = toggleModelAllowed({
+      modelId: 'openai/gpt-4.1',
+      nextAllowed: false,
+      draftModelAllowList: [MODEL_ALLOW_NONE_SENTINEL],
+      allModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet'],
+      providerSlugsForModelId: ['openai'],
+      hadAllModelsInitially: true,
+    });
+    expect(next).toEqual([MODEL_ALLOW_NONE_SENTINEL]);
+  });
+
+  test('setAllModelsAllowed(true) returns [] when hadAllModelsInitially and targeting all', () => {
+    const next = setAllModelsAllowed({
+      nextAllowed: true,
+      targetModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet'],
+      draftModelAllowList: ['openai/gpt-4.1'],
+      allModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet'],
+      hadAllModelsInitially: true,
+    });
+    expect(next).toEqual([]);
+  });
+
+  test('setAllModelsAllowed(true) returns all model IDs when not hadAllModelsInitially', () => {
+    const next = setAllModelsAllowed({
+      nextAllowed: true,
+      targetModelIds: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4.1'],
+      draftModelAllowList: ['openai/gpt-4.1'],
+      allModelIds: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4.1'],
+      hadAllModelsInitially: false,
+    });
+    expect(next).toEqual(['anthropic/claude-3.5-sonnet', 'openai/gpt-4.1']);
+  });
+
+  test('setAllModelsAllowed(true) preserves wildcards when not hadAllModelsInitially', () => {
+    const next = setAllModelsAllowed({
+      nextAllowed: true,
+      targetModelIds: ['openai/gpt-4.1'],
+      draftModelAllowList: ['cerebras/*', 'openai/gpt-4.1'],
+      allModelIds: ['openai/gpt-4.1'],
+      hadAllModelsInitially: false,
+    });
+    expect(next).toEqual(['cerebras/*', 'openai/gpt-4.1']);
+  });
+
+  test('setAllModelsAllowed(false) returns sentinel list when deselecting all models', () => {
+    const next = setAllModelsAllowed({
+      nextAllowed: false,
+      targetModelIds: ['openai/gpt-4.1'],
+      draftModelAllowList: [],
+      allModelIds: ['openai/gpt-4.1'],
+      hadAllModelsInitially: true,
+    });
+    expect(next).toEqual([MODEL_ALLOW_NONE_SENTINEL]);
+  });
+
+  test('setAllModelsAllowed(true) on filtered subset merges into existing allow list', () => {
+    const next = setAllModelsAllowed({
+      nextAllowed: true,
+      targetModelIds: ['anthropic/claude-3.5-sonnet'],
+      draftModelAllowList: ['openai/gpt-4.1'],
+      allModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet', 'meta/llama-3'],
+      hadAllModelsInitially: false,
+    });
+    expect(next).toEqual(['anthropic/claude-3.5-sonnet', 'openai/gpt-4.1']);
+  });
+
+  test('setAllModelsAllowed(false) on filtered subset removes only targets', () => {
+    const next = setAllModelsAllowed({
+      nextAllowed: false,
+      targetModelIds: ['openai/gpt-4.1'],
+      draftModelAllowList: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4.1'],
+      allModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet'],
+      hadAllModelsInitially: false,
+    });
+    expect(next).toEqual(['anthropic/claude-3.5-sonnet']);
+  });
+
+  test('setAllModelsAllowed(false) from empty list (all allowed) keeps non-targets', () => {
+    const next = setAllModelsAllowed({
+      nextAllowed: false,
+      targetModelIds: ['openai/gpt-4.1'],
+      draftModelAllowList: [],
+      allModelIds: ['openai/gpt-4.1', 'anthropic/claude-3.5-sonnet'],
+      hadAllModelsInitially: true,
+    });
+    expect(next).toEqual(['anthropic/claude-3.5-sonnet']);
+  });
+
+  test('computeAllowedModelIds returns empty set for sentinel list', () => {
+    const openRouterModels = [{ slug: 'openai/gpt-4.1' }, { slug: 'anthropic/claude-3.5-sonnet' }];
+    const openRouterProviders = [
+      { slug: 'openai', models: [{ slug: 'openai/gpt-4.1', endpoint: {} }] },
+      { slug: 'anthropic', models: [{ slug: 'anthropic/claude-3.5-sonnet', endpoint: {} }] },
+    ];
+
+    const allowed = computeAllowedModelIds(
+      [MODEL_ALLOW_NONE_SENTINEL],
+      openRouterModels,
+      openRouterProviders
+    );
+    expect(allowed.size).toBe(0);
+  });
+
+  test('sanitizeModelAllowListForPersistence removes sentinel', () => {
+    const sanitized = sanitizeModelAllowListForPersistence([MODEL_ALLOW_NONE_SENTINEL]);
+    expect(sanitized).toEqual([]);
+  });
+
+  test('sanitizeModelAllowListForPersistence preserves valid entries', () => {
+    const sanitized = sanitizeModelAllowListForPersistence([
+      'openai/gpt-4.1',
+      'anthropic/*',
+      MODEL_ALLOW_NONE_SENTINEL,
+    ]);
+    expect(sanitized).toEqual(['openai/gpt-4.1', 'anthropic/*']);
+  });
+
+  test('sanitizeModelAllowListForPersistence returns empty array unchanged', () => {
+    const sanitized = sanitizeModelAllowListForPersistence([]);
+    expect(sanitized).toEqual([]);
   });
 });

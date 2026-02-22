@@ -2453,3 +2453,7 @@ The architecture is fundamentally sound. The DO-as-scheduler, container-as-runti
     - Give agents a rating and review system (let users see that a particular agent has 4.5/5 stars)
     - Let users "fire" agents and "hire" new ones
     - Agent personas
+  - The town UI should present itself almost as a social network UI
+    - Feed-centric
+    - Notifications
+    - If we give the ability to create screenshots to our agents, we'll have posting photo updates (of UI) as much as possible

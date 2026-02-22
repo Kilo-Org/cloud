@@ -19,7 +19,7 @@ export const BeadEventType = z.enum([
 export type BeadEventType = z.infer<typeof BeadEventType>;
 
 export const BeadEventRecord = z.object({
-  id: z.string(),
+  bead_event_id: z.string(),
   bead_id: z.string(),
   agent_id: z.string().nullable(),
   event_type: BeadEventType,
@@ -42,7 +42,7 @@ export const bead_events = getTableFromZodSchema('bead_events', BeadEventRecord)
 
 export function createTableBeadEvents(): string {
   return getCreateTableQueryFromTable(bead_events, {
-    id: `text primary key`,
+    bead_event_id: `text primary key`,
     bead_id: `text not null`,
     agent_id: `text`,
     event_type: `text not null`,

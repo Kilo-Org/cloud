@@ -14,6 +14,10 @@
 - Always validate data at IO boundaries (HTTP responses, JSON.parse results, SSE event payloads, subprocess output) with Zod schemas. Return `unknown` from raw fetch/parse helpers and `.parse()` in the caller.
 - Never use `as` to cast IO data. If the shape is known, define a Zod schema; if not, use `.passthrough()` or a catch-all schema.
 
+## Column naming
+
+- Never name a primary key column just `id`. Encode the entity in the column name, e.g. `bead_id`, `bead_event_id`, `rig_id`. This avoids ambiguity in joins and makes grep-based navigation reliable.
+
 ## SQL queries
 
 - Use the type-safe `query()` helper from `util/query.util.ts` for all SQL queries.

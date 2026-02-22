@@ -2435,6 +2435,7 @@ The architecture is fundamentally sound. The DO-as-scheduler, container-as-runti
     - On every message to the mayor, we can preload rigs and add them to the system prompt
     - I'm sure we can pretty much do this on any message to the mayor
     - We still need to keep these tools so the mayor knows that it may need to refresh its knowledge
+  - Shell-based e2e tests should run in vitest
 - Feature
   - Mayor should be a persistent chat interface across the town
     - Perhaps we use xterm.js to just use the cli

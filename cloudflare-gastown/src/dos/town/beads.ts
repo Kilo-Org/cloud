@@ -280,7 +280,7 @@ export function logBeadEvent(
     sql,
     /* sql */ `
       INSERT INTO ${bead_events} (
-        ${bead_events.columns.id},
+        ${bead_events.columns.bead_event_id},
         ${bead_events.columns.bead_id},
         ${bead_events.columns.agent_id},
         ${bead_events.columns.event_type},

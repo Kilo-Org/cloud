@@ -362,7 +362,7 @@ export async function deleteAgent(townId: string, rigId: string, agentId: string
 // ── Event operations ──────────────────────────────────────────────────────
 
 export const BeadEventSchema = z.object({
-  id: z.string(),
+  bead_event_id: z.string(),
   bead_id: z.string(),
   agent_id: z.string().nullable(),
   event_type: z.string(),

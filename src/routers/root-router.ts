@@ -19,6 +19,7 @@ import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
 import { appBuilderRouter } from '@/routers/app-builder-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
+import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
 import { autoTriageRouter } from '@/routers/auto-triage/auto-triage-router';
 import { personalAutoTriageRouter } from '@/routers/personal-auto-triage-router';
 import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
@@ -51,6 +52,7 @@ export const rootRouter = createTRPCRouter({
   byok: byokRouter,
   appBuilder: appBuilderRouter,
   securityAgent: securityAgentRouter,
+  securityAuditLog: securityAuditLogRouter,
   autoTriage: autoTriageRouter,
   personalAutoTriage: personalAutoTriageRouter,
   autoFix: autoFixRouter,

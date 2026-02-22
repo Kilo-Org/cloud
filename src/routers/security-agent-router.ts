@@ -60,6 +60,10 @@ import {
   trackSecurityAgentSync,
   trackSecurityAgentFindingDismissed,
 } from '@/lib/security-agent/posthog-tracking';
+import {
+  logSecurityAudit,
+  SecurityAuditLogAction,
+} from '@/lib/security-agent/services/audit-log-service';
 
 /**
  * Security Agent Router for personal users
@@ -146,6 +150,23 @@ export const securityAgentRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
 
+      const existingConfig = await getSecurityAgentConfigWithStatus(owner);
+      const beforeState = existingConfig
+        ? {
+            autoSyncEnabled: existingConfig.config.auto_sync_enabled,
+            analysisMode: existingConfig.config.analysis_mode,
+            autoDismissEnabled: existingConfig.config.auto_dismiss_enabled,
+            autoDismissConfidenceThreshold: existingConfig.config.auto_dismiss_confidence_threshold,
+            modelSlug: existingConfig.config.model_slug,
+            repositorySelectionMode: existingConfig.config.repository_selection_mode,
+            selectedRepositoryIds: existingConfig.config.selected_repository_ids,
+            slaCriticalDays: existingConfig.config.sla_critical_days,
+            slaHighDays: existingConfig.config.sla_high_days,
+            slaMediumDays: existingConfig.config.sla_medium_days,
+            slaLowDays: existingConfig.config.sla_low_days,
+          }
+        : undefined;
+
       await upsertSecurityAgentConfig(
         owner,
         {
@@ -176,6 +197,30 @@ export const securityAgentRouter = createTRPCRouter({
         modelSlug: input.modelSlug,
         repositorySelectionMode: input.repositorySelectionMode,
         selectedRepoCount: input.selectedRepositoryIds?.length,
+      });
+
+      logSecurityAudit({
+        owner: { userId: ctx.user.id },
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.ConfigUpdated,
+        resource_type: 'agent_config',
+        resource_id: ctx.user.id,
+        before_state: beforeState,
+        after_state: {
+          autoSyncEnabled: input.autoSyncEnabled,
+          analysisMode: input.analysisMode,
+          autoDismissEnabled: input.autoDismissEnabled,
+          autoDismissConfidenceThreshold: input.autoDismissConfidenceThreshold,
+          modelSlug: input.modelSlug,
+          repositorySelectionMode: input.repositorySelectionMode,
+          selectedRepositoryIds: input.selectedRepositoryIds,
+          slaCriticalDays: input.slaCriticalDays,
+          slaHighDays: input.slaHighDays,
+          slaMediumDays: input.slaMediumDays,
+          slaLowDays: input.slaLowDays,
+        },
       });
 
       return { success: true };
@@ -289,6 +334,17 @@ export const securityAgentRouter = createTRPCRouter({
             syncErrors: syncResult.errors,
           });
 
+          logSecurityAudit({
+            owner: securityOwner,
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            action: SecurityAuditLogAction.ConfigEnabled,
+            resource_type: 'agent_config',
+            resource_id: ctx.user.id,
+            after_state: { isEnabled: true, repositorySelectionMode: selectionMode },
+          });
+
           return {
             success: true,
             syncResult: {
@@ -315,6 +371,19 @@ export const securityAgentRouter = createTRPCRouter({
       isEnabled: input.isEnabled,
       repositorySelectionMode: selectionMode,
       selectedRepoCount: effectiveRepoCount,
+    });
+
+    logSecurityAudit({
+      owner: securityOwner,
+      actor_id: ctx.user.id,
+      actor_email: ctx.user.google_user_email,
+      actor_name: ctx.user.google_user_name,
+      action: input.isEnabled
+        ? SecurityAuditLogAction.ConfigEnabled
+        : SecurityAuditLogAction.ConfigDisabled,
+      resource_type: 'agent_config',
+      resource_id: ctx.user.id,
+      after_state: { isEnabled: input.isEnabled, repositorySelectionMode: selectionMode },
     });
 
     return { success: true };
@@ -482,6 +551,22 @@ export const securityAgentRouter = createTRPCRouter({
         errors: result.errors,
       });
 
+      logSecurityAudit({
+        owner: securityOwner,
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.SyncTriggered,
+        resource_type: 'agent_config',
+        resource_id: ctx.user.id,
+        metadata: {
+          syncType: 'single_repo',
+          repoFullName: input.repoFullName,
+          synced: result.synced,
+          errors: result.errors,
+        },
+      });
+
       return {
         success: true,
         synced: result.synced,
@@ -525,6 +610,22 @@ export const securityAgentRouter = createTRPCRouter({
       repoCount: repositoriesToSync.length,
       synced: result.synced,
       errors: result.errors,
+    });
+
+    logSecurityAudit({
+      owner: securityOwner,
+      actor_id: ctx.user.id,
+      actor_email: ctx.user.google_user_email,
+      actor_name: ctx.user.google_user_name,
+      action: SecurityAuditLogAction.SyncTriggered,
+      resource_type: 'agent_config',
+      resource_id: ctx.user.id,
+      metadata: {
+        syncType: 'all_repos',
+        repoCount: repositoriesToSync.length,
+        synced: result.synced,
+        errors: result.errors,
+      },
     });
 
     return {
@@ -615,6 +716,19 @@ export const securityAgentRouter = createTRPCRouter({
         severity: finding.severity,
       });
 
+      logSecurityAudit({
+        owner: { userId: ctx.user.id },
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.FindingDismissed,
+        resource_type: 'security_finding',
+        resource_id: input.findingId,
+        before_state: { status: finding.status },
+        after_state: { status: 'ignored', ignoredReason: input.reason },
+        metadata: { source: finding.source, severity: finding.severity },
+      });
+
       return { success: true };
     }),
 
@@ -691,6 +805,17 @@ export const securityAgentRouter = createTRPCRouter({
           message: result.error || 'Failed to start analysis',
         });
       }
+
+      logSecurityAudit({
+        owner: securityOwner,
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.FindingAnalysisStarted,
+        resource_type: 'security_finding',
+        resource_id: input.findingId,
+        metadata: { model, analysisMode, triageOnly: result.triageOnly },
+      });
 
       return { success: true, triageOnly: result.triageOnly };
     } catch (error) {
@@ -804,6 +929,17 @@ export const securityAgentRouter = createTRPCRouter({
         repoFullName: input.repoFullName,
       });
 
+      logSecurityAudit({
+        owner: securityOwner,
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.FindingDeleted,
+        resource_type: 'security_finding',
+        resource_id: input.repoFullName,
+        metadata: { repoFullName: input.repoFullName, deletedCount: result.deletedCount },
+      });
+
       return {
         success: true,
         deletedCount: result.deletedCount,
@@ -825,6 +961,24 @@ export const securityAgentRouter = createTRPCRouter({
    */
   autoDismissEligible: baseProcedure.mutation(async ({ ctx }) => {
     const securityOwner: SecurityReviewOwner = { userId: ctx.user.id };
-    return await autoDismissEligibleFindings(securityOwner, ctx.user.id);
+    const result = await autoDismissEligibleFindings(securityOwner, ctx.user.id);
+
+    logSecurityAudit({
+      owner: securityOwner,
+      actor_id: ctx.user.id,
+      actor_email: ctx.user.google_user_email,
+      actor_name: ctx.user.google_user_name,
+      action: SecurityAuditLogAction.FindingAutoDismissed,
+      resource_type: 'security_finding',
+      resource_id: 'bulk',
+      metadata: {
+        source: 'bulk',
+        dismissed: result.dismissed,
+        skipped: result.skipped,
+        errors: result.errors,
+      },
+    });
+
+    return result;
   }),
 });

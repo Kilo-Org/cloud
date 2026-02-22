@@ -22,6 +22,7 @@ import { dismissDependabotAlert } from '../github/dependabot-api';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
 import { sentryLogger } from '@/lib/utils.server';
+import { logSecurityAudit, SecurityAuditLogAction } from './audit-log-service';
 
 const log = sentryLogger('security-agent:auto-dismiss', 'info');
 const logError = sentryLogger('security-agent:auto-dismiss', 'error');
@@ -188,6 +189,23 @@ export async function maybeAutoDismissAnalysis(options: {
       source: 'sandbox',
     });
 
+    logSecurityAudit({
+      owner,
+      actor_id: null,
+      actor_email: null,
+      actor_name: null,
+      action: SecurityAuditLogAction.FindingAutoDismissed,
+      resource_type: 'security_finding',
+      resource_id: findingId,
+      after_state: { status: 'ignored' },
+      metadata: {
+        source: 'system',
+        trigger: 'auto_dismiss_policy',
+        dismissSource: 'sandbox',
+        correlationId,
+      },
+    });
+
     return { dismissed: true, source: 'sandbox' };
   }
 
@@ -229,6 +247,24 @@ export async function maybeAutoDismissAnalysis(options: {
         findingId,
         source: 'triage',
         confidence: triage.confidence,
+      });
+
+      logSecurityAudit({
+        owner,
+        actor_id: null,
+        actor_email: null,
+        actor_name: null,
+        action: SecurityAuditLogAction.FindingAutoDismissed,
+        resource_type: 'security_finding',
+        resource_id: findingId,
+        after_state: { status: 'ignored' },
+        metadata: {
+          source: 'system',
+          trigger: 'auto_dismiss_policy',
+          dismissSource: 'triage',
+          confidence: triage.confidence,
+          correlationId,
+        },
       });
 
       return { dismissed: true, source: 'triage' };

@@ -585,10 +585,8 @@ export class TownDO extends DurableObject<Env> {
 
       await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
         townId,
-        // TODO: Why are we setting rigId at all?
         rigId: `mayor-${townId}`,
-        // TODO: Why is userId taken from rig?
-        userId: rigConfig?.userId ?? '',
+        userId: townConfig.owner_user_id ?? rigConfig?.userId ?? '',
         agentId: mayor.id,
         agentName: 'mayor',
         role: 'mayor',

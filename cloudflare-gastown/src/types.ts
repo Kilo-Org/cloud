@@ -132,6 +132,9 @@ export const TownConfigSchema = z.object({
     })
     .default({}),
 
+  /** Owner user ID — stored so the mayor can mint JWTs without a rig config */
+  owner_user_id: z.string().optional(),
+
   /** Kilo API token for LLM gateway authentication */
   kilocode_token: z.string().optional(),
 

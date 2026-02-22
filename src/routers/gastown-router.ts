@@ -52,7 +52,10 @@ export const gastownRouter = createTRPCRouter({
         expiresIn: TOKEN_EXPIRY.thirtyDays,
       });
       await withGastownError(() =>
-        gastown.updateTownConfig(town.id, { kilocode_token: kilocodeToken })
+        gastown.updateTownConfig(town.id, {
+          kilocode_token: kilocodeToken,
+          owner_user_id: ctx.user.id,
+        })
       );
 
       return town;

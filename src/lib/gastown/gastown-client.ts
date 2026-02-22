@@ -471,6 +471,40 @@ export async function getStreamTicket(townId: string, agentId: string): Promise<
   return parseSuccessData(body, StreamTicketSchema);
 }
 
+// ── PTY operations (via Town Container DO) ────────────────────────────────
+
+const PtySessionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  status: z.enum(['running', 'exited']),
+  pid: z.number(),
+});
+export type PtySession = z.output<typeof PtySessionSchema>;
+
+export async function createPtySession(townId: string, agentId: string): Promise<PtySession> {
+  const body = await gastownFetch(`/api/towns/${townId}/container/agents/${agentId}/pty`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  return PtySessionSchema.parse(body);
+}
+
+export async function resizePtySession(
+  townId: string,
+  agentId: string,
+  ptyId: string,
+  cols: number,
+  rows: number
+): Promise<void> {
+  await gastownFetch(`/api/towns/${townId}/container/agents/${agentId}/pty/${ptyId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ cols, rows }),
+  });
+}
+
 // ── Mayor operations (via MayorDO) ────────────────────────────────────────
 
 const MayorSendResultSchema = z.object({

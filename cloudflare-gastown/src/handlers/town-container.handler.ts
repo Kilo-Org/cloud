@@ -158,3 +158,26 @@ export async function handleContainerHealth(c: Context<GastownEnv>, params: { to
   const container = getTownContainerStub(c.env, params.townId);
   return proxyToContainer(container, '/health');
 }
+
+/**
+ * Generic container proxy — forwards the request path (after stripping
+ * the /api/towns/:townId/container prefix) to the container as-is.
+ * Used for PTY routes and any future passthrough endpoints.
+ */
+export async function handleContainerProxy(c: Context<GastownEnv>, params: { townId: string }) {
+  const url = new URL(c.req.url);
+  // Strip /api/towns/:townId/container prefix to get the container-relative path
+  const prefix = `/api/towns/${params.townId}/container`;
+  const containerPath = url.pathname.slice(prefix.length) || '/';
+
+  const container = getTownContainerStub(c.env, params.townId);
+  const init: RequestInit = { method: c.req.method };
+  if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+    const body = await c.req.text();
+    if (body) {
+      init.body = body;
+      init.headers = { 'Content-Type': c.req.header('Content-Type') ?? 'application/json' };
+    }
+  }
+  return proxyToContainer(container, containerPath, init);
+}

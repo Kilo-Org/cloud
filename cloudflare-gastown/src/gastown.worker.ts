@@ -48,6 +48,7 @@ import {
   handleContainerAgentStatus,
   handleContainerStreamTicket,
   handleContainerHealth,
+  handleContainerProxy,
 } from './handlers/town-container.handler';
 import {
   handleCreateTown,
@@ -297,6 +298,25 @@ app.post('/api/towns/:townId/container/agents/:agentId/stream-ticket', c =>
 
 app.get('/api/towns/:townId/container/health', c => handleContainerHealth(c, c.req.param()));
 
+// PTY routes — proxy to container's SDK PTY endpoints
+app.post('/api/towns/:townId/container/agents/:agentId/pty', c =>
+  handleContainerProxy(c, c.req.param())
+);
+app.get('/api/towns/:townId/container/agents/:agentId/pty', c =>
+  handleContainerProxy(c, c.req.param())
+);
+app.get('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
+  handleContainerProxy(c, c.req.param())
+);
+app.put('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
+  handleContainerProxy(c, c.req.param())
+);
+app.delete('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
+  handleContainerProxy(c, c.req.param())
+);
+// Note: GET /agents/:agentId/pty/:ptyId/connect (WebSocket) is handled
+// in the default export's fetch handler, bypassing Hono.
+
 // ── Mayor ────────────────────────────────────────────────────────────────
 // MayorDO endpoints — town-level conversational agent with persistent session.
 
@@ -340,21 +360,35 @@ app.onError((err, c) => {
 // directly to the runtime.
 
 const WS_STREAM_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/stream$/;
+const WS_PTY_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/pty\/([^/]+)\/connect$/;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // Intercept WebSocket upgrade requests for agent streaming.
+    // Intercept WebSocket upgrade requests for agent streaming and PTY.
     // Must bypass Hono — the DO returns a 101 + WebSocketPair that the
     // runtime handles directly.
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       const url = new URL(request.url);
-      const match = url.pathname.match(WS_STREAM_PATTERN);
-      if (match) {
-        const townId = match[1];
-        const agentId = match[2];
-        console.log(`[gastown-worker] WS upgrade: townId=${townId} agentId=${agentId}`);
-        // Pass the original request to the DO — the CF runtime needs the
-        // original Request object to handle the WebSocket upgrade.
+
+      // Agent event stream
+      const streamMatch = url.pathname.match(WS_STREAM_PATTERN);
+      if (streamMatch) {
+        const townId = streamMatch[1];
+        const agentId = streamMatch[2];
+        console.log(`[gastown-worker] WS upgrade (stream): townId=${townId} agentId=${agentId}`);
+        const stub = getTownContainerStub(env, townId);
+        return stub.fetch(request);
+      }
+
+      // PTY terminal connection
+      const ptyMatch = url.pathname.match(WS_PTY_PATTERN);
+      if (ptyMatch) {
+        const townId = ptyMatch[1];
+        const agentId = ptyMatch[2];
+        const ptyId = ptyMatch[3];
+        console.log(
+          `[gastown-worker] WS upgrade (pty): townId=${townId} agentId=${agentId} ptyId=${ptyId}`
+        );
         const stub = getTownContainerStub(env, townId);
         return stub.fetch(request);
       }

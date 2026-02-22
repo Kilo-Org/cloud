@@ -357,6 +357,55 @@ export const gastownRouter = createTRPCRouter({
       return { ...ticket, url: fullUrl };
     }),
 
+  // ── Agent Terminal (PTY) ──────────────────────────────────────────────────
+
+  createPtySession: baseProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        agentId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify ownership
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+
+      // Create a PTY session on the container via the worker
+      const pty = await withGastownError(() =>
+        gastown.createPtySession(input.townId, input.agentId)
+      );
+
+      // Construct the WebSocket URL for the PTY connection
+      const baseUrl = new URL(GASTOWN_SERVICE_URL ?? 'http://localhost:8787');
+      const wsProtocol = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${baseUrl.host}/api/towns/${input.townId}/container/agents/${input.agentId}/pty/${pty.id}/connect`;
+
+      return { pty, wsUrl };
+    }),
+
+  resizePtySession: baseProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        agentId: z.string().uuid(),
+        ptyId: z.string(),
+        cols: z.number().int().min(1).max(500),
+        rows: z.number().int().min(1).max(200),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      await withGastownError(() =>
+        gastown.resizePtySession(input.townId, input.agentId, input.ptyId, input.cols, input.rows)
+      );
+    }),
+
   // ── Town Configuration ──────────────────────────────────────────────────
 
   getTownConfig: baseProcedure

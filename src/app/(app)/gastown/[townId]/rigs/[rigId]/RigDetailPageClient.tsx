@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BeadBoard } from '@/components/gastown/BeadBoard';
 import { AgentCard } from '@/components/gastown/AgentCard';
 import { AgentStream } from '@/components/gastown/AgentStream';
+import { AgentTerminal } from '@/components/gastown/AgentTerminal';
 import { SlingDialog } from '@/components/gastown/SlingDialog';
 import { MayorChat } from '@/components/gastown/MayorChat';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
@@ -28,6 +29,7 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
   const [isSlingOpen, setIsSlingOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [selectedBeadId, setSelectedBeadId] = useState<string | null>(null);
+  const [agentView, setAgentView] = useState<'events' | 'terminal'>('events');
 
   const queryClient = useQueryClient();
   const rigQuery = useQuery(trpc.gastown.getRig.queryOptions({ rigId }));
@@ -221,22 +223,56 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
         </div>
       </div>
 
-      {/* Agent Stream */}
+      {/* Agent Stream / Terminal */}
       {selectedAgentId && (
         <div className="mt-6">
           <div className="mb-3 flex items-end justify-between">
             <div>
-              <h2 className="text-sm font-medium tracking-wide text-white/70">Agent Stream</h2>
+              <h2 className="text-sm font-medium tracking-wide text-white/70">
+                {agentView === 'events' ? 'Agent Stream' : 'Agent Terminal'}
+              </h2>
               <p className="mt-0.5 text-xs text-white/45">
-                Real-time tool calls, diffs, and narrative output.
+                {agentView === 'events'
+                  ? 'Real-time tool calls, diffs, and narrative output.'
+                  : 'Live terminal view of the agent session.'}
               </p>
             </div>
+            <div className="flex gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-0.5">
+              <button
+                onClick={() => setAgentView('events')}
+                className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+                  agentView === 'events'
+                    ? 'bg-white/10 text-white/90'
+                    : 'text-white/50 hover:text-white/70'
+                }`}
+              >
+                Events
+              </button>
+              <button
+                onClick={() => setAgentView('terminal')}
+                className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+                  agentView === 'terminal'
+                    ? 'bg-white/10 text-white/90'
+                    : 'text-white/50 hover:text-white/70'
+                }`}
+              >
+                Terminal
+              </button>
+            </div>
           </div>
-          <AgentStream
-            townId={townId}
-            agentId={selectedAgentId}
-            onClose={() => setSelectedAgentId(null)}
-          />
+          {agentView === 'events' ? (
+            <AgentStream
+              townId={townId}
+              agentId={selectedAgentId}
+              onClose={() => setSelectedAgentId(null)}
+            />
+          ) : (
+            <AgentTerminal
+              townId={townId}
+              agentId={selectedAgentId}
+              onClose={() => setSelectedAgentId(null)}
+            />
+          )}
         </div>
       )}
 

@@ -285,6 +285,14 @@ async function handleAnalysisFailed(
 
   await updateAnalysisStatus(findingId, 'failed', { error: errorMessage });
 
+  if (!triggeredByUserId) {
+    logError('Missing triggeredByUserId in analysis context, skipping PostHog tracking', {
+      findingId,
+      correlationId,
+    });
+    return;
+  }
+
   trackSecurityAgentAnalysisCompleted({
     distinctId: triggeredByUserId,
     userId: triggeredByUserId,

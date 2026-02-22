@@ -42,6 +42,10 @@ export async function updateTownConfig(
         ? (current.git_auth[key] ?? incoming)
         : incoming;
     }
+    // platform_integration_id is not masked — always take the update value
+    if (update.git_auth.platform_integration_id !== undefined) {
+      resolvedGitAuth.platform_integration_id = update.git_auth.platform_integration_id;
+    }
   }
 
   const merged: TownConfig = {

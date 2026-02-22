@@ -15,6 +15,7 @@ function createDbSession(overrides: Partial<DbSessionDetails> = {}): DbSessionDe
     session_id: 'test-session-id',
     title: 'Test Session',
     git_url: 'https://github.com/owner/repo',
+    git_branch: null,
     cloud_agent_session_id: null,
     created_on_platform: 'cli',
     created_at: new Date(),

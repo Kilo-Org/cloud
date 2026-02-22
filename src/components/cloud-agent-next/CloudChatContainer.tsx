@@ -234,6 +234,12 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     [loadedDbSession?.git_url]
   );
 
+  // Derive default branch from loaded session's git_branch for the resume config modal
+  const defaultResumeBranch = useMemo(
+    () => loadedDbSession?.git_branch ?? undefined,
+    [loadedDbSession?.git_branch]
+  );
+
   // Mobile sheet state
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
@@ -451,6 +457,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
             // Include mode/model from DO runtime state so needsResumeConfigModal works correctly
             last_mode: runtimeState?.mode,
             last_model: runtimeState?.model,
+            git_url: sessionData.git_url,
+            git_branch: sessionData.git_branch,
           };
 
           // Check if session has been initiated - prefer DO state, fallback to message check
@@ -992,6 +1000,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
       repositories={repositories}
       isLoadingRepos={isLoadingRepos}
       defaultResumeRepo={defaultResumeRepo}
+      defaultResumeBranch={defaultResumeBranch}
       needsResumeConfig={needsResumeConfig}
       resumeConfigPersisting={resumeConfigState.status === 'persisting'}
       resumeConfigFailed={resumeConfigState.status === 'failed'}

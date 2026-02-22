@@ -24,6 +24,7 @@ import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/R
 import { EnvVarsDialog } from './EnvVarsDialog';
 import { SetupCommandsDialog } from './SetupCommandsDialog';
 import type { ResumeConfig } from './types';
+import { extractRepoFromGitUrl } from './utils/git-utils';
 import { Cloud } from 'lucide-react';
 
 // Re-export ResumeConfig for backwards compatibility
@@ -51,6 +52,10 @@ type ResumeConfigModalProps = {
   defaultMode?: ResumeConfig['mode'];
   /** Default model to select (from session's last_model or org default) */
   defaultModel?: string;
+  /** Git URL already stored on the session (makes repo read-only when truthy) */
+  sessionGitUrl?: string | null;
+  /** Git branch already stored on the session (makes branch read-only when truthy) */
+  sessionGitBranch?: string | null;
 };
 
 export const MODES = [
@@ -84,14 +89,20 @@ export function ResumeConfigModal({
   isLoadingModels = false,
   defaultMode,
   defaultModel,
+  sessionGitUrl,
+  sessionGitBranch,
 }: ResumeConfigModalProps) {
   // Form state
   const [mode, setMode] = useState<ResumeConfig['mode']>(defaultMode || 'build');
   const [model, setModel] = useState<string>(defaultModel || '');
   const [envVars, setEnvVars] = useState<Record<string, string>>({});
   const [setupCommands, setSetupCommands] = useState<string[]>([]);
-  const [githubRepo, setGithubRepo] = useState<string>(defaultRepo || '');
-  const [branch, setBranch] = useState<string>(defaultBranch || '');
+  const [githubRepo, setGithubRepo] = useState<string>(
+    sessionGitUrl ? (extractRepoFromGitUrl(sessionGitUrl) ?? '') : defaultRepo || ''
+  );
+  const [branch, setBranch] = useState<string>(
+    sessionGitBranch ? sessionGitBranch : defaultBranch || ''
+  );
 
   // Sync mode when defaultMode prop changes (e.g., when session data loads or modal opens for different session)
   // Always sync to handle both truthy values and reset to fallback when undefined/null
@@ -106,12 +117,20 @@ export function ResumeConfigModal({
   }, [defaultModel]);
 
   useEffect(() => {
-    setGithubRepo(defaultRepo || '');
-  }, [defaultRepo]);
+    if (sessionGitUrl) {
+      setGithubRepo(extractRepoFromGitUrl(sessionGitUrl) ?? '');
+    } else {
+      setGithubRepo(defaultRepo || '');
+    }
+  }, [defaultRepo, sessionGitUrl]);
 
   useEffect(() => {
-    setBranch(defaultBranch || '');
-  }, [defaultBranch]);
+    if (sessionGitBranch) {
+      setBranch(sessionGitBranch);
+    } else {
+      setBranch(defaultBranch || '');
+    }
+  }, [defaultBranch, sessionGitBranch]);
 
   // Auto-select first model if none selected and models are available
   const effectiveModel = useMemo(() => {
@@ -170,30 +189,45 @@ export function ResumeConfigModal({
           )}
 
           {/* Repository selector */}
-          <RepositoryCombobox
-            label="Repository"
-            repositories={repositories}
-            value={githubRepo}
-            onValueChange={setGithubRepo}
-            isLoading={isLoadingRepos}
-            required
-            helperText="Select the repository for this session"
-            groupByPlatform
-          />
+          {sessionGitUrl ? (
+            <div className="space-y-2">
+              <Label>
+                Repository <span className="text-red-400">*</span>
+              </Label>
+              <p className="text-muted-foreground text-sm">{githubRepo}</p>
+            </div>
+          ) : (
+            <RepositoryCombobox
+              label="Repository"
+              repositories={repositories}
+              value={githubRepo}
+              onValueChange={setGithubRepo}
+              isLoading={isLoadingRepos}
+              required
+              helperText="Select the repository for this session"
+              groupByPlatform
+            />
+          )}
 
           {/* Branch input */}
           <div className="space-y-2">
             <Label htmlFor="branch">Branch</Label>
-            <Input
-              id="branch"
-              value={branch}
-              onChange={e => setBranch(e.target.value)}
-              placeholder="main"
-              className="font-mono"
-            />
-            <p className="text-muted-foreground text-xs">
-              Branch to use (leave empty for default branch)
-            </p>
+            {sessionGitBranch ? (
+              <p className="text-muted-foreground text-sm">{branch}</p>
+            ) : (
+              <>
+                <Input
+                  id="branch"
+                  value={branch}
+                  onChange={e => setBranch(e.target.value)}
+                  placeholder="main"
+                  className="font-mono"
+                />
+                <p className="text-muted-foreground text-xs">
+                  Branch to use (leave empty for default branch)
+                </p>
+              </>
+            )}
           </div>
 
           {/* Required: Mode selector */}

@@ -121,6 +121,8 @@ export type CloudChatPresentationProps = {
   isLoadingRepos: boolean;
   /** Default repo for resume config modal */
   defaultResumeRepo?: string;
+  /** Default branch for resume config modal */
+  defaultResumeBranch?: string;
 
   // Config state
   needsResumeConfig: boolean;
@@ -208,6 +210,7 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
   repositories,
   isLoadingRepos,
   defaultResumeRepo,
+  defaultResumeBranch,
   needsResumeConfig,
   resumeConfigPersisting,
   resumeConfigFailed,
@@ -268,6 +271,9 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
           repositories={repositories}
           isLoadingRepos={isLoadingRepos}
           defaultRepo={defaultResumeRepo}
+          defaultBranch={defaultResumeBranch}
+          sessionGitUrl={pendingResumeSession.git_url}
+          sessionGitBranch={pendingResumeSession.git_branch}
           sessionTitle={pendingResumeSession.title}
           modelOptions={modelOptions}
           isLoadingModels={isLoadingModels}

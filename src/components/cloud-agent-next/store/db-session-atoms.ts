@@ -336,6 +336,7 @@ export type DbSessionDetails = {
   // V1-only fields (optional for V2 compatibility)
   kilo_user_id?: string;
   git_url?: string | null;
+  git_branch?: string | null;
   created_on_platform?: string | null;
   forked_from?: string | null;
   api_conversation_history_blob_url?: string | null;

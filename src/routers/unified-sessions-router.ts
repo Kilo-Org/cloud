@@ -20,6 +20,7 @@ type UnifiedSession = {
   version: number;
   last_mode: string | null;
   last_model: string | null;
+  git_branch: string | null;
   parent_session_id: string | null;
   source: 'v1' | 'v2';
 };
@@ -105,6 +106,7 @@ function v1Columns(): SQL {
     ${cliSessions.version} AS version,
     ${cliSessions.last_mode} AS last_mode,
     ${cliSessions.last_model} AS last_model,
+    NULL AS git_branch,
     ${cliSessions.parent_session_id}::text AS parent_session_id,
     'v1' AS source`;
 }
@@ -114,7 +116,7 @@ function v2Columns(): SQL {
   return sql`
     ${cli_sessions_v2.session_id} AS session_id,
     COALESCE(${cli_sessions_v2.title}, 'Untitled') AS title,
-    NULL AS git_url,
+    ${cli_sessions_v2.git_url} AS git_url,
     ${cli_sessions_v2.cloud_agent_session_id} AS cloud_agent_session_id,
     ${cli_sessions_v2.created_on_platform} AS created_on_platform,
     ${cli_sessions_v2.organization_id}::text AS organization_id,
@@ -123,6 +125,7 @@ function v2Columns(): SQL {
     ${cli_sessions_v2.version} AS version,
     NULL AS last_mode,
     NULL AS last_model,
+    ${cli_sessions_v2.git_branch} AS git_branch,
     ${cli_sessions_v2.parent_session_id} AS parent_session_id,
     'v2' AS source`;
 }

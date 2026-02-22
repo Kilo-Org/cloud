@@ -52,6 +52,7 @@ export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {
     /* sql */ `
       INSERT INTO ${rig_beads} (
         ${rig_beads.columns.id},
+        ${rig_beads.columns.rig_id},
         ${rig_beads.columns.type},
         ${rig_beads.columns.status},
         ${rig_beads.columns.title},
@@ -65,10 +66,11 @@ export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {
         ${rig_beads.columns.created_at},
         ${rig_beads.columns.updated_at},
         ${rig_beads.columns.closed_at}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       id,
+      input.rig_id ?? null,
       input.type,
       'open',
       input.title,
@@ -122,6 +124,7 @@ export function listBeads(sql: SqlStorage, filter: BeadFilter): Bead[] {
           AND (? IS NULL OR ${rig_beads.columns.type} = ?)
           AND (? IS NULL OR ${rig_beads.columns.assignee_agent_id} = ?)
           AND (? IS NULL OR ${rig_beads.columns.convoy_id} = ?)
+          AND (? IS NULL OR ${rig_beads.columns.rig_id} = ?)
         ORDER BY ${rig_beads.columns.created_at} DESC
         LIMIT ? OFFSET ?
       `,
@@ -134,6 +137,8 @@ export function listBeads(sql: SqlStorage, filter: BeadFilter): Bead[] {
         filter.assignee_agent_id ?? null,
         filter.convoy_id ?? null,
         filter.convoy_id ?? null,
+        filter.rig_id ?? null,
+        filter.rig_id ?? null,
         limit,
         offset,
       ]

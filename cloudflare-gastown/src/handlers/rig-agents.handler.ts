@@ -64,6 +64,7 @@ export async function handleListAgents(c: Context<GastownEnv>, params: { rigId: 
   const agents = await town.listAgents({
     role: role?.data,
     status: status?.data,
+    rig_id: params.rigId,
   });
   return c.json(resSuccess(agents));
 }

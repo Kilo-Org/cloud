@@ -2174,7 +2174,7 @@ Inside of this sidebar will be all of the important items for your town:
 
 #### Fullscreen App
 
-Unlike other sections of the kilo dash, Gastown should behavior like an information-dense, full screen application. With information flowing autonomously and smoothly animating throughout. The user should see the objects of the system, know how to manipulate them, and intuitively be able to flow from one object to another through a graph/pane interface that allows for seamless navigation.
+Unlike other sections of the kilo dash, Gastown should behave like an information-dense, full screen application. With information flowing autonomously and smoothly animating throughout. The user should see the objects of the system, know how to manipulate them, and intuitively be able to trace the flow from one object to another through a graph/pane interface that allows for seamless navigation.
 
 #### Convoy Visualization
 
@@ -2430,7 +2430,17 @@ The architecture is fundamentally sound. The DO-as-scheduler, container-as-runti
 
 - Infra
   - Mint tokens from within the gastown service itself using the jwt secret
+  - Make the whole UI live in the gastown service, use SolidJS so that integrating with kilo's existing web UI's is easier
 - Feature
+  - Mayor should be a persistent chat interface across the town
+    - Perhaps we use xterm.js to just use the cli
+  - Mayor should automatically check in after creating a town and tell you what's going on
+  - Give the Mayor tools to control the UI
+    - Say you create a town
+    - The mayor should see you've got some github repos connected and should suggest adding a rig
+    - You say "yeah go ahead and add the cloud repo rig"
+    - The mayor should be able to do that and the user should see it happening the UI in realtime
+    - We've basically already gotten a ws connection plumbed through to the container, so this sort of two-way rpc should be pretty easy to implement
   - Agent evolution and evaluation
     - The CV sort of covers this, but we should give the agents the ability to modify their system prompts
     - After each work item is completed, we should have another agent grade their work

@@ -27,6 +27,7 @@ export type CreateBeadInput = {
   metadata?: Record<string, unknown>;
   assignee_agent_id?: string;
   convoy_id?: string;
+  rig_id?: string;
 };
 
 export type BeadFilter = {
@@ -34,6 +35,7 @@ export type BeadFilter = {
   type?: BeadType;
   assignee_agent_id?: string;
   convoy_id?: string;
+  rig_id?: string;
   limit?: number;
   offset?: number;
 };
@@ -58,6 +60,7 @@ export type RegisterAgentInput = {
 export type AgentFilter = {
   role?: AgentRole;
   status?: AgentStatus;
+  rig_id?: string;
 };
 
 // -- Mail --

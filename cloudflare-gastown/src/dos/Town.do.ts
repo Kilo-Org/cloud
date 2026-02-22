@@ -508,6 +508,7 @@ export class TownDO extends DurableObject<Env> {
       title: input.title,
       body: input.body,
       priority: (input.priority as 'low' | 'medium' | 'high' | 'critical') ?? 'medium',
+      rig_id: input.rigId,
     });
 
     const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);

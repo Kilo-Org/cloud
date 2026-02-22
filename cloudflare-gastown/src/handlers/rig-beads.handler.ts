@@ -78,6 +78,7 @@ export async function handleListBeads(c: Context<GastownEnv>, params: { rigId: s
     type: type?.data,
     assignee_agent_id: c.req.query('assignee_agent_id'),
     convoy_id: c.req.query('convoy_id'),
+    rig_id: params.rigId,
     limit: limit?.data,
     offset: offset?.data,
   });

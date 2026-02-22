@@ -123,9 +123,17 @@ export function listAgents(sql: SqlStorage, filter?: AgentFilter): Agent[] {
         SELECT * FROM ${rig_agents}
         WHERE (? IS NULL OR ${rig_agents.columns.role} = ?)
           AND (? IS NULL OR ${rig_agents.columns.status} = ?)
+          AND (? IS NULL OR ${rig_agents.columns.rig_id} = ?)
         ORDER BY ${rig_agents.columns.created_at} ASC
       `,
-      [filter?.role ?? null, filter?.role ?? null, filter?.status ?? null, filter?.status ?? null]
+      [
+        filter?.role ?? null,
+        filter?.role ?? null,
+        filter?.status ?? null,
+        filter?.status ?? null,
+        filter?.rig_id ?? null,
+        filter?.rig_id ?? null,
+      ]
     ),
   ];
   return RigAgentRecord.array().parse(rows);

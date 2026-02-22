@@ -3,7 +3,6 @@ import type * as securityFindingsModule from '@/lib/security-agent/db/security-f
 import type * as securityAnalysisModule from '@/lib/security-agent/db/security-analysis';
 import type * as triageModule from './triage-service';
 import type * as tokensModule from '@/lib/tokens';
-import type { StreamEvent } from '@/components/cloud-agent/types';
 import type { User } from '@/db/schema';
 import type { startSecurityAnalysis as startSecurityAnalysisType } from './analysis-service';
 
@@ -17,9 +16,12 @@ const mockTriageSecurityFinding = jest.fn() as jest.MockedFunction<
   typeof triageModule.triageSecurityFinding
 >;
 const mockGenerateApiToken = jest.fn() as jest.MockedFunction<typeof tokensModule.generateApiToken>;
-const mockInitiateSessionStream = jest.fn() as jest.MockedFunction<
-  (input: unknown) => AsyncGenerator<StreamEvent, void, unknown>
->;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockPrepareSession = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockInitiateFromPreparedSession = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDeleteSession = jest.fn<any>();
 
 jest.mock('@/lib/security-agent/db/security-findings', () => ({
   getSecurityFindingById: mockGetSecurityFindingById,
@@ -37,10 +39,20 @@ jest.mock('@/lib/tokens', () => ({
   generateApiToken: mockGenerateApiToken,
 }));
 
-jest.mock('@/lib/cloud-agent/cloud-agent-client', () => ({
-  createCloudAgentClient: jest.fn(() => ({
-    initiateSessionStream: mockInitiateSessionStream,
+jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+  createCloudAgentNextClient: jest.fn(() => ({
+    prepareSession: mockPrepareSession,
+    initiateFromPreparedSession: mockInitiateFromPreparedSession,
+    deleteSession: mockDeleteSession,
   })),
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {
+    readonly httpStatus = 402;
+    readonly code = 'PAYMENT_REQUIRED';
+    constructor(message = 'Insufficient credits') {
+      super(message);
+      this.name = 'InsufficientCreditsError';
+    }
+  },
 }));
 
 jest.mock('./auto-dismiss-service', () => ({
@@ -62,7 +74,7 @@ describe('analysis-service', () => {
     jest.clearAllMocks();
   });
 
-  it('passes organization id to cloud agent sandbox analysis', async () => {
+  it('passes organization id to cloud-agent-next prepareSession', async () => {
     const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const findingId = 'finding-123';
     const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
@@ -96,7 +108,16 @@ describe('analysis-service', () => {
       triageAt: new Date().toISOString(),
     });
     mockGenerateApiToken.mockReturnValue('test-token');
-    mockInitiateSessionStream.mockReturnValue((async function* () {})());
+    mockPrepareSession.mockResolvedValue({
+      cloudAgentSessionId: 'ses-agent-123',
+      kiloSessionId: 'ses_kilo-123',
+    });
+    mockInitiateFromPreparedSession.mockResolvedValue({
+      cloudAgentSessionId: 'ses-agent-123',
+      executionId: 'exec-123',
+      status: 'started',
+      streamUrl: 'wss://example.com/stream',
+    });
 
     const result = await startSecurityAnalysis({
       findingId,
@@ -108,10 +129,184 @@ describe('analysis-service', () => {
     });
 
     expect(result.started).toBe(true);
-    expect(mockInitiateSessionStream).toHaveBeenCalledWith(
+    expect(result.triageOnly).toBe(false);
+    expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         kilocodeOrganizationId: organizationId,
+        githubRepo: 'acme/repo',
+        githubToken: 'gh-token',
+        mode: 'code',
+        model: 'anthropic/claude-sonnet-4',
+        callbackTarget: expect.objectContaining({
+          url: expect.stringContaining(`/api/internal/security-analysis-callback/${findingId}`),
+          headers: expect.objectContaining({ 'X-Internal-Secret': expect.any(String) }),
+        }),
       })
     );
+    expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
+      cloudAgentSessionId: 'ses-agent-123',
+    });
+  });
+
+  it('stores session IDs after prepareSession', async () => {
+    const findingId = 'finding-456';
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+
+    const mockFinding = {
+      id: findingId,
+      analysis_status: 'new',
+      repo_full_name: 'acme/repo',
+      package_name: 'lodash',
+      package_ecosystem: 'npm',
+      severity: 'high',
+      dependency_scope: 'runtime',
+      cve_id: null,
+      ghsa_id: null,
+      title: 'Test vulnerability',
+      description: null,
+      vulnerable_version_range: null,
+      patched_version: null,
+      manifest_path: null,
+    };
+
+    mockGetSecurityFindingById.mockResolvedValue(
+      mockFinding as Awaited<ReturnType<typeof mockGetSecurityFindingById>>
+    );
+    mockUpdateAnalysisStatus.mockResolvedValue(undefined);
+    mockTriageSecurityFinding.mockResolvedValue({
+      needsSandboxAnalysis: true,
+      needsSandboxReasoning: 'Needs analysis',
+      suggestedAction: 'analyze_codebase',
+      confidence: 'medium',
+      triageAt: new Date().toISOString(),
+    });
+    mockGenerateApiToken.mockReturnValue('test-token');
+    mockPrepareSession.mockResolvedValue({
+      cloudAgentSessionId: 'agent-session-abc',
+      kiloSessionId: 'ses_kilo-abc',
+    });
+    mockInitiateFromPreparedSession.mockResolvedValue({
+      cloudAgentSessionId: 'agent-session-abc',
+      executionId: 'exec-abc',
+      status: 'started',
+      streamUrl: 'wss://example.com/stream',
+    });
+
+    await startSecurityAnalysis({
+      findingId,
+      user,
+      githubRepo: 'acme/repo',
+      githubToken: 'gh-token',
+    });
+
+    // Verify session IDs were stored via updateAnalysisStatus('running', ...)
+    expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(findingId, 'running', {
+      sessionId: 'agent-session-abc',
+      cliSessionId: 'ses_kilo-abc',
+    });
+  });
+
+  it('returns triageOnly when sandbox analysis is not needed', async () => {
+    const findingId = 'finding-triage';
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+
+    const mockFinding = {
+      id: findingId,
+      analysis_status: 'new',
+      repo_full_name: 'acme/repo',
+      package_name: 'lodash',
+      package_ecosystem: 'npm',
+      severity: 'low',
+      dependency_scope: 'development',
+      cve_id: null,
+      ghsa_id: null,
+      title: 'Low severity dev dep',
+      description: null,
+      vulnerable_version_range: null,
+      patched_version: null,
+      manifest_path: null,
+    };
+
+    mockGetSecurityFindingById.mockResolvedValue(
+      mockFinding as Awaited<ReturnType<typeof mockGetSecurityFindingById>>
+    );
+    mockUpdateAnalysisStatus.mockResolvedValue(undefined);
+    mockTriageSecurityFinding.mockResolvedValue({
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'Dev dependency, low severity',
+      suggestedAction: 'dismiss',
+      confidence: 'high',
+      triageAt: new Date().toISOString(),
+    });
+    mockGenerateApiToken.mockReturnValue('test-token');
+
+    const result = await startSecurityAnalysis({
+      findingId,
+      user,
+      githubRepo: 'acme/repo',
+      githubToken: 'gh-token',
+    });
+
+    expect(result.started).toBe(true);
+    expect(result.triageOnly).toBe(true);
+    // prepareSession should NOT be called for triage-only
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('handles initiateFromPreparedSession failure and cleans up', async () => {
+    const findingId = 'finding-fail';
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+
+    const mockFinding = {
+      id: findingId,
+      analysis_status: 'new',
+      repo_full_name: 'acme/repo',
+      package_name: 'lodash',
+      package_ecosystem: 'npm',
+      severity: 'high',
+      dependency_scope: 'runtime',
+      cve_id: null,
+      ghsa_id: null,
+      title: 'Test vulnerability',
+      description: null,
+      vulnerable_version_range: null,
+      patched_version: null,
+      manifest_path: null,
+    };
+
+    mockGetSecurityFindingById.mockResolvedValue(
+      mockFinding as Awaited<ReturnType<typeof mockGetSecurityFindingById>>
+    );
+    mockUpdateAnalysisStatus.mockResolvedValue(undefined);
+    mockTriageSecurityFinding.mockResolvedValue({
+      needsSandboxAnalysis: true,
+      needsSandboxReasoning: 'Needs analysis',
+      suggestedAction: 'analyze_codebase',
+      confidence: 'medium',
+      triageAt: new Date().toISOString(),
+    });
+    mockGenerateApiToken.mockReturnValue('test-token');
+    mockPrepareSession.mockResolvedValue({
+      cloudAgentSessionId: 'agent-session-xyz',
+      kiloSessionId: 'ses_kilo-xyz',
+    });
+    mockInitiateFromPreparedSession.mockRejectedValue(new Error('Sandbox unavailable'));
+    mockDeleteSession.mockResolvedValue({ success: true });
+
+    const result = await startSecurityAnalysis({
+      findingId,
+      user,
+      githubRepo: 'acme/repo',
+      githubToken: 'gh-token',
+    });
+
+    expect(result.started).toBe(false);
+    expect(result.error).toBe('Sandbox unavailable');
+    // Should attempt to clean up the prepared session
+    expect(mockDeleteSession).toHaveBeenCalledWith('agent-session-xyz');
+    // Should mark finding as failed
+    expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(findingId, 'failed', {
+      error: 'Sandbox unavailable',
+    });
   });
 });

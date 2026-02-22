@@ -1,22 +1,31 @@
 import { z } from 'zod';
-import type { RigBeadRecord } from './db/tables/rig-beads.table';
-import type { RigAgentRecord } from './db/tables/rig-agents.table';
-import type { RigMailRecord } from './db/tables/rig-mail.table';
-import type { RigReviewQueueRecord } from './db/tables/rig-review-queue.table';
-import type { RigMoleculeRecord } from './db/tables/rig-molecules.table';
+import type { BeadRecord } from './db/tables/beads.table';
+import type { AgentMetadataRecord } from './db/tables/agent-metadata.table';
+import type { ReviewMetadataRecord } from './db/tables/review-metadata.table';
+import type { EscalationMetadataRecord } from './db/tables/escalation-metadata.table';
+import type { ConvoyMetadataRecord } from './db/tables/convoy-metadata.table';
+import type { BeadEventRecord } from './db/tables/bead-events.table';
 
 // -- Beads --
 
 export const BeadStatus = z.enum(['open', 'in_progress', 'closed', 'failed']);
 export type BeadStatus = z.infer<typeof BeadStatus>;
 
-export const BeadType = z.enum(['issue', 'message', 'escalation', 'merge_request']);
+export const BeadType = z.enum([
+  'issue',
+  'message',
+  'escalation',
+  'merge_request',
+  'convoy',
+  'molecule',
+  'agent',
+]);
 export type BeadType = z.infer<typeof BeadType>;
 
 export const BeadPriority = z.enum(['low', 'medium', 'high', 'critical']);
 export type BeadPriority = z.infer<typeof BeadPriority>;
 
-export type Bead = RigBeadRecord;
+export type Bead = BeadRecord;
 
 export type CreateBeadInput = {
   type: BeadType;
@@ -25,30 +34,48 @@ export type CreateBeadInput = {
   priority?: BeadPriority;
   labels?: string[];
   metadata?: Record<string, unknown>;
-  assignee_agent_id?: string;
-  convoy_id?: string;
+  assignee_agent_bead_id?: string;
+  parent_bead_id?: string;
   rig_id?: string;
+  created_by?: string;
 };
 
 export type BeadFilter = {
   status?: BeadStatus;
   type?: BeadType;
-  assignee_agent_id?: string;
-  convoy_id?: string;
+  assignee_agent_bead_id?: string;
+  parent_bead_id?: string;
   rig_id?: string;
   limit?: number;
   offset?: number;
 };
 
-// -- Agents --
+// -- Agents (now beads + agent_metadata) --
 
 export const AgentRole = z.enum(['polecat', 'refinery', 'mayor', 'witness']);
 export type AgentRole = z.infer<typeof AgentRole>;
 
-export const AgentStatus = z.enum(['idle', 'working', 'blocked', 'dead']);
+export const AgentStatus = z.enum(['idle', 'working', 'stalled', 'dead']);
 export type AgentStatus = z.infer<typeof AgentStatus>;
 
-export type Agent = RigAgentRecord;
+/**
+ * An Agent is a bead (type='agent') joined with its agent_metadata row.
+ * This combined type is used throughout the codebase.
+ */
+export type Agent = {
+  /** The agent's bead_id (primary key across both tables) */
+  id: string;
+  rig_id: string | null;
+  role: AgentMetadataRecord['role'];
+  name: string;
+  identity: string;
+  status: AgentMetadataRecord['status'];
+  current_hook_bead_id: string | null;
+  dispatch_attempts: number;
+  last_activity_at: string | null;
+  checkpoint: unknown;
+  created_at: string;
+};
 
 export type RegisterAgentInput = {
   role: AgentRole;
@@ -63,9 +90,18 @@ export type AgentFilter = {
   rig_id?: string;
 };
 
-// -- Mail --
+// -- Mail (now beads with type='message') --
 
-export type Mail = RigMailRecord;
+export type Mail = {
+  id: string;
+  from_agent_id: string;
+  to_agent_id: string;
+  subject: string;
+  body: string;
+  delivered: boolean;
+  created_at: string;
+  delivered_at: string | null;
+};
 
 export type SendMailInput = {
   from_agent_id: string;
@@ -74,12 +110,22 @@ export type SendMailInput = {
   body: string;
 };
 
-// -- Review Queue --
+// -- Review Queue (now beads with type='merge_request' + review_metadata) --
 
 export const ReviewStatus = z.enum(['pending', 'running', 'merged', 'failed']);
 export type ReviewStatus = z.infer<typeof ReviewStatus>;
 
-export type ReviewQueueEntry = RigReviewQueueRecord;
+export type ReviewQueueEntry = {
+  id: string;
+  agent_id: string;
+  bead_id: string;
+  branch: string;
+  pr_url: string | null;
+  status: ReviewStatus;
+  summary: string | null;
+  created_at: string;
+  processed_at: string | null;
+};
 
 export type ReviewQueueInput = {
   agent_id: string;
@@ -89,12 +135,20 @@ export type ReviewQueueInput = {
   summary?: string;
 };
 
-// -- Molecules --
+// -- Molecules (now beads with type='molecule' + child step beads) --
 
 export const MoleculeStatus = z.enum(['active', 'completed', 'failed']);
 export type MoleculeStatus = z.infer<typeof MoleculeStatus>;
 
-export type Molecule = RigMoleculeRecord;
+export type Molecule = {
+  id: string;
+  bead_id: string;
+  formula: unknown;
+  current_step: number;
+  status: MoleculeStatus;
+  created_at: string;
+  updated_at: string;
+};
 
 // -- Prime context --
 
@@ -183,3 +237,11 @@ export const AgentConfigOverridesSchema = z.object({
   model: z.string().optional(),
 });
 export type AgentConfigOverrides = z.infer<typeof AgentConfigOverridesSchema>;
+
+// Re-export satellite metadata types for convenience
+export type { AgentMetadataRecord } from './db/tables/agent-metadata.table';
+export type { ReviewMetadataRecord } from './db/tables/review-metadata.table';
+export type { EscalationMetadataRecord } from './db/tables/escalation-metadata.table';
+export type { ConvoyMetadataRecord } from './db/tables/convoy-metadata.table';
+export type { BeadEventRecord } from './db/tables/bead-events.table';
+export type { BeadDependencyRecord } from './db/tables/bead-dependencies.table';

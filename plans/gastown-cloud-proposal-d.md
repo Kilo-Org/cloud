@@ -2435,6 +2435,7 @@ The architecture is fundamentally sound. The DO-as-scheduler, container-as-runti
     - On every message to the mayor, we can preload rigs and add them to the system prompt
     - I'm sure we can pretty much do this on any message to the mayor
     - We still need to keep these tools so the mayor knows that it may need to refresh its knowledge
+  - Shell-based e2e tests should run in vitest
 - Feature
   - Mayor should be a persistent chat interface across the town
     - Perhaps we use xterm.js to just use the cli
@@ -2452,3 +2453,7 @@ The architecture is fundamentally sound. The DO-as-scheduler, container-as-runti
     - Give agents a rating and review system (let users see that a particular agent has 4.5/5 stars)
     - Let users "fire" agents and "hire" new ones
     - Agent personas
+  - The town UI should present itself almost as a social network UI
+    - Feed-centric
+    - Notifications
+    - If we give the ability to create screenshots to our agents, we'll have posting photo updates (of UI) as much as possible

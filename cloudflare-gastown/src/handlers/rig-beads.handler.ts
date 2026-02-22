@@ -76,8 +76,8 @@ export async function handleListBeads(c: Context<GastownEnv>, params: { rigId: s
   const beads = await town.listBeads({
     status: status?.data,
     type: type?.data,
-    assignee_agent_id: c.req.query('assignee_agent_id'),
-    convoy_id: c.req.query('convoy_id'),
+    assignee_agent_bead_id:
+      c.req.query('assignee_agent_bead_id') ?? c.req.query('assignee_agent_id'),
     rig_id: params.rigId,
     limit: limit?.data,
     offset: offset?.data,

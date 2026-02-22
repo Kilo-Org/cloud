@@ -8,12 +8,12 @@ import { Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 type Bead = {
-  id: string;
+  bead_id: string;
   type: string;
   status: string;
   title: string;
   body: string | null;
-  assignee_agent_id: string | null;
+  assignee_agent_bead_id: string | null;
   priority: string;
   labels: string[];
   created_at: string;
@@ -63,7 +63,9 @@ function BeadCard({
   isSelected?: boolean;
   agentNameById?: Record<string, string>;
 }) {
-  const assigneeName = bead.assignee_agent_id ? agentNameById?.[bead.assignee_agent_id] : null;
+  const assigneeName = bead.assignee_agent_bead_id
+    ? agentNameById?.[bead.assignee_agent_bead_id]
+    : null;
 
   // Use a non-interactive wrapper (div) + interactive elements inside.
   // Avoid nesting <button> inside <button> (invalid HTML, a11y issues).
@@ -196,11 +198,11 @@ export function BeadBoard({
               )}
               {columnBeads.map(bead => (
                 <BeadCard
-                  key={bead.id}
+                  key={bead.bead_id}
                   bead={bead}
-                  onDelete={onDeleteBead ? () => onDeleteBead(bead.id) : undefined}
+                  onDelete={onDeleteBead ? () => onDeleteBead(bead.bead_id) : undefined}
                   onSelect={onSelectBead ? () => onSelectBead(bead) : undefined}
-                  isSelected={selectedBeadId === bead.id}
+                  isSelected={selectedBeadId === bead.bead_id}
                   agentNameById={agentNameById}
                 />
               ))}

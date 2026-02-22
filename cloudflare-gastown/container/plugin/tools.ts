@@ -135,7 +135,7 @@ export function createTools(client: GastownClient) {
           priority: args.priority,
           metadata,
         });
-        return `Escalation created: ${bead.id} (priority: ${bead.priority})`;
+        return `Escalation created: ${bead.bead_id} (priority: ${bead.priority})`;
       },
     }),
 

@@ -50,14 +50,14 @@ export const RigSchema = z.object({
 export type Rig = z.output<typeof RigSchema>;
 
 export const BeadSchema = z.object({
-  id: z.string(),
-  type: z.enum(['issue', 'message', 'escalation', 'merge_request']),
+  bead_id: z.string(),
+  type: z.enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent']),
   status: z.enum(['open', 'in_progress', 'closed', 'failed']),
   title: z.string(),
   body: z.string().nullable(),
-  assignee_agent_id: z.string().nullable(),
-  convoy_id: z.string().nullable(),
-  molecule_id: z.string().nullable(),
+  rig_id: z.string().nullable(),
+  parent_bead_id: z.string().nullable(),
+  assignee_agent_bead_id: z.string().nullable(),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
   labels: z.union([
     z.array(z.string()),
@@ -73,6 +73,7 @@ export const BeadSchema = z.object({
       .transform((v, ctx) => parseJsonOrIssue(v, ctx, 'metadata'))
       .pipe(z.record(z.string(), z.unknown())),
   ]),
+  created_by: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
   closed_at: z.string().nullable(),
@@ -81,10 +82,11 @@ export type Bead = z.output<typeof BeadSchema>;
 
 export const AgentSchema = z.object({
   id: z.string(),
+  rig_id: z.string().nullable(),
   role: z.enum(['polecat', 'refinery', 'mayor', 'witness']),
   name: z.string(),
   identity: z.string(),
-  status: z.enum(['idle', 'working', 'blocked', 'dead']),
+  status: z.enum(['idle', 'working', 'stalled', 'dead']),
   current_hook_bead_id: z.string().nullable(),
   dispatch_attempts: z.number().default(0),
   last_activity_at: z.string().nullable(),
@@ -360,7 +362,7 @@ export async function deleteAgent(townId: string, rigId: string, agentId: string
 // ── Event operations ──────────────────────────────────────────────────────
 
 export const BeadEventSchema = z.object({
-  id: z.string(),
+  bead_event_id: z.string(),
   bead_id: z.string(),
   agent_id: z.string().nullable(),
   event_type: z.string(),

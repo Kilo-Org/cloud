@@ -52,7 +52,7 @@ export function createMayorTools(client: MayorGastownClient) {
         });
         return [
           `Task slung successfully.`,
-          `Bead: ${result.bead.id} — "${result.bead.title}"`,
+          `Bead: ${result.bead.bead_id} — "${result.bead.title}"`,
           `Assigned to: ${result.agent.name} (${result.agent.role}, id: ${result.agent.id})`,
           `Status: ${result.bead.status}`,
           `The polecat will be dispatched automatically by the alarm scheduler.`,

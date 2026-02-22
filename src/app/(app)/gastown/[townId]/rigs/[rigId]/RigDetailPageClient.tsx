@@ -47,7 +47,7 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
     return acc;
   }, {});
 
-  const selectedBead = (beadsQuery.data ?? []).find(b => b.id === selectedBeadId) ?? null;
+  const selectedBead = (beadsQuery.data ?? []).find(b => b.bead_id === selectedBeadId) ?? null;
 
   const deleteBead = useMutation(
     trpc.gastown.deleteBead.mutationOptions({
@@ -164,7 +164,7 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
                   }
                 }}
                 onSelectBead={bead => {
-                  setSelectedBeadId(bead.id);
+                  setSelectedBeadId(bead.bead_id);
                 }}
                 selectedBeadId={selectedBeadId}
                 agentNameById={agentNameById}
@@ -267,7 +267,7 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
           selectedBead
             ? () => {
                 if (confirm('Delete this bead?')) {
-                  deleteBead.mutate({ rigId, beadId: selectedBead.id });
+                  deleteBead.mutate({ rigId, beadId: selectedBead.bead_id });
                   setSelectedBeadId(null);
                 }
               }

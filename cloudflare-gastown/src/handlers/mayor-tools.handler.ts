@@ -155,8 +155,8 @@ export async function handleMayorListBeads(
   const beads = await town.listBeads({
     status: status?.data,
     type: type?.data,
-    assignee_agent_id: c.req.query('assignee_agent_id'),
-    convoy_id: c.req.query('convoy_id'),
+    assignee_agent_bead_id:
+      c.req.query('assignee_agent_bead_id') ?? c.req.query('assignee_agent_id'),
     limit: limit?.data,
     offset: offset?.data,
   });

@@ -56,7 +56,9 @@ export function GastownBeadDetailSheet({
   agentNameById,
   onDelete,
 }: GastownBeadDetailSheetProps) {
-  const assigneeName = bead?.assignee_agent_id ? agentNameById?.[bead.assignee_agent_id] : null;
+  const assigneeName = bead?.assignee_agent_bead_id
+    ? agentNameById?.[bead.assignee_agent_bead_id]
+    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -113,7 +115,7 @@ export function GastownBeadDetailSheet({
           ) : (
             <>
               <div className="grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <MetaRow icon={Hash} label="Bead ID" value={bead.id} />
+                <MetaRow icon={Hash} label="Bead ID" value={bead.bead_id} />
                 <MetaRow
                   icon={Clock}
                   label="Created"
@@ -123,7 +125,8 @@ export function GastownBeadDetailSheet({
                   icon={User}
                   label="Assignee"
                   value={
-                    assigneeName ?? (bead.assignee_agent_id ? bead.assignee_agent_id : 'Unassigned')
+                    assigneeName ??
+                    (bead.assignee_agent_bead_id ? bead.assignee_agent_bead_id : 'Unassigned')
                   }
                 />
                 <MetaRow
@@ -151,7 +154,7 @@ export function GastownBeadDetailSheet({
                     Append-only ledger for this bead.
                   </div>
                 </div>
-                <BeadEventTimeline rigId={rigId} beadId={bead.id} />
+                <BeadEventTimeline rigId={rigId} beadId={bead.bead_id} />
               </div>
             </>
           )}

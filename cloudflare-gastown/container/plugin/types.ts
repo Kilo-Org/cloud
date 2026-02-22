@@ -1,37 +1,47 @@
-// Types mirroring the Rig DO domain model.
+// Types mirroring the Town DO domain model.
 // These are the API response shapes — the plugin never touches SQLite directly.
 
 export type BeadStatus = 'open' | 'in_progress' | 'closed' | 'failed';
-export type BeadType = 'issue' | 'message' | 'escalation' | 'merge_request';
+export type BeadType =
+  | 'issue'
+  | 'message'
+  | 'escalation'
+  | 'merge_request'
+  | 'convoy'
+  | 'molecule'
+  | 'agent';
 export type BeadPriority = 'low' | 'medium' | 'high' | 'critical';
 
 export type Bead = {
-  id: string;
+  bead_id: string;
   type: BeadType;
   status: BeadStatus;
   title: string;
   body: string | null;
-  assignee_agent_id: string | null;
-  convoy_id: string | null;
-  molecule_id: string | null;
+  rig_id: string | null;
+  parent_bead_id: string | null;
+  assignee_agent_bead_id: string | null;
   priority: BeadPriority;
   labels: string[];
   metadata: Record<string, unknown>;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
   closed_at: string | null;
 };
 
 export type AgentRole = 'polecat' | 'refinery' | 'mayor' | 'witness';
-export type AgentStatus = 'idle' | 'working' | 'blocked' | 'dead';
+export type AgentStatus = 'idle' | 'working' | 'stalled' | 'dead';
 
 export type Agent = {
   id: string;
+  rig_id: string | null;
   role: AgentRole;
   name: string;
   identity: string;
   status: AgentStatus;
   current_hook_bead_id: string | null;
+  dispatch_attempts: number;
   last_activity_at: string | null;
   checkpoint: unknown | null;
   created_at: string;

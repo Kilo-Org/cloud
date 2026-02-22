@@ -137,7 +137,7 @@ export function ActivityFeedView({ townId, events, isLoading }: ActivityFeedView
 
         return (
           <div
-            key={event.id}
+            key={event.bead_event_id}
             className="flex items-start gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-white/[0.05]"
           >
             <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
@@ -191,7 +191,7 @@ export function BeadEventTimeline({ rigId, beadId }: { rigId: string; beadId: st
         const color = EVENT_COLORS[event.event_type] ?? 'text-muted-foreground';
 
         return (
-          <div key={event.id} className="flex items-start gap-2 py-1 text-xs">
+          <div key={event.bead_event_id} className="flex items-start gap-2 py-1 text-xs">
             <Icon className={`mt-0.5 h-3 w-3 shrink-0 ${color}`} />
             <div className="min-w-0 flex-1">
               <span className="text-foreground">

@@ -1,25 +1,30 @@
 /**
  * Bead CRUD operations for the Town DO.
- * Beads are scoped to a rig via rig_id column (added in the town-centric refactor).
+ * After the beads-centric refactor (#441), all object types are beads.
  */
 
-import { z } from 'zod';
+import { beads, BeadRecord, createTableBeads, getIndexesBeads } from '../../db/tables/beads.table';
 import {
-  rig_beads,
-  RigBeadRecord,
-  createTableRigBeads,
-  getIndexesRigBeads,
-} from '../../db/tables/rig-beads.table';
+  bead_events,
+  BeadEventRecord,
+  createTableBeadEvents,
+  getIndexesBeadEvents,
+} from '../../db/tables/bead-events.table';
 import {
-  rig_bead_events,
-  RigBeadEventRecord,
-  createTableRigBeadEvents,
-  getIndexesRigBeadEvents,
-} from '../../db/tables/rig-bead-events.table';
-import { rig_agents } from '../../db/tables/rig-agents.table';
+  bead_dependencies,
+  createTableBeadDependencies,
+  getIndexesBeadDependencies,
+} from '../../db/tables/bead-dependencies.table';
+import { agent_metadata, createTableAgentMetadata } from '../../db/tables/agent-metadata.table';
+import { review_metadata, createTableReviewMetadata } from '../../db/tables/review-metadata.table';
+import {
+  escalation_metadata,
+  createTableEscalationMetadata,
+} from '../../db/tables/escalation-metadata.table';
+import { convoy_metadata, createTableConvoyMetadata } from '../../db/tables/convoy-metadata.table';
 import { query } from '../../util/query.util';
 import type { CreateBeadInput, BeadFilter, Bead } from '../../types';
-import type { BeadEventType } from '../../db/tables/rig-bead-events.table';
+import type { BeadEventType } from '../../db/tables/bead-events.table';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -30,14 +35,23 @@ function now(): string {
 }
 
 export function initBeadTables(sql: SqlStorage): void {
-  query(sql, createTableRigBeads(), []);
-  for (const idx of getIndexesRigBeads()) {
+  query(sql, createTableBeads(), []);
+  for (const idx of getIndexesBeads()) {
     query(sql, idx, []);
   }
-  query(sql, createTableRigBeadEvents(), []);
-  for (const idx of getIndexesRigBeadEvents()) {
+  query(sql, createTableBeadEvents(), []);
+  for (const idx of getIndexesBeadEvents()) {
     query(sql, idx, []);
   }
+  query(sql, createTableBeadDependencies(), []);
+  for (const idx of getIndexesBeadDependencies()) {
+    query(sql, idx, []);
+  }
+  // Satellite metadata tables
+  query(sql, createTableAgentMetadata(), []);
+  query(sql, createTableReviewMetadata(), []);
+  query(sql, createTableEscalationMetadata(), []);
+  query(sql, createTableConvoyMetadata(), []);
 }
 
 export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {
@@ -50,37 +64,37 @@ export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {
   query(
     sql,
     /* sql */ `
-      INSERT INTO ${rig_beads} (
-        ${rig_beads.columns.id},
-        ${rig_beads.columns.rig_id},
-        ${rig_beads.columns.type},
-        ${rig_beads.columns.status},
-        ${rig_beads.columns.title},
-        ${rig_beads.columns.body},
-        ${rig_beads.columns.assignee_agent_id},
-        ${rig_beads.columns.convoy_id},
-        ${rig_beads.columns.molecule_id},
-        ${rig_beads.columns.priority},
-        ${rig_beads.columns.labels},
-        ${rig_beads.columns.metadata},
-        ${rig_beads.columns.created_at},
-        ${rig_beads.columns.updated_at},
-        ${rig_beads.columns.closed_at}
+      INSERT INTO ${beads} (
+        ${beads.columns.bead_id},
+        ${beads.columns.type},
+        ${beads.columns.status},
+        ${beads.columns.title},
+        ${beads.columns.body},
+        ${beads.columns.rig_id},
+        ${beads.columns.parent_bead_id},
+        ${beads.columns.assignee_agent_bead_id},
+        ${beads.columns.priority},
+        ${beads.columns.labels},
+        ${beads.columns.metadata},
+        ${beads.columns.created_by},
+        ${beads.columns.created_at},
+        ${beads.columns.updated_at},
+        ${beads.columns.closed_at}
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       id,
-      input.rig_id ?? null,
       input.type,
       'open',
       input.title,
       input.body ?? null,
-      input.assignee_agent_id ?? null,
-      input.convoy_id ?? null,
-      null,
+      input.rig_id ?? null,
+      input.parent_bead_id ?? null,
+      input.assignee_agent_bead_id ?? null,
       input.priority ?? 'medium',
       labels,
       metadata,
+      input.created_by ?? null,
       timestamp,
       timestamp,
       null,
@@ -92,7 +106,7 @@ export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {
 
   logBeadEvent(sql, {
     beadId: id,
-    agentId: input.assignee_agent_id ?? null,
+    agentId: input.assignee_agent_bead_id ?? null,
     eventType: 'created',
     newValue: 'open',
     metadata: { type: input.type, title: input.title },
@@ -103,12 +117,10 @@ export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {
 
 export function getBead(sql: SqlStorage, beadId: string): Bead | null {
   const rows = [
-    ...query(sql, /* sql */ `SELECT * FROM ${rig_beads} WHERE ${rig_beads.columns.id} = ?`, [
-      beadId,
-    ]),
+    ...query(sql, /* sql */ `SELECT * FROM ${beads} WHERE ${beads.bead_id} = ?`, [beadId]),
   ];
   if (rows.length === 0) return null;
-  return RigBeadRecord.parse(rows[0]);
+  return BeadRecord.parse(rows[0]);
 }
 
 export function listBeads(sql: SqlStorage, filter: BeadFilter): Bead[] {
@@ -119,13 +131,13 @@ export function listBeads(sql: SqlStorage, filter: BeadFilter): Bead[] {
     ...query(
       sql,
       /* sql */ `
-        SELECT * FROM ${rig_beads}
-        WHERE (? IS NULL OR ${rig_beads.columns.status} = ?)
-          AND (? IS NULL OR ${rig_beads.columns.type} = ?)
-          AND (? IS NULL OR ${rig_beads.columns.assignee_agent_id} = ?)
-          AND (? IS NULL OR ${rig_beads.columns.convoy_id} = ?)
-          AND (? IS NULL OR ${rig_beads.columns.rig_id} = ?)
-        ORDER BY ${rig_beads.columns.created_at} DESC
+        SELECT * FROM ${beads}
+        WHERE (? IS NULL OR ${beads.status} = ?)
+          AND (? IS NULL OR ${beads.type} = ?)
+          AND (? IS NULL OR ${beads.assignee_agent_bead_id} = ?)
+          AND (? IS NULL OR ${beads.parent_bead_id} = ?)
+          AND (? IS NULL OR ${beads.rig_id} = ?)
+        ORDER BY ${beads.created_at} DESC
         LIMIT ? OFFSET ?
       `,
       [
@@ -133,10 +145,10 @@ export function listBeads(sql: SqlStorage, filter: BeadFilter): Bead[] {
         filter.status ?? null,
         filter.type ?? null,
         filter.type ?? null,
-        filter.assignee_agent_id ?? null,
-        filter.assignee_agent_id ?? null,
-        filter.convoy_id ?? null,
-        filter.convoy_id ?? null,
+        filter.assignee_agent_bead_id ?? null,
+        filter.assignee_agent_bead_id ?? null,
+        filter.parent_bead_id ?? null,
+        filter.parent_bead_id ?? null,
         filter.rig_id ?? null,
         filter.rig_id ?? null,
         limit,
@@ -145,7 +157,7 @@ export function listBeads(sql: SqlStorage, filter: BeadFilter): Bead[] {
     ),
   ];
 
-  return RigBeadRecord.array().parse(rows);
+  return BeadRecord.array().parse(rows);
 }
 
 export function updateBeadStatus(
@@ -164,11 +176,11 @@ export function updateBeadStatus(
   query(
     sql,
     /* sql */ `
-      UPDATE ${rig_beads}
-      SET ${rig_beads.columns.status} = ?,
-          ${rig_beads.columns.updated_at} = ?,
-          ${rig_beads.columns.closed_at} = ?
-      WHERE ${rig_beads.columns.id} = ?
+      UPDATE ${beads}
+      SET ${beads.columns.status} = ?,
+          ${beads.columns.updated_at} = ?,
+          ${beads.columns.closed_at} = ?
+      WHERE ${beads.bead_id} = ?
     `,
     [status, timestamp, closedAt, beadId]
   );
@@ -191,24 +203,58 @@ export function closeBead(sql: SqlStorage, beadId: string, agentId: string): Bea
 }
 
 export function deleteBead(sql: SqlStorage, beadId: string): void {
+  // Recursively delete child beads (e.g. molecule steps) before the parent
+  const children = BeadRecord.pick({ bead_id: true })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} = ?`,
+        [beadId]
+      ),
+    ]);
+  for (const { bead_id } of children) {
+    deleteBead(sql, bead_id);
+  }
+
   // Unhook any agent assigned to this bead
   query(
     sql,
     /* sql */ `
-      UPDATE ${rig_agents}
-      SET ${rig_agents.columns.current_hook_bead_id} = NULL,
-          ${rig_agents.columns.status} = 'idle'
-      WHERE ${rig_agents.columns.current_hook_bead_id} = ?
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.current_hook_bead_id} = NULL,
+          ${agent_metadata.columns.status} = 'idle'
+      WHERE ${agent_metadata.current_hook_bead_id} = ?
     `,
     [beadId]
   );
 
+  // Delete dependencies referencing this bead
   query(
     sql,
-    /* sql */ `DELETE FROM ${rig_bead_events} WHERE ${rig_bead_events.columns.bead_id} = ?`,
+    /* sql */ `DELETE FROM ${bead_dependencies} WHERE ${bead_dependencies.bead_id} = ? OR ${bead_dependencies.depends_on_bead_id} = ?`,
+    [beadId, beadId]
+  );
+
+  query(sql, /* sql */ `DELETE FROM ${bead_events} WHERE ${bead_events.bead_id} = ?`, [beadId]);
+
+  // Delete satellite metadata if present
+  query(sql, /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.bead_id} = ?`, [
+    beadId,
+  ]);
+  query(sql, /* sql */ `DELETE FROM ${review_metadata} WHERE ${review_metadata.bead_id} = ?`, [
+    beadId,
+  ]);
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${escalation_metadata} WHERE ${escalation_metadata.bead_id} = ?`,
     [beadId]
   );
-  query(sql, /* sql */ `DELETE FROM ${rig_beads} WHERE ${rig_beads.columns.id} = ?`, [beadId]);
+  query(sql, /* sql */ `DELETE FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} = ?`, [
+    beadId,
+  ]);
+
+  query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} = ?`, [beadId]);
 }
 
 // ── Bead Events ─────────────────────────────────────────────────────
@@ -227,15 +273,15 @@ export function logBeadEvent(
   query(
     sql,
     /* sql */ `
-      INSERT INTO ${rig_bead_events} (
-        ${rig_bead_events.columns.id},
-        ${rig_bead_events.columns.bead_id},
-        ${rig_bead_events.columns.agent_id},
-        ${rig_bead_events.columns.event_type},
-        ${rig_bead_events.columns.old_value},
-        ${rig_bead_events.columns.new_value},
-        ${rig_bead_events.columns.metadata},
-        ${rig_bead_events.columns.created_at}
+      INSERT INTO ${bead_events} (
+        ${bead_events.columns.bead_event_id},
+        ${bead_events.columns.bead_id},
+        ${bead_events.columns.agent_id},
+        ${bead_events.columns.event_type},
+        ${bead_events.columns.old_value},
+        ${bead_events.columns.new_value},
+        ${bead_events.columns.metadata},
+        ${bead_events.columns.created_at}
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
@@ -258,16 +304,16 @@ export function listBeadEvents(
     since?: string;
     limit?: number;
   }
-): RigBeadEventRecord[] {
+): BeadEventRecord[] {
   const limit = options.limit ?? 100;
   const rows = [
     ...query(
       sql,
       /* sql */ `
-        SELECT * FROM ${rig_bead_events}
-        WHERE (? IS NULL OR ${rig_bead_events.columns.bead_id} = ?)
-          AND (? IS NULL OR ${rig_bead_events.columns.created_at} > ?)
-        ORDER BY ${rig_bead_events.columns.created_at} DESC
+        SELECT * FROM ${bead_events}
+        WHERE (? IS NULL OR ${bead_events.bead_id} = ?)
+          AND (? IS NULL OR ${bead_events.created_at} > ?)
+        ORDER BY ${bead_events.created_at} DESC
         LIMIT ?
       `,
       [
@@ -279,5 +325,5 @@ export function listBeadEvents(
       ]
     ),
   ];
-  return RigBeadEventRecord.array().parse(rows);
+  return BeadEventRecord.array().parse(rows);
 }

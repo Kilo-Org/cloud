@@ -8,6 +8,7 @@ import { TRPCClientError } from '@trpc/client';
 import { cli_sessions_v2 } from '@/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateApiToken } from '@/lib/tokens';
+import { fetchSessionMessages } from '@/lib/session-ingest-client';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 
 /**
@@ -189,30 +190,27 @@ export const cliSessionsV2Router = createTRPCRouter({
     }),
 
   /**
-   * Get messages for a V2 session from R2.
-   * Messages are stored as JSON blobs in R2.
+   * Get messages for a V2 session from the session ingest worker.
    */
   getSessionMessages: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
     .query(async ({ ctx, input }) => {
-      // Verify ownership
       await getSessionWithOwnerCheck(input.session_id, ctx.user.id);
-      return { messages: [] };
 
-      // TODO: cloud-agent-next
-      // const blobKey = getV2MessagesBlobKey(input.session_id);
-
-      // try {
-      //   const messages = await getBlobContent(blobKey);
-      //   return { messages: messages ?? [] };
-      // } catch (error) {
-      //   // If blob doesn't exist yet, return empty messages
-      //   // This is expected for new sessions before first sync
-      //   if (error instanceof Error && error.name === 'NoSuchKey') {
-      //     return { messages: [] };
-      //   }
-      //   throw error;
-      // }
+      try {
+        const messages = await fetchSessionMessages(input.session_id, ctx.user);
+        return { messages: messages ?? [] };
+      } catch (error) {
+        console.error(
+          `Failed to fetch messages for session ${input.session_id}:`,
+          error instanceof Error ? error.message : error
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session messages',
+          cause: error,
+        });
+      }
     }),
 
   /**

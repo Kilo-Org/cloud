@@ -19,13 +19,20 @@ function resolveEnv(request: StartAgentRequest, key: string): string | undefined
  * the Kilo LLM gateway. Mirrors the pattern in cloud-agent-next's
  * session-service.ts getSaferEnvVars().
  */
-function buildKiloConfigContent(kilocodeToken: string): string {
+function buildKiloConfigContent(kilocodeToken: string, model?: string): string {
+  const resolvedModel = model ?? 'anthropic/claude-sonnet-4.6';
   return JSON.stringify({
     provider: {
       kilo: {
         options: {
           apiKey: kilocodeToken,
           kilocodeToken,
+        },
+        // Explicitly register models so the kilo server doesn't reject them
+        // before routing to the gateway. The gateway handles actual validation.
+        models: {
+          [resolvedModel]: {},
+          'anthropic/claude-haiku-4.5': {},
         },
       },
     },
@@ -34,7 +41,7 @@ function buildKiloConfigContent(kilocodeToken: string): string {
     // openai/gpt-5-nano which doesn't exist in the kilo provider,
     // causing ProviderModelNotFoundError that kills the entire prompt loop.
     small_model: 'anthropic/claude-haiku-4.5',
-    model: 'anthropic/claude-sonnet-4.6',
+    model: resolvedModel,
     // Override the title agent to use a valid model (same as small_model).
     // kilo serve v1.0.23 resolves title model independently and the
     // small_model fallback doesn't prevent ProviderModelNotFoundError.
@@ -147,7 +154,7 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   // Must also set OPENCODE_CONFIG_CONTENT — kilo serve checks both names.
   const kilocodeToken = env.KILOCODE_TOKEN;
   if (kilocodeToken) {
-    const configJson = buildKiloConfigContent(kilocodeToken);
+    const configJson = buildKiloConfigContent(kilocodeToken, request.model);
     env.KILO_CONFIG_CONTENT = configJson;
     env.OPENCODE_CONFIG_CONTENT = configJson;
     console.log(`[buildAgentEnv] KILO_CONFIG_CONTENT set (model=${JSON.parse(configJson).model})`);

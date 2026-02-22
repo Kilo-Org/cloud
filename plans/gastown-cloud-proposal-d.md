@@ -2425,3 +2425,16 @@ The current phase ordering puts UI (PR 8), merge flow (PR 9), and multi-agent (P
 7. **Town DO + convoys** — Required for multi-rig coordination and convoy dashboard.
 
 The architecture is fundamentally sound. The DO-as-scheduler, container-as-runtime split is correct. The kilo serve adoption was the right call. The gaps are mostly about completing the implementation rather than rearchitecting — with two notable exceptions: the event log (needed for the dashboard vision) and the Witness-as-agent question (which affects how transparent the system feels to users).
+
+## Things me, the human, thinks we should do eventually
+
+- Infra
+  - Mint tokens from within the gastown service itself using the jwt secret
+- Feature
+  - Agent evolution and evaluation
+    - The CV sort of covers this, but we should give the agents the ability to modify their system prompts
+    - After each work item is completed, we should have another agent grade their work
+    - Punish/reward the agents for their prompt changes
+    - Give agents a rating and review system (let users see that a particular agent has 4.5/5 stars)
+    - Let users "fire" agents and "hire" new ones
+    - Agent personas

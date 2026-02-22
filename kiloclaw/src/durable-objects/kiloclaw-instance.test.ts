@@ -733,7 +733,7 @@ describe('gateway process control via controller', () => {
     );
 
     const call = fetchSpy.mock.calls[0];
-    const headers = new Headers((call[1] as RequestInit | undefined)?.headers);
+    const headers = new Headers(call[1]?.headers);
     expect(headers.get('authorization')).toMatch(/^Bearer [a-f0-9]{64}$/);
     fetchSpy.mockRestore();
   });

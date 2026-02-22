@@ -422,6 +422,7 @@ export const TownConfigSchema = z.object({
     github_token: z.string().optional(),
     gitlab_token: z.string().optional(),
     gitlab_instance_url: z.string().optional(),
+    platform_integration_id: z.string().optional(),
   }),
   kilocode_token: z.string().optional(),
   owner_user_id: z.string().optional(),

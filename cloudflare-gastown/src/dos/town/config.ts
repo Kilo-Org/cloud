@@ -30,11 +30,29 @@ export async function updateTownConfig(
     }
   }
 
+  // git_auth: preserve masked token values (starting with "****") to avoid
+  // overwriting real secrets when the UI round-trips masked config.
+  let resolvedGitAuth = current.git_auth;
+  if (update.git_auth) {
+    resolvedGitAuth = { ...current.git_auth };
+    for (const key of ['github_token', 'gitlab_token', 'gitlab_instance_url'] as const) {
+      const incoming = update.git_auth[key];
+      if (incoming === undefined) continue;
+      resolvedGitAuth[key] = incoming.startsWith('****')
+        ? (current.git_auth[key] ?? incoming)
+        : incoming;
+    }
+    // platform_integration_id is not masked — always take the update value
+    if (update.git_auth.platform_integration_id !== undefined) {
+      resolvedGitAuth.platform_integration_id = update.git_auth.platform_integration_id;
+    }
+  }
+
   const merged: TownConfig = {
     ...current,
     ...update,
     env_vars: resolvedEnvVars,
-    git_auth: { ...current.git_auth, ...(update.git_auth ?? {}) },
+    git_auth: resolvedGitAuth,
     refinery:
       update.refinery !== undefined
         ? { ...current.refinery, ...update.refinery }

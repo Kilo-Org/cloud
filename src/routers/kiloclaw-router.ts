@@ -272,4 +272,9 @@ export const kiloclawRouter = createTRPCRouter({
       const client = new KiloClawInternalClient();
       return client.approvePairingRequest(ctx.user.id, input.channel, input.code);
     }),
+
+  runDoctor: kiloclawProcedure.mutation(async ({ ctx }) => {
+    const client = new KiloClawInternalClient();
+    return client.runDoctor(ctx.user.id);
+  }),
 });

@@ -109,6 +109,18 @@ export type CreateVolumeRequest = {
   compute?: VolumeComputeHint;
 };
 
+// -- Volume snapshot types --
+
+export type FlyVolumeSnapshot = {
+  id: string;
+  created_at: string;
+  digest: string;
+  retention_days: number;
+  size: number;
+  status: string;
+  volume_size: number;
+};
+
 // -- Exec types --
 
 export type MachineExecRequest = {

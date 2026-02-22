@@ -1,10 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Bug, History, Sparkles } from 'lucide-react';
+import { Bug, ChevronDown, ChevronUp, History, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CHANGELOG_ENTRIES, type ChangelogEntry } from './changelog-data';
+
+const COLLAPSED_COUNT = 4;
 
 const CATEGORY_STYLES = {
   feature: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400',
@@ -55,7 +59,12 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
 }
 
 export function ChangelogCard() {
+  const [expanded, setExpanded] = useState(false);
+
   if (CHANGELOG_ENTRIES.length === 0) return null;
+
+  const hasMore = CHANGELOG_ENTRIES.length > COLLAPSED_COUNT;
+  const visibleEntries = expanded ? CHANGELOG_ENTRIES : CHANGELOG_ENTRIES.slice(0, COLLAPSED_COUNT);
 
   return (
     <Card>
@@ -66,10 +75,32 @@ export function ChangelogCard() {
         </CardTitle>
         <CardDescription>Recent changes and updates to the KiloClaw platform.</CardDescription>
       </CardHeader>
-      <CardContent className="divide-y">
-        {CHANGELOG_ENTRIES.map((entry, i) => (
-          <ChangelogRow key={`${entry.date}-${i}`} entry={entry} />
-        ))}
+      <CardContent>
+        <div className="divide-y">
+          {visibleEntries.map((entry, i) => (
+            <ChangelogRow key={`${entry.date}-${i}`} entry={entry} />
+          ))}
+        </div>
+        {hasMore && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground mt-2 w-full"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? (
+              <>
+                <ChevronUp className="mr-1 h-4 w-4" />
+                Show less
+              </>
+            ) : (
+              <>
+                <ChevronDown className="mr-1 h-4 w-4" />
+                See more ({CHANGELOG_ENTRIES.length - COLLAPSED_COUNT} older)
+              </>
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

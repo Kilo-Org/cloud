@@ -217,6 +217,25 @@ platform.post('/pairing/approve', async c => {
   }
 });
 
+// POST /api/platform/doctor
+platform.post('/doctor', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const doctor = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.runDoctor(),
+      'runDoctor'
+    );
+    return c.json(doctor, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] doctor failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
 // POST /api/platform/start
 platform.post('/start', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
@@ -320,6 +339,28 @@ platform.get('/gateway-token', async c => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[platform] gateway-token failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// GET /api/platform/volume-snapshots?userId=...
+// Returns the list of Fly volume snapshots for the user's instance.
+platform.get('/volume-snapshots', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  try {
+    const snapshots = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.listVolumeSnapshots(),
+      'listVolumeSnapshots'
+    );
+    return c.json({ snapshots });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] volume-snapshots failed:', message);
     return c.json({ error: message }, 500);
   }
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { needsResumeConfigModal, buildStreamResumeConfig } from './useResumeConfigModal';
+import { needsResumeConfigModal, getPersistedResumeConfig } from './useResumeConfigModal';
 import type { DbSessionDetails, IndexedDbSessionData } from '../store/db-session-atoms';
 
 // ============================================================================
@@ -96,6 +96,7 @@ describe('needsResumeConfigModal', () => {
       resumeConfig: {
         mode: 'build',
         model: 'anthropic/claude-3-5-sonnet',
+        githubRepo: 'owner/repo',
       },
     });
 
@@ -140,66 +141,61 @@ describe('needsResumeConfigModal', () => {
 });
 
 // ============================================================================
-// buildStreamResumeConfig Tests
+// getPersistedResumeConfig Tests
 // ============================================================================
 
-describe('buildStreamResumeConfig', () => {
+describe('getPersistedResumeConfig', () => {
   it('returns null when no config sources available', () => {
-    const result = buildStreamResumeConfig({
+    const result = getPersistedResumeConfig({
       resumeConfig: null,
-      pendingResumeSession: null,
       currentIndexedDbSession: null,
     });
 
     expect(result).toBeNull();
   });
 
-  it('prioritizes local resumeConfig over IndexedDB stored config', () => {
+  it('prioritizes in-memory resumeConfig over IndexedDB stored config', () => {
     const indexedDbSession = createIndexedDbSession({
       repository: 'indexed/db-repo',
       resumeConfig: {
         mode: 'plan',
         model: 'stored-model',
+        githubRepo: 'indexed/db-repo',
       },
     });
 
-    const result = buildStreamResumeConfig({
-      resumeConfig: {
-        mode: 'build',
-        model: 'local-model',
-        githubRepo: 'local/repo',
-        branch: 'feature-branch',
-        envVars: { API_KEY: 'secret' },
-      },
-      pendingResumeSession: null,
+    const inMemoryConfig = {
+      mode: 'build' as const,
+      model: 'local-model',
+      githubRepo: 'local/repo',
+      branch: 'feature-branch',
+      envVars: { API_KEY: 'secret' },
+    };
+
+    const result = getPersistedResumeConfig({
+      resumeConfig: inMemoryConfig,
       currentIndexedDbSession: indexedDbSession,
     });
 
-    expect(result).toEqual({
-      mode: 'build',
-      model: 'local-model',
-      envVars: { API_KEY: 'secret' },
-      setupCommands: undefined,
-      githubRepo: 'local/repo',
-      upstreamBranch: 'feature-branch',
-    });
+    // Should return the in-memory config as-is
+    expect(result).toBe(inMemoryConfig);
   });
 
-  it('falls back to IndexedDB stored config when no local config', () => {
+  it('falls back to IndexedDB stored config when no in-memory config', () => {
     const indexedDbSession = createIndexedDbSession({
       repository: 'indexed/db-repo',
       resumeConfig: {
         mode: 'plan',
         model: 'stored-model',
+        githubRepo: 'stored/repo',
         envVars: { DB_KEY: 'value' },
         setupCommands: ['npm install'],
         branch: 'develop',
       },
     });
 
-    const result = buildStreamResumeConfig({
+    const result = getPersistedResumeConfig({
       resumeConfig: null,
-      pendingResumeSession: null,
       currentIndexedDbSession: indexedDbSession,
     });
 
@@ -208,8 +204,33 @@ describe('buildStreamResumeConfig', () => {
       model: 'stored-model',
       envVars: { DB_KEY: 'value' },
       setupCommands: ['npm install'],
-      githubRepo: 'indexed/db-repo',
-      upstreamBranch: 'develop',
+      githubRepo: 'stored/repo',
+      branch: 'develop',
+    });
+  });
+
+  it('uses repository from IndexedDB session when resumeConfig.githubRepo is missing', () => {
+    const indexedDbSession = createIndexedDbSession({
+      repository: 'fallback/repo',
+      resumeConfig: {
+        mode: 'build',
+        model: 'some-model',
+        githubRepo: '',
+      },
+    });
+
+    const result = getPersistedResumeConfig({
+      resumeConfig: null,
+      currentIndexedDbSession: indexedDbSession,
+    });
+
+    expect(result).toEqual({
+      mode: 'build',
+      model: 'some-model',
+      githubRepo: 'fallback/repo',
+      branch: undefined,
+      envVars: undefined,
+      setupCommands: undefined,
     });
   });
 });

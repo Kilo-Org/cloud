@@ -49,7 +49,7 @@ import { useResumeConfigModal } from './hooks/useResumeConfigModal';
 import { useSessionConfigCommand } from './hooks/useSessionConfigCommand';
 import { useOrgContextCommand } from './hooks/useOrgContextCommand';
 import { usePreparedSession } from './hooks/usePreparedSession';
-import { buildPrepareSessionRepoParams, extractRepoFromGitUrl } from './utils/git-utils';
+import { buildPrepareSessionRepoParams } from './utils/git-utils';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { CloudChatPresentation } from './CloudChatPresentation';
 import type { ResumeConfig } from './ResumeConfigModal';
@@ -59,17 +59,6 @@ import type { AgentMode, SessionStartConfig } from './types';
 type CloudChatContainerProps = {
   organizationId?: string;
 };
-
-/**
- * Discriminated union for resume config lifecycle
- * Prevents impossible states and makes persistence status explicit
- */
-type ResumeConfigState =
-  | { status: 'none' }
-  | { status: 'pending'; config: ResumeConfig }
-  | { status: 'persisting'; config: ResumeConfig }
-  | { status: 'persisted'; config: ResumeConfig }
-  | { status: 'failed'; config: ResumeConfig; error: Error };
 
 export function CloudChatContainer({ organizationId }: CloudChatContainerProps) {
   const router = useRouter();
@@ -130,14 +119,16 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     null
   );
 
-  // Single source of truth for resume config lifecycle
-  const [resumeConfigState, setResumeConfigState] = useState<ResumeConfigState>({ status: 'none' });
+  // Simple resume config persistence state
+  const [resumeConfigPersisting, setResumeConfigPersisting] = useState(false);
+  const [persistedConfig, setPersistedConfig] = useState<ResumeConfig | null>(null);
+  const [resumeConfigError, setResumeConfigError] = useState<string | null>(null);
 
   // Resume config modal hook
   const {
     showResumeModal,
     pendingResumeSession,
-    streamResumeConfig,
+    persistedResumeConfig,
     reopenResumeModal,
     handleResumeConfirm: handleResumeConfirmFromHook,
     handleResumeClose,
@@ -146,17 +137,41 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     currentDbSessionId,
     currentIndexedDbSession,
     loadedDbSession,
-    persistedResumeConfig:
-      resumeConfigState.status === 'persisted' ? resumeConfigState.config : null,
+    persistedResumeConfig: persistedConfig,
   });
 
-  // Wrap the modal confirm handler to set discriminated union state
+  // Handle modal confirm: persist config directly (no effect-based state machine)
   const handleResumeConfirm = useCallback(
     async (config: ResumeConfig) => {
       await handleResumeConfirmFromHook(config);
-      setResumeConfigState({ status: 'pending', config });
+
+      if (!currentDbSessionId || !loadedDbSession) return;
+
+      setResumeConfigPersisting(true);
+      setResumeConfigError(null);
+      try {
+        await applyResumeConfig({
+          config,
+          sessionId: currentDbSessionId,
+          loadedDbSession,
+        });
+        setPersistedConfig(config);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        setResumeConfigError(message);
+        clearResumeConfig();
+        toast.error('Failed to save configuration. Please try again.');
+      } finally {
+        setResumeConfigPersisting(false);
+      }
     },
-    [handleResumeConfirmFromHook]
+    [
+      handleResumeConfirmFromHook,
+      currentDbSessionId,
+      loadedDbSession,
+      applyResumeConfig,
+      clearResumeConfig,
+    ]
   );
 
   // Org context modal state
@@ -215,18 +230,6 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     }));
     return [...github, ...gitlab];
   }, [githubRepoData, gitlabRepoData]);
-
-  // Derive default repo from loaded session's git_url for the resume config modal
-  const defaultResumeRepo = useMemo(
-    () => (loadedDbSession?.git_url ? extractRepoFromGitUrl(loadedDbSession.git_url) : undefined),
-    [loadedDbSession?.git_url]
-  );
-
-  // Derive default branch from loaded session's git_branch for the resume config modal
-  const defaultResumeBranch = useMemo(
-    () => loadedDbSession?.git_branch ?? undefined,
-    [loadedDbSession?.git_branch]
-  );
 
   // Mobile sheet state
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -652,46 +655,12 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
       // Disconnect old WebSocket to prevent events from old session updating UI
       cleanup();
       setAutoInitiatedSessionId(null);
-      setResumeConfigState({ status: 'none' });
+      setPersistedConfig(null);
+      setResumeConfigError(null);
       connectedExistingSessionRef.current = null;
     }
     prevDbSessionIdRef.current = currentDbSessionId;
   }, [currentDbSessionId, cleanup]);
-
-  // Apply resume config when state transitions to 'pending'
-  useEffect(() => {
-    if (resumeConfigState.status !== 'pending') return;
-    if (!currentDbSessionId || !loadedDbSession) return;
-
-    setResumeConfigState({ status: 'persisting', config: resumeConfigState.config });
-
-    const apply = async () => {
-      try {
-        await applyResumeConfig({
-          config: resumeConfigState.config,
-          sessionId: currentDbSessionId,
-          loadedDbSession,
-        });
-        setResumeConfigState({ status: 'persisted', config: resumeConfigState.config });
-      } catch (error) {
-        setResumeConfigState({
-          status: 'failed',
-          config: resumeConfigState.config,
-          error: error instanceof Error ? error : new Error('Unknown error'),
-        });
-        clearResumeConfig();
-        toast.error('Failed to save configuration. Please try again.');
-      }
-    };
-
-    void apply();
-  }, [
-    resumeConfigState,
-    currentDbSessionId,
-    loadedDbSession,
-    applyResumeConfig,
-    clearResumeConfig,
-  ]);
 
   // Periodic staleness check
   useEffect(() => {
@@ -808,7 +777,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
       // the case where we have a valid sessionConfig (already-initiated or CLI sessions)
       if (sessionConfig) {
         if (needsLegacyPrepare && effectiveSessionId && currentDbSessionId) {
-          const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
+          const resumeRepo = persistedResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
           const repoParams = buildPrepareSessionRepoParams({
             repo: resumeRepo,
@@ -831,9 +800,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
                 mode: inputMode,
                 model: inputModel,
                 ...repoParams,
-                envVars: streamResumeConfig?.envVars,
-                setupCommands: streamResumeConfig?.setupCommands,
-                upstreamBranch: streamResumeConfig?.upstreamBranch,
+                envVars: persistedResumeConfig?.envVars,
+                setupCommands: persistedResumeConfig?.setupCommands,
+                upstreamBranch: persistedResumeConfig?.branch,
               });
             } else {
               result = await trpcClient.cloudAgentNext.prepareSession.mutate({
@@ -841,9 +810,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
                 mode: inputMode,
                 model: inputModel,
                 ...repoParams,
-                envVars: streamResumeConfig?.envVars,
-                setupCommands: streamResumeConfig?.setupCommands,
-                upstreamBranch: streamResumeConfig?.upstreamBranch,
+                envVars: persistedResumeConfig?.envVars,
+                setupCommands: persistedResumeConfig?.setupCommands,
+                upstreamBranch: persistedResumeConfig?.branch,
               });
             }
 
@@ -859,7 +828,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         }
 
         if (!effectiveSessionId) {
-          const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
+          const resumeRepo = persistedResumeConfig?.githubRepo || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
           const repoParams = buildPrepareSessionRepoParams({
             repo: resumeRepo,
@@ -877,9 +846,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
               mode: inputMode,
               model: inputModel,
               ...repoParams,
-              envVars: streamResumeConfig?.envVars,
-              setupCommands: streamResumeConfig?.setupCommands,
-              upstreamBranch: streamResumeConfig?.upstreamBranch,
+              envVars: persistedResumeConfig?.envVars,
+              setupCommands: persistedResumeConfig?.setupCommands,
+              upstreamBranch: persistedResumeConfig?.branch,
             });
             await initiateFromPreparedSession(effectiveSessionId);
             return;
@@ -902,7 +871,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
       currentSessionId,
       needsLegacyPrepare,
       currentDbSessionId,
-      streamResumeConfig,
+      persistedResumeConfig,
       prepareSession,
       trpcClient,
       initiateFromPreparedSession,
@@ -952,8 +921,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     !isPreflightPending &&
     needsResumeConfiguration({
       currentDbSessionId,
-      resumeConfig: resumeConfigState.status === 'persisted' ? resumeConfigState.config : null,
-      streamResumeConfig,
+      resumeConfig: persistedConfig,
+      persistedResumeConfig,
       sessionConfig,
     });
 
@@ -987,21 +956,17 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
       pendingResumeSession={pendingResumeSession}
       repositories={repositories}
       isLoadingRepos={isLoadingRepos}
-      defaultResumeRepo={defaultResumeRepo}
-      defaultResumeBranch={defaultResumeBranch}
       needsResumeConfig={needsResumeConfig}
-      resumeConfigPersisting={resumeConfigState.status === 'persisting'}
-      resumeConfigFailed={resumeConfigState.status === 'failed'}
-      resumeConfigError={
-        resumeConfigState.status === 'failed' ? resumeConfigState.error.message : null
-      }
+      resumeConfigPersisting={resumeConfigPersisting}
+      resumeConfigFailed={resumeConfigError !== null}
+      resumeConfigError={resumeConfigError}
       modelOptions={modelOptions}
       isLoadingModels={isLoadingModels}
       defaultModel={defaultModel}
       availableCommands={availableCommands}
       scrollContainerRef={scrollContainerRef}
       messagesEndRef={messagesEndRef}
-      streamResumeConfig={streamResumeConfig}
+      persistedResumeConfig={persistedResumeConfig}
       onSendMessage={handleSendMessage}
       onStopExecution={handleStopExecution}
       onRefresh={handleRefreshSession}

@@ -24,6 +24,7 @@ import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/R
 import { EnvVarsDialog } from './EnvVarsDialog';
 import { SetupCommandsDialog } from './SetupCommandsDialog';
 import type { ResumeConfig } from './types';
+import type { DbSessionDetails } from './store/db-session-atoms';
 import { extractRepoFromGitUrl } from './utils/git-utils';
 import { Cloud } from 'lucide-react';
 
@@ -34,28 +35,18 @@ type ResumeConfigModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (config: ResumeConfig) => void;
+  /** The session being configured — source for title, git_url, git_branch, last_mode, last_model */
+  session: DbSessionDetails;
   /** Available repositories to select from */
   repositories: RepositoryOption[];
   /** Whether repositories are loading */
   isLoadingRepos?: boolean;
-  /** Default repository (owner/repo format) */
-  defaultRepo?: string;
-  /** Default branch name */
-  defaultBranch?: string;
-  /** Session title for display */
-  sessionTitle?: string | null;
   /** Available models to select from */
   modelOptions: ModelOption[];
   /** Whether models are still loading */
   isLoadingModels?: boolean;
-  /** Default mode to select (from session's last_mode) */
-  defaultMode?: ResumeConfig['mode'];
-  /** Default model to select (from session's last_model or org default) */
-  defaultModel?: string;
-  /** Git URL already stored on the session (makes repo read-only when truthy) */
-  sessionGitUrl?: string | null;
-  /** Git branch already stored on the session (makes branch read-only when truthy) */
-  sessionGitBranch?: string | null;
+  /** Organization default model (fallback when session has no last_model) */
+  orgDefaultModel?: string;
 };
 
 export const MODES = [
@@ -65,6 +56,10 @@ export const MODES = [
 
 /** Valid mode values for validation */
 export const VALID_MODE_VALUES = MODES.map(m => m.value);
+
+function isValidMode(value: string): value is ResumeConfig['mode'] {
+  return (VALID_MODE_VALUES as readonly string[]).includes(value);
+}
 
 /**
  * Modal for collecting configuration when resuming a CLI session
@@ -80,18 +75,26 @@ export function ResumeConfigModal({
   isOpen,
   onClose,
   onConfirm,
+  session,
   repositories,
   isLoadingRepos = false,
-  defaultRepo,
-  defaultBranch,
-  sessionTitle,
   modelOptions,
   isLoadingModels = false,
-  defaultMode,
-  defaultModel,
-  sessionGitUrl,
-  sessionGitBranch,
+  orgDefaultModel,
 }: ResumeConfigModalProps) {
+  // Derive defaults from session
+  const sessionGitUrl = session.git_url;
+  const sessionGitBranch = session.git_branch;
+  const sessionTitle = session.title;
+  const defaultRepo = sessionGitUrl ? extractRepoFromGitUrl(sessionGitUrl) : undefined;
+  const defaultBranch = sessionGitBranch ?? undefined;
+  const defaultMode =
+    session.last_mode && isValidMode(session.last_mode) ? session.last_mode : undefined;
+  const defaultModel =
+    session.last_model && modelOptions.some(m => m.id === session.last_model)
+      ? session.last_model
+      : orgDefaultModel;
+
   // Form state
   const [mode, setMode] = useState<ResumeConfig['mode']>(defaultMode || 'build');
   const [model, setModel] = useState<string>(defaultModel || '');
@@ -104,14 +107,12 @@ export function ResumeConfigModal({
     sessionGitBranch ? sessionGitBranch : defaultBranch || ''
   );
 
-  // Sync mode when defaultMode prop changes (e.g., when session data loads or modal opens for different session)
-  // Always sync to handle both truthy values and reset to fallback when undefined/null
+  // Sync mode when session changes (e.g., modal opens for different session)
   useEffect(() => {
     setMode(defaultMode || 'build');
   }, [defaultMode]);
 
-  // Sync model when defaultModel prop changes (e.g., when session data loads or modal opens for different session)
-  // Always sync to handle both truthy values and reset to fallback when undefined/null
+  // Sync model when session changes
   useEffect(() => {
     setModel(defaultModel || '');
   }, [defaultModel]);

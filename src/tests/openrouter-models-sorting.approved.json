@@ -243,7 +243,18 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 4
+      "preferredIndex": 4,
+      "versioned_settings": {
+        "4.146.0": {
+          "included_tools": [
+            "write_file",
+            "edit_file"
+          ],
+          "excluded_tools": [
+            "apply_diff"
+          ]
+        }
+      }
     },
     {
       "id": "anthropic/claude-sonnet-4",

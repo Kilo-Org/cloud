@@ -52,6 +52,7 @@ export type RegisterAgentInput = {
   role: AgentRole;
   name: string;
   identity: string;
+  rig_id?: string;
 };
 
 export type AgentFilter = {

@@ -61,6 +61,7 @@ export function registerAgent(sql: SqlStorage, input: RegisterAgentInput): Agent
     /* sql */ `
       INSERT INTO ${rig_agents} (
         ${rig_agents.columns.id},
+        ${rig_agents.columns.rig_id},
         ${rig_agents.columns.role},
         ${rig_agents.columns.name},
         ${rig_agents.columns.identity},
@@ -70,9 +71,21 @@ export function registerAgent(sql: SqlStorage, input: RegisterAgentInput): Agent
         ${rig_agents.columns.last_activity_at},
         ${rig_agents.columns.checkpoint},
         ${rig_agents.columns.created_at}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    [id, input.role, input.name, input.identity, 'idle', null, 0, null, null, timestamp]
+    [
+      id,
+      input.rig_id ?? null,
+      input.role,
+      input.name,
+      input.identity,
+      'idle',
+      null,
+      0,
+      null,
+      null,
+      timestamp,
+    ]
   );
 
   const agent = getAgent(sql, id);
@@ -300,7 +313,7 @@ export function getOrCreateAgent(
   const name = role === 'polecat' ? allocatePolecatName(sql, rigId) : role;
   const identity = `${name}-${role}-${rigId.slice(0, 8)}@${townId.slice(0, 8)}`;
 
-  return registerAgent(sql, { role, name, identity });
+  return registerAgent(sql, { role, name, identity, rig_id: rigId });
 }
 
 // ── Prime Context ───────────────────────────────────────────────────

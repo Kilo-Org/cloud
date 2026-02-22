@@ -27,7 +27,7 @@ export async function reportAgentCompleted(
 
   const url =
     agent.completionCallbackUrl ??
-    `${apiUrl}/api/rigs/${agent.rigId}/agents/${agent.agentId}/completed`;
+    `${apiUrl}/api/towns/${agent.townId}/rigs/${agent.rigId}/agents/${agent.agentId}/completed`;
   try {
     const response = await fetch(url, {
       method: 'POST',

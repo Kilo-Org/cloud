@@ -6,6 +6,7 @@ const AgentStatus = z.enum(['idle', 'working', 'blocked', 'dead']);
 
 export const RigAgentRecord = z.object({
   id: z.string(),
+  rig_id: z.string().nullable(),
   role: AgentRole,
   name: z.string(),
   identity: z.string(),
@@ -29,6 +30,7 @@ export const rig_agents = getTableFromZodSchema('rig_agents', RigAgentRecord);
 export function createTableRigAgents(): string {
   return getCreateTableQueryFromTable(rig_agents, {
     id: `text primary key`,
+    rig_id: `text`,
     role: `text not null check(role in ('polecat', 'refinery', 'mayor', 'witness'))`,
     name: `text not null`,
     identity: `text not null unique`,

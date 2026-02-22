@@ -992,6 +992,10 @@ export class TownDO extends DurableObject<Env> {
     if (pendingAgents.length === 0) return;
 
     const townConfig = await this.getTownConfig();
+    const kilocodeToken = await this.resolveKilocodeToken();
+
+    // Build dispatch tasks for all pending agents, then run in parallel
+    const dispatchTasks: Array<() => Promise<void>> = [];
 
     for (const agent of pendingAgents) {
       const beadId = agent.current_hook_bead_id;
@@ -1014,44 +1018,49 @@ export class TownDO extends DurableObject<Env> {
         [attempts, agent.id]
       );
 
-      // OPEN QUESTION: How do we determine which rig an agent belongs to?
-      // Currently agents aren't rig-scoped in the schema. For now, use the
-      // first rig as a fallback. This needs a rig_id column on rig_agents.
-      const rigList = rigs.listRigs(this.sql);
-      const rigId = rigList[0]?.id ?? '';
-      const rigConfig = await this.getRigConfig(rigId);
+      // Use the agent's rig_id to get the correct rig config
+      const rigId = agent.rig_id ?? rigs.listRigs(this.sql)[0]?.id ?? '';
+      const rigConfig = rigId ? await this.getRigConfig(rigId) : null;
 
       if (!rigConfig) {
-        console.warn(`${TOWN_LOG} schedulePendingWork: no rig config for rig=${rigId}`);
+        console.warn(
+          `${TOWN_LOG} schedulePendingWork: no rig config for agent=${agent.id} rig=${rigId}`
+        );
         continue;
       }
 
-      const kilocodeToken = await this.resolveKilocodeToken();
-      const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-        townId: this.townId,
-        rigId,
-        userId: rigConfig.userId,
-        agentId: agent.id,
-        agentName: agent.name,
-        role: agent.role,
-        identity: agent.identity,
-        beadId,
-        beadTitle: bead.title,
-        beadBody: bead.body ?? '',
-        checkpoint: agent.checkpoint,
-        gitUrl: rigConfig.gitUrl,
-        defaultBranch: rigConfig.defaultBranch,
-        kilocodeToken,
-        townConfig,
-      });
+      dispatchTasks.push(async () => {
+        const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
+          townId: this.townId,
+          rigId,
+          userId: rigConfig.userId,
+          agentId: agent.id,
+          agentName: agent.name,
+          role: agent.role,
+          identity: agent.identity,
+          beadId,
+          beadTitle: bead.title,
+          beadBody: bead.body ?? '',
+          checkpoint: agent.checkpoint,
+          gitUrl: rigConfig.gitUrl,
+          defaultBranch: rigConfig.defaultBranch,
+          kilocodeToken,
+          townConfig,
+        });
 
-      if (started) {
-        query(
-          this.sql,
-          /* sql */ `UPDATE ${rig_agents} SET ${rig_agents.columns.status} = 'working', ${rig_agents.columns.dispatch_attempts} = 0, ${rig_agents.columns.last_activity_at} = ? WHERE ${rig_agents.columns.id} = ?`,
-          [now(), agent.id]
-        );
-      }
+        if (started) {
+          query(
+            this.sql,
+            /* sql */ `UPDATE ${rig_agents} SET ${rig_agents.columns.status} = 'working', ${rig_agents.columns.dispatch_attempts} = 0, ${rig_agents.columns.last_activity_at} = ? WHERE ${rig_agents.columns.id} = ?`,
+            [now(), agent.id]
+          );
+        }
+      });
+    }
+
+    // Dispatch all agents in parallel
+    if (dispatchTasks.length > 0) {
+      await Promise.allSettled(dispatchTasks.map(fn => fn()));
     }
   }
 

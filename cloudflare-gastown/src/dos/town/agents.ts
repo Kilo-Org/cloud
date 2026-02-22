@@ -270,8 +270,9 @@ export function allocatePolecatName(sql: SqlStorage, rigId: string): string {
       /* sql */ `
         SELECT ${rig_agents.columns.name} FROM ${rig_agents}
         WHERE ${rig_agents.columns.role} = 'polecat'
+          AND ${rig_agents.columns.rig_id} = ?
       `,
-      []
+      [rigId]
     ),
   ];
   const usedNames = new Set(usedRows.map(r => String(r.name)));
@@ -349,17 +350,18 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   ];
   const undeliveredMail = RigMailRecord.array().parse(mailRows);
 
-  // Open beads (for context awareness)
+  // Open beads (for context awareness, scoped to agent's rig)
   const openBeadRows = [
     ...query(
       sql,
       /* sql */ `
         SELECT * FROM ${rig_beads}
         WHERE ${rig_beads.columns.status} IN ('open', 'in_progress')
+          AND (${rig_beads.columns.rig_id} IS NULL OR ${rig_beads.columns.rig_id} = ?)
         ORDER BY ${rig_beads.columns.created_at} DESC
         LIMIT 20
       `,
-      []
+      [agent.rig_id]
     ),
   ];
   const openBeads = RigBeadRecord.array().parse(openBeadRows);

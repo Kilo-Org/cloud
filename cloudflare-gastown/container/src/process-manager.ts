@@ -6,7 +6,7 @@
  * no SSE text parsing, no ring buffers.
  */
 
-import { createOpencode, createOpencodeClient, type OpencodeClient } from '@kilocode/sdk';
+import { createOpencode, type OpencodeClient } from '@kilocode/sdk';
 import type { ManagedAgent, StartAgentRequest, KiloSSEEvent, KiloSSEEventData } from './types';
 import { reportAgentCompleted } from './completion-reporter';
 

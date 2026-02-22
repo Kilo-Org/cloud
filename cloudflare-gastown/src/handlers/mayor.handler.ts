@@ -98,7 +98,8 @@ export async function handleMayorCompleted(c: Context<GastownEnv>, params: { tow
  * Tear down the mayor session and clear all state.
  */
 export async function handleDestroyMayor(c: Context<GastownEnv>, params: { townId: string }) {
-  // No-op: we don't want to destroy the entire town from this endpoint.
-  console.log(`${MAYOR_HANDLER_LOG} handleDestroyMayor: no-op for townId=${params.townId}`);
+  console.log(`${MAYOR_HANDLER_LOG} handleDestroyMayor: destroying townId=${params.townId}`);
+  const town = getTownDOStub(c.env, params.townId);
+  await town.destroy();
   return c.json(resSuccess({ destroyed: true }), 200);
 }

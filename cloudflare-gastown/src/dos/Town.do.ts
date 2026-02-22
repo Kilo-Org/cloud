@@ -196,6 +196,12 @@ export class TownDO extends DurableObject<Env> {
     await this.ensureInitialized();
     rigs.removeRig(this.sql, rigId);
     await this.ctx.storage.delete(`rig:${rigId}:config`);
+    query(this.sql, /* sql */ `DELETE FROM ${rig_agents} WHERE ${rig_agents.columns.rig_id} = ?`, [
+      rigId,
+    ]);
+    query(this.sql, /* sql */ `DELETE FROM ${rig_beads} WHERE ${rig_beads.columns.rig_id} = ?`, [
+      rigId,
+    ]);
   }
 
   async listRigs(): Promise<rigs.RigRecord[]> {
@@ -565,8 +571,8 @@ export class TownDO extends DurableObject<Env> {
     // BUT also TODO, we're supposed to be sending configs on each request to any agent anyway
     if (isAlive) {
       // Send follow-up message
-      await dispatch.sendMessageToAgent(this.env, townId, mayor.id, message);
-      sessionStatus = 'active';
+      const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, message);
+      sessionStatus = sent ? 'active' : 'idle';
     } else {
       // Start a new mayor session
       const townConfig = await this.getTownConfig();
@@ -1022,13 +1028,6 @@ export class TownDO extends DurableObject<Env> {
         continue;
       }
 
-      // Increment dispatch attempts
-      query(
-        this.sql,
-        /* sql */ `UPDATE ${rig_agents} SET ${rig_agents.columns.dispatch_attempts} = ? WHERE ${rig_agents.columns.id} = ?`,
-        [attempts, agent.id]
-      );
-
       // Use the agent's rig_id to get the correct rig config
       const rigId = agent.rig_id ?? rigList[0]?.id ?? '';
       const rigConfig = rigId ? await this.getRigConfig(rigId) : null;
@@ -1043,6 +1042,14 @@ export class TownDO extends DurableObject<Env> {
         );
         continue;
       }
+
+      // Increment dispatch attempts (after rigConfig check so we don't
+      // burn attempts when config is simply missing)
+      query(
+        this.sql,
+        /* sql */ `UPDATE ${rig_agents} SET ${rig_agents.columns.dispatch_attempts} = ? WHERE ${rig_agents.columns.id} = ?`,
+        [attempts, agent.id]
+      );
 
       dispatchTasks.push(async () => {
         const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
@@ -1151,7 +1158,10 @@ export class TownDO extends DurableObject<Env> {
     const rigList = rigs.listRigs(this.sql);
     const rigId = rigList[0]?.id ?? '';
     const rigConfig = await this.getRigConfig(rigId);
-    if (!rigConfig) return;
+    if (!rigConfig) {
+      reviewQueue.completeReview(this.sql, entry.id, 'failed');
+      return;
+    }
 
     const townConfig = await this.getTownConfig();
     const gates = townConfig.refinery?.gates ?? [];

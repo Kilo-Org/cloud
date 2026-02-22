@@ -245,6 +245,8 @@ export async function handleDeleteAgent(
   const townId = getTownId(c);
   if (!townId) return c.json(resError('Missing townId'), 400);
   const town = getTownDOStub(c.env, townId);
+  const agent = await town.getAgentAsync(params.agentId);
+  if (!agent) return c.json(resError('Agent not found'), 404);
   await town.deleteAgent(params.agentId);
   return c.json(resSuccess({ deleted: true }));
 }

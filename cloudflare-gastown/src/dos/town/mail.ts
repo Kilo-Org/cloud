@@ -62,34 +62,36 @@ export function sendMail(sql: SqlStorage, input: SendMailInput): void {
 }
 
 export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
-  const timestamp = now();
-
-  // Mark all undelivered mail as delivered
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${rig_mail}
-      SET ${rig_mail.columns.delivered} = 1,
-          ${rig_mail.columns.delivered_at} = ?
-      WHERE ${rig_mail.columns.to_agent_id} = ?
-        AND ${rig_mail.columns.delivered} = 0
-    `,
-    [timestamp, agentId]
-  );
-
-  // Return the just-delivered messages
+  // Read undelivered messages first
   const rows = [
     ...query(
       sql,
       /* sql */ `
         SELECT * FROM ${rig_mail}
         WHERE ${rig_mail.columns.to_agent_id} = ?
-          AND ${rig_mail.columns.delivered_at} = ?
+          AND ${rig_mail.columns.delivered} = 0
         ORDER BY ${rig_mail.columns.created_at} ASC
       `,
-      [agentId, timestamp]
+      [agentId]
     ),
   ];
 
-  return RigMailRecord.array().parse(rows);
+  const messages = RigMailRecord.array().parse(rows);
+
+  // Then mark them as delivered
+  if (messages.length > 0) {
+    query(
+      sql,
+      /* sql */ `
+        UPDATE ${rig_mail}
+        SET ${rig_mail.columns.delivered} = 1,
+            ${rig_mail.columns.delivered_at} = ?
+        WHERE ${rig_mail.columns.to_agent_id} = ?
+          AND ${rig_mail.columns.delivered} = 0
+      `,
+      [now(), agentId]
+    );
+  }
+
+  return messages;
 }

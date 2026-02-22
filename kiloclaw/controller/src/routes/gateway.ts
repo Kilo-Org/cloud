@@ -14,7 +14,7 @@ export function registerGatewayRoutes(
   supervisor: Supervisor,
   expectedToken: string
 ): void {
-  app.use('/gateway/*', async (c, next) => {
+  app.use('/_kilo/gateway/*', async (c, next) => {
     const authHeader = c.req.header('authorization');
     const token = getBearerToken(authHeader);
     if (!token || token !== expectedToken) {
@@ -23,7 +23,7 @@ export function registerGatewayRoutes(
     await next();
   });
 
-  app.get('/gateway/status', c => {
+  app.get('/_kilo/gateway/status', c => {
     const stats = supervisor.getStats();
     return c.json({
       state: stats.state,
@@ -34,7 +34,7 @@ export function registerGatewayRoutes(
     });
   });
 
-  app.post('/gateway/start', async c => {
+  app.post('/_kilo/gateway/start', async c => {
     try {
       const started = await supervisor.start();
       if (!started) {
@@ -42,22 +42,22 @@ export function registerGatewayRoutes(
       }
       return c.json({ ok: true });
     } catch (error) {
-      console.error('[controller] /gateway/start failed:', error);
+      console.error('[controller] /_kilo/gateway/start failed:', error);
       return c.json({ error: 'Failed to start gateway' }, 500);
     }
   });
 
-  app.post('/gateway/stop', async c => {
+  app.post('/_kilo/gateway/stop', async c => {
     try {
       await supervisor.stop();
       return c.json({ ok: true });
     } catch (error) {
-      console.error('[controller] /gateway/stop failed:', error);
+      console.error('[controller] /_kilo/gateway/stop failed:', error);
       return c.json({ error: 'Failed to stop gateway' }, 500);
     }
   });
 
-  app.post('/gateway/restart', async c => {
+  app.post('/_kilo/gateway/restart', async c => {
     try {
       const restarted = await supervisor.restart();
       if (!restarted) {
@@ -65,7 +65,7 @@ export function registerGatewayRoutes(
       }
       return c.json({ ok: true });
     } catch (error) {
-      console.error('[controller] /gateway/restart failed:', error);
+      console.error('[controller] /_kilo/gateway/restart failed:', error);
       return c.json({ error: 'Failed to restart gateway' }, 500);
     }
   });

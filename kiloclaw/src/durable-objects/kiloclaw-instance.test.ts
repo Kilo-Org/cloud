@@ -643,7 +643,7 @@ describe('createNewMachine: persist ID before waitForState', () => {
             type: 'http',
             port: 18789,
             method: 'GET',
-            path: '/health',
+            path: '/_kilo/health',
             interval: '30s',
             timeout: '5s',
             grace_period: '60s',
@@ -669,6 +669,133 @@ describe('createNewMachine: persist ID before waitForState', () => {
 
     // Machine ID is persisted despite the failure — not orphaned
     expect(storage._store.get('flyMachineId')).toBe('machine-orphan-safe');
+  });
+});
+
+describe('gateway process control via controller', () => {
+  it('allows gateway status calls when machine ID exists even if DO status is stale', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          state: 'running',
+          pid: 123,
+          uptime: 42,
+          restarts: 1,
+          lastExit: null,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const status = await instance.getGatewayProcessStatus();
+    expect(status.state).toBe('running');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
+  });
+
+  it('calls gateway status through Fly Proxy with controller auth headers', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyMachineId: 'machine-1', flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          state: 'running',
+          pid: 123,
+          uptime: 42,
+          restarts: 1,
+          lastExit: null,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const status = await instance.getGatewayProcessStatus();
+
+    expect(status.state).toBe('running');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://acct-test.fly.dev/_kilo/gateway/status',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Accept: 'application/json',
+          'fly-force-instance-id': 'machine-1',
+        }),
+      })
+    );
+
+    const call = fetchSpy.mock.calls[0];
+    const headers = new Headers((call[1] as RequestInit | undefined)?.headers);
+    expect(headers.get('authorization')).toMatch(/^Bearer [a-f0-9]{64}$/);
+    fetchSpy.mockRestore();
+  });
+
+  it('starts, stops, and restarts the gateway process through controller routes', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyMachineId: 'machine-1', flyAppName: 'acct-test' });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+    await instance.startGatewayProcess();
+    await instance.stopGatewayProcess();
+    await instance.restartGatewayProcess();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://acct-test.fly.dev/_kilo/gateway/start');
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe('https://acct-test.fly.dev/_kilo/gateway/stop');
+    expect(fetchSpy.mock.calls[2]?.[0]).toBe('https://acct-test.fly.dev/_kilo/gateway/restart');
+    fetchSpy.mockRestore();
+  });
+
+  it('surfaces controller HTTP status errors', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyMachineId: 'machine-1', flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Gateway already running or starting' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.startGatewayProcess()).rejects.toSatisfy((err: unknown) => {
+      if (typeof err !== 'object' || err === null) return false;
+      return (
+        'status' in err &&
+        (err as { status: number }).status === 409 &&
+        'message' in err &&
+        (err as { message: string }).message.includes('already running')
+      );
+    });
+
+    fetchSpy.mockRestore();
   });
 });
 

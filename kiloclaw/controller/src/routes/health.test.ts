@@ -20,12 +20,12 @@ function createMockSupervisor(state: string): Supervisor {
   };
 }
 
-describe('GET /health', () => {
+describe('GET /_kilo/health', () => {
   it('returns 200 with status fields when gateway is running', async () => {
     const app = new Hono();
     registerHealthRoute(app, createMockSupervisor('running'));
 
-    const resp = await app.request('/health');
+    const resp = await app.request('/_kilo/health');
     expect(resp.status).toBe(200);
     expect(await resp.json()).toEqual({
       status: 'ok',
@@ -39,10 +39,26 @@ describe('GET /health', () => {
     const app = new Hono();
     registerHealthRoute(app, createMockSupervisor('crashed'));
 
-    const resp = await app.request('/health');
+    const resp = await app.request('/_kilo/health');
     expect(resp.status).toBe(200);
     const body = (await resp.json()) as { status: string; gateway: string };
     expect(body.status).toBe('ok');
     expect(body.gateway).toBe('crashed');
+  });
+});
+
+describe('GET /health (compatibility alias)', () => {
+  it('returns 200 with status fields', async () => {
+    const app = new Hono();
+    registerHealthRoute(app, createMockSupervisor('running'));
+
+    const resp = await app.request('/health');
+    expect(resp.status).toBe(200);
+    expect(await resp.json()).toEqual({
+      status: 'ok',
+      gateway: 'running',
+      uptime: 123,
+      restarts: 2,
+    });
   });
 });

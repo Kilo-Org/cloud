@@ -1,8 +1,8 @@
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 import type { Supervisor } from '../supervisor';
 
 export function registerHealthRoute(app: Hono, supervisor: Supervisor): void {
-  app.get('/health', c => {
+  const handler = (c: Context) => {
     const stats = supervisor.getStats();
     return c.json({
       status: 'ok',
@@ -10,5 +10,9 @@ export function registerHealthRoute(app: Hono, supervisor: Supervisor): void {
       uptime: stats.uptime,
       restarts: stats.restarts,
     });
-  });
+  };
+
+  app.get('/_kilo/health', handler);
+  // Compatibility alias for machines still configured with legacy health path.
+  app.get('/health', handler);
 }

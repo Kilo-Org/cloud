@@ -134,6 +134,24 @@ export type RestartGatewayResponse = {
   error?: string;
 };
 
+/** Response from GET /api/platform/gateway/status */
+export type GatewayProcessStatusResponse = {
+  state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
+  pid: number | null;
+  uptime: number;
+  restarts: number;
+  lastExit: {
+    code: number | null;
+    signal: string | null;
+    at: string;
+  } | null;
+};
+
+/** Response from POST /api/platform/gateway/{start|stop|restart} */
+export type GatewayProcessActionResponse = {
+  ok: boolean;
+};
+
 /** Combined status + gateway token returned by tRPC getStatus */
 export type KiloClawDashboardStatus = PlatformStatusResponse & {
   gatewayToken: string | null;

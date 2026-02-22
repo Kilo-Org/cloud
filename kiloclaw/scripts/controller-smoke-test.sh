@@ -31,16 +31,16 @@ CID=$(docker run -d --rm \
 sleep 4
 
 echo "health:"
-curl -sS "http://127.0.0.1:${PORT}/health"
+curl -sS "http://127.0.0.1:${PORT}/_kilo/health"
 
 echo
 echo "gateway status (no auth) -> expect 401:"
-curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:${PORT}/gateway/status"
+curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:${PORT}/_kilo/gateway/status"
 
 echo "gateway status (bearer auth) -> expect 200:"
 curl -s -o /dev/null -w "%{http_code}\n" \
   -H "Authorization: Bearer $TOKEN" \
-  "http://127.0.0.1:${PORT}/gateway/status"
+  "http://127.0.0.1:${PORT}/_kilo/gateway/status"
 
 echo "user traffic without proxy token (REQUIRE_PROXY_TOKEN=true) -> expect 401:"
 curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:${PORT}/"

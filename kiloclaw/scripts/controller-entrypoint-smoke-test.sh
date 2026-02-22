@@ -36,29 +36,28 @@ CID=$(docker run -d --rm \
   -v "$ROOTDIR:/root" \
   "$IMAGE")
 
-echo "waiting for /health on port $PORT ..."
+echo "waiting for /_kilo/health on port $PORT ..."
 for _ in $(seq 1 40); do
-  if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+  if curl -fsS "http://127.0.0.1:${PORT}/_kilo/health" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
 echo "health:"
-curl -sS "http://127.0.0.1:${PORT}/health"
+curl -sS "http://127.0.0.1:${PORT}/_kilo/health"
 
 echo
 echo "gateway status (no auth) -> expect 401:"
-curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:${PORT}/gateway/status"
+curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:${PORT}/_kilo/gateway/status"
 
 echo "gateway status (bearer auth) -> expect 200:"
 curl -s -o /dev/null -w "%{http_code}\n" \
   -H "Authorization: Bearer $TOKEN" \
-  "http://127.0.0.1:${PORT}/gateway/status"
+  "http://127.0.0.1:${PORT}/_kilo/gateway/status"
 
 echo "user traffic without proxy token (REQUIRE_PROXY_TOKEN=true) -> expect 401:"
 curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:${PORT}/"
 
 echo "container logs:"
 docker logs --tail 120 "$CID"
-

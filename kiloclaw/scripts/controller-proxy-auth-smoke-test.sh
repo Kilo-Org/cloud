@@ -36,16 +36,16 @@ CID=$(docker run -d --rm \
   -v "$ROOTDIR:/root" \
   "$IMAGE")
 
-echo "waiting for /health on port $PORT ..."
+echo "waiting for /_kilo/health on port $PORT ..."
 for _ in $(seq 1 40); do
-  if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+  if curl -fsS "http://127.0.0.1:${PORT}/_kilo/health" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
 echo "health:"
-curl -sS "http://127.0.0.1:${PORT}/health"
+curl -sS "http://127.0.0.1:${PORT}/_kilo/health"
 
 echo
 echo "proxy without token -> expect 401:"

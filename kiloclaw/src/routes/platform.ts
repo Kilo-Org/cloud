@@ -49,6 +49,26 @@ function instanceStubFactory(env: AppEnv['Bindings'], userId: string) {
   return () => env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(userId));
 }
 
+function statusCodeFromError(err: unknown): number {
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    'status' in err &&
+    typeof (err as { status: unknown }).status === 'number'
+  ) {
+    const status = (err as { status: number }).status;
+    if (status >= 400 && status < 600) return status;
+  }
+  return 500;
+}
+
+function jsonError(message: string, status: number): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 /**
  * Safely parse JSON body through a zod schema.
  * Returns 400 with a consistent error shape on malformed JSON or validation failure.
@@ -214,6 +234,88 @@ platform.post('/pairing/approve', async c => {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[platform] pairing approve failed:', message);
     return c.json({ error: message }, 500);
+  }
+});
+
+// GET /api/platform/gateway/status?userId=...
+platform.get('/gateway/status', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  try {
+    const gatewayStatus = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.getGatewayProcessStatus(),
+      'getGatewayProcessStatus'
+    );
+    return c.json(gatewayStatus, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = statusCodeFromError(err);
+    console.error('[platform] gateway status failed:', message);
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/gateway/start
+platform.post('/gateway/start', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.startGatewayProcess(),
+      'startGatewayProcess'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = statusCodeFromError(err);
+    console.error('[platform] gateway start failed:', message);
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/gateway/stop
+platform.post('/gateway/stop', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.stopGatewayProcess(),
+      'stopGatewayProcess'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = statusCodeFromError(err);
+    console.error('[platform] gateway stop failed:', message);
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/gateway/restart
+platform.post('/gateway/restart', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.restartGatewayProcess(),
+      'restartGatewayProcess'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = statusCodeFromError(err);
+    console.error('[platform] gateway restart failed:', message);
+    return jsonError(message, status);
   }
 });
 

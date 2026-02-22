@@ -312,7 +312,12 @@ export function getHookedBead(sql: SqlStorage, agentId: string): Bead | null {
 
 // ── Name Allocation ─────────────────────────────────────────────────
 
-export function allocatePolecatName(sql: SqlStorage, rigId: string): string {
+/**
+ * Allocate a unique polecat name from the pool.
+ * Names are town-global (agents belong to the town, not rigs) so we
+ * check all existing polecats across every rig.
+ */
+export function allocatePolecatName(sql: SqlStorage): string {
   const usedRows = [
     ...query(
       sql,
@@ -320,9 +325,8 @@ export function allocatePolecatName(sql: SqlStorage, rigId: string): string {
         SELECT ${beads.title} FROM ${beads}
         INNER JOIN ${agent_metadata} ON ${beads.bead_id} = ${agent_metadata.bead_id}
         WHERE ${agent_metadata.role} = 'polecat'
-          AND ${beads.rig_id} = ?
       `,
-      [rigId]
+      []
     ),
   ];
   const usedNames = new Set(usedRows.map(r => String((r as Record<string, unknown>).title)));
@@ -331,8 +335,8 @@ export function allocatePolecatName(sql: SqlStorage, rigId: string): string {
     if (!usedNames.has(name)) return name;
   }
 
-  // Fallback: use rig prefix + counter
-  return `Polecat-${rigId.slice(0, 4)}-${usedNames.size + 1}`;
+  // Fallback: sequential numbering beyond the 20-name pool
+  return `Polecat-${usedNames.size + 1}`;
 }
 
 /**
@@ -371,7 +375,7 @@ export function getOrCreateAgent(
   }
 
   // Create a new agent
-  const name = role === 'polecat' ? allocatePolecatName(sql, rigId) : role;
+  const name = role === 'polecat' ? allocatePolecatName(sql) : role;
   const identity = `${name}-${role}-${rigId.slice(0, 8)}@${townId.slice(0, 8)}`;
 
   return registerAgent(sql, { role, name, identity, rig_id: rigId });

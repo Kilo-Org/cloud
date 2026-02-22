@@ -7,7 +7,7 @@ PORT="${PORT:-18789}"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Image '$IMAGE' is not available locally."
-  echo "Build it first from /Users/syn/projects/cloud-alt/kiloclaw:"
+  echo "Build it first from the kiloclaw directory:"
   echo "  docker build --progress=plain -t $IMAGE ."
   exit 1
 fi

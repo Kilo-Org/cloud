@@ -21,7 +21,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Import after mocks are set up (jest.mock is hoisted, but this makes intent clear)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
 const { generateInternalServiceToken } = require('@/lib/tokens') as {
   generateInternalServiceToken: jest.Mock;
 };

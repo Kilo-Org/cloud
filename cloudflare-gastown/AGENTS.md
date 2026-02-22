@@ -25,7 +25,7 @@
 - Format queries for human readability: use multi-line strings with one clause per line (`SELECT`, `FROM`, `WHERE`, `SET`, etc.).
 - Reference tables and columns via the table interpolator objects exported from `db/tables/*.table.ts` (created with `getTableFromZodSchema` from `util/table.ts`). Never use raw table/column name strings in queries.
 - Prefer static queries over dynamically constructed ones. Move conditional logic into the query itself using SQL constructs like `COALESCE`, `CASE`, `NULLIF`, or `WHERE (? IS NULL OR col = ?)` patterns so the full query is always visible as a single readable string.
-- Validate/parse query results with the Zod `Record` schemas defined in the corresponding `db/tables/*.table.ts` module. For an array of rows use the `.array()` modifier, e.g. `AgentRecord.array().parse(rows)`.
+- Always parse query results with the Zod `Record` schemas from `db/tables/*.table.ts`. Never use ad-hoc `as Record<string, unknown>` casts or `String(row.col)` to extract fields — use `.pick()` for partial selects and `.array()` for lists, e.g. `BeadRecord.pick({ bead_id: true }).array().parse(rows)`. This keeps row parsing type-safe and co-located with the schema definition.
 - When a column has a SQL `CHECK` constraint that restricts it to a set of values (i.e. an enum), mirror that in the Record schema using `z.enum()` rather than `z.string()`, e.g. `role: z.enum(['polecat', 'refinery', 'mayor', 'witness'])`.
 
 ## HTTP routes

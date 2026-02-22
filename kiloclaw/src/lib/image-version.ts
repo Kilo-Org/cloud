@@ -3,7 +3,7 @@ import {
   imageVersionKey,
   imageVersionLatestKey,
 } from '../schemas/image-version';
-import type { ImageVersionEntry } from '../schemas/image-version';
+import type { ImageVersionEntry, ImageVariant } from '../schemas/image-version';
 
 /**
  * Read `image-version:latest:<variant>` from KV.
@@ -62,7 +62,7 @@ export async function lookupImageTag(
 export async function registerVersionIfNeeded(
   kv: KVNamespace,
   openclawVersion: string,
-  variant: string,
+  variant: ImageVariant,
   imageTag: string,
   imageDigest: string | null = null
 ): Promise<boolean> {

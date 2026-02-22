@@ -13,7 +13,7 @@ export type ImageVariant = z.infer<typeof ImageVariantSchema>;
  */
 export const ImageVersionEntrySchema = z.object({
   openclawVersion: z.string(),
-  variant: z.string(),
+  variant: ImageVariantSchema,
   imageTag: z.string(),
   imageDigest: z.string().nullable(),
   publishedAt: z.string(),
@@ -22,8 +22,12 @@ export const ImageVersionEntrySchema = z.object({
 export type ImageVersionEntry = z.infer<typeof ImageVersionEntrySchema>;
 
 // KV key helpers — variant is encoded in the key so each lookup is a single read.
+// "latest" is reserved for the latest pointer key and cannot be used as a version.
 
 export function imageVersionKey(version: string, variant: string): string {
+  if (version === 'latest') {
+    throw new Error('Cannot use "latest" as a version — it is reserved for the latest pointer key');
+  }
   return `image-version:${version}:${variant}`;
 }
 

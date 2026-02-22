@@ -378,13 +378,19 @@ const PublishImageVersionSchema = z.object({
   variant: z.string().min(1).default('default'),
   imageTag: z.string().min(1),
   imageDigest: z.string().nullable().optional(),
+  // Set to false when backfilling older versions to avoid overwriting the latest pointer.
+  setLatest: z.boolean().optional().default(true),
 });
 
 platform.post('/publish-image-version', async c => {
   const result = await parseBody(c, PublishImageVersionSchema);
   if ('error' in result) return result.error;
 
-  const { openclawVersion, variant, imageTag, imageDigest } = result.data;
+  const { openclawVersion, variant, imageTag, imageDigest, setLatest } = result.data;
+
+  if (openclawVersion === 'latest') {
+    return c.json({ error: '"latest" is reserved and cannot be used as a version' }, 400);
+  }
 
   const entry = {
     openclawVersion,
@@ -400,15 +406,25 @@ platform.post('/publish-image-version', async c => {
     return c.json({ error: 'Invalid version entry', details: parsed.error.flatten() }, 400);
   }
 
-  // Write both the versioned key and the latest key (both store the full entry)
+  // Write the versioned key; optionally update the latest pointer
   const serialized = JSON.stringify(parsed.data);
-  await Promise.all([
+  const writes: Promise<void>[] = [
     c.env.KV_CLAW_CACHE.put(imageVersionKey(openclawVersion, variant), serialized),
-    c.env.KV_CLAW_CACHE.put(imageVersionLatestKey(variant), serialized),
-  ]);
+  ];
+  if (setLatest) {
+    writes.push(c.env.KV_CLAW_CACHE.put(imageVersionLatestKey(variant), serialized));
+  }
+  await Promise.all(writes);
 
-  console.log('[platform] Published image version:', openclawVersion, variant, '→', imageTag);
-  return c.json({ ok: true, ...parsed.data }, 201);
+  console.log(
+    '[platform] Published image version:',
+    openclawVersion,
+    variant,
+    '→',
+    imageTag,
+    setLatest ? '(latest)' : '(backfill)'
+  );
+  return c.json({ ok: true, setLatest, ...parsed.data }, 201);
 });
 
 export { platform };

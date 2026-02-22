@@ -40,8 +40,9 @@ async function getVercelRoutingPercentage() {
   return isOpenRouterErrorRateHigh ? 90 : 10;
 }
 
-function isOpenRouterModel(requestedModel: string) {
+function isLikelyAvailableOnAllGateways(requestedModel: string) {
   return (
+    !requestedModel.startsWith('openrouter/') &&
     (kiloFreeModels.find(m => m.public_id === requestedModel && m.is_enabled)?.gateway ??
       'openrouter') === 'openrouter'
   );
@@ -59,14 +60,21 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (!isOpenRouterModel(requestedModel)) {
-    console.debug(`[shouldRouteToVercel] model not available on the gateways`);
+  if (!isLikelyAvailableOnAllGateways(requestedModel)) {
+    console.debug(`[shouldRouteToVercel] model not available on all gateways`);
     return false;
   }
 
   if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
     console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
     return true;
+  }
+
+  if (isAnthropicModel(requestedModel)) {
+    console.debug(
+      `[shouldRouteToVercel] Anthropic models are not routed to Vercel pending fine-grained tool streaming support`
+    );
+    return false;
   }
 
   if (!preferredModels.includes(requestedModel)) {

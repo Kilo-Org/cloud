@@ -165,6 +165,7 @@ export async function finalizeAnalysis(
   const analysis: SecurityFindingAnalysis = {
     triage: existingAnalysis?.triage,
     sandboxAnalysis,
+    rawMarkdown: existingAnalysis?.rawMarkdown,
     analyzedAt: new Date().toISOString(),
     modelUsed: model,
     triggeredByUserId: existingAnalysis?.triggeredByUserId,

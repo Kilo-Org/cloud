@@ -110,20 +110,17 @@ export async function POST(
 }
 
 /** Safely read the stored analysis metadata from the JSONB column */
-function readAnalysisContext(analysis: unknown): {
+function readAnalysisContext(analysis: SecurityFindingAnalysis | null | undefined): {
   correlationId: string;
   modelUsed: string;
   triggeredByUserId: string;
 } {
-  if (analysis && typeof analysis === 'object') {
-    const a = analysis as Record<string, unknown>;
-    return {
-      correlationId: typeof a.correlationId === 'string' ? a.correlationId : '',
-      modelUsed: typeof a.modelUsed === 'string' ? a.modelUsed : 'anthropic/claude-sonnet-4',
-      triggeredByUserId: typeof a.triggeredByUserId === 'string' ? a.triggeredByUserId : '',
-    };
-  }
-  return { correlationId: '', modelUsed: 'anthropic/claude-sonnet-4', triggeredByUserId: '' };
+  const defaultModel = 'anthropic/claude-sonnet-4';
+  return {
+    correlationId: analysis?.correlationId ?? '',
+    modelUsed: analysis?.modelUsed ?? defaultModel,
+    triggeredByUserId: analysis?.triggeredByUserId ?? '',
+  };
 }
 
 async function handleAnalysisCompleted(
@@ -215,11 +212,8 @@ async function handleAnalysisCompleted(
 
   // Write raw markdown to the analysis field (powers the user-facing summary display).
   // This must happen before Tier 3 extraction so the UI has content even if extraction fails.
-  const existingAnalysisObj = (
-    finding.analysis && typeof finding.analysis === 'object' ? finding.analysis : {}
-  ) as Partial<SecurityFindingAnalysis>;
   const analysisWithRawMarkdown: SecurityFindingAnalysis = {
-    ...existingAnalysisObj,
+    ...finding.analysis,
     rawMarkdown,
     analyzedAt: new Date().toISOString(),
   };

@@ -141,6 +141,14 @@ async function handleAnalysisCompleted(
     ? { organizationId }
     : { userId: finding.owned_by_user_id ?? triggeredByUserId };
 
+  if (!triggeredByUserId) {
+    logError('Missing triggeredByUserId in analysis context', { findingId, correlationId });
+    await updateAnalysisStatus(findingId, 'failed', {
+      error: 'Cannot process callback — triggeredByUserId missing from analysis context',
+    });
+    return;
+  }
+
   const kiloSessionId = payload.kiloSessionId;
   if (!kiloSessionId) {
     logError('Callback missing kiloSessionId', { findingId, correlationId });

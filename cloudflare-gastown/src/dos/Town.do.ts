@@ -26,13 +26,15 @@ import * as rigs from './town/rigs';
 import * as dispatch from './town/container-dispatch';
 
 // Table imports for beads-centric operations
-import { beads } from '../db/tables/beads.table';
-import { agent_metadata } from '../db/tables/agent-metadata.table';
 import {
-  escalation_metadata,
-  EscalationMetadataRecord,
-} from '../db/tables/escalation-metadata.table';
-import { convoy_metadata, ConvoyMetadataRecord } from '../db/tables/convoy-metadata.table';
+  beads,
+  AgentBeadRecord,
+  EscalationBeadRecord,
+  ConvoyBeadRecord,
+} from '../db/tables/beads.table';
+import { agent_metadata } from '../db/tables/agent-metadata.table';
+import { escalation_metadata } from '../db/tables/escalation-metadata.table';
+import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
 import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
@@ -90,7 +92,7 @@ type RigConfig = {
   kilocodeToken?: string;
 };
 
-// ── Escalation helper type (bead + escalation_metadata) ─────────────
+// ── Escalation API type (derived from EscalationBeadRecord) ─────────
 type EscalationEntry = {
   id: string;
   source_rig_id: string;
@@ -104,22 +106,22 @@ type EscalationEntry = {
   acknowledged_at: string | null;
 };
 
-function parseEscalation(row: Record<string, unknown>): EscalationEntry {
+function toEscalation(row: EscalationBeadRecord): EscalationEntry {
   return {
-    id: String(row.bead_id),
-    source_rig_id: String(row.rig_id ?? ''),
-    source_agent_id: row.created_by === null ? null : String(row.created_by),
-    severity: EscalationMetadataRecord.shape.severity.parse(row.severity),
-    category: row.category === null ? null : String(row.category),
-    message: String(row.body ?? row.title ?? ''),
-    acknowledged: Number(row.acknowledged ?? 0),
-    re_escalation_count: Number(row.re_escalation_count ?? 0),
-    created_at: String(row.created_at),
-    acknowledged_at: row.acknowledged_at === null ? null : String(row.acknowledged_at),
+    id: row.bead_id,
+    source_rig_id: row.rig_id ?? '',
+    source_agent_id: row.created_by,
+    severity: row.severity,
+    category: row.category,
+    message: row.body ?? row.title,
+    acknowledged: row.acknowledged,
+    re_escalation_count: row.re_escalation_count,
+    created_at: row.created_at,
+    acknowledged_at: row.acknowledged_at,
   };
 }
 
-// ── Convoy helper type (bead + convoy_metadata) ─────────────────────
+// ── Convoy API type (derived from ConvoyBeadRecord) ─────────────────
 type ConvoyEntry = {
   id: string;
   title: string;
@@ -131,22 +133,21 @@ type ConvoyEntry = {
   landed_at: string | null;
 };
 
-function parseConvoy(row: Record<string, unknown>): ConvoyEntry {
+function toConvoy(row: ConvoyBeadRecord): ConvoyEntry {
   return {
-    id: String(row.bead_id),
-    title: String(row.title),
-    status: row.bead_status === 'closed' ? 'landed' : 'active',
-    total_beads: Number(row.total_beads ?? 0),
-    closed_beads: Number(row.closed_beads ?? 0),
-    created_by: row.created_by === null ? null : String(row.created_by),
-    created_at: String(row.created_at),
-    landed_at: row.landed_at === null ? null : String(row.landed_at),
+    id: row.bead_id,
+    title: row.title,
+    status: row.status === 'closed' ? 'landed' : 'active',
+    total_beads: row.total_beads,
+    closed_beads: row.closed_beads,
+    created_by: row.created_by,
+    created_at: row.created_at,
+    landed_at: row.landed_at,
   };
 }
 
 const CONVOY_JOIN = /* sql */ `
-  SELECT ${beads.bead_id}, ${beads.title}, ${beads.status} AS bead_status,
-         ${beads.created_by}, ${beads.created_at},
+  SELECT ${beads}.*,
          ${convoy_metadata.total_beads}, ${convoy_metadata.closed_beads},
          ${convoy_metadata.landed_at}
   FROM ${beads}
@@ -154,8 +155,7 @@ const CONVOY_JOIN = /* sql */ `
 `;
 
 const ESCALATION_JOIN = /* sql */ `
-  SELECT ${beads.bead_id}, ${beads.rig_id}, ${beads.title}, ${beads.body},
-         ${beads.created_by}, ${beads.created_at},
+  SELECT ${beads}.*,
          ${escalation_metadata.severity}, ${escalation_metadata.category},
          ${escalation_metadata.acknowledged}, ${escalation_metadata.re_escalation_count},
          ${escalation_metadata.acknowledged_at}
@@ -880,7 +880,7 @@ export class TownDO extends DurableObject<Env> {
       ...query(this.sql, /* sql */ `${CONVOY_JOIN} WHERE ${beads.bead_id} = ?`, [convoyId]),
     ];
     if (rows.length === 0) return null;
-    return parseConvoy(rows[0] as Record<string, unknown>);
+    return toConvoy(ConvoyBeadRecord.parse(rows[0]));
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -919,7 +919,7 @@ export class TownDO extends DurableObject<Env> {
               []
             ),
           ];
-    return rows.map(r => parseEscalation(r as Record<string, unknown>));
+    return EscalationBeadRecord.array().parse(rows).map(toEscalation);
   }
 
   async routeEscalation(input: {
@@ -997,7 +997,7 @@ export class TownDO extends DurableObject<Env> {
       ...query(this.sql, /* sql */ `${ESCALATION_JOIN} WHERE ${beads.bead_id} = ?`, [escalationId]),
     ];
     if (rows.length === 0) return null;
-    return parseEscalation(rows[0] as Record<string, unknown>);
+    return toEscalation(EscalationBeadRecord.parse(rows[0]));
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1087,9 +1087,11 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${beads.bead_id}, ${beads.rig_id}, ${beads.title}, ${beads.created_at},
+          SELECT ${beads}.*,
                  ${agent_metadata.role}, ${agent_metadata.identity},
-                 ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+                 ${agent_metadata.container_process_id},
+                 ${agent_metadata.status} AS status,
+                 ${agent_metadata.current_hook_bead_id},
                  ${agent_metadata.dispatch_attempts}, ${agent_metadata.last_activity_at},
                  ${agent_metadata.checkpoint}
           FROM ${beads}
@@ -1099,23 +1101,21 @@ export class TownDO extends DurableObject<Env> {
         []
       ),
     ];
-    const pendingAgents: Agent[] = rows.map(r => {
-      const row = r as Record<string, unknown>;
-      return {
-        id: String(row.bead_id),
-        rig_id: row.rig_id === null ? null : String(row.rig_id),
-        role: String(row.role) as Agent['role'],
-        name: String(row.title),
-        identity: String(row.identity),
-        status: String(row.status) as Agent['status'],
-        current_hook_bead_id:
-          row.current_hook_bead_id === null ? null : String(row.current_hook_bead_id),
-        dispatch_attempts: Number(row.dispatch_attempts ?? 0),
-        last_activity_at: row.last_activity_at === null ? null : String(row.last_activity_at),
-        checkpoint: row.checkpoint === null ? null : JSON.parse(String(row.checkpoint)),
-        created_at: String(row.created_at),
-      };
-    });
+    const pendingAgents: Agent[] = AgentBeadRecord.array()
+      .parse(rows)
+      .map(row => ({
+        id: row.bead_id,
+        rig_id: row.rig_id,
+        role: row.role,
+        name: row.title,
+        identity: row.identity,
+        status: row.status,
+        current_hook_bead_id: row.current_hook_bead_id,
+        dispatch_attempts: row.dispatch_attempts,
+        last_activity_at: row.last_activity_at,
+        checkpoint: row.checkpoint,
+        created_at: row.created_at,
+      }));
 
     console.log(`${TOWN_LOG} schedulePendingWork: found ${pendingAgents.length} pending agents`);
     if (pendingAgents.length === 0) return;
@@ -1360,7 +1360,7 @@ export class TownDO extends DurableObject<Env> {
         /* sql */ `${ESCALATION_JOIN} WHERE ${escalation_metadata.acknowledged} = 0 AND ${escalation_metadata.re_escalation_count} < ?`,
         [MAX_RE_ESCALATIONS]
       ),
-    ].map(r => parseEscalation(r as Record<string, unknown>));
+    ].map(r => toEscalation(EscalationBeadRecord.parse(r)));
 
     const nowMs = Date.now();
     for (const esc of candidates) {

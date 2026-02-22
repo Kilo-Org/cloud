@@ -5,8 +5,8 @@
  * joined with agent_metadata for operational state.
  */
 
-import { beads, BeadRecord } from '../../db/tables/beads.table';
-import { agent_metadata, AgentMetadataRecord } from '../../db/tables/agent-metadata.table';
+import { beads, BeadRecord, AgentBeadRecord } from '../../db/tables/beads.table';
+import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
 import { logBeadEvent, getBead } from './beads';
 import type {
@@ -51,42 +51,35 @@ function now(): string {
   return new Date().toISOString();
 }
 
-function parseCheckpoint(raw: unknown): unknown {
-  if (raw === null || raw === undefined) return null;
-  try {
-    return JSON.parse(String(raw));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Parse a joined bead + agent_metadata row into an Agent object.
- * The SQL query aliases bead columns and agent_metadata columns into
- * a flat row that we reconstruct here.
- */
-function parseAgent(row: Record<string, unknown>): Agent {
+/** Map a parsed AgentBeadRecord to the Agent API type. */
+function toAgent(row: AgentBeadRecord): Agent {
   return {
-    id: String(row.bead_id),
-    rig_id: row.rig_id === null ? null : String(row.rig_id),
-    role: AgentMetadataRecord.shape.role.parse(row.role),
-    name: String(row.title),
-    identity: String(row.identity),
-    status: AgentMetadataRecord.shape.status.parse(row.status),
-    current_hook_bead_id:
-      row.current_hook_bead_id === null ? null : String(row.current_hook_bead_id),
-    dispatch_attempts: Number(row.dispatch_attempts ?? 0),
-    last_activity_at: row.last_activity_at === null ? null : String(row.last_activity_at),
-    checkpoint: parseCheckpoint(row.checkpoint),
-    created_at: String(row.created_at),
+    id: row.bead_id,
+    rig_id: row.rig_id,
+    role: row.role,
+    name: row.title,
+    identity: row.identity,
+    status: row.status,
+    current_hook_bead_id: row.current_hook_bead_id,
+    dispatch_attempts: row.dispatch_attempts,
+    last_activity_at: row.last_activity_at,
+    checkpoint: row.checkpoint,
+    created_at: row.created_at,
   };
 }
 
-/** SQL fragment for joining beads + agent_metadata */
+/**
+ * SQL fragment for joining beads + agent_metadata.
+ * Uses SELECT ${beads}.* so all bead columns are available, then selects
+ * the agent_metadata columns explicitly (since status conflicts).
+ * agent_metadata.status is aliased to avoid colliding with beads.status.
+ */
 const AGENT_JOIN = /* sql */ `
-  SELECT ${beads.bead_id}, ${beads.rig_id}, ${beads.title}, ${beads.created_at},
+  SELECT ${beads}.*,
          ${agent_metadata.role}, ${agent_metadata.identity},
-         ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+         ${agent_metadata.container_process_id},
+         ${agent_metadata.status} AS status,
+         ${agent_metadata.current_hook_bead_id},
          ${agent_metadata.dispatch_attempts}, ${agent_metadata.last_activity_at},
          ${agent_metadata.checkpoint}
   FROM ${beads}
@@ -157,7 +150,7 @@ export function registerAgent(sql: SqlStorage, input: RegisterAgentInput): Agent
 export function getAgent(sql: SqlStorage, agentId: string): Agent | null {
   const rows = [...query(sql, /* sql */ `${AGENT_JOIN} WHERE ${beads.bead_id} = ?`, [agentId])];
   if (rows.length === 0) return null;
-  return parseAgent(rows[0] as Record<string, unknown>);
+  return toAgent(AgentBeadRecord.parse(rows[0]));
 }
 
 export function getAgentByIdentity(sql: SqlStorage, identity: string): Agent | null {
@@ -165,7 +158,7 @@ export function getAgentByIdentity(sql: SqlStorage, identity: string): Agent | n
     ...query(sql, /* sql */ `${AGENT_JOIN} WHERE ${agent_metadata.identity} = ?`, [identity]),
   ];
   if (rows.length === 0) return null;
-  return parseAgent(rows[0] as Record<string, unknown>);
+  return toAgent(AgentBeadRecord.parse(rows[0]));
 }
 
 export function listAgents(sql: SqlStorage, filter?: AgentFilter): Agent[] {
@@ -189,7 +182,7 @@ export function listAgents(sql: SqlStorage, filter?: AgentFilter): Agent[] {
       ]
     ),
   ];
-  return rows.map(r => parseAgent(r as Record<string, unknown>));
+  return AgentBeadRecord.array().parse(rows).map(toAgent);
 }
 
 export function updateAgentStatus(sql: SqlStorage, agentId: string, status: string): void {
@@ -375,7 +368,7 @@ export function getOrCreateAgent(
         []
       ),
     ];
-    if (idle.length > 0) return parseAgent(idle[0] as Record<string, unknown>);
+    if (idle.length > 0) return toAgent(AgentBeadRecord.parse(idle[0]));
   }
 
   // Create a new agent

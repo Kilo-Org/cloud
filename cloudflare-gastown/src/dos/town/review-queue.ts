@@ -6,13 +6,13 @@
  * - Molecules are parent beads with type='molecule' + child step beads
  */
 
-import { beads, BeadRecord } from '../../db/tables/beads.table';
-import { review_metadata, ReviewMetadataRecord } from '../../db/tables/review-metadata.table';
+import { beads, BeadRecord, MergeRequestBeadRecord } from '../../db/tables/beads.table';
+import { review_metadata } from '../../db/tables/review-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
 import { logBeadEvent, getBead, closeBead, updateBeadStatus, createBead } from './beads';
-import { getAgent, unhookBead, hookBead } from './agents';
+import { getAgent, unhookBead } from './agents';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
 
 // Review entries stuck in 'running' past this timeout are reset to 'pending'
@@ -33,40 +33,36 @@ export function initReviewQueueTables(_sql: SqlStorage): void {
 
 // ── Review Queue ────────────────────────────────────────────────────
 
-/**
- * Parse a joined bead + review_metadata row into a ReviewQueueEntry.
- */
-function parseReviewEntry(row: Record<string, unknown>): ReviewQueueEntry {
-  return {
-    id: String(row.bead_id),
-    agent_id: String(row.assignee_agent_bead_id ?? row.created_by ?? ''),
-    bead_id: String(row.bead_id),
-    branch: String(row.branch),
-    pr_url: row.pr_url === null ? null : String(row.pr_url),
-    status:
-      row.bead_status === 'open'
-        ? 'pending'
-        : row.bead_status === 'in_progress'
-          ? 'running'
-          : row.bead_status === 'closed'
-            ? 'merged'
-            : 'failed',
-    summary: row.body === null ? null : String(row.body),
-    created_at: String(row.created_at),
-    processed_at: row.updated_at === row.created_at ? null : String(row.updated_at),
-  };
-}
-
 const REVIEW_JOIN = /* sql */ `
-  SELECT ${beads.bead_id}, ${beads.assignee_agent_bead_id}, ${beads.created_by},
-         ${beads.body}, ${beads.created_at}, ${beads.updated_at},
-         ${beads.status} AS bead_status,
-         ${review_metadata.branch}, ${review_metadata.pr_url},
-         ${review_metadata.target_branch}, ${review_metadata.merge_commit},
+  SELECT ${beads}.*,
+         ${review_metadata.branch}, ${review_metadata.target_branch},
+         ${review_metadata.merge_commit}, ${review_metadata.pr_url},
          ${review_metadata.retry_count}
   FROM ${beads}
   INNER JOIN ${review_metadata} ON ${beads.bead_id} = ${review_metadata.bead_id}
 `;
+
+/** Map a parsed MergeRequestBeadRecord to the ReviewQueueEntry API type. */
+function toReviewQueueEntry(row: MergeRequestBeadRecord): ReviewQueueEntry {
+  return {
+    id: row.bead_id,
+    agent_id: row.assignee_agent_bead_id ?? row.created_by ?? '',
+    bead_id: row.bead_id,
+    branch: row.branch,
+    pr_url: row.pr_url,
+    status:
+      row.status === 'open'
+        ? 'pending'
+        : row.status === 'in_progress'
+          ? 'running'
+          : row.status === 'closed'
+            ? 'merged'
+            : 'failed',
+    summary: row.body,
+    created_at: row.created_at,
+    processed_at: row.updated_at === row.created_at ? null : row.updated_at,
+  };
+}
 
 export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): void {
   const id = generateId();
@@ -141,7 +137,8 @@ export function popReviewQueue(sql: SqlStorage): ReviewQueueEntry | null {
   ];
 
   if (rows.length === 0) return null;
-  const entry = parseReviewEntry(rows[0] as Record<string, unknown>);
+  const parsed = MergeRequestBeadRecord.parse(rows[0]);
+  const entry = toReviewQueueEntry(parsed);
 
   // Mark as running (in_progress)
   query(
@@ -199,7 +196,8 @@ export function completeReviewWithResult(
     ...query(sql, /* sql */ `${REVIEW_JOIN} WHERE ${beads.bead_id} = ?`, [input.entry_id]),
   ];
   if (entryRows.length === 0) return;
-  const entry = parseReviewEntry(entryRows[0] as Record<string, unknown>);
+  const parsed = MergeRequestBeadRecord.parse(entryRows[0]);
+  const entry = toReviewQueueEntry(parsed);
 
   logBeadEvent(sql, {
     beadId: entry.bead_id,

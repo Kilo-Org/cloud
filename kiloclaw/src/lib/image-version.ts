@@ -12,7 +12,7 @@ import type { ImageVersionEntry, ImageVariant } from '../schemas/image-version';
  */
 export async function resolveLatestVersion(
   kv: KVNamespace,
-  variant: string
+  variant: ImageVariant
 ): Promise<ImageVersionEntry | null> {
   const raw = await kv.get(imageVersionLatestKey(variant), 'json');
   if (!raw) return null;
@@ -24,32 +24,6 @@ export async function resolveLatestVersion(
   }
 
   return parsed.data;
-}
-
-/**
- * Look up the image tag for a specific OpenClaw version + variant from KV.
- * Returns the image tag, or null if the version is not registered.
- */
-export async function lookupImageTag(
-  kv: KVNamespace,
-  version: string,
-  variant: string
-): Promise<string | null> {
-  const raw = await kv.get(imageVersionKey(version, variant), 'json');
-  if (!raw) return null;
-
-  const parsed = ImageVersionEntrySchema.safeParse(raw);
-  if (!parsed.success) {
-    console.warn(
-      '[image-version] Invalid version entry in KV for',
-      version,
-      variant,
-      parsed.error.flatten()
-    );
-    return null;
-  }
-
-  return parsed.data.imageTag;
 }
 
 /**

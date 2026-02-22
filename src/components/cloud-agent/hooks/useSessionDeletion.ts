@@ -78,7 +78,7 @@ export function useSessionDeletion({
         serverDeleteFailed = true;
       }
 
-      void queryClient.invalidateQueries(trpc.cliSessions.list.pathFilter());
+      void queryClient.invalidateQueries(trpc.unifiedSessions.list.pathFilter());
 
       // Always refetch sessions to sync with server state
       // If delete succeeded: session will be gone from the list

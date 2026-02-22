@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Search, Cloud, Terminal, Puzzle, Bot } from 'lucide-react';
-import type { SessionsListItem, SessionsListProps } from '@/components/cloud-agent/SessionsList';
+import type { SessionsListItem } from '@/components/cloud-agent/SessionsList';
 import { SessionsList } from '@/components/cloud-agent/SessionsList';
 import { extractRepoFromGitUrl } from '@/components/cloud-agent/store/db-session-atoms';
 import {
@@ -51,7 +51,9 @@ export function SessionsPageContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<PlatformFilterValue>('all');
-  const [selectedSession, setSelectedSession] = useState<SessionsListItem | null>(null);
+  const [includeSubSessions, setIncludeSubSessions] = useState(false);
+  type SessionWithSource = SessionsListItem & { source: 'v1' | 'v2' };
+  const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Debounce search query (300ms delay)
@@ -73,22 +75,24 @@ export function SessionsPageContent() {
   // Query for listing sessions (when not searching)
   // Order by updated_at and filter by organization and platform
   const { data: listData, isLoading: isListLoading } = useQuery(
-    trpc.cliSessions.list.queryOptions({
+    trpc.unifiedSessions.list.queryOptions({
       limit: 50,
       orderBy: 'updated_at',
       organizationId: organizationId ?? null,
       createdOnPlatform: platformFilter === 'all' ? undefined : platformFilter,
+      includeSubSessions,
     })
   );
 
   // Query for searching sessions (uses debounced value)
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
-    ...trpc.cliSessions.search.queryOptions({
+    ...trpc.unifiedSessions.search.queryOptions({
       search_string: debouncedSearchQuery.trim(),
       limit: 50,
       offset: 0,
       organizationId: organizationId ?? null,
       createdOnPlatform: platformFilter === 'all' ? undefined : platformFilter,
+      includeSubSessions,
     }),
     enabled: isSearching,
   });
@@ -102,8 +106,9 @@ export function SessionsPageContent() {
     updated_at: string;
     created_on_platform: string;
     cloud_agent_session_id: string | null;
-  }): SessionsListItem => {
-    const repository = extractRepoFromGitUrl(session.git_url) || 'Unknown repository';
+    source: 'v1' | 'v2';
+  }): SessionWithSource => {
+    const repository = extractRepoFromGitUrl(session.git_url) ?? null;
     const prompt = session.title || 'Untitled';
 
     return {
@@ -113,6 +118,7 @@ export function SessionsPageContent() {
       repository,
       sessionId: session.session_id,
       mode: '',
+      source: session.source,
     };
   };
 
@@ -123,7 +129,7 @@ export function SessionsPageContent() {
 
   const isLoading = isSearching ? isSearchLoading : isListLoading;
 
-  const handleSessionClick: SessionsListProps['onSessionClick'] = session => {
+  const handleSessionClick = (session: SessionWithSource) => {
     setSelectedSession(session);
     setIsDialogOpen(true);
   };
@@ -165,6 +171,18 @@ export function SessionsPageContent() {
               })}
             </SelectContent>
           </Select>
+          <Select
+            value={includeSubSessions ? 'all' : 'root'}
+            onValueChange={value => setIncludeSubSessions(value === 'all')}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="root">Root sessions</SelectItem>
+              <SelectItem value="all">All sessions</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -197,9 +215,11 @@ export function SessionsPageContent() {
                 <p className="text-sm">
                   <span className="font-medium">Session:</span> {selectedSession.prompt}
                 </p>
-                <p className="text-sm">
-                  <span className="font-medium">Repository:</span> {selectedSession.repository}
-                </p>
+                {selectedSession.repository && (
+                  <p className="text-sm">
+                    <span className="font-medium">Repository:</span> {selectedSession.repository}
+                  </p>
+                )}
                 <p className="text-sm">
                   <span className="font-medium">ID:</span> {selectedSession.sessionId}
                 </p>
@@ -230,24 +250,42 @@ export function SessionsPageContent() {
                   Fork this session to continue working on it in your editor or CLI
                 </p>
 
-                {/* Open in Editor */}
-                <div className="flex justify-center">
-                  <OpenInEditorButton sessionId={selectedSession.sessionId} />
-                </div>
+                {selectedSession.source === 'v1' && (
+                  <>
+                    {/* Open in Editor (v1 only) */}
+                    <div className="flex justify-center">
+                      <OpenInEditorButton sessionId={selectedSession.sessionId} />
+                    </div>
 
-                {/* Open in CLI */}
-                <div className="flex justify-center">
-                  <OpenInCliButton command={`kilocode --fork ${selectedSession.sessionId}`} />
-                </div>
+                    {/* Open in CLI (v1 only) */}
+                    <div className="flex justify-center">
+                      <OpenInCliButton command={`kilocode --fork ${selectedSession.sessionId}`} />
+                    </div>
 
-                {/* Manual fork command */}
-                <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs">Or use the fork command manually:</p>
-                  <CopyableCommand
-                    command={`/session fork ${selectedSession.sessionId}`}
-                    className="bg-muted rounded-md px-3 py-2 text-sm"
-                  />
-                </div>
+                    {/* Manual fork command (v1) */}
+                    <div className="space-y-2">
+                      <p className="text-muted-foreground text-xs">
+                        Or use the fork command manually:
+                      </p>
+                      <CopyableCommand
+                        command={`/session fork ${selectedSession.sessionId}`}
+                        className="bg-muted rounded-md px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {selectedSession.source === 'v2' && (
+                  <div className="space-y-2">
+                    <p className="text-muted-foreground text-xs">
+                      Use the CLI to fork this session:
+                    </p>
+                    <CopyableCommand
+                      command={`kilo --session ${selectedSession.sessionId} --fork`}
+                      className="bg-muted rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}

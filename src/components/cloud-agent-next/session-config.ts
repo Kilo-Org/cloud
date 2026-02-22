@@ -4,7 +4,7 @@
  * Centralized logic for building, validating, and deriving SessionConfig.
  */
 
-import type { SessionConfig, ResumeConfig, StreamResumeConfig, AgentMode } from './types';
+import type { SessionConfig, ResumeConfig, AgentMode } from './types';
 
 // Re-export AgentMode for backwards compatibility
 export type { AgentMode };
@@ -163,12 +163,12 @@ export function getModeModelWithSource(options: {
 export function needsResumeConfiguration(params: {
   currentDbSessionId: string | null;
   resumeConfig: ResumeConfig | null;
-  streamResumeConfig: StreamResumeConfig | null;
+  persistedResumeConfig: ResumeConfig | null;
   sessionConfig: SessionConfig | null;
 }): boolean {
-  const { currentDbSessionId, resumeConfig, streamResumeConfig, sessionConfig } = params;
+  const { currentDbSessionId, resumeConfig, persistedResumeConfig, sessionConfig } = params;
 
   if (!currentDbSessionId) return false;
-  if (resumeConfig || streamResumeConfig) return false;
+  if (resumeConfig || persistedResumeConfig) return false;
   return !isValidSessionConfig(sessionConfig);
 }

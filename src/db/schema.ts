@@ -2140,6 +2140,7 @@ export const cli_sessions_v2 = pgTable(
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
     index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
     index('IDX_cli_sessions_v2_created_at').on(table.created_at),
+    index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
   ]
 );
 

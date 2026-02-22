@@ -8,7 +8,7 @@
 
 import React, { memo, type RefObject } from 'react';
 import { OrgContextModal } from './OrgContextModal';
-import { ResumeConfigModal, type ResumeConfig, VALID_MODE_VALUES } from './ResumeConfigModal';
+import { ResumeConfigModal, type ResumeConfig } from './ResumeConfigModal';
 import { OldSessionBanner } from './OldSessionBanner';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatHeader } from './ChatHeader';
@@ -23,6 +23,7 @@ import type { AgentMode, SessionConfig, StoredSession, StoredMessage } from './t
 import { isMessageStreaming } from './types';
 import type { DbSessionDetails, IndexedDbSessionData } from './store/db-session-atoms';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
+import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 
 // V2: No conversion needed - StoredMessage format is used directly by MessageBubble
@@ -114,7 +115,10 @@ export type CloudChatPresentationProps = {
   showResumeModal: boolean;
   pendingSessionForOrgContext: IndexedDbSessionData | null;
   pendingResumeSession: DbSessionDetails | null;
-  pendingGitState: { branch?: string } | null;
+  /** Available repositories for resume config modal */
+  repositories: RepositoryOption[];
+  /** Whether repositories are loading */
+  isLoadingRepos: boolean;
 
   // Config state
   needsResumeConfig: boolean;
@@ -134,12 +138,8 @@ export type CloudChatPresentationProps = {
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   messagesEndRef: RefObject<HTMLDivElement | null>;
 
-  // Stream resume config (for input enabling)
-  streamResumeConfig: {
-    mode: string;
-    model: string;
-    githubRepo: string;
-  } | null;
+  // Persisted resume config (for input enabling)
+  persistedResumeConfig: ResumeConfig | null;
 
   // Child session messages function
   getChildMessages?: (sessionId: string) => StoredMessage[];
@@ -199,7 +199,8 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
   showResumeModal,
   pendingSessionForOrgContext,
   pendingResumeSession,
-  pendingGitState,
+  repositories,
+  isLoadingRepos,
   needsResumeConfig,
   resumeConfigPersisting,
   resumeConfigFailed,
@@ -210,7 +211,7 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
   availableCommands,
   scrollContainerRef,
   messagesEndRef,
-  streamResumeConfig,
+  persistedResumeConfig,
   onSendMessage,
   onStopExecution,
   onRefresh,
@@ -257,26 +258,12 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
           isOpen={showResumeModal}
           onClose={onResumeClose}
           onConfirm={onResumeConfirm}
-          session={{
-            session_id: pendingResumeSession.session_id,
-            git_url: pendingResumeSession.git_url ?? null,
-            title: pendingResumeSession.title,
-          }}
-          gitState={pendingGitState}
+          session={pendingResumeSession}
+          repositories={repositories}
+          isLoadingRepos={isLoadingRepos}
           modelOptions={modelOptions}
           isLoadingModels={isLoadingModels}
-          defaultMode={
-            pendingResumeSession.last_mode &&
-            (VALID_MODE_VALUES as readonly string[]).includes(pendingResumeSession.last_mode)
-              ? (pendingResumeSession.last_mode as ResumeConfig['mode'])
-              : undefined
-          }
-          defaultModel={
-            pendingResumeSession.last_model &&
-            modelOptions.some(m => m.id === pendingResumeSession.last_model)
-              ? pendingResumeSession.last_model
-              : defaultModel
-          }
+          orgDefaultModel={defaultModel}
         />
       )}
 
@@ -431,9 +418,9 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
                 (cloudAgentSessionId && !isSessionInitiated) ||
                 // Allow sending if:
                 // 1. We have an active cloud session (currentSessionId), OR
-                // 2. We have streamResumeConfig ready for CLI sessions, OR
+                // 2. We have persistedResumeConfig ready for CLI sessions, OR
                 // 3. We have cloudAgentSessionId for web sessions (ready for initiateFromKilocodeSession)
-                (!currentSessionId && !streamResumeConfig && !cloudAgentSessionId)
+                (!currentSessionId && !persistedResumeConfig && !cloudAgentSessionId)
               }
               isStreaming={isStreaming}
               placeholder={

@@ -104,10 +104,12 @@ export function ChatSidebar({
                       </div>
                     )}
                   </div>
-                  <div className="text-muted-foreground flex items-center gap-1 text-xs">
-                    <GitBranch className="h-3 w-3" />
-                    <span className="truncate">{session.repository}</span>
-                  </div>
+                  {session.repository && (
+                    <div className="text-muted-foreground flex items-center gap-1 text-xs">
+                      <GitBranch className="h-3 w-3" />
+                      <span className="truncate">{session.repository}</span>
+                    </div>
+                  )}
                   <div className="text-muted-foreground flex items-center gap-1 text-xs">
                     <Clock className="h-3 w-3" />
                     <span>{timeAgo}</span>

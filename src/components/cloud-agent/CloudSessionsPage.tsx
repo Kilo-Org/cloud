@@ -453,7 +453,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
       // Invalidate the sessions list cache so the sidebar shows the new session
       void queryClient.invalidateQueries({
-        queryKey: trpc.cliSessions.list.queryKey({
+        queryKey: trpc.unifiedSessions.list.queryKey({
           limit: 3,
           createdOnPlatform: 'cloud-agent',
           orderBy: 'updated_at',
@@ -482,7 +482,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
     selectedPlatform,
     selectedRepo,
     selectedProfile,
-    trpc.cliSessions.list,
+    trpc.unifiedSessions.list,
     trpcClient,
   ]);
 

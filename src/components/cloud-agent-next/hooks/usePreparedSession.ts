@@ -15,6 +15,7 @@ export type PrepareSessionConfig = {
   gitlabProject?: string;
   envVars?: Record<string, string>;
   setupCommands?: string[];
+  upstreamBranch?: string;
   autoCommit?: boolean;
   profileName?: string;
 };

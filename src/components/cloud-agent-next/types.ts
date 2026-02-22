@@ -287,20 +287,10 @@ export type StreamEventType =
 export type ResumeConfig = {
   mode: AgentMode;
   model: string;
-  envVars?: Record<string, string>;
-  setupCommands?: string[];
-};
-
-/**
- * Config shape passed to useCloudAgentStream for resuming sessions.
- * Similar to ResumeConfig but includes the repository.
- */
-export type StreamResumeConfig = {
-  mode: AgentMode;
-  model: string;
-  envVars?: Record<string, string>;
-  setupCommands?: string[];
   githubRepo: string;
+  branch?: string;
+  envVars?: Record<string, string>;
+  setupCommands?: string[];
 };
 
 // ============================================================================

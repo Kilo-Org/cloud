@@ -22,7 +22,7 @@
 
 import { atom } from 'jotai';
 import { MiniDb } from 'jotai-minidb';
-import type { StoredMessage, Part } from '../types';
+import type { StoredMessage, Part, ResumeConfig } from '../types';
 import {
   clearMessagesAtom,
   sessionConfigAtom,
@@ -47,15 +47,11 @@ export type OrgContext = {
 };
 
 /**
- * Resume configuration stored with the session
- * Captures the settings needed to resume a session
+ * Resume configuration stored with the session.
+ * This is the same as ResumeConfig — a single type for both modal output and IndexedDB persistence.
+ * @deprecated Use ResumeConfig directly. This alias exists for backwards compatibility.
  */
-export type StoredResumeConfig = {
-  mode: string;
-  model: string;
-  envVars?: Record<string, string>;
-  setupCommands?: string[];
-};
+export type StoredResumeConfig = ResumeConfig;
 
 /**
  * IndexedDB session data version.
@@ -334,6 +330,7 @@ export type DbSessionDetails = {
   // V1-only fields (optional for V2 compatibility)
   kilo_user_id?: string;
   git_url?: string | null;
+  git_branch?: string | null;
   created_on_platform?: string | null;
   forked_from?: string | null;
   api_conversation_history_blob_url?: string | null;
@@ -536,13 +533,12 @@ export const createNewSessionInIndexedDbAtom = atom(
 
     // Store mode/model as resumeConfig so it's preserved across refreshes
     // This is CRITICAL for new sessions - without it, the resume modal will show on refresh
-    const resumeConfig: StoredResumeConfig | null =
+    const resumeConfig: ResumeConfig | null =
       mode && model
         ? {
             mode,
             model,
-            envVars: undefined,
-            setupCommands: undefined,
+            githubRepo: repository,
           }
         : null;
 
@@ -960,7 +956,7 @@ export const updateResumeConfigAtom = atom(
     set,
     payload: {
       sessionId: string;
-      resumeConfig: StoredResumeConfig;
+      resumeConfig: ResumeConfig;
     }
   ): Promise<void> => {
     const { sessionId, resumeConfig } = payload;

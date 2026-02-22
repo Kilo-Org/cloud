@@ -5,7 +5,6 @@ import {
   updateResumeConfigAtom,
   extractRepoFromGitUrl,
   type DbSessionDetails,
-  type StoredResumeConfig,
 } from '../store/db-session-atoms';
 import { sessionConfigAtom } from '../store/atoms';
 import { buildSessionConfig } from '../session-config';
@@ -42,17 +41,10 @@ export function useSessionConfigCommand() {
       const { config, sessionId, loadedDbSession } = params;
 
       try {
-        // 1. Persist to IndexedDB
-        const storedConfig: StoredResumeConfig = {
-          mode: config.mode,
-          model: config.model,
-          envVars: config.envVars,
-          setupCommands: config.setupCommands,
-        };
-
+        // 1. Persist full ResumeConfig to IndexedDB (including githubRepo and branch)
         await updateResumeConfig({
           sessionId,
-          resumeConfig: storedConfig,
+          resumeConfig: config,
         });
 
         // 2. Update application state

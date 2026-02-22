@@ -83,6 +83,7 @@ export type GastownEnv = {
   sessionToken: string;
   agentId: string;
   rigId: string;
+  townId: string;
 };
 
 // Environment variable config for the mayor (town-scoped)

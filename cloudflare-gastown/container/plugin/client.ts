@@ -27,16 +27,18 @@ export class GastownClient {
   private token: string;
   private agentId: string;
   private rigId: string;
+  private townId: string;
 
   constructor(env: GastownEnv) {
     this.baseUrl = env.apiUrl.replace(/\/+$/, '');
     this.token = env.sessionToken;
     this.agentId = env.agentId;
     this.rigId = env.rigId;
+    this.townId = env.townId;
   }
 
   private rigPath(path: string): string {
-    return `${this.baseUrl}/api/rigs/${this.rigId}${path}`;
+    return `${this.baseUrl}/api/towns/${this.townId}/rigs/${this.rigId}${path}`;
   }
 
   private agentPath(path: string): string {
@@ -294,18 +296,20 @@ export function createClientFromEnv(): GastownClient {
   const sessionToken = process.env.GASTOWN_SESSION_TOKEN;
   const agentId = process.env.GASTOWN_AGENT_ID;
   const rigId = process.env.GASTOWN_RIG_ID;
+  const townId = process.env.GASTOWN_TOWN_ID;
 
-  if (!apiUrl || !sessionToken || !agentId || !rigId) {
+  if (!apiUrl || !sessionToken || !agentId || !rigId || !townId) {
     const missing = [
       !apiUrl && 'GASTOWN_API_URL',
       !sessionToken && 'GASTOWN_SESSION_TOKEN',
       !agentId && 'GASTOWN_AGENT_ID',
       !rigId && 'GASTOWN_RIG_ID',
+      !townId && 'GASTOWN_TOWN_ID',
     ].filter(Boolean);
     throw new Error(`Missing required Gastown environment variables: ${missing.join(', ')}`);
   }
 
-  return new GastownClient({ apiUrl, sessionToken, agentId, rigId });
+  return new GastownClient({ apiUrl, sessionToken, agentId, rigId, townId });
 }
 
 export function createMayorClientFromEnv(): MayorGastownClient {

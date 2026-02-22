@@ -201,25 +201,13 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
 
   // Combine repositories with platform tags for the resume config modal
   const repositories = useMemo<RepositoryOption[]>(() => {
-    const github = (
-      (githubRepoData?.repositories || []) as Array<{
-        id: string | number;
-        fullName: string;
-        private?: boolean;
-      }>
-    ).map(repo => ({
+    const github = (githubRepoData?.repositories ?? []).map(repo => ({
       id: repo.id,
       fullName: repo.fullName,
       private: repo.private,
       platform: 'github' as const,
     }));
-    const gitlab = (
-      (gitlabRepoData?.repositories || []) as Array<{
-        id: string | number;
-        fullName: string;
-        private?: boolean;
-      }>
-    ).map(repo => ({
+    const gitlab = (gitlabRepoData?.repositories ?? []).map(repo => ({
       id: repo.id,
       fullName: repo.fullName,
       private: repo.private,

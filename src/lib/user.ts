@@ -33,6 +33,7 @@ import {
   webhook_events,
   agent_environment_profiles,
   security_findings,
+  security_audit_log,
   auto_triage_tickets,
   auto_fix_tickets,
   slack_bot_requests,
@@ -524,6 +525,13 @@ export async function softDeleteUser(userId: string) {
       .update(organization_audit_logs)
       .set({ actor_email: null, actor_name: null })
       .where(eq(organization_audit_logs.actor_id, userId));
+
+    // Security audit logs: keep org-owned entries, strip actor PII
+    // (user-owned entries are cascade-deleted via owned_by_user_id FK)
+    await tx
+      .update(security_audit_log)
+      .set({ actor_email: null, actor_name: null })
+      .where(eq(security_audit_log.actor_id, userId));
 
     // Payment methods: soft-delete and strip address/name/IP fields
     await tx

@@ -76,6 +76,21 @@ describe('database schema', () => {
       KiloPassAuditLogResult: ['success', 'skipped_idempotent', 'failed'],
       KiloPassScheduledChangeStatus: ['not_started', 'active', 'completed', 'released', 'canceled'],
       CliSessionSharedState: ['public', 'organization'],
+      SecurityAuditLogAction: [
+        'security.finding.created',
+        'security.finding.status_change',
+        'security.finding.dismissed',
+        'security.finding.auto_dismissed',
+        'security.finding.analysis_started',
+        'security.finding.analysis_completed',
+        'security.finding.deleted',
+        'security.config.enabled',
+        'security.config.disabled',
+        'security.config.updated',
+        'security.sync.triggered',
+        'security.sync.completed',
+        'security.audit_log.exported',
+      ],
     };
 
     const actualEnumValues: Record<string, string[]> = {};

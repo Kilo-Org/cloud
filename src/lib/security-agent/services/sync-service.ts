@@ -23,6 +23,7 @@ import {
 } from '../core/types';
 import type { Owner } from '@/lib/code-reviews/core';
 import { sentryLogger } from '@/lib/utils.server';
+import { logSecurityAudit, SecurityAuditLogAction } from './audit-log-service';
 
 const log = sentryLogger('security-agent:sync', 'info');
 const warn = sentryLogger('security-agent:sync', 'warning');
@@ -410,6 +411,27 @@ export async function runFullSync(): Promise<{
           });
         }
       }
+
+      const ownerId =
+        'organizationId' in config.owner
+          ? (config.owner.organizationId ?? 'unknown')
+          : (config.owner.userId ?? 'unknown');
+      logSecurityAudit({
+        owner: config.owner,
+        actor_id: null,
+        actor_email: null,
+        actor_name: null,
+        action: SecurityAuditLogAction.SyncCompleted,
+        resource_type: 'agent_config',
+        resource_id: ownerId,
+        metadata: {
+          source: 'system',
+          trigger: 'cron',
+          synced: result.synced,
+          errors: result.errors,
+          repoCount: config.repositories.length,
+        },
+      });
     } catch (error) {
       totalErrors++;
       captureException(error, {

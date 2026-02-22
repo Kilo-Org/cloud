@@ -25,6 +25,10 @@ import { kilocode_users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { sentryLogger } from '@/lib/utils.server';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '@/lib/security-agent/core/types';
+import {
+  logSecurityAudit,
+  SecurityAuditLogAction,
+} from '@/lib/security-agent/services/audit-log-service';
 
 const log = sentryLogger('security-agent:callback', 'info');
 const warn = sentryLogger('security-agent:callback', 'warning');
@@ -240,6 +244,17 @@ async function handleAnalysisCompleted(
   }
 
   const authToken = generateApiToken(user);
+
+  logSecurityAudit({
+    owner,
+    actor_id: null,
+    actor_email: null,
+    actor_name: null,
+    action: SecurityAuditLogAction.FindingAnalysisCompleted,
+    resource_type: 'security_finding',
+    resource_id: findingId,
+    metadata: { source: 'system', model, correlationId, triggeredByUserId },
+  });
 
   await finalizeAnalysis(
     findingId,

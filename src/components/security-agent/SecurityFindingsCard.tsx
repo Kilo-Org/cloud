@@ -76,7 +76,6 @@ type SecurityFindingsCardProps = {
   lastSyncTime?: string | null;
   onStartAnalysis?: (findingId: string) => void;
   startingAnalysisId?: string | null;
-  isAdmin: boolean;
 };
 
 export function SecurityFindingsCard({
@@ -99,7 +98,6 @@ export function SecurityFindingsCard({
   lastSyncTime,
   onStartAnalysis,
   startingAnalysisId,
-  isAdmin,
 }: SecurityFindingsCardProps) {
   const totalPages = Math.ceil(totalCount / pageSize);
   const startItem = (page - 1) * pageSize + 1;
@@ -191,16 +189,14 @@ export function SecurityFindingsCard({
                 Last synced {formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true })}
               </span>
             )}
-            {isAdmin && (
-              <Button variant="outline" size="sm" onClick={() => onSync()} disabled={isSyncing}>
-                {isSyncing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                {isSyncing ? 'Syncing...' : 'Sync'}
-              </Button>
-            )}
+            <Button variant="outline" size="sm" onClick={() => onSync()} disabled={isSyncing}>
+              {isSyncing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {isSyncing ? 'Syncing...' : 'Sync'}
+            </Button>
           </div>
         ) : hasIntegration ? (
           <Button variant="outline" size="sm" onClick={onEnableClick}>

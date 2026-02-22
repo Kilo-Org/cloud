@@ -28,7 +28,6 @@ import Link from 'next/link';
 
 type SecurityAgentPageClientProps = {
   organizationId?: string;
-  isAdmin: boolean;
 };
 
 const PAGE_SIZE = 20;
@@ -47,7 +46,7 @@ function isGitHubIntegrationError(error: unknown): boolean {
   );
 }
 
-export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAgentPageClientProps) {
+export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageClientProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -804,7 +803,6 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
             lastSyncTime={lastSyncData?.lastSyncTime}
             onStartAnalysis={handleStartAnalysis}
             startingAnalysisId={startingAnalysisId}
-            isAdmin={isAdmin}
           />
         </TabsContent>
 

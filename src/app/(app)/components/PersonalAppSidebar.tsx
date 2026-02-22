@@ -39,7 +39,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const isAdmin = user?.is_admin || false;
   const isKiloClawEnabled = useFeatureFlagEnabled('kiloclaw');
 
   // Dashboard group
@@ -98,15 +97,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Bot,
       url: '/code-reviews',
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Security Agent',
-            icon: Shield,
-            url: '/security-agent',
-          },
-        ]
-      : []),
+    {
+      title: 'Security Agent',
+      icon: Shield,
+      url: '/security-agent',
+    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
       ? [
           {

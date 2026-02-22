@@ -556,6 +556,8 @@ export class TownDO extends DurableObject<Env> {
 
     let sessionStatus: 'idle' | 'active' | 'starting';
 
+    // TODO: If we start the container early, then isAlive will be true and we won't get the all the configs
+    // BUT also TODO, we're supposed to be sending configs on each request to any agent anyway
     if (isAlive) {
       // Send follow-up message
       await dispatch.sendMessageToAgent(this.env, townId, mayor.id, message);
@@ -563,6 +565,7 @@ export class TownDO extends DurableObject<Env> {
     } else {
       // Start a new mayor session
       const townConfig = await this.getTownConfig();
+      // TODO: What is a Mayor Rig Config?
       const rigConfig = await this.getMayorRigConfig();
       const kilocodeToken = await this.resolveKilocodeToken();
 
@@ -582,7 +585,9 @@ export class TownDO extends DurableObject<Env> {
 
       await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
         townId,
+        // TODO: Why are we setting rigId at all?
         rigId: `mayor-${townId}`,
+        // TODO: Why is userId taken from rig?
         userId: rigConfig?.userId ?? '',
         agentId: mayor.id,
         agentName: 'mayor',
@@ -1215,7 +1220,7 @@ export class TownDO extends DurableObject<Env> {
       const requiredAgeMs = (esc.re_escalation_count + 1) * STALE_ESCALATION_THRESHOLD_MS;
       if (ageMs < requiredAgeMs) continue;
 
-      const currentIdx = SEVERITY_ORDER.indexOf(esc.severity as (typeof SEVERITY_ORDER)[number]);
+      const currentIdx = SEVERITY_ORDER.indexOf(esc.severity);
       if (currentIdx < 0 || currentIdx >= SEVERITY_ORDER.length - 1) continue;
 
       const newSeverity = SEVERITY_ORDER[currentIdx + 1];

@@ -23,6 +23,7 @@ export const RigAgentRecord = z.object({
 
 export type RigAgentRecord = z.output<typeof RigAgentRecord>;
 
+// TODO: This should be called town_agents
 export const rig_agents = getTableFromZodSchema('rig_agents', RigAgentRecord);
 
 export function createTableRigAgents(): string {

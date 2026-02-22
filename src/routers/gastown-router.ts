@@ -44,7 +44,18 @@ export const gastownRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return withGastownError(() => gastown.createTown(ctx.user.id, input.name));
+      const town = await withGastownError(() => gastown.createTown(ctx.user.id, input.name));
+
+      // Store the user's API token on the town config so the mayor can
+      // authenticate with the Kilo gateway without needing a rig.
+      const kilocodeToken = generateApiToken(ctx.user, undefined, {
+        expiresIn: TOKEN_EXPIRY.thirtyDays,
+      });
+      await withGastownError(() =>
+        gastown.updateTownConfig(town.id, { kilocode_token: kilocodeToken })
+      );
+
+      return town;
     }),
 
   listTowns: baseProcedure.query(async ({ ctx }) => {

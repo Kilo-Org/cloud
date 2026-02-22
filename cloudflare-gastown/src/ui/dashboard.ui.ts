@@ -229,7 +229,7 @@ export function dashboardHtml(): string {
     </select>
   </div>
   <div class="row">
-    <input type="text" id="cModel" placeholder="model" value="anthropic/claude-sonnet-4-20250514" style="min-width:220px" />
+    <input type="text" id="cModel" placeholder="model" value="anthropic/claude-sonnet-4.6" style="min-width:220px" />
     <input type="text" id="cBranch" placeholder="branch" style="min-width:120px" />
   </div>
   <div class="row">
@@ -685,7 +685,7 @@ async function containerStartAgent() {
     name,
     identity: name,
     prompt,
-    model: model || 'anthropic/claude-sonnet-4-20250514',
+    model: model || 'anthropic/claude-sonnet-4.6',
     systemPrompt: systemPrompt || 'You are a helpful coding agent.',
     gitUrl,
     branch,

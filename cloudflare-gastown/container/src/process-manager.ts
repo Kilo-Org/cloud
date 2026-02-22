@@ -288,7 +288,7 @@ export async function startAgent(
     void subscribeToEvents(client, agent, request);
 
     // 4. Send the initial prompt
-    // The model string is an OpenRouter-style ID like "anthropic/claude-sonnet-4".
+    // The model string is an OpenRouter-style ID like "anthropic/claude-sonnet-4.6".
     // The kilo provider (which wraps OpenRouter) takes the FULL model string as modelID.
     // providerID is always 'kilo' since we route through the Kilo gateway.
     let modelParam: { providerID: string; modelID: string } | undefined;

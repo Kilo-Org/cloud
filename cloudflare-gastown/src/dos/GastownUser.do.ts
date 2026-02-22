@@ -76,6 +76,9 @@ export class GastownUserDO extends DurableObject<Env> {
     const town = this.getTown(id);
     if (!town) throw new Error('Failed to create town');
     console.log(`${USER_LOG} createTown: created town id=${town.id}`);
+    // TODO: Should create the Town DO now, call setTownId, and then some function like ensureContainer
+    // In the background, this way the town will likely be ready to go when the user gets to the UI
+
     return town;
   }
 

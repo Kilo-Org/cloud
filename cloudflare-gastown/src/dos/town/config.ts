@@ -60,7 +60,7 @@ export async function updateTownConfig(
 export function resolveModel(townConfig: TownConfig, _rigId: string, _role: string): string {
   // OPEN QUESTION: Should we add rig_overrides to TownConfig?
   // For now, just use the town default.
-  return townConfig.default_model ?? 'anthropic/claude-sonnet-4';
+  return townConfig.default_model ?? 'anthropic/claude-sonnet-4.6';
 }
 
 /**
@@ -74,7 +74,7 @@ export async function buildContainerConfig(
   const config = await getTownConfig(storage);
   return {
     env_vars: config.env_vars,
-    default_model: config.default_model ?? 'anthropic/claude-sonnet-4',
+    default_model: config.default_model ?? 'anthropic/claude-sonnet-4.6',
     git_auth: config.git_auth,
     kilocode_token: config.kilocode_token,
     kilo_api_url: env.KILO_API_URL ?? '',

@@ -188,7 +188,7 @@ export async function startAgentInContainer(
           beadBody: params.beadBody,
           checkpoint: params.checkpoint,
         }),
-        model: params.townConfig.default_model ?? 'anthropic/claude-sonnet-4',
+        model: params.townConfig.default_model ?? 'anthropic/claude-sonnet-4.6',
         systemPrompt:
           params.systemPromptOverride ??
           systemPromptForRole({
@@ -240,6 +240,7 @@ export async function startMergeInContainer(
       agentId: params.agentId,
       rigId: params.rigId,
       townId: params.townId,
+      // TODO: Why is userId ''?
       userId: '',
     });
 
@@ -298,6 +299,7 @@ export async function checkAgentContainerStatus(
 ): Promise<{ status: string; exitReason?: string }> {
   try {
     const container = getTownContainerStub(env, townId);
+    // TODO: Generally you should use containerFetch which waits for ports to be available
     const response = await container.fetch(`http://container/agents/${agentId}/status`);
     if (!response.ok) return { status: 'unknown' };
     const data = await response.json<{ status: string; exitReason?: string }>();

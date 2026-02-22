@@ -193,7 +193,7 @@ export const gastownRouter = createTRPCRouter({
         })
       );
       console.log(
-        `${LOG_PREFIX} sling: completed beadId=${result.bead.id} agentId=${result.agent.id} agentRole=${result.agent.role} agentStatus=${result.agent.status}`
+        `${LOG_PREFIX} sling: completed beadId=${result.bead.bead_id} agentId=${result.agent.id} agentRole=${result.agent.role} agentStatus=${result.agent.status}`
       );
       return result;
     }),

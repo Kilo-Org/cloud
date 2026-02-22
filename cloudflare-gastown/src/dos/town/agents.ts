@@ -9,6 +9,7 @@ import { beads, BeadRecord, AgentBeadRecord } from '../../db/tables/beads.table'
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
 import { logBeadEvent, getBead } from './beads';
+import { readAndDeliverMail } from './mail';
 import type {
   RegisterAgentInput,
   AgentFilter,
@@ -16,7 +17,6 @@ import type {
   AgentRole,
   PrimeContext,
   Bead,
-  Mail,
 } from '../../types';
 
 // Polecat name pool (20 names, used in allocation order)
@@ -315,18 +315,22 @@ export function getHookedBead(sql: SqlStorage, agentId: string): Bead | null {
  * check all existing polecats across every rig.
  */
 export function allocatePolecatName(sql: SqlStorage): string {
-  const usedRows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT ${beads.title} FROM ${beads}
-        INNER JOIN ${agent_metadata} ON ${beads.bead_id} = ${agent_metadata.bead_id}
-        WHERE ${agent_metadata.role} = 'polecat'
-      `,
-      []
-    ),
-  ];
-  const usedNames = new Set(usedRows.map(r => String((r as Record<string, unknown>).title)));
+  const usedNames = new Set(
+    BeadRecord.pick({ title: true })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `
+            SELECT ${beads.title} FROM ${beads}
+            INNER JOIN ${agent_metadata} ON ${beads.bead_id} = ${agent_metadata.bead_id}
+            WHERE ${agent_metadata.role} = 'polecat'
+          `,
+          []
+        ),
+      ])
+      .map(r => r.title)
+  );
 
   for (const name of POLECAT_NAME_POOL) {
     if (!usedNames.has(name)) return name;
@@ -386,49 +390,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
 
   const hookedBead = agent.current_hook_bead_id ? getBead(sql, agent.current_hook_bead_id) : null;
 
-  // Undelivered mail: message beads assigned to this agent that are still open
-  const mailRows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT * FROM ${beads}
-        WHERE ${beads.type} = 'message'
-          AND ${beads.assignee_agent_bead_id} = ?
-          AND ${beads.status} = 'open'
-        ORDER BY ${beads.created_at} ASC
-      `,
-      [agentId]
-    ),
-  ];
-  const mailBeads = BeadRecord.array().parse(mailRows);
-  const undeliveredMail: Mail[] = mailBeads.map(mb => ({
-    id: mb.bead_id,
-    from_agent_id: String(mb.metadata?.from_agent_id ?? mb.created_by ?? ''),
-    to_agent_id: agentId,
-    subject: mb.title,
-    body: mb.body ?? '',
-    delivered: false,
-    created_at: mb.created_at,
-    delivered_at: null,
-  }));
-
-  // Mark mail as delivered (close the message beads)
-  if (mailBeads.length > 0) {
-    const timestamp = now();
-    for (const mb of mailBeads) {
-      query(
-        sql,
-        /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.status} = 'closed',
-              ${beads.columns.closed_at} = ?,
-              ${beads.columns.updated_at} = ?
-          WHERE ${beads.bead_id} = ?
-        `,
-        [timestamp, timestamp, mb.bead_id]
-      );
-    }
-  }
+  const undeliveredMail = readAndDeliverMail(sql, agentId);
 
   // Open beads (for context awareness, scoped to agent's rig)
   const openBeadRows = [

@@ -28,14 +28,15 @@ import * as dispatch from './town/container-dispatch';
 // Table imports for beads-centric operations
 import {
   beads,
+  BeadRecord,
   AgentBeadRecord,
   EscalationBeadRecord,
   ConvoyBeadRecord,
 } from '../db/tables/beads.table';
-import { agent_metadata } from '../db/tables/agent-metadata.table';
+import { agent_metadata, AgentMetadataRecord } from '../db/tables/agent-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
-import { bead_dependencies } from '../db/tables/bead-dependencies.table';
+import { bead_dependencies, BeadDependencyRecord } from '../db/tables/bead-dependencies.table';
 import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
@@ -248,19 +249,19 @@ export class TownDO extends DurableObject<Env> {
     await this.ensureInitialized();
     rigs.removeRig(this.sql, rigId);
     await this.ctx.storage.delete(`rig:${rigId}:config`);
-    // Delete agents belonging to this rig
-    query(
-      this.sql,
-      /* sql */ `
-        DELETE FROM ${agent_metadata}
-        WHERE ${agent_metadata.bead_id} IN (
-          SELECT ${beads.bead_id} FROM ${beads}
-          WHERE ${beads.type} = 'agent' AND ${beads.rig_id} = ?
-        )
-      `,
-      [rigId]
-    );
-    query(this.sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.rig_id} = ?`, [rigId]);
+    // Delete all beads belonging to this rig (cascades to satellite tables via deleteBead)
+    const rigBeads = BeadRecord.pick({ bead_id: true })
+      .array()
+      .parse([
+        ...query(
+          this.sql,
+          /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.rig_id} = ?`,
+          [rigId]
+        ),
+      ]);
+    for (const { bead_id } of rigBeads) {
+      beadOps.deleteBead(this.sql, bead_id);
+    }
   }
 
   async listRigs(): Promise<rigs.RigRecord[]> {
@@ -354,9 +355,11 @@ export class TownDO extends DurableObject<Env> {
           [beadId]
         ),
       ];
-      for (const row of convoyRows) {
-        const convoyId = String((row as Record<string, unknown>).depends_on_bead_id);
-        this.onBeadClosed({ convoyId, beadId }).catch(() => {});
+      const parsed = BeadDependencyRecord.pick({ depends_on_bead_id: true })
+        .array()
+        .parse(convoyRows);
+      for (const { depends_on_bead_id } of parsed) {
+        this.onBeadClosed({ convoyId: depends_on_bead_id, beadId }).catch(() => {});
       }
     }
 
@@ -1200,7 +1203,12 @@ export class TownDO extends DurableObject<Env> {
     const townId = this.townId;
     const guppThreshold = new Date(Date.now() - GUPP_THRESHOLD_MS).toISOString();
 
-    const workingAgents = [
+    const WorkingAgentRow = AgentMetadataRecord.pick({
+      bead_id: true,
+      current_hook_bead_id: true,
+      last_activity_at: true,
+    });
+    const workingAgents = WorkingAgentRow.array().parse([
       ...query(
         this.sql,
         /* sql */ `
@@ -1210,15 +1218,12 @@ export class TownDO extends DurableObject<Env> {
         `,
         []
       ),
-    ];
+    ]);
 
-    for (const row of workingAgents) {
-      const working = row as Record<string, unknown>;
-      const agentId = String(working.bead_id);
-      const hookBeadId =
-        working.current_hook_bead_id === null ? null : String(working.current_hook_bead_id);
-      const lastActivity =
-        working.last_activity_at === null ? null : String(working.last_activity_at);
+    for (const working of workingAgents) {
+      const agentId = working.bead_id;
+      const hookBeadId = working.current_hook_bead_id;
+      const lastActivity = working.last_activity_at;
 
       const containerInfo = await dispatch.checkAgentContainerStatus(this.env, townId, agentId);
 

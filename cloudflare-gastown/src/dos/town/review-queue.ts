@@ -6,6 +6,7 @@
  * - Molecules are parent beads with type='molecule' + child step beads
  */
 
+import { z } from 'zod';
 import { beads, BeadRecord, MergeRequestBeadRecord } from '../../db/tables/beads.table';
 import { review_metadata } from '../../db/tables/review-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
@@ -47,7 +48,8 @@ function toReviewQueueEntry(row: MergeRequestBeadRecord): ReviewQueueEntry {
   return {
     id: row.bead_id,
     agent_id: row.assignee_agent_bead_id ?? row.created_by ?? '',
-    bead_id: row.bead_id,
+    bead_id:
+      typeof row.metadata?.source_bead_id === 'string' ? row.metadata.source_bead_id : row.bead_id,
     branch: row.branch,
     pr_url: row.pr_url,
     status:
@@ -364,9 +366,7 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
         stepId,
         'issue',
         'open',
-        typeof step === 'object' && step !== null && 'title' in step
-          ? String((step as Record<string, unknown>).title)
-          : `Step ${i + 1}`,
+        z.object({ title: z.string() }).safeParse(step).data?.title ?? `Step ${i + 1}`,
         typeof step === 'string' ? step : JSON.stringify(step),
         null,
         id,

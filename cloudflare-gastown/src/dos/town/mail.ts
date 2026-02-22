@@ -78,8 +78,11 @@ export function sendMail(sql: SqlStorage, input: SendMailInput): void {
   }
 }
 
-export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
-  // Read undelivered message beads assigned to this agent
+/**
+ * Read and deliver undelivered mail for an agent.
+ * Returns the mail items and batch-closes the message beads in a single UPDATE.
+ */
+export function readAndDeliverMail(sql: SqlStorage, agentId: string): Mail[] {
   const rows = [
     ...query(
       sql,
@@ -95,6 +98,7 @@ export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
   ];
 
   const mailBeads = BeadRecord.array().parse(rows);
+  if (mailBeads.length === 0) return [];
 
   const messages: Mail[] = mailBeads.map(mb => ({
     id: mb.bead_id,
@@ -107,23 +111,25 @@ export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
     delivered_at: null,
   }));
 
-  // Mark as delivered by closing the message beads
-  if (mailBeads.length > 0) {
-    const timestamp = now();
-    for (const mb of mailBeads) {
-      query(
-        sql,
-        /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.status} = 'closed',
-              ${beads.columns.closed_at} = ?,
-              ${beads.columns.updated_at} = ?
-          WHERE ${beads.bead_id} = ?
-        `,
-        [timestamp, timestamp, mb.bead_id]
-      );
-    }
-  }
+  // Batch-close all open message beads for this agent in a single UPDATE
+  const timestamp = now();
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${beads}
+      SET ${beads.columns.status} = 'closed',
+          ${beads.columns.closed_at} = ?,
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.type} = 'message'
+        AND ${beads.assignee_agent_bead_id} = ?
+        AND ${beads.status} = 'open'
+    `,
+    [timestamp, timestamp, agentId]
+  );
 
   return messages;
+}
+
+export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
+  return readAndDeliverMail(sql, agentId);
 }

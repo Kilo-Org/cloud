@@ -30,11 +30,25 @@ export const BeadRecord = z.object({
   priority: BeadPriority,
   labels: z
     .string()
-    .transform(v => JSON.parse(v))
+    .transform((v, ctx) => {
+      try {
+        return JSON.parse(v);
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid JSON in labels' });
+        return [];
+      }
+    })
     .pipe(z.array(z.string())),
   metadata: z
     .string()
-    .transform(v => JSON.parse(v))
+    .transform((v, ctx) => {
+      try {
+        return JSON.parse(v);
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid JSON in metadata' });
+        return {};
+      }
+    })
     .pipe(z.record(z.string(), z.unknown())),
   created_by: z.string().nullable(),
   created_at: z.string(),

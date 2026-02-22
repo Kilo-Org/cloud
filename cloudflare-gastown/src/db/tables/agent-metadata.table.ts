@@ -15,7 +15,15 @@ export const AgentMetadataRecord = z.object({
   checkpoint: z
     .string()
     .nullable()
-    .transform(v => (v === null ? null : JSON.parse(v)))
+    .transform((v, ctx) => {
+      if (v === null) return null;
+      try {
+        return JSON.parse(v);
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid JSON in checkpoint' });
+        return null;
+      }
+    })
     .pipe(z.unknown()),
   last_activity_at: z.string().nullable(),
 });

@@ -8,6 +8,7 @@ import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { GASTOWN_SERVICE_URL } from '@/lib/config.server';
 import {
   resolveGitCredentialsFromIntegration,
+  resolveIntegrationIdFromGitUrl,
   refreshGitCredentials,
 } from '@/lib/gastown/git-credentials';
 
@@ -157,6 +158,19 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
 
+      // Auto-detect the platform integration from the git URL when not
+      // explicitly provided. This is the server-side safety net that ensures
+      // agents always get git credentials even if the frontend omits the ID.
+      const platformIntegrationId =
+        input.platformIntegrationId ??
+        (await resolveIntegrationIdFromGitUrl(ctx.user.id, input.gitUrl));
+
+      if (!input.platformIntegrationId && platformIntegrationId) {
+        console.log(
+          `${LOG_PREFIX} createRig: auto-resolved platformIntegrationId=${platformIntegrationId} from gitUrl=${input.gitUrl}`
+        );
+      }
+
       // Generate a user API token so agents can route LLM calls through the
       // Kilo gateway. Stored in RigConfig and injected into agent env vars.
       // 30-day expiry to limit blast radius if leaked; refreshed on rig update.
@@ -174,32 +188,30 @@ export const gastownRouter = createTRPCRouter({
           git_url: input.gitUrl,
           default_branch: input.defaultBranch,
           kilocode_token: kilocodeToken,
-          platform_integration_id: input.platformIntegrationId,
+          platform_integration_id: platformIntegrationId,
         })
       );
 
       // Resolve git credentials from the platform integration and store
       // them in the town config so agents can clone and push.
-      if (input.platformIntegrationId) {
-        const gitCredentials = await resolveGitCredentialsFromIntegration(
-          input.platformIntegrationId
-        );
+      if (platformIntegrationId) {
+        const gitCredentials = await resolveGitCredentialsFromIntegration(platformIntegrationId);
         if (gitCredentials) {
           console.log(
-            `${LOG_PREFIX} createRig: resolved git credentials for integration=${input.platformIntegrationId} hasGithub=${!!gitCredentials.github_token} hasGitlab=${!!gitCredentials.gitlab_token}`
+            `${LOG_PREFIX} createRig: resolved git credentials for integration=${platformIntegrationId} hasGithub=${!!gitCredentials.github_token} hasGitlab=${!!gitCredentials.gitlab_token}`
           );
           await withGastownError(() =>
             gastown.updateTownConfig(input.townId, {
               git_auth: {
                 ...gitCredentials,
                 // Store the integration ID so we can refresh tokens later
-                platform_integration_id: input.platformIntegrationId,
+                platform_integration_id: platformIntegrationId,
               },
             })
           );
         } else {
           console.warn(
-            `${LOG_PREFIX} createRig: could not resolve git credentials for integration=${input.platformIntegrationId}`
+            `${LOG_PREFIX} createRig: could not resolve git credentials for integration=${platformIntegrationId}`
           );
         }
       }

@@ -7,6 +7,7 @@
  */
 
 import { beads, BeadRecord } from '../../db/tables/beads.table';
+import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
 import { logBeadEvent } from './beads';
 import { getAgent } from './agents';
@@ -132,4 +133,59 @@ export function readAndDeliverMail(sql: SqlStorage, agentId: string): Mail[] {
 
 export function checkMail(sql: SqlStorage, agentId: string): Mail[] {
   return readAndDeliverMail(sql, agentId);
+}
+
+/**
+ * Find open mail addressed to agents that are currently working.
+ * Returns a map of agentId → Mail[] so the caller can push each batch
+ * to the corresponding container process.
+ *
+ * Calling this does NOT mark mail as delivered — the caller should call
+ * `readAndDeliverMail` after successfully pushing the messages.
+ */
+export function getPendingMailForWorkingAgents(sql: SqlStorage): Map<string, Mail[]> {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${beads}.*
+        FROM ${beads}
+        INNER JOIN ${agent_metadata}
+          ON ${beads.assignee_agent_bead_id} = ${agent_metadata.bead_id}
+        WHERE ${beads.type} = 'message'
+          AND ${beads.status} = 'open'
+          AND ${agent_metadata.status} = 'working'
+        ORDER BY ${beads.created_at} ASC
+      `,
+      []
+    ),
+  ];
+
+  const mailBeads = BeadRecord.array().parse(rows);
+  const grouped = new Map<string, Mail[]>();
+
+  for (const mb of mailBeads) {
+    const recipientId = mb.assignee_agent_bead_id ?? '';
+    if (!recipientId) continue;
+
+    const m: Mail = {
+      id: mb.bead_id,
+      from_agent_id: String(mb.metadata?.from_agent_id ?? mb.created_by ?? ''),
+      to_agent_id: recipientId,
+      subject: mb.title,
+      body: mb.body ?? '',
+      delivered: false,
+      created_at: mb.created_at,
+      delivered_at: null,
+    };
+
+    const existing = grouped.get(recipientId);
+    if (existing) {
+      existing.push(m);
+    } else {
+      grouped.set(recipientId, [m]);
+    }
+  }
+
+  return grouped;
 }

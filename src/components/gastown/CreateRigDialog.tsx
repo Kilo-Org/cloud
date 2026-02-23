@@ -121,9 +121,8 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
       name: name.trim(),
       gitUrl: resolvedUrl,
       defaultBranch: defaultBranch.trim() || 'main',
-      // platform_integration_id is stored for future automatic token
-      // management. For now, tokens come from town config (#385).
-      platformIntegrationId: undefined,
+      // platformIntegrationId is auto-resolved server-side from the git URL
+      // when not provided, so we don't need to pass it here.
     });
   };
 

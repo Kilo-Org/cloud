@@ -219,6 +219,45 @@ async function configureGitCredentials(
 }
 
 /**
+ * Pre-flight check: verify git credentials can authenticate against the remote.
+ * Uses `git ls-remote` which tests auth without modifying anything.
+ * Logs a clear warning on failure — the agent will still start, but push will fail.
+ */
+async function verifyGitCredentials(
+  workdir: string,
+  gitUrl: string,
+  envVars?: Record<string, string>
+): Promise<void> {
+  const hasToken = !!(envVars?.GIT_TOKEN || envVars?.GITHUB_TOKEN || envVars?.GITLAB_TOKEN);
+  if (!hasToken) {
+    console.warn(
+      `[verifyGitCredentials] No git token found in env vars (keys: ${Object.keys(envVars ?? {}).join(', ')}). ` +
+        `Push will fail. Ensure git_auth is configured in town settings.`
+    );
+    return;
+  }
+
+  try {
+    const proc = Bun.spawn(['git', 'ls-remote', '--exit-code', '--heads', 'origin'], {
+      cwd: workdir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) {
+      const stderr = await new Response(proc.stderr).text();
+      console.error(
+        `[verifyGitCredentials] FAILED for ${gitUrl}: exit=${exitCode} stderr=${stderr.slice(0, 300)}`
+      );
+    } else {
+      console.log(`[verifyGitCredentials] OK for ${gitUrl}`);
+    }
+  } catch (err) {
+    console.warn(`[verifyGitCredentials] Error testing credentials:`, err);
+  }
+}
+
+/**
  * Create a minimal git-initialized workspace for the mayor agent.
  * The mayor doesn't need a real repo clone — it's a conversational
  * orchestrator that delegates work via tools. But kilo serve requires
@@ -275,6 +314,10 @@ export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent
 
     // Set up git credentials so the agent can push
     await configureGitCredentials(workdir, request.gitUrl, request.envVars);
+
+    // Pre-flight: verify git credentials can authenticate against the remote.
+    // Catch push auth failures early instead of discovering them mid-task.
+    await verifyGitCredentials(workdir, request.gitUrl, request.envVars);
   }
 
   const env = buildAgentEnv(request);

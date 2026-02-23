@@ -219,6 +219,85 @@ async function configureGitCredentials(
 }
 
 /**
+ * If no GIT_TOKEN/GITLAB_TOKEN is present in envVars but a platformIntegrationId
+ * is available, call the Next.js server to resolve fresh credentials.
+ * Returns the (potentially enriched) envVars.
+ */
+async function resolveGitCredentialsIfMissing(
+  request: StartAgentRequest
+): Promise<Record<string, string>> {
+  const envVars = { ...(request.envVars ?? {}) };
+  const hasToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
+
+  if (hasToken) return envVars;
+
+  const integrationId = request.platformIntegrationId;
+  const kiloToken = envVars.KILOCODE_TOKEN;
+  // The Next.js server URL — in dev it's localhost:3000, in prod it's the main app URL.
+  // We derive it from KILO_API_URL (the gateway URL) or fall back to localhost.
+  const apiBase = process.env.KILO_CLOUD_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+
+  if (!integrationId) {
+    console.warn(
+      '[resolveGitCredentialsIfMissing] No git token and no platformIntegrationId — clone will likely fail'
+    );
+    return envVars;
+  }
+
+  if (!kiloToken) {
+    console.warn(
+      '[resolveGitCredentialsIfMissing] No KILOCODE_TOKEN — cannot authenticate to credential API'
+    );
+    return envVars;
+  }
+
+  console.log(
+    `[resolveGitCredentialsIfMissing] Fetching fresh credentials for integration=${integrationId}`
+  );
+
+  try {
+    const resp = await fetch(`${apiBase}/api/gastown/git-credentials`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${kiloToken}`,
+      },
+      body: JSON.stringify({ platform_integration_id: integrationId }),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error(
+        `[resolveGitCredentialsIfMissing] API returned ${resp.status}: ${text.slice(0, 200)}`
+      );
+      return envVars;
+    }
+
+    const creds = (await resp.json()) as {
+      github_token?: string;
+      gitlab_token?: string;
+      gitlab_instance_url?: string;
+    };
+
+    if (creds.github_token) {
+      envVars.GIT_TOKEN = creds.github_token;
+      console.log('[resolveGitCredentialsIfMissing] Got fresh GitHub token');
+    }
+    if (creds.gitlab_token) {
+      envVars.GITLAB_TOKEN = creds.gitlab_token;
+      console.log('[resolveGitCredentialsIfMissing] Got fresh GitLab token');
+    }
+    if (creds.gitlab_instance_url) {
+      envVars.GITLAB_INSTANCE_URL = creds.gitlab_instance_url;
+    }
+  } catch (err) {
+    console.error('[resolveGitCredentialsIfMissing] Failed to fetch credentials:', err);
+  }
+
+  return envVars;
+}
+
+/**
  * Pre-flight check: verify git credentials can authenticate against the remote.
  * Uses `git ls-remote` which tests auth without modifying anything.
  * Logs a clear warning on failure — the agent will still start, but push will fail.
@@ -300,11 +379,16 @@ export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent
     // Mayor doesn't need a repo clone — just a git-initialized directory
     workdir = await createMayorWorkspace(request.rigId);
   } else {
+    // Resolve git credentials if missing. When the town config doesn't have
+    // a token (common on first dispatch after rig creation), fetch one from
+    // the Next.js server using the platform_integration_id.
+    const envVars = await resolveGitCredentialsIfMissing(request);
+
     await cloneRepo({
       rigId: request.rigId,
       gitUrl: request.gitUrl,
       defaultBranch: request.defaultBranch,
-      envVars: request.envVars,
+      envVars,
     });
 
     workdir = await createWorktree({
@@ -313,11 +397,10 @@ export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent
     });
 
     // Set up git credentials so the agent can push
-    await configureGitCredentials(workdir, request.gitUrl, request.envVars);
+    await configureGitCredentials(workdir, request.gitUrl, envVars);
 
     // Pre-flight: verify git credentials can authenticate against the remote.
-    // Catch push auth failures early instead of discovering them mid-task.
-    await verifyGitCredentials(workdir, request.gitUrl, request.envVars);
+    await verifyGitCredentials(workdir, request.gitUrl, envVars);
   }
 
   const env = buildAgentEnv(request);

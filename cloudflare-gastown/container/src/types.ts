@@ -21,6 +21,8 @@ export const StartAgentRequest = z.object({
   branch: z.string(),
   defaultBranch: z.string(),
   envVars: z.record(z.string(), z.string()).optional(),
+  /** Platform integration ID for resolving fresh git credentials at startup */
+  platformIntegrationId: z.string().optional(),
 });
 export type StartAgentRequest = z.infer<typeof StartAgentRequest>;
 

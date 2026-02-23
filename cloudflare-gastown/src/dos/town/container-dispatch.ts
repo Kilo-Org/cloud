@@ -131,6 +131,7 @@ export async function startAgentInContainer(
     kilocodeToken?: string;
     townConfig: TownConfig;
     systemPromptOverride?: string;
+    platformIntegrationId?: string;
   }
 ): Promise<boolean> {
   console.log(
@@ -202,6 +203,7 @@ export async function startAgentInContainer(
         branch: branchForAgent(params.agentName, params.beadId),
         defaultBranch: params.defaultBranch,
         envVars,
+        platformIntegrationId: params.platformIntegrationId,
       }),
     });
 

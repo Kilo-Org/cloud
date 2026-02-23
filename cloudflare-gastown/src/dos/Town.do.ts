@@ -91,6 +91,7 @@ type RigConfig = {
   defaultBranch: string;
   userId: string;
   kilocodeToken?: string;
+  platformIntegrationId?: string;
 };
 
 // ── Escalation API type (derived from EscalationBeadRecord) ─────────
@@ -1257,6 +1258,7 @@ export class TownDO extends DurableObject<Env> {
           defaultBranch: rigConfig.defaultBranch,
           kilocodeToken,
           townConfig,
+          platformIntegrationId: rigConfig.platformIntegrationId,
         });
 
         if (started) {

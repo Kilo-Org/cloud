@@ -23,19 +23,35 @@ async function refreshTownGitCredentials(townId: string, userId: string): Promis
   const townConfig = await withGastownError(() => gastown.getTownConfig(townId));
   let integrationId = townConfig.git_auth.platform_integration_id;
 
+  console.log(
+    `${LOG_PREFIX} refreshTownGitCredentials: town=${townId} configIntegration=${integrationId ?? 'none'} git_auth_keys=[${Object.keys(
+      townConfig.git_auth
+    )
+      .filter(k => townConfig.git_auth[k as keyof typeof townConfig.git_auth])
+      .join(',')}]`
+  );
+
   if (!integrationId) {
     const rigList = await withGastownError(() => gastown.listRigs(userId, townId));
+    console.log(
+      `${LOG_PREFIX} refreshTownGitCredentials: checking ${rigList.length} rigs for platform_integration_id: ${rigList.map(r => `${r.id}=${r.platform_integration_id ?? 'null'}`).join(', ')}`
+    );
     const rigWithIntegration = rigList.find(r => r.platform_integration_id);
     if (rigWithIntegration) {
       integrationId = rigWithIntegration.platform_integration_id ?? undefined;
-      console.log(
-        `${LOG_PREFIX} refreshTownGitCredentials: resolved integration from rig=${rigWithIntegration.id}`
-      );
     }
   }
 
-  if (!integrationId) return;
+  if (!integrationId) {
+    console.warn(
+      `${LOG_PREFIX} refreshTownGitCredentials: no platform_integration_id found for town=${townId} — git credentials will not be refreshed`
+    );
+    return;
+  }
 
+  console.log(
+    `${LOG_PREFIX} refreshTownGitCredentials: refreshing credentials for integration=${integrationId}`
+  );
   const freshCredentials = await refreshGitCredentials(integrationId);
   if (freshCredentials) {
     await withGastownError(() =>
@@ -47,7 +63,11 @@ async function refreshTownGitCredentials(townId: string, userId: string): Promis
       })
     );
     console.log(
-      `${LOG_PREFIX} refreshTownGitCredentials: refreshed for town=${townId} integration=${integrationId}`
+      `${LOG_PREFIX} refreshTownGitCredentials: wrote fresh credentials for town=${townId} hasGithub=${!!freshCredentials.github_token} hasGitlab=${!!freshCredentials.gitlab_token}`
+    );
+  } else {
+    console.warn(
+      `${LOG_PREFIX} refreshTownGitCredentials: refreshGitCredentials returned null for integration=${integrationId}`
     );
   }
 }

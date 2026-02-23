@@ -127,10 +127,20 @@ export function AgentTerminal({ townId, agentId, onClose }: AgentTerminalProps) 
       };
 
       ws.onmessage = (e: MessageEvent) => {
-        // Raw PTY output — write directly to xterm
+        // The SDK server may send JSON control messages (e.g. {"cursor":N})
+        // on connect. Filter these out — only write actual PTY byte data.
         if (e.data instanceof ArrayBuffer) {
           term.write(new Uint8Array(e.data));
         } else if (typeof e.data === 'string') {
+          if (e.data.startsWith('{')) {
+            try {
+              JSON.parse(e.data);
+              // Valid JSON control message — skip it
+              return;
+            } catch {
+              // Not valid JSON — fall through to write as PTY data
+            }
+          }
           term.write(e.data);
         }
       };

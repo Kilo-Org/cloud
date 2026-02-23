@@ -84,6 +84,7 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
       defaultBranch: parsed.data.default_branch,
       userId: params.userId,
       kilocodeToken: parsed.data.kilocode_token,
+      platformIntegrationId: parsed.data.platform_integration_id,
     });
     await townDOStub.addRig({
       rigId: rig.id,

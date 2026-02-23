@@ -349,7 +349,9 @@ export function getOrCreateAgent(
     const existing = listAgents(sql, { role });
     if (existing.length > 0) return existing[0];
   } else {
-    // For polecats, try to find an idle one without a hook
+    // For polecats, try to find an idle one without a hook in the SAME rig.
+    // Agents are tied to a rig's worktree/repo — reusing one from a different
+    // rig would dispatch it into the wrong repository.
     const idle = [
       ...query(
         sql,
@@ -358,9 +360,10 @@ export function getOrCreateAgent(
           WHERE ${agent_metadata.role} = 'polecat'
             AND ${agent_metadata.status} = 'idle'
             AND ${agent_metadata.current_hook_bead_id} IS NULL
+            AND ${beads.rig_id} = ?
           LIMIT 1
         `,
-        []
+        [rigId]
       ),
     ];
     if (idle.length > 0) return toAgent(AgentBeadRecord.parse(idle[0]));

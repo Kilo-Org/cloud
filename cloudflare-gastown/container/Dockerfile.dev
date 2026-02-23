@@ -20,7 +20,8 @@ RUN apt-get update && \
 # Install both glibc and musl variants — the CLI's binary resolver may
 # pick either depending on the detected libc. bun:1-slim is Debian (glibc)
 # but the resolver sometimes misdetects; installing both is safe.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-arm64 @kilocode/cli-linux-arm64-musl && \
+# Also install pnpm — many projects use it as their package manager.
+RUN npm install -g @kilocode/cli @kilocode/cli-linux-arm64 @kilocode/cli-linux-arm64-musl pnpm && \
     ln -s "$(which kilo)" /usr/local/bin/opencode
 
 # Create workspace directories

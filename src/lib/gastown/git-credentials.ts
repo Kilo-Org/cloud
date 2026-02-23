@@ -4,7 +4,8 @@ import { platform_integrations } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
-import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 
 const LOG_PREFIX = '[gastown-git-credentials]';
 
@@ -103,6 +104,61 @@ export async function resolveGitCredentialsFromIntegration(
     `${LOG_PREFIX} unsupported platform="${integration.platform}" for integration=${platformIntegrationId}`
   );
   return null;
+}
+
+/**
+ * Detect the platform from a git URL and look up the user's integration for it.
+ * Returns the integration ID if found, undefined otherwise.
+ *
+ * This is a server-side safety net: even when the frontend doesn't pass a
+ * platformIntegrationId, we can resolve it from the git URL + user's integrations.
+ */
+export async function resolveIntegrationIdFromGitUrl(
+  userId: string,
+  gitUrl: string
+): Promise<string | undefined> {
+  const platform = detectPlatformFromGitUrl(gitUrl);
+  if (!platform) {
+    console.log(
+      `${LOG_PREFIX} resolveIntegrationIdFromGitUrl: could not detect platform from url=${gitUrl}`
+    );
+    return undefined;
+  }
+
+  const integration = await getIntegrationForOwner(
+    { type: 'user', id: userId },
+    platform,
+    INTEGRATION_STATUS.ACTIVE
+  );
+
+  if (!integration) {
+    console.log(
+      `${LOG_PREFIX} resolveIntegrationIdFromGitUrl: no active ${platform} integration for user=${userId}`
+    );
+    return undefined;
+  }
+
+  console.log(
+    `${LOG_PREFIX} resolveIntegrationIdFromGitUrl: resolved integration=${integration.id} platform=${platform} for url=${gitUrl}`
+  );
+  return integration.id;
+}
+
+function detectPlatformFromGitUrl(gitUrl: string): string | undefined {
+  try {
+    const url = new URL(gitUrl);
+    if (url.hostname === 'github.com' || url.hostname.endsWith('.github.com')) {
+      return PLATFORM.GITHUB;
+    }
+    if (url.hostname === 'gitlab.com' || url.hostname.endsWith('.gitlab.com')) {
+      return PLATFORM.GITLAB;
+    }
+    // Self-hosted GitLab instances won't be detected by hostname alone,
+    // but the user can pass platformIntegrationId explicitly for those.
+    return undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

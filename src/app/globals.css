@@ -4,6 +4,7 @@
 */
 
 @import 'tw-animate-css';
+@import '@xterm/xterm/css/xterm.css';
 @plugin '@tailwindcss/typography';
 
 @theme inline {

@@ -391,6 +391,13 @@ export function getAgentStatus(agentId: string): ManagedAgent | null {
   return agents.get(agentId) ?? null;
 }
 
+/** Return the SDK server port for an agent, or null if not running. */
+export function getAgentServerPort(agentId: string): number | null {
+  const agent = agents.get(agentId);
+  if (!agent || !agent.serverPort) return null;
+  return agent.serverPort;
+}
+
 export function listAgents(): ManagedAgent[] {
   return [...agents.values()];
 }

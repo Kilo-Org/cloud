@@ -8,10 +8,71 @@ import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { GASTOWN_SERVICE_URL } from '@/lib/config.server';
 import {
   resolveGitCredentialsFromIntegration,
+  resolveIntegrationIdFromGitUrl,
   refreshGitCredentials,
 } from '@/lib/gastown/git-credentials';
 
 const LOG_PREFIX = '[gastown-router]';
+
+/**
+ * Refresh git credentials for a town, writing fresh tokens to the town config.
+ * Looks up the platform_integration_id from the town config first, falling
+ * back to the first rig that has one. This handles the case where createRig
+ * failed to write credentials to the town config initially.
+ */
+async function refreshTownGitCredentials(townId: string, userId: string): Promise<void> {
+  const townConfig = await withGastownError(() => gastown.getTownConfig(townId));
+  let integrationId = townConfig.git_auth.platform_integration_id;
+
+  console.log(
+    `${LOG_PREFIX} refreshTownGitCredentials: town=${townId} configIntegration=${integrationId ?? 'none'} git_auth_keys=[${Object.entries(
+      townConfig.git_auth
+    )
+      .filter(([, v]) => v)
+      .map(([k]) => k)
+      .join(',')}]`
+  );
+
+  if (!integrationId) {
+    const rigList = await withGastownError(() => gastown.listRigs(userId, townId));
+    console.log(
+      `${LOG_PREFIX} refreshTownGitCredentials: checking ${rigList.length} rigs for platform_integration_id: ${rigList.map(r => `${r.id}=${r.platform_integration_id ?? 'null'}`).join(', ')}`
+    );
+    const rigWithIntegration = rigList.find(r => r.platform_integration_id);
+    if (rigWithIntegration) {
+      integrationId = rigWithIntegration.platform_integration_id ?? undefined;
+    }
+  }
+
+  if (!integrationId) {
+    console.warn(
+      `${LOG_PREFIX} refreshTownGitCredentials: no platform_integration_id found for town=${townId} — git credentials will not be refreshed`
+    );
+    return;
+  }
+
+  console.log(
+    `${LOG_PREFIX} refreshTownGitCredentials: refreshing credentials for integration=${integrationId}`
+  );
+  const freshCredentials = await refreshGitCredentials(integrationId);
+  if (freshCredentials) {
+    await withGastownError(() =>
+      gastown.updateTownConfig(townId, {
+        git_auth: {
+          ...freshCredentials,
+          platform_integration_id: integrationId,
+        },
+      })
+    );
+    console.log(
+      `${LOG_PREFIX} refreshTownGitCredentials: wrote fresh credentials for town=${townId} hasGithub=${!!freshCredentials.github_token} hasGitlab=${!!freshCredentials.gitlab_token}`
+    );
+  } else {
+    console.warn(
+      `${LOG_PREFIX} refreshTownGitCredentials: refreshGitCredentials returned null for integration=${integrationId}`
+    );
+  }
+}
 
 /**
  * Wraps a gastown client call and converts GastownApiError into TRPCError
@@ -98,6 +159,19 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
 
+      // Auto-detect the platform integration from the git URL when not
+      // explicitly provided. This is the server-side safety net that ensures
+      // agents always get git credentials even if the frontend omits the ID.
+      const platformIntegrationId =
+        input.platformIntegrationId ??
+        (await resolveIntegrationIdFromGitUrl(ctx.user.id, input.gitUrl));
+
+      if (!input.platformIntegrationId && platformIntegrationId) {
+        console.log(
+          `${LOG_PREFIX} createRig: auto-resolved platformIntegrationId=${platformIntegrationId} from gitUrl=${input.gitUrl}`
+        );
+      }
+
       // Generate a user API token so agents can route LLM calls through the
       // Kilo gateway. Stored in RigConfig and injected into agent env vars.
       // 30-day expiry to limit blast radius if leaked; refreshed on rig update.
@@ -115,32 +189,30 @@ export const gastownRouter = createTRPCRouter({
           git_url: input.gitUrl,
           default_branch: input.defaultBranch,
           kilocode_token: kilocodeToken,
-          platform_integration_id: input.platformIntegrationId,
+          platform_integration_id: platformIntegrationId,
         })
       );
 
       // Resolve git credentials from the platform integration and store
       // them in the town config so agents can clone and push.
-      if (input.platformIntegrationId) {
-        const gitCredentials = await resolveGitCredentialsFromIntegration(
-          input.platformIntegrationId
-        );
+      if (platformIntegrationId) {
+        const gitCredentials = await resolveGitCredentialsFromIntegration(platformIntegrationId);
         if (gitCredentials) {
           console.log(
-            `${LOG_PREFIX} createRig: resolved git credentials for integration=${input.platformIntegrationId} hasGithub=${!!gitCredentials.github_token} hasGitlab=${!!gitCredentials.gitlab_token}`
+            `${LOG_PREFIX} createRig: resolved git credentials for integration=${platformIntegrationId} hasGithub=${!!gitCredentials.github_token} hasGitlab=${!!gitCredentials.gitlab_token}`
           );
           await withGastownError(() =>
             gastown.updateTownConfig(input.townId, {
               git_auth: {
                 ...gitCredentials,
                 // Store the integration ID so we can refresh tokens later
-                platform_integration_id: input.platformIntegrationId,
+                platform_integration_id: platformIntegrationId,
               },
             })
           );
         } else {
           console.warn(
-            `${LOG_PREFIX} createRig: could not resolve git credentials for integration=${input.platformIntegrationId}`
+            `${LOG_PREFIX} createRig: could not resolve git credentials for integration=${platformIntegrationId}`
           );
         }
       }
@@ -215,27 +287,8 @@ export const gastownRouter = createTRPCRouter({
       const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
       console.log(`${LOG_PREFIX} sling: rig verified, name=${rig.name}`);
 
-      // Refresh git credentials before dispatch. GitHub installation tokens
-      // expire after ~1 hour, so we refresh them each time a bead is slung
-      // to ensure the agent gets a fresh token.
-      const townConfig = await withGastownError(() => gastown.getTownConfig(rig.town_id));
-      const integrationId = townConfig.git_auth.platform_integration_id;
-      if (integrationId) {
-        const freshCredentials = await refreshGitCredentials(integrationId);
-        if (freshCredentials) {
-          await withGastownError(() =>
-            gastown.updateTownConfig(rig.town_id, {
-              git_auth: {
-                ...freshCredentials,
-                platform_integration_id: integrationId,
-              },
-            })
-          );
-          console.log(
-            `${LOG_PREFIX} sling: refreshed git credentials for integration=${integrationId}`
-          );
-        }
-      }
+      // Refresh git credentials before dispatch.
+      await refreshTownGitCredentials(rig.town_id, ctx.user.id);
 
       // Atomic sling: creates bead, assigns/creates polecat, hooks them,
       // and arms the alarm — all in a single Rig DO call to avoid TOCTOU races.
@@ -281,26 +334,8 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
 
-      // Refresh git credentials before mayor interaction. The mayor may
-      // delegate work that requires fresh git tokens.
-      const townConfig = await withGastownError(() => gastown.getTownConfig(input.townId));
-      const integrationId = townConfig.git_auth.platform_integration_id;
-      if (integrationId) {
-        const freshCredentials = await refreshGitCredentials(integrationId);
-        if (freshCredentials) {
-          await withGastownError(() =>
-            gastown.updateTownConfig(input.townId, {
-              git_auth: {
-                ...freshCredentials,
-                platform_integration_id: integrationId,
-              },
-            })
-          );
-          console.log(
-            `${LOG_PREFIX} sendMessage: refreshed git credentials for integration=${integrationId}`
-          );
-        }
-      }
+      // Refresh git credentials before mayor interaction.
+      await refreshTownGitCredentials(input.townId, ctx.user.id);
 
       // Send message directly to MayorDO — single DO call, no beads
       console.log(`${LOG_PREFIX} sendMessage: routing to MayorDO for townId=${input.townId}`);
@@ -325,6 +360,28 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
       return withGastownError(() => gastown.getMayorStatus(input.townId));
+    }),
+
+  ensureMayor: baseProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+
+      // Best-effort refresh so polecats dispatched by the mayor's gt_sling
+      // tool have a fresh token. Failures must not block the mayor startup.
+      try {
+        await refreshTownGitCredentials(input.townId, ctx.user.id);
+      } catch (err) {
+        console.warn(
+          `${LOG_PREFIX} ensureMayor: git credential refresh failed (non-blocking)`,
+          err
+        );
+      }
+
+      return withGastownError(() => gastown.ensureMayor(input.townId));
     }),
 
   // ── Agent Streams ───────────────────────────────────────────────────────
@@ -355,6 +412,55 @@ export const gastownRouter = createTRPCRouter({
       const fullUrl = `${wsProtocol}//${baseUrl.host}${ticket.url}`;
 
       return { ...ticket, url: fullUrl };
+    }),
+
+  // ── Agent Terminal (PTY) ──────────────────────────────────────────────────
+
+  createPtySession: baseProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        agentId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify ownership
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+
+      // Create a PTY session on the container via the worker
+      const pty = await withGastownError(() =>
+        gastown.createPtySession(input.townId, input.agentId)
+      );
+
+      // Construct the WebSocket URL for the PTY connection
+      const baseUrl = new URL(GASTOWN_SERVICE_URL ?? 'http://localhost:8787');
+      const wsProtocol = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${baseUrl.host}/api/towns/${input.townId}/container/agents/${input.agentId}/pty/${pty.id}/connect`;
+
+      return { pty, wsUrl };
+    }),
+
+  resizePtySession: baseProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        agentId: z.string().uuid(),
+        ptyId: z.string().regex(/^[a-zA-Z0-9_-]+$/, 'Invalid ptyId'),
+        cols: z.number().int().min(1).max(500),
+        rows: z.number().int().min(1).max(200),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
+      if (town.owner_user_id !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+      }
+      await withGastownError(() =>
+        gastown.resizePtySession(input.townId, input.agentId, input.ptyId, input.cols, input.rows)
+      );
     }),
 
   // ── Town Configuration ──────────────────────────────────────────────────

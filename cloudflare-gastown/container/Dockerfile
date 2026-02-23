@@ -21,7 +21,8 @@ RUN apt-get update && \
 # .opencode/tool/*.ts) can resolve it without a local node_modules.
 # Install both glibc and musl variants — the CLI's binary resolver may
 # pick either depending on the detected libc.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64 @kilocode/cli-linux-x64-musl @kilocode/plugin && \
+# Also install pnpm — many projects use it as their package manager.
+RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64 @kilocode/cli-linux-x64-musl @kilocode/plugin pnpm && \
     ln -s "$(which kilo)" /usr/local/bin/opencode
 
 # Create workspace directories

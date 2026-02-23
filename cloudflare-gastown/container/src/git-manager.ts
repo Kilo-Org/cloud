@@ -162,6 +162,11 @@ export async function cloneRepo(
     await rm(dir, { recursive: true, force: true });
   }
 
+  const hasAuth = authUrl !== options.gitUrl;
+  console.log(
+    `Cloning repo for rig ${options.rigId}: hasAuth=${hasAuth} envKeys=[${Object.keys(options.envVars ?? {}).join(',')}]`
+  );
+
   await mkdir(dir, { recursive: true });
   await exec('git', ['clone', '--no-checkout', '--branch', options.defaultBranch, authUrl, dir]);
   console.log(`Cloned repo for rig ${options.rigId}`);
@@ -274,14 +279,16 @@ export async function mergeBranch(options: {
   // Only create the parent — git worktree add creates the leaf directory itself
   await mkdir(resolve(WORKSPACE_ROOT, options.rigId, 'merge-tmp'), { recursive: true });
 
+  const tmpBranch = `merge-tmp-${Date.now()}`;
   try {
-    // Add worktree tracking the target branch
-    await exec('git', ['worktree', 'add', mergeDir, options.targetBranch], repo);
+    // Add worktree in detached HEAD state at the target branch tip.
+    // Using --detach avoids "branch already checked out" errors when
+    // the target branch (e.g. master) is checked out by the main repo.
+    await exec('git', ['worktree', 'add', '--detach', mergeDir, options.targetBranch], repo);
 
-    // Pull latest on the target branch
-    await exec('git', ['pull', '--ff-only'], mergeDir).catch(() => {
-      // Pull may fail if target has no upstream; that's fine for local-only branches
-    });
+    // Create a local branch for the merge so we can push the result.
+    // Use a temporary name to avoid conflicts with the main worktree.
+    await exec('git', ['checkout', '-b', tmpBranch], mergeDir);
 
     // Attempt the merge
     try {
@@ -308,15 +315,14 @@ export async function mergeBranch(options: {
     // Get the commit SHA of the merge commit
     const commitSha = await exec('git', ['rev-parse', 'HEAD'], mergeDir);
 
-    // Push the merged target branch
-    await exec('git', ['push', 'origin', options.targetBranch], mergeDir);
+    // Push the merge commit to the target branch on the remote
+    await exec('git', ['push', 'origin', `${tmpBranch}:${options.targetBranch}`], mergeDir);
 
     return { status: 'merged', message: 'Merge successful', commitSha };
   } finally {
-    // Always clean up the temporary worktree
-    await exec('git', ['worktree', 'remove', '--force', mergeDir], repo).catch(err => {
-      console.warn(`Failed to remove merge worktree at ${mergeDir}:`, err);
-    });
+    // Always clean up the temporary worktree and temp branch
+    await exec('git', ['worktree', 'remove', '--force', mergeDir], repo).catch(() => {});
     await rm(mergeDir, { recursive: true, force: true }).catch(() => {});
+    await exec('git', ['branch', '-D', tmpBranch], repo).catch(() => {});
   }
 }

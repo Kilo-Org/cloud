@@ -25,10 +25,11 @@ async function refreshTownGitCredentials(townId: string, userId: string): Promis
   let integrationId = townConfig.git_auth.platform_integration_id;
 
   console.log(
-    `${LOG_PREFIX} refreshTownGitCredentials: town=${townId} configIntegration=${integrationId ?? 'none'} git_auth_keys=[${Object.keys(
+    `${LOG_PREFIX} refreshTownGitCredentials: town=${townId} configIntegration=${integrationId ?? 'none'} git_auth_keys=[${Object.entries(
       townConfig.git_auth
     )
-      .filter(k => townConfig.git_auth[k as keyof typeof townConfig.git_auth])
+      .filter(([, v]) => v)
+      .map(([k]) => k)
       .join(',')}]`
   );
 
@@ -369,9 +370,16 @@ export const gastownRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
 
-      // Refresh git credentials on every page load so polecats dispatched
-      // by the mayor's gt_sling tool have a fresh token.
-      await refreshTownGitCredentials(input.townId, ctx.user.id);
+      // Best-effort refresh so polecats dispatched by the mayor's gt_sling
+      // tool have a fresh token. Failures must not block the mayor startup.
+      try {
+        await refreshTownGitCredentials(input.townId, ctx.user.id);
+      } catch (err) {
+        console.warn(
+          `${LOG_PREFIX} ensureMayor: git credential refresh failed (non-blocking)`,
+          err
+        );
+      }
 
       return withGastownError(() => gastown.ensureMayor(input.townId));
     }),

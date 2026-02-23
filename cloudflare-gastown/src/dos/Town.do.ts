@@ -1176,31 +1176,31 @@ export class TownDO extends DurableObject<Env> {
    * (periodic recovery). Returns true if the agent was started.
    */
   private async dispatchAgent(agent: Agent, bead: Bead): Promise<boolean> {
-    const rigId = agent.rig_id ?? rigs.listRigs(this.sql)[0]?.id ?? '';
-    const rigConfig = rigId ? await this.getRigConfig(rigId) : null;
-    if (!rigConfig) {
-      console.warn(`${TOWN_LOG} dispatchAgent: no rig config for agent=${agent.id} rig=${rigId}`);
-      return false;
-    }
-
-    const townConfig = await this.getTownConfig();
-    const kilocodeToken = await this.resolveKilocodeToken();
-
-    // Mark dispatch in progress: set last_activity_at so schedulePendingWork
-    // skips this agent while the container start is in flight, and bump
-    // dispatch_attempts for the retry budget.
-    query(
-      this.sql,
-      /* sql */ `
-        UPDATE ${agent_metadata}
-        SET ${agent_metadata.columns.dispatch_attempts} = ${agent_metadata.columns.dispatch_attempts} + 1,
-            ${agent_metadata.columns.last_activity_at} = ?
-        WHERE ${agent_metadata.bead_id} = ?
-      `,
-      [now(), agent.id]
-    );
-
     try {
+      const rigId = agent.rig_id ?? rigs.listRigs(this.sql)[0]?.id ?? '';
+      const rigConfig = rigId ? await this.getRigConfig(rigId) : null;
+      if (!rigConfig) {
+        console.warn(`${TOWN_LOG} dispatchAgent: no rig config for agent=${agent.id} rig=${rigId}`);
+        return false;
+      }
+
+      const townConfig = await this.getTownConfig();
+      const kilocodeToken = await this.resolveKilocodeToken();
+
+      // Mark dispatch in progress: set last_activity_at so schedulePendingWork
+      // skips this agent while the container start is in flight, and bump
+      // dispatch_attempts for the retry budget.
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${agent_metadata}
+          SET ${agent_metadata.columns.dispatch_attempts} = ${agent_metadata.columns.dispatch_attempts} + 1,
+              ${agent_metadata.columns.last_activity_at} = ?
+          WHERE ${agent_metadata.bead_id} = ?
+        `,
+        [now(), agent.id]
+      );
+
       const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
         townId: this.townId,
         rigId,

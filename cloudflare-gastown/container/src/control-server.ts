@@ -336,16 +336,17 @@ app.post('/agents/:agentId/pty', async c => {
     // Fall through to create
   }
 
-  // No existing session — create one. Launch the kilo TUI (interactive
-  // session viewer) connected to the agent's SDK server. The `kilo` binary
-  // is globally installed in the container (/usr/local/bin/kilo).
+  // No existing session — create one. Use `kilo attach` to connect the TUI
+  // to the EXISTING SDK server (started by process-manager) rather than
+  // launching a separate server. This ensures the TUI shares the same
+  // sessions, system prompts, model config, and provider credentials.
   const agent = getAgentStatus(agentId);
   const createUrl = sdkUrl(agentId, '/pty');
-  if (!createUrl || !agent) {
+  if (!createUrl || !agent?.serverPort) {
     return c.json({ error: `Agent ${agentId} not found or not running` }, 404);
   }
-  // Forward config env vars so the kilo TUI uses the correct model
-  // and provider credentials (not the default free model).
+
+  // Forward config env vars for the kilo attach process
   const ptyEnv: Record<string, string> = {};
   for (const key of [
     'KILO_CONFIG_CONTENT',
@@ -357,12 +358,11 @@ app.post('/agents/:agentId/pty', async c => {
     if (process.env[key]) ptyEnv[key] = process.env[key];
   }
 
-  // Build CLI args. --session reconnects to the agent's existing session
-  // (which has the system prompt already applied). --model ensures the
-  // TUI uses the configured model, not the default free one.
-  const cliArgs: string[] = [`--project=${agent.workdir}`];
+  // `kilo attach <url>` connects to an existing kilo-serve instance.
+  // --session resumes the agent's headless session (with system prompt + model).
+  const serverUrl = `http://127.0.0.1:${agent.serverPort}`;
+  const cliArgs: string[] = ['attach', serverUrl];
   if (agent.sessionId) cliArgs.push(`--session=${agent.sessionId}`);
-  if (agent.model) cliArgs.push(`--model=${agent.model}`);
 
   console.log(`[control-server] Creating PTY for agent ${agentId}: kilo ${cliArgs.join(' ')}`);
 

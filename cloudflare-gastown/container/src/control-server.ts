@@ -89,6 +89,7 @@ app.post('/agents/start', async c => {
   console.log(
     `[control-server] /agents/start: role=${parsed.data.role} name=${parsed.data.name} rigId=${parsed.data.rigId} agentId=${parsed.data.agentId}`
   );
+  console.log(`[control-server] system prompt: ${parsed.data.systemPrompt}`);
 
   try {
     const agent = await runAgent(parsed.data);
@@ -342,7 +343,7 @@ app.post('/agents/:agentId/pty', async c => {
   // sessions, system prompts, model config, and provider credentials.
   const agent = getAgentStatus(agentId);
   const createUrl = sdkUrl(agentId, '/pty');
-  if (!createUrl || !agent?.serverPort) {
+  if (!createUrl || !agent?.serverPort || !agent?.sessionId) {
     return c.json({ error: `Agent ${agentId} not found or not running` }, 404);
   }
 
@@ -362,7 +363,7 @@ app.post('/agents/:agentId/pty', async c => {
   // --session resumes the agent's headless session (with system prompt + model).
   const serverUrl = `http://127.0.0.1:${agent.serverPort}`;
   const cliArgs: string[] = ['attach', serverUrl];
-  if (agent.sessionId) cliArgs.push(`--session=${agent.sessionId}`);
+  cliArgs.push(`--session=${agent.sessionId}`);
 
   console.log(`[control-server] Creating PTY for agent ${agentId}: kilo ${cliArgs.join(' ')}`);
 

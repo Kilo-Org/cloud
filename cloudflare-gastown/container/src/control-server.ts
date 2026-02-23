@@ -283,10 +283,15 @@ app.post('/git/merge', async c => {
 // Proxy PTY operations to the agent's internal SDK server.
 // The SDK server (kilo serve) exposes /pty/* routes on 127.0.0.1:<port>.
 
+/**
+ * Build the SDK server URL for an agent, including the agent's workdir as
+ * the `directory` query param so the SDK resolves the correct project context.
+ */
 function sdkUrl(agentId: string, path: string): string | null {
-  const port = getAgentServerPort(agentId);
-  if (!port) return null;
-  return `http://127.0.0.1:${port}${path}`;
+  const agent = getAgentStatus(agentId);
+  if (!agent?.serverPort) return null;
+  const sep = path.includes('?') ? '&' : '?';
+  return `http://127.0.0.1:${agent.serverPort}${path}${sep}directory=${encodeURIComponent(agent.workdir)}`;
 }
 
 async function proxyToSDK(agentId: string, path: string, init?: RequestInit): Promise<Response> {
@@ -303,14 +308,52 @@ async function proxyToSDK(agentId: string, path: string, init?: RequestInit): Pr
   });
 }
 
-// POST /agents/:agentId/pty — create PTY session
+// POST /agents/:agentId/pty — get-or-create a TUI PTY session for the agent.
+// Reuses an existing running session if one exists, otherwise creates a new
+// one in the agent's workdir context (which launches the kilo TUI, not a raw
+// shell). The `directory` query param tells the SDK server which project to use.
 app.post('/agents/:agentId/pty', async c => {
   const { agentId } = c.req.param();
-  const body = await c.req.text();
-  return proxyToSDK(agentId, '/pty', {
+  const listUrl = sdkUrl(agentId, '/pty');
+  if (!listUrl) {
+    return c.json({ error: `Agent ${agentId} not found or not running` }, 404);
+  }
+
+  // Check for an existing running PTY session we can reuse
+  try {
+    const listResp = await fetch(listUrl);
+    if (listResp.ok) {
+      const sessions = (await listResp.json()) as Array<{ id: string; status: string }>;
+      const running = sessions.find(s => s.status === 'running');
+      if (running) {
+        console.log(
+          `[control-server] Reusing existing PTY session ${running.id} for agent ${agentId}`
+        );
+        return c.json(running);
+      }
+    }
+  } catch {
+    // Fall through to create
+  }
+
+  // No existing session — create one. Omit `command` so the SDK server
+  // starts its default TUI (the kilo interactive session).
+  const createUrl = sdkUrl(agentId, '/pty');
+  if (!createUrl) {
+    return c.json({ error: `Agent ${agentId} not found or not running` }, 404);
+  }
+  const createResp = await fetch(createUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body,
+    body: JSON.stringify({}),
+  });
+  const data = await createResp.text();
+  console.log(
+    `[control-server] Created new PTY session for agent ${agentId}: ${data.slice(0, 200)}`
+  );
+  return new Response(data, {
+    status: createResp.status,
+    headers: { 'Content-Type': 'application/json' },
   });
 });
 
@@ -465,14 +508,15 @@ export function startControlServer(): void {
       open(ws) {
         // PTY proxy connection — connect to the SDK server's PTY WS
         if (ws.data.ptyId) {
-          const port = getAgentServerPort(ws.data.agentId ?? '');
-          if (!port) {
+          const agent = getAgentStatus(ws.data.agentId ?? '');
+          if (!agent || !agent.serverPort) {
             console.warn(`[control-server] PTY WS open: agent ${ws.data.agentId} not found`);
             ws.close(1011, 'Agent not found');
             return;
           }
 
-          const sdkWsUrl = `ws://127.0.0.1:${port}/pty/${ws.data.ptyId}/connect`;
+          const dirParam = `?directory=${encodeURIComponent(agent.workdir)}`;
+          const sdkWsUrl = `ws://127.0.0.1:${agent.serverPort}/pty/${ws.data.ptyId}/connect${dirParam}`;
           console.log(`[control-server] PTY WS: proxying to ${sdkWsUrl}`);
 
           const upstream = new WebSocket(sdkWsUrl);

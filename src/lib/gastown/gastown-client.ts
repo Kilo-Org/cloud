@@ -501,7 +501,7 @@ export async function resizePtySession(
 ): Promise<void> {
   await gastownFetch(`/api/towns/${townId}/container/agents/${agentId}/pty/${ptyId}`, {
     method: 'PUT',
-    body: JSON.stringify({ cols, rows }),
+    body: JSON.stringify({ size: { cols, rows } }),
   });
 }
 

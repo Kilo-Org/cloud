@@ -344,6 +344,19 @@ app.post('/agents/:agentId/pty', async c => {
   if (!createUrl || !agent) {
     return c.json({ error: `Agent ${agentId} not found or not running` }, 404);
   }
+  // Forward config env vars so the kilo TUI uses the correct model
+  // and provider credentials (not the default free model).
+  const ptyEnv: Record<string, string> = {};
+  for (const key of [
+    'KILO_CONFIG_CONTENT',
+    'OPENCODE_CONFIG_CONTENT',
+    'KILOCODE_TOKEN',
+    'KILO_API_URL',
+    'KILO_OPENROUTER_BASE',
+  ]) {
+    if (process.env[key]) ptyEnv[key] = process.env[key];
+  }
+
   const createResp = await fetch(createUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -352,6 +365,7 @@ app.post('/agents/:agentId/pty', async c => {
       args: [agent.workdir],
       cwd: agent.workdir,
       title: `kilo – ${agent.name}`,
+      env: ptyEnv,
     }),
   });
   const data = await createResp.text();

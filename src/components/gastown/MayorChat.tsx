@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/Button';
 import { toast } from 'sonner';
 import { Send, Radio } from 'lucide-react';
-import { AgentStream } from './AgentStream';
+import { AgentTerminal } from './AgentTerminal';
 
 type MayorChatProps = {
   townId: string;
@@ -135,9 +135,13 @@ export function MayorChat({ townId }: MayorChatProps) {
         </CardContent>
       </Card>
 
-      {/* Mayor agent stream — shows live events when the mayor is working */}
+      {/* Mayor terminal — live PTY view of the mayor agent session */}
       {mayorAgentId && showStream && (
-        <AgentStream townId={townId} agentId={mayorAgentId} onClose={() => setShowStream(false)} />
+        <AgentTerminal
+          townId={townId}
+          agentId={mayorAgentId}
+          onClose={() => setShowStream(false)}
+        />
       )}
     </div>
   );

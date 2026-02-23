@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -41,14 +41,35 @@ export function MayorChat({ townId }: MayorChatProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Poll mayor status every 3s when there's an active session
+  // Eagerly ensure the mayor agent + container are running on mount.
+  // This makes the terminal available immediately without requiring
+  // the user to send a message first.
+  const ensureMayor = useMutation(
+    trpc.gastown.ensureMayor.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.getMayorStatus.queryKey(),
+        });
+      },
+    })
+  );
+
+  const ensuredRef = useRef(false);
+  useEffect(() => {
+    if (ensuredRef.current) return;
+    ensuredRef.current = true;
+    ensureMayor.mutate({ townId });
+  }, [townId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll mayor status — always poll at 5s so we pick up the agent once
+  // the container finishes starting, then increase to 3s when active.
   const statusQuery = useQuery({
     ...trpc.gastown.getMayorStatus.queryOptions({ townId }),
     refetchInterval: query => {
       const session = query.state.data?.session;
-      return session && (session.status === 'active' || session.status === 'starting')
-        ? 3_000
-        : false;
+      if (session?.status === 'active' || session?.status === 'starting') return 3_000;
+      // Keep polling at a slower rate so we detect when the agent becomes available
+      return 5_000;
     },
   });
 
@@ -77,23 +98,16 @@ export function MayorChat({ townId }: MayorChatProps) {
   };
 
   const session = statusQuery.data?.session;
-  const [showStream, setShowStream] = useState(true);
+  const [showTerminal, setShowTerminal] = useState(true);
 
-  // Latch the agentId: once we see an active/starting session, keep the
-  // stream open even after the status transitions to idle. This prevents
-  // the AgentStream from unmounting (and losing buffered events) when
-  // the 3s status poll returns idle before all events have been streamed.
+  // Latch agentId from any non-null session (not just active/starting).
+  // Once the mayor agent exists (even if idle), the terminal can connect.
   const latchedAgentIdRef = useRef<string | null>(null);
   const currentAgentId = session?.agentId ?? null;
-  const isSessionLive = session?.status === 'active' || session?.status === 'starting';
 
-  // Latch when a session becomes active, and re-show the stream if
-  // the agentId changes (new session started)
-  if (isSessionLive && currentAgentId) {
-    if (currentAgentId !== latchedAgentIdRef.current) {
-      latchedAgentIdRef.current = currentAgentId;
-      setShowStream(true);
-    }
+  if (currentAgentId && currentAgentId !== latchedAgentIdRef.current) {
+    latchedAgentIdRef.current = currentAgentId;
+    setShowTerminal(true);
   }
 
   const mayorAgentId = latchedAgentIdRef.current;
@@ -135,12 +149,12 @@ export function MayorChat({ townId }: MayorChatProps) {
         </CardContent>
       </Card>
 
-      {/* Mayor terminal — live PTY view of the mayor agent session */}
-      {mayorAgentId && showStream && (
+      {/* Mayor terminal — live PTY view of the mayor's kilo TUI session */}
+      {mayorAgentId && showTerminal && (
         <AgentTerminal
           townId={townId}
           agentId={mayorAgentId}
-          onClose={() => setShowStream(false)}
+          onClose={() => setShowTerminal(false)}
         />
       )}
     </div>

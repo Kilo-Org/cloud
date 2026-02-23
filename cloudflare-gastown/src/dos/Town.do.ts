@@ -678,6 +678,77 @@ export class TownDO extends DurableObject<Env> {
     return { agentId: mayor.id, sessionStatus };
   }
 
+  /**
+   * Ensure the mayor agent exists and its container is running.
+   * Called eagerly on page load so the terminal is available immediately
+   * without requiring the user to send a message first.
+   */
+  async ensureMayor(): Promise<{ agentId: string; sessionStatus: 'idle' | 'active' | 'starting' }> {
+    await this.ensureInitialized();
+    const townId = this.townId;
+
+    let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+    if (!mayor) {
+      const identity = `mayor-${townId.slice(0, 8)}`;
+      mayor = agents.registerAgent(this.sql, {
+        role: 'mayor',
+        name: 'mayor',
+        identity,
+      });
+      console.log(`${TOWN_LOG} ensureMayor: created mayor agent ${mayor.id}`);
+    }
+
+    // Check if the container is already running
+    const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
+    const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
+
+    if (isAlive) {
+      const status = mayor.status === 'working' || mayor.status === 'stalled' ? 'active' : 'idle';
+      return { agentId: mayor.id, sessionStatus: status };
+    }
+
+    // Start the container with an idle mayor (no initial prompt)
+    const townConfig = await this.getTownConfig();
+    const rigConfig = await this.getMayorRigConfig();
+    const kilocodeToken = await this.resolveKilocodeToken();
+
+    if (kilocodeToken) {
+      try {
+        const containerStub = getTownContainerStub(this.env, townId);
+        await containerStub.setEnvVar('KILOCODE_TOKEN', kilocodeToken);
+      } catch {
+        // Best effort
+      }
+    }
+
+    // Start with an empty prompt — the mayor will be idle but its container
+    // and SDK server will be running, ready for PTY connections.
+    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
+      townId,
+      rigId: `mayor-${townId}`,
+      userId: townConfig.owner_user_id ?? rigConfig?.userId ?? '',
+      agentId: mayor.id,
+      agentName: 'mayor',
+      role: 'mayor',
+      identity: mayor.identity,
+      beadId: '',
+      beadTitle: 'Mayor ready. Waiting for instructions.',
+      beadBody: '',
+      checkpoint: null,
+      gitUrl: rigConfig?.gitUrl ?? '',
+      defaultBranch: rigConfig?.defaultBranch ?? 'main',
+      kilocodeToken,
+      townConfig,
+    });
+
+    if (started) {
+      agents.updateAgentStatus(this.sql, mayor.id, 'working');
+      return { agentId: mayor.id, sessionStatus: 'starting' };
+    }
+
+    return { agentId: mayor.id, sessionStatus: 'idle' };
+  }
+
   async getMayorStatus(): Promise<{
     configured: boolean;
     townId: string;

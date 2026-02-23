@@ -67,6 +67,19 @@ export async function handleGetMayorStatus(c: Context<GastownEnv>, params: { tow
 }
 
 /**
+ * POST /api/towns/:townId/mayor/ensure
+ * Eagerly ensure the mayor agent + container are running.
+ * Called on page load so the terminal is available immediately.
+ */
+export async function handleEnsureMayor(c: Context<GastownEnv>, params: { townId: string }) {
+  console.log(`${MAYOR_HANDLER_LOG} handleEnsureMayor: townId=${params.townId}`);
+  const town = getTownDOStub(c.env, params.townId);
+  await town.setTownId(params.townId);
+  const result = await town.ensureMayor();
+  return c.json(resSuccess(result), 200);
+}
+
+/**
  * POST /api/towns/:townId/mayor/completed
  * Completion callback from the container. Clears the session immediately
  * so the UI reflects idle status without waiting for the alarm.

@@ -336,16 +336,23 @@ app.post('/agents/:agentId/pty', async c => {
     // Fall through to create
   }
 
-  // No existing session — create one. Omit `command` so the SDK server
-  // starts its default TUI (the kilo interactive session).
+  // No existing session — create one. Launch the kilo TUI (interactive
+  // session viewer) connected to the agent's SDK server. The `kilo` binary
+  // is globally installed in the container (/usr/local/bin/kilo).
+  const agent = getAgentStatus(agentId);
   const createUrl = sdkUrl(agentId, '/pty');
-  if (!createUrl) {
+  if (!createUrl || !agent) {
     return c.json({ error: `Agent ${agentId} not found or not running` }, 404);
   }
   const createResp = await fetch(createUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      command: 'kilo',
+      args: [agent.workdir],
+      cwd: agent.workdir,
+      title: `kilo – ${agent.name}`,
+    }),
   });
   const data = await createResp.text();
   console.log(

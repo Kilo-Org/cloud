@@ -559,6 +559,12 @@ export async function getMayorStatus(townId: string): Promise<MayorStatus> {
   return parseSuccessData(body, MayorStatusSchema);
 }
 
+/** Eagerly ensure the mayor agent + container are running. */
+export async function ensureMayor(townId: string): Promise<MayorSendResult> {
+  const body = await gastownFetch(`/api/towns/${townId}/mayor/ensure`, { method: 'POST' });
+  return parseSuccessData(body, MayorSendResultSchema);
+}
+
 export async function destroyMayor(townId: string): Promise<void> {
   await gastownFetch(`/api/towns/${townId}/mayor/destroy`, { method: 'POST' });
 }

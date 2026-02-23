@@ -64,6 +64,7 @@ import {
   handleConfigureMayor,
   handleSendMayorMessage,
   handleGetMayorStatus,
+  handleEnsureMayor,
   handleMayorCompleted,
   handleDestroyMayor,
 } from './handlers/mayor.handler';
@@ -323,6 +324,7 @@ app.delete('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
 app.post('/api/towns/:townId/mayor/configure', c => handleConfigureMayor(c, c.req.param()));
 app.post('/api/towns/:townId/mayor/message', c => handleSendMayorMessage(c, c.req.param()));
 app.get('/api/towns/:townId/mayor/status', c => handleGetMayorStatus(c, c.req.param()));
+app.post('/api/towns/:townId/mayor/ensure', c => handleEnsureMayor(c, c.req.param()));
 app.post('/api/towns/:townId/mayor/completed', c => handleMayorCompleted(c, c.req.param()));
 app.post('/api/towns/:townId/mayor/destroy', c => handleDestroyMayor(c, c.req.param()));
 

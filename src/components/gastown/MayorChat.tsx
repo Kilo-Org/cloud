@@ -126,15 +126,25 @@ export function MayorChat({ townId }: MayorChatProps) {
       xtermRef.current = term;
       fitAddonRef.current = fitAddon;
 
-      setStatus('Creating PTY session...');
+      setStatus('Connecting to mayor...');
 
-      const result = await new Promise<{ pty: { id: string }; wsUrl: string }>(
-        (resolve, reject) => {
-          createPty.mutate({ townId, agentId }, { onSuccess: resolve, onError: reject });
+      // Retry PTY creation — the agent may still be starting up (especially
+      // on first town creation when ensureMayor is waiting for a kilocode token).
+      let result: { pty: { id: string }; wsUrl: string } | null = null;
+      for (let attempt = 0; attempt < 10 && !disposed; attempt++) {
+        try {
+          result = await new Promise<{ pty: { id: string }; wsUrl: string }>((resolve, reject) => {
+            createPty.mutate({ townId, agentId }, { onSuccess: resolve, onError: reject });
+          });
+          break;
+        } catch {
+          if (disposed) return;
+          setStatus(`Waiting for mayor... (${attempt + 1})`);
+          await new Promise(r => setTimeout(r, 3_000));
         }
-      );
+      }
 
-      if (disposed) return;
+      if (disposed || !result) return;
 
       ptyRef.current = result.pty;
       setStatus('Connecting...');

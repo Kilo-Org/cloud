@@ -712,13 +712,20 @@ export class TownDO extends DurableObject<Env> {
     const rigConfig = await this.getMayorRigConfig();
     const kilocodeToken = await this.resolveKilocodeToken();
 
-    if (kilocodeToken) {
-      try {
-        const containerStub = getTownContainerStub(this.env, townId);
-        await containerStub.setEnvVar('KILOCODE_TOKEN', kilocodeToken);
-      } catch {
-        // Best effort
-      }
+    // Don't start without a kilocode token — the session would use the
+    // default free model and have no provider credentials. The frontend
+    // will retry via status polling once a rig is created and the token
+    // becomes available.
+    if (!kilocodeToken) {
+      console.warn(`${TOWN_LOG} ensureMayor: no kilocodeToken available, deferring start`);
+      return { agentId: mayor.id, sessionStatus: 'idle' };
+    }
+
+    try {
+      const containerStub = getTownContainerStub(this.env, townId);
+      await containerStub.setEnvVar('KILOCODE_TOKEN', kilocodeToken);
+    } catch {
+      // Best effort
     }
 
     // Start with an empty prompt — the mayor will be idle but its container

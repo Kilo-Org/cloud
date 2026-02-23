@@ -164,7 +164,7 @@ export async function startAgentInContainer(
     if (kilocodeToken) envVars.KILOCODE_TOKEN = kilocodeToken;
 
     console.log(
-      `${TOWN_LOG} startAgentInContainer: envVars built: keys=[${Object.keys(envVars).join(',')}] hasJwt=${!!token} hasKilocodeToken=${!!kilocodeToken} paramToken=${!!params.kilocodeToken} configToken=${!!params.townConfig.kilocode_token}`
+      `${TOWN_LOG} startAgentInContainer: envVars built: keys=[${Object.keys(envVars).join(',')}] hasGitToken=${!!envVars.GIT_TOKEN} hasGitlabToken=${!!envVars.GITLAB_TOKEN} hasJwt=${!!token} hasKilocodeToken=${!!kilocodeToken} git_auth_keys=[${Object.keys(params.townConfig.git_auth ?? {}).join(',')}]`
     );
 
     const containerConfig = await buildContainerConfig(storage, env);

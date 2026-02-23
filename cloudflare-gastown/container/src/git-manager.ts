@@ -162,6 +162,11 @@ export async function cloneRepo(
     await rm(dir, { recursive: true, force: true });
   }
 
+  const hasAuth = authUrl !== options.gitUrl;
+  console.log(
+    `Cloning repo for rig ${options.rigId}: hasAuth=${hasAuth} envKeys=[${Object.keys(options.envVars ?? {}).join(',')}]`
+  );
+
   await mkdir(dir, { recursive: true });
   await exec('git', ['clone', '--no-checkout', '--branch', options.defaultBranch, authUrl, dir]);
   console.log(`Cloned repo for rig ${options.rigId}`);

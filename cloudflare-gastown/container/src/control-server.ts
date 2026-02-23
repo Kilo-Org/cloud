@@ -357,12 +357,21 @@ app.post('/agents/:agentId/pty', async c => {
     if (process.env[key]) ptyEnv[key] = process.env[key];
   }
 
+  // Build CLI args. --session reconnects to the agent's existing session
+  // (which has the system prompt already applied). --model ensures the
+  // TUI uses the configured model, not the default free one.
+  const cliArgs: string[] = [`--project=${agent.workdir}`];
+  if (agent.sessionId) cliArgs.push(`--session=${agent.sessionId}`);
+  if (agent.model) cliArgs.push(`--model=${agent.model}`);
+
+  console.log(`[control-server] Creating PTY for agent ${agentId}: kilo ${cliArgs.join(' ')}`);
+
   const createResp = await fetch(createUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       command: 'kilo',
-      args: [agent.workdir],
+      args: cliArgs,
       cwd: agent.workdir,
       title: `kilo – ${agent.name}`,
       env: ptyEnv,

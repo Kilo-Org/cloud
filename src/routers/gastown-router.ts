@@ -440,7 +440,7 @@ export const gastownRouter = createTRPCRouter({
       z.object({
         townId: z.string().uuid(),
         agentId: z.string().uuid(),
-        ptyId: z.string(),
+        ptyId: z.string().regex(/^[a-zA-Z0-9_-]+$/, 'Invalid ptyId'),
         cols: z.number().int().min(1).max(500),
         rows: z.number().int().min(1).max(200),
       })

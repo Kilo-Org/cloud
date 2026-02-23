@@ -1,4 +1,5 @@
 import type { Config } from '@kilocode/sdk';
+import { z } from 'zod';
 import { writeFile } from 'node:fs/promises';
 import { cloneRepo, createWorktree } from './git-manager';
 import { startAgent } from './process-manager';
@@ -273,11 +274,14 @@ async function resolveGitCredentialsIfMissing(
       return envVars;
     }
 
-    const creds = (await resp.json()) as {
-      github_token?: string;
-      gitlab_token?: string;
-      gitlab_instance_url?: string;
-    };
+    const rawCreds: unknown = await resp.json();
+    const creds = z
+      .object({
+        github_token: z.string().optional(),
+        gitlab_token: z.string().optional(),
+        gitlab_instance_url: z.string().optional(),
+      })
+      .parse(rawCreds);
 
     if (creds.github_token) {
       envVars.GIT_TOKEN = creds.github_token;

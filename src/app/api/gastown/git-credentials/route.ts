@@ -16,6 +16,9 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { resolveGitCredentialsFromIntegration } from '@/lib/gastown/git-credentials';
 import { validateAuthorizationHeader } from '@/lib/tokens';
+import { db } from '@/lib/drizzle';
+import { platform_integrations } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   // Verify auth — accept any valid Kilo API token
@@ -28,6 +31,25 @@ export async function POST(request: NextRequest) {
   const platformIntegrationId = body?.platform_integration_id;
   if (!platformIntegrationId || typeof platformIntegrationId !== 'string') {
     return NextResponse.json({ error: 'platform_integration_id is required' }, { status: 400 });
+  }
+
+  // Verify the caller owns this integration
+  const [integration] = await db
+    .select({ id: platform_integrations.id })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.id, platformIntegrationId),
+        eq(platform_integrations.owned_by_user_id, authResult.kiloUserId)
+      )
+    )
+    .limit(1);
+
+  if (!integration) {
+    return NextResponse.json(
+      { error: 'Integration not found or not owned by this user' },
+      { status: 403 }
+    );
   }
 
   const credentials = await resolveGitCredentialsFromIntegration(platformIntegrationId);

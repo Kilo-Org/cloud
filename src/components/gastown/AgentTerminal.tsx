@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,9 +23,9 @@ export function AgentTerminal({ townId, agentId, onClose }: AgentTerminalProps) 
   const wsRef = useRef<WebSocket | null>(null);
   const xtermRef = useRef<import('@xterm/xterm').Terminal | null>(null);
   const fitAddonRef = useRef<import('@xterm/addon-fit').FitAddon | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [status, setStatus] = useState<string>('Initializing...');
   const [connected, setConnected] = useState(false);
-  // Track the pty session for resize calls
   const ptyRef = useRef<{ id: string } | null>(null);
 
   const createPty = useMutation(
@@ -35,26 +35,16 @@ export function AgentTerminal({ townId, agentId, onClose }: AgentTerminalProps) 
   );
 
   const resizePty = useMutation(trpc.gastown.resizePtySession.mutationOptions({}));
-
-  const handleResize = useCallback(
-    (cols: number, rows: number) => {
-      if (!ptyRef.current) return;
-      resizePty.mutate({
-        townId,
-        agentId,
-        ptyId: ptyRef.current.id,
-        cols,
-        rows,
-      });
-    },
-    [townId, agentId, resizePty]
-  );
+  // Stable ref for the resize mutate fn so useCallback isn't needed
+  const resizeMutateRef = useRef(resizePty.mutate);
+  resizeMutateRef.current = resizePty.mutate;
 
   useEffect(() => {
     let disposed = false;
 
     async function init() {
-      if (!terminalRef.current) return;
+      const container = terminalRef.current;
+      if (!container) return;
 
       // Lazy-load xterm.js (avoids SSR issues)
       const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
@@ -83,7 +73,7 @@ export function AgentTerminal({ townId, agentId, onClose }: AgentTerminalProps) 
 
       term.loadAddon(fitAddon);
       term.loadAddon(webLinksAddon);
-      term.open(terminalRef.current);
+      term.open(container);
       fitAddon.fit();
 
       xtermRef.current = term;
@@ -109,6 +99,17 @@ export function AgentTerminal({ townId, agentId, onClose }: AgentTerminalProps) 
       ptyRef.current = result.pty;
       setStatus('Connecting...');
 
+      function doResize(cols: number, rows: number) {
+        if (!ptyRef.current) return;
+        resizeMutateRef.current({
+          townId,
+          agentId,
+          ptyId: ptyRef.current.id,
+          cols,
+          rows,
+        });
+      }
+
       // Connect WebSocket to the PTY
       const ws = new WebSocket(result.wsUrl);
       ws.binaryType = 'arraybuffer';
@@ -122,7 +123,7 @@ export function AgentTerminal({ townId, agentId, onClose }: AgentTerminalProps) 
         // Send initial terminal size
         const dims = fitAddon.proposeDimensions();
         if (dims) {
-          handleResize(dims.cols, dims.rows);
+          doResize(dims.cols, dims.rows);
         }
       };
 
@@ -135,7 +136,6 @@ export function AgentTerminal({ townId, agentId, onClose }: AgentTerminalProps) 
           if (e.data.startsWith('{')) {
             try {
               JSON.parse(e.data);
-              // Valid JSON control message — skip it
               return;
             } catch {
               // Not valid JSON — fall through to write as PTY data
@@ -165,22 +165,23 @@ export function AgentTerminal({ townId, agentId, onClose }: AgentTerminalProps) 
 
       // Handle terminal resize
       term.onResize(({ cols, rows }) => {
-        handleResize(cols, rows);
+        doResize(cols, rows);
       });
 
       // Watch for container resize
-      const resizeObserver = new ResizeObserver(() => {
+      const observer = new ResizeObserver(() => {
         fitAddon.fit();
       });
-      if (terminalRef.current) {
-        resizeObserver.observe(terminalRef.current);
-      }
+      observer.observe(container);
+      resizeObserverRef.current = observer;
     }
 
     void init();
 
     return () => {
       disposed = true;
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       wsRef.current?.close(1000, 'Component unmount');
       wsRef.current = null;
       xtermRef.current?.dispose();

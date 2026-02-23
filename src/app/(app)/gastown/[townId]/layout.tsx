@@ -9,8 +9,8 @@ export default function TownLayout({
 }) {
   return (
     <>
-      {/* Page content with bottom padding to clear the fixed terminal bar */}
-      <div className="pb-[360px]">{children}</div>
+      {/* Bottom padding clears the fixed terminal bar (title bar height = 40px) */}
+      <div className="pb-12">{children}</div>
       <MayorTerminalBar params={params} />
     </>
   );

@@ -19,7 +19,7 @@ export const BeadEventType = z.enum([
 export type BeadEventType = z.infer<typeof BeadEventType>;
 
 export const BeadEventRecord = z.object({
-  bead_event_id: z.string().catch(() => crypto.randomUUID()),
+  bead_event_id: z.string().default(() => crypto.randomUUID()),
   bead_id: z.string(),
   agent_id: z.string().nullable(),
   event_type: BeadEventType,

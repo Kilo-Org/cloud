@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -24,6 +24,7 @@ export function MayorChat({ townId }: MayorChatProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const xtermRef = useRef<import('@xterm/xterm').Terminal | null>(null);
   const fitAddonRef = useRef<import('@xterm/addon-fit').FitAddon | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const ptyRef = useRef<{ id: string } | null>(null);
 
   // Eagerly ensure mayor agent + container on mount
@@ -37,10 +38,11 @@ export function MayorChat({ townId }: MayorChatProps) {
     })
   );
 
-  const ensuredRef = useRef(false);
+  // Reset on townId change so ensureMayor fires for each town
+  const ensuredTownRef = useRef<string | null>(null);
   useEffect(() => {
-    if (ensuredRef.current) return;
-    ensuredRef.current = true;
+    if (ensuredTownRef.current === townId) return;
+    ensuredTownRef.current = townId;
     ensureMayor.mutate({ townId });
   }, [townId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -64,20 +66,8 @@ export function MayorChat({ townId }: MayorChatProps) {
   );
 
   const resizePty = useMutation(trpc.gastown.resizePtySession.mutationOptions({}));
-
-  const handleResize = useCallback(
-    (cols: number, rows: number) => {
-      if (!ptyRef.current) return;
-      resizePty.mutate({
-        townId,
-        agentId: mayorAgentId ?? '',
-        ptyId: ptyRef.current.id,
-        cols,
-        rows,
-      });
-    },
-    [townId, mayorAgentId, resizePty]
-  );
+  const resizeMutateRef = useRef(resizePty.mutate);
+  resizeMutateRef.current = resizePty.mutate;
 
   // Connect terminal when mayorAgentId becomes available
   const connectedAgentRef = useRef<string | null>(null);
@@ -89,7 +79,8 @@ export function MayorChat({ townId }: MayorChatProps) {
     let disposed = false;
 
     async function init() {
-      if (!terminalRef.current) return;
+      const container = terminalRef.current;
+      if (!container) return;
 
       const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
         import('@xterm/xterm'),
@@ -120,13 +111,24 @@ export function MayorChat({ townId }: MayorChatProps) {
 
       term.loadAddon(fitAddon);
       term.loadAddon(webLinksAddon);
-      term.open(terminalRef.current!);
+      term.open(container);
       fitAddon.fit();
 
       xtermRef.current = term;
       fitAddonRef.current = fitAddon;
 
       setStatus('Connecting to mayor...');
+
+      function doResize(cols: number, rows: number) {
+        if (!ptyRef.current) return;
+        resizeMutateRef.current({
+          townId,
+          agentId,
+          ptyId: ptyRef.current.id,
+          cols,
+          rows,
+        });
+      }
 
       // Retry PTY creation — the agent may still be starting up (especially
       // on first town creation when ensureMayor is waiting for a kilocode token).
@@ -144,7 +146,12 @@ export function MayorChat({ townId }: MayorChatProps) {
         }
       }
 
-      if (disposed || !result) return;
+      if (disposed || !result) {
+        if (!disposed && !result) {
+          setStatus('Failed to connect to mayor');
+        }
+        return;
+      }
 
       ptyRef.current = result.pty;
       setStatus('Connecting...');
@@ -158,7 +165,7 @@ export function MayorChat({ townId }: MayorChatProps) {
         setConnected(true);
         setStatus('Connected');
         const dims = fitAddon.proposeDimensions();
-        if (dims) handleResize(dims.cols, dims.rows);
+        if (dims) doResize(dims.cols, dims.rows);
       };
 
       ws.onmessage = (e: MessageEvent) => {
@@ -192,16 +199,19 @@ export function MayorChat({ townId }: MayorChatProps) {
         if (ws.readyState === WebSocket.OPEN) ws.send(data);
       });
 
-      term.onResize(({ cols, rows }) => handleResize(cols, rows));
+      term.onResize(({ cols, rows }) => doResize(cols, rows));
 
-      const resizeObserver = new ResizeObserver(() => fitAddon.fit());
-      if (terminalRef.current) resizeObserver.observe(terminalRef.current);
+      const observer = new ResizeObserver(() => fitAddon.fit());
+      observer.observe(container);
+      resizeObserverRef.current = observer;
     }
 
     void init();
 
     return () => {
       disposed = true;
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       wsRef.current?.close(1000, 'Mayor terminal unmount');
       wsRef.current = null;
       xtermRef.current?.dispose();

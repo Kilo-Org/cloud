@@ -4,7 +4,6 @@ import {
   stopAgent,
   sendMessage,
   getAgentStatus,
-  getAgentServerPort,
   activeAgentCount,
   activeServerCount,
   getUptime,
@@ -89,7 +88,7 @@ app.post('/agents/start', async c => {
   console.log(
     `[control-server] /agents/start: role=${parsed.data.role} name=${parsed.data.name} rigId=${parsed.data.rigId} agentId=${parsed.data.agentId}`
   );
-  console.log(`[control-server] system prompt: ${parsed.data.systemPrompt}`);
+  console.log(`[control-server] system prompt length: ${parsed.data.systemPrompt.length}`);
 
   try {
     const agent = await runAgent(parsed.data);
@@ -563,7 +562,7 @@ export function startControlServer(): void {
           upstream.onmessage = (e: MessageEvent) => {
             try {
               // Forward raw bytes from SDK → browser
-              ws.send(e.data as ArrayBuffer | string);
+              ws.send(e.data instanceof ArrayBuffer ? e.data : String(e.data));
             } catch {
               // Client disconnected
             }

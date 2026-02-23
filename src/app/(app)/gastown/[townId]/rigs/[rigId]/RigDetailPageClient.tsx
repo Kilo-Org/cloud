@@ -13,7 +13,6 @@ import { AgentCard } from '@/components/gastown/AgentCard';
 import { AgentStream } from '@/components/gastown/AgentStream';
 import { AgentTerminal } from '@/components/gastown/AgentTerminal';
 import { SlingDialog } from '@/components/gastown/SlingDialog';
-import { MayorChat } from '@/components/gastown/MayorChat';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
 import { GastownBeadDetailSheet } from '@/components/gastown/GastownBeadDetailSheet';
 import { ArrowLeft, Plus, GitBranch } from 'lucide-react';
@@ -275,21 +274,6 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
           )}
         </div>
       )}
-
-      {/* Mayor Chat */}
-      <div className="mt-6">
-        <div className="mb-3">
-          <h2 className="text-sm font-medium tracking-wide text-white/70">Mayor Chat</h2>
-          <p className="mt-0.5 text-xs text-white/45">
-            Delegate work to the town-level coordinator.
-          </p>
-        </div>
-        <GastownBackdrop>
-          <div className="p-4">
-            <MayorChat townId={townId} />
-          </div>
-        </GastownBackdrop>
-      </div>
 
       <GastownBeadDetailSheet
         open={Boolean(selectedBeadId)}

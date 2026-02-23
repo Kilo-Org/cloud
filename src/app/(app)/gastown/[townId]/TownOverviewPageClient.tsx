@@ -9,10 +9,9 @@ import { Button } from '@/components/Button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateRigDialog } from '@/components/gastown/CreateRigDialog';
-import { MayorChat } from '@/components/gastown/MayorChat';
 import { ActivityFeedView } from '@/components/gastown/ActivityFeed';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
-import { ArrowLeft, Plus, GitBranch, Trash2, Activity, Bot, Users, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, GitBranch, Trash2, Activity, Users, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -136,24 +135,7 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
       </GastownBackdrop>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <div className="mb-3">
-            <div className="flex items-center gap-2">
-              <Bot className="size-4 text-[color:oklch(95%_0.15_108_/_0.95)]" />
-              <h2 className="text-sm font-medium tracking-wide text-white/70">Mayor</h2>
-            </div>
-            <p className="mt-0.5 text-xs text-white/45">
-              The orchestrator. Describe intent; watch the machine route it into beads and agents.
-            </p>
-          </div>
-          <GastownBackdrop>
-            <div className="p-4">
-              <MayorChat townId={townId} />
-            </div>
-          </GastownBackdrop>
-        </div>
-
-        <div className="space-y-4 lg:col-span-7">
+        <div className="space-y-4 lg:col-span-12">
           {/* Rig Cards */}
           <div>
             <h2 className="mb-2 flex items-center gap-2 text-sm font-medium text-white/70">

@@ -1,49 +1,32 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/Button';
-import { toast } from 'sonner';
-import { Send, Radio } from 'lucide-react';
-import { AgentTerminal } from './AgentTerminal';
+import { useSidebar } from '@/components/ui/sidebar';
+import { ChevronDown, ChevronUp, Terminal as TerminalIcon } from 'lucide-react';
 
 type MayorChatProps = {
   townId: string;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  active: 'Working',
-  starting: 'Starting',
-  idle: 'Idle',
-};
-
-function SessionStatusBadge({ status }: { status: string }) {
-  const isActive = status === 'active' || status === 'starting';
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        isActive
-          ? 'bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-400/20'
-          : 'bg-white/5 text-white/55 ring-1 ring-white/10'
-      }`}
-    >
-      <Radio className={`size-2.5 ${isActive ? 'animate-pulse' : ''}`} />
-      {STATUS_LABELS[status] ?? status}
-    </span>
-  );
-}
+const COLLAPSED_HEIGHT = 40; // px — title bar only
+const EXPANDED_HEIGHT = 320; // px — terminal area
 
 export function MayorChat({ townId }: MayorChatProps) {
-  const [message, setMessage] = useState('');
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const [collapsed, setCollapsed] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState('Initializing...');
 
-  // Eagerly ensure the mayor agent + container are running on mount.
-  // This makes the terminal available immediately without requiring
-  // the user to send a message first.
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const xtermRef = useRef<import('@xterm/xterm').Terminal | null>(null);
+  const fitAddonRef = useRef<import('@xterm/addon-fit').FitAddon | null>(null);
+  const ptyRef = useRef<{ id: string } | null>(null);
+
+  // Eagerly ensure mayor agent + container on mount
   const ensureMayor = useMutation(
     trpc.gastown.ensureMayor.mutationOptions({
       onSuccess: () => {
@@ -61,102 +44,215 @@ export function MayorChat({ townId }: MayorChatProps) {
     ensureMayor.mutate({ townId });
   }, [townId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll mayor status — always poll at 5s so we pick up the agent once
-  // the container finishes starting, then increase to 3s when active.
+  // Poll mayor status to get agentId
   const statusQuery = useQuery({
     ...trpc.gastown.getMayorStatus.queryOptions({ townId }),
     refetchInterval: query => {
       const session = query.state.data?.session;
-      if (session?.status === 'active' || session?.status === 'starting') return 3_000;
-      // Keep polling at a slower rate so we detect when the agent becomes available
-      return 5_000;
+      if (!session) return 3_000; // Poll faster until mayor is available
+      if (session.status === 'active' || session.status === 'starting') return 3_000;
+      return 10_000;
     },
   });
 
-  const sendMessage = useMutation(
-    trpc.gastown.sendMessage.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.gastown.getMayorStatus.queryKey(),
-        });
-        toast.success('Message sent to Mayor');
-        setMessage('');
-      },
-      onError: err => {
-        toast.error(err.message);
-      },
+  const mayorAgentId = statusQuery.data?.session?.agentId ?? null;
+
+  const createPty = useMutation(
+    trpc.gastown.createPtySession.mutationOptions({
+      onError: err => setStatus(`Error: ${err.message}`),
     })
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim()) return;
-    sendMessage.mutate({
-      townId,
-      message: message.trim(),
-    });
-  };
+  const resizePty = useMutation(trpc.gastown.resizePtySession.mutationOptions({}));
 
-  const session = statusQuery.data?.session;
-  const [showTerminal, setShowTerminal] = useState(true);
+  const handleResize = useCallback(
+    (cols: number, rows: number) => {
+      if (!ptyRef.current) return;
+      resizePty.mutate({
+        townId,
+        agentId: mayorAgentId ?? '',
+        ptyId: ptyRef.current.id,
+        cols,
+        rows,
+      });
+    },
+    [townId, mayorAgentId, resizePty]
+  );
 
-  // Latch agentId from any non-null session (not just active/starting).
-  // Once the mayor agent exists (even if idle), the terminal can connect.
-  const latchedAgentIdRef = useRef<string | null>(null);
-  const currentAgentId = session?.agentId ?? null;
+  // Connect terminal when mayorAgentId becomes available
+  const connectedAgentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!mayorAgentId || mayorAgentId === connectedAgentRef.current) return;
+    const agentId = mayorAgentId; // capture for closure
+    connectedAgentRef.current = agentId;
 
-  if (currentAgentId && currentAgentId !== latchedAgentIdRef.current) {
-    latchedAgentIdRef.current = currentAgentId;
-    setShowTerminal(true);
-  }
+    let disposed = false;
 
-  const mayorAgentId = latchedAgentIdRef.current;
+    async function init() {
+      if (!terminalRef.current) return;
+
+      const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
+        import('@xterm/xterm'),
+        import('@xterm/addon-fit'),
+        import('@xterm/addon-web-links'),
+      ]);
+
+      if (disposed) return;
+
+      // Clean up any previous terminal
+      xtermRef.current?.dispose();
+
+      const fitAddon = new FitAddon();
+      const webLinksAddon = new WebLinksAddon();
+
+      const term = new Terminal({
+        cursorBlink: true,
+        fontSize: 13,
+        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+        theme: {
+          background: '#0a0a0a',
+          foreground: '#e0e0e0',
+          cursor: '#e0e0e0',
+          selectionBackground: '#3a3a5a',
+        },
+        allowProposedApi: true,
+      });
+
+      term.loadAddon(fitAddon);
+      term.loadAddon(webLinksAddon);
+      term.open(terminalRef.current!);
+      fitAddon.fit();
+
+      xtermRef.current = term;
+      fitAddonRef.current = fitAddon;
+
+      setStatus('Creating PTY session...');
+
+      const result = await new Promise<{ pty: { id: string }; wsUrl: string }>(
+        (resolve, reject) => {
+          createPty.mutate({ townId, agentId }, { onSuccess: resolve, onError: reject });
+        }
+      );
+
+      if (disposed) return;
+
+      ptyRef.current = result.pty;
+      setStatus('Connecting...');
+
+      const ws = new WebSocket(result.wsUrl);
+      ws.binaryType = 'arraybuffer';
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        if (disposed) return;
+        setConnected(true);
+        setStatus('Connected');
+        const dims = fitAddon.proposeDimensions();
+        if (dims) handleResize(dims.cols, dims.rows);
+      };
+
+      ws.onmessage = (e: MessageEvent) => {
+        if (e.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(e.data));
+        } else if (typeof e.data === 'string') {
+          if (e.data.startsWith('{')) {
+            try {
+              JSON.parse(e.data);
+              return;
+            } catch {
+              // Not JSON control message
+            }
+          }
+          term.write(e.data);
+        }
+      };
+
+      ws.onclose = () => {
+        if (disposed) return;
+        setConnected(false);
+        setStatus('Disconnected');
+      };
+
+      ws.onerror = () => {
+        if (disposed) return;
+        setStatus('Connection error');
+      };
+
+      term.onData(data => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      });
+
+      term.onResize(({ cols, rows }) => handleResize(cols, rows));
+
+      const resizeObserver = new ResizeObserver(() => fitAddon.fit());
+      if (terminalRef.current) resizeObserver.observe(terminalRef.current);
+    }
+
+    void init();
+
+    return () => {
+      disposed = true;
+      wsRef.current?.close(1000, 'Mayor terminal unmount');
+      wsRef.current = null;
+      xtermRef.current?.dispose();
+      xtermRef.current = null;
+      fitAddonRef.current = null;
+      ptyRef.current = null;
+      connectedAgentRef.current = null;
+    };
+  }, [mayorAgentId, townId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { state: sidebarState, isMobile } = useSidebar();
+
+  // Re-fit terminal when expanding or sidebar changes
+  useEffect(() => {
+    if (collapsed || !fitAddonRef.current) return;
+    // Small delay so the DOM has finished resizing
+    const t = setTimeout(() => fitAddonRef.current?.fit(), 50);
+    return () => clearTimeout(t);
+  }, [collapsed, sidebarState]);
+
+  // Sidebar is hidden on mobile, 3rem when collapsed to icons, 16rem when expanded.
+  // Add extra padding to account for the sidebar's outer spacing.
+  const sidebarLeft = isMobile ? '0px' : sidebarState === 'expanded' ? '16rem' : '3rem';
 
   return (
-    <div className="space-y-4">
-      <Card className="border-white/10 bg-transparent shadow-none">
-        <CardContent className="p-4">
-          {/* Status indicator */}
-          {session && (
-            <div className="mb-3 flex items-center justify-between text-sm">
-              <SessionStatusBadge status={session.status} />
-              <span className="text-xs text-white/45">
-                Last activity: {new Date(session.lastActivityAt).toLocaleTimeString()}
-              </span>
-            </div>
-          )}
+    <div
+      className="fixed right-0 bottom-0 z-50 border-t border-white/10 bg-[#0a0a0a] transition-[left] duration-200 ease-linear"
+      style={{
+        left: sidebarLeft,
+        height: collapsed ? COLLAPSED_HEIGHT : COLLAPSED_HEIGHT + EXPANDED_HEIGHT,
+      }}
+    >
+      {/* Title bar */}
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        className="flex w-full items-center justify-between px-4"
+        style={{ height: COLLAPSED_HEIGHT }}
+      >
+        <div className="flex items-center gap-2">
+          <TerminalIcon
+            className={`size-3.5 ${connected ? 'text-emerald-400' : 'text-white/30'}`}
+          />
+          <span className="text-xs font-medium text-white/70">Mayor</span>
+          <span className="text-[11px] text-white/40">{status}</span>
+        </div>
+        {collapsed ? (
+          <ChevronUp className="size-4 text-white/40" />
+        ) : (
+          <ChevronDown className="size-4 text-white/40" />
+        )}
+      </button>
 
-          {/* Message input */}
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Input
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              placeholder="Send a message to the Mayor..."
-              disabled={sendMessage.isPending}
-              className="flex-1 border-white/10 bg-black/25"
-            />
-            <Button
-              variant="primary"
-              size="md"
-              type="submit"
-              disabled={!message.trim() || sendMessage.isPending}
-              className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-            >
-              <Send className="size-4" />
-              {sendMessage.isPending ? 'Sending...' : 'Send'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Mayor terminal — live PTY view of the mayor's kilo TUI session */}
-      {mayorAgentId && showTerminal && (
-        <AgentTerminal
-          townId={townId}
-          agentId={mayorAgentId}
-          onClose={() => setShowTerminal(false)}
-        />
-      )}
+      {/* Terminal area */}
+      <div
+        ref={terminalRef}
+        className="overflow-hidden px-1"
+        style={{
+          height: EXPANDED_HEIGHT,
+          display: collapsed ? 'none' : 'block',
+        }}
+      />
     </div>
   );
 }

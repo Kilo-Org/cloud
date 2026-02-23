@@ -25,6 +25,7 @@ export const StartAgentRequest = z.object({
 export type StartAgentRequest = z.infer<typeof StartAgentRequest>;
 
 export const MergeRequest = z.object({
+  townId: z.string().min(1),
   rigId: z.string().min(1),
   branch: z.string().min(1),
   targetBranch: z.string().min(1),

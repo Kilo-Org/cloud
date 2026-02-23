@@ -268,6 +268,7 @@ export async function startMergeInContainer(
         'X-Town-Config': JSON.stringify(containerConfig),
       },
       body: JSON.stringify({
+        townId: params.townId,
         rigId: params.rigId,
         branch: params.branch,
         targetBranch: params.targetBranch,

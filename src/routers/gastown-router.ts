@@ -334,6 +334,30 @@ export const gastownRouter = createTRPCRouter({
       if (town.owner_user_id !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
       }
+
+      // Refresh git credentials on every page load so polecats dispatched
+      // by the mayor's gt_sling tool have a fresh token. The mayor's tool
+      // calls bypass the tRPC sling mutation (which normally refreshes),
+      // so this is the only refresh point.
+      const townConfig = await withGastownError(() => gastown.getTownConfig(input.townId));
+      const integrationId = townConfig.git_auth.platform_integration_id;
+      if (integrationId) {
+        const freshCredentials = await refreshGitCredentials(integrationId);
+        if (freshCredentials) {
+          await withGastownError(() =>
+            gastown.updateTownConfig(input.townId, {
+              git_auth: {
+                ...freshCredentials,
+                platform_integration_id: integrationId,
+              },
+            })
+          );
+          console.log(
+            `${LOG_PREFIX} ensureMayor: refreshed git credentials for integration=${integrationId}`
+          );
+        }
+      }
+
       return withGastownError(() => gastown.ensureMayor(input.townId));
     }),
 

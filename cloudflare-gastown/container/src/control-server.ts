@@ -239,7 +239,9 @@ app.post('/git/merge', async c => {
     // Report result back to the Rig DO
     const callbackUrl =
       req.callbackUrl ??
-      (apiUrl ? `${apiUrl}/api/rigs/${req.rigId}/review-queue/${req.entryId}/complete` : null);
+      (apiUrl
+        ? `${apiUrl}/api/towns/${req.townId}/rigs/${req.rigId}/review-queue/${req.entryId}/complete`
+        : null);
 
     if (callbackUrl && token) {
       try {

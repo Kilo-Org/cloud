@@ -15,6 +15,39 @@ import {
 import { modelsByProvider } from '@/db/schema';
 import { db } from '@/lib/drizzle';
 import { lt } from 'drizzle-orm';
+import * as z from 'zod';
+import { PROVIDERS } from '@/lib/providers';
+
+async function fetchVercelAiGatewayProviders() {
+  const gateway = PROVIDERS.VERCEL_AI_GATEWAY;
+  const headers = {
+    authorization: `Bearer ${gateway.apiKey}`,
+  };
+  const result: Record<string, string[]> = {};
+
+  const modelsSchema = z.object({ data: z.array(z.object({ id: z.string() })) });
+  const endpointsSchema = z.object({
+    data: z.object({ endpoints: z.array(z.object({ provider_name: z.string() })) }),
+  });
+
+  const modelsResponse = await fetch(`${gateway.apiUrl}/models`, {
+    method: 'GET',
+    headers,
+  });
+  const models = modelsSchema.parse(await modelsResponse.json());
+
+  for (const model of models.data) {
+    console.debug(`[fetchVercelAiGatewayProviders] ${model.id}`);
+    const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
+      method: 'GET',
+      headers,
+    });
+    const endpoints = endpointsSchema.parse(await endpointsResponse.json());
+    result[model.id] = endpoints.data.endpoints.map(ep => ep.provider_name);
+  }
+
+  return result;
+}
 
 async function fetchProviders(): Promise<OpenRouterProvider[]> {
   console.log('Fetching OpenRouter providers from frontend endpoint...');
@@ -360,18 +393,35 @@ export async function syncProviders() {
 }
 
 export async function syncAndStoreProviders() {
-  const providers = await syncProviders();
+  const [openrouter_providers, vercel_providers] = await Promise.all([
+    syncProviders(),
+    fetchVercelAiGatewayProviders(),
+  ]);
 
-  if (providers.total_providers < 10) {
-    throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);
+  if (openrouter_providers.total_providers < 10) {
+    throw new Error(
+      `Suspicious: total number of providers is ${openrouter_providers.total_providers} < 10`
+    );
   }
 
-  if (providers.total_models < 100) {
-    throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
+  if (openrouter_providers.total_models < 100) {
+    throw new Error(
+      `Suspicious: total number of models is ${openrouter_providers.total_models} < 100`
+    );
+  }
+
+  const vercel_provider_count = Object.keys(vercel_providers).length;
+  if (vercel_provider_count < 100) {
+    throw new Error(
+      `Suspicious: total number of potential user byok models is ${vercel_provider_count} < 100`
+    );
   }
 
   const result = await db.transaction(async () => {
-    const results = await db.insert(modelsByProvider).values({ data: providers }).returning();
+    const results = await db
+      .insert(modelsByProvider)
+      .values({ data: openrouter_providers, vercel_providers })
+      .returning();
     await db.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
     return results[0];
   });
@@ -381,5 +431,6 @@ export async function syncAndStoreProviders() {
     generated_at: result.data.generated_at,
     total_models: result.data.total_models,
     total_providers: result.data.total_providers,
+    vercel_provider_count,
   };
 }

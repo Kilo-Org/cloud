@@ -1944,6 +1944,7 @@ export type NewModelStats = typeof modelStats.$inferInsert;
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
+  vercel_providers: jsonb('vercel_providers').$type<Record<string, string[]>>(),
 });
 
 export const cloud_agent_code_reviews = pgTable(

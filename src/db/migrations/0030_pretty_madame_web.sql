@@ -1,0 +1,1 @@
+ALTER TABLE "models_by_provider" ALTER COLUMN "data" DROP NOT NULL;

@@ -15,7 +15,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import {
   ArrowLeft,
@@ -90,7 +89,7 @@ export function GastownTownSidebar({ townId, ...sidebarProps }: GastownTownSideb
         </div>
       </SidebarHeader>
 
-      <SidebarSeparator />
+      <div className="mx-3 border-b border-white/[0.08]" />
 
       <SidebarContent>
         {/* Primary navigation */}

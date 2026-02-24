@@ -425,11 +425,19 @@ function AgentTerminalPane({ townId, agentId }: { townId: string; agentId: strin
         resizeMutateRef.current({ townId, agentId, ptyId: ptyRef.current.id, cols, rows });
       }
 
-      const result = await new Promise<{ pty: { id: string }; wsUrl: string }>(
-        (resolve, reject) => {
+      let result: { pty: { id: string }; wsUrl: string };
+      try {
+        result = await new Promise<{ pty: { id: string }; wsUrl: string }>((resolve, reject) => {
           createPty.mutate({ townId, agentId }, { onSuccess: resolve, onError: reject });
+        });
+      } catch (err) {
+        if (!disposed) {
+          setStatus(
+            `Error: ${err instanceof Error ? err.message : 'Failed to create PTY session'}`
+          );
         }
-      );
+        return;
+      }
 
       if (disposed) return;
 

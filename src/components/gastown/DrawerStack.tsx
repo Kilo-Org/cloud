@@ -8,7 +8,7 @@ import { X, ChevronLeft } from 'lucide-react';
 
 export type ResourceRef =
   | { type: 'bead'; beadId: string; rigId: string }
-  | { type: 'agent'; agentId: string; rigId: string; townId: string }
+  | { type: 'agent'; agentId: string; rigId: string; townId?: string }
   | { type: 'event'; event: import('./ActivityFeed').TownEvent };
 
 type DrawerStackEntry = {

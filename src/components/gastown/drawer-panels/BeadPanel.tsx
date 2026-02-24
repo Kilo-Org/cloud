@@ -112,7 +112,7 @@ export function BeadPanel({
               if (townId) {
                 push({
                   type: 'agent',
-                  agentId: bead.assignee_agent_bead_id!,
+                  agentId: bead.assignee_agent_bead_id ?? '',
                   rigId,
                   townId,
                 });
@@ -145,7 +145,7 @@ export function BeadPanel({
         {/* Parent bead — clickable */}
         {bead.parent_bead_id && (
           <button
-            onClick={() => push({ type: 'bead', beadId: bead.parent_bead_id!, rigId })}
+            onClick={() => push({ type: 'bead', beadId: bead.parent_bead_id ?? '', rigId })}
             className="group/link flex flex-col border-r border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] [&:nth-child(2n)]:border-r-0"
           >
             <div className="flex items-center gap-1 text-[10px] text-white/30">

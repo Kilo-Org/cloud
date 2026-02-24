@@ -128,16 +128,25 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
     })),
   });
 
-  const recentAgents = useMemo(() => {
-    const agents: Array<Agent & { rigName: string; rigId: string }> = [];
+  const agentsByRig = useMemo(() => {
+    const map: Record<string, Agent[]> = {};
     rigAgentQueries.forEach((q, i) => {
       const rig = rigs[i];
-      if (q.data && rig) {
-        for (const agent of q.data) {
+      if (q.data && rig) map[rig.id] = q.data;
+    });
+    return map;
+  }, [rigAgentQueries, rigs]);
+
+  const recentAgents = useMemo(() => {
+    const agents: Array<Agent & { rigName: string; rigId: string }> = [];
+    for (const [rigId, rigAgents] of Object.entries(agentsByRig)) {
+      const rig = rigs.find(r => r.id === rigId);
+      if (rig) {
+        for (const agent of rigAgents) {
           agents.push({ ...agent, rigName: rig.name, rigId: rig.id });
         }
       }
-    });
+    }
     // Sort by last_activity_at descending, then by created_at
     agents.sort((a, b) => {
       const aTime = a.last_activity_at ?? a.created_at;
@@ -145,7 +154,7 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
       return new Date(bTime).getTime() - new Date(aTime).getTime();
     });
     return agents.slice(0, 5);
-  }, [rigAgentQueries, rigs]);
+  }, [agentsByRig, rigs]);
 
   const deleteRig = useMutation(
     trpc.gastown.deleteRig.mutationOptions({
@@ -443,7 +452,7 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
                   <SystemTopology
                     townName={townQuery.data?.name ?? 'Town'}
                     rigs={rigs}
-                    agentsByRig={{}}
+                    agentsByRig={agentsByRig}
                     recentEvents={events.slice(-10)}
                     onSelectRig={rigId => void router.push(`/gastown/${townId}/rigs/${rigId}`)}
                   />

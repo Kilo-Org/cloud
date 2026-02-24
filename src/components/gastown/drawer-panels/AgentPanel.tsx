@@ -52,24 +52,28 @@ const BEAD_STATUS_DOT: Record<string, string> = {
 export function AgentPanel({
   agentId,
   rigId,
-  townId,
+  townId: townIdProp,
   push,
   close,
 }: {
   agentId: string;
   rigId: string;
-  townId: string;
+  townId?: string;
   push: (ref: ResourceRef) => void;
   close: () => void;
 }) {
   const trpc = useTRPC();
   const { openAgentTab } = useTerminalBar();
 
+  const rigQuery = useQuery(trpc.gastown.getRig.queryOptions({ rigId }));
   const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));
   const beadsQuery = useQuery({
     ...trpc.gastown.listBeads.queryOptions({ rigId }),
     refetchInterval: 8_000,
   });
+
+  // Derive townId from the rig if not provided directly
+  const townId = townIdProp || rigQuery.data?.town_id || '';
 
   const agent = (agentsQuery.data ?? []).find(a => a.id === agentId);
   const relatedBeads = (beadsQuery.data ?? []).filter(b => b.assignee_agent_bead_id === agentId);
@@ -140,7 +144,7 @@ export function AgentPanel({
         {/* Hooked bead — clickable */}
         {agent.current_hook_bead_id ? (
           <button
-            onClick={() => push({ type: 'bead', beadId: agent.current_hook_bead_id!, rigId })}
+            onClick={() => push({ type: 'bead', beadId: agent.current_hook_bead_id ?? '', rigId })}
             className="group/link flex flex-col border-r border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] [&:nth-child(2n)]:border-r-0"
           >
             <div className="flex items-center gap-1 text-[10px] text-white/30">

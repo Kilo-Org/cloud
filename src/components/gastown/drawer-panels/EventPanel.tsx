@@ -131,7 +131,7 @@ export function EventPanel({
   const summary = eventSummary(event);
 
   const meta = event.metadata;
-  const rigId = 'rig_id' in event ? (event.rig_id as string | undefined) : undefined;
+  const rigId = 'rig_id' in event && typeof event.rig_id === 'string' ? event.rig_id : undefined;
   const rigName = 'rig_name' in event ? event.rig_name : undefined;
 
   // Extract well-known metadata fields to show in context sections
@@ -237,7 +237,9 @@ export function EventPanel({
               icon={Bot}
               label={event.agent_id.slice(0, 12)}
               mono
-              onClick={() => push({ type: 'agent', agentId: event.agent_id!, rigId, townId: '' })}
+              onClick={() =>
+                push({ type: 'agent', agentId: event.agent_id ?? '', rigId, townId: undefined })
+              }
             />
           ) : (
             <span className="font-mono text-xs text-white/50">{event.agent_id.slice(0, 12)}</span>
@@ -306,7 +308,7 @@ export function EventPanel({
                   icon={Bot}
                   label={mailTo.slice(0, 12)}
                   mono
-                  onClick={() => push({ type: 'agent', agentId: mailTo, rigId, townId: '' })}
+                  onClick={() => push({ type: 'agent', agentId: mailTo, rigId, townId: undefined })}
                 />
               </div>
             )}
@@ -318,7 +320,7 @@ export function EventPanel({
                   label={event.agent_id.slice(0, 12)}
                   mono
                   onClick={() =>
-                    push({ type: 'agent', agentId: event.agent_id!, rigId, townId: '' })
+                    push({ type: 'agent', agentId: event.agent_id ?? '', rigId, townId: undefined })
                   }
                 />
               </div>
@@ -355,7 +357,9 @@ export function EventPanel({
               icon={Bot}
               label="Agent"
               value={event.agent_id.slice(0, 12)}
-              onClick={() => push({ type: 'agent', agentId: event.agent_id!, rigId, townId: '' })}
+              onClick={() =>
+                push({ type: 'agent', agentId: event.agent_id ?? '', rigId, townId: undefined })
+              }
             />
           ) : (
             <MetaCell

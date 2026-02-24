@@ -1,9 +1,9 @@
 'use client';
 
 import { use } from 'react';
-import { MayorChat } from '@/components/gastown/MayorChat';
+import { TerminalBar } from '@/components/gastown/TerminalBar';
 
 export function MayorTerminalBar({ params }: { params: Promise<{ townId: string }> }) {
   const { townId } = use(params);
-  return <MayorChat townId={townId} />;
+  return <TerminalBar townId={townId} />;
 }

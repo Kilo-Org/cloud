@@ -131,7 +131,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
-    ...(ENABLE_GASTOWN_FEATURE
+    ...(ENABLE_GASTOWN_FEATURE && isAdmin
       ? [
           {
             title: 'Gastown',

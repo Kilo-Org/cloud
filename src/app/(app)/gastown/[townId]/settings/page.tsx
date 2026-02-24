@@ -9,7 +9,9 @@ export default async function TownSettingsPage({
   params: Promise<{ townId: string }>;
 }) {
   const { townId } = await params;
-  await getUserFromAuthOrRedirect(`/users/sign_in?callbackPath=/gastown/${townId}/settings`);
-  if (!ENABLE_GASTOWN_FEATURE) return notFound();
+  const user = await getUserFromAuthOrRedirect(
+    `/users/sign_in?callbackPath=/gastown/${townId}/settings`
+  );
+  if (!ENABLE_GASTOWN_FEATURE || !user.is_admin) return notFound();
   return <TownSettingsPageClient townId={townId} />;
 }

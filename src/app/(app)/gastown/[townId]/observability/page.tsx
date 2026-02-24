@@ -9,7 +9,9 @@ export default async function ObservabilityPage({
   params: Promise<{ townId: string }>;
 }) {
   const { townId } = await params;
-  await getUserFromAuthOrRedirect(`/users/sign_in?callbackPath=/gastown/${townId}/observability`);
-  if (!ENABLE_GASTOWN_FEATURE) return notFound();
+  const user = await getUserFromAuthOrRedirect(
+    `/users/sign_in?callbackPath=/gastown/${townId}/observability`
+  );
+  if (!ENABLE_GASTOWN_FEATURE || !user.is_admin) return notFound();
   return <ObservabilityPageClient townId={townId} />;
 }

@@ -1,5 +1,5 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import * as gastown from '@/lib/gastown/gastown-client';
@@ -102,7 +102,7 @@ async function withGastownError<T>(fn: () => Promise<T>): Promise<T> {
 export const gastownRouter = createTRPCRouter({
   // ── Towns ───────────────────────────────────────────────────────────────
 
-  createTown: baseProcedure
+  createTown: adminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(64),
@@ -126,11 +126,11 @@ export const gastownRouter = createTRPCRouter({
       return town;
     }),
 
-  listTowns: baseProcedure.query(async ({ ctx }) => {
+  listTowns: adminProcedure.query(async ({ ctx }) => {
     return withGastownError(() => gastown.listTowns(ctx.user.id));
   }),
 
-  getTown: baseProcedure
+  getTown: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
@@ -142,7 +142,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Rigs ────────────────────────────────────────────────────────────────
 
-  createRig: baseProcedure
+  createRig: adminProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -220,7 +220,7 @@ export const gastownRouter = createTRPCRouter({
       return rig;
     }),
 
-  listRigs: baseProcedure
+  listRigs: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       // Verify ownership
@@ -231,7 +231,7 @@ export const gastownRouter = createTRPCRouter({
       return withGastownError(() => gastown.listRigs(ctx.user.id, input.townId));
     }),
 
-  getRig: baseProcedure
+  getRig: adminProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
@@ -244,7 +244,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Beads ───────────────────────────────────────────────────────────────
 
-  listBeads: baseProcedure
+  listBeads: adminProcedure
     .input(
       z.object({
         rigId: z.string().uuid(),
@@ -261,7 +261,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Agents ──────────────────────────────────────────────────────────────
 
-  listAgents: baseProcedure
+  listAgents: adminProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const rig = await withGastownError(() => gastown.getRig(ctx.user.id, input.rigId));
@@ -270,7 +270,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Work Assignment ─────────────────────────────────────────────────────
 
-  sling: baseProcedure
+  sling: adminProcedure
     .input(
       z.object({
         rigId: z.string().uuid(),
@@ -309,7 +309,7 @@ export const gastownRouter = createTRPCRouter({
   // Routes messages to MayorDO (town-level persistent conversational agent).
   // No beads are created — the mayor decides when to delegate work via tools.
 
-  sendMessage: baseProcedure
+  sendMessage: adminProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -351,7 +351,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Mayor Status ──────────────────────────────────────────────────────
 
-  getMayorStatus: baseProcedure
+  getMayorStatus: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       // Verify ownership
@@ -362,7 +362,7 @@ export const gastownRouter = createTRPCRouter({
       return withGastownError(() => gastown.getMayorStatus(input.townId));
     }),
 
-  ensureMayor: baseProcedure
+  ensureMayor: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
@@ -386,7 +386,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Agent Streams ───────────────────────────────────────────────────────
 
-  getAgentStreamUrl: baseProcedure
+  getAgentStreamUrl: adminProcedure
     .input(
       z.object({
         agentId: z.string().uuid(),
@@ -416,7 +416,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Agent Terminal (PTY) ──────────────────────────────────────────────────
 
-  createPtySession: baseProcedure
+  createPtySession: adminProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -443,7 +443,7 @@ export const gastownRouter = createTRPCRouter({
       return { pty, wsUrl };
     }),
 
-  resizePtySession: baseProcedure
+  resizePtySession: adminProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -465,7 +465,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Town Configuration ──────────────────────────────────────────────────
 
-  getTownConfig: baseProcedure
+  getTownConfig: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
@@ -475,7 +475,7 @@ export const gastownRouter = createTRPCRouter({
       return withGastownError(() => gastown.getTownConfig(input.townId));
     }),
 
-  updateTownConfig: baseProcedure
+  updateTownConfig: adminProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -492,7 +492,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Events ─────────────────────────────────────────────────────────────
 
-  getBeadEvents: baseProcedure
+  getBeadEvents: adminProcedure
     .input(
       z.object({
         rigId: z.string().uuid(),
@@ -512,7 +512,7 @@ export const gastownRouter = createTRPCRouter({
       );
     }),
 
-  getTownEvents: baseProcedure
+  getTownEvents: adminProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -535,7 +535,7 @@ export const gastownRouter = createTRPCRouter({
 
   // ── Deletes ────────────────────────────────────────────────────────────
 
-  deleteTown: baseProcedure
+  deleteTown: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const town = await withGastownError(() => gastown.getTown(ctx.user.id, input.townId));
@@ -545,13 +545,13 @@ export const gastownRouter = createTRPCRouter({
       await withGastownError(() => gastown.deleteTown(ctx.user.id, input.townId));
     }),
 
-  deleteRig: baseProcedure
+  deleteRig: adminProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await withGastownError(() => gastown.deleteRig(ctx.user.id, input.rigId));
     }),
 
-  deleteBead: baseProcedure
+  deleteBead: adminProcedure
     .input(z.object({ rigId: z.string().uuid(), beadId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the caller owns this rig before deleting
@@ -559,7 +559,7 @@ export const gastownRouter = createTRPCRouter({
       await withGastownError(() => gastown.deleteBead(rig.town_id, rig.id, input.beadId));
     }),
 
-  deleteAgent: baseProcedure
+  deleteAgent: adminProcedure
     .input(z.object({ rigId: z.string().uuid(), agentId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Verify the caller owns this rig before deleting

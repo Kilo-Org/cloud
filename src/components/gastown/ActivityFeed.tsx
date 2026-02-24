@@ -13,7 +13,9 @@ import {
   PlayCircle,
   PauseCircle,
   Mail,
+  ChevronRight,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const EVENT_ICONS: Record<string, typeof Activity> = {
   created: PlayCircle,
@@ -91,9 +93,15 @@ type ActivityFeedViewProps = {
   townId: string;
   events?: TownEvent[];
   isLoading?: boolean;
+  onEventClick?: (event: TownEvent) => void;
 };
 
-export function ActivityFeedView({ townId, events, isLoading }: ActivityFeedViewProps) {
+export function ActivityFeedView({
+  townId,
+  events,
+  isLoading,
+  onEventClick,
+}: ActivityFeedViewProps) {
   const trpc = useTRPC();
   const query = useQuery({
     ...trpc.gastown.getTownEvents.queryOptions({ townId, limit: 50 }),
@@ -108,10 +116,16 @@ export function ActivityFeedView({ townId, events, isLoading }: ActivityFeedView
     return (
       <div className="space-y-2 p-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex animate-pulse items-center gap-2">
-            <div className="bg-muted h-4 w-4 rounded-full" />
-            <div className="bg-muted h-3 flex-1 rounded" />
-          </div>
+          <motion.div
+            key={i}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.05 }}
+            className="flex items-center gap-2"
+          >
+            <div className="size-4 rounded-full bg-white/[0.06]" />
+            <div className="h-3 flex-1 rounded bg-white/[0.04]" />
+          </motion.div>
         ))}
       </div>
     );
@@ -119,42 +133,70 @@ export function ActivityFeedView({ townId, events, isLoading }: ActivityFeedView
 
   if (!effectiveEvents?.length) {
     return (
-      <div className="text-muted-foreground flex flex-col items-center justify-center p-6 text-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-muted-foreground flex flex-col items-center justify-center p-6 text-sm"
+      >
         <Activity className="mb-2 h-8 w-8 opacity-40" />
         <p>No activity yet</p>
-      </div>
+      </motion.div>
     );
   }
 
-  // Show newest first
-  const sorted = [...effectiveEvents].reverse();
+  // Newest first — events from the API come oldest-first, so reverse.
+  const sorted = [...effectiveEvents].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  const clickable = Boolean(onEventClick);
 
   return (
-    <div className="max-h-[420px] space-y-1 overflow-y-auto p-2">
-      {sorted.map(event => {
-        const Icon = EVENT_ICONS[event.event_type] ?? Activity;
-        const color = EVENT_COLORS[event.event_type] ?? 'text-muted-foreground';
+    <div className="max-h-[420px] space-y-0.5 overflow-y-auto p-2">
+      <AnimatePresence initial={false}>
+        {sorted.map(event => {
+          const Icon = EVENT_ICONS[event.event_type] ?? Activity;
+          const color = EVENT_COLORS[event.event_type] ?? 'text-muted-foreground';
 
-        return (
-          <div
-            key={event.bead_event_id}
-            className="flex items-start gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-white/[0.05]"
-          >
-            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-white/85">
-                {eventDescription(toEventDescriptionInput(event))}
-              </p>
-              <p className="text-xs text-white/40">
-                {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
-              </p>
-            </div>
-          </div>
-        );
-      })}
+          return (
+            <motion.div
+              key={event.bead_event_id}
+              layout
+              initial={{ opacity: 0, height: 0, y: -8 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+              role={clickable ? 'button' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onClick={clickable ? () => onEventClick?.(event) : undefined}
+              onKeyDown={
+                clickable
+                  ? e => {
+                      if (e.key === 'Enter' || e.key === ' ') onEventClick?.(event);
+                    }
+                  : undefined
+              }
+              className={`flex items-start gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-white/[0.05] ${clickable ? 'cursor-pointer' : ''}`}
+            >
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-white/85">
+                  {eventDescription(toEventDescriptionInput(event))}
+                </p>
+                <p className="text-xs text-white/40">
+                  {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
+                </p>
+              </div>
+              {clickable && <ChevronRight className="mt-1 size-3 shrink-0 text-white/15" />}
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 }
+
+export type { TownEvent };
 
 export function ActivityFeed({ townId }: { townId: string }) {
   return <ActivityFeedView townId={townId} />;
@@ -171,10 +213,16 @@ export function BeadEventTimeline({ rigId, beadId }: { rigId: string; beadId: st
     return (
       <div className="space-y-2 p-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="flex animate-pulse items-center gap-2">
-            <div className="bg-muted h-3 w-3 rounded-full" />
-            <div className="bg-muted h-2.5 flex-1 rounded" />
-          </div>
+          <motion.div
+            key={i}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.06 }}
+            className="flex items-center gap-2"
+          >
+            <div className="size-3 rounded-full bg-white/[0.06]" />
+            <div className="h-2.5 flex-1 rounded bg-white/[0.04]" />
+          </motion.div>
         ))}
       </div>
     );
@@ -186,24 +234,32 @@ export function BeadEventTimeline({ rigId, beadId }: { rigId: string; beadId: st
 
   return (
     <div className="space-y-1 p-2">
-      {events.map(event => {
-        const Icon = EVENT_ICONS[event.event_type] ?? Activity;
-        const color = EVENT_COLORS[event.event_type] ?? 'text-muted-foreground';
+      <AnimatePresence initial={false}>
+        {events.map((event, i) => {
+          const Icon = EVENT_ICONS[event.event_type] ?? Activity;
+          const color = EVENT_COLORS[event.event_type] ?? 'text-muted-foreground';
 
-        return (
-          <div key={event.bead_event_id} className="flex items-start gap-2 py-1 text-xs">
-            <Icon className={`mt-0.5 h-3 w-3 shrink-0 ${color}`} />
-            <div className="min-w-0 flex-1">
-              <span className="text-foreground">
-                {eventDescription(toEventDescriptionInput(event))}
-              </span>
-              <span className="text-muted-foreground ml-1">
-                {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
-              </span>
-            </div>
-          </div>
-        );
-      })}
+          return (
+            <motion.div
+              key={event.bead_event_id}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.03, duration: 0.2 }}
+              className="flex items-start gap-2 py-1 text-xs"
+            >
+              <Icon className={`mt-0.5 h-3 w-3 shrink-0 ${color}`} />
+              <div className="min-w-0 flex-1">
+                <span className="text-foreground">
+                  {eventDescription(toEventDescriptionInput(event))}
+                </span>
+                <span className="text-muted-foreground ml-1">
+                  {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
+                </span>
+              </div>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 }

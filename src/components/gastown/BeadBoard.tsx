@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { motion, AnimatePresence } from 'motion/react';
 
 type Bead = {
   bead_id: string;
@@ -67,8 +68,6 @@ function BeadCard({
     ? agentNameById?.[bead.assignee_agent_bead_id]
     : null;
 
-  // Use a non-interactive wrapper (div) + interactive elements inside.
-  // Avoid nesting <button> inside <button> (invalid HTML, a11y issues).
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!onSelect) return;
     if (e.key === 'Enter' || e.key === ' ') {
@@ -177,10 +176,15 @@ export function BeadBoard({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      {statusColumns.map(status => {
-        const columnBeads = beads.filter(b => b.status === status);
+      {statusColumns.map((status, colIdx) => {
+        const columnBeads = beads.filter(b => b.status === status && b.type !== 'agent');
         return (
-          <div key={status}>
+          <motion.div
+            key={status}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: colIdx * 0.08, duration: 0.3 }}
+          >
             <div className="mb-3 flex items-center gap-2">
               <span
                 className={cn(
@@ -190,24 +194,53 @@ export function BeadBoard({
               >
                 {statusLabels[status]}
               </span>
-              <span className="text-xs text-white/45">{columnBeads.length}</span>
+              <motion.span
+                key={columnBeads.length}
+                initial={{ scale: 1.3, opacity: 0.5 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="text-xs text-white/45"
+              >
+                {columnBeads.length}
+              </motion.span>
             </div>
             <div className="space-y-2">
-              {columnBeads.length === 0 && (
-                <p className="py-4 text-center text-xs text-white/35">No beads</p>
-              )}
-              {columnBeads.map(bead => (
-                <BeadCard
-                  key={bead.bead_id}
-                  bead={bead}
-                  onDelete={onDeleteBead ? () => onDeleteBead(bead.bead_id) : undefined}
-                  onSelect={onSelectBead ? () => onSelectBead(bead) : undefined}
-                  isSelected={selectedBeadId === bead.bead_id}
-                  agentNameById={agentNameById}
-                />
-              ))}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {columnBeads.length === 0 && (
+                  <motion.p
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="py-4 text-center text-xs text-white/35"
+                  >
+                    No beads
+                  </motion.p>
+                )}
+                {columnBeads.map(bead => (
+                  <motion.div
+                    key={bead.bead_id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    transition={{
+                      layout: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+                      opacity: { duration: 0.2 },
+                      scale: { duration: 0.2 },
+                    }}
+                  >
+                    <BeadCard
+                      bead={bead}
+                      onDelete={onDeleteBead ? () => onDeleteBead(bead.bead_id) : undefined}
+                      onSelect={onSelectBead ? () => onSelectBead(bead) : undefined}
+                      isSelected={selectedBeadId === bead.bead_id}
+                      agentNameById={agentNameById}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
-          </div>
+          </motion.div>
         );
       })}
     </div>

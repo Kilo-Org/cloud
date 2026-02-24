@@ -7,6 +7,21 @@
 @import '@xterm/xterm/css/xterm.css';
 @plugin '@tailwindcss/typography';
 
+/* xterm's helper textarea is used for IME/clipboard but Tailwind v4's reset
+   overrides its off-screen positioning, making it visible as a garbled box.
+   Re-assert the off-screen placement with enough specificity to survive the reset. */
+.xterm .xterm-helper-textarea {
+  position: absolute !important;
+  opacity: 0 !important;
+  left: -9999em !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

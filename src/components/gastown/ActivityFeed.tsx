@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -112,6 +113,9 @@ export function ActivityFeedView({
   const effectiveEvents = events ?? query.data;
   const effectiveLoading = isLoading ?? query.isLoading;
 
+  const PAGE_SIZE = 10;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
   if (effectiveLoading) {
     return (
       <div className="space-y-2 p-3">
@@ -149,12 +153,15 @@ export function ActivityFeedView({
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
+  const visible = sorted.slice(0, visibleCount);
+  const hasMore = visibleCount < sorted.length;
+
   const clickable = Boolean(onEventClick);
 
   return (
-    <div className="max-h-[420px] space-y-0.5 overflow-y-auto p-2">
+    <div className="space-y-0.5 p-2">
       <AnimatePresence initial={false}>
-        {sorted.map(event => {
+        {visible.map(event => {
           const Icon = EVENT_ICONS[event.event_type] ?? Activity;
           const color = EVENT_COLORS[event.event_type] ?? 'text-muted-foreground';
 
@@ -192,6 +199,17 @@ export function ActivityFeedView({
           );
         })}
       </AnimatePresence>
+      {hasMore && (
+        <button
+          onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs text-white/35 transition-colors hover:bg-white/[0.04] hover:text-white/55"
+        >
+          Show more
+          <span className="font-mono text-[10px] text-white/20">
+            {sorted.length - visibleCount} remaining
+          </span>
+        </button>
+      )}
     </div>
   );
 }

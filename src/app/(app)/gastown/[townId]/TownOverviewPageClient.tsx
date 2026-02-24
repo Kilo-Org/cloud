@@ -160,9 +160,9 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
   );
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
+    <div>
+      {/* Top bar — sticky */}
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-3">
           {townQuery.isLoading ? (
             <Skeleton className="h-6 w-40" />
@@ -187,273 +187,269 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
         </Button>
       </div>
 
-      {/* Main content area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_380px]">
-          {/* Left column: activity feed (social-media-style) */}
-          <div className="border-r border-white/[0.06]">
-            {/* Stats strip */}
-            <div className="grid grid-cols-4 border-b border-white/[0.06]">
-              <StatCell
-                label="Open"
-                value={openBeadCount}
-                icon={<Hexagon className="size-3.5" />}
-                color="text-sky-400"
-              />
-              <StatCell
-                label="In Progress"
-                value={inProgressBeadCount}
-                icon={<Bot className="size-3.5" />}
-                color="text-violet-400"
-              />
-              <StatCell
-                label="Closed"
-                value={closedBeadCount}
-                icon={<Zap className="size-3.5" />}
-                color="text-emerald-400"
-              />
-              <StatCell
-                label="Escalations"
-                value={escalationsCount}
-                icon={<AlertTriangle className="size-3.5" />}
-                color="text-orange-400"
-              />
-            </div>
+      {/* Main content area — no scroll container; viewport scrolls */}
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_380px]">
+        {/* Left column: activity feed */}
+        <div className="border-r border-white/[0.06]">
+          {/* Stats strip */}
+          <div className="grid grid-cols-4 border-b border-white/[0.06]">
+            <StatCell
+              label="Open"
+              value={openBeadCount}
+              icon={<Hexagon className="size-3.5" />}
+              color="text-sky-400"
+            />
+            <StatCell
+              label="In Progress"
+              value={inProgressBeadCount}
+              icon={<Bot className="size-3.5" />}
+              color="text-violet-400"
+            />
+            <StatCell
+              label="Closed"
+              value={closedBeadCount}
+              icon={<Zap className="size-3.5" />}
+              color="text-emerald-400"
+            />
+            <StatCell
+              label="Escalations"
+              value={escalationsCount}
+              icon={<AlertTriangle className="size-3.5" />}
+              color="text-orange-400"
+            />
+          </div>
 
-            {/* Activity chart */}
-            <div className="border-b border-white/[0.06] px-5 pt-4 pb-2">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Activity className="size-3.5 text-white/30" />
-                  <span className="text-[11px] font-medium tracking-wide text-white/40 uppercase">
-                    Activity — 24h
-                  </span>
-                </div>
-                <span className="font-mono text-[11px] text-white/30">{events.length} events</span>
-              </div>
-              <div className="h-[100px]">
-                {activityData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={activityData}>
-                      <defs>
-                        <linearGradient id="activityGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="oklch(95% 0.15 108)" stopOpacity={0.3} />
-                          <stop offset="100%" stopColor="oklch(95% 0.15 108)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="time" hide />
-                      <YAxis hide />
-                      <Tooltip
-                        contentStyle={{
-                          background: 'oklch(0.15 0 0)',
-                          border: '1px solid oklch(1 0 0 / 0.1)',
-                          borderRadius: '8px',
-                          fontSize: '11px',
-                          color: 'oklch(1 0 0 / 0.7)',
-                        }}
-                        labelFormatter={() => ''}
-                        formatter={(value: number) => [value, 'events']}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="count"
-                        stroke="oklch(95% 0.15 108)"
-                        strokeWidth={1.5}
-                        fill="url(#activityGrad)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-white/20">
-                    No activity data
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Activity feed — clickable items */}
-            <div className="px-2">
-              <div className="flex items-center gap-2 px-3 pt-4 pb-2">
+          {/* Activity chart */}
+          <div className="border-b border-white/[0.06] px-5 pt-4 pb-2">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="size-3.5 text-white/30" />
                 <span className="text-[11px] font-medium tracking-wide text-white/40 uppercase">
-                  Feed
+                  Activity — 24h
                 </span>
               </div>
-              <ActivityFeedView
-                townId={townId}
-                events={events.slice(-80)}
-                isLoading={townEventsQuery.isLoading}
-                onEventClick={event => openDrawer({ type: 'event', event })}
-              />
+              <span className="font-mono text-[11px] text-white/30">{events.length} events</span>
+            </div>
+            <div className="h-[100px]">
+              {activityData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={activityData}>
+                    <defs>
+                      <linearGradient id="activityGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="oklch(95% 0.15 108)" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="oklch(95% 0.15 108)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="time" hide />
+                    <YAxis hide />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'oklch(0.15 0 0)',
+                        border: '1px solid oklch(1 0 0 / 0.1)',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        color: 'oklch(1 0 0 / 0.7)',
+                      }}
+                      labelFormatter={() => ''}
+                      formatter={(value: number) => [value, 'events']}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="oklch(95% 0.15 108)"
+                      strokeWidth={1.5}
+                      fill="url(#activityGrad)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs text-white/20">
+                  No activity data
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right column: rigs + recent agents + topology */}
-          <div className="flex flex-col">
-            <div className="flex-1 p-4">
-              {/* Rigs */}
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-[11px] font-medium tracking-wide text-white/40 uppercase">
-                  Rigs ({rigs.length})
-                </span>
-              </div>
+          {/* Activity feed — clickable items */}
+          <div className="px-2">
+            <div className="flex items-center gap-2 px-3 pt-4 pb-2">
+              <span className="text-[11px] font-medium tracking-wide text-white/40 uppercase">
+                Feed
+              </span>
+            </div>
+            <ActivityFeedView
+              townId={townId}
+              events={events.slice(-80)}
+              isLoading={townEventsQuery.isLoading}
+              onEventClick={event => openDrawer({ type: 'event', event })}
+            />
+          </div>
+        </div>
 
-              {rigsQuery.isLoading && (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full rounded-lg" />
-                  ))}
-                </div>
-              )}
+        {/* Right column: rigs + recent agents + topology — sticky alongside the feed */}
+        <div className="lg:sticky lg:top-[53px] lg:self-start">
+          <div className="p-4">
+            {/* Rigs */}
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[11px] font-medium tracking-wide text-white/40 uppercase">
+                Rigs ({rigs.length})
+              </span>
+            </div>
 
-              {rigs.length === 0 && !rigsQuery.isLoading && (
-                <div className="rounded-xl border border-dashed border-white/10 p-6 text-center">
-                  <GitBranch className="mx-auto mb-2 size-6 text-white/20" />
-                  <p className="text-xs text-white/40">
-                    No rigs yet. Connect a repo to get started.
-                  </p>
-                  <button
-                    onClick={() => setIsCreateRigOpen(true)}
-                    className="mt-3 inline-flex items-center gap-1 rounded-md bg-white/[0.06] px-3 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.1] hover:text-white/80"
-                  >
-                    <Plus className="size-3" />
-                    Create rig
-                  </button>
-                </div>
-              )}
-
-              <AnimatePresence mode="popLayout">
-                {rigs.map((rig, i) => (
-                  <motion.div
-                    key={rig.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ delay: i * 0.04, duration: 0.25 }}
-                    onClick={() => void router.push(`/gastown/${townId}/rigs/${rig.id}`)}
-                    className="group mb-2 cursor-pointer rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-white/85">{rig.name}</span>
-                        <div className="mt-1 flex items-center gap-2 text-[11px] text-white/40">
-                          <GitBranch className="size-3" />
-                          <span>{rig.default_branch}</span>
-                          <span className="text-white/20">|</span>
-                          <Clock className="size-3" />
-                          <span>
-                            {formatDistanceToNow(new Date(rig.created_at), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          if (confirm(`Delete rig "${rig.name}"?`)) {
-                            deleteRig.mutate({ rigId: rig.id });
-                          }
-                        }}
-                        className="rounded p-1 text-white/20 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                    </div>
-                    <div className="mt-2 max-w-full truncate font-mono text-[10px] text-white/25">
-                      {rig.git_url}
-                    </div>
-                  </motion.div>
+            {rigsQuery.isLoading && (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
                 ))}
-              </AnimatePresence>
+              </div>
+            )}
 
-              {/* Recent Agents */}
-              {recentAgents.length > 0 && (
-                <div className="mt-5">
-                  <div className="mb-2.5 flex items-center justify-between">
-                    <span className="text-[11px] font-medium tracking-wide text-white/40 uppercase">
-                      Recent Agents
-                    </span>
+            {rigs.length === 0 && !rigsQuery.isLoading && (
+              <div className="rounded-xl border border-dashed border-white/10 p-6 text-center">
+                <GitBranch className="mx-auto mb-2 size-6 text-white/20" />
+                <p className="text-xs text-white/40">No rigs yet. Connect a repo to get started.</p>
+                <button
+                  onClick={() => setIsCreateRigOpen(true)}
+                  className="mt-3 inline-flex items-center gap-1 rounded-md bg-white/[0.06] px-3 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.1] hover:text-white/80"
+                >
+                  <Plus className="size-3" />
+                  Create rig
+                </button>
+              </div>
+            )}
+
+            <AnimatePresence mode="popLayout">
+              {rigs.map((rig, i) => (
+                <motion.div
+                  key={rig.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ delay: i * 0.04, duration: 0.25 }}
+                  onClick={() => void router.push(`/gastown/${townId}/rigs/${rig.id}`)}
+                  className="group mb-2 cursor-pointer rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-white/85">{rig.name}</span>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-white/40">
+                        <GitBranch className="size-3" />
+                        <span>{rig.default_branch}</span>
+                        <span className="text-white/20">|</span>
+                        <Clock className="size-3" />
+                        <span>
+                          {formatDistanceToNow(new Date(rig.created_at), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
                     <button
-                      onClick={() => void router.push(`/gastown/${townId}/agents`)}
-                      className="text-[10px] text-white/25 transition-colors hover:text-white/50"
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (confirm(`Delete rig "${rig.name}"?`)) {
+                          deleteRig.mutate({ rigId: rig.id });
+                        }
+                      }}
+                      className="rounded p-1 text-white/20 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400"
                     >
-                      View all
+                      <Trash2 className="size-3" />
                     </button>
                   </div>
-                  <div className="space-y-1.5">
-                    <AnimatePresence mode="popLayout">
-                      {recentAgents.map((agent, i) => {
-                        const RoleIcon = ROLE_ICONS[agent.role] ?? Bot;
-                        return (
-                          <motion.div
-                            key={agent.id}
-                            initial={{ opacity: 0, x: 8 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -8 }}
-                            transition={{ delay: i * 0.04, duration: 0.2 }}
-                            onClick={() => {
-                              const a = agent as Agent & { rigId: string };
-                              openDrawer({
-                                type: 'agent',
-                                agentId: agent.id,
-                                rigId: a.rigId,
-                                townId,
-                              });
-                            }}
-                            className="group/agent flex cursor-pointer items-center gap-2.5 rounded-lg border border-white/[0.05] bg-white/[0.015] px-3 py-2 transition-colors hover:border-white/[0.1] hover:bg-white/[0.03]"
-                          >
-                            <div className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.05]">
-                              <RoleIcon className="size-3.5 text-white/40" />
-                              <span
-                                className={`absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-[oklch(0.12_0_0)] ${AGENT_STATUS_DOT[agent.status] ?? 'bg-white/20'}`}
-                              />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="truncate text-xs font-medium text-white/75">
-                                  {agent.name}
-                                </span>
-                                <span className="shrink-0 text-[9px] text-white/25 capitalize">
-                                  {agent.role}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[10px] text-white/25">
-                                <span>{(agent as Agent & { rigName: string }).rigName}</span>
-                                <span className="text-white/10">·</span>
-                                <span>
-                                  {agent.last_activity_at
-                                    ? formatDistanceToNow(new Date(agent.last_activity_at), {
-                                        addSuffix: true,
-                                      })
-                                    : 'no activity'}
-                                </span>
-                              </div>
-                            </div>
-                            <ChevronRight className="size-3 shrink-0 text-white/0 transition-colors group-hover/agent:text-white/20" />
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
+                  <div className="mt-2 max-w-full truncate font-mono text-[10px] text-white/25">
+                    {rig.git_url}
                   </div>
-                </div>
-              )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
 
-              {/* System Topology (mini view) */}
-              {rigs.length > 0 && (
-                <div className="mt-5">
-                  <div className="mb-2 text-[11px] font-medium tracking-wide text-white/40 uppercase">
-                    System Topology
-                  </div>
-                  <div className="h-[280px] rounded-lg border border-white/[0.06] bg-white/[0.02]">
-                    <SystemTopology
-                      townName={townQuery.data?.name ?? 'Town'}
-                      rigs={rigs}
-                      agentsByRig={{}}
-                      recentEvents={events.slice(-10)}
-                      onSelectRig={rigId => void router.push(`/gastown/${townId}/rigs/${rigId}`)}
-                    />
-                  </div>
+            {/* Recent Agents */}
+            {recentAgents.length > 0 && (
+              <div className="mt-5">
+                <div className="mb-2.5 flex items-center justify-between">
+                  <span className="text-[11px] font-medium tracking-wide text-white/40 uppercase">
+                    Recent Agents
+                  </span>
+                  <button
+                    onClick={() => void router.push(`/gastown/${townId}/agents`)}
+                    className="text-[10px] text-white/25 transition-colors hover:text-white/50"
+                  >
+                    View all
+                  </button>
                 </div>
-              )}
-            </div>
+                <div className="space-y-1.5">
+                  <AnimatePresence mode="popLayout">
+                    {recentAgents.map((agent, i) => {
+                      const RoleIcon = ROLE_ICONS[agent.role] ?? Bot;
+                      return (
+                        <motion.div
+                          key={agent.id}
+                          initial={{ opacity: 0, x: 8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -8 }}
+                          transition={{ delay: i * 0.04, duration: 0.2 }}
+                          onClick={() => {
+                            const a = agent as Agent & { rigId: string };
+                            openDrawer({
+                              type: 'agent',
+                              agentId: agent.id,
+                              rigId: a.rigId,
+                              townId,
+                            });
+                          }}
+                          className="group/agent flex cursor-pointer items-center gap-2.5 rounded-lg border border-white/[0.05] bg-white/[0.015] px-3 py-2 transition-colors hover:border-white/[0.1] hover:bg-white/[0.03]"
+                        >
+                          <div className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.05]">
+                            <RoleIcon className="size-3.5 text-white/40" />
+                            <span
+                              className={`absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-[oklch(0.12_0_0)] ${AGENT_STATUS_DOT[agent.status] ?? 'bg-white/20'}`}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-xs font-medium text-white/75">
+                                {agent.name}
+                              </span>
+                              <span className="shrink-0 text-[9px] text-white/25 capitalize">
+                                {agent.role}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-white/25">
+                              <span>{(agent as Agent & { rigName: string }).rigName}</span>
+                              <span className="text-white/10">·</span>
+                              <span>
+                                {agent.last_activity_at
+                                  ? formatDistanceToNow(new Date(agent.last_activity_at), {
+                                      addSuffix: true,
+                                    })
+                                  : 'no activity'}
+                              </span>
+                            </div>
+                          </div>
+                          <ChevronRight className="size-3 shrink-0 text-white/0 transition-colors group-hover/agent:text-white/20" />
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
+            {/* System Topology (mini view) */}
+            {rigs.length > 0 && (
+              <div className="mt-5">
+                <div className="mb-2 text-[11px] font-medium tracking-wide text-white/40 uppercase">
+                  System Topology
+                </div>
+                <div className="h-[280px] rounded-lg border border-white/[0.06] bg-white/[0.02]">
+                  <SystemTopology
+                    townName={townQuery.data?.name ?? 'Town'}
+                    rigs={rigs}
+                    agentsByRig={{}}
+                    recentEvents={events.slice(-10)}
+                    onSelectRig={rigId => void router.push(`/gastown/${townId}/rigs/${rigId}`)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

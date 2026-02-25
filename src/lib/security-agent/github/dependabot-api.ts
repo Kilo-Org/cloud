@@ -165,9 +165,13 @@ export async function fetchAllDependabotAlerts(
     const httpStatus = (error as { status?: number }).status;
     const message = (error as { message?: string }).message;
 
-    // Handle case where Dependabot alerts are disabled for the repository
-    if (httpStatus === 403 && message?.includes('Dependabot alerts are disabled')) {
-      log(`Dependabot alerts are disabled for ${owner}/${repo}, skipping`);
+    // Handle case where Dependabot alerts are disabled or unavailable for the repository
+    if (
+      httpStatus === 403 &&
+      (message?.includes('Dependabot alerts are disabled') ||
+        message?.includes('Dependabot alerts are not available'))
+    ) {
+      log(`Dependabot alerts are not available for ${owner}/${repo}, skipping`);
       return { status: 'alerts_disabled' };
     }
 
@@ -266,13 +270,20 @@ export async function dismissDependabotAlert(
   const tokenData = await generateGitHubInstallationToken(installationId);
   const octokit = new Octokit({ auth: tokenData.token });
 
+  // GitHub API limits dismissed_comment to 280 characters
+  const MAX_COMMENT_LENGTH = 280;
+  const truncatedComment =
+    dismissedComment && dismissedComment.length > MAX_COMMENT_LENGTH
+      ? dismissedComment.slice(0, MAX_COMMENT_LENGTH - 1) + '\u2026'
+      : dismissedComment;
+
   await octokit.rest.dependabot.updateAlert({
     owner,
     repo,
     alert_number: alertNumber,
     state: 'dismissed',
     dismissed_reason: dismissedReason,
-    dismissed_comment: dismissedComment,
+    dismissed_comment: truncatedComment,
   });
 }
 

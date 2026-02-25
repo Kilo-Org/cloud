@@ -11,5 +11,5 @@ export const minimax_m25_free_model = {
   flags: ['reasoning', 'prompt_cache'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.5',
-  inference_providers: ['minimax'],
+  inference_providers: [],
 } as KiloFreeModel;

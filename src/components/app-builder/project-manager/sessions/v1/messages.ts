@@ -1,10 +1,13 @@
 /**
- * Messages Module
+ * V1 Messages Module
  *
- * Handles message processing, updates, and stream event mapping.
+ * Handles message processing, updates, and stream event mapping for V1 sessions.
+ * Works with V1SessionStore instead of the full ProjectStore.
  */
 
-import type { CloudMessage, StreamEvent, Images, ProjectStore } from './types';
+import type { CloudMessage, StreamEvent } from '@/components/cloud-agent/types';
+import type { Images } from '@/lib/images-schema';
+import type { V1SessionStore } from './store';
 
 /**
  * Time window (in ms) for content-based deduplication.
@@ -22,7 +25,7 @@ const DEDUP_TIME_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
  * deduplication to handle the case where an optimistic user message (with client
  * timestamp) is followed by the same message from WebSocket (with server timestamp).
  */
-export function updateMessage(store: ProjectStore, message: CloudMessage): void {
+export function updateMessage(store: V1SessionStore, message: CloudMessage): void {
   const prevMessages = store.getState().messages;
 
   // First: check for exact timestamp match
@@ -59,9 +62,30 @@ export function updateMessage(store: ProjectStore, message: CloudMessage): void 
 }
 
 /**
+ * Marks all partial (streaming) messages as complete.
+ * Called on session interrupt to prevent orphaned streaming messages.
+ */
+export function completePartialMessages(store: V1SessionStore): void {
+  const messages = store.getState().messages;
+  let hasChanges = false;
+
+  const updated = messages.map(m => {
+    if (m.partial) {
+      hasChanges = true;
+      return { ...m, partial: false };
+    }
+    return m;
+  });
+
+  if (hasChanges) {
+    store.setState({ messages: updated });
+  }
+}
+
+/**
  * Adds a user message to the store.
  */
-export function addUserMessage(store: ProjectStore, content: string, images?: Images): void {
+export function addUserMessage(store: V1SessionStore, content: string, images?: Images): void {
   const userMessage: CloudMessage = {
     ts: Date.now(),
     type: 'user',
@@ -73,9 +97,27 @@ export function addUserMessage(store: ProjectStore, content: string, images?: Im
 }
 
 /**
+ * Removes the last user message from the store.
+ * Used when a session change is detected after an optimistic user message was added —
+ * the message will arrive in the new session via server replay, so we remove it from
+ * the old session to avoid duplication.
+ */
+export function removeLastUserMessage(store: V1SessionStore): void {
+  const messages = store.getState().messages;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].type === 'user') {
+      const newMessages = [...messages];
+      newMessages.splice(i, 1);
+      store.setState({ messages: newMessages });
+      return;
+    }
+  }
+}
+
+/**
  * Adds an error message to the store.
  */
-export function addErrorMessage(store: ProjectStore, error: string): void {
+export function addErrorMessage(store: V1SessionStore, error: string): void {
   const errorMessage: CloudMessage = {
     ts: Date.now(),
     type: 'system',
@@ -90,7 +132,7 @@ export function addErrorMessage(store: ProjectStore, error: string): void {
  * Processes a stream event and updates messages accordingly.
  */
 export function processStreamEvent(
-  store: ProjectStore,
+  store: V1SessionStore,
   event: StreamEvent & { projectId?: string }
 ): void {
   switch (event.streamEventType) {
@@ -134,7 +176,6 @@ export function processStreamEvent(
 
     case 'complete': {
       // Complete events are handled at the streaming level, not message level
-      // No message is added here
       break;
     }
 

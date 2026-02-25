@@ -3,70 +3,69 @@ import { MCPServerConfigSchema, MetadataSchema } from './schemas.js';
 import type { MCPServerConfig } from './types.js';
 
 describe('MCPServerConfigSchema', () => {
-  describe('valid stdio configuration', () => {
-    it('should accept valid stdio config with command and args', () => {
+  describe('valid local configuration', () => {
+    it('should accept valid local config with command array', () => {
       const config = {
-        type: 'stdio' as const,
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-puppeteer'],
+        type: 'local' as const,
+        command: ['npx', '-y', '@modelcontextprotocol/server-puppeteer'],
       };
 
       const result = MCPServerConfigSchema.parse(config);
-      expect(result).toMatchObject({
-        type: 'stdio',
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-puppeteer'],
+      expect(result).toEqual({
+        type: 'local',
+        command: ['npx', '-y', '@modelcontextprotocol/server-puppeteer'],
       });
     });
 
-    it('should accept stdio config without explicit type', () => {
+    it('should accept local config with all optional fields', () => {
       const config = {
-        command: 'node',
-        args: ['server.js'],
+        type: 'local' as const,
+        command: ['node', 'server.js'],
+        environment: { NODE_ENV: 'production' },
+        enabled: true,
+        timeout: 30000,
       };
 
       const result = MCPServerConfigSchema.parse(config);
-      expect(result.type).toBe('stdio');
-      expect(result.command).toBe('node');
+      expect(result).toEqual({
+        type: 'local',
+        command: ['node', 'server.js'],
+        environment: { NODE_ENV: 'production' },
+        enabled: true,
+        timeout: 30000,
+      });
     });
 
-    it('should accept stdio config with optional fields', () => {
+    it('should accept local config with enabled: false', () => {
       const config = {
-        command: 'node',
-        args: ['server.js'],
-        cwd: '/path/to/project',
-        env: { NODE_ENV: 'production' },
+        type: 'local' as const,
+        command: ['node', 'server.js'],
+        enabled: false,
       };
 
       const result = MCPServerConfigSchema.parse(config);
-      expect(result).toMatchObject({
-        type: 'stdio',
-        command: 'node',
-        args: ['server.js'],
-        cwd: '/path/to/project',
-        env: { NODE_ENV: 'production' },
-      });
+      expect(result.enabled).toBe(false);
     });
   });
 
-  describe('valid SSE configuration', () => {
-    it('should accept valid sse config with URL', () => {
+  describe('valid remote configuration', () => {
+    it('should accept valid remote config with URL', () => {
       const config = {
-        type: 'sse' as const,
+        type: 'remote' as const,
         url: 'https://mcp-server.example.com/sse',
       };
 
       const result = MCPServerConfigSchema.parse(config);
-      expect(result).toMatchObject({
-        type: 'sse',
+      expect(result).toEqual({
+        type: 'remote',
         url: 'https://mcp-server.example.com/sse',
       });
     });
 
-    it('should accept sse config with headers', () => {
+    it('should accept remote config with headers', () => {
       const config = {
-        type: 'sse' as const,
-        url: 'https://example.com/sse',
+        type: 'remote' as const,
+        url: 'https://example.com/mcp',
         headers: {
           Authorization: 'Bearer token123',
           'X-Custom-Header': 'value',
@@ -74,272 +73,154 @@ describe('MCPServerConfigSchema', () => {
       };
 
       const result = MCPServerConfigSchema.parse(config);
-      expect(result).toMatchObject({
-        type: 'sse',
-        url: 'https://example.com/sse',
+      expect(result).toEqual({
+        type: 'remote',
+        url: 'https://example.com/mcp',
         headers: {
           Authorization: 'Bearer token123',
           'X-Custom-Header': 'value',
         },
       });
     });
-  });
 
-  describe('valid streamable-http configuration', () => {
-    it('should accept valid streamable-http config with URL', () => {
+    it('should accept remote config with all optional fields', () => {
       const config = {
-        type: 'streamable-http' as const,
-        url: 'https://mcp-server.example.com/stream',
+        type: 'remote' as const,
+        url: 'https://example.com/mcp',
+        headers: { 'X-API-Key': 'key456' },
+        enabled: false,
+        timeout: 60000,
       };
 
       const result = MCPServerConfigSchema.parse(config);
-      expect(result).toMatchObject({
-        type: 'streamable-http',
-        url: 'https://mcp-server.example.com/stream',
-      });
-    });
-
-    it('should accept streamable-http config with headers', () => {
-      const config = {
-        type: 'streamable-http' as const,
-        url: 'https://example.com/stream',
-        headers: {
-          'X-API-Key': 'key456',
-        },
-      };
-
-      const result = MCPServerConfigSchema.parse(config);
-      expect(result).toMatchObject({
-        type: 'streamable-http',
-        url: 'https://example.com/stream',
-        headers: {
-          'X-API-Key': 'key456',
-        },
+      expect(result).toEqual({
+        type: 'remote',
+        url: 'https://example.com/mcp',
+        headers: { 'X-API-Key': 'key456' },
+        enabled: false,
+        timeout: 60000,
       });
     });
   });
 
-  describe('stdio missing command', () => {
-    it('should reject stdio config without command field', () => {
-      const config = {
-        type: 'stdio' as const,
-        args: ['server.js'],
-      };
-
+  describe('local missing/invalid command', () => {
+    it('should reject local config without command field', () => {
+      const config = { type: 'local' };
       expect(() => MCPServerConfigSchema.parse(config)).toThrow();
     });
 
-    it('should reject stdio config with empty command', () => {
+    it('should reject local config with empty command array', () => {
       const config = {
-        command: '',
-        args: ['server.js'],
+        type: 'local' as const,
+        command: [],
       };
-
-      expect(() => MCPServerConfigSchema.parse(config)).toThrow('Command cannot be empty');
+      expect(() => MCPServerConfigSchema.parse(config)).toThrow();
     });
   });
 
-  describe('SSE invalid URL', () => {
-    it('should reject SSE config with malformed URL', () => {
+  describe('remote invalid URL', () => {
+    it('should reject remote config with malformed URL', () => {
       const config = {
-        type: 'sse' as const,
+        type: 'remote' as const,
         url: 'not-a-valid-url',
       };
 
       const result = MCPServerConfigSchema.safeParse(config);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        // Zod returns "Invalid input" for discriminated union validation failures
-        expect(result.error.issues.length).toBeGreaterThan(0);
-      }
     });
 
-    it('should reject SSE config without protocol', () => {
+    it('should reject remote config without protocol', () => {
       const config = {
-        type: 'sse' as const,
-        url: 'example.com/sse',
+        type: 'remote' as const,
+        url: 'example.com/mcp',
       };
 
       const result = MCPServerConfigSchema.safeParse(config);
       expect(result.success).toBe(false);
-    });
-
-    it('should reject streamable-http config with malformed URL', () => {
-      const config = {
-        type: 'streamable-http' as const,
-        url: 'invalid url with spaces',
-      };
-
-      const result = MCPServerConfigSchema.safeParse(config);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        // Zod returns "Invalid input" for discriminated union validation failures
-        expect(result.error.issues.length).toBeGreaterThan(0);
-      }
     });
   });
 
-  describe('field contamination', () => {
-    it('should reject stdio with URL field', () => {
+  describe('missing type discriminator', () => {
+    it('should reject config without type field', () => {
+      const config = { command: ['node', 'server.js'] };
+      const result = MCPServerConfigSchema.safeParse(config);
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject config with unknown type', () => {
+      const config = { type: 'stdio', command: 'node' };
+      const result = MCPServerConfigSchema.safeParse(config);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('strict mode rejects unknown fields', () => {
+    it('should reject local config with url field', () => {
       const config = {
-        type: 'stdio' as const,
-        command: 'node',
-        args: ['server.js'],
+        type: 'local' as const,
+        command: ['node'],
         url: 'https://example.com',
       };
-
       expect(() => MCPServerConfigSchema.parse(config)).toThrow();
     });
 
-    it('should reject stdio with headers field', () => {
+    it('should reject local config with headers field', () => {
       const config = {
-        command: 'node',
+        type: 'local' as const,
+        command: ['node'],
         headers: { Authorization: 'Bearer token' },
       };
-
       expect(() => MCPServerConfigSchema.parse(config)).toThrow();
     });
 
-    it('should reject SSE with command field', () => {
+    it('should reject remote config with command field', () => {
       const config = {
-        type: 'sse' as const,
+        type: 'remote' as const,
         url: 'https://example.com',
-        command: 'node',
+        command: ['node'],
       };
-
       expect(() => MCPServerConfigSchema.parse(config)).toThrow();
     });
 
-    it('should reject SSE with args field', () => {
+    it('should reject remote config with environment field', () => {
       const config = {
-        type: 'sse' as const,
+        type: 'remote' as const,
         url: 'https://example.com',
-        args: ['--flag'],
+        environment: { NODE_ENV: 'production' },
       };
-
       expect(() => MCPServerConfigSchema.parse(config)).toThrow();
     });
 
-    it('should reject streamable-http with command field', () => {
+    it('should reject local config with legacy fields', () => {
       const config = {
-        type: 'streamable-http' as const,
-        url: 'https://example.com',
-        command: 'node',
+        type: 'local' as const,
+        command: ['node'],
+        alwaysAllow: ['tool1'],
       };
-
-      expect(() => MCPServerConfigSchema.parse(config)).toThrow();
-    });
-
-    it('should reject streamable-http with env field', () => {
-      const config = {
-        type: 'streamable-http' as const,
-        url: 'https://example.com',
-        env: { NODE_ENV: 'production' },
-      };
-
       expect(() => MCPServerConfigSchema.parse(config)).toThrow();
     });
   });
 
-  describe('BaseConfig fields', () => {
-    it('should accept timeout field within valid range', () => {
+  describe('optional fields', () => {
+    it('should accept timeout on local config', () => {
       const config = {
-        command: 'node',
-        timeout: 120,
+        type: 'local' as const,
+        command: ['node'],
+        timeout: 30000,
       };
 
       const result = MCPServerConfigSchema.parse(config);
-      expect(result.timeout).toBe(120);
+      expect(result.timeout).toBe(30000);
     });
 
-    it('should reject timeout below minimum', () => {
+    it('should not add defaults for missing optional fields', () => {
       const config = {
-        command: 'node',
-        timeout: 0,
-      };
-
-      expect(() => MCPServerConfigSchema.parse(config)).toThrow();
-    });
-
-    it('should reject timeout above maximum', () => {
-      const config = {
-        command: 'node',
-        timeout: 3601,
-      };
-
-      expect(() => MCPServerConfigSchema.parse(config)).toThrow();
-    });
-
-    it('should accept alwaysAllow field', () => {
-      const config = {
-        command: 'node',
-        alwaysAllow: ['tool1', 'tool2', 'tool3'],
+        type: 'local' as const,
+        command: ['node'],
       };
 
       const result = MCPServerConfigSchema.parse(config);
-      expect(result.alwaysAllow).toEqual(['tool1', 'tool2', 'tool3']);
-    });
-
-    it('should accept watchPaths field', () => {
-      const config = {
-        command: 'node',
-        watchPaths: ['/src', '/config'],
-      };
-
-      const result = MCPServerConfigSchema.parse(config);
-      expect(result.watchPaths).toEqual(['/src', '/config']);
-    });
-
-    it('should accept disabledTools field', () => {
-      const config = {
-        command: 'node',
-        disabledTools: ['dangerous-tool', 'deprecated-tool'],
-      };
-
-      const result = MCPServerConfigSchema.parse(config);
-      expect(result.disabledTools).toEqual(['dangerous-tool', 'deprecated-tool']);
-    });
-
-    it('should accept all BaseConfig fields together', () => {
-      const config = {
-        type: 'stdio' as const,
-        command: 'node',
-        args: ['server.js'],
-        timeout: 90,
-        alwaysAllow: ['read_file'],
-        watchPaths: ['/src'],
-        disabledTools: ['delete_file'],
-      };
-
-      const result = MCPServerConfigSchema.parse(config);
-      expect(result).toMatchObject({
-        type: 'stdio',
-        command: 'node',
-        args: ['server.js'],
-        timeout: 90,
-        alwaysAllow: ['read_file'],
-        watchPaths: ['/src'],
-        disabledTools: ['delete_file'],
-      });
-    });
-
-    it('should apply default values for alwaysAllow and disabledTools', () => {
-      const config = {
-        command: 'node',
-      };
-
-      const result = MCPServerConfigSchema.parse(config);
-      expect(result.alwaysAllow).toEqual([]);
-      expect(result.disabledTools).toEqual([]);
-    });
-
-    it('should apply default timeout value', () => {
-      const config = {
-        command: 'node',
-      };
-
-      const result = MCPServerConfigSchema.parse(config);
-      expect(result.timeout).toBe(60);
+      expect(result).toEqual({ type: 'local', command: ['node'] });
     });
   });
 });
@@ -567,13 +448,12 @@ describe('MetadataSchema', () => {
     it('should accept valid record of MCP server configs', () => {
       const mcpServers: Record<string, MCPServerConfig> = {
         puppeteer: {
-          type: 'stdio',
-          command: 'npx',
-          args: ['-y', '@modelcontextprotocol/server-puppeteer'],
+          type: 'local',
+          command: ['npx', '-y', '@modelcontextprotocol/server-puppeteer'],
         },
         remote: {
-          type: 'sse',
-          url: 'https://example.com/sse',
+          type: 'remote',
+          url: 'https://example.com/mcp',
         },
       };
 
@@ -588,15 +468,16 @@ describe('MetadataSchema', () => {
 
       const result = MetadataSchema.parse(metadata);
       expect(result.mcpServers).toBeDefined();
-      expect(result.mcpServers!.puppeteer.type).toBe('stdio');
-      expect(result.mcpServers!.remote.type).toBe('sse');
+      expect(result.mcpServers!['puppeteer'].type).toBe('local');
+      expect(result.mcpServers!['remote'].type).toBe('remote');
     });
 
     it('should accept server names at maximum length', () => {
       const longServerName = 'A'.repeat(100);
       const mcpServers: Record<string, MCPServerConfig> = {
         [longServerName]: {
-          command: 'node',
+          type: 'local',
+          command: ['node'],
         },
       };
 
@@ -619,7 +500,8 @@ describe('MetadataSchema', () => {
       const longServerName = 'A'.repeat(101);
       const mcpServers: Record<string, MCPServerConfig> = {
         [longServerName]: {
-          command: 'node',
+          type: 'local',
+          command: ['node'],
         },
       };
 

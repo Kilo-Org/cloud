@@ -34,9 +34,12 @@ export const LEGACY_MODE_OPTIONS: ModeOption<
 /**
  * New mode options for cloud-agent-next.
  */
-export const NEXT_MODE_OPTIONS: ModeOption<'plan' | 'build'>[] = [
-  { value: 'build', label: 'Build', description: 'Write and modify code' },
+export const NEXT_MODE_OPTIONS: ModeOption<'code' | 'plan' | 'debug' | 'orchestrator' | 'ask'>[] = [
+  { value: 'code', label: 'Code', description: 'Write and modify code' },
   { value: 'plan', label: 'Plan', description: 'Plan and design solutions' },
+  { value: 'debug', label: 'Debug', description: 'Find and fix issues' },
+  { value: 'orchestrator', label: 'Orchestrator', description: 'Coordinate complex tasks' },
+  { value: 'ask', label: 'Ask', description: 'Get answers and explanations' },
 ];
 
 /**

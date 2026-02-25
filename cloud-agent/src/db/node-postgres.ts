@@ -1,4 +1,11 @@
-import { Pool, types } from 'pg';
+/**
+ * pg Client implementation of the Database facade.
+ *
+ * Creates a new connection per query/transaction -- the expected pattern
+ * for Cloudflare Hyperdrive, which pools connections at the infrastructure level.
+ */
+
+import { Client, types } from 'pg';
 
 import type { CreateDatabaseConnection, Database } from './database.js';
 
@@ -6,30 +13,31 @@ import type { CreateDatabaseConnection, Database } from './database.js';
 // as regular numbers
 types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
 
-// Ensure timestamptz values are properly handled as Date objects
-// types.setTypeParser(types.builtins.TIMESTAMPTZ, (val) => new Date(val))
-// types.setTypeParser(types.builtins.TIMESTAMP, (val) => new Date(val))
-
 export const createNodePostgresConnection: CreateDatabaseConnection = connectionString => {
-  const pool = new Pool({
-    connectionString,
-    max: 100,
-    statement_timeout: 10 * 1000,
-  });
-
-  pool.on('error', error => console.error('Pool:error - Unexpected error on idle client', error));
+  const createConnectedClient = async (): Promise<Client> => {
+    const client = new Client({ connectionString, statement_timeout: 10_000 });
+    await client.connect();
+    return client;
+  };
 
   return {
     __kind: 'Database',
-    begin: async transactionFn => {
-      // Pull an available client from pg-pool
-      const client = await pool.connect();
 
+    query: async (text, values = {}) => {
+      const client = await createConnectedClient();
       try {
-        // Start the transaction
-        await client.query('begin');
+        const result = await client.query(text, Object.values(values));
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return result.rows ?? [];
+      } finally {
+        await client.end();
+      }
+    },
 
-        // Call user provided transaction function
+    begin: async transactionFn => {
+      const client = await createConnectedClient();
+      try {
+        await client.query('BEGIN');
         const result = await transactionFn({
           __kind: 'Transaction',
           query: async (text, values = {}) => {
@@ -38,31 +46,21 @@ export const createNodePostgresConnection: CreateDatabaseConnection = connection
             return rows ?? [];
           },
           rollback: async () => {
-            await client.query('rollback');
+            await client.query('ROLLBACK');
           },
         });
-
-        // Commit the results
-        await client.query('commit');
-
+        await client.query('COMMIT');
         return result;
       } catch (e) {
-        // Rollback if there were any errors
-        await client.query('rollback');
+        await client.query('ROLLBACK');
         throw e;
       } finally {
-        // Always release the client back to the pool!
-        client.release();
+        await client.end();
       }
     },
+
     end: async () => {
-      // no-op with node-postgres since we just query from the pool
+      // no-op -- each operation manages its own client
     },
-    query: async (text, values = {}) => {
-      const result = await pool.query(text, Object.values(values));
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return result.rows ?? [];
-    },
-    // casting as Database here so we don't have to manually fill in function args
   } satisfies Database;
 };

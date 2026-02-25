@@ -6,7 +6,7 @@
  * to clone from GitHub and schedules deletion of the internal git repo.
  */
 
-import { logger } from '../utils/logger';
+import { logger, formatError } from '../utils/logger';
 import { verifyBearerToken } from '../utils/auth';
 import type { Env } from '../types';
 import { MigrateToGithubRequestSchema } from '../api-schemas';
@@ -135,7 +135,11 @@ export async function handleMigrateToGithub(
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    logger.error({ source: 'MigrateToGithubHandler' }, 'Migrate to GitHub handler error', error);
+    logger.error(
+      { source: 'MigrateToGithubHandler' },
+      'Migrate to GitHub handler error',
+      formatError(error)
+    );
     return new Response(
       JSON.stringify({
         success: false,

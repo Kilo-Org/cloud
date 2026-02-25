@@ -28,3 +28,13 @@ export function useAdminApiConversationHistory(sessionId: string | null) {
     enabled: !!sessionId,
   });
 }
+
+export function useAdminResolveCloudAgentSession(cloudAgentSessionId: string | null) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.admin.sessionTraces.resolveCloudAgentSession.queryOptions({
+      cloud_agent_session_id: cloudAgentSessionId ?? '',
+    }),
+    enabled: !!cloudAgentSessionId,
+  });
+}

@@ -60,68 +60,37 @@ export const branchNameSchema = z
   );
 
 /**
- * Base configuration schema shared by all MCP server types
+ * Local MCP server configuration schema (runs a command).
  */
-const MCPServerBaseConfigSchema = z.object({
-  disabled: z.boolean().optional(),
-  timeout: z.number().min(1).max(3600).optional().default(60),
-  alwaysAllow: z.array(z.string()).default([]),
-  watchPaths: z.array(z.string()).optional(),
-  disabledTools: z.array(z.string()).default([]),
-});
-
-export const MCPStdioServerConfigSchema = MCPServerBaseConfigSchema.extend({
-  type: z.enum(['stdio']).optional(),
-  command: z.string().min(1, 'Command cannot be empty'),
-  args: z.array(z.string()).optional(),
-  cwd: z.string().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  // Field contamination prevention
-  url: z.undefined().optional(),
-  headers: z.undefined().optional(),
-}).transform(data => ({
-  ...data,
-  type: 'stdio' as const,
-}));
-
-export const MCPSseServerConfigSchema = MCPServerBaseConfigSchema.extend({
-  type: z.enum(['sse']),
-  url: z.string().url('URL must be a valid URL format'),
-  headers: z.record(z.string(), z.string()).optional(),
-  // Field contamination prevention
-  command: z.undefined().optional(),
-  args: z.undefined().optional(),
-  env: z.undefined().optional(),
-  cwd: z.undefined().optional(),
-}).transform(data => ({
-  ...data,
-  type: 'sse' as const,
-}));
-
-export const MCPStreamableHttpServerConfigSchema = MCPServerBaseConfigSchema.extend({
-  type: z.enum(['streamable-http']),
-  url: z.string().url('URL must be a valid URL format'),
-  headers: z.record(z.string(), z.string()).optional(),
-  // Field contamination prevention
-  command: z.undefined().optional(),
-  args: z.undefined().optional(),
-  env: z.undefined().optional(),
-  cwd: z.undefined().optional(),
-}).transform(data => ({
-  ...data,
-  type: 'streamable-http' as const,
-}));
+const MCPLocalServerConfigSchema = z
+  .object({
+    type: z.literal('local'),
+    command: z.string().array().min(1, 'Command array must have at least one element'),
+    environment: z.record(z.string(), z.string()).optional(),
+    enabled: z.boolean().optional(),
+    timeout: z.number().min(1).max(3_600_000).optional(),
+  })
+  .strict();
 
 /**
- * MCP Server configuration schema supporting three transport types:
- * - stdio: local process execution
- * - sse: Server-Sent Events
- * - streamable-http: HTTP streaming
+ * Remote MCP server configuration schema (connects to a URL).
  */
-export const MCPServerConfigSchema = z.union([
-  MCPStdioServerConfigSchema,
-  MCPSseServerConfigSchema,
-  MCPStreamableHttpServerConfigSchema,
+const MCPRemoteServerConfigSchema = z
+  .object({
+    type: z.literal('remote'),
+    url: z.string().url('URL must be a valid URL format'),
+    headers: z.record(z.string(), z.string()).optional(),
+    enabled: z.boolean().optional(),
+    timeout: z.number().min(1).max(3_600_000).optional(),
+  })
+  .strict();
+
+/**
+ * MCP Server configuration schema — CLI-native local/remote discriminated union.
+ */
+export const MCPServerConfigSchema = z.discriminatedUnion('type', [
+  MCPLocalServerConfigSchema,
+  MCPRemoteServerConfigSchema,
 ]);
 
 /**
@@ -162,6 +131,7 @@ export const MetadataSchema = z.object({
     .optional(),
   upstreamBranch: branchNameSchema.optional(),
   kiloSessionId: z.string().optional(),
+  createdOnPlatform: z.string().max(100).optional(),
 
   // Execution params
   prompt: z.string().max(Limits.MAX_PROMPT_LENGTH).optional(),

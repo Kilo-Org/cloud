@@ -139,6 +139,10 @@ export const PrepareSessionInput = z
       .optional()
       .describe('Generic git repository HTTPS URL (mutually exclusive with githubRepo)'),
     gitToken: z.string().optional().describe('Git token for authentication with generic git repos'),
+    platform: z
+      .enum(['github', 'gitlab'])
+      .optional()
+      .describe('Git platform type for correct token/env var handling'),
 
     // Optional configuration
     envVars: envVarsSchema.optional().describe('Environment variables to inject into the session'),
@@ -190,6 +194,11 @@ export const PrepareSessionInput = z
     images: ImagesSchema.optional().describe(
       'Optional image attachments to download from R2 to the sandbox'
     ),
+    createdOnPlatform: z
+      .string()
+      .max(100)
+      .optional()
+      .describe('Platform that created this session (e.g. slack, app-builder)'),
   })
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',

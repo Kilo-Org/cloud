@@ -1060,6 +1060,45 @@ export async function findKiloReviewNote(
 }
 
 /**
+ * Updates an existing Kilo review note on a GitLab MR
+ * Used to append usage footer (model + token count) after review completion
+ */
+export async function updateKiloReviewNote(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  noteId: number,
+  body: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<void> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes/${noteId}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ body }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab MR note update failed: ${response.status} ${error}`);
+  }
+
+  logExceptInTest('[updateKiloReviewNote] Updated note', {
+    projectId,
+    mrIid,
+    noteId,
+  });
+}
+
+/**
  * Fetches existing inline comments (discussions) on a GitLab MR
  * Used to detect duplicates and track outdated comments
  *

@@ -7,7 +7,6 @@ import {
   determineBranchName,
   runSetupCommands,
   writeAuthFile,
-  writeMCPSettings,
 } from '../../session-service.js';
 import { InstallationLookupService } from '../../services/installation-lookup-service.js';
 import { GitHubTokenService } from '../../services/github-token-service.js';
@@ -217,6 +216,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         githubToken: resolvedGithubToken, // Use resolved token (from input or generated from installation)
         gitUrl: input.gitUrl,
         gitToken: input.gitToken,
+        platform: input.platform,
         upstreamBranch: input.upstreamBranch,
         botId: ctx.botId,
       });
@@ -230,8 +230,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
         input.model,
         input.kilocodeOrganizationId,
         input.encryptedSecrets,
-        undefined, // createdOnPlatform
-        input.appendSystemPrompt
+        input.createdOnPlatform,
+        input.appendSystemPrompt,
+        input.mcpServers
       );
 
       // 6. Clone repository
@@ -274,15 +275,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         await runSetupCommands(session, context, input.setupCommands, true); // fail-fast
       }
 
-      // 9. Write MCP settings
-      if (input.mcpServers && Object.keys(input.mcpServers).length > 0) {
-        logger
-          .withFields({ count: Object.keys(input.mcpServers).length })
-          .info('Writing MCP settings');
-        await writeMCPSettings(sandbox, sessionHome, input.mcpServers);
-      }
-
-      // 9b. Write auth file for session ingest
+      // 9. Write auth file for session ingest
       await writeAuthFile(sandbox, sessionHome, ctx.authToken);
 
       // 10. Start kilo server
@@ -311,7 +304,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           ctx.userId,
           ctx.env,
           input.kilocodeOrganizationId,
-          'cloud-agent'
+          input.createdOnPlatform ?? 'cloud-agent'
         );
       } catch (error) {
         logger
@@ -360,6 +353,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           githubAppType: resolvedGithubAppType,
           gitUrl: input.gitUrl,
           gitToken: input.gitToken,
+          platform: input.platform,
           envVars: input.envVars,
           encryptedSecrets: input.encryptedSecrets,
           setupCommands: input.setupCommands,
@@ -370,6 +364,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           appendSystemPrompt: input.appendSystemPrompt,
           callbackTarget: input.callbackTarget,
           images: input.images,
+          createdOnPlatform: input.createdOnPlatform,
           // Workspace metadata
           workspacePath,
           sessionHome,

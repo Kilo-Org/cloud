@@ -19,6 +19,7 @@ import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
 import { appBuilderRouter } from '@/routers/app-builder-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
+import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
 import { autoTriageRouter } from '@/routers/auto-triage/auto-triage-router';
 import { personalAutoTriageRouter } from '@/routers/personal-auto-triage-router';
 import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
@@ -29,7 +30,9 @@ import { agentProfilesRouter } from '@/routers/agent-profiles-router';
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
 import { appBuilderFeedbackRouter } from '@/routers/app-builder-feedback-router';
+import { cloudAgentNextFeedbackRouter } from '@/routers/cloud-agent-next-feedback-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
+import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 
 export const rootRouter = createTRPCRouter({
   test: testRouter,
@@ -51,6 +54,7 @@ export const rootRouter = createTRPCRouter({
   byok: byokRouter,
   appBuilder: appBuilderRouter,
   securityAgent: securityAgentRouter,
+  securityAuditLog: securityAuditLogRouter,
   autoTriage: autoTriageRouter,
   personalAutoTriage: personalAutoTriageRouter,
   autoFix: autoFixRouter,
@@ -61,7 +65,9 @@ export const rootRouter = createTRPCRouter({
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,
   appBuilderFeedback: appBuilderFeedbackRouter,
+  cloudAgentNextFeedback: cloudAgentNextFeedbackRouter,
   kiloclaw: kiloclawRouter,
+  unifiedSessions: unifiedSessionsRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

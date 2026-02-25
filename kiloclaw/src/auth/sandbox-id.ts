@@ -40,5 +40,5 @@ export function sandboxIdFromUserId(userId: string): string {
 
 export function userIdFromSandboxId(sandboxId: string): string {
   const bytes = base64urlToBytes(sandboxId);
-  return new TextDecoder().decode(bytes);
+  return new TextDecoder('utf-8', { fatal: false, ignoreBOM: true }).decode(bytes);
 }

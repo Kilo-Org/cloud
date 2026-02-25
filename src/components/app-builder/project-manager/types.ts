@@ -1,28 +1,20 @@
 /**
  * Shared types for ProjectManager modules.
- * These types define the contracts between modules.
  */
 
 import type { TRPCClient } from '@trpc/client';
 import type { RootRouter } from '@/routers/root-router';
-import type { CloudMessage } from '@/components/cloud-agent/types';
 import type { AppBuilderProject, DeployProjectResult } from '@/lib/app-builder/types';
-import type { Images } from '@/lib/images-schema';
+import type { AppBuilderSession } from './sessions/types';
 
-// =============================================================================
-// TRPC Client Type
-// =============================================================================
+export type { AppBuilderSession, V1Session, V2Session } from './sessions/types';
 
 export type AppTRPCClient = TRPCClient<RootRouter>;
-
-// =============================================================================
-// State Types
-// =============================================================================
 
 export type PreviewStatus = 'idle' | 'building' | 'running' | 'error';
 
 export type ProjectState = {
-  messages: CloudMessage[];
+  /** Derived from active session — true if active session is streaming */
   isStreaming: boolean;
   isInterrupting: boolean;
   previewUrl: string | null;
@@ -33,11 +25,9 @@ export type ProjectState = {
   currentIframeUrl: string | null;
   /** GitHub repo name if migrated (e.g., "owner/repo"), null if not migrated */
   gitRepoFullName: string | null;
+  /** Session objects — each owns its own messages and streaming state */
+  sessions: AppBuilderSession[];
 };
-
-// =============================================================================
-// Store Types
-// =============================================================================
 
 export type StateListener = () => void;
 
@@ -45,23 +35,13 @@ export type ProjectStore = {
   getState: () => ProjectState;
   setState: (partial: Partial<ProjectState>) => void;
   subscribe: (listener: StateListener) => () => void;
-  updateMessages: (updater: (messages: CloudMessage[]) => CloudMessage[]) => void;
 };
-
-// =============================================================================
-// Configuration Types
-// =============================================================================
 
 export type ProjectManagerConfig = {
   project: AppBuilderProject;
-  messages: CloudMessage[];
   trpcClient: AppTRPCClient;
   organizationId: string | null;
 };
-
-// =============================================================================
-// Preview Polling Types
-// =============================================================================
 
 export type PreviewPollingConfig = {
   projectId: string;
@@ -76,43 +56,6 @@ export type PreviewPollingState = {
   stop: () => void;
 };
 
-// =============================================================================
-// Streaming Types
-// =============================================================================
-
-export type StreamingConfig = {
-  projectId: string;
-  organizationId: string | null;
-  trpcClient: AppTRPCClient;
-  store: ProjectStore;
-  onStreamComplete?: () => void;
-};
-
-export type StreamingCoordinator = {
-  sendMessage: (message: string, images?: Images, model?: string) => void;
-  interrupt: () => void;
-  startInitialStreaming: () => void;
-  destroy: () => void;
-};
-
-/**
- * Extended streaming coordinator with V2-specific methods.
- * Used for WebSocket-based streaming with the V2 API.
- */
-export type V2StreamingCoordinator = StreamingCoordinator & {
-  /**
-   * Connect to WebSocket stream for an existing session.
-   * Used for reconnection or replaying messages.
-   * @param cloudAgentSessionId - The cloud agent session ID to connect to
-   * @param fromId - Event ID to replay from (0 to replay all events)
-   */
-  connectToExistingSession: (cloudAgentSessionId: string, fromId?: number) => Promise<void>;
-};
-
-// =============================================================================
-// Deployment Types
-// =============================================================================
-
 export type DeployResult = DeployProjectResult;
 
 export type DeploymentConfig = {
@@ -121,10 +64,6 @@ export type DeploymentConfig = {
   trpcClient: AppTRPCClient;
   store: ProjectStore;
 };
-
-// =============================================================================
-// Re-exports for convenience
-// =============================================================================
 
 export type { CloudMessage, StreamEvent } from '@/components/cloud-agent/types';
 export type { Images } from '@/lib/images-schema';

@@ -148,6 +148,83 @@
       "when": 1771507192123,
       "tag": "0020_lucky_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1771833139369,
+      "tag": "0021_cute_radioactive_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1771839135189,
+      "tag": "0022_broad_frank_castle",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1771839228110,
+      "tag": "0023_slippery_korg",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1771855153221,
+      "tag": "0024_real_ikaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1771923129231,
+      "tag": "0025_busy_colleen_wing",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1771928226112,
+      "tag": "0026_quiet_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1771935201251,
+      "tag": "0027_unknown_shiva",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1771945770117,
+      "tag": "0028_wakeful_mercury",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1771946512470,
+      "tag": "0029_busy_dark_phoenix",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1772006095707,
+      "tag": "0030_wet_wither",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1772009431335,
+      "tag": "0031_polite_warpath",
+      "breakpoints": true
     }
   ]
 }

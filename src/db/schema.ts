@@ -39,6 +39,7 @@ import type { PlatformRepository, IntegrationPermissions } from '@/lib/integrati
 import type { BuildStatus, Provider } from '@/lib/user-deployments/types';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import type { DependabotAlertRaw, SecurityFindingAnalysis } from '@/lib/security-agent/core/types';
+import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
@@ -57,6 +58,7 @@ import {
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
 import type { Tool } from '@/lib/organizations/model-settings';
+import type { StoredModel } from '@/lib/providers/vercel/types';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -93,6 +95,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
+  SecurityAuditLogAction,
 } as const;
 
 export const credit_transactions = pgTable(
@@ -617,6 +620,7 @@ export const microdollar_usage_metadata = pgTable(
     has_tools: boolean(),
     machine_id: text(),
     feature_id: integer(),
+    session_id: text(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
@@ -773,6 +777,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   has_tools: boolean(),
   machine_id: text(),
   feature: text(),
+  session_id: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -818,7 +823,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     edit.editor_name,
     meta.has_tools,
     meta.machine_id,
-    feat.feature
+    feat.feature,
+    meta.session_id
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -852,6 +858,16 @@ export const custom_llm = pgTable('custom_llm', {
 });
 
 export type CustomLlm = typeof custom_llm.$inferSelect;
+
+export const temp_phase = pgTable(
+  'temp_phase',
+  {
+    key: text().notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    value: text().notNull(),
+  },
+  table => [index('IDX_temp_phase_created_at').on(table.created_at)]
+);
 
 export const user_admin_notes = pgTable(
   'user_admin_notes',
@@ -1939,6 +1955,8 @@ export type NewModelStats = typeof modelStats.$inferInsert;
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
+  openrouter: jsonb('openrouter').$type<Record<string, StoredModel>>(),
+  vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
 });
 
 export const cloud_agent_code_reviews = pgTable(
@@ -1978,6 +1996,15 @@ export const cloud_agent_code_reviews = pgTable(
     // Review status
     status: text().notNull().default('pending'), // 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
     error_message: text(),
+
+    // Which cloud agent backend executed this review: 'v1' (cloud-agent SSE) or 'v2' (cloud-agent-next)
+    agent_version: text().default('v1'),
+
+    // Usage tracking (populated on completion by orchestrator)
+    model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
+    total_tokens_in: integer(), // Total input tokens across all LLM calls
+    total_tokens_out: integer(), // Total output tokens across all LLM calls
+    total_cost_musd: integer(), // Total cost in microdollars (for consistency with microdollar_usage)
 
     // Timestamps
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -2140,6 +2167,7 @@ export const cli_sessions_v2 = pgTable(
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
     index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
     index('IDX_cli_sessions_v2_created_at').on(table.created_at),
+    index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
   ]
 );
 
@@ -2230,6 +2258,7 @@ export type AppBuilderProject = typeof app_builder_projects.$inferSelect;
 export const AppBuilderSessionReason = {
   Initial: 'initial', // First session created with project
   GitHubMigration: 'github_migration', // New session after migrating to GitHub
+  Upgrade: 'upgrade', // New session after worker version upgrade (v1→v2)
 } satisfies Record<string, string>;
 
 export const app_builder_project_sessions = pgTable(
@@ -2245,7 +2274,8 @@ export const app_builder_project_sessions = pgTable(
     cloud_agent_session_id: text().notNull(), // "agent_xxx"
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     ended_at: timestamp({ withTimezone: true, mode: 'string' }), // null = current/active session
-    reason: text().notNull(), // 'initial', 'github_migration', etc.
+    reason: text().notNull(), // 'initial', 'github_migration', 'upgrade', etc.
+    worker_version: text().notNull().default('v1'), // 'v1' (old cloud-agent) or 'v2' (cloud-agent-next)
   },
   table => [
     index('IDX_app_builder_project_sessions_project_id').on(table.project_id),
@@ -2279,6 +2309,7 @@ export const byok_api_keys = pgTable(
     kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
     provider_id: text().notNull(),
     encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
+    is_enabled: boolean().default(true).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -2366,7 +2397,7 @@ export const security_findings = pgTable(
 
     // Agent session tracking (for analysis workflow)
     session_id: text(), // Cloud agent session ID (agent_xxx)
-    cli_session_id: uuid().references(() => cliSessions.session_id, { onDelete: 'set null' }), // CLI session UUID
+    cli_session_id: text(), // Kilo CLI session ID (ses_xxx from cli_sessions_v2)
     analysis_status: text(), // 'pending' | 'running' | 'completed' | 'failed'
     analysis_started_at: timestamp({ withTimezone: true, mode: 'string' }),
     analysis_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -2415,6 +2446,45 @@ export const security_findings = pgTable(
 
 export type SecurityFinding = typeof security_findings.$inferSelect;
 export type NewSecurityFinding = typeof security_findings.$inferInsert;
+
+// Security Audit Log — SOC2-compliant audit trail for security agent actions
+export const security_audit_log = pgTable(
+  'security_audit_log',
+  {
+    id: idPrimaryKeyColumn,
+    // XOR ownership: exactly one of owned_by_organization_id or owned_by_user_id must be set.
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // actor_id is text to match kilocode_users.id; nullable for system-initiated actions
+    actor_id: text(),
+    actor_email: text(),
+    actor_name: text(),
+    action: text().$type<SecurityAuditLogAction>().notNull(),
+    resource_type: text().notNull(),
+    resource_id: text().notNull(),
+    before_state: jsonb().$type<Record<string, unknown>>(),
+    after_state: jsonb().$type<Record<string, unknown>>(),
+    metadata: jsonb().$type<Record<string, unknown>>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    check(
+      'security_audit_log_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    enumCheck('security_audit_log_action_check', table.action, SecurityAuditLogAction),
+    index('IDX_security_audit_log_org_created').on(
+      table.owned_by_organization_id,
+      table.created_at
+    ),
+    index('IDX_security_audit_log_user_created').on(table.owned_by_user_id, table.created_at),
+    index('IDX_security_audit_log_resource').on(table.resource_type, table.resource_id),
+    index('IDX_security_audit_log_actor').on(table.actor_id, table.created_at),
+    index('IDX_security_audit_log_action').on(table.action, table.created_at),
+  ]
+);
+
+export type SecurityAuditLogEntry = typeof security_audit_log.$inferSelect;
 
 // Slack Bot Request Logs - for admin debugging and statistics
 export type SlackBotEventType = 'app_mention' | 'message';
@@ -2928,6 +2998,41 @@ export const app_builder_feedback = pgTable(
 
 export type AppBuilderFeedback = typeof app_builder_feedback.$inferSelect;
 export type NewAppBuilderFeedback = typeof app_builder_feedback.$inferInsert;
+
+// ============ CLOUD AGENT FEEDBACK ============
+
+export const cloud_agent_feedback = pgTable(
+  'cloud_agent_feedback',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    cloud_agent_session_id: text(),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'set null',
+    }),
+    model: text(),
+    repository: text(),
+    is_streaming: boolean(),
+    message_count: integer(),
+    feedback_text: text().notNull(),
+    recent_messages: jsonb().$type<{ role: string; text: string; ts: number }[]>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_cloud_agent_feedback_created_at').on(table.created_at),
+    index('IDX_cloud_agent_feedback_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_cloud_agent_feedback_cloud_agent_session_id').on(table.cloud_agent_session_id),
+  ]
+);
+
+export type CloudAgentFeedback = typeof cloud_agent_feedback.$inferSelect;
+export type NewCloudAgentFeedback = typeof cloud_agent_feedback.$inferInsert;
 
 // ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
 

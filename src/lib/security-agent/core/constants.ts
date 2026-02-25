@@ -33,6 +33,8 @@ export const DEFAULT_SECURITY_AGENT_CONFIG: SecurityAgentConfig = {
   auto_sync_enabled: true,
   repository_selection_mode: 'all',
   model_slug: DEFAULT_SECURITY_AGENT_MODEL,
+  // Analysis mode: auto (triage → conditional sandbox), shallow (triage only), deep (always sandbox)
+  analysis_mode: 'auto',
   // Auto-dismiss is off by default - users manually review and dismiss findings
   auto_dismiss_enabled: false,
   auto_dismiss_confidence_threshold: 'high',

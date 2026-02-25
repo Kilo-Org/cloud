@@ -1,11 +1,9 @@
 import type { BYOKResult } from '@/lib/byok';
-import { kiloFreeModels } from '@/lib/models';
+import { kiloFreeModels, preferredModels } from '@/lib/models';
 import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
 import {
   AutocompleteUserByokProviderIdSchema,
-  inferVercelFirstPartyInferenceProviderForModel,
   openRouterToVercelInferenceProviderId,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/providers/openrouter/inference-provider-id';
@@ -15,7 +13,7 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/providers/openrouter/types';
-import { zai_glm5_free_model } from '@/lib/providers/zai';
+import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import * as crypto from 'crypto';
 
 // EMERGENCY SWITCH
@@ -23,22 +21,6 @@ import * as crypto from 'crypto';
 // Many of these models are not available, named differently or not tested on Vercel.
 // Only use when OpenRouter is down and automatic failover is not working adequately.
 const ENABLE_UNIVERSAL_VERCEL_ROUTING = false;
-
-const VERCEL_ROUTING_ALLOW_LIST = [
-  'arcee-ai/trinity-large-preview:free',
-  'google/gemini-3-pro-preview',
-  'google/gemini-3-flash-preview',
-  'minimax/minimax-m2.1',
-  minimax_m25_free_model.public_id,
-  'minimax/minimax-m2.5',
-  'openai/gpt-5.2',
-  'openai/gpt-5.2-codex',
-  'x-ai/grok-code-fast-1',
-  'z-ai/glm-4.7',
-  zai_glm5_free_model.public_id,
-  'z-ai/glm-5',
-  // TODO: test and add anthropic, kat-coder, kimi, mistral, qwen models
-];
 
 const ERROR_RATE_THRESHOLD = 0.5;
 
@@ -58,8 +40,9 @@ async function getVercelRoutingPercentage() {
   return isOpenRouterErrorRateHigh ? 90 : 10;
 }
 
-function isOpenRouterModel(requestedModel: string) {
+function isLikelyAvailableOnAllGateways(requestedModel: string) {
   return (
+    !requestedModel.startsWith('openrouter/') &&
     (kiloFreeModels.find(m => m.public_id === requestedModel && m.is_enabled)?.gateway ??
       'openrouter') === 'openrouter'
   );
@@ -77,13 +60,25 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (ENABLE_UNIVERSAL_VERCEL_ROUTING && isOpenRouterModel(requestedModel)) {
+  if (!isLikelyAvailableOnAllGateways(requestedModel)) {
+    console.debug(`[shouldRouteToVercel] model not available on all gateways`);
+    return false;
+  }
+
+  if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
     console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
     return true;
   }
 
-  if (!VERCEL_ROUTING_ALLOW_LIST.includes(requestedModel)) {
-    console.debug(`[shouldRouteToVercel] model not on the allow list for Vercel routing`);
+  if (isAnthropicModel(requestedModel)) {
+    console.debug(
+      `[shouldRouteToVercel] Anthropic models are not routed to Vercel pending fine-grained tool streaming support`
+    );
+    return false;
+  }
+
+  if (!preferredModels.includes(requestedModel)) {
+    console.debug(`[shouldRouteToVercel] only recommended models are tested for Vercel routing`);
     return false;
   }
 
@@ -106,30 +101,13 @@ function convertProviderOptions(
   };
 }
 
-const vercelModelIdMapping = {
-  'arcee-ai/trinity-large-preview:free': 'arcee-ai/trinity-large-preview',
-  'google/gemini-3-flash-preview': 'google/gemini-3-flash',
-  'mistralai/codestral-2508': 'mistral/codestral',
-  'mistralai/devstral-2512': 'mistral/devstral-2',
-  'mistralai/devstral-2512:free': 'mistral/devstral-2',
-} as Record<string, string>;
-
 export function applyVercelSettings(
   requestedModel: string,
   requestToMutate: OpenRouterChatCompletionRequest,
   extraHeaders: Record<string, string>,
-  userByok: BYOKResult | null
+  userByok: BYOKResult[] | null
 ) {
-  const vercelModelId = vercelModelIdMapping[requestedModel];
-  if (vercelModelId) {
-    requestToMutate.model = vercelModelId;
-  } else {
-    const firstPartyProvider = inferVercelFirstPartyInferenceProviderForModel(requestedModel);
-    const slashIndex = requestToMutate.model.indexOf('/');
-    if (firstPartyProvider && slashIndex >= 0) {
-      requestToMutate.model = firstPartyProvider + requestToMutate.model.slice(slashIndex);
-    }
-  }
+  requestToMutate.model = mapModelIdToVercel(requestedModel);
 
   if (isAnthropicModel(requestedModel)) {
     // https://vercel.com/docs/ai-gateway/model-variants#anthropic-claude-sonnet-4:-1m-token-context-beta
@@ -140,28 +118,33 @@ export function applyVercelSettings(
   }
 
   if (userByok) {
-    const provider =
-      userByok.providerId === AutocompleteUserByokProviderIdSchema.enum.codestral
-        ? VercelUserByokInferenceProviderIdSchema.enum.mistral
-        : userByok.providerId;
-    const list = new Array<VercelInferenceProviderConfig>();
-    // Z.AI Coding Plan support
-    if (provider === VercelUserByokInferenceProviderIdSchema.enum.zai) {
-      list.push({
-        apiKey: userByok.decryptedAPIKey,
-        baseURL: 'https://api.z.ai/api/coding/paas/v4',
-      });
+    if (userByok.length === 0) {
+      throw new Error('Invalid state: userByok should be null or not empty');
     }
-    list.push({ apiKey: userByok.decryptedAPIKey });
+    const byokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    for (const provider of userByok) {
+      const key =
+        provider.providerId === AutocompleteUserByokProviderIdSchema.enum.codestral
+          ? VercelUserByokInferenceProviderIdSchema.enum.mistral
+          : provider.providerId;
+      const list = new Array<VercelInferenceProviderConfig>();
+      if (key === VercelUserByokInferenceProviderIdSchema.enum.zai) {
+        // Z.AI Coding Plan support
+        list.push({
+          apiKey: provider.decryptedAPIKey,
+          baseURL: 'https://api.z.ai/api/coding/paas/v4',
+        });
+      }
+      list.push({ apiKey: provider.decryptedAPIKey });
+      byokProviders[key] = [...(byokProviders[key] ?? []), ...list];
+    }
 
     // this is vercel specific BYOK configuration to force vercel gateway to use the BYOK API key
     // for the user/org. If the key is invalid the request will faill - it will not fall back to bill our API key.
     requestToMutate.providerOptions = {
       gateway: {
-        only: [provider],
-        byok: {
-          [provider]: list,
-        },
+        only: Object.keys(byokProviders),
+        byok: byokProviders,
       },
     };
   } else {

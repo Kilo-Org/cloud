@@ -24,6 +24,7 @@ import {
   Loader2,
   RefreshCw,
   Bot,
+  ScanSearch,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,8 @@ type SlaConfig = {
   low: number;
 };
 
+type AnalysisMode = 'auto' | 'shallow' | 'deep';
+
 type AutoDismissConfidenceThreshold = 'high' | 'medium' | 'low';
 
 type RepositoryData = {
@@ -58,6 +61,7 @@ type SecurityConfigFormProps = {
   repositorySelectionMode: 'all' | 'selected';
   selectedRepositoryIds: number[];
   modelSlug: string;
+  analysisMode: AnalysisMode;
   autoDismissEnabled: boolean;
   autoDismissConfidenceThreshold: AutoDismissConfidenceThreshold;
   repositories: RepositoryData[];
@@ -68,6 +72,7 @@ type SecurityConfigFormProps = {
       repositorySelectionMode: 'all' | 'selected';
       selectedRepositoryIds: number[];
       modelSlug: string;
+      analysisMode: AnalysisMode;
       autoDismissEnabled: boolean;
       autoDismissConfidenceThreshold: AutoDismissConfidenceThreshold;
     }
@@ -91,6 +96,27 @@ const DEFAULT_SLA_CONFIG: SlaConfig = {
   medium: 45,
   low: 90,
 };
+
+const ANALYSIS_MODE_OPTIONS = [
+  {
+    value: 'auto' as const,
+    label: 'Auto',
+    description:
+      'Triage runs first; sandbox analysis runs only if triage determines it is needed (default)',
+  },
+  {
+    value: 'shallow' as const,
+    label: 'Shallow (triage only)',
+    description:
+      'Only the quick triage step runs. No sandbox analysis is performed, saving time and credits',
+  },
+  {
+    value: 'deep' as const,
+    label: 'Deep (always sandbox)',
+    description:
+      'Always runs full sandbox analysis for every finding, providing the most thorough results',
+  },
+];
 
 const CONFIDENCE_THRESHOLD_OPTIONS = [
   {
@@ -147,6 +173,7 @@ export function SecurityConfigForm({
   repositorySelectionMode: initialSelectionMode,
   selectedRepositoryIds: initialSelectedIds,
   modelSlug: initialModelSlug,
+  analysisMode: initialAnalysisMode,
   autoDismissEnabled: initialAutoDismissEnabled,
   autoDismissConfidenceThreshold: initialAutoDismissThreshold,
   repositories,
@@ -167,6 +194,7 @@ export function SecurityConfigForm({
   const [selectedModel, setSelectedModel] = useState<string>(
     initialModelSlug || DEFAULT_SECURITY_AGENT_MODEL
   );
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(initialAnalysisMode);
   const [autoDismissEnabled, setAutoDismissEnabled] = useState(initialAutoDismissEnabled);
   const [autoDismissConfidenceThreshold, setAutoDismissConfidenceThreshold] =
     useState<AutoDismissConfidenceThreshold>(initialAutoDismissThreshold);
@@ -177,6 +205,7 @@ export function SecurityConfigForm({
     setRepositorySelectionMode(initialSelectionMode);
     setSelectedRepositoryIds(initialSelectedIds);
     setSelectedModel(initialModelSlug || DEFAULT_SECURITY_AGENT_MODEL);
+    setAnalysisMode(initialAnalysisMode);
     setAutoDismissEnabled(initialAutoDismissEnabled);
     setAutoDismissConfidenceThreshold(initialAutoDismissThreshold);
     setHasChanges(false);
@@ -185,6 +214,7 @@ export function SecurityConfigForm({
     initialSelectionMode,
     initialSelectedIds,
     initialModelSlug,
+    initialAnalysisMode,
     initialAutoDismissEnabled,
     initialAutoDismissThreshold,
   ]);
@@ -195,6 +225,7 @@ export function SecurityConfigForm({
       newMode: 'all' | 'selected',
       newSelectedIds: number[],
       newModel: string,
+      newAnalysisMode: AnalysisMode,
       newAutoDismissEnabled: boolean,
       newAutoDismissThreshold: AutoDismissConfidenceThreshold
     ) => {
@@ -208,6 +239,7 @@ export function SecurityConfigForm({
       const idsChanged =
         JSON.stringify(newSelectedIds.sort()) !== JSON.stringify(initialSelectedIds.sort());
       const modelChanged = newModel !== (initialModelSlug || DEFAULT_SECURITY_AGENT_MODEL);
+      const analysisModeChanged = newAnalysisMode !== initialAnalysisMode;
       const autoDismissEnabledChanged = newAutoDismissEnabled !== initialAutoDismissEnabled;
       const autoDismissThresholdChanged = newAutoDismissThreshold !== initialAutoDismissThreshold;
 
@@ -216,6 +248,7 @@ export function SecurityConfigForm({
           modeChanged ||
           idsChanged ||
           modelChanged ||
+          analysisModeChanged ||
           autoDismissEnabledChanged ||
           autoDismissThresholdChanged
       );
@@ -225,6 +258,7 @@ export function SecurityConfigForm({
       initialSelectionMode,
       initialSelectedIds,
       initialModelSlug,
+      initialAnalysisMode,
       initialAutoDismissEnabled,
       initialAutoDismissThreshold,
     ]
@@ -241,6 +275,7 @@ export function SecurityConfigForm({
       repositorySelectionMode,
       selectedRepositoryIds,
       selectedModel,
+      analysisMode,
       autoDismissEnabled,
       autoDismissConfidenceThreshold
     );
@@ -253,6 +288,7 @@ export function SecurityConfigForm({
       mode,
       selectedRepositoryIds,
       selectedModel,
+      analysisMode,
       autoDismissEnabled,
       autoDismissConfidenceThreshold
     );
@@ -265,6 +301,7 @@ export function SecurityConfigForm({
       repositorySelectionMode,
       ids,
       selectedModel,
+      analysisMode,
       autoDismissEnabled,
       autoDismissConfidenceThreshold
     );
@@ -277,6 +314,20 @@ export function SecurityConfigForm({
       repositorySelectionMode,
       selectedRepositoryIds,
       model,
+      analysisMode,
+      autoDismissEnabled,
+      autoDismissConfidenceThreshold
+    );
+  };
+
+  const handleAnalysisModeChange = (mode: AnalysisMode) => {
+    setAnalysisMode(mode);
+    checkForChanges(
+      localConfig,
+      repositorySelectionMode,
+      selectedRepositoryIds,
+      selectedModel,
+      mode,
       autoDismissEnabled,
       autoDismissConfidenceThreshold
     );
@@ -289,6 +340,7 @@ export function SecurityConfigForm({
       repositorySelectionMode,
       selectedRepositoryIds,
       selectedModel,
+      analysisMode,
       newEnabled,
       autoDismissConfidenceThreshold
     );
@@ -301,6 +353,7 @@ export function SecurityConfigForm({
       repositorySelectionMode,
       selectedRepositoryIds,
       selectedModel,
+      analysisMode,
       autoDismissEnabled,
       threshold
     );
@@ -312,6 +365,7 @@ export function SecurityConfigForm({
       repositorySelectionMode,
       selectedRepositoryIds,
       modelSlug: selectedModel,
+      analysisMode,
       autoDismissEnabled,
       autoDismissConfidenceThreshold,
     });
@@ -324,6 +378,7 @@ export function SecurityConfigForm({
       repositorySelectionMode,
       selectedRepositoryIds,
       selectedModel,
+      analysisMode,
       autoDismissEnabled,
       autoDismissConfidenceThreshold
     );
@@ -505,6 +560,47 @@ export function SecurityConfigForm({
                 This model will be used when analyzing security findings
               </p>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Analysis Mode Card - only show when enabled */}
+      {enabled && (
+        <Card className="w-full">
+          <CardHeader className="pb-3">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/20">
+                <ScanSearch className="h-5 w-5 text-indigo-400" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold">Analysis Mode</CardTitle>
+                <p className="text-muted-foreground text-xs">
+                  Control the depth of vulnerability analysis
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <RadioGroup
+              value={analysisMode}
+              onValueChange={value => handleAnalysisModeChange(value as AnalysisMode)}
+              className="space-y-3"
+            >
+              {ANALYSIS_MODE_OPTIONS.map(option => (
+                <div key={option.value} className="flex items-start space-x-3">
+                  <RadioGroupItem value={option.value} id={`analysis-mode-${option.value}`} />
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor={`analysis-mode-${option.value}`}
+                      className="cursor-pointer font-normal"
+                    >
+                      {option.label}
+                    </Label>
+                    <p className="text-muted-foreground text-xs">{option.description}</p>
+                  </div>
+                </div>
+              ))}
+            </RadioGroup>
           </CardContent>
         </Card>
       )}

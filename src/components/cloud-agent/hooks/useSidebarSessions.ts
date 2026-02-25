@@ -22,7 +22,7 @@ import type { StoredSession } from '../types';
  * Convert a DbSession to StoredSession format for display in ChatSidebar
  */
 function dbSessionToStoredSession(session: DbSession): StoredSession {
-  const repository = extractRepoFromGitUrl(session.git_url) || 'Unknown repository';
+  const repository = extractRepoFromGitUrl(session.git_url) ?? '';
   const title = session.title || `Session ${session.session_id.substring(0, 8)}`;
 
   return {
@@ -72,13 +72,13 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   const queryInput = { limit: 10, organizationId };
 
   // Query key for invalidation (includes organizationId for cache separation)
-  const queryKey = trpc.cliSessions.list.queryKey(queryInput);
+  const queryKey = trpc.unifiedSessions.list.queryKey(queryInput);
 
   // Fetch sessions from database and populate Jotai atom
   // staleTime: 5000 prevents unnecessary refetches within 5 seconds
   // while still catching sessions created from other devices/tabs on navigation
   const { data: dbSessionsData, isLoading } = useQuery({
-    ...trpc.cliSessions.list.queryOptions(queryInput),
+    ...trpc.unifiedSessions.list.queryOptions(queryInput),
     staleTime: 5000,
   });
 

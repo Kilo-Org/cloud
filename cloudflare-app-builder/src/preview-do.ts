@@ -305,17 +305,22 @@ export class PreviewDO extends DurableObject<Env> {
     return withLogTags(
       { source: 'PreviewDO', tags: { appId: this.persistedState.appId ?? undefined } },
       async () => {
-        logger.info('Setting GitHub source', {
-          githubRepo: config.githubRepo,
-          hasOrgId: !!config.orgId,
-        });
-        this.persistedState.githubSource = config;
-        await this.savePersistedState();
+        try {
+          logger.info('Setting GitHub source', {
+            githubRepo: config.githubRepo,
+            hasOrgId: !!config.orgId,
+          });
+          this.persistedState.githubSource = config;
+          await this.savePersistedState();
 
-        // Destroy the sandbox to ensure a clean state when switching sources.
-        // The next build will clone fresh from GitHub.
-        await this.destroy();
-        logger.info('Sandbox destroyed after setting GitHub source');
+          // Destroy the sandbox to ensure a clean state when switching sources.
+          // The next build will clone fresh from GitHub.
+          await this.destroy();
+          logger.info('Sandbox destroyed after setting GitHub source');
+        } catch (error) {
+          logger.error('Failed to set GitHub source', formatError(error));
+          throw error;
+        }
       }
     );
   }
@@ -403,7 +408,9 @@ export class PreviewDO extends DurableObject<Env> {
             if (!checkoutResult.success) {
               throw new Error('Failed to clone repo');
             }
-            const pullResult = await sandbox.exec('cd /workspace && git reset --hard origin/main');
+            const pullResult = await sandbox.exec(
+              'cd /workspace && git fetch origin && git reset --hard origin/main'
+            );
             if (!pullResult.success) {
               throw new Error('Failed to pull new changes');
             }

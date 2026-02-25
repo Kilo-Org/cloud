@@ -39,8 +39,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const isAdmin = user?.is_admin || false;
-  const isKiloClawEnabled = useFeatureFlagEnabled('kiloclaw');
 
   // Dashboard group
   const dashboardItems: Array<{
@@ -98,28 +96,18 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Bot,
       url: '/code-reviews',
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Security Agent',
-            icon: Shield,
-            url: '/security-agent',
-          },
-        ]
-      : []),
+    {
+      title: 'Security Agent',
+      icon: Shield,
+      url: '/security-agent',
+    },
+    {
+      title: 'Auto Triage',
+      icon: ListChecks,
+      url: '/auto-triage',
+    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          {
-            title: 'Auto Triage',
-            icon: ListChecks,
-            url: '/auto-triage',
-          },
-          {
-            title: 'Auto Fix',
-            icon: Wrench,
-            url: '/auto-fix',
-          },
-        ]
+      ? [{ title: 'Auto Fix', icon: Wrench, url: '/auto-fix' }]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [
@@ -139,15 +127,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
-    ...(isKiloClawEnabled || isDevelopment
-      ? [
-          {
-            title: 'Claw',
-            icon: KiloCrabIcon,
-            url: '/claw',
-          },
-        ]
-      : []),
+    {
+      title: 'Claw',
+      icon: KiloCrabIcon,
+      url: '/claw',
+    },
   ];
 
   // Account group

@@ -1,6 +1,9 @@
 /**
  * CodeReviewOrchestrator - Durable Object for managing code review lifecycle.
- * Handles calling cloud agent, maintaining SSE subscription, and updating status in DB.
+ *
+ * Supports two execution modes based on the useCloudAgentNext flag:
+ * - Default (cloud-agent): SSE streaming via initiateSessionAsync
+ * - cloud-agent-next: prepareSession + initiateFromKilocodeSessionV2, callback-based completion
  */
 
 import { DurableObject } from 'cloudflare:workers';
@@ -35,6 +38,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /** Flag to signal stream processing to stop when cancelled */
   private cancelled = false;
+
+  /** Accumulated usage data from LLM API calls */
+  private totalTokensIn = 0;
+  private totalTokensOut = 0;
+  private totalCost = 0;
+  private model: string | undefined;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -91,6 +100,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     if (storedState) {
       this.state = storedState;
+
+      // Restore usage accumulators from persisted state so they survive DO eviction
+      if (storedState.model != null) this.model = storedState.model;
+      if (storedState.totalTokensIn != null) this.totalTokensIn = storedState.totalTokensIn;
+      if (storedState.totalTokensOut != null) this.totalTokensOut = storedState.totalTokensOut;
+      if (storedState.totalCost != null) this.totalCost = storedState.totalCost;
     }
   }
 
@@ -235,6 +250,58 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   }
 
   /**
+   * Report accumulated LLM usage data to Next.js backend.
+   * Called after SSE stream processing completes, before cloud agent callback.
+   */
+  private async reportUsage(): Promise<void> {
+    if (!this.model && this.totalTokensIn === 0 && this.totalTokensOut === 0) {
+      return; // No usage data to report
+    }
+
+    try {
+      const url = `${this.env.API_URL}/api/internal/code-review-usage/${this.state.reviewId}`;
+      const payload = {
+        model: this.model,
+        totalTokensIn: this.totalTokensIn,
+        totalTokensOut: this.totalTokensOut,
+        totalCost: this.totalCost,
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[CodeReviewOrchestrator] Failed to report usage:', {
+          reviewId: this.state.reviewId,
+          status: response.status,
+          error: errorText,
+        });
+      } else {
+        console.log('[CodeReviewOrchestrator] Usage reported', {
+          reviewId: this.state.reviewId,
+          model: this.model,
+          totalTokensIn: this.totalTokensIn,
+          totalTokensOut: this.totalTokensOut,
+          totalCost: this.totalCost,
+        });
+      }
+    } catch (error) {
+      // Non-blocking — usage reporting failure should not affect review completion
+      console.error('[CodeReviewOrchestrator] Error reporting usage:', {
+        reviewId: this.state.reviewId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
    * RPC method: Start the review.
    */
   async start(params: {
@@ -247,6 +314,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       userId: string;
     };
     skipBalanceCheck?: boolean;
+    agentVersion?: string;
   }): Promise<{ status: CodeReviewStatus }> {
     this.state = {
       reviewId: params.reviewId,
@@ -256,12 +324,14 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       status: 'queued',
       updatedAt: new Date().toISOString(),
       skipBalanceCheck: params.skipBalanceCheck,
+      agentVersion: params.agentVersion,
     };
     await this.saveState();
 
     console.log('[CodeReviewOrchestrator] Review created and queued', {
       reviewId: params.reviewId,
       owner: params.owner,
+      agentVersion: params.agentVersion,
     });
 
     // Note: Review execution is triggered via runReview() from the worker
@@ -289,6 +359,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       cliSessionId: this.state.cliSessionId,
       startedAt: this.state.startedAt,
       completedAt: this.state.completedAt,
+      model: this.state.model,
+      totalTokensIn: this.state.totalTokensIn,
+      totalTokensOut: this.state.totalTokensOut,
+      totalCost: this.state.totalCost,
       errorMessage: this.state.errorMessage,
     };
   }
@@ -344,12 +418,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /**
    * Interrupt the cloud agent session to stop it from running and posting comments.
-   * Calls the cloud agent's interruptSession tRPC mutation.
+   * Routes to the correct backend based on agentVersion.
    */
   private async interruptCloudAgentSession(sessionId: string): Promise<void> {
-    // Build tRPC mutation endpoint
-    // tRPC mutations use POST with JSON body
-    const cloudAgentUrl = `${this.env.CLOUD_AGENT_URL}/trpc/interruptSession`;
+    const baseUrl =
+      this.state.agentVersion === 'v2' ? this.env.CLOUD_AGENT_NEXT_URL : this.env.CLOUD_AGENT_URL;
+    const cloudAgentUrl = `${baseUrl}/trpc/interruptSession`;
 
     const response = await fetch(cloudAgentUrl, {
       method: 'POST',
@@ -367,7 +441,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   }
 
   /**
-   * RPC method: Get events for this review.
+   * RPC method: Get events for this review (used by SSE/cloud-agent flow only).
    */
   async getEvents(): Promise<{ events: CodeReviewEvent[] }> {
     await this.loadState();
@@ -397,15 +471,193 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       return;
     }
 
-    await this.run();
+    // Branch based on agent version
+    if (this.state.agentVersion === 'v2') {
+      await this.runWithCloudAgentNext();
+    } else {
+      await this.runWithCloudAgent();
+    }
   }
 
+  // ---------------------------------------------------------------------------
+  // cloud-agent-next flow (feature-flagged)
+  // Uses prepareSession + initiateFromKilocodeSessionV2 with callback-based completion.
+  // ---------------------------------------------------------------------------
+
   /**
-   * Main orchestration method.
+   * Orchestration via cloud-agent-next.
+   * Calls prepareSession + initiateFromKilocodeSessionV2.
+   * Terminal status is delivered reliably via cloud-agent-next's callback queue.
+   */
+  private async runWithCloudAgentNext(): Promise<void> {
+    const runStartTime = Date.now();
+
+    try {
+      await this.updateStatus('running');
+
+      console.log('[CodeReviewOrchestrator] Starting review via cloud-agent-next', {
+        reviewId: this.state.reviewId,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Build common headers for prepareSession (internalApiProtectedProcedure)
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${this.state.authToken}`,
+        'Content-Type': 'application/json',
+        'x-internal-api-key': this.env.INTERNAL_API_SECRET,
+      };
+      if (this.state.skipBalanceCheck) {
+        headers['x-skip-balance-check'] = 'true';
+      }
+
+      // Step 1: Prepare session with callback target
+      const prepareInput = {
+        ...this.state.sessionInput,
+        callbackTarget: {
+          url: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`,
+          headers: {
+            'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
+          },
+        },
+      };
+
+      console.log('[CodeReviewOrchestrator] Calling prepareSession', {
+        reviewId: this.state.reviewId,
+        callbackUrl: prepareInput.callbackTarget.url,
+        skipBalanceCheck: this.state.skipBalanceCheck,
+      });
+
+      const prepareResponse = await fetch(`${this.env.CLOUD_AGENT_NEXT_URL}/trpc/prepareSession`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(prepareInput),
+      });
+
+      if (!prepareResponse.ok) {
+        const errorText = await prepareResponse.text();
+        throw new Error(`prepareSession failed (${prepareResponse.status}): ${errorText}`);
+      }
+
+      const prepareResult = (await prepareResponse.json()) as Record<string, unknown>;
+      const prepareData = (prepareResult?.result as Record<string, unknown>)?.data as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        !prepareData ||
+        typeof prepareData.cloudAgentSessionId !== 'string' ||
+        typeof prepareData.kiloSessionId !== 'string'
+      ) {
+        throw new Error(
+          `Unexpected prepareSession response shape: ${JSON.stringify(prepareResult).slice(0, 500)}`
+        );
+      }
+      const { cloudAgentSessionId, kiloSessionId } = prepareData as {
+        cloudAgentSessionId: string;
+        kiloSessionId: string;
+      };
+
+      console.log('[CodeReviewOrchestrator] Session prepared', {
+        reviewId: this.state.reviewId,
+        cloudAgentSessionId,
+        kiloSessionId,
+      });
+
+      // Store session IDs immediately (no stream parsing needed)
+      await this.updateStatus('running', {
+        sessionId: cloudAgentSessionId,
+        cliSessionId: kiloSessionId,
+      });
+
+      // Step 2: Initiate execution
+      // initiateFromKilocodeSessionV2 is a protectedProcedure (Bearer token only)
+      const initiateHeaders: Record<string, string> = {
+        Authorization: `Bearer ${this.state.authToken}`,
+        'Content-Type': 'application/json',
+      };
+      if (this.state.skipBalanceCheck) {
+        initiateHeaders['x-skip-balance-check'] = 'true';
+      }
+
+      console.log('[CodeReviewOrchestrator] Calling initiateFromKilocodeSessionV2', {
+        reviewId: this.state.reviewId,
+        cloudAgentSessionId,
+      });
+
+      const initiateResponse = await fetch(
+        `${this.env.CLOUD_AGENT_NEXT_URL}/trpc/initiateFromKilocodeSessionV2`,
+        {
+          method: 'POST',
+          headers: initiateHeaders,
+          body: JSON.stringify({ cloudAgentSessionId }),
+        }
+      );
+
+      if (!initiateResponse.ok) {
+        const errorText = await initiateResponse.text();
+        throw new Error(
+          `initiateFromKilocodeSessionV2 failed (${initiateResponse.status}): ${errorText}`
+        );
+      }
+
+      const initiateResult = (await initiateResponse.json()) as Record<string, unknown>;
+      const initiateData = (initiateResult?.result as Record<string, unknown>)?.data as
+        | Record<string, unknown>
+        | undefined;
+      if (!initiateData || typeof initiateData.executionId !== 'string') {
+        throw new Error(
+          `Unexpected initiateFromKilocodeSessionV2 response shape: ${JSON.stringify(initiateResult).slice(0, 500)}`
+        );
+      }
+
+      console.log('[CodeReviewOrchestrator] Execution started', {
+        reviewId: this.state.reviewId,
+        cloudAgentSessionId,
+        executionId: initiateData.executionId,
+        status: initiateData.status,
+      });
+
+      // Done — cloud-agent-next callback will deliver terminal status
+      console.log('[CodeReviewOrchestrator] Review dispatched to cloud-agent-next', {
+        reviewId: this.state.reviewId,
+        sessionId: cloudAgentSessionId,
+        note: 'Callback will update final status',
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      await this.updateStatus('failed', { errorMessage });
+
+      console.error('[CodeReviewOrchestrator] Review failed (cloud-agent-next):', {
+        reviewId: this.state.reviewId,
+        error: errorMessage,
+      });
+    } finally {
+      const totalExecutionTimeMs = Date.now() - runStartTime;
+      const minutes = Math.floor(totalExecutionTimeMs / 60000);
+      const seconds = Math.floor((totalExecutionTimeMs % 60000) / 1000);
+
+      console.log('[CodeReviewOrchestrator] Run completed (cloud-agent-next)', {
+        reviewId: this.state.reviewId,
+        sessionId: this.state.sessionId,
+        status: this.state.status,
+        totalExecutionTimeMs,
+        totalExecutionTime: `${minutes}m ${seconds}s`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // cloud-agent flow (default / legacy)
+  // Uses SSE streaming via initiateSessionAsync.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Orchestration via cloud-agent (SSE).
    * Calls cloud agent async streaming endpoint with callback for reliable completion notification.
    * The callback ensures status is updated even if this DO dies or the SSE connection drops.
    */
-  private async run(): Promise<void> {
+  private async runWithCloudAgent(): Promise<void> {
     const runStartTime = Date.now();
 
     try {
@@ -533,14 +785,24 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         status: this.state.status,
         totalExecutionTimeMs,
         totalExecutionTime: `${minutes}m ${seconds}s`,
+        model: this.model,
+        totalTokensIn: this.totalTokensIn,
+        totalTokensOut: this.totalTokensOut,
+        totalCost: this.totalCost,
         timestamp: new Date().toISOString(),
       });
+
+      // Report accumulated usage to Next.js backend
+      // This runs before the cloud agent callback fires 'completed',
+      // so usage data is persisted before the comment update is triggered.
+      await this.reportUsage();
     }
   }
 
   /**
    * Process Server-Sent Events stream from cloud agent.
    * Parses SSE events and extracts sessionId from the first event.
+   * Used only in the cloud-agent (SSE) flow.
    */
   private async processEventStream(response: Response): Promise<void> {
     if (!response.body) {
@@ -645,6 +907,27 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
                   logData.tokensIn = event.payload.metadata.tokensIn;
                   logData.tokensOut = event.payload.metadata.tokensOut;
                   logData.cost = event.payload.metadata.cost;
+
+                  // Capture model from the first LLM call (intentionally ignoring subsequent
+                  // calls that may use different models — the primary review model is what matters)
+                  if (!this.model && typeof event.payload.metadata.model === 'string') {
+                    this.model = event.payload.metadata.model;
+                  }
+                  if (typeof event.payload.metadata.tokensIn === 'number') {
+                    this.totalTokensIn += event.payload.metadata.tokensIn;
+                  }
+                  if (typeof event.payload.metadata.tokensOut === 'number') {
+                    this.totalTokensOut += event.payload.metadata.tokensOut;
+                  }
+                  if (typeof event.payload.metadata.cost === 'number') {
+                    this.totalCost += event.payload.metadata.cost;
+                  }
+
+                  // Sync usage data to persistent state so it survives DO eviction
+                  this.state.model = this.model;
+                  this.state.totalTokensIn = this.totalTokensIn;
+                  this.state.totalTokensOut = this.totalTokensOut;
+                  this.state.totalCost = this.totalCost;
                 }
 
                 // Add CLI session ID for session_created events
@@ -694,9 +977,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
                   message = payload.content;
                 } else if (payload.say === 'api_req_started') {
                   const provider = payload.metadata?.inferenceProvider || 'API';
-                  const tokensIn = payload.metadata?.tokensIn || 0;
-                  const tokensOut = payload.metadata?.tokensOut || 0;
-                  const cost = payload.metadata?.cost || 0;
+                  const tokensIn = payload.metadata?.tokensIn ?? 0;
+                  const tokensOut = payload.metadata?.tokensOut ?? 0;
+                  const cost = payload.metadata?.cost ?? 0;
                   message = `${provider} request: ${tokensIn.toLocaleString()} tokens in, ${tokensOut.toLocaleString()} tokens out`;
                   if (cost > 0) {
                     content = `Cost: $${cost.toFixed(4)}`;

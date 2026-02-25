@@ -1,0 +1,11 @@
+{
+  "name": "kiloclaw-controller",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "hono": "4.11.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.0.0"
+  }
+}

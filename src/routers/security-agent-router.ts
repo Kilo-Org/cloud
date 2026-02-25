@@ -39,6 +39,7 @@ import {
 } from '@/lib/security-agent/services/auto-dismiss-service';
 import { dismissDependabotAlert } from '@/lib/security-agent/github/dependabot-api';
 import { getGitHubTokenForUser } from '@/lib/cloud-agent/github-integration-helpers';
+import { rethrowAsPaymentRequired } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import {
   SaveSecurityConfigInputSchema,
@@ -59,6 +60,10 @@ import {
   trackSecurityAgentSync,
   trackSecurityAgentFindingDismissed,
 } from '@/lib/security-agent/posthog-tracking';
+import {
+  logSecurityAudit,
+  SecurityAuditLogAction,
+} from '@/lib/security-agent/services/audit-log-service';
 
 /**
  * Security Agent Router for personal users
@@ -111,6 +116,8 @@ export const securityAgentRouter = createTRPCRouter({
         repositorySelectionMode: 'selected' as const,
         selectedRepositoryIds: [] as number[],
         modelSlug: DEFAULT_SECURITY_AGENT_MODEL,
+        // Analysis mode default
+        analysisMode: 'auto' as const,
         // Auto-dismiss defaults (off by default)
         autoDismissEnabled: false,
         autoDismissConfidenceThreshold: 'high' as const,
@@ -127,6 +134,8 @@ export const securityAgentRouter = createTRPCRouter({
       repositorySelectionMode: result.config.repository_selection_mode || 'selected',
       selectedRepositoryIds: result.config.selected_repository_ids || [],
       modelSlug: result.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL,
+      // Analysis mode configuration
+      analysisMode: result.config.analysis_mode ?? 'auto',
       // Auto-dismiss configuration
       autoDismissEnabled: result.config.auto_dismiss_enabled ?? false,
       autoDismissConfidenceThreshold: result.config.auto_dismiss_confidence_threshold ?? 'high',
@@ -141,6 +150,23 @@ export const securityAgentRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
 
+      const existingConfig = await getSecurityAgentConfigWithStatus(owner);
+      const beforeState = existingConfig
+        ? {
+            autoSyncEnabled: existingConfig.config.auto_sync_enabled,
+            analysisMode: existingConfig.config.analysis_mode,
+            autoDismissEnabled: existingConfig.config.auto_dismiss_enabled,
+            autoDismissConfidenceThreshold: existingConfig.config.auto_dismiss_confidence_threshold,
+            modelSlug: existingConfig.config.model_slug,
+            repositorySelectionMode: existingConfig.config.repository_selection_mode,
+            selectedRepositoryIds: existingConfig.config.selected_repository_ids,
+            slaCriticalDays: existingConfig.config.sla_critical_days,
+            slaHighDays: existingConfig.config.sla_high_days,
+            slaMediumDays: existingConfig.config.sla_medium_days,
+            slaLowDays: existingConfig.config.sla_low_days,
+          }
+        : undefined;
+
       await upsertSecurityAgentConfig(
         owner,
         {
@@ -152,6 +178,8 @@ export const securityAgentRouter = createTRPCRouter({
           repository_selection_mode: input.repositorySelectionMode,
           selected_repository_ids: input.selectedRepositoryIds,
           model_slug: input.modelSlug,
+          // Analysis mode configuration
+          analysis_mode: input.analysisMode,
           // Auto-dismiss configuration
           auto_dismiss_enabled: input.autoDismissEnabled,
           auto_dismiss_confidence_threshold: input.autoDismissConfidenceThreshold,
@@ -163,11 +191,36 @@ export const securityAgentRouter = createTRPCRouter({
         distinctId: ctx.user.id,
         userId: ctx.user.id,
         autoSyncEnabled: input.autoSyncEnabled,
+        analysisMode: input.analysisMode,
         autoDismissEnabled: input.autoDismissEnabled,
         autoDismissConfidenceThreshold: input.autoDismissConfidenceThreshold,
         modelSlug: input.modelSlug,
         repositorySelectionMode: input.repositorySelectionMode,
         selectedRepoCount: input.selectedRepositoryIds?.length,
+      });
+
+      logSecurityAudit({
+        owner: { userId: ctx.user.id },
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.ConfigUpdated,
+        resource_type: 'agent_config',
+        resource_id: ctx.user.id,
+        before_state: beforeState,
+        after_state: {
+          autoSyncEnabled: input.autoSyncEnabled,
+          analysisMode: input.analysisMode,
+          autoDismissEnabled: input.autoDismissEnabled,
+          autoDismissConfidenceThreshold: input.autoDismissConfidenceThreshold,
+          modelSlug: input.modelSlug,
+          repositorySelectionMode: input.repositorySelectionMode,
+          selectedRepositoryIds: input.selectedRepositoryIds,
+          slaCriticalDays: input.slaCriticalDays,
+          slaHighDays: input.slaHighDays,
+          slaMediumDays: input.slaMediumDays,
+          slaLowDays: input.slaLowDays,
+        },
       });
 
       return { success: true };
@@ -281,6 +334,17 @@ export const securityAgentRouter = createTRPCRouter({
             syncErrors: syncResult.errors,
           });
 
+          logSecurityAudit({
+            owner: securityOwner,
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            action: SecurityAuditLogAction.ConfigEnabled,
+            resource_type: 'agent_config',
+            resource_id: ctx.user.id,
+            after_state: { isEnabled: true, repositorySelectionMode: selectionMode },
+          });
+
           return {
             success: true,
             syncResult: {
@@ -307,6 +371,19 @@ export const securityAgentRouter = createTRPCRouter({
       isEnabled: input.isEnabled,
       repositorySelectionMode: selectionMode,
       selectedRepoCount: effectiveRepoCount,
+    });
+
+    logSecurityAudit({
+      owner: securityOwner,
+      actor_id: ctx.user.id,
+      actor_email: ctx.user.google_user_email,
+      actor_name: ctx.user.google_user_name,
+      action: input.isEnabled
+        ? SecurityAuditLogAction.ConfigEnabled
+        : SecurityAuditLogAction.ConfigDisabled,
+      resource_type: 'agent_config',
+      resource_id: ctx.user.id,
+      after_state: { isEnabled: input.isEnabled, repositorySelectionMode: selectionMode },
     });
 
     return { success: true };
@@ -474,6 +551,22 @@ export const securityAgentRouter = createTRPCRouter({
         errors: result.errors,
       });
 
+      logSecurityAudit({
+        owner: securityOwner,
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.SyncTriggered,
+        resource_type: 'agent_config',
+        resource_id: ctx.user.id,
+        metadata: {
+          syncType: 'single_repo',
+          repoFullName: input.repoFullName,
+          synced: result.synced,
+          errors: result.errors,
+        },
+      });
+
       return {
         success: true,
         synced: result.synced,
@@ -517,6 +610,22 @@ export const securityAgentRouter = createTRPCRouter({
       repoCount: repositoriesToSync.length,
       synced: result.synced,
       errors: result.errors,
+    });
+
+    logSecurityAudit({
+      owner: securityOwner,
+      actor_id: ctx.user.id,
+      actor_email: ctx.user.google_user_email,
+      actor_name: ctx.user.google_user_name,
+      action: SecurityAuditLogAction.SyncTriggered,
+      resource_type: 'agent_config',
+      resource_id: ctx.user.id,
+      metadata: {
+        syncType: 'all_repos',
+        repoCount: repositoriesToSync.length,
+        synced: result.synced,
+        errors: result.errors,
+      },
     });
 
     return {
@@ -607,6 +716,19 @@ export const securityAgentRouter = createTRPCRouter({
         severity: finding.severity,
       });
 
+      logSecurityAudit({
+        owner: { userId: ctx.user.id },
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.FindingDismissed,
+        resource_type: 'security_finding',
+        resource_id: input.findingId,
+        before_state: { status: finding.status },
+        after_state: { status: 'ignored', ignoredReason: input.reason },
+        metadata: { source: finding.source, severity: finding.severity },
+      });
+
       return { success: true };
     }),
 
@@ -614,7 +736,7 @@ export const securityAgentRouter = createTRPCRouter({
    * Starts LLM analysis for a security finding using three-tier approach.
    *
    * Tier 1 (Quick Triage): Always runs first. Direct LLM call to analyze metadata.
-   * Tier 2 (Sandbox Analysis): Only runs if triage says it's needed OR forceSandbox is true.
+   * Tier 2 (Sandbox Analysis): Controlled by analysisMode — always in 'deep', never in 'shallow', triage-driven in 'auto'.
    * Tier 3 (Extraction): Extracts structured fields from sandbox analysis.
    *
    * Returns immediately - analysis runs in background.
@@ -661,31 +783,45 @@ export const securityAgentRouter = createTRPCRouter({
       });
     }
 
-    // Get model from input or fall back to configured model
-    let model = input.model;
-    if (!model) {
-      const config = await getSecurityAgentConfigWithStatus(owner);
-      model = config?.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL;
-    }
+    // Get model and analysis mode from input or fall back to configured values
+    const config = await getSecurityAgentConfigWithStatus(owner);
+    const model = input.model || config?.config.model_slug || DEFAULT_SECURITY_AGENT_MODEL;
+    const analysisMode = config?.config.analysis_mode ?? 'auto';
 
-    const result = await startSecurityAnalysis({
-      findingId: input.findingId,
-      user: ctx.user,
-      githubRepo: finding.repo_full_name,
-      githubToken,
-      model,
-      forceSandbox: input.forceSandbox,
-      // Personal user - no organizationId
-    });
-
-    if (!result.started) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: result.error || 'Failed to start analysis',
+    try {
+      const result = await startSecurityAnalysis({
+        findingId: input.findingId,
+        user: ctx.user,
+        githubRepo: finding.repo_full_name,
+        githubToken,
+        model,
+        analysisMode,
+        retrySandboxOnly: input.retrySandboxOnly,
+        // Personal user - no organizationId
       });
-    }
 
-    return { success: true, triageOnly: result.triageOnly };
+      if (!result.started) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: result.error || 'Failed to start analysis',
+        });
+      }
+
+      logSecurityAudit({
+        owner: securityOwner,
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.FindingAnalysisStarted,
+        resource_type: 'security_finding',
+        resource_id: input.findingId,
+        metadata: { model, analysisMode, triageOnly: result.triageOnly },
+      });
+
+      return { success: true, triageOnly: result.triageOnly };
+    } catch (error) {
+      rethrowAsPaymentRequired(error);
+    }
   }),
 
   /**
@@ -794,6 +930,17 @@ export const securityAgentRouter = createTRPCRouter({
         repoFullName: input.repoFullName,
       });
 
+      logSecurityAudit({
+        owner: securityOwner,
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        action: SecurityAuditLogAction.FindingDeleted,
+        resource_type: 'security_finding',
+        resource_id: input.repoFullName,
+        metadata: { repoFullName: input.repoFullName, deletedCount: result.deletedCount },
+      });
+
       return {
         success: true,
         deletedCount: result.deletedCount,
@@ -815,6 +962,24 @@ export const securityAgentRouter = createTRPCRouter({
    */
   autoDismissEligible: baseProcedure.mutation(async ({ ctx }) => {
     const securityOwner: SecurityReviewOwner = { userId: ctx.user.id };
-    return await autoDismissEligibleFindings(securityOwner, ctx.user.id);
+    const result = await autoDismissEligibleFindings(securityOwner, ctx.user.id);
+
+    logSecurityAudit({
+      owner: securityOwner,
+      actor_id: ctx.user.id,
+      actor_email: ctx.user.google_user_email,
+      actor_name: ctx.user.google_user_name,
+      action: SecurityAuditLogAction.FindingAutoDismissed,
+      resource_type: 'security_finding',
+      resource_id: 'bulk',
+      metadata: {
+        source: 'bulk',
+        dismissed: result.dismissed,
+        skipped: result.skipped,
+        errors: result.errors,
+      },
+    });
+
+    return result;
   }),
 });

@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -116,6 +117,20 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     })
   );
 
+  const setEnabledMutation = useMutation(
+    trpc.byok.setEnabled.mutationOptions({
+      onSuccess: data => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.byok.list.queryKey(listQueryInput),
+        });
+        toast.success(data.is_enabled ? 'API key enabled' : 'API key disabled');
+      },
+      onError: (error: { message: string }) => {
+        toast.error(`Failed to update API key status: ${error.message}`);
+      },
+    })
+  );
+
   // Check if a provider already has a key
   const hasExistingKey = (providerSlug: string) => {
     return keys?.some(k => k.provider_id === providerSlug) ?? false;
@@ -160,6 +175,14 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
   };
 
+  const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {
+    setEnabledMutation.mutate({
+      ...(organizationId && { organizationId }),
+      id: keyId,
+      is_enabled,
+    });
+  };
+
   if (keysLoading) {
     return (
       <div className="space-y-4">
@@ -201,38 +224,68 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   <tr className="bg-muted/50 border-b">
                     <th className="p-4 text-left font-medium">Provider</th>
                     <th className="p-4 text-left font-medium">Created</th>
+                    <th className="p-4 text-left font-medium">Enabled</th>
                     <th className="p-4 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {keys.map((key: { id: string; provider_id: string; created_at: string }) => (
-                    <tr key={key.id} className="border-b last:border-0">
-                      <td className="p-4">{getProviderDisplayName(key.provider_id)}</td>
-                      <td className="text-muted-foreground p-4">
-                        {new Date(key.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="space-x-2 p-4 text-right">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleEdit(key.id)}
-                          disabled={updateMutation.isPending}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() =>
-                            handleDelete(key.id, getProviderDisplayName(key.provider_id))
-                          }
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                  {keys.map(
+                    (key: {
+                      id: string;
+                      provider_id: string;
+                      created_at: string;
+                      is_enabled: boolean;
+                    }) => (
+                      <tr
+                        key={key.id}
+                        className={
+                          !key.is_enabled
+                            ? 'bg-muted/20 border-b last:border-0'
+                            : 'border-b last:border-0'
+                        }
+                      >
+                        <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
+                          {getProviderDisplayName(key.provider_id)}
+                        </td>
+                        <td className="text-muted-foreground p-4">
+                          {new Date(key.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <Switch
+                              checked={key.is_enabled}
+                              onCheckedChange={isEnabled => handleToggleEnabled(key.id, isEnabled)}
+                              disabled={setEnabledMutation.isPending}
+                              aria-label={`Toggle ${getProviderDisplayName(key.provider_id)} BYOK key`}
+                            />
+                            <span className="text-sm">
+                              {key.is_enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="space-x-2 p-4 text-right">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleEdit(key.id)}
+                            disabled={updateMutation.isPending}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              handleDelete(key.id, getProviderDisplayName(key.provider_id))
+                            }
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>

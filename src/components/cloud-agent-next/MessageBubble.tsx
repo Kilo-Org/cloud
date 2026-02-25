@@ -1,7 +1,9 @@
 'use client';
 
-import { User, Bot, Scissors, Image, FileText } from 'lucide-react';
+import { useCallback } from 'react';
+import { User, Bot, Scissors, Image, FileText, AlertCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage, Part, CompactionPart } from './types';
 import {
   isUserMessage,
@@ -13,6 +15,7 @@ import {
 } from './types';
 import type { FilePart } from './types';
 import { PartRenderer } from './PartRenderer';
+import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 
 /**
  * Compaction separator component - shown when context is compacted
@@ -83,6 +86,28 @@ function getUserTextContent(parts: Part[]): string {
   return textParts.map(p => p.text).join('');
 }
 
+/**
+ * Get copyable text content from message parts.
+ * Extracts text from TextParts (the main prose the assistant writes).
+ */
+function getAssistantTextContent(parts: Part[]): string {
+  return parts
+    .filter(isTextPart)
+    .map(p => p.text)
+    .join('\n\n')
+    .trim();
+}
+
+/**
+ * Extract a human-readable error message from an AssistantMessage error field.
+ */
+function getAssistantErrorMessage(error: NonNullable<AssistantMessage['error']>): string {
+  if ('data' in error && 'message' in error.data && typeof error.data.message === 'string') {
+    return error.data.message;
+  }
+  return 'An error occurred while generating a response';
+}
+
 type MessageBubbleProps = {
   message: StoredMessage;
   isStreaming?: boolean;
@@ -136,6 +161,8 @@ export function MessageBubble({
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
   const timeAgo = formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+
+  const getTextForCopy = useCallback(() => getAssistantTextContent(message.parts), [message.parts]);
 
   // User message
   if (isUserMessage(message.info)) {
@@ -192,10 +219,13 @@ export function MessageBubble({
 
   // Assistant message
   if (isAssistantMessage(message.info)) {
-    const { cost, tokens } = message.info;
+    const { cost, tokens, error } = message.info;
+    // Show error when message failed with no output
+    const showError = !isStreaming && error !== undefined;
+    const errorMessage = error ? getAssistantErrorMessage(error) : undefined;
 
     return (
-      <div className="flex items-start gap-2 py-4 md:gap-3">
+      <div className="group/msg flex items-start gap-2 py-4 md:gap-3">
         <AvatarWithDebugInfo messageId={message.info.id} sessionId={message.info.sessionID}>
           <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8">
             <Bot className="h-4 w-4" />
@@ -214,14 +244,26 @@ export function MessageBubble({
                 Streaming...
               </span>
             )}
+            {showError && (
+              <span className="text-destructive flex items-center gap-1 text-xs">
+                <AlertCircle className="h-3 w-3" />
+                Failed
+              </span>
+            )}
             {/* Cost/token display */}
-            {!isStreaming && (cost !== undefined || tokens !== undefined) && (
+            {!isStreaming && !showError && (cost !== undefined || tokens !== undefined) && (
               <span className="text-muted-foreground text-xs">
                 {tokens !== undefined &&
                   `${(tokens.input + tokens.output).toLocaleString()} tokens`}
                 {tokens !== undefined && cost !== undefined && ' · '}
                 {cost !== undefined && `$${cost.toFixed(4)}`}
               </span>
+            )}
+            {!isStreaming && (
+              <CopyMessageButton
+                getText={getTextForCopy}
+                className="opacity-0 transition-opacity group-hover/msg:opacity-100"
+              />
             )}
           </div>
           {/* Render all parts via PartRenderer */}
@@ -235,6 +277,8 @@ export function MessageBubble({
               />
             ))}
           </div>
+          {/* Inline error message for failed responses */}
+          {showError && errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
         </div>
       </div>
     );

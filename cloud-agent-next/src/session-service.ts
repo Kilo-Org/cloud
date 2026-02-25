@@ -257,37 +257,6 @@ export async function runSetupCommands(
   logger.info('Setup commands completed');
 }
 
-// Write MCP server config to global settings file in the session home.
-export async function writeMCPSettings(
-  sandbox: SandboxInstance,
-  sessionHome: string,
-  mcpServers: Record<string, MCPServerConfig>
-): Promise<void> {
-  if (!mcpServers || Object.keys(mcpServers).length === 0) {
-    return;
-  }
-
-  const settingsDir = `${sessionHome}/.kilocode/cli/global/settings`;
-  const settingsPath = `${settingsDir}/mcp_settings.json`;
-
-  // Ensure directory exists
-  await sandbox.exec(`mkdir -p ${settingsDir}`);
-
-  // Generate settings JSON inline (no need for separate function)
-  const settingsJSON = JSON.stringify({ mcpServers }, null, 2);
-
-  // Write settings file
-  await sandbox.writeFile(settingsPath, settingsJSON);
-
-  const serverNames = Object.keys(mcpServers);
-  logger
-    .withTags({
-      serverCount: serverNames.length,
-      serverNames: serverNames.join(', '),
-    })
-    .info('Configured MCP servers');
-}
-
 // Write Kilo auth file so the CLI's KiloSessions can call session ingest.
 // The CLI reads ~/.local/share/kilo/auth.json via Auth.get("kilo") but we
 // never run `kilo auth login` — credentials are injected purely via env vars
@@ -459,7 +428,8 @@ export class SessionService {
     appendSystemPrompt?: string,
     gitUrl?: string,
     gitToken?: string,
-    platform?: 'github' | 'gitlab'
+    platform?: 'github' | 'gitlab',
+    mcpServers?: Record<string, MCPServerConfig>
   ): Record<string, string> {
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
@@ -507,11 +477,17 @@ export class SessionService {
     if (env.KILO_OPENROUTER_BASE) {
       providerOptions.baseURL = env.KILO_OPENROUTER_BASE;
     }
+    const isInteractive =
+      !createdOnPlatform ||
+      createdOnPlatform === 'cloud-agent' ||
+      createdOnPlatform === 'app-builder';
+
     const configContent: Record<string, unknown> = {
       permission: {
         external_directory: {
           [`/tmp/attachments/${sessionId}/**`]: 'allow',
         },
+        ...(!isInteractive && { question: 'deny' }),
       },
       provider: {
         kilo: {
@@ -519,6 +495,10 @@ export class SessionService {
         },
       },
     };
+    // MCP configs are already in CLI-native format — pass through directly
+    if (mcpServers && Object.keys(mcpServers).length > 0) {
+      configContent.mcp = mcpServers;
+    }
     if (kilocodeModel && kilocodeModel.trim()) {
       const normalizedModel = kilocodeModel.startsWith('kilo/')
         ? kilocodeModel
@@ -601,7 +581,8 @@ export class SessionService {
     originalOrgId?: string,
     encryptedSecrets?: EncryptedSecrets,
     createdOnPlatform?: string,
-    appendSystemPrompt?: string
+    appendSystemPrompt?: string,
+    mcpServers?: Record<string, MCPServerConfig>
   ) {
     const { sessionId, sessionHome, workspacePath, envVars } = context;
 
@@ -621,7 +602,8 @@ export class SessionService {
       appendSystemPrompt,
       context.gitUrl,
       context.gitToken,
-      context.platform
+      context.platform,
+      mcpServers
     );
 
     const session = await sandbox.createSession({
@@ -721,7 +703,9 @@ export class SessionService {
       kilocodeModel,
       orgId,
       encryptedSecrets,
-      createdOnPlatform
+      createdOnPlatform,
+      undefined, // appendSystemPrompt
+      mcpServers
     );
 
     // Check disk space before clone for observability (logs warning if low)
@@ -764,11 +748,6 @@ export class SessionService {
     // Run setup commands after branch checkout
     if (setupCommands && setupCommands.length > 0) {
       await runSetupCommands(session, context, setupCommands, true); // fail-fast
-    }
-
-    // Write MCP server settings
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
-      await writeMCPSettings(sandbox, context.sessionHome, mcpServers);
     }
 
     // Write auth file for session ingest
@@ -1005,8 +984,9 @@ export class SessionService {
       kilocodeModel,
       orgId,
       encryptedSecrets,
-      undefined, // createdOnPlatform - not used for initiateFromKiloSession
-      existingMetadata?.appendSystemPrompt
+      options.createdOnPlatform ?? existingMetadata?.createdOnPlatform,
+      existingMetadata?.appendSystemPrompt,
+      mcpServers
     );
 
     // Check disk space before clone for observability (logs warning if low)
@@ -1057,11 +1037,6 @@ export class SessionService {
     // Run setup commands (lenient mode since resuming)
     if (setupCommands && setupCommands.length > 0) {
       await runSetupCommands(session, context, setupCommands, false);
-    }
-
-    // Write MCP settings
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
-      await writeMCPSettings(sandbox, context.sessionHome, mcpServers);
     }
 
     // Write auth file for session ingest
@@ -1207,8 +1182,9 @@ export class SessionService {
       kilocodeModel,
       orgId,
       metadata?.encryptedSecrets,
-      undefined, // createdOnPlatform - not used for resume
-      metadata?.appendSystemPrompt
+      metadata?.createdOnPlatform,
+      metadata?.appendSystemPrompt,
+      metadata?.mcpServers
     );
 
     // Check if workspace repo exists - if not, we may need to reclone
@@ -1310,11 +1286,6 @@ export class SessionService {
     if (metadata.setupCommands && metadata.setupCommands.length > 0) {
       logger.info('Re-running setup commands after fresh clone');
       await runSetupCommands(session, context, metadata.setupCommands, false); // lenient
-    }
-
-    // Re-write MCP settings (fresh clone)
-    if (metadata.mcpServers && Object.keys(metadata.mcpServers).length > 0) {
-      await writeMCPSettings(sandbox, context.sessionHome, metadata.mcpServers);
     }
 
     // Re-write auth file (fresh clone)
@@ -1825,6 +1796,7 @@ type InitiateFromKiloSessionBaseOptions = {
   botId?: string;
   /** GitHub App type for selecting correct slug/bot identity */
   githubAppType?: 'standard' | 'lite';
+  createdOnPlatform?: string;
   /**
    * Existing metadata from prepared session flow.
    * When provided, saveSessionMetadata will merge with it to preserve

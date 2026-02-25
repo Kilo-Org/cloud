@@ -1,7 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { notFound } from 'next/navigation';
 import { AutoTriagePageClient } from './AutoTriagePageClient';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 
 type AutoTriagePageProps = {
   params: Promise<{ id: string }>;
@@ -9,19 +7,7 @@ type AutoTriagePageProps = {
 };
 
 export default async function AutoTriagePage({ params, searchParams }: AutoTriagePageProps) {
-  const { id: organizationId } = await params;
   const search = await searchParams;
-
-  // Feature flags - use server-side check with organization ID as distinct ID
-  const isAutoTriageFeatureEnabled = await isFeatureFlagEnabled(
-    'auto-triage-feature',
-    organizationId
-  );
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
-  if (!isAutoTriageFeatureEnabled && !isDevelopment) {
-    return notFound();
-  }
 
   return (
     <OrganizationByPageLayout

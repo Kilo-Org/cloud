@@ -260,7 +260,7 @@ const inferenceProviderSchema = z.object({
                 gateway: z
                   .object({
                     routing: z.object({
-                      resolvedProvider: z.string().min(1).optional(),
+                      finalProvider: z.string().min(1).optional(),
                     }),
                   })
                   .partial()
@@ -278,7 +278,7 @@ const inferenceProviderSchema = z.object({
                 gateway: z
                   .object({
                     routing: z.object({
-                      resolvedProvider: z.string().min(1).optional(),
+                      finalProvider: z.string().min(1).optional(),
                     }),
                   })
                   .partial()
@@ -302,10 +302,10 @@ function extractInferenceProvider(data: unknown): string | undefined {
   if (directProvider) return directProvider;
 
   const choice = parsed.data.choices?.[0];
-  const resolvedProvider =
-    choice?.message?.provider_metadata?.gateway?.routing?.resolvedProvider?.trim() ??
-    choice?.delta?.provider_metadata?.gateway?.routing?.resolvedProvider?.trim();
-  return resolvedProvider || undefined;
+  const finalProvider =
+    choice?.message?.provider_metadata?.gateway?.routing?.finalProvider?.trim() ??
+    choice?.delta?.provider_metadata?.gateway?.routing?.finalProvider?.trim();
+  return finalProvider || undefined;
 }
 
 function safeParseJson(payload: string): unknown {

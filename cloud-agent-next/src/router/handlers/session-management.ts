@@ -378,8 +378,7 @@ export function createSessionManagementHandlers() {
             // gitToken: OMITTED
 
             prompt: metadata.prompt,
-            // Cast mode since CloudAgentSessionState.mode is string | undefined
-            // but was validated at storage time to be a valid AgentMode
+            // mode is validated by zod (AgentModeSchema) at storage time
             mode: metadata.mode as AgentMode | undefined,
             model: metadata.model,
             autoCommit: metadata.autoCommit,

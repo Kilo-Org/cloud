@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
+import { FeedbackDialog } from './FeedbackDialog';
 
 type ChatHeaderProps = {
   /** The cloud-agent session ID (e.g., agent_xxx format) */
@@ -90,6 +91,10 @@ export function ChatHeader({
               <Info className="h-5 w-5" />
             </Button>
 
+            <div className="lg:hidden">
+              <FeedbackDialog />
+            </div>
+
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-base font-semibold text-gray-100 md:text-lg">
@@ -116,21 +121,24 @@ export function ChatHeader({
                   </Badge>
                 )}
               </div>
-              <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-gray-400 md:text-sm">
-                <GitBranch className="h-3 w-3 shrink-0" />
-                <span className="truncate">{repository}</span>
-                <a
-                  href={githubUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 text-blue-400 transition-colors hover:text-blue-300"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+              {repository && (
+                <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-gray-400 md:text-sm">
+                  <GitBranch className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{repository}</span>
+                  <a
+                    href={githubUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-blue-400 transition-colors hover:text-blue-300"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
             </div>
           </div>
           <div className="hidden items-center gap-2 lg:flex">
+            <FeedbackDialog />
             {onToggleSound && (
               <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="sm" />
             )}

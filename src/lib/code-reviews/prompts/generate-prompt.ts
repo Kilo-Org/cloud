@@ -82,7 +82,7 @@ const PromptTemplateSchema = z.object({
 });
 
 // Template type derived from schema
-type PromptTemplate = z.infer<typeof PromptTemplateSchema>;
+export type PromptTemplate = z.infer<typeof PromptTemplateSchema>;
 
 /**
  * Get the default local template for a platform
@@ -101,6 +101,50 @@ function getDefaultTemplate(platform: CodeReviewPlatform): PromptTemplate {
 }
 
 /**
+ * Merges style override records: { ...local, ...remote }.
+ * Remote keys win when both define the same key.
+ * When remote is undefined the local values pass through unchanged.
+ */
+function mergeStyleOverrides<V>(
+  local: Record<string, V> | undefined,
+  remote: Record<string, V> | undefined
+): Record<string, V> | undefined {
+  if (!local && !remote) return undefined;
+  return { ...local, ...remote };
+}
+
+/**
+ * Merges a remote (PostHog) template with the local template.
+ * Remote wins for all base prompt sections and for style override
+ * keys that it explicitly provides. Local style overrides fill in
+ * any keys the remote template doesn't define.
+ */
+export function resolveTemplate(
+  remoteTemplate: PromptTemplate | undefined,
+  localTemplate: PromptTemplate
+): { template: PromptTemplate; source: 'posthog' | 'local' } {
+  if (!remoteTemplate) {
+    return { template: localTemplate, source: 'local' };
+  }
+
+  return {
+    template: {
+      ...remoteTemplate,
+      styleGuidance: mergeStyleOverrides(localTemplate.styleGuidance, remoteTemplate.styleGuidance),
+      commentFormatOverrides: mergeStyleOverrides(
+        localTemplate.commentFormatOverrides,
+        remoteTemplate.commentFormatOverrides
+      ),
+      summaryFormatOverrides: mergeStyleOverrides(
+        localTemplate.summaryFormatOverrides,
+        remoteTemplate.summaryFormatOverrides
+      ),
+    },
+    source: 'posthog',
+  };
+}
+
+/**
  * Load prompt template from PostHog or fall back to local
  * @param platform The platform to load template for
  * @returns Template and source indicator
@@ -115,20 +159,15 @@ async function loadPromptTemplate(platform: CodeReviewPlatform): Promise<{
   // Try to load from PostHog first
   const remoteTemplate = await getFeatureFlagPayload(PromptTemplateSchema, featureFlagName);
 
-  if (remoteTemplate) {
-    logExceptInTest('[loadPromptTemplate] Loaded template from PostHog', {
-      platform,
-      version: remoteTemplate.version,
-    });
-    return { template: remoteTemplate, source: 'posthog' };
-  }
+  const { template, source } = resolveTemplate(remoteTemplate, defaultTemplate);
 
-  // Fall back to local template
-  logExceptInTest('[loadPromptTemplate] Using local template', {
+  logExceptInTest('[loadPromptTemplate] Template resolved', {
     platform,
-    version: defaultTemplate.version,
+    version: template.version,
+    source,
   });
-  return { template: defaultTemplate, source: 'local' };
+
+  return { template, source };
 }
 
 /**

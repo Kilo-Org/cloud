@@ -16,9 +16,11 @@ import {
   organization_user_usage,
   organization_audit_logs,
   organization_invitations,
+  security_audit_log,
   free_model_usage,
   organizations,
   user_feedback,
+  cloud_agent_feedback,
   user_admin_notes,
   magic_link_tokens,
   stytch_fingerprints,
@@ -35,6 +37,7 @@ import {
   KiloPassIssuanceSource,
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
+import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
@@ -49,12 +52,14 @@ describe('User', () => {
     await db.delete(referral_code_usages);
     await db.delete(referral_codes);
     await db.delete(organization_audit_logs);
+    await db.delete(security_audit_log);
     await db.delete(organization_invitations);
     await db.delete(organization_user_usage);
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
     await db.delete(free_model_usage);
     await db.delete(user_feedback);
+    await db.delete(cloud_agent_feedback);
     await db.delete(user_admin_notes);
     await db.delete(magic_link_tokens);
     await db.delete(stytch_fingerprints);
@@ -351,6 +356,39 @@ describe('User', () => {
       expect(logs[0].message).toBe('User joined org'); // message preserved
     });
 
+    it('should anonymize security audit logs where user is actor', async () => {
+      const user = await insertTestUser();
+      const orgId = randomUUID();
+      await db.insert(organizations).values({
+        id: orgId,
+        name: 'Test Org',
+        stripe_customer_id: `stripe-org-${orgId}`,
+        plan: 'teams',
+      });
+
+      await db.insert(security_audit_log).values({
+        owned_by_organization_id: orgId,
+        actor_id: user.id,
+        actor_email: user.google_user_email,
+        actor_name: user.google_user_name,
+        action: SecurityAuditLogAction.FindingDismissed,
+        resource_type: 'security_finding',
+        resource_id: randomUUID(),
+      });
+
+      await softDeleteUser(user.id);
+
+      const logs = await db
+        .select()
+        .from(security_audit_log)
+        .where(eq(security_audit_log.actor_id, user.id));
+      expect(logs).toHaveLength(1);
+      expect(logs[0].actor_email).toBeNull();
+      expect(logs[0].actor_name).toBeNull();
+      expect(logs[0].actor_id).toBe(user.id); // actor_id preserved
+      expect(logs[0].action).toBe(SecurityAuditLogAction.FindingDismissed); // action preserved
+    });
+
     it('should soft-delete and anonymize payment methods', async () => {
       const user = await insertTestUser();
       const pm = createTestPaymentMethod(user.id);
@@ -383,6 +421,21 @@ describe('User', () => {
       expect(feedback).toHaveLength(1);
       expect(feedback[0].kilo_user_id).toBeNull();
       expect(feedback[0].feedback_text).toBe('Great product!');
+    });
+
+    it('should nullify cloud_agent_feedback FK', async () => {
+      const user = await insertTestUser();
+      await db.insert(cloud_agent_feedback).values({
+        kilo_user_id: user.id,
+        feedback_text: 'Cloud agent is great!',
+      });
+
+      await softDeleteUser(user.id);
+
+      const feedback = await db.select().from(cloud_agent_feedback);
+      expect(feedback).toHaveLength(1);
+      expect(feedback[0].kilo_user_id).toBeNull();
+      expect(feedback[0].feedback_text).toBe('Cloud agent is great!');
     });
 
     it('should nullify free_model_usage FK', async () => {

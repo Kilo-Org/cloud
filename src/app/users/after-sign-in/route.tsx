@@ -6,12 +6,14 @@ import { APP_URL } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
-  const { user } = await getUserFromAuth({ adminOnly: false });
+  const { user } = await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true });
 
   let responsePath: string;
 
   if (!user) {
     responsePath = '/users/sign_in';
+  } else if (user.blocked_reason) {
+    responsePath = '/account-blocked';
   } else {
     const callbackPath = url.searchParams.get('callbackPath');
     if (callbackPath && isValidCallbackPath(callbackPath)) {

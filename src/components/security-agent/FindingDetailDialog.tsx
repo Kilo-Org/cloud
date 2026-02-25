@@ -116,14 +116,15 @@ export function FindingDetailDialog({
   const isAnalyzing =
     startAnalysisMutation.isPending || analysisStatus === 'pending' || analysisStatus === 'running';
 
-  const handleStartAnalysis = () => {
+  const handleStartAnalysis = ({ retrySandboxOnly }: { retrySandboxOnly?: boolean } = {}) => {
     if (isOrg) {
       startOrgAnalysisMutation.mutate({
         organizationId: organizationId,
         findingId: finding.id,
+        retrySandboxOnly,
       });
     } else {
-      startUserAnalysisMutation.mutate({ findingId: finding.id });
+      startUserAnalysisMutation.mutate({ findingId: finding.id, retrySandboxOnly });
     }
   };
 
@@ -261,6 +262,23 @@ export function FindingDetailDialog({
                   analysis={analysis}
                   showSandboxReasoning={analysisStatus === 'running'}
                 />
+                {/* Show error + retry when triage succeeded but sandbox analysis failed */}
+                {analysisStatus === 'failed' && (
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                    <p className="text-sm text-red-400">
+                      Codebase analysis failed: {analysisError || 'Unknown error'}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStartAnalysis({ retrySandboxOnly: true })}
+                      disabled={isAnalyzing}
+                      className="mt-2"
+                    >
+                      Retry Analysis
+                    </Button>
+                  </div>
+                )}
                 {cliSessionId && (
                   <div className="mt-2">
                     <Link
@@ -287,7 +305,7 @@ export function FindingDetailDialog({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleStartAnalysis}
+                  onClick={() => handleStartAnalysis()}
                   disabled={isAnalyzing}
                   className="mt-2"
                 >
@@ -332,7 +350,7 @@ export function FindingDetailDialog({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleStartAnalysis}
+                  onClick={() => handleStartAnalysis()}
                   disabled={isAnalyzing}
                 >
                   <Brain className="mr-2 h-4 w-4" />

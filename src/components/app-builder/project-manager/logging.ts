@@ -1,15 +1,8 @@
 /**
- * Logging utilities for ProjectManager
- *
- * Provides consistent logging with project context prefix
- * and error formatting for stream errors.
+ * Logging utilities for ProjectManager — prefixed console logging and error formatting.
  */
 
 import { TRPCClientError } from '@trpc/client';
-
-// =============================================================================
-// Types
-// =============================================================================
 
 export type Logger = {
   log: (...args: unknown[]) => void;
@@ -17,14 +10,6 @@ export type Logger = {
   logError: (...args: unknown[]) => void;
 };
 
-// =============================================================================
-// Logger Factory
-// =============================================================================
-
-/**
- * Creates a logger with a consistent prefix for ProjectManager logging.
- * The prefix includes the project ID for easier debugging in multi-project scenarios.
- */
 export function createLogger(projectId?: string): Logger {
   const prefix = projectId ? `[ProjectManager:${projectId}]` : '[ProjectManager]';
 
@@ -41,15 +26,7 @@ export function createLogger(projectId?: string): Logger {
   };
 }
 
-// =============================================================================
-// Error Formatting
-// =============================================================================
-
-/**
- * Formats stream errors into user-friendly messages.
- * Handles TRPC errors with specific codes (payment required, unauthorized, etc.)
- * and generic connection errors.
- */
+/** Formats stream errors into user-friendly messages, handling tRPC error codes. */
 export function formatStreamError(err: unknown): string {
   if (err instanceof TRPCClientError) {
     const code = err.data?.code ?? err.shape?.code;

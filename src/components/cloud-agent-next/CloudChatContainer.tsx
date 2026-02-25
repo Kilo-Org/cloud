@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -22,6 +22,8 @@ import {
   sessionConfigAtom,
   totalCostAtom,
   getChildSessionMessagesAtom,
+  questionRequestIdsAtom,
+  sessionOrganizationIdAtom,
 } from './store/atoms';
 import { buildSessionConfig, needsResumeConfiguration } from './session-config';
 import {
@@ -49,26 +51,23 @@ import { useResumeConfigModal } from './hooks/useResumeConfigModal';
 import { useSessionConfigCommand } from './hooks/useSessionConfigCommand';
 import { useOrgContextCommand } from './hooks/useOrgContextCommand';
 import { usePreparedSession } from './hooks/usePreparedSession';
-import { buildPrepareSessionRepoParams } from './utils/git-utils';
+import { buildPrepareSessionRepoParams, extractRepoFromGitUrl } from './utils/git-utils';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { CloudChatPresentation } from './CloudChatPresentation';
+import { QuestionContextProvider } from './QuestionContext';
 import type { ResumeConfig } from './ResumeConfigModal';
 import type { AgentMode, SessionStartConfig } from './types';
+
+/** Normalize legacy mode strings ('build' → 'code', 'architect' → 'plan') from DB/DO */
+function normalizeMode(mode: string): AgentMode {
+  if (mode === 'build') return 'code';
+  if (mode === 'architect') return 'plan';
+  return mode as AgentMode;
+}
 
 type CloudChatContainerProps = {
   organizationId?: string;
 };
-
-/**
- * Discriminated union for resume config lifecycle
- * Prevents impossible states and makes persistence status explicit
- */
-type ResumeConfigState =
-  | { status: 'none' }
-  | { status: 'pending'; config: ResumeConfig }
-  | { status: 'persisting'; config: ResumeConfig }
-  | { status: 'persisted'; config: ResumeConfig }
-  | { status: 'failed'; config: ResumeConfig; error: Error };
 
 export function CloudChatContainer({ organizationId }: CloudChatContainerProps) {
   const router = useRouter();
@@ -84,6 +83,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   const currentSessionId = useAtomValue(currentSessionIdAtom);
   const sessionConfig = useAtomValue(sessionConfigAtom);
   const totalCost = useAtomValue(totalCostAtom);
+  const questionRequestIds = useAtomValue(questionRequestIdsAtom);
+  const questionOrganizationId = useAtomValue(sessionOrganizationIdAtom);
 
   // Write to atoms
   const setError = useSetAtom(errorAtom);
@@ -124,20 +125,28 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   // Track the session loaded from DB
   const [loadedDbSession, setLoadedDbSession] = useState<DbSessionDetails | null>(null);
 
+  // Derive non-resumable state: CLI session without git_url or git_branch
+  const isNonResumableSession = useMemo(() => {
+    if (!loadedDbSession) return false;
+    const isCliSession = !loadedDbSession.cloud_agent_session_id;
+    return isCliSession && (!loadedDbSession.git_url || !loadedDbSession.git_branch);
+  }, [loadedDbSession]);
+
   // Track whether org context modal was dismissed
   const [orgContextDismissedForSession, setOrgContextDismissedForSession] = useState<string | null>(
     null
   );
 
-  // Single source of truth for resume config lifecycle
-  const [resumeConfigState, setResumeConfigState] = useState<ResumeConfigState>({ status: 'none' });
+  // Simple resume config persistence state
+  const [resumeConfigPersisting, setResumeConfigPersisting] = useState(false);
+  const [persistedConfig, setPersistedConfig] = useState<ResumeConfig | null>(null);
+  const [resumeConfigError, setResumeConfigError] = useState<string | null>(null);
 
   // Resume config modal hook
   const {
     showResumeModal,
     pendingResumeSession,
-    pendingGitState,
-    streamResumeConfig,
+    persistedResumeConfig,
     reopenResumeModal,
     handleResumeConfirm: handleResumeConfirmFromHook,
     handleResumeClose,
@@ -146,17 +155,41 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     currentDbSessionId,
     currentIndexedDbSession,
     loadedDbSession,
-    persistedResumeConfig:
-      resumeConfigState.status === 'persisted' ? resumeConfigState.config : null,
+    persistedResumeConfig: persistedConfig,
   });
 
-  // Wrap the modal confirm handler to set discriminated union state
+  // Handle modal confirm: persist config directly (no effect-based state machine)
   const handleResumeConfirm = useCallback(
     async (config: ResumeConfig) => {
       await handleResumeConfirmFromHook(config);
-      setResumeConfigState({ status: 'pending', config });
+
+      if (!currentDbSessionId || !loadedDbSession) return;
+
+      setResumeConfigPersisting(true);
+      setResumeConfigError(null);
+      try {
+        await applyResumeConfig({
+          config,
+          sessionId: currentDbSessionId,
+          loadedDbSession,
+        });
+        setPersistedConfig(config);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        setResumeConfigError(message);
+        clearResumeConfig();
+        toast.error('Failed to save configuration. Please try again.');
+      } finally {
+        setResumeConfigPersisting(false);
+      }
     },
-    [handleResumeConfirmFromHook]
+    [
+      handleResumeConfirmFromHook,
+      currentDbSessionId,
+      loadedDbSession,
+      applyResumeConfig,
+      clearResumeConfig,
+    ]
   );
 
   // Org context modal state
@@ -178,7 +211,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
 
   // Input toolbar state for mode/model selection
   // These persist between messages and update sessionConfig when changed
-  const [inputMode, setInputMode] = useState<AgentMode>('build');
+  const [inputMode, setInputMode] = useState<AgentMode>('code');
   const [inputModel, setInputModel] = useState<string>('');
 
   // Auto-scroll behavior
@@ -293,7 +326,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   // Only sync when sessionConfig changes (new session loaded or initial config)
   useEffect(() => {
     if (sessionConfig?.mode) {
-      setInputMode(sessionConfig.mode as AgentMode);
+      setInputMode(normalizeMode(sessionConfig.mode));
     }
     if (sessionConfig?.model) {
       setInputModel(sessionConfig.model);
@@ -390,6 +423,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
             // Include mode/model from DO runtime state so needsResumeConfigModal works correctly
             last_mode: runtimeState?.mode,
             last_model: runtimeState?.model,
+            git_url: sessionData.git_url,
+            git_branch: sessionData.git_branch,
           };
 
           // Check if session has been initiated - prefer DO state, fallback to message check
@@ -431,17 +466,19 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
           // Apply runtime state from DO (mode, model, repository)
           if (runtimeState) {
             if (runtimeState.mode) {
-              setInputMode(runtimeState.mode as AgentMode);
+              setInputMode(normalizeMode(runtimeState.mode));
             }
             if (runtimeState.model) {
               setInputModel(runtimeState.model);
             }
             // Update sessionConfig with mode/model/repository from cloud-agent DO
             if (runtimeState.mode && runtimeState.model) {
+              const normalizedMode = normalizeMode(runtimeState.mode);
+              const model = runtimeState.model;
               setSessionConfig(prev => ({
                 sessionId: sessionData.cloud_agent_session_id ?? sessionData.session_id,
-                mode: runtimeState.mode as AgentMode,
-                model: runtimeState.model as string,
+                mode: normalizedMode,
+                model,
                 repository: runtimeState.githubRepo ?? prev?.repository ?? '',
               }));
             }
@@ -595,46 +632,12 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
       // Disconnect old WebSocket to prevent events from old session updating UI
       cleanup();
       setAutoInitiatedSessionId(null);
-      setResumeConfigState({ status: 'none' });
+      setPersistedConfig(null);
+      setResumeConfigError(null);
       connectedExistingSessionRef.current = null;
     }
     prevDbSessionIdRef.current = currentDbSessionId;
   }, [currentDbSessionId, cleanup]);
-
-  // Apply resume config when state transitions to 'pending'
-  useEffect(() => {
-    if (resumeConfigState.status !== 'pending') return;
-    if (!currentDbSessionId || !loadedDbSession) return;
-
-    setResumeConfigState({ status: 'persisting', config: resumeConfigState.config });
-
-    const apply = async () => {
-      try {
-        await applyResumeConfig({
-          config: resumeConfigState.config,
-          sessionId: currentDbSessionId,
-          loadedDbSession,
-        });
-        setResumeConfigState({ status: 'persisted', config: resumeConfigState.config });
-      } catch (error) {
-        setResumeConfigState({
-          status: 'failed',
-          config: resumeConfigState.config,
-          error: error instanceof Error ? error : new Error('Unknown error'),
-        });
-        clearResumeConfig();
-        toast.error('Failed to save configuration. Please try again.');
-      }
-    };
-
-    void apply();
-  }, [
-    resumeConfigState,
-    currentDbSessionId,
-    loadedDbSession,
-    applyResumeConfig,
-    clearResumeConfig,
-  ]);
 
   // Periodic staleness check
   useEffect(() => {
@@ -751,7 +754,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
       // the case where we have a valid sessionConfig (already-initiated or CLI sessions)
       if (sessionConfig) {
         if (needsLegacyPrepare && effectiveSessionId && currentDbSessionId) {
-          const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
+          const resumeRepo =
+            extractRepoFromGitUrl(loadedDbSession?.git_url) || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
           const repoParams = buildPrepareSessionRepoParams({
             repo: resumeRepo,
@@ -774,8 +778,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
                 mode: inputMode,
                 model: inputModel,
                 ...repoParams,
-                envVars: streamResumeConfig?.envVars,
-                setupCommands: streamResumeConfig?.setupCommands,
+                envVars: persistedResumeConfig?.envVars,
+                setupCommands: persistedResumeConfig?.setupCommands,
+                upstreamBranch: loadedDbSession?.git_branch ?? undefined,
               });
             } else {
               result = await trpcClient.cloudAgentNext.prepareSession.mutate({
@@ -783,8 +788,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
                 mode: inputMode,
                 model: inputModel,
                 ...repoParams,
-                envVars: streamResumeConfig?.envVars,
-                setupCommands: streamResumeConfig?.setupCommands,
+                envVars: persistedResumeConfig?.envVars,
+                setupCommands: persistedResumeConfig?.setupCommands,
+                upstreamBranch: loadedDbSession?.git_branch ?? undefined,
               });
             }
 
@@ -800,7 +806,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         }
 
         if (!effectiveSessionId) {
-          const resumeRepo = streamResumeConfig?.githubRepo || sessionConfig.repository;
+          const resumeRepo =
+            extractRepoFromGitUrl(loadedDbSession?.git_url) || sessionConfig.repository;
           const gitUrl = currentIndexedDbSession?.gitUrl || loadedDbSession?.git_url || null;
           const repoParams = buildPrepareSessionRepoParams({
             repo: resumeRepo,
@@ -818,8 +825,9 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
               mode: inputMode,
               model: inputModel,
               ...repoParams,
-              envVars: streamResumeConfig?.envVars,
-              setupCommands: streamResumeConfig?.setupCommands,
+              envVars: persistedResumeConfig?.envVars,
+              setupCommands: persistedResumeConfig?.setupCommands,
+              upstreamBranch: loadedDbSession?.git_branch ?? undefined,
             });
             await initiateFromPreparedSession(effectiveSessionId);
             return;
@@ -842,7 +850,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
       currentSessionId,
       needsLegacyPrepare,
       currentDbSessionId,
-      streamResumeConfig,
+      persistedResumeConfig,
       prepareSession,
       trpcClient,
       initiateFromPreparedSession,
@@ -892,8 +900,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     !isPreflightPending &&
     needsResumeConfiguration({
       currentDbSessionId,
-      resumeConfig: resumeConfigState.status === 'persisted' ? resumeConfigState.config : null,
-      streamResumeConfig,
+      resumeConfig: persistedConfig,
+      persistedResumeConfig,
       sessionConfig,
     });
 
@@ -903,65 +911,69 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     : false;
 
   return (
-    <CloudChatPresentation
-      organizationId={organizationId}
-      staticMessages={staticMessages}
-      dynamicMessages={dynamicMessages}
-      sessions={sessions}
-      currentSessionId={currentSessionId}
-      currentDbSessionId={currentDbSessionId}
-      cloudAgentSessionId={cloudAgentSessionId}
-      sessionConfig={sessionConfig}
-      totalCost={totalCost}
-      error={error}
-      isStreaming={isStreaming}
-      isLoadingFromDb={isLoadingFromDb}
-      isStale={isStale}
-      isSessionInitiated={isSessionInitiated}
-      showScrollButton={showScrollButton}
-      mobileSheetOpen={mobileSheetOpen}
-      soundEnabled={soundEnabled}
-      showOrgContextModal={showOrgContextModal}
-      showResumeModal={showResumeModal}
-      pendingSessionForOrgContext={pendingSessionForOrgContext}
-      pendingResumeSession={pendingResumeSession}
-      pendingGitState={pendingGitState}
-      needsResumeConfig={needsResumeConfig}
-      resumeConfigPersisting={resumeConfigState.status === 'persisting'}
-      resumeConfigFailed={resumeConfigState.status === 'failed'}
-      resumeConfigError={
-        resumeConfigState.status === 'failed' ? resumeConfigState.error.message : null
-      }
-      modelOptions={modelOptions}
-      isLoadingModels={isLoadingModels}
-      defaultModel={defaultModel}
-      availableCommands={availableCommands}
-      scrollContainerRef={scrollContainerRef}
-      messagesEndRef={messagesEndRef}
-      streamResumeConfig={streamResumeConfig}
-      onSendMessage={handleSendMessage}
-      onStopExecution={handleStopExecution}
-      onRefresh={handleRefreshSession}
-      onNewSession={handleNewSession}
-      onSelectSession={handleSelectSession}
-      onDeleteSession={handleDeleteSession}
-      onDismissError={handleDismissError}
-      onOrgContextConfirm={handleOrgContextConfirm}
-      onOrgContextClose={handleOrgContextClose}
-      onResumeConfirm={handleResumeConfirm}
-      onResumeClose={handleResumeClose}
-      onReopenResumeModal={reopenResumeModal}
-      onScroll={handleScroll}
-      onScrollToBottom={scrollToBottom}
-      onToggleSound={handleToggleSound}
-      onMenuClick={() => setMobileSheetOpen(true)}
-      onMobileSheetOpenChange={setMobileSheetOpen}
-      inputMode={inputMode}
-      inputModel={inputModel}
-      onInputModeChange={handleInputModeChange}
-      onInputModelChange={handleInputModelChange}
-      isOldSession={isOldSession}
-      getChildMessages={getChildSessionMessages}
-    />
+    <QuestionContextProvider
+      questionRequestIds={questionRequestIds}
+      cloudAgentSessionId={currentSessionId}
+      organizationId={questionOrganizationId}
+    >
+      <CloudChatPresentation
+        organizationId={organizationId}
+        staticMessages={staticMessages}
+        dynamicMessages={dynamicMessages}
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        currentDbSessionId={currentDbSessionId}
+        cloudAgentSessionId={cloudAgentSessionId}
+        sessionConfig={sessionConfig}
+        totalCost={totalCost}
+        error={error}
+        isStreaming={isStreaming}
+        isLoadingFromDb={isLoadingFromDb}
+        isStale={isStale}
+        isSessionInitiated={isSessionInitiated}
+        showScrollButton={showScrollButton}
+        mobileSheetOpen={mobileSheetOpen}
+        soundEnabled={soundEnabled}
+        showOrgContextModal={showOrgContextModal}
+        showResumeModal={showResumeModal}
+        pendingSessionForOrgContext={pendingSessionForOrgContext}
+        pendingResumeSession={pendingResumeSession}
+        isNonResumableSession={isNonResumableSession}
+        needsResumeConfig={needsResumeConfig}
+        resumeConfigPersisting={resumeConfigPersisting}
+        resumeConfigFailed={resumeConfigError !== null}
+        resumeConfigError={resumeConfigError}
+        modelOptions={modelOptions}
+        isLoadingModels={isLoadingModels}
+        defaultModel={defaultModel}
+        availableCommands={availableCommands}
+        scrollContainerRef={scrollContainerRef}
+        messagesEndRef={messagesEndRef}
+        persistedResumeConfig={persistedResumeConfig}
+        onSendMessage={handleSendMessage}
+        onStopExecution={handleStopExecution}
+        onRefresh={handleRefreshSession}
+        onNewSession={handleNewSession}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
+        onDismissError={handleDismissError}
+        onOrgContextConfirm={handleOrgContextConfirm}
+        onOrgContextClose={handleOrgContextClose}
+        onResumeConfirm={handleResumeConfirm}
+        onResumeClose={handleResumeClose}
+        onReopenResumeModal={reopenResumeModal}
+        onScroll={handleScroll}
+        onScrollToBottom={scrollToBottom}
+        onToggleSound={handleToggleSound}
+        onMenuClick={() => setMobileSheetOpen(true)}
+        onMobileSheetOpenChange={setMobileSheetOpen}
+        inputMode={inputMode}
+        inputModel={inputModel}
+        onInputModeChange={handleInputModeChange}
+        onInputModelChange={handleInputModelChange}
+        isOldSession={isOldSession}
+        getChildMessages={getChildSessionMessages}
+      />
+    </QuestionContextProvider>
   );
 }

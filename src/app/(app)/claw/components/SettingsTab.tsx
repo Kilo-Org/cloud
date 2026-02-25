@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Save, Square, X } from 'lucide-react';
+import { AlertTriangle, Hash, Save, Square, X } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
@@ -12,6 +12,7 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { DetailTile } from './DetailTile';
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 import { ChannelTokenInput } from './ChannelTokenInput';
 import { CHANNELS, CHANNEL_TYPES, type ChannelDefinition } from './channel-config';
@@ -197,6 +198,14 @@ export function SettingsTab({
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <DetailTile label="Env Vars" value={String(status.envVarCount)} icon={Hash} />
+        <DetailTile label="Secrets" value={String(status.secretCount)} icon={Hash} />
+        <DetailTile label="Channels" value={String(status.channelCount)} icon={Hash} />
+      </div>
+
+      <Separator />
+
       <div>
         <h3 className="text-foreground mb-1 text-sm font-medium">KiloCode Configuration</h3>
         <p className="text-muted-foreground mb-4 text-xs">

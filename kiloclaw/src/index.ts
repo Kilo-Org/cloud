@@ -19,6 +19,8 @@ import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform } from './ro
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
+import { registerVersionIfNeeded } from './lib/image-version';
+import { startingUpPage } from './pages/starting-up';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
@@ -87,7 +89,7 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
     if (!c.env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
     if (missing.length > 0) {
       console.error('[CONFIG] Platform route missing bindings:', missing.join(', '));
-      return c.json({ error: 'Configuration error', missing }, 503);
+      return c.json({ error: 'Configuration error' }, 503);
     }
     return next();
   }
@@ -95,15 +97,7 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
   const missingVars = validateRequiredEnv(c.env);
   if (missingVars.length > 0) {
     console.error('[CONFIG] Missing required environment variables:', missingVars.join(', '));
-    return c.json(
-      {
-        error: 'Configuration error',
-        message: 'Required environment variables are not configured',
-        missing: missingVars,
-        hint: 'Set these using: wrangler secret put <VARIABLE_NAME>',
-      },
-      503
-    );
+    return c.json({ error: 'Configuration error' }, 503);
   }
 
   return next();
@@ -123,7 +117,14 @@ async function authGuard(c: Context<AppEnv>, next: Next) {
 async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
   const userId = c.get('userId');
   if (userId) {
-    c.set('sandboxId', sandboxIdFromUserId(userId));
+    try {
+      c.set('sandboxId', sandboxIdFromUserId(userId));
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('userId too long')) {
+        return c.text('Invalid user identifier', 400);
+      }
+      throw err;
+    }
   }
   return next();
 }
@@ -295,6 +296,17 @@ app.all('*', async c => {
     }
     console.log('[WS] Fly Proxy response status:', containerResponse.status);
 
+    // Gateway not ready yet — return a clear JSON error for WebSocket clients
+    if (containerResponse.status === 502) {
+      return c.json(
+        {
+          error: 'Instance is starting up',
+          hint: 'The gateway process is still initializing. Please retry shortly.',
+        },
+        503
+      );
+    }
+
     const containerWs = containerResponse.webSocket;
     if (!containerWs) {
       console.error('[WS] No WebSocket in response - returning direct response');
@@ -408,9 +420,33 @@ app.all('*', async c => {
     }
   }
   console.log('[HTTP] Response status:', httpResponse.status);
+
+  // Gateway not ready yet — show friendly "starting up" page instead of raw 502
+  if (httpResponse.status === 502) {
+    return startingUpPage();
+  }
+
   return httpResponse;
 });
 
 export default {
-  fetch: app.fetch,
+  fetch(request: Request, env: KiloClawEnv, ctx: ExecutionContext) {
+    // Self-register the current OpenClaw version in KV on deploy.
+    // Runs after the response is sent. If the very first request after deploy
+    // is a provision(), the KV write races with resolveLatestVersion() —
+    // provision may see the previous latest (or null) and fall back to
+    // FLY_IMAGE_TAG, which is already correct for the new deploy. This is benign.
+    if (env.OPENCLAW_VERSION && env.FLY_IMAGE_TAG) {
+      ctx.waitUntil(
+        registerVersionIfNeeded(
+          env.KV_CLAW_CACHE,
+          env.OPENCLAW_VERSION,
+          'default', // variant hardcoded day 1
+          env.FLY_IMAGE_TAG
+        )
+      );
+    }
+
+    return app.fetch(request, env, ctx);
+  },
 };

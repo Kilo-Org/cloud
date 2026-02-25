@@ -1,0 +1,1 @@
+ALTER TABLE "byok_api_keys" ADD COLUMN "is_enabled" boolean DEFAULT true NOT NULL;

@@ -91,6 +91,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       user_byok: false,
       has_tools: false,
       feature: null,
+      session_id: null,
     };
 
     // Use the existing countAndStoreUsage function

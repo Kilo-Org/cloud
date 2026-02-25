@@ -52,7 +52,6 @@ export default function OrganizationAppSidebar({
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const isAdmin = user?.is_admin || false;
 
   // Get current organization role and data
   const currentOrg = organizationData;
@@ -153,28 +152,18 @@ export default function OrganizationAppSidebar({
       icon: Bot,
       url: `/organizations/${organizationId}/code-reviews`,
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Security Agent',
-            icon: Shield,
-            url: `/organizations/${organizationId}/security-agent`,
-          },
-        ]
-      : []),
+    {
+      title: 'Security Agent',
+      icon: Shield,
+      url: `/organizations/${organizationId}/security-agent`,
+    },
+    {
+      title: 'Auto Triage',
+      icon: ListChecks,
+      url: `/organizations/${organizationId}/auto-triage`,
+    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          {
-            title: 'Auto Triage',
-            icon: ListChecks,
-            url: `/organizations/${organizationId}/auto-triage`,
-          },
-          {
-            title: 'Auto Fix',
-            icon: Wrench,
-            url: `/organizations/${organizationId}/auto-fix`,
-          },
-        ]
+      ? [{ title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` }]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [

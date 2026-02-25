@@ -7,6 +7,7 @@ import { AnimatedLogo } from '@/components/AnimatedLogo';
 import { CopyableCommand } from '@/components/CopyableCommand';
 import { APP_URL } from '@/lib/constants';
 import { OpenInCliButton } from '@/app/share/[shareId]/open-in-cli-button';
+import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 export const revalidate = 86400;
@@ -68,6 +69,20 @@ export default async function SharedSessionPage({
             </CardHeader>
 
             <CardContent className="flex flex-col gap-4">
+              <div className="bg-muted/40 rounded-xl border p-5 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-left">
+                    <div className="text-sm font-medium">Open in Extension</div>
+                    <div className="text-muted-foreground mt-1 text-xs">
+                      Open this session directly in your editor.
+                    </div>
+                  </div>
+                  <div className="flex justify-start sm:justify-end">
+                    <OpenInEditorButton sessionId={sessionId} pathOverride={`/s/${sessionId}`} />
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-muted/40 rounded-xl border p-5 shadow-sm">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-left">

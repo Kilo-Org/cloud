@@ -1,7 +1,7 @@
 /**
- * WebSocket Streaming Module
+ * V1 WebSocket Streaming Module
  *
- * Low-level WebSocket connection management for App Builder streaming.
+ * Low-level WebSocket connection management for V1 App Builder streaming.
  * This module handles only WebSocket lifecycle concerns:
  * - Connection establishment with ticket-based auth
  * - Automatic reconnection with ticket refresh
@@ -20,9 +20,10 @@ import {
 import { type StreamError, type V2Event } from '@/lib/cloud-agent/event-normalizer';
 import { CLOUD_AGENT_WS_URL } from '@/lib/constants';
 import { stripSystemContext } from '@/lib/app-builder/message-utils';
-import type { StreamingConfig, CloudMessage } from './types';
+import type { CloudMessage } from '@/components/cloud-agent/types';
+import type { V1SessionStore } from './store';
 import { updateMessage, addErrorMessage } from './messages';
-import { createLogger } from './logging';
+import { createLogger } from '../../logging';
 
 type ExecutionStateTracker = {
   hasStartedEvent: boolean;
@@ -111,7 +112,6 @@ function transformV2EventToCloudMessage(event: V2Event): CloudMessage | null {
     }
 
     case 'started': {
-      // Session started event - just a status message
       return {
         ts,
         type: 'system',
@@ -126,15 +126,17 @@ function transformV2EventToCloudMessage(event: V2Event): CloudMessage | null {
     }
 
     default:
-      // Unknown event types are ignored
       return null;
   }
 }
 
 /**
- * Configuration for WebSocket streaming coordinator
+ * Configuration for V1 WebSocket streaming coordinator
  */
-export type WebSocketStreamingConfig = StreamingConfig & {
+export type V1WebSocketStreamingConfig = {
+  projectId: string;
+  store: V1SessionStore;
+  onStreamComplete?: () => void;
   /** Function to fetch stream ticket from API */
   fetchStreamTicket: (
     cloudAgentSessionId: string
@@ -142,10 +144,10 @@ export type WebSocketStreamingConfig = StreamingConfig & {
 };
 
 /**
- * WebSocket streaming coordinator interface.
+ * V1 WebSocket streaming coordinator interface.
  * Focused on WebSocket connection lifecycle - message handling is done by the caller.
  */
-export type WebSocketStreamingCoordinator = {
+export type V1WebSocketStreamingCoordinator = {
   /** Connect to WebSocket stream for a session */
   connectToStream: (cloudAgentSessionId: string, fromId?: number) => Promise<void>;
   /** Interrupt the current stream (disconnects WebSocket) */
@@ -157,19 +159,16 @@ export type WebSocketStreamingCoordinator = {
 };
 
 /**
- * Creates a WebSocket streaming coordinator for managing WebSocket connections.
+ * Creates a V1 WebSocket streaming coordinator for managing WebSocket connections.
  *
  * The coordinator handles:
  * - WebSocket connection lifecycle (connect, disconnect)
  * - Automatic reconnection with ticket refresh
- * - Processing incoming V2 stream events
- *
- * Note: This is a low-level module. tRPC mutations and user message handling
- * are managed by streaming.ts which wraps this coordinator.
+ * - Processing incoming V2 stream events into CloudMessages
  */
-export function createWebSocketStreamingCoordinator(
-  config: WebSocketStreamingConfig
-): WebSocketStreamingCoordinator {
+export function createV1WebSocketStreamingCoordinator(
+  config: V1WebSocketStreamingConfig
+): V1WebSocketStreamingCoordinator {
   const { projectId, store, onStreamComplete, fetchStreamTicket } = config;
 
   const logger = createLogger(projectId);
@@ -199,7 +198,7 @@ export function createWebSocketStreamingCoordinator(
     const now = Date.now();
     const timeSinceLastEvent = now - tracker.lastEventTimestamp;
     if (timeSinceLastEvent > STALE_EXECUTION_TIMEOUT_MS) {
-      console.warn('[WebSocketStreaming] Detected stale execution - no events for >30s', {
+      console.warn('[V1WebSocketStreaming] Detected stale execution - no events for >30s', {
         lastEventTimestamp: tracker.lastEventTimestamp,
         timeSinceLastEvent,
       });
@@ -214,15 +213,10 @@ export function createWebSocketStreamingCoordinator(
     }
   }
 
-  /**
-   * Updates the connection state and notifies the store
-   */
   function updateConnectionState(state: ConnectionState): void {
     connectionState = state;
-    logger.log('WebSocket connection state changed', { status: state.status });
+    logger.log('V1 WebSocket connection state changed', { status: state.status });
 
-    // Only set isStreaming: false on error/disconnect
-    // The 'started' event will set isStreaming: true
     if (state.status === 'error' || state.status === 'disconnected') {
       store.setState({ isStreaming: false });
       clearStaleTimer();
@@ -232,53 +226,36 @@ export function createWebSocketStreamingCoordinator(
     }
   }
 
-  /**
-   * Handles stream errors from WebSocket
-   */
   function handleStreamError(error: StreamError): void {
-    logger.logError('WebSocket stream error', new Error(error.message));
+    logger.logError('V1 WebSocket stream error', new Error(error.message));
     addErrorMessage(store, error.message);
 
-    // Some errors are fatal and should stop streaming
     if (error.code === 'WS_SESSION_NOT_FOUND' || error.code === 'WS_AUTH_ERROR') {
       wsManager?.disconnect();
     }
   }
 
-  /**
-   * Checks if the current WebSocket connection can be reused for the given session.
-   * A connection is reusable if it's connected/connecting to the same session ID.
-   */
   function canReuseConnection(cloudAgentSessionId: string): boolean {
     if (!wsManager || !currentCloudSessionId) {
       return false;
     }
 
-    // Must be the same session ID
     if (currentCloudSessionId !== cloudAgentSessionId) {
       return false;
     }
 
-    // Must be in a usable state
     const status = connectionState.status;
     return status === 'connected' || status === 'connecting' || status === 'reconnecting';
   }
 
-  /**
-   * Connects to WebSocket stream for the given session
-   *
-   * @param cloudAgentSessionId - The cloud agent session ID to connect to
-   * @param fromId - Optional event ID to replay from (0 to replay all events)
-   */
   async function connectToStream(cloudAgentSessionId: string, fromId?: number): Promise<void> {
     if (destroyed) {
-      logger.logWarn('Cannot connect: Streaming coordinator is destroyed');
+      logger.logWarn('Cannot connect: V1 streaming coordinator is destroyed');
       return;
     }
 
-    // Check if we can reuse the existing connection
     if (canReuseConnection(cloudAgentSessionId)) {
-      logger.log('Reusing existing WebSocket connection for session', { cloudAgentSessionId });
+      logger.log('Reusing existing V1 WebSocket connection for session', { cloudAgentSessionId });
       return;
     }
 
@@ -292,14 +269,11 @@ export function createWebSocketStreamingCoordinator(
       wsManager = null;
     }
 
-    // Track the session we're connecting to
     currentCloudSessionId = cloudAgentSessionId;
 
     try {
-      // Fetch initial ticket
       const { ticket, expiresAt } = await fetchStreamTicket(cloudAgentSessionId);
 
-      // Build WebSocket URL with optional fromId for replay
       let wsUrl = `${CLOUD_AGENT_WS_URL}/stream?cloudAgentSessionId=${encodeURIComponent(cloudAgentSessionId)}`;
       if (fromId !== undefined) {
         wsUrl += `&fromId=${fromId}`;
@@ -310,16 +284,13 @@ export function createWebSocketStreamingCoordinator(
         ticket,
         ticketExpiresAt: expiresAt,
         onEvent: (event: V2Event) => {
-          // Ignore heartbeat events
           if (event.streamEventType === 'heartbeat') {
             return;
           }
 
-          // Update timestamp tracking
           const eventTime = new Date(event.timestamp).getTime();
           tracker.lastEventTimestamp = eventTime;
 
-          // Track lifecycle events
           if (event.streamEventType === 'started') {
             tracker.hasStartedEvent = true;
             store.setState({ isStreaming: true });
@@ -332,11 +303,9 @@ export function createWebSocketStreamingCoordinator(
             store.setState({ isStreaming: false });
             clearStaleTimer();
           } else if (tracker.hasStartedEvent && !tracker.hasTerminalEvent) {
-            // Reset stale timer on any event while execution is in progress
             scheduleStaleCheck();
           }
 
-          // Continue with existing discard/transform logic
           if (shouldDiscardEvent(event)) {
             return;
           }
@@ -355,27 +324,19 @@ export function createWebSocketStreamingCoordinator(
       wsManager = createWebSocketManager(wsConfig);
       wsManager.connect();
     } catch (err) {
-      logger.logError('Failed to connect to WebSocket stream', err);
+      logger.logError('Failed to connect to V1 WebSocket stream', err);
       store.setState({ isStreaming: false });
       addErrorMessage(store, err instanceof Error ? err.message : 'Failed to connect to stream');
     }
   }
 
-  /**
-   * Interrupts the current stream by disconnecting the WebSocket.
-   *
-   * Note: This only handles WebSocket cleanup. The actual interrupt API call
-   * and isInterrupting state management should be handled by the caller
-   * (streaming.ts) using tRPC appBuilder.interruptSession mutation.
-   */
   function interrupt(): void {
     if (destroyed) {
       return;
     }
 
-    logger.log('Interrupting WebSocket connection');
+    logger.log('Interrupting V1 WebSocket connection');
 
-    // Disconnect WebSocket and clear session tracking
     if (wsManager) {
       wsManager.disconnect();
       wsManager = null;
@@ -383,13 +344,9 @@ export function createWebSocketStreamingCoordinator(
     currentCloudSessionId = null;
     clearStaleTimer();
 
-    // Only set isStreaming: false - isInterrupting is managed by the caller
     store.setState({ isStreaming: false });
   }
 
-  /**
-   * Destroys the coordinator and cleans up resources.
-   */
   function destroy(): void {
     if (destroyed) {
       return;
@@ -405,9 +362,6 @@ export function createWebSocketStreamingCoordinator(
     }
   }
 
-  /**
-   * Gets the current WebSocket connection state
-   */
   function getConnectionState(): ConnectionState {
     return connectionState;
   }

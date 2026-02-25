@@ -12,6 +12,7 @@ import {
   CreateBYOKKeyInputSchema,
   UpdateBYOKKeyInputSchema,
   DeleteBYOKKeyInputSchema,
+  SetBYOKKeyEnabledInputSchema,
   ListBYOKKeysInputSchema,
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
@@ -36,6 +37,7 @@ export const byokRouter = createTRPCRouter({
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
+          is_enabled: byok_api_keys.is_enabled,
         })
         .from(byok_api_keys)
         .where(
@@ -88,6 +90,7 @@ export const byokRouter = createTRPCRouter({
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
+          is_enabled: byok_api_keys.is_enabled,
         });
 
       // Create audit log only for organization keys
@@ -176,6 +179,7 @@ export const byokRouter = createTRPCRouter({
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
+          is_enabled: byok_api_keys.is_enabled,
         });
 
       // Create audit log only for organization keys
@@ -186,6 +190,80 @@ export const byokRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `Updated BYOK key for provider: ${existingKey.provider_id}`,
+          organization_id: existingKey.organization_id,
+        });
+      }
+
+      return {
+        ...updatedKey,
+        provider_name: updatedKey.provider_id,
+      };
+    }),
+
+  setEnabled: baseProcedure
+    .input(SetBYOKKeyEnabledInputSchema)
+    .output(BYOKApiKeyResponseSchema)
+    .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
+      const { organizationId, id, is_enabled } = input;
+
+      if (organizationId) {
+        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+      }
+
+      const [existingKey] = await db
+        .select({
+          organization_id: byok_api_keys.organization_id,
+          kilo_user_id: byok_api_keys.kilo_user_id,
+          provider_id: byok_api_keys.provider_id,
+        })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, id));
+
+      if (!existingKey) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'BYOK key not found',
+        });
+      }
+
+      if (organizationId) {
+        if (existingKey.organization_id !== organizationId) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'BYOK key not found',
+          });
+        }
+      } else {
+        if (existingKey.kilo_user_id !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'BYOK key not found',
+          });
+        }
+      }
+
+      const [updatedKey] = await db
+        .update(byok_api_keys)
+        .set({
+          is_enabled,
+        })
+        .where(eq(byok_api_keys.id, id))
+        .returning({
+          id: byok_api_keys.id,
+          provider_id: byok_api_keys.provider_id,
+          created_at: byok_api_keys.created_at,
+          updated_at: byok_api_keys.updated_at,
+          created_by: byok_api_keys.created_by,
+          is_enabled: byok_api_keys.is_enabled,
+        });
+
+      if (existingKey.organization_id) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `${is_enabled ? 'Enabled' : 'Disabled'} BYOK key for provider: ${existingKey.provider_id}`,
           organization_id: existingKey.organization_id,
         });
       }

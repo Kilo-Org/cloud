@@ -3,22 +3,21 @@
   "name": "kilo-code-review-worker",
   "main": "src/index.ts",
   "compatibility_date": "2025-01-20",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   // Production features
   "upload_source_maps": true,
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
   "version_metadata": {
-    "binding": "CF_VERSION_METADATA"
+    "binding": "CF_VERSION_METADATA",
   },
   // Public environment variables
   "vars": {
     "ENVIRONMENT": "production",
     "API_URL": "https://app.kilo.ai",
-    "CLOUD_AGENT_URL": "https://cloud-agent.kilosessions.ai"
+    "CLOUD_AGENT_URL": "https://cloud-agent.kilosessions.ai",
+    "CLOUD_AGENT_NEXT_URL": "https://cloud-agent-next.kilosessions.ai",
   },
   // Durable Objects configuration
   "durable_objects": {
@@ -26,21 +25,19 @@
       {
         "name": "CODE_REVIEW_ORCHESTRATOR",
         "class_name": "CodeReviewOrchestrator",
-        "script_name": "kilo-code-review-worker"
-      }
-    ]
+        "script_name": "kilo-code-review-worker",
+      },
+    ],
   },
   "dev": {
     "port": 8789,
-    "local_protocol": "http"
+    "local_protocol": "http",
   },
   // Migrations for Durable Objects
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": [
-        "CodeReviewOrchestrator"
-      ]
-    }
-  ]
+      "new_sqlite_classes": ["CodeReviewOrchestrator"],
+    },
+  ],
 }

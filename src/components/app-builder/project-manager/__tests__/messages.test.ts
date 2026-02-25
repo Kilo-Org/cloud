@@ -1,32 +1,33 @@
 /**
- * Messages Module Tests
+ * V1 Messages Module Tests
  *
  * Tests for message processing and stream event mapping.
  */
 
-import { updateMessage, addUserMessage, addErrorMessage, processStreamEvent } from '../messages';
-import type { ProjectStore } from '../types';
+import {
+  updateMessage,
+  addUserMessage,
+  addErrorMessage,
+  processStreamEvent,
+} from '../sessions/v1/messages';
+import type { V1SessionStore } from '../sessions/v1/store';
 import type { CloudMessage, StreamEvent } from '@/components/cloud-agent/types';
 
-// Helper to create a mock store for testing
-function createMockStore(initialMessages: CloudMessage[] = []): ProjectStore {
+// Helper to create a mock V1 session store for testing
+function createMockStore(initialMessages: CloudMessage[] = []): V1SessionStore {
   let messages = [...initialMessages];
+  const childSessionMessages = new Map<string, CloudMessage[]>();
   const listeners = new Set<() => void>();
 
   return {
     getState: () => ({
       messages,
       isStreaming: false,
-      isInterrupting: false,
-      previewUrl: null,
-      previewStatus: 'idle' as const,
-      deploymentId: null,
-      model: 'anthropic/claude-sonnet-4',
-      currentIframeUrl: null,
-      gitRepoFullName: null,
+      questionRequestIds: new Map<string, string>(),
+      childSessionMessages,
     }),
     setState: jest.fn(partial => {
-      if (partial.messages) {
+      if ('messages' in partial && partial.messages) {
         messages = partial.messages;
       }
       listeners.forEach(l => l());
@@ -38,6 +39,16 @@ function createMockStore(initialMessages: CloudMessage[] = []): ProjectStore {
     updateMessages: jest.fn(updater => {
       messages = updater(messages);
       listeners.forEach(l => l());
+    }),
+    setQuestionRequestId: jest.fn(),
+    updateChildSessionMessages: jest.fn(
+      (childSessionId: string, updater: (msgs: CloudMessage[]) => CloudMessage[]) => {
+        const existing = childSessionMessages.get(childSessionId) ?? [];
+        childSessionMessages.set(childSessionId, updater(existing));
+      }
+    ),
+    getChildSessionMessages: jest.fn((childSessionId: string) => {
+      return childSessionMessages.get(childSessionId) ?? [];
     }),
   };
 }

@@ -13,6 +13,7 @@ These are non-negotiable. Do not reintroduce shared/fallback paths.
 - **Per-user Fly Apps.** New instances get a per-user Fly app created by `KiloClawApp.ensureApp()`. The app name (`flyAppName`) is cached in the Instance DO for proxy routing. Legacy instances without `flyAppName` fall back to `FLY_APP_NAME`. Apps are kept alive after instance destroy (empty apps cost nothing) and reused on re-provision.
 - **`buildEnvVars` requires `sandboxId` and `gatewayTokenSecret`.** Returns `{ env, sensitive }` split. Sensitive values are AES-256-GCM encrypted and prefixed with `KILOCLAW_ENC_` before placement in machine config.env. Gateway token and `AUTO_APPROVE_DEVICES` are always set. No fallback to worker-level channel tokens.
 - **Env var name constraints.** User-provided `envVars` and `encryptedSecrets` keys must be valid shell identifiers (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and must not use reserved prefixes `KILOCLAW_ENC_` or `KILOCLAW_ENV_`. Validated at schema level (ingest) and runtime (decrypt block).
+- **Token comparisons must be timing-safe.** Never compare auth/proxy tokens with `===`/`!==`. Use `timingSafeTokenEqual` from `controller/src/auth.ts` (or an equivalent `crypto.timingSafeEqual`-based helper) for bearer/proxy token validation.
 - **Next.js is the sole Postgres writer.** The worker only reads via Hyperdrive (pepper validation + DO restore). The DB stores registry data (`user_id`, `sandbox_id`, `created_at`, `destroyed_at`) plus config backup. Operational state (status, timestamps, Fly machine/volume IDs) lives in the DO only.
 - **DO restore from Postgres.** If DO SQLite is wiped, `start(userId)` reads the active instance row from Postgres and repopulates the DO state. This is the backup path for development mistakes that corrupt DO storage.
 - **Two-phase destroy.** Fly resource IDs (`pendingDestroyMachineId`, `pendingDestroyVolumeId`) are persisted before deletion attempts. DO state is only cleared when both are confirmed deleted. The alarm retries on failure.
@@ -148,6 +149,21 @@ pnpm test             # vitest (node)
 pnpm types            # regenerate worker-configuration.d.ts (run after changing wrangler.jsonc)
 pnpm start            # wrangler dev
 ```
+
+## Controller Smoke Scripts
+
+When working on machine-side controller behavior, use the Docker smoke scripts in
+`scripts/` (build image first: `docker build -t kiloclaw:controller .`):
+
+- `scripts/controller-smoke-test.sh`
+  - Direct controller binary startup (`node /usr/local/bin/kiloclaw-controller.js`).
+  - Best for quick auth/proxy sanity checks.
+- `scripts/controller-entrypoint-smoke-test.sh`
+  - Default CMD path (`start-openclaw.sh`) with config patching and controller launch.
+  - Best for startup/Docker integration changes.
+- `scripts/controller-proxy-auth-smoke-test.sh`
+  - Confirms proxy-token enforcement semantics (`401` without token, pass-through with token).
+  - Best for proxy auth and routing-order validation.
 
 ## Change Checklist
 

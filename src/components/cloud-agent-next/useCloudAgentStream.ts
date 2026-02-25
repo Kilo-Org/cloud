@@ -523,7 +523,7 @@ export function useCloudAgentStream({
     try {
       let result: { cloudAgentSessionId: string };
 
-      // Use cloudAgentNext endpoints with new modes ('plan' | 'build')
+      // Use cloudAgentNext endpoints
       if (organizationIdRef.current) {
         result = await trpcClient.organizations.cloudAgentNext.initiateFromPreparedSession.mutate(
           {
@@ -665,13 +665,13 @@ export function useCloudAgentStream({
       try {
         let result: { cloudAgentSessionId: string };
 
-        // Use cloudAgentNext endpoints with new modes ('plan' | 'build')
+        // mode param is string from caller; cast to schema type needed
         if (organizationIdRef.current) {
           result = await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
             {
               cloudAgentSessionId: activeCloudAgentSessionId,
               prompt: message,
-              mode: mode as 'plan' | 'build',
+              mode: mode as 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask',
               model,
               organizationId: organizationIdRef.current,
             },
@@ -682,7 +682,7 @@ export function useCloudAgentStream({
             {
               cloudAgentSessionId: activeCloudAgentSessionId,
               prompt: message,
-              mode: mode as 'plan' | 'build',
+              mode: mode as 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask',
               model,
             },
             { context: { skipBatch: true } }

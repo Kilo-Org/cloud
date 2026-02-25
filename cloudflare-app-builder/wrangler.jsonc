@@ -16,6 +16,7 @@
     "BACKEND_PUSH_NOTIFICATION_URL": "https://app.kilo.ai/api/app-builder/push-notification",
     "GIT_TOKEN_EXPIRY_SECONDS": "21600",
     "DB_PROXY_URL": "https://db-proxy.engineering-e11.workers.dev",
+    "ALLOWED_ORIGINS": "https://app.kilo.ai",
   },
   "routes": [
     {

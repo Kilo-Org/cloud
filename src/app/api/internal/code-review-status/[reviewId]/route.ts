@@ -3,7 +3,12 @@
  *
  * Called by:
  * - Code Review Orchestrator (for 'running' status and sessionId updates)
- * - Cloud Agent callback (for 'completed' or 'failed' status)
+ * - Cloud-agent-next callback (for 'completed', 'failed', or 'interrupted' status)
+ *
+ * Accepts both legacy format (from orchestrator) and cloud-agent-next callback format:
+ * - Legacy: { status, sessionId?, cliSessionId?, errorMessage? }
+ * - cloud-agent-next: { status, sessionId?, cloudAgentSessionId?, executionId?,
+ *     kiloSessionId?, errorMessage?, lastSeenBranch? }
  *
  * The reviewId is passed in the URL path.
  *
@@ -17,8 +22,16 @@ import { updateCodeReviewStatus, getCodeReviewById } from '@/lib/code-reviews/db
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
-import { addReactionToPR } from '@/lib/integrations/platforms/github/adapter';
-import { addReactionToMR } from '@/lib/integrations/platforms/gitlab/adapter';
+import {
+  addReactionToPR,
+  findKiloReviewComment,
+  updateKiloReviewComment,
+} from '@/lib/integrations/platforms/github/adapter';
+import {
+  addReactionToMR,
+  findKiloReviewNote,
+  updateKiloReviewNote,
+} from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import {
   getValidGitLabToken,
@@ -27,11 +40,86 @@ import {
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-interface StatusUpdatePayload {
-  sessionId?: string; // Cloud agent session ID (agent_xxx) - may not be available yet for 'running' status
-  cliSessionId?: string; // CLI session UUID (from session_created event)
+import { appendUsageFooter } from '@/lib/code-reviews/summary/usage-footer';
+
+/**
+ * Payload from the orchestrator DO (legacy format).
+ */
+type OrchestratorPayload = {
+  sessionId?: string;
+  cliSessionId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
   errorMessage?: string;
+};
+
+/**
+ * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
+ */
+type CloudAgentNextCallbackPayload = {
+  sessionId?: string;
+  cloudAgentSessionId?: string;
+  executionId?: string;
+  kiloSessionId?: string;
+  status: 'completed' | 'failed' | 'interrupted';
+  errorMessage?: string;
+  lastSeenBranch?: string;
+};
+
+type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
+
+/**
+ * Normalize a payload from either the orchestrator or cloud-agent-next callback
+ * into the common format expected by the update logic.
+ */
+function normalizePayload(raw: StatusUpdatePayload): {
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  sessionId?: string;
+  cliSessionId?: string;
+  errorMessage?: string;
+} {
+  // Map cloud-agent-next 'interrupted' → 'cancelled'
+  const status = raw.status === 'interrupted' ? 'cancelled' : raw.status;
+
+  // Map cloud-agent-next 'kiloSessionId' → 'cliSessionId'
+  const cliSessionId =
+    'cliSessionId' in raw
+      ? raw.cliSessionId
+      : 'kiloSessionId' in raw
+        ? raw.kiloSessionId
+        : undefined;
+
+  // Map cloud-agent-next 'cloudAgentSessionId' → 'sessionId' as fallback
+  const sessionId =
+    raw.sessionId ?? ('cloudAgentSessionId' in raw ? raw.cloudAgentSessionId : undefined);
+
+  return {
+    status,
+    sessionId,
+    cliSessionId,
+    errorMessage: raw.errorMessage,
+  };
+}
+
+/**
+ * Read a review's usage data, polling with exponential backoff if not yet available.
+ * Handles the race between the orchestrator's usage report and the cloud agent's completion callback.
+ */
+async function getReviewUsageData(reviewId: string) {
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 200;
+
+  let review = await getCodeReviewById(reviewId);
+
+  for (let attempt = 0; attempt < MAX_RETRIES && review && !review.model; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, BASE_DELAY_MS * 2 ** attempt));
+    review = await getCodeReviewById(reviewId);
+  }
+
+  return {
+    model: review?.model ?? null,
+    tokensIn: review?.total_tokens_in ?? null,
+    tokensOut: review?.total_tokens_out ?? null,
+  };
 }
 
 export async function POST(
@@ -41,13 +129,13 @@ export async function POST(
   try {
     // Validate internal API secret
     const secret = req.headers.get('X-Internal-Secret');
-    if (secret !== INTERNAL_API_SECRET) {
+    if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { reviewId } = await params;
-    const payload: StatusUpdatePayload = await req.json();
-    const { sessionId, cliSessionId, status, errorMessage } = payload;
+    const rawPayload: StatusUpdatePayload = await req.json();
+    const { status, sessionId, cliSessionId, errorMessage } = normalizePayload(rawPayload);
 
     // Validate payload
     if (!status) {
@@ -100,7 +188,10 @@ export async function POST(
       cliSessionId,
       errorMessage,
       startedAt: status === 'running' ? new Date() : undefined,
-      completedAt: status === 'completed' || status === 'failed' ? new Date() : undefined,
+      completedAt:
+        status === 'completed' || status === 'failed' || status === 'cancelled'
+          ? new Date()
+          : undefined,
     });
 
     logExceptInTest('[code-review-status] Updated review status', {
@@ -160,7 +251,7 @@ export async function POST(
         });
       }
 
-      // Add reaction to indicate review completion status (completed or failed only)
+      // Add reaction to indicate review completion status AND update usage footer
       if (status === 'completed' || status === 'failed') {
         if (review.platform_integration_id) {
           try {
@@ -169,8 +260,9 @@ export async function POST(
               const platform = review.platform || 'github';
 
               if (platform === 'github' && integration.platform_installation_id) {
-                // GitHub: Use installation token and addReactionToPR
                 const [repoOwner, repoName] = review.repo_full_name.split('/');
+
+                // Reaction
                 const reaction = status === 'completed' ? 'hooray' : 'confused';
                 await addReactionToPR(
                   integration.platform_installation_id,
@@ -182,31 +274,61 @@ export async function POST(
                 logExceptInTest(
                   `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
                 );
+
+                // Usage footer (completed only)
+                if (status === 'completed') {
+                  const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+
+                  if (model && tokensIn != null && tokensOut != null) {
+                    const existing = await findKiloReviewComment(
+                      integration.platform_installation_id,
+                      repoOwner,
+                      repoName,
+                      review.pr_number
+                    );
+                    if (existing) {
+                      const updatedBody = appendUsageFooter(
+                        existing.body,
+                        model,
+                        tokensIn,
+                        tokensOut
+                      );
+                      await updateKiloReviewComment(
+                        integration.platform_installation_id,
+                        repoOwner,
+                        repoName,
+                        existing.commentId,
+                        updatedBody
+                      );
+                      logExceptInTest(
+                        `[code-review-status] Updated summary comment with usage footer on ${review.repo_full_name}#${review.pr_number}`
+                      );
+                    }
+                  } else {
+                    logExceptInTest(
+                      '[code-review-status] Usage data not available for footer update',
+                      {
+                        reviewId,
+                        model,
+                        tokensIn,
+                        tokensOut,
+                      }
+                    );
+                  }
+                }
               } else if (platform === PLATFORM.GITLAB) {
-                // GitLab: Use PrAT for bot identity, fall back to OAuth token
                 const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
                 const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
-
-                // Use the stored platform_project_id from the review record
-                // This is the numeric GitLab project ID stored when the review was created
                 const projectId = review.platform_project_id;
                 const storedPrat = projectId
                   ? getStoredProjectAccessToken(integration, projectId)
                   : null;
-                let accessToken: string;
+                const accessToken = storedPrat
+                  ? storedPrat.token
+                  : await getValidGitLabToken(integration);
 
-                if (storedPrat) {
-                  accessToken = storedPrat.token;
-                } else {
-                  // Fallback to OAuth token
-                  accessToken = await getValidGitLabToken(integration);
-                }
-
-                // GitLab uses emoji names like 'tada' for hooray, 'confused' for confused
+                // Reaction
                 const emoji = status === 'completed' ? 'tada' : 'confused';
-
-                // For GitLab, we need the project ID from the repo_full_name
-                // The repo_full_name is the path_with_namespace (e.g., "group/project")
                 await addReactionToMR(
                   accessToken,
                   review.repo_full_name,
@@ -217,13 +339,56 @@ export async function POST(
                 logExceptInTest(
                   `[code-review-status] Added ${emoji} reaction to GitLab MR ${review.repo_full_name}!${review.pr_number}`
                 );
+
+                // Usage footer (completed only)
+                if (status === 'completed') {
+                  const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+
+                  if (model && tokensIn != null && tokensOut != null) {
+                    const existing = await findKiloReviewNote(
+                      accessToken,
+                      review.repo_full_name,
+                      review.pr_number,
+                      instanceUrl
+                    );
+                    if (existing) {
+                      const updatedBody = appendUsageFooter(
+                        existing.body,
+                        model,
+                        tokensIn,
+                        tokensOut
+                      );
+                      await updateKiloReviewNote(
+                        accessToken,
+                        review.repo_full_name,
+                        review.pr_number,
+                        existing.noteId,
+                        updatedBody,
+                        instanceUrl
+                      );
+                      logExceptInTest(
+                        `[code-review-status] Updated summary note with usage footer on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+                      );
+                    }
+                  } else {
+                    logExceptInTest(
+                      '[code-review-status] Usage data not available for footer update',
+                      {
+                        reviewId,
+                        model,
+                        tokensIn,
+                        tokensOut,
+                      }
+                    );
+                  }
+                }
               }
             }
-          } catch (reactionError) {
+          } catch (postCompletionError) {
             // Non-blocking - log but don't fail the callback
             logExceptInTest(
-              '[code-review-status] Failed to add completion reaction:',
-              reactionError
+              '[code-review-status] Failed to add completion reaction or usage footer:',
+              postCompletionError
             );
           }
         }

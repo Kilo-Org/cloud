@@ -4,12 +4,23 @@
  * Chat pane component with messages and input.
  * Uses ProjectSession context hooks for state and actions.
  * Supports model selection during chat via inline model selector.
+ *
+ * Renders sessions from state.sessions — each session subscribes to its
+ * own store via useSyncExternalStore and renders V1 or V2 messages.
  */
 
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, memo, useCallback } from 'react';
-import { User, ArrowDown } from 'lucide-react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  memo,
+  useCallback,
+  useSyncExternalStore,
+} from 'react';
+import { User, ArrowDown, ChevronRight, ChevronDown } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import AssistantLogo from '@/components/AssistantLogo';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -17,6 +28,11 @@ import { Button } from '@/components/ui/button';
 import { MessageContent } from '@/components/cloud-agent/MessageContent';
 import { TypingIndicator } from '@/components/cloud-agent/TypingIndicator';
 import type { CloudMessage } from '@/components/cloud-agent/types';
+import type { StoredMessage } from '@/components/cloud-agent-next/types';
+import { isMessageStreaming } from '@/components/cloud-agent-next/types';
+import { MessageBubble as V2MessageBubble } from '@/components/cloud-agent-next/MessageBubble';
+import { QuestionContextProvider } from '@/components/cloud-agent-next/QuestionContext';
+import type { AppBuilderSession, V1Session, V2Session } from './project-manager/types';
 import {
   filterAppBuilderMessages,
   paginateMessages,
@@ -179,12 +195,269 @@ function DynamicMessages({
 }
 
 /**
+ * Expandable session block for ended sessions.
+ * Loads messages via WebSocket replay when expanded, then renders
+ * through the same V1SessionMessages / V2SessionMessages as the active session.
+ */
+function ExpandableSessionBlock({
+  session,
+  visibleSessionCount,
+  onLoadMore,
+  organizationId,
+}: {
+  session: AppBuilderSession;
+  visibleSessionCount: number;
+  onLoadMore: () => void;
+  organizationId?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { ended_at, title } = session.info;
+  const endedDate = ended_at ? new Date(ended_at) : null;
+
+  const handleToggle = useCallback(() => {
+    if (!expanded) {
+      session.loadMessages();
+    }
+    setExpanded(prev => !prev);
+  }, [expanded, session]);
+
+  return (
+    <div className="border-b">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="hover:bg-muted/50 flex w-full items-start gap-2 rounded px-3 py-3 text-left transition-colors"
+      >
+        <div className="text-muted-foreground mt-0.5 shrink-0">
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-foreground truncate text-sm font-medium">
+            {title || 'Chat session'}
+          </div>
+          {endedDate && (
+            <div className="text-muted-foreground mt-0.5 text-xs">
+              Chat session ended {format(endedDate, 'MMM d, yyyy')} (
+              {formatDistanceToNow(endedDate, { addSuffix: true })})
+            </div>
+          )}
+        </div>
+      </button>
+      {expanded &&
+        (session.type === 'v2' ? (
+          <V2SessionMessages session={session} organizationId={organizationId} />
+        ) : (
+          <V1SessionMessages
+            session={session}
+            visibleSessionCount={visibleSessionCount}
+            onLoadMore={onLoadMore}
+          />
+        ))}
+    </div>
+  );
+}
+
+/**
+ * Memoized static V2 messages - never re-render once complete
+ */
+const V2StaticMessages = memo(function V2StaticMessages({
+  messages,
+  getChildMessages,
+}: {
+  messages: StoredMessage[];
+  getChildMessages?: (sessionId: string) => StoredMessage[];
+}) {
+  return (
+    <>
+      {messages.map(msg => (
+        <V2MessageBubble key={msg.info.id} message={msg} getChildMessages={getChildMessages} />
+      ))}
+    </>
+  );
+});
+
+/**
+ * V2 dynamic messages (streaming)
+ */
+function V2DynamicMessages({
+  messages,
+  getChildMessages,
+}: {
+  messages: StoredMessage[];
+  getChildMessages?: (sessionId: string) => StoredMessage[];
+}) {
+  return (
+    <>
+      {messages.map(msg => {
+        const streaming = isMessageStreaming(msg);
+        return (
+          <V2MessageBubble
+            key={`${msg.info.id}-${streaming ? 'streaming' : 'complete'}`}
+            message={msg}
+            isStreaming={streaming}
+            getChildMessages={getChildMessages}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * Renders a V1 session's messages with filtering and pagination.
+ */
+function V1SessionMessages({
+  session,
+  visibleSessionCount,
+  onLoadMore,
+}: {
+  session: V1Session;
+  visibleSessionCount: number;
+  onLoadMore: () => void;
+}) {
+  const sessionState = useSyncExternalStore(session.subscribe, session.getState);
+
+  const filteredMessages = useMemo(
+    () => filterAppBuilderMessages(sessionState.messages),
+    [sessionState.messages]
+  );
+
+  const { visibleMessages, hasOlderMessages } = useMemo(
+    () => paginateMessages(filteredMessages, visibleSessionCount),
+    [filteredMessages, visibleSessionCount]
+  );
+
+  const { staticMessages, dynamicMessages } = useMemo(() => {
+    const staticMsgs: CloudMessage[] = [];
+    const dynamicMsgs: CloudMessage[] = [];
+    for (const msg of visibleMessages) {
+      if (msg.partial) {
+        dynamicMsgs.push(msg);
+      } else {
+        staticMsgs.push(msg);
+      }
+    }
+    return { staticMessages: staticMsgs, dynamicMessages: dynamicMsgs };
+  }, [visibleMessages]);
+
+  if (visibleMessages.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {hasOlderMessages && (
+        <div className="flex justify-center py-2">
+          <Button variant="ghost" size="sm" onClick={onLoadMore}>
+            Load earlier messages
+          </Button>
+        </div>
+      )}
+      <StaticMessages messages={staticMessages} />
+      <DynamicMessages messages={dynamicMessages} isStreaming={sessionState.isStreaming} />
+      {sessionState.isStreaming && dynamicMessages.length === 0 && <TypingIndicator />}
+    </>
+  );
+}
+
+/**
+ * Renders a V2 session's messages.
+ */
+function V2SessionMessages({
+  session,
+  organizationId,
+}: {
+  session: V2Session;
+  organizationId?: string;
+}) {
+  const sessionState = useSyncExternalStore(session.subscribe, session.getState);
+
+  const { v2Static, v2Dynamic } = useMemo(() => {
+    const staticMsgs: StoredMessage[] = [];
+    const dynamicMsgs: StoredMessage[] = [];
+    for (const msg of sessionState.messages) {
+      if (isMessageStreaming(msg)) {
+        dynamicMsgs.push(msg);
+      } else {
+        staticMsgs.push(msg);
+      }
+    }
+    return { v2Static: staticMsgs, v2Dynamic: dynamicMsgs };
+  }, [sessionState.messages]);
+
+  // Identity changes when childSessionMessages changes, which forces memo'd
+  // V2StaticMessages to re-render with updated child session data.
+  // This is intentional: static parent messages may contain task tool parts
+  // whose child sessions are still streaming.
+  const getChildMessages = useCallback(
+    (childSessionId: string) => session.getChildSessionMessages(childSessionId),
+    [session, sessionState.childSessionMessages] // eslint-disable-line react-hooks/exhaustive-deps -- childSessionMessages triggers re-render
+  );
+
+  if (sessionState.messages.length === 0 && !sessionState.isStreaming) {
+    return null;
+  }
+
+  return (
+    <QuestionContextProvider
+      questionRequestIds={sessionState.questionRequestIds}
+      cloudAgentSessionId={session.info.cloud_agent_session_id}
+      organizationId={organizationId ?? null}
+    >
+      <V2StaticMessages messages={v2Static} getChildMessages={getChildMessages} />
+      <V2DynamicMessages messages={v2Dynamic} getChildMessages={getChildMessages} />
+      {sessionState.isStreaming && v2Dynamic.length === 0 && <TypingIndicator />}
+    </QuestionContextProvider>
+  );
+}
+
+/**
+ * Renders a single session — expandable if not the active session, or full messages if active.
+ */
+function SessionMessages({
+  session,
+  isLast,
+  visibleSessionCount,
+  onLoadMore,
+  organizationId,
+}: {
+  session: AppBuilderSession;
+  isLast: boolean;
+  visibleSessionCount: number;
+  onLoadMore: () => void;
+  organizationId?: string;
+}) {
+  if (!isLast) {
+    return (
+      <ExpandableSessionBlock
+        session={session}
+        visibleSessionCount={visibleSessionCount}
+        onLoadMore={onLoadMore}
+        organizationId={organizationId}
+      />
+    );
+  }
+
+  if (session.type === 'v2') {
+    return <V2SessionMessages session={session} organizationId={organizationId} />;
+  }
+
+  return (
+    <V1SessionMessages
+      session={session}
+      visibleSessionCount={visibleSessionCount}
+      onLoadMore={onLoadMore}
+    />
+  );
+}
+
+/**
  * Main chat component
  */
 export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
-  const { messages, isStreaming, isInterrupting, model: projectModel } = state;
+  const { isStreaming, isInterrupting, model: projectModel, sessions } = state;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -301,30 +574,9 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
   }, [defaultsData?.defaultModel, modelOptions, selectedModel]);
 
-  // Filter messages to show only important ones for cleaner UX
-  const filteredMessages = useMemo(() => filterAppBuilderMessages(messages), [messages]);
-
-  // Apply session-based pagination to avoid overwhelming UI with long histories
-  const { visibleMessages, hasOlderMessages } = useMemo(
-    () => paginateMessages(filteredMessages, visibleSessionCount),
-    [filteredMessages, visibleSessionCount]
-  );
-
-  // Split messages into static (complete) and dynamic (streaming)
-  const { staticMessages, dynamicMessages } = useMemo(() => {
-    const staticMsgs: CloudMessage[] = [];
-    const dynamicMsgs: CloudMessage[] = [];
-
-    visibleMessages.forEach(msg => {
-      if (msg.partial) {
-        dynamicMsgs.push(msg);
-      } else {
-        staticMsgs.push(msg);
-      }
-    });
-
-    return { staticMessages: staticMsgs, dynamicMessages: dynamicMsgs };
-  }, [visibleMessages]);
+  // Subscribe to active session for auto-scroll
+  const activeSession = sessions.length > 0 ? sessions[sessions.length - 1] : undefined;
+  const activeSessionMessages = useActiveSessionMessages(activeSession);
 
   // Auto-scroll effect
   useEffect(() => {
@@ -334,7 +586,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
         behavior: 'smooth',
       });
     }
-  }, [messages, shouldAutoScroll]);
+  }, [activeSessionMessages, shouldAutoScroll]);
 
   // Handle scroll events
   const handleScroll = () => {
@@ -384,6 +636,14 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     manager.interrupt();
   }, [manager]);
 
+  // Handle loading more messages (for V1 pagination)
+  const handleLoadMore = useCallback(() => {
+    setVisibleSessionCount(prev => prev + 1);
+  }, []);
+
+  // Check if input should be disabled (no messages in any session yet)
+  const hasAnyMessages = activeSessionMessages.length > 0;
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -411,7 +671,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
           onScroll={handleScroll}
           className="absolute inset-0 overflow-x-hidden overflow-y-auto p-4"
         >
-          {visibleMessages.length === 0 ? (
+          {sessions.length === 0 || (!hasAnyMessages && !isStreaming) ? (
             <div className="flex h-full items-center justify-center">
               <div className="text-center text-gray-400">
                 <p className="text-sm">Start building your app</p>
@@ -419,22 +679,16 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
               </div>
             </div>
           ) : (
-            <>
-              {hasOlderMessages && (
-                <div className="flex justify-center py-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setVisibleSessionCount(prev => prev + 1)}
-                  >
-                    Load earlier messages
-                  </Button>
-                </div>
-              )}
-              <StaticMessages messages={staticMessages} />
-              <DynamicMessages messages={dynamicMessages} isStreaming={isStreaming} />
-              {isStreaming && dynamicMessages.length === 0 && <TypingIndicator />}
-            </>
+            sessions.map((session, index) => (
+              <SessionMessages
+                key={session.info.id}
+                session={session}
+                isLast={index === sessions.length - 1}
+                visibleSessionCount={visibleSessionCount}
+                onLoadMore={handleLoadMore}
+                organizationId={organizationId}
+              />
+            ))
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -457,7 +711,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
         messageUuid={messageUuid}
         organizationId={organizationId}
         placeholder={isStreaming ? 'Building...' : 'Describe changes to your app...'}
-        disabled={messages.length === 0 || isBlocked}
+        disabled={!hasAnyMessages || isBlocked}
         isSubmitting={isStreaming}
         onInterrupt={handleInterrupt}
         isInterrupting={isInterrupting}
@@ -474,4 +728,53 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
       />
     </div>
   );
+}
+
+// =============================================================================
+// Hooks
+// =============================================================================
+
+/** No-op subscribe for when there's no active session */
+function noopSubscribe() {
+  return () => {};
+}
+
+const EMPTY_MESSAGES: never[] = [];
+
+/**
+ * Subscribe to the active session's messages for auto-scroll triggering.
+ * Returns the messages array (identity changes when messages update).
+ */
+function useActiveSessionMessages(session: AppBuilderSession | undefined): readonly unknown[] {
+  const v1Messages = useV1Messages(session?.type === 'v1' ? session : undefined);
+  const v2Messages = useV2Messages(session?.type === 'v2' ? session : undefined);
+
+  if (!session) return EMPTY_MESSAGES;
+  return session.type === 'v1' ? v1Messages : v2Messages;
+}
+
+function useV1Messages(session: V1Session | undefined): readonly CloudMessage[] {
+  const state = useSyncExternalStore(
+    session?.subscribe ?? noopSubscribe,
+    session?.getState ?? emptyV1State
+  );
+  return state.messages;
+}
+
+function useV2Messages(session: V2Session | undefined): readonly StoredMessage[] {
+  const state = useSyncExternalStore(
+    session?.subscribe ?? noopSubscribe,
+    session?.getState ?? emptyV2State
+  );
+  return state.messages;
+}
+
+const EMPTY_V1_STATE = { messages: [] as CloudMessage[], isStreaming: false };
+function emptyV1State() {
+  return EMPTY_V1_STATE;
+}
+
+const EMPTY_V2_STATE = { messages: [] as StoredMessage[], isStreaming: false };
+function emptyV2State() {
+  return EMPTY_V2_STATE;
 }

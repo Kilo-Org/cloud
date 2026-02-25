@@ -1,9 +1,11 @@
 'use client';
 
+import { useCallback } from 'react';
 import { User, Bot, Info } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Message } from './types';
 import { MessageContent } from './MessageContent';
+import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 
 type MessageBubbleProps = {
   message: Message & {
@@ -24,6 +26,7 @@ export function MessageBubble({
   userAvatarUrl,
 }: MessageBubbleProps) {
   const timeAgo = formatDistanceToNow(new Date(message.timestamp), { addSuffix: true });
+  const getTextForCopy = useCallback(() => message.content, [message.content]);
 
   // User message
   if (message.role === 'user') {
@@ -119,7 +122,7 @@ export function MessageBubble({
 
   // Assistant message
   return (
-    <div className="flex items-start gap-2 py-4 md:gap-3">
+    <div className="group/msg flex items-start gap-2 py-4 md:gap-3">
       <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8">
         <Bot className="h-4 w-4" />
       </div>
@@ -135,6 +138,12 @@ export function MessageBubble({
               </span>
               Streaming...
             </span>
+          )}
+          {!isStreaming && (
+            <CopyMessageButton
+              getText={getTextForCopy}
+              className="opacity-0 transition-opacity group-hover/msg:opacity-100"
+            />
           )}
         </div>
         <MessageContent

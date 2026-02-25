@@ -85,6 +85,8 @@ export type CodeReviewPayload = {
   sessionInput: SessionInput;
   owner: Owner;
   skipBalanceCheck?: boolean;
+  /** Which cloud agent backend to use: 'v1' (cloud-agent SSE) or 'v2' (cloud-agent-next) */
+  agentVersion?: string;
 };
 
 /**

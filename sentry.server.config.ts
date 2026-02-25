@@ -24,6 +24,7 @@ function isDrizzleQueryError(error: unknown): error is DrizzleQueryError {
 const TRPC_4XX_CODES = new Set([
   'BAD_REQUEST',
   'UNAUTHORIZED',
+  'PAYMENT_REQUIRED',
   'FORBIDDEN',
   'NOT_FOUND',
   'METHOD_NOT_SUPPORTED',

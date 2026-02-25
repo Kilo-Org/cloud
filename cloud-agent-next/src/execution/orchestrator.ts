@@ -264,6 +264,9 @@ export class ExecutionOrchestrator {
           botId: initContext.botId,
           githubRepo: initContext.githubRepo,
           githubToken: initContext.githubToken,
+          gitUrl: initContext.gitUrl,
+          gitToken: initContext.gitToken,
+          platform: initContext.platform,
           envVars: initContext.envVars,
         };
 
@@ -275,7 +278,7 @@ export class ExecutionOrchestrator {
           initContext.kilocodeModel ?? 'default',
           orgId,
           initContext.encryptedSecrets,
-          undefined,
+          initContext.createdOnPlatform,
           existingMetadata.appendSystemPrompt
         );
 
@@ -323,6 +326,7 @@ export class ExecutionOrchestrator {
           mcpServers: initContext.mcpServers,
           botId: initContext.botId,
           githubAppType: initContext.githubAppType,
+          createdOnPlatform: initContext.createdOnPlatform,
           // Note: existingMetadata requires CloudAgentSessionState, not our simplified type
           ...gitSource,
         });
@@ -351,6 +355,7 @@ export class ExecutionOrchestrator {
         botId: initContext.botId,
         githubAppType: initContext.githubAppType,
         platform: initContext.platform,
+        createdOnPlatform: initContext.createdOnPlatform,
       });
     } catch (error) {
       if (error instanceof ExecutionError) throw error;

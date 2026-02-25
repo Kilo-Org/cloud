@@ -11,7 +11,7 @@
  *
  * Usage:
  *   cd cloudflare-app-builder
- *   AUTH_TOKEN=dev-token-change-this-in-production npx ts-node src/test-git-integration.ts
+ *   AUTH_TOKEN=dev-token-change-this-in-production pnpm test:git
  *
  * What this tests:
  * 1. Initialize a new project
@@ -22,131 +22,28 @@
  * 6. Verify read-only token cannot push
  */
 
-import { execSync } from 'child_process';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
-
-// --- Configuration ---
-const APP_BUILDER_URL = process.env.APP_BUILDER_URL || 'http://localhost:8790';
-const AUTH_TOKEN = process.env.AUTH_TOKEN || 'dev-token-change-this-in-production';
-
-// --- Types ---
-type TokenPermission = 'full' | 'ro';
-
-type InitSuccessResponse = {
-  success: true;
-  app_id: string;
-  git_url: string;
-};
-
-type TokenResponse = {
-  success: true;
-  token: string;
-  expires_at: string;
-  permission: TokenPermission;
-};
-
-// --- Helper Functions ---
-
-function log(message: string, data?: unknown) {
-  console.log(`[TEST] ${message}`, data ? JSON.stringify(data, null, 2) : '');
-}
-
-function logError(message: string, error?: unknown) {
-  console.error(`[ERROR] ${message}`, error);
-}
-
-function logSuccess(message: string) {
-  console.log(`[✓] ${message}`);
-}
-
-function logFailure(message: string) {
-  console.error(`[✗] ${message}`);
-}
-
-async function initProject(projectId: string): Promise<InitSuccessResponse> {
-  const endpoint = `${APP_BUILDER_URL}/apps/${encodeURIComponent(projectId)}/init`;
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${AUTH_TOKEN}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`Failed to init project: ${response.status} - ${errorText}`);
-  }
-
-  return response.json();
-}
-
-async function generateGitToken(
-  appId: string,
-  permission: TokenPermission
-): Promise<TokenResponse> {
-  const endpoint = `${APP_BUILDER_URL}/apps/${encodeURIComponent(appId)}/token`;
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${AUTH_TOKEN}`,
-    },
-    body: JSON.stringify({ permission }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`Failed to generate token: ${response.status} - ${errorText}`);
-  }
-
-  return response.json();
-}
-
-function buildGitUrlWithToken(gitUrl: string, token: string): string {
-  // Replace https://hostname/path with https://x-access-token:token@hostname/path
-  const url = new URL(gitUrl);
-  url.username = 'x-access-token';
-  url.password = token;
-  return url.toString();
-}
-
-function runGitCommand(dir: string, command: string, expectFailure = false): string {
-  const fullCommand = `cd "${dir}" && ${command}`;
-  log(`Running: ${command}`);
-
-  try {
-    const output = execSync(fullCommand, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    if (expectFailure) {
-      throw new Error(`Expected command to fail but it succeeded: ${command}`);
-    }
-    return output;
-  } catch (error: unknown) {
-    // execSync throws on non-zero exit
-    if (expectFailure) {
-      const execError = error as { stderr?: string; stdout?: string; message?: string };
-      log('Command failed as expected', {
-        stderr: execError.stderr?.slice(0, 500),
-        stdout: execError.stdout?.slice(0, 500),
-      });
-      return execError.stderr || execError.message || 'Command failed';
-    }
-    throw error;
-  }
-}
-
-// --- Main Test ---
+import {
+  APP_BUILDER_URL,
+  initProject,
+  generateGitToken,
+  buildGitUrlWithToken,
+  runGitCommand,
+  createTempDir,
+  removeTempDir,
+  log,
+  logError,
+  logSuccess,
+  logFailure,
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+  mkdirSync,
+  join,
+} from './git-test-helpers';
 
 async function runTests() {
   const testId = `test-git-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const tempDir = mkdtempSync(join(tmpdir(), 'app-builder-test-'));
+  const tempDir = createTempDir();
 
   log('Starting git integration test', {
     testId,
@@ -319,31 +216,26 @@ async function runTests() {
     // All Tests Passed
     // ===========================================
     console.log('\n' + '='.repeat(50));
-    console.log('🎉 ALL TESTS PASSED!');
+    console.log('ALL TESTS PASSED');
     console.log('='.repeat(50));
     console.log(`\nTest Summary:`);
     console.log(`  - Project ID: ${testId}`);
     console.log(`  - Git URL: ${gitUrl}`);
-    console.log(`  - Full token clone: ✓`);
-    console.log(`  - Full token push: ✓`);
-    console.log(`  - Push persistence verified: ✓`);
-    console.log(`  - Read-only token clone: ✓`);
-    console.log(`  - Read-only token push blocked: ✓`);
+    console.log(`  - Full token clone: PASS`);
+    console.log(`  - Full token push: PASS`);
+    console.log(`  - Push persistence verified: PASS`);
+    console.log(`  - Read-only token clone: PASS`);
+    console.log(`  - Read-only token push blocked: PASS`);
   } catch (error) {
     logError('Test failed', error);
     console.log('\n' + '='.repeat(50));
-    console.log('❌ TESTS FAILED');
+    console.log('TESTS FAILED');
     console.log('='.repeat(50));
     process.exit(1);
   } finally {
-    // Cleanup
     log('\nCleaning up temp directory...');
-    try {
-      rmSync(tempDir, { recursive: true, force: true });
-      log('Cleanup complete');
-    } catch (e) {
-      logError('Failed to cleanup temp directory', e);
-    }
+    removeTempDir(tempDir);
+    log('Cleanup complete');
   }
 }
 

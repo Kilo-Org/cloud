@@ -17,6 +17,10 @@ export function validateKiloToken(
 ):
   | { success: true; userId: string; token: string; botId?: string }
   | { success: false; error: string } {
+  if (!secret) {
+    return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
+  }
+
   // Check header exists and has Bearer format
   if (!authHeader) {
     return { success: false, error: 'Missing Authorization header' };

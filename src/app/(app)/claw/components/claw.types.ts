@@ -34,11 +34,11 @@ export const CLAW_STATUS_BADGE: Record<
   { label: string; className: string }
 > = {
   running: {
-    label: 'Running',
+    label: 'Machine Online',
     className: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400',
   },
   stopped: {
-    label: 'Stopped',
+    label: 'Machine Stopped',
     className: 'border-red-500/30 bg-red-500/15 text-red-400',
   },
   provisioned: {

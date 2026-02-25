@@ -39,17 +39,20 @@ export async function GET(
       sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(PROMOTION_WINDOW_HOURS))} hours' AND ${ANONYMOUS_FILTER}`
     );
 
-  // Get per-IP stats to find IPs at limits (anonymous only)
-  const perIpStats = await db
+  // Count IPs at or above the promotion limit threshold using a SQL subquery (anonymous only)
+  const ipsAtLimitResult = await db
     .select({
-      ip_address: free_model_usage.ip_address,
-      request_count: sql<number>`COUNT(*)`,
+      count: sql<number>`COUNT(*)`,
     })
-    .from(free_model_usage)
-    .where(
-      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(PROMOTION_WINDOW_HOURS))} hours' AND ${ANONYMOUS_FILTER}`
-    )
-    .groupBy(free_model_usage.ip_address);
+    .from(
+      sql`(
+        SELECT ${free_model_usage.ip_address}
+        FROM ${free_model_usage}
+        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(PROMOTION_WINDOW_HOURS))} hours' AND ${ANONYMOUS_FILTER}
+        GROUP BY ${free_model_usage.ip_address}
+        HAVING COUNT(*) >= ${PROMOTION_MAX_REQUESTS}
+      ) sub`
+    );
 
   const bigIntToNumber = (value: unknown): number => {
     if (value === null || value === undefined) return 0;
@@ -62,15 +65,7 @@ export async function GET(
 
   const windowUniqueIps = bigIntToNumber(windowStats.unique_ips);
   const windowTotalRequests = bigIntToNumber(windowStats.total_requests);
-
-  // Count IPs at or near the promotion limit
-  let ipsAtRequestLimit = 0;
-  for (const ip of perIpStats) {
-    const requestCount = bigIntToNumber(ip.request_count);
-    if (requestCount >= PROMOTION_MAX_REQUESTS) {
-      ipsAtRequestLimit++;
-    }
-  }
+  const ipsAtRequestLimit = bigIntToNumber(ipsAtLimitResult[0]?.count ?? 0);
 
   return NextResponse.json({
     // Current window stats

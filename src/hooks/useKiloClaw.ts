@@ -40,6 +40,37 @@ export function useRefreshPairing() {
   };
 }
 
+export function useKiloClawDevicePairing(enabled = true) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.listDevicePairingRequests.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled ? 120_000 : false,
+    })
+  );
+}
+
+export function useRefreshDevicePairing() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return async () => {
+    const fresh = await queryClient.fetchQuery(
+      trpc.kiloclaw.listDevicePairingRequests.queryOptions({ refresh: true })
+    );
+    queryClient.setQueryData(trpc.kiloclaw.listDevicePairingRequests.queryKey(), fresh);
+  };
+}
+
+export function useKiloClawGatewayStatus(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.gatewayStatus.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled ? 30_000 : false,
+    })
+  );
+}
+
 export function useKiloClawMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -72,7 +103,24 @@ export function useKiloClawMutations() {
       })
     ),
     restartGateway: useMutation(
-      trpc.kiloclaw.restartGateway.mutationOptions({ onSuccess: invalidateStatus })
+      trpc.kiloclaw.restartGateway.mutationOptions({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.gatewayStatus.queryKey(),
+          });
+        },
+      })
+    ),
+    restartOpenClaw: useMutation(
+      trpc.kiloclaw.restartOpenClaw.mutationOptions({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.gatewayStatus.queryKey(),
+          });
+        },
+      })
     ),
     approvePairingRequest: useMutation(
       trpc.kiloclaw.approvePairingRequest.mutationOptions({
@@ -82,6 +130,18 @@ export function useKiloClawMutations() {
           });
         },
       })
+    ),
+    approveDevicePairingRequest: useMutation(
+      trpc.kiloclaw.approveDevicePairingRequest.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.listDevicePairingRequests.queryKey(),
+          });
+        },
+      })
+    ),
+    runDoctor: useMutation(
+      trpc.kiloclaw.runDoctor.mutationOptions({ onSuccess: invalidateStatus })
     ),
   };
 }

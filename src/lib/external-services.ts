@@ -8,9 +8,8 @@ import { cliSessions, sharedCliSessions, cli_sessions_v2 } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
 import { errorExceptInTest, logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
-import jwt from 'jsonwebtoken';
-import { NEXTAUTH_SECRET, SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { JWT_TOKEN_VERSION } from '@/lib/tokens';
+import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { generateInternalServiceToken } from '@/lib/tokens';
 
 /**
  * Delete user from Customer.io
@@ -126,24 +125,6 @@ async function deleteCliSessionBlobs(userId: string): Promise<void> {
   }
 }
 
-/**
- * Generate a minimal JWT token for internal GDPR deletion operations.
- * This token only contains the fields required by the session ingest worker.
- */
-function generateGdprDeletionToken(userId: string): string {
-  return jwt.sign(
-    {
-      kiloUserId: userId,
-      version: JWT_TOKEN_VERSION,
-    },
-    NEXTAUTH_SECRET,
-    {
-      algorithm: 'HS256',
-      expiresIn: '1h',
-    }
-  );
-}
-
 const V2_SESSION_DELETE_CONCURRENCY = 10;
 
 /**
@@ -171,7 +152,7 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
     }
 
     // Generate a token for the user to authenticate with the session ingest worker
-    const token = generateGdprDeletionToken(userId);
+    const token = generateInternalServiceToken(userId);
 
     // Delete sessions in concurrent batches
     let successCount = 0;

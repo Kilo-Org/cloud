@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { needsResumeConfiguration } from './session-config';
-import type { SessionConfig, ResumeConfig, StreamResumeConfig } from './types';
+import type { SessionConfig, ResumeConfig } from './types';
 
 describe('needsResumeConfiguration', () => {
   it('returns false when no session is loaded', () => {
@@ -8,7 +8,7 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: null,
         resumeConfig: null,
-        streamResumeConfig: null,
+        persistedResumeConfig: null,
         sessionConfig: null,
       })
     ).toBe(false);
@@ -16,7 +16,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns false when resumeConfig is provided', () => {
     const resumeConfig: ResumeConfig = {
-      mode: 'build',
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
     };
 
@@ -24,24 +24,23 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig,
-        streamResumeConfig: null,
+        persistedResumeConfig: null,
         sessionConfig: null,
       })
     ).toBe(false);
   });
 
-  it('returns false when streamResumeConfig is provided', () => {
-    const streamResumeConfig: StreamResumeConfig = {
-      mode: 'build',
+  it('returns false when persistedResumeConfig is provided', () => {
+    const persistedResumeConfig: ResumeConfig = {
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
-      githubRepo: 'owner/repo',
     };
 
     expect(
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig: null,
-        streamResumeConfig,
+        persistedResumeConfig,
         sessionConfig: null,
       })
     ).toBe(false);
@@ -49,7 +48,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns true for CLI session without valid config', () => {
     const invalidConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: '', // Empty model is invalid
       repository: '',
       sessionId: '',
@@ -59,7 +58,7 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig: null,
-        streamResumeConfig: null,
+        persistedResumeConfig: null,
         sessionConfig: invalidConfig,
       })
     ).toBe(true);
@@ -67,7 +66,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns false for web session with valid config', () => {
     const validConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
       repository: 'owner/repo',
       sessionId: 'agent_xyz',
@@ -77,7 +76,7 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig: null,
-        streamResumeConfig: null,
+        persistedResumeConfig: null,
         sessionConfig: validConfig,
       })
     ).toBe(false);
@@ -85,7 +84,7 @@ describe('needsResumeConfiguration', () => {
 
   it('returns true for legacy web session with invalid config (empty model)', () => {
     const invalidConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: '', // Legacy sessions may have empty model
       repository: '',
       sessionId: '',
@@ -95,7 +94,7 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig: null,
-        streamResumeConfig: null,
+        persistedResumeConfig: null,
         sessionConfig: invalidConfig,
       })
     ).toBe(true);
@@ -106,7 +105,7 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig: null,
-        streamResumeConfig: null,
+        persistedResumeConfig: null,
         sessionConfig: null,
       })
     ).toBe(true);
@@ -124,7 +123,7 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig: null,
-        streamResumeConfig: null,
+        persistedResumeConfig: null,
         sessionConfig: invalidConfig,
       })
     ).toBe(true);
@@ -132,12 +131,12 @@ describe('needsResumeConfiguration', () => {
 
   it('prioritizes resumeConfig over invalid sessionConfig', () => {
     const resumeConfig: ResumeConfig = {
-      mode: 'build',
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
     };
 
     const invalidConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: '', // Invalid
       repository: '',
       sessionId: '',
@@ -147,21 +146,20 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig,
-        streamResumeConfig: null,
+        persistedResumeConfig: null,
         sessionConfig: invalidConfig,
       })
     ).toBe(false);
   });
 
-  it('prioritizes streamResumeConfig over invalid sessionConfig', () => {
-    const streamResumeConfig: StreamResumeConfig = {
-      mode: 'build',
+  it('prioritizes persistedResumeConfig over invalid sessionConfig', () => {
+    const persistedResumeConfig: ResumeConfig = {
+      mode: 'code',
       model: 'anthropic/claude-3-5-sonnet',
-      githubRepo: 'owner/repo',
     };
 
     const invalidConfig: SessionConfig = {
-      mode: 'build',
+      mode: 'code',
       model: '', // Invalid
       repository: '',
       sessionId: '',
@@ -171,7 +169,7 @@ describe('needsResumeConfiguration', () => {
       needsResumeConfiguration({
         currentDbSessionId: 'abc-123',
         resumeConfig: null,
-        streamResumeConfig,
+        persistedResumeConfig,
         sessionConfig: invalidConfig,
       })
     ).toBe(false);

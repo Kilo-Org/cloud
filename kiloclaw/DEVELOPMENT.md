@@ -45,6 +45,31 @@ pnpm deploy           # wrangler deploy
 Run `pnpm types` after changing `wrangler.jsonc` to regenerate the TypeScript
 binding types.
 
+## Controller Smoke Tests (Docker)
+
+These scripts validate the machine-side Node controller introduced for KiloClaw.
+
+Build the image first from `kiloclaw/`:
+
+```bash
+docker build --progress=plain -t kiloclaw:controller .
+```
+
+Then run one of:
+
+- `bash scripts/controller-smoke-test.sh`
+  - Fastest check. Runs the controller binary directly as the container entrypoint.
+  - Use this when iterating on controller auth/proxy behavior.
+- `bash scripts/controller-entrypoint-smoke-test.sh`
+  - Runs the default image CMD (`start-openclaw.sh`) and validates the full startup path.
+  - Use this when changing startup script, env patching, or Docker wiring.
+- `bash scripts/controller-proxy-auth-smoke-test.sh`
+  - Validates proxy enforcement semantics end-to-end:
+    no token -> `401`, correct proxy token -> pass-through.
+  - Use this when changing proxy token logic or route/auth ordering.
+
+All scripts support overrides via env vars (`IMAGE`, `PORT`, `TOKEN`).
+
 ## Environment Variables
 
 All secrets are configured in `.dev.vars` for local development and via
@@ -102,10 +127,10 @@ user-provided encrypted secrets and channel tokens are silently skipped.
 
 ### Development Flags
 
-| Variable     | Description                                                                                         |
-| ------------ | --------------------------------------------------------------------------------------------------- |
-| `DEV_MODE`   | Set to `true` to skip JWT auth and enable `allowInsecureAuth` in the container. **Local dev only.** |
-| `WORKER_ENV` | Set to `production` to enforce JWT `env` claim matching. When unset, env validation is skipped.     |
+| Variable     | Description                                                                                                                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEV_MODE`   | Set to `true` to skip JWT auth and enable `allowInsecureAuth` in the container. **Local dev only.**                                                                                       |
+| `WORKER_ENV` | Defaults to `"production"` in `wrangler.jsonc`. **Set to `"development"` in `.dev.vars` for local dev.** Controls JWT `env` claim matching and Fly app name prefixes (`dev-` vs `acct-`). |
 
 ### Optional
 
@@ -145,8 +170,7 @@ npx wrangler secret put CF_ACCOUNT_ID
 # Set encryption key (get from the Next.js deployment's AGENT_ENV_VARS_PRIVATE_KEY)
 npx wrangler secret put AGENT_ENV_VARS_PRIVATE_KEY
 
-# Optional: enforce JWT env matching
-echo "production" | npx wrangler secret put WORKER_ENV
+# WORKER_ENV defaults to "production" in wrangler.jsonc -- no secret needed.
 
 # Deploy
 pnpm deploy
@@ -159,7 +183,7 @@ pnpm deploy
 | `NEXTAUTH_SECRET`            | `NEXTAUTH_SECRET`              | Same HS256 signing key for JWT verification           |
 | `INTERNAL_API_SECRET`        | `KILOCLAW_INTERNAL_API_SECRET` | Platform API authentication                           |
 | `AGENT_ENV_VARS_PRIVATE_KEY` | `AGENT_ENV_VARS_PUBLIC_KEY`    | RSA key pair (worker has private, Next.js has public) |
-| `WORKER_ENV`                 | `NODE_ENV`                     | Should both be `production` in prod                   |
+| `WORKER_ENV`                 | `NODE_ENV`                     | Defaults to `production` in `wrangler.jsonc`          |
 
 ## Architecture
 

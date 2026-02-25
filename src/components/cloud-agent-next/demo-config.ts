@@ -21,7 +21,7 @@ export const DEMO_CONFIGS: DemoConfig[] = [
       'Personalize the KiloMan game by updating the player avatar to use your GitHub Gravatar',
     prompt:
       'Update the player avatar in this game to use the Gravatar for GitHub user "{username}". The Gravatar URL should be: https://github.com/{username}.png. Once complete, please use "gh" the github cli to create a draft pull request with the changes, the GH_TOKEN is already available in the environment. Please be sure assign the pr to the user.',
-    mode: 'build',
+    mode: 'code',
     model: 'x-ai/grok-code-fast-1',
   },
   {

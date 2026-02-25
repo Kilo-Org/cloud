@@ -259,7 +259,7 @@ describe('WrapperClient', () => {
       const options: WrapperPromptOptions = {
         prompt: 'Complex prompt',
         model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4-20250514' },
-        agent: 'build',
+        agent: 'code',
         messageId: 'msg_custom',
         system: 'You are a helpful assistant',
         tools: { read_file: true, write_file: false },

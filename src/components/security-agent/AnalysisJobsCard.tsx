@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,20 +9,21 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   RotateCcw,
   Package,
-  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
+import { differenceInDays, differenceInHours, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { SeverityBadge } from './SeverityBadge';
-import type { SecurityFindingAnalysis } from '@/lib/security-agent/core/types';
+import { FindingDetailDialog } from './FindingDetailDialog';
+import { DismissFindingDialog, type DismissReason } from './DismissFindingDialog';
+import { cn } from '@/lib/utils';
+import type { SecurityFinding } from '@/db/schema';
 
 type AnalysisJobsCardProps = {
   organizationId?: string;
@@ -31,39 +31,50 @@ type AnalysisJobsCardProps = {
 };
 
 type AnalysisStatus = 'pending' | 'running' | 'completed' | 'failed';
+type Severity = 'critical' | 'high' | 'medium' | 'low';
 
 const statusConfig: Record<
   AnalysisStatus,
   {
     icon: React.ComponentType<{ className?: string }>;
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
     label: string;
+    badgeClass: string;
   }
 > = {
-  pending: { icon: Clock, variant: 'secondary', label: 'Queued' },
-  running: { icon: Loader2, variant: 'default', label: 'Analyzing' },
-  completed: { icon: CheckCircle2, variant: 'default', label: 'Completed' },
-  failed: { icon: XCircle, variant: 'destructive', label: 'Failed' },
+  pending: {
+    icon: Clock,
+    label: 'Queued',
+    badgeClass: 'border-gray-500/30 bg-gray-500/20 text-gray-400',
+  },
+  running: {
+    icon: Loader2,
+    label: 'Analyzing',
+    badgeClass: 'border-yellow-500/30 bg-yellow-500/20 text-yellow-400',
+  },
+  completed: {
+    icon: CheckCircle2,
+    label: 'Completed',
+    badgeClass: 'border-green-500/30 bg-green-500/20 text-green-400',
+  },
+  failed: {
+    icon: XCircle,
+    label: 'Failed',
+    badgeClass: 'border-red-500/30 bg-red-500/20 text-red-400',
+  },
 };
 
 const PAGE_SIZE = 10;
 
-type AnalysisJob = {
-  id: string;
-  package_name: string;
-  severity: string;
-  repo_full_name: string;
-  title: string;
-  analysis_status: string | null;
-  analysis_started_at: Date | null;
-  analysis_completed_at: Date | null;
-  analysis_error: string | null;
-  analysis: SecurityFindingAnalysis | null;
-  session_id: string | null;
-  cli_session_id: string | null;
-};
+function formatCompactTimeAgo(date: Date) {
+  const now = new Date();
+  const days = Math.abs(differenceInDays(now, date));
+  if (days >= 1) return `${days}d ago`;
+  const hours = Math.abs(differenceInHours(now, date));
+  if (hours >= 1) return `${hours}h ago`;
+  const minutes = Math.abs(differenceInMinutes(now, date));
+  return `${minutes}m ago`;
+}
 
-// Helper to detect GitHub integration errors from error messages
 function isGitHubIntegrationError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
@@ -71,19 +82,121 @@ function isGitHubIntegrationError(error: unknown): boolean {
     message.includes('GitHub installation') ||
     message.includes('installation_id') ||
     message.includes('Bad credentials') ||
-    message.includes('Not Found') // GitHub API returns 404 for uninstalled apps
+    message.includes('Not Found')
   );
 }
+
+// ─── Row sub-components ──────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: AnalysisStatus | null }) {
+  if (!status) return null;
+  const info = statusConfig[status];
+  const Icon = info.icon;
+  return (
+    <Badge variant="outline" className={info.badgeClass}>
+      <Icon className={cn('mr-1 h-3 w-3', status === 'running' && 'animate-spin')} />
+      {info.label}
+    </Badge>
+  );
+}
+
+function AnalysisJobRow({
+  finding,
+  onRetry,
+  isRetrying,
+  retryDisabled,
+  onClick,
+}: {
+  finding: SecurityFinding;
+  onRetry: (id: string) => void;
+  isRetrying: boolean;
+  retryDisabled: boolean;
+  onClick: () => void;
+}) {
+  const status = finding.analysis_status as AnalysisStatus | null;
+  const canRetry = status === 'failed' || (status === 'completed' && finding.analysis);
+
+  const time =
+    finding.analysis_completed_at && (status === 'completed' || status === 'failed')
+      ? formatCompactTimeAgo(new Date(finding.analysis_completed_at))
+      : finding.analysis_started_at
+        ? formatCompactTimeAgo(new Date(finding.analysis_started_at))
+        : null;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className={cn(
+        'hover:bg-muted/50 grid w-full cursor-pointer grid-cols-[96px_1fr_80px_100px_16px] items-center gap-x-1.5 px-4 py-3 text-left transition-colors',
+        status === 'failed' && 'bg-red-500/5'
+      )}
+    >
+      {/* Severity */}
+      <div>
+        <SeverityBadge severity={finding.severity as Severity} size="sm" />
+      </div>
+
+      {/* Title + package */}
+      <div className="min-w-0">
+        <h4 className="truncate text-sm font-medium">{finding.title}</h4>
+        <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+          <Package className="h-3 w-3" />
+          {finding.package_name}
+        </span>
+      </div>
+
+      {/* Status + time */}
+      <div className="text-xs">
+        <StatusBadge status={status} />
+        {time && <div className="text-muted-foreground mt-1 text-xs">{time}</div>}
+      </div>
+
+      {/* Action */}
+      <div className="flex items-center justify-end">
+        {canRetry && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={e => {
+              e.stopPropagation();
+              onRetry(finding.id);
+            }}
+            disabled={isRetrying || retryDisabled}
+            className="gap-1"
+          >
+            <RotateCcw className={cn('h-3 w-3', isRetrying && 'animate-spin')} />
+            {isRetrying ? 'Starting...' : 'Retry'}
+          </Button>
+        )}
+      </div>
+
+      {/* Detail chevron */}
+      <ChevronRight className="text-muted-foreground h-4 w-4" />
+    </div>
+  );
+}
+
+// ─── Main Component ─────────────────────────────────────────────────────────
 
 export function AnalysisJobsCard({ organizationId, onGitHubError }: AnalysisJobsCardProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [startingAnalysisId, setStartingAnalysisId] = useState<string | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<SecurityFinding | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [dismissDialogOpen, setDismissDialogOpen] = useState(false);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isOrg = !!organizationId;
   const offset = (currentPage - 1) * PAGE_SIZE;
 
-  // Fetch findings with analysis status (pending, running, completed, failed)
   const { data, isLoading, isFetching } = useQuery({
     ...(isOrg
       ? trpc.organizations.securityAgent.listAnalysisJobs.queryOptions({
@@ -98,326 +211,236 @@ export function AnalysisJobsCard({ organizationId, onGitHubError }: AnalysisJobs
     refetchInterval: query => {
       const result = query.state.data;
       if (!result) return false;
-      const jobs = (result.jobs || []) as AnalysisJob[];
-      const hasActiveJobs = jobs.some(j =>
-        ['pending', 'running'].includes(j.analysis_status || '')
+      const findings = result.jobs || [];
+      const hasActiveJobs = findings.some(f =>
+        ['pending', 'running'].includes(f.analysis_status || '')
       );
-      return hasActiveJobs ? 5000 : false; // Poll every 5s if active jobs
+      return hasActiveJobs ? 5000 : false;
     },
   });
 
-  // Retry mutation for failed analyses (organization)
+  const handleMutationSuccess = async () => {
+    onGitHubError?.(null);
+    await queryClient.invalidateQueries();
+    setStartingAnalysisId(null);
+  };
+
+  const handleMutationError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (isGitHubIntegrationError(error)) {
+      onGitHubError?.(message);
+      toast.error('GitHub Integration Error', {
+        description: 'The GitHub App may have been uninstalled. Please check your integrations.',
+      });
+    } else {
+      toast.error('Analysis Failed', { description: message, duration: 8000 });
+    }
+    setStartingAnalysisId(null);
+  };
+
   const retryOrgMutation = useMutation(
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async () => {
-        onGitHubError?.(null); // Clear any previous error on success
-        await queryClient.invalidateQueries();
-        setStartingAnalysisId(null);
+      onSuccess: handleMutationSuccess,
+      onError: handleMutationError,
+    })
+  );
+
+  const retryUserMutation = useMutation(
+    trpc.securityAgent.startAnalysis.mutationOptions({
+      onSuccess: handleMutationSuccess,
+      onError: handleMutationError,
+    })
+  );
+
+  const handleRetry = (findingId: string) => {
+    setStartingAnalysisId(findingId);
+    // If the finding has triage data, retry only sandbox analysis to avoid redundant triage
+    const jobs = data?.jobs || [];
+    const finding = jobs.find(f => f.id === findingId);
+    const retrySandboxOnly = !!finding?.analysis?.triage && finding.analysis_status === 'failed';
+    if (isOrg) {
+      retryOrgMutation.mutate({ organizationId: organizationId, findingId, retrySandboxOnly });
+    } else {
+      retryUserMutation.mutate({ findingId, retrySandboxOnly });
+    }
+  };
+
+  // Dismiss mutation (organization)
+  const dismissOrgMutation = useMutation(
+    trpc.organizations.securityAgent.dismissFinding.mutationOptions({
+      onSuccess: () => {
+        toast.success('Finding dismissed');
+        void queryClient.invalidateQueries();
+        setDismissDialogOpen(false);
+        setDetailDialogOpen(false);
+        setSelectedFinding(null);
       },
       onError: error => {
-        const message = error instanceof Error ? error.message : String(error);
-        if (isGitHubIntegrationError(error)) {
-          onGitHubError?.(message); // Set error at page level
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
-          });
-        } else {
-          toast.error('Analysis Failed', {
-            description: message,
-            duration: 8000, // 8 seconds for errors
-          });
-        }
-        setStartingAnalysisId(null);
+        toast.error('Failed to dismiss finding', { description: error.message });
       },
     })
   );
 
-  // Retry mutation for failed analyses (user)
-  const retryUserMutation = useMutation(
-    trpc.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async () => {
-        onGitHubError?.(null); // Clear any previous error on success
-        await queryClient.invalidateQueries();
-        setStartingAnalysisId(null);
+  // Dismiss mutation (user)
+  const dismissUserMutation = useMutation(
+    trpc.securityAgent.dismissFinding.mutationOptions({
+      onSuccess: () => {
+        toast.success('Finding dismissed');
+        void queryClient.invalidateQueries();
+        setDismissDialogOpen(false);
+        setDetailDialogOpen(false);
+        setSelectedFinding(null);
       },
       onError: error => {
-        const message = error instanceof Error ? error.message : String(error);
-        if (isGitHubIntegrationError(error)) {
-          onGitHubError?.(message); // Set error at page level
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
-          });
-        } else {
-          toast.error('Analysis Failed', {
-            description: message,
-            duration: 8000, // 8 seconds for errors
-          });
-        }
-        setStartingAnalysisId(null);
+        toast.error('Failed to dismiss finding', { description: error.message });
       },
     })
   );
+
+  const handleDismiss = (reason: DismissReason, comment?: string) => {
+    if (!selectedFinding) return;
+    if (isOrg && organizationId) {
+      dismissOrgMutation.mutate({
+        organizationId,
+        findingId: selectedFinding.id,
+        reason,
+        comment,
+      });
+    } else {
+      dismissUserMutation.mutate({
+        findingId: selectedFinding.id,
+        reason,
+        comment,
+      });
+    }
+  };
+
+  const handleRowClick = (finding: SecurityFinding) => {
+    setSelectedFinding(finding);
+    setDetailDialogOpen(true);
+  };
+
+  const handleOpenDismissDialog = () => {
+    setDetailDialogOpen(false);
+    setDismissDialogOpen(true);
+  };
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Analysis Jobs</CardTitle>
-          <CardDescription>Loading...</CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="flex items-center justify-center py-12">
+        <RefreshCw className="text-muted-foreground h-6 w-6 animate-spin" />
+      </div>
     );
   }
 
-  const jobs = (data?.jobs || []) as AnalysisJob[];
+  const findings = data?.jobs || [];
   const total = data?.total || 0;
   const runningCount = data?.runningCount || 0;
   const concurrencyLimit = data?.concurrencyLimit || 3;
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const hasPrevious = currentPage > 1;
-  const hasNext = currentPage < totalPages;
-
-  if (jobs.length === 0 && currentPage === 1) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Brain className="h-5 w-5" />
-            Analysis Jobs
-          </CardTitle>
-          <CardDescription>No analysis jobs yet</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Analysis jobs will appear here when you analyze security findings. Click &quot;Start
-            Analysis&quot; on any finding to begin.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const startItem = offset + 1;
+  const endItem = Math.min(offset + findings.length, total);
+  const isDismissing = isOrg ? dismissOrgMutation.isPending : dismissUserMutation.isPending;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5" />
-              Analysis Jobs
-            </CardTitle>
-            <CardDescription>
-              {total > 0 ? (
-                <>
-                  Showing {offset + 1}-{Math.min(offset + jobs.length, total)} of {total} jobs
-                </>
-              ) : (
-                'No analysis jobs'
-              )}
-            </CardDescription>
+    <div className="space-y-4">
+      {/* Summary bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-800 bg-gray-900/50 px-4 py-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-5">
+          <span className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Loader2 className="h-4 w-4" />
+            {runningCount} Running
+          </span>
+          <span className="text-muted-foreground flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4" />
+            {findings.filter(f => f.analysis_status === 'completed').length} Completed
+          </span>
+          <span className="text-muted-foreground flex items-center gap-2 text-sm">
+            <XCircle className="h-4 w-4" />
+            {findings.filter(f => f.analysis_status === 'failed').length} Failed
+          </span>
+        </div>
+        <Badge variant={runningCount >= concurrencyLimit ? 'destructive' : 'secondary'}>
+          {runningCount}/{concurrencyLimit} capacity
+        </Badge>
+      </div>
+
+      {/* Rows */}
+      <div className="rounded-lg border border-gray-800">
+        {findings.length === 0 ? (
+          <div className="text-muted-foreground flex flex-col items-center justify-center py-12">
+            <Brain className="mb-2 h-8 w-8 opacity-50" />
+            <p>No analysis jobs yet</p>
+            <p className="mt-1 text-xs">
+              Click &quot;Start Analysis&quot; on any finding to begin.
+            </p>
           </div>
-          {/* Concurrency indicator */}
-          <Badge variant={runningCount >= concurrencyLimit ? 'destructive' : 'secondary'}>
-            {runningCount}/{concurrencyLimit} running
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {jobs.map(job => {
-            const status = job.analysis_status as AnalysisStatus | null;
-            const statusInfo = status ? statusConfig[status] : null;
-            const StatusIcon = statusInfo?.icon || AlertCircle;
-
-            return (
-              <div
-                key={job.id}
-                className="hover:bg-muted/50 flex items-start gap-3 rounded-lg border p-3 transition-colors"
-              >
-                {/* Status Icon */}
-                <div className="mt-1">
-                  <StatusIcon
-                    className={`h-5 w-5 ${status === 'running' ? 'animate-spin' : ''} ${
-                      status === 'completed'
-                        ? 'text-green-500'
-                        : status === 'failed'
-                          ? 'text-red-500'
-                          : 'text-muted-foreground'
-                    }`}
-                  />
-                </div>
-
-                {/* Job Info */}
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <Package className="text-muted-foreground h-4 w-4" />
-                        <span className="font-medium">{job.package_name}</span>
-                        <SeverityBadge
-                          severity={job.severity as 'critical' | 'high' | 'medium' | 'low'}
-                        />
-                      </div>
-                      <div className="text-muted-foreground mt-0.5 text-xs">
-                        {job.repo_full_name} • {job.title}
-                      </div>
-                    </div>
-
-                    {/* Status Badge */}
-                    {statusInfo && (
-                      <Badge variant={statusInfo.variant} className="gap-1 whitespace-nowrap">
-                        <StatusIcon
-                          className={`h-3 w-3 ${status === 'running' ? 'animate-spin' : ''}`}
-                        />
-                        {statusInfo.label}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Timestamps */}
-                  <div className="text-muted-foreground flex items-center gap-3 text-xs">
-                    {job.analysis_started_at && (
-                      <span>
-                        Started{' '}
-                        {formatDistanceToNow(new Date(job.analysis_started_at), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    )}
-                    {/* Only show completed_at when status is completed or failed */}
-                    {job.analysis_completed_at &&
-                      (status === 'completed' || status === 'failed') && (
-                        <span>
-                          Completed{' '}
-                          {formatDistanceToNow(new Date(job.analysis_completed_at), {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      )}
-                  </div>
-
-                  {/* Cloud Agent Session Link */}
-                  {job.cli_session_id && (
-                    <div className="mt-1">
-                      <Link
-                        href={
-                          organizationId
-                            ? `/organizations/${organizationId}/cloud/chat?sessionId=${job.cli_session_id}`
-                            : `/cloud/chat?sessionId=${job.cli_session_id}`
-                        }
-                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        View agent session
-                      </Link>
-                    </div>
-                  )}
-
-                  {/* Error Message */}
-                  {job.analysis_error && (
-                    <div className="text-destructive mt-1 text-xs">Error: {job.analysis_error}</div>
-                  )}
-
-                  {/* Analysis Result Summary with Re-run button */}
-                  {status === 'completed' && job.analysis && (
-                    <div className="mt-2 flex items-center gap-2 text-xs">
-                      <Badge variant="outline" className="bg-green-500/20 text-green-400">
-                        Analysis Complete
-                      </Badge>
-                      <span className="text-muted-foreground">
-                        View finding details for full analysis
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setStartingAnalysisId(job.id);
-                          if (isOrg) {
-                            retryOrgMutation.mutate({
-                              organizationId: organizationId,
-                              findingId: job.id,
-                            });
-                          } else {
-                            retryUserMutation.mutate({ findingId: job.id });
-                          }
-                        }}
-                        disabled={startingAnalysisId === job.id || runningCount >= concurrencyLimit}
-                        className="ml-auto gap-1"
-                      >
-                        <RotateCcw
-                          className={`h-3 w-3 ${startingAnalysisId === job.id ? 'animate-spin' : ''}`}
-                        />
-                        {startingAnalysisId === job.id ? 'Starting...' : 'Re-run Analysis'}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Retry Button for Failed */}
-                  {status === 'failed' && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setStartingAnalysisId(job.id);
-                          if (isOrg) {
-                            retryOrgMutation.mutate({
-                              organizationId: organizationId,
-                              findingId: job.id,
-                            });
-                          } else {
-                            retryUserMutation.mutate({ findingId: job.id });
-                          }
-                        }}
-                        disabled={startingAnalysisId === job.id || runningCount >= concurrencyLimit}
-                        className="gap-2"
-                      >
-                        <RotateCcw
-                          className={`h-3 w-3 ${startingAnalysisId === job.id ? 'animate-spin' : ''}`}
-                        />
-                        {startingAnalysisId === job.id ? 'Starting...' : 'Retry'}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Pagination Controls */}
-        {total > PAGE_SIZE && (
-          <div className="mt-4 flex items-center justify-between border-t pt-4">
-            <div className="text-muted-foreground text-sm">
-              Page {currentPage} of {totalPages}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={!hasPrevious || isFetching}
-                className="flex items-center gap-1"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => p + 1)}
-                disabled={!hasNext || isFetching}
-                className="flex items-center gap-1"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+        ) : (
+          <div className="divide-y divide-gray-800">
+            {findings.map(finding => (
+              <AnalysisJobRow
+                key={finding.id}
+                finding={finding}
+                onRetry={handleRetry}
+                isRetrying={startingAnalysisId === finding.id}
+                retryDisabled={runningCount >= concurrencyLimit}
+                onClick={() => handleRowClick(finding)}
+              />
+            ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <p className="text-muted-foreground text-sm">
+            Showing {startItem}–{endItem} of {total}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage <= 1 || isFetching}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <span className="text-muted-foreground text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => p + 1)}
+              disabled={currentPage >= totalPages || isFetching}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Finding Detail Dialog */}
+      <FindingDetailDialog
+        finding={selectedFinding}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        onDismiss={handleOpenDismissDialog}
+        canDismiss={selectedFinding?.status === 'open'}
+        organizationId={organizationId}
+      />
+
+      {/* Dismiss Finding Dialog */}
+      <DismissFindingDialog
+        finding={selectedFinding}
+        open={dismissDialogOpen}
+        onOpenChange={setDismissDialogOpen}
+        onDismiss={handleDismiss}
+        isLoading={isDismissing}
+      />
+    </div>
   );
 }

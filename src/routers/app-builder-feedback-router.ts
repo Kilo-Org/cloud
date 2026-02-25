@@ -58,10 +58,13 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
 
       // Best-effort Slack notification
       if (SLACK_USER_FEEDBACK_WEBHOOK_URL) {
-        const adminLink = `https://app.kilo.ai/admin/app-builder/${input.project_id}`;
+        const projectLink = `<https://app.kilo.ai/admin/app-builder/${input.project_id}|${input.project_id}>`;
+
+        const metadataLines = [`• project: ${projectLink}`];
+
         const trimmedFeedback = input.feedback_text.trim();
-        const wasTruncated = trimmedFeedback.length > 500;
-        const feedbackText = trimmedFeedback.slice(0, 500) + (wasTruncated ? '...' : '');
+        const feedbackText =
+          trimmedFeedback.slice(0, 500) + (trimmedFeedback.length > 500 ? '...' : '');
 
         fetch(SLACK_USER_FEEDBACK_WEBHOOK_URL, {
           method: 'POST',
@@ -72,25 +75,20 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
             unfurl_media: false,
             blocks: [
               {
-                type: 'header',
-                text: {
-                  type: 'plain_text',
-                  text: 'New App Builder feedback :hammer_and_wrench:',
-                },
+                type: 'section',
+                text: { type: 'mrkdwn', text: '*New App Builder feedback:* :hammer_and_wrench:' },
               },
               {
                 type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `<${adminLink}|View project>`,
-                },
+                text: { type: 'mrkdwn', text: metadataLines.join('\n') },
               },
               {
                 type: 'section',
-                text: {
-                  type: 'plain_text',
-                  text: feedbackText,
-                },
+                text: { type: 'mrkdwn', text: '• feedback:' },
+              },
+              {
+                type: 'section',
+                text: { type: 'plain_text', text: feedbackText || '<empty>' },
               },
             ],
           }),

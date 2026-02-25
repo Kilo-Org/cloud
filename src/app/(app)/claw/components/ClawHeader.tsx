@@ -10,11 +10,13 @@ export function ClawHeader({
   sandboxId,
   region,
   gatewayUrl,
+  gatewayReady,
 }: {
   status: ClawState;
   sandboxId: string | null;
   region: string | null;
   gatewayUrl: string;
+  gatewayReady?: boolean;
 }) {
   const statusInfo = status ? CLAW_STATUS_BADGE[status] : null;
   const displayRegion = region ? region.toUpperCase() : 'Region pending';
@@ -41,7 +43,10 @@ export function ClawHeader({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <AccessCodeActions canShow={status === 'running'} gatewayUrl={gatewayUrl} />
+        <AccessCodeActions
+          canShow={status === 'running' && !!gatewayReady}
+          gatewayUrl={gatewayUrl}
+        />
       </div>
     </header>
   );

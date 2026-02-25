@@ -15,6 +15,55 @@ import {
 import { modelsByProvider } from '@/db/schema';
 import { db } from '@/lib/drizzle';
 import { lt } from 'drizzle-orm';
+import { type Provider, PROVIDERS } from '@/lib/providers';
+import type { StoredModel } from '@/lib/providers/vercel/types';
+import { EndpointsSchema, ModelsSchema } from '@/lib/providers/vercel/types';
+
+async function fetchGatewayModels(gateway: Provider) {
+  const headers = {
+    authorization: `Bearer ${gateway.apiKey}`,
+  };
+
+  const modelsResponse = await fetch(`${gateway.apiUrl}/models`, {
+    method: 'GET',
+    headers,
+  });
+  if (!modelsResponse.ok) {
+    throw new Error(`Fetching models from ${gateway.id} failed: ${modelsResponse.status}`);
+  }
+  const models = ModelsSchema.parse(await modelsResponse.json());
+
+  const limit = pLimit(8);
+  const result: Record<string, StoredModel> = {};
+  await Promise.all(
+    models.data.map(model =>
+      limit(async () => {
+        console.debug(`[fetchGatewayModels] ${gateway.id}/${model.id}`);
+        const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
+          method: 'GET',
+          headers,
+        });
+        if (!endpointsResponse.ok) {
+          throw new Error(
+            `Fetching model endpoints for ${gateway.id}/${model.id} failed: ${endpointsResponse.status}`
+          );
+        }
+        const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
+        result[model.id] = {
+          ...model,
+          endpoints: endpoints.data.endpoints,
+        };
+      })
+    )
+  );
+
+  const count = Object.keys(result).length;
+  if (count < 100) {
+    throw new Error(`Suspicious: total number of ${gateway.id} models is ${count} < 100`);
+  }
+
+  return result;
+}
 
 async function fetchProviders(): Promise<OpenRouterProvider[]> {
   console.log('Fetching OpenRouter providers from frontend endpoint...');
@@ -360,6 +409,11 @@ export async function syncProviders() {
 }
 
 export async function syncAndStoreProviders() {
+  const startTime = performance.now();
+
+  const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
+  const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
+
   const providers = await syncProviders();
 
   if (providers.total_providers < 10) {
@@ -370,9 +424,12 @@ export async function syncAndStoreProviders() {
     throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
   }
 
-  const result = await db.transaction(async () => {
-    const results = await db.insert(modelsByProvider).values({ data: providers }).returning();
-    await db.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
+  const result = await db.transaction(async tx => {
+    const results = await tx
+      .insert(modelsByProvider)
+      .values({ data: providers, openrouter: openrouter_data, vercel: vercel_data })
+      .returning();
+    await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
     return results[0];
   });
 
@@ -381,5 +438,6 @@ export async function syncAndStoreProviders() {
     generated_at: result.data.generated_at,
     total_models: result.data.total_models,
     total_providers: result.data.total_providers,
+    time: performance.now() - startTime,
   };
 }

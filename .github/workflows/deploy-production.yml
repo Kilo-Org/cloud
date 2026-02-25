@@ -175,6 +175,30 @@ jobs:
     uses: ./.github/workflows/deploy-cloud-agent.yml
     secrets: inherit
 
+  check-cloud-agent-next-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs['cloud-agent-next'] }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for cloud-agent-next changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            cloud-agent-next:
+              - 'cloud-agent-next/**'
+
+  deploy-cloud-agent-next:
+    needs: [check-cloud-agent-next-changes]
+    if: needs.check-cloud-agent-next-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-cloud-agent-next.yml
+    secrets: inherit
+
   check-session-ingest-changes:
     runs-on: ubuntu-latest
     outputs:

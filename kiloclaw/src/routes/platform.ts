@@ -15,6 +15,11 @@ import {
   ChannelsPatchSchema,
 } from '../schemas/instance-config';
 import type { ModelEntry } from '../schemas/instance-config';
+import {
+  ImageVersionEntrySchema,
+  imageVersionKey,
+  imageVersionLatestKey,
+} from '../schemas/image-version';
 import { z } from 'zod';
 import { withDORetry } from '../util/do-retry';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -47,6 +52,26 @@ const platform = new Hono<AppEnv>();
  */
 function instanceStubFactory(env: AppEnv['Bindings'], userId: string) {
   return () => env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(userId));
+}
+
+function statusCodeFromError(err: unknown): number {
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    'status' in err &&
+    typeof (err as { status: unknown }).status === 'number'
+  ) {
+    const status = (err as { status: number }).status;
+    if (status >= 400 && status < 600) return status;
+  }
+  return 500;
+}
+
+function jsonError(message: string, status: number): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 /**
@@ -217,6 +242,154 @@ platform.post('/pairing/approve', async c => {
   }
 });
 
+// GET /api/platform/device-pairing?userId=...&refresh=true
+platform.get('/device-pairing', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) return c.json({ error: 'userId is required' }, 400);
+
+  const forceRefresh = c.req.query('refresh') === 'true';
+
+  try {
+    const pairing = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.listDevicePairingRequests(forceRefresh),
+      'listDevicePairingRequests'
+    );
+    return c.json(pairing, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] device pairing list failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// POST /api/platform/device-pairing/approve
+const DevicePairingApproveSchema = z.object({
+  userId: z.string().min(1),
+  requestId: z.string().uuid(),
+});
+
+platform.post('/device-pairing/approve', async c => {
+  const result = await parseBody(c, DevicePairingApproveSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, requestId } = result.data;
+
+  try {
+    const approved = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.approveDevicePairingRequest(requestId),
+      'approveDevicePairingRequest'
+    );
+    return c.json(approved, approved.success ? 200 : 500);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] device pairing approve failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// GET /api/platform/gateway/status?userId=...
+platform.get('/gateway/status', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  try {
+    const gatewayStatus = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.getGatewayProcessStatus(),
+      'getGatewayProcessStatus'
+    );
+    return c.json(gatewayStatus, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = statusCodeFromError(err);
+    console.error(`[platform] gateway status failed: ${message} status=${status}`);
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/gateway/start
+platform.post('/gateway/start', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.startGatewayProcess(),
+      'startGatewayProcess'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = statusCodeFromError(err);
+    console.error('[platform] gateway start failed:', message);
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/gateway/stop
+platform.post('/gateway/stop', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.stopGatewayProcess(),
+      'stopGatewayProcess'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = statusCodeFromError(err);
+    console.error('[platform] gateway stop failed:', message);
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/gateway/restart
+platform.post('/gateway/restart', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.restartGatewayProcess(),
+      'restartGatewayProcess'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = statusCodeFromError(err);
+    console.error('[platform] gateway restart failed:', message);
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/doctor
+platform.post('/doctor', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const doctor = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.runDoctor(),
+      'runDoctor'
+    );
+    return c.json(doctor, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] doctor failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
 // POST /api/platform/start
 platform.post('/start', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
@@ -322,6 +495,85 @@ platform.get('/gateway-token', async c => {
     console.error('[platform] gateway-token failed:', message);
     return c.json({ error: message }, 500);
   }
+});
+
+// GET /api/platform/volume-snapshots?userId=...
+// Returns the list of Fly volume snapshots for the user's instance.
+platform.get('/volume-snapshots', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  try {
+    const snapshots = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.listVolumeSnapshots(),
+      'listVolumeSnapshots'
+    );
+    return c.json({ snapshots });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[platform] volume-snapshots failed:', message);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// POST /api/platform/publish-image-version
+// Manual fallback for publishing/correcting version entries.
+// Primary registration path is worker self-registration on deploy.
+const PublishImageVersionSchema = z.object({
+  openclawVersion: z.string().min(1),
+  variant: z.string().min(1).default('default'),
+  imageTag: z.string().min(1),
+  imageDigest: z.string().nullable().optional(),
+  // Set to false when backfilling older versions to avoid overwriting the latest pointer.
+  setLatest: z.boolean().optional().default(true),
+});
+
+platform.post('/publish-image-version', async c => {
+  const result = await parseBody(c, PublishImageVersionSchema);
+  if ('error' in result) return result.error;
+
+  const { openclawVersion, variant, imageTag, imageDigest, setLatest } = result.data;
+
+  if (openclawVersion === 'latest') {
+    return c.json({ error: '"latest" is reserved and cannot be used as a version' }, 400);
+  }
+
+  const entry = {
+    openclawVersion,
+    variant,
+    imageTag,
+    imageDigest: imageDigest ?? null,
+    publishedAt: new Date().toISOString(),
+  };
+
+  // Validate against schema
+  const parsed = ImageVersionEntrySchema.safeParse(entry);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid version entry', details: parsed.error.flatten() }, 400);
+  }
+
+  // Write the versioned key; optionally update the latest pointer
+  const serialized = JSON.stringify(parsed.data);
+  const writes: Promise<void>[] = [
+    c.env.KV_CLAW_CACHE.put(imageVersionKey(openclawVersion, variant), serialized),
+  ];
+  if (setLatest) {
+    writes.push(c.env.KV_CLAW_CACHE.put(imageVersionLatestKey(variant), serialized));
+  }
+  await Promise.all(writes);
+
+  console.log(
+    '[platform] Published image version:',
+    openclawVersion,
+    variant,
+    '→',
+    imageTag,
+    setLatest ? '(latest)' : '(backfill)'
+  );
+  return c.json({ ok: true, setLatest, ...parsed.data }, 201);
 });
 
 export { platform };

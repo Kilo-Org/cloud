@@ -24,6 +24,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { KiloClawEnv } from '../types';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
+import { deriveGatewayToken } from '../auth/gateway-token';
 import { createDatabaseConnection, InstanceStore } from '../db';
 import { buildEnvVars } from '../gateway/env';
 import {
@@ -46,14 +47,65 @@ import {
   SELF_HEAL_THRESHOLD,
   DEFAULT_FLY_REGION,
   LIVE_CHECK_THROTTLE_MS,
+  HEALTH_PROBE_TIMEOUT_SECONDS,
+  HEALTH_PROBE_INTERVAL_MS,
 } from '../config';
 import type { FlyClientConfig } from '../fly/client';
-import type { FlyMachineConfig, FlyMachine, FlyMachineState } from '../fly/types';
+import type {
+  FlyMachineConfig,
+  FlyMachine,
+  FlyMachineState,
+  FlyVolumeSnapshot,
+} from '../fly/types';
 import * as fly from '../fly/client';
 import { appNameFromUserId } from '../fly/apps';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../utils/env-encryption';
+import { z, type ZodType } from 'zod';
+import { resolveLatestVersion } from '../lib/image-version';
 
 type InstanceStatus = PersistedState['status'];
+
+type GatewayProcessStatus = {
+  state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
+  pid: number | null;
+  uptime: number;
+  restarts: number;
+  lastExit: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    at: string;
+  } | null;
+};
+
+const GatewayProcessStatusSchema: ZodType<GatewayProcessStatus> = z.object({
+  state: z.enum(['stopped', 'starting', 'running', 'stopping', 'crashed', 'shutting_down']),
+  pid: z.number().int().nullable(),
+  uptime: z.number(),
+  restarts: z.number().int(),
+  lastExit: z
+    .object({
+      code: z.number().int().nullable(),
+      signal: z
+        .custom<NodeJS.Signals>((value): value is NodeJS.Signals => typeof value === 'string')
+        .nullable(),
+      at: z.string(),
+    })
+    .nullable(),
+});
+
+const GatewayCommandResponseSchema = z.object({
+  ok: z.boolean(),
+});
+
+class GatewayControllerError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'GatewayControllerError';
+    this.status = status;
+  }
+}
 
 // Derived from PersistedStateSchema -- single source of truth for DO KV keys.
 const STORAGE_KEYS = Object.keys(PersistedStateSchema.shape);
@@ -105,12 +157,19 @@ function nextAlarmTime(status: InstanceStatus): number {
 
 export const METADATA_KEY_USER_ID = 'kiloclaw_user_id';
 export const METADATA_KEY_SANDBOX_ID = 'kiloclaw_sandbox_id';
+export const METADATA_KEY_OPENCLAW_VERSION = 'kiloclaw_openclaw_version';
+export const METADATA_KEY_IMAGE_VARIANT = 'kiloclaw_image_variant';
 
 // ============================================================================
 // Machine config builder
 // ============================================================================
 
-type MachineIdentity = { userId: string; sandboxId: string };
+type MachineIdentity = {
+  userId: string;
+  sandboxId: string;
+  openclawVersion: string | null;
+  imageVariant: string | null;
+};
 
 function buildMachineConfig(
   registryApp: string,
@@ -133,10 +192,25 @@ function buildMachineConfig(
         autostop: 'off',
       },
     ],
+    checks: {
+      controller: {
+        type: 'http',
+        port: OPENCLAW_PORT,
+        method: 'GET',
+        path: '/_kilo/health',
+        interval: '30s',
+        timeout: '5s',
+        grace_period: '60s',
+      },
+    },
     mounts: flyVolumeId ? [{ volume: flyVolumeId, path: '/root' }] : [],
     metadata: {
       [METADATA_KEY_USER_ID]: identity.userId,
       [METADATA_KEY_SANDBOX_ID]: identity.sandboxId,
+      ...(identity.openclawVersion && {
+        [METADATA_KEY_OPENCLAW_VERSION]: identity.openclawVersion,
+      }),
+      ...(identity.imageVariant && { [METADATA_KEY_IMAGE_VARIANT]: identity.imageVariant }),
     },
   };
 }
@@ -171,6 +245,17 @@ export function parseRegions(regionList: string): string[] {
     .split(',')
     .map(r => r.trim())
     .filter(Boolean);
+}
+
+/** Fisher-Yates shuffle (in-place). Returns the same array for chaining. */
+export function shuffleRegions(regions: string[]): string[] {
+  for (let i = regions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = regions[i];
+    regions[i] = regions[j];
+    regions[j] = tmp;
+  }
+  return regions;
 }
 
 /**
@@ -276,6 +361,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private pendingDestroyMachineId: string | null = null;
   private pendingDestroyVolumeId: string | null = null;
   private lastMetadataRecoveryAt: number | null = null;
+  private openclawVersion: string | null = null;
+  private imageVariant: string | null = null;
+  private trackedImageTag: string | null = null;
 
   // In-memory only (not persisted to SQLite) — throttles live Fly checks in getStatus()
   private lastLiveCheckAt: number | null = null;
@@ -313,6 +401,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.pendingDestroyMachineId = s.pendingDestroyMachineId;
       this.pendingDestroyVolumeId = s.pendingDestroyVolumeId;
       this.lastMetadataRecoveryAt = s.lastMetadataRecoveryAt;
+      this.openclawVersion = s.openclawVersion;
+      this.imageVariant = s.imageVariant;
+      this.trackedImageTag = s.trackedImageTag;
     } else {
       const hasAnyData = entries.size > 0;
       if (hasAnyData) {
@@ -361,7 +452,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // with capacity for both the volume and the expected machine spec.
     if (isNew && !this.flyVolumeId) {
       const flyConfig = this.getFlyConfig();
-      const regions = parseRegions(config.region ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+      const regions = shuffleRegions(
+        parseRegions(config.region ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION)
+      );
       const guest = guestFromSize(config.machineSize ?? null);
       const volume = await fly.createVolumeWithFallback(
         flyConfig,
@@ -375,6 +468,20 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.flyVolumeId = volume.id;
       this.flyRegion = volume.region;
       console.log('[DO] Created Fly Volume:', volume.id, 'region:', volume.region);
+    }
+
+    // Resolve the latest registered version on every provision (including re-provision).
+    // If the registry isn't populated yet, fields stay null → fallback to FLY_IMAGE_TAG.
+    const variant = 'default'; // hardcoded day 1; future: from config or provision request
+    const latest = await resolveLatestVersion(this.env.KV_CLAW_CACHE, variant);
+    if (latest) {
+      this.openclawVersion = latest.openclawVersion;
+      this.imageVariant = latest.variant;
+      this.trackedImageTag = latest.imageTag;
+    } else if (isNew) {
+      this.openclawVersion = null;
+      this.imageVariant = null;
+      this.trackedImageTag = null;
     }
 
     const configFields = {
@@ -391,9 +498,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       machineSize: config.machineSize ?? this.machineSize ?? null,
     } satisfies Partial<PersistedState>;
 
+    const versionFields = {
+      openclawVersion: this.openclawVersion,
+      imageVariant: this.imageVariant,
+      trackedImageTag: this.trackedImageTag,
+    };
+
     const update = isNew
       ? storageUpdate({
           ...configFields,
+          ...versionFields,
           provisionedAt: Date.now(),
           lastStartedAt: null,
           lastStoppedAt: null,
@@ -405,7 +519,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           pendingDestroyMachineId: null,
           pendingDestroyVolumeId: null,
         })
-      : storageUpdate(configFields);
+      : storageUpdate({ ...configFields, ...versionFields });
 
     await this.ctx.storage.put(update);
 
@@ -595,7 +709,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyConfig,
       flyMachineId,
       ['/usr/bin/env', 'HOME=/root', 'node', '/usr/local/bin/openclaw-pairing-list.js'],
-      20
+      60
     );
 
     const empty = {
@@ -663,7 +777,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyConfig,
       flyMachineId,
       ['/usr/bin/env', 'HOME=/root', 'openclaw', 'pairing', 'approve', channel, code, '--notify'],
-      15
+      60
     );
 
     const success = result.exit_code === 0;
@@ -679,6 +793,172 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       success,
       message: success ? 'Pairing approved' : result.stderr || result.stdout || 'Approval failed',
     };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Device pairing (Control UI / node device identity)
+  // ──────────────────────────────────────────────────────────────────────
+
+  /** KV cache key for device pairing requests, scoped to the specific machine. */
+  private devicePairingCacheKey(): string | null {
+    const { flyAppName, flyMachineId } = this;
+    if (!flyAppName || !flyMachineId) return null;
+    return `device-pairing:${flyAppName}:${flyMachineId}`;
+  }
+
+  private static DEVICE_PAIRING_CACHE_TTL_SECONDS = 120;
+
+  /**
+   * List pending device pairing requests via the openclaw-device-pairing-list.js
+   * helper script on the machine.
+   * Results are cached in KV for 2 minutes. Pass forceRefresh to bypass cache.
+   * Requires the machine to be running.
+   */
+  async listDevicePairingRequests(forceRefresh = false): Promise<{
+    requests: Array<{
+      requestId: string;
+      deviceId: string;
+      role?: string;
+      platform?: string;
+      clientId?: string;
+      ts?: number;
+    }>;
+  }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { requests: [] };
+    }
+
+    const cacheKey = this.devicePairingCacheKey();
+    if (cacheKey && !forceRefresh) {
+      const cached = await this.env.KV_CLAW_CACHE.get(cacheKey, 'json');
+      if (
+        cached &&
+        typeof cached === 'object' &&
+        'requests' in cached &&
+        Array.isArray(cached.requests)
+      ) {
+        console.log(`[DO] device pairing list served from KV cache (key=${cacheKey})`);
+        return { requests: cached.requests };
+      }
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'node', '/usr/local/bin/openclaw-device-pairing-list.js'],
+      60
+    );
+
+    const empty = {
+      requests: [] as Array<{
+        requestId: string;
+        deviceId: string;
+        role?: string;
+        platform?: string;
+        clientId?: string;
+        ts?: number;
+      }>,
+    };
+
+    const logCtx = `sandboxId=${this.sandboxId} appId=${this.flyAppName}`;
+    if (result.exit_code !== 0) {
+      console.error(`[DO] device pairing list failed: ${result.stderr} ${logCtx}`);
+      return empty;
+    }
+
+    let pairing = empty;
+    try {
+      const data = JSON.parse(result.stdout.trim());
+      if (Array.isArray(data.requests)) {
+        pairing = { requests: data.requests };
+      }
+    } catch {
+      console.error(`[DO] device pairing list parse error: ${result.stdout} ${logCtx}`);
+    }
+
+    if (cacheKey) {
+      await this.env.KV_CLAW_CACHE.put(cacheKey, JSON.stringify(pairing), {
+        expirationTtl: KiloClawInstance.DEVICE_PAIRING_CACHE_TTL_SECONDS,
+      });
+    }
+
+    return pairing;
+  }
+
+  /**
+   * Approve a pending device pairing request via `openclaw devices approve` on the machine.
+   * Busts the device pairing KV cache on success.
+   * Requires the machine to be running.
+   */
+  async approveDevicePairingRequest(
+    requestId: string
+  ): Promise<{ success: boolean; message: string }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { success: false, message: 'Instance is not running' };
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    // Validate requestId as a UUID to prevent command injection
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+      return { success: false, message: 'Invalid request ID' };
+    }
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'devices', 'approve', requestId],
+      60
+    );
+
+    const success = result.exit_code === 0;
+
+    if (success) {
+      const cacheKey = this.devicePairingCacheKey();
+      if (cacheKey) {
+        await this.env.KV_CLAW_CACHE.delete(cacheKey);
+      }
+    }
+
+    return {
+      success,
+      message: success
+        ? 'Device pairing approved'
+        : result.stderr || result.stdout || 'Approval failed',
+    };
+  }
+
+  /**
+   * Run `openclaw doctor --fix --non-interactive` on the machine and return the output.
+   * Requires the machine to be running.
+   */
+  async runDoctor(): Promise<{ success: boolean; output: string }> {
+    await this.loadState();
+
+    const { flyMachineId } = this;
+    if (this.status !== 'running' || !flyMachineId) {
+      return { success: false, output: 'Instance is not running' };
+    }
+
+    const flyConfig = this.getFlyConfig();
+
+    const result = await fly.execCommand(
+      flyConfig,
+      flyMachineId,
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'doctor', '--fix', '--non-interactive'],
+      60
+    );
+
+    const output = result.stdout + (result.stderr ? '\n' + result.stderr : '');
+    return { success: result.exit_code === 0, output };
   }
 
   /**
@@ -758,8 +1038,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
     const guest = guestFromSize(this.machineSize);
-    const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
-    const identity = { userId: this.userId, sandboxId: this.sandboxId };
+    const imageTag = this.resolveImageTag();
+    const identity = {
+      userId: this.userId,
+      sandboxId: this.sandboxId,
+      openclawVersion: this.openclawVersion,
+      imageVariant: this.imageVariant,
+    };
     const machineConfig = buildMachineConfig(
       this.getRegistryApp(),
       imageTag,
@@ -778,11 +1063,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     } catch (err) {
       if (!fly.isFlyInsufficientResources(err)) throw err;
 
-      // 412: host where the volume lives has no capacity.
+      // Capacity error (403/409/412): host or region has no room.
       // Replace the volume (fork if user data exists, fresh otherwise)
       // and retry machine creation once.
-      console.warn('[DO] Insufficient resources (412), replacing stranded volume');
-      await this.replaceStrandedVolume(flyConfig, 'start_412_recovery');
+      // isFlyInsufficientResources guarantees err is FlyApiError
+      const code = err instanceof fly.FlyApiError ? err.status : 0;
+      console.error(
+        `[DO] Insufficient resources (${code}) in ${this.flyRegion ?? 'unknown'}, replacing stranded volume`
+      );
+      await this.replaceStrandedVolume(flyConfig, `start_${code}_recovery`);
 
       // Rebuild machine config with new volume ID
       const retryConfig = buildMachineConfig(
@@ -794,6 +1083,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         identity
       );
       await this.createNewMachine(flyConfig, retryConfig, minSecretsVersion);
+    }
+
+    // Wait for the gateway process inside the container to be healthy
+    if (this.flyMachineId) {
+      await this.waitForHealthy(flyConfig.appName, this.flyMachineId);
     }
 
     // Update state
@@ -921,6 +1215,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyMachineId: string | null;
     flyVolumeId: string | null;
     flyRegion: string | null;
+    openclawVersion: string | null;
+    imageVariant: string | null;
+    trackedImageTag: string | null;
   }> {
     await this.loadState();
 
@@ -951,6 +1248,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyMachineId: this.flyMachineId,
       flyVolumeId: this.flyVolumeId,
       flyRegion: this.flyRegion,
+      openclawVersion: this.openclawVersion,
+      imageVariant: this.imageVariant,
+      trackedImageTag: this.trackedImageTag,
     };
   }
 
@@ -967,6 +1267,135 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       channels: this.channels ?? undefined,
       machineSize: this.machineSize ?? undefined,
     };
+  }
+
+  async listVolumeSnapshots(): Promise<FlyVolumeSnapshot[]> {
+    await this.loadState();
+    if (!this.flyVolumeId) return [];
+    const flyConfig = this.getFlyConfig();
+    return fly.listVolumeSnapshots(flyConfig, this.flyVolumeId);
+  }
+
+  private requireGatewayControllerContext(): {
+    appName: string;
+    machineId: string;
+    sandboxId: string;
+  } {
+    if (!this.sandboxId) {
+      throw new GatewayControllerError(404, 'Instance not provisioned');
+    }
+    if (!this.flyMachineId) {
+      throw new GatewayControllerError(409, 'Instance has no machine ID');
+    }
+
+    const appName = this.flyAppName ?? this.env.FLY_APP_NAME;
+    if (!appName) {
+      throw new GatewayControllerError(503, 'No Fly app name for this instance');
+    }
+
+    return {
+      appName,
+      machineId: this.flyMachineId,
+      sandboxId: this.sandboxId,
+    };
+  }
+
+  private async callGatewayController<T>(
+    path: string,
+    method: 'GET' | 'POST',
+    responseSchema: ZodType<T>
+  ): Promise<T> {
+    const { appName, machineId, sandboxId } = this.requireGatewayControllerContext();
+
+    if (!this.env.GATEWAY_TOKEN_SECRET) {
+      throw new GatewayControllerError(503, 'GATEWAY_TOKEN_SECRET is not configured');
+    }
+
+    const gatewayToken = await deriveGatewayToken(sandboxId, this.env.GATEWAY_TOKEN_SECRET);
+    const url = `https://${appName}.fly.dev${path}`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${gatewayToken}`,
+          Accept: 'application/json',
+          'fly-force-instance-id': machineId,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new GatewayControllerError(503, `Gateway controller request failed: ${message}`);
+    }
+
+    const rawBody = await response.text();
+    let body: unknown = null;
+    if (rawBody.length > 0) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        body = { error: rawBody };
+      }
+    }
+
+    if (!response.ok) {
+      const errorMessage =
+        typeof body === 'object' &&
+        body !== null &&
+        'error' in body &&
+        typeof (body as { error?: unknown }).error === 'string'
+          ? (body as { error: string }).error
+          : `Gateway controller request failed (${response.status})`;
+      throw new GatewayControllerError(response.status, errorMessage);
+    }
+
+    const parsed = responseSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      console.warn(
+        '[DO] Gateway controller returned invalid response payload',
+        JSON.stringify({
+          path,
+          status: response.status,
+          body: rawBody.slice(0, 1024),
+          issues: parsed.error.issues.map(issue => ({
+            path: issue.path.join('.'),
+            code: issue.code,
+            message: issue.message,
+          })),
+        })
+      );
+      throw new GatewayControllerError(
+        502,
+        `Gateway controller returned invalid response for ${path}`
+      );
+    }
+
+    return parsed.data;
+  }
+
+  async getGatewayProcessStatus(): Promise<GatewayProcessStatus> {
+    await this.loadState();
+    return this.callGatewayController('/_kilo/gateway/status', 'GET', GatewayProcessStatusSchema);
+  }
+
+  async startGatewayProcess(): Promise<{ ok: boolean }> {
+    await this.loadState();
+    return this.callGatewayController('/_kilo/gateway/start', 'POST', GatewayCommandResponseSchema);
+  }
+
+  async stopGatewayProcess(): Promise<{ ok: boolean }> {
+    await this.loadState();
+    return this.callGatewayController('/_kilo/gateway/stop', 'POST', GatewayCommandResponseSchema);
+  }
+
+  async restartGatewayProcess(): Promise<{ ok: boolean }> {
+    await this.loadState();
+    return this.callGatewayController(
+      '/_kilo/gateway/restart',
+      'POST',
+      GatewayCommandResponseSchema
+    );
   }
 
   // ========================================================================
@@ -986,8 +1415,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
       const guest = guestFromSize(this.machineSize);
-      const imageTag = this.env.FLY_IMAGE_TAG ?? 'latest';
-      const identity = { userId: this.userId ?? '', sandboxId: this.sandboxId ?? '' };
+      const imageTag = this.resolveImageTag();
+      const identity = {
+        userId: this.userId ?? '',
+        sandboxId: this.sandboxId ?? '',
+        openclawVersion: this.openclawVersion,
+        imageVariant: this.imageVariant,
+      };
       const machineConfig = buildMachineConfig(
         this.getRegistryApp(),
         imageTag,
@@ -999,6 +1433,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       await fly.updateMachine(flyConfig, this.flyMachineId, machineConfig, { minSecretsVersion });
       await fly.waitForState(flyConfig, this.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
+      await this.waitForHealthy(flyConfig.appName, this.flyMachineId);
 
       return { success: true };
     } catch (err) {
@@ -1447,6 +1882,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.pendingDestroyMachineId = null;
     this.pendingDestroyVolumeId = null;
     this.lastMetadataRecoveryAt = null;
+    this.openclawVersion = null;
+    this.imageVariant = null;
+    this.trackedImageTag = null;
     this.loaded = false;
 
     return true;
@@ -1457,11 +1895,96 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // ========================================================================
 
   /**
+   * Resolve the Docker image tag for this instance.
+   * Reads from DO state only — no KV on the hot path.
+   * Falls back to FLY_IMAGE_TAG for instances provisioned before tracking was enabled.
+   */
+  private resolveImageTag(): string {
+    if (this.trackedImageTag) {
+      return this.trackedImageTag;
+    }
+    // Fallback for instances provisioned before tracking was enabled
+    return this.env.FLY_IMAGE_TAG ?? 'latest';
+  }
+
+  /**
    * Shared Docker image registry app name.
    * Images are pushed to this app's registry and referenced by all per-user apps.
    */
   private getRegistryApp(): string {
     return this.env.FLY_REGISTRY_APP ?? this.env.FLY_APP_NAME ?? 'kiloclaw-machines';
+  }
+
+  /**
+   * Poll the gateway status endpoint until the OpenClaw gateway process
+   * reports state === 'running', meaning it's ready to accept WebSocket
+   * connections on port 3001.
+   *
+   * The controller's /_kilo/health returns 200 as soon as the controller
+   * itself is up, which is too early — the gateway process spawns after.
+   * So we check /_kilo/gateway/status and parse the JSON state field.
+   *
+   * On timeout, logs a warning but does NOT throw — the caller proceeds
+   * anyway (the proxy layer catches lingering 502s with a friendly page).
+   */
+  private async waitForHealthy(appName: string, machineId: string): Promise<void> {
+    const url = `https://${appName}.fly.dev/_kilo/gateway/status`;
+    const deadline = Date.now() + HEALTH_PROBE_TIMEOUT_SECONDS * 1000;
+
+    // Derive auth token — gateway controller requires Bearer auth
+    let gatewayToken: string | undefined;
+    if (this.sandboxId && this.env.GATEWAY_TOKEN_SECRET) {
+      gatewayToken = await deriveGatewayToken(this.sandboxId, this.env.GATEWAY_TOKEN_SECRET);
+    }
+
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch(url, {
+          headers: {
+            'fly-force-instance-id': machineId,
+            ...(gatewayToken && { Authorization: `Bearer ${gatewayToken}` }),
+            Accept: 'application/json',
+          },
+        });
+        if (res.ok) {
+          const body: { state?: string } = await res.json();
+          if (body.state === 'running') {
+            // Gateway reports running — verify it's actually serving traffic
+            // by probing the root path (controller proxies to gateway on :3001)
+            const rootUrl = `https://${appName}.fly.dev/`;
+            try {
+              const rootRes = await fetch(rootUrl, {
+                headers: { 'fly-force-instance-id': machineId },
+              });
+              if (rootRes.status !== 502) {
+                console.log(
+                  '[DO] Gateway health probe passed (state: running, root:',
+                  rootRes.status,
+                  ')'
+                );
+                return;
+              }
+              console.log('[DO] Gateway reports running but root returned 502 — retrying');
+            } catch {
+              console.log('[DO] Gateway reports running but root fetch failed — retrying');
+            }
+          } else {
+            console.log('[DO] Gateway state:', body.state, '— retrying');
+          }
+        } else {
+          console.log('[DO] Gateway status returned', res.status, '— retrying');
+        }
+      } catch (err) {
+        console.log('[DO] Gateway status fetch error — retrying:', err);
+      }
+      await new Promise(r => setTimeout(r, HEALTH_PROBE_INTERVAL_MS));
+    }
+
+    console.warn(
+      '[DO] Gateway health probe timed out after',
+      HEALTH_PROBE_TIMEOUT_SECONDS,
+      's — proceeding anyway'
+    );
   }
 
   private getFlyConfig(): FlyClientConfig {
@@ -1493,7 +2016,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.flyVolumeId) return;
     if (!this.sandboxId) return;
 
-    const regions = parseRegions(this.flyRegion ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+    // When flyRegion is set this is a single region — shuffle is a no-op.
+    const regions = shuffleRegions(
+      parseRegions(this.flyRegion ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION)
+    );
     const volume = await fly.createVolumeWithFallback(
       flyConfig,
       {
@@ -1531,7 +2057,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const oldVolumeId = this.flyVolumeId;
     const oldRegion = this.flyRegion;
     const hasUserData = this.lastStartedAt !== null;
-    const allRegions = parseRegions(this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+    const allRegions = shuffleRegions(parseRegions(this.env.FLY_REGION ?? DEFAULT_FLY_REGION));
     const regions = deprioritizeRegion(allRegions, oldRegion);
     const compute = guestFromSize(this.machineSize);
 
@@ -1736,6 +2262,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           healthCheckFailCount: 0,
           pendingDestroyMachineId: null,
           pendingDestroyVolumeId: null,
+          openclawVersion: null,
+          imageVariant: null,
+          trackedImageTag: null,
         })
       );
 
@@ -1757,6 +2286,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.pendingDestroyMachineId = null;
       this.pendingDestroyVolumeId = null;
       this.lastMetadataRecoveryAt = null;
+      this.openclawVersion = null;
+      this.imageVariant = null;
+      this.trackedImageTag = null;
       this.loaded = true;
 
       console.log('[DO] Restored from Postgres: sandboxId =', instance.sandboxId);

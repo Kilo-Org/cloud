@@ -14,7 +14,7 @@ import {
   isFreeModel,
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
-  isRateLimitedModel,
+  isKiloFreeModel,
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
@@ -36,7 +36,7 @@ import {
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
-import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import { rewriteFreeModelResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -89,7 +89,7 @@ const MODE_TO_MODEL = new Map<string, string>([
 const DEFAULT_AUTO_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 function resolveAutoModel(modeHeader: string | null) {
-  const mode = modeHeader?.trim().toLowerCase() ?? 'build';
+  const mode = modeHeader?.trim().toLowerCase() ?? 'code';
   return MODE_TO_MODEL.get(mode) ?? DEFAULT_AUTO_MODEL;
 }
 
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // For FREE models: check IP rate limit BEFORE auth, log at start
   // Slackbot-only models are exempt from free model rate limits since they're
   // already gated behind the Slack integration (internalApiUse auth).
-  if (isRateLimitedModel(originalModelIdLowerCased)) {
+  if (isKiloFreeModel(originalModelIdLowerCased)) {
     const rateLimitResult = await checkFreeModelRateLimit(ipAddress);
     if (!rateLimitResult.allowed) {
       console.warn(
@@ -220,8 +220,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
           error: {
             code: PROMOTION_MODEL_LIMIT_REACHED,
             message:
-              'Sign up to receive $5 in credits for paid models and ' +
-              'to continue using free models. No credit card or purchase required.',
+              'Sign up for free to continue and explore 500 other models. ' +
+              'Takes 2 minutes, no credit card required. Or come back later.',
           },
         },
         { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRateLimitedModel(originalModelIdLowerCased)) {
+  if (isKiloFreeModel(originalModelIdLowerCased)) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const taskId = request.headers.get('X-KiloCode-TaskId') ?? undefined;
+  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const { provider, userByok, customLlm } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
@@ -310,6 +310,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
     botId,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
+    session_id: taskId ?? null,
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);
@@ -388,6 +389,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     ? await customLlmRequest(
         customLlm,
         requestBodyParsed,
+        user.id,
+        taskId,
         !!fraudHeaders.http_user_agent?.startsWith('Kilo-Code/')
       )
     : await openRouterRequest({
@@ -498,8 +501,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (provider.requiresResponseRewrite) {
-    return rewriteModelResponse(response, originalModelIdLowerCased);
+  if (
+    provider.id !== 'custom' &&
+    (isKiloFreeModel(originalModelIdLowerCased) ||
+      isActiveReviewPromo(botId, originalModelIdLowerCased))
+  ) {
+    return rewriteFreeModelResponse(response, originalModelIdLowerCased);
   }
 
   return wrapInSafeNextResponse(response);

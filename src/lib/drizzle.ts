@@ -7,8 +7,13 @@ import * as schema from '../db/schema';
 import { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
 export const { Client, Pool } = pg;
 import { attachDatabasePool } from '@vercel/functions';
-const { POSTGRES_CONNECT_TIMEOUT, POSTGRES_MAX_QUERY_TIME, DEBUG_QUERY_LOGGING, VERCEL_REGION } =
-  process.env;
+const {
+  POSTGRES_CONNECT_TIMEOUT,
+  POSTGRES_MAX_QUERY_TIME,
+  DEBUG_QUERY_LOGGING,
+  VERCEL_REGION,
+  VERCEL_ENV,
+} = process.env;
 
 const POSTGRES_URL = getEnvVariable('POSTGRES_URL');
 
@@ -64,9 +69,12 @@ function getReplicaUrl(): string {
 }
 
 // Primary pool - always points to Frankfurt (writes go here)
+// max: 15 — keep low because Vercel can spawn 100+ concurrent serverless instances,
+// each with its own pool, all hitting the same pgbouncer. At max:100, a cold-start
+// cascade can open 100×N connections simultaneously and overwhelm pgbouncer.
 export const pool = new Pool({
   ...getDatabaseClientConfig(postgresUrl),
-  max: 100,
+  max: 15,
   connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT || '30000'),
   idleTimeoutMillis: 3000,
   application_name: appName,
@@ -79,7 +87,7 @@ export const usesSeparateReplica = replicaUrl !== postgresUrl;
 const replicaPool = usesSeparateReplica
   ? new Pool({
       ...getDatabaseClientConfig(replicaUrl),
-      max: 100,
+      max: 15,
       connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT || '30000'),
       idleTimeoutMillis: 3000,
       application_name: `${appName}-replica`,
@@ -105,6 +113,86 @@ if (usesSeparateReplica) {
     console.error('Unexpected error on idle client (replica)', err);
     process.exit(-1);
   });
+}
+
+// --- Pool observability ---
+// Periodic pool metrics (every 30s) — picked up by Vercel log drain → Axiom.
+// instanceId lets us deduplicate readings per instance in Axiom queries.
+const instanceId = `${VERCEL_REGION ?? 'unknown'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+// Pool lifecycle events — low-volume, high-signal logs for connection churn.
+// `connect` = new TCP connection to Postgres created
+// `remove`  = connection destroyed (idle timeout, error, pool shutdown)
+function attachPoolLifecycleLogging(targetPool: pg.Pool, label: 'primary' | 'replica') {
+  targetPool.on('connect', () => {
+    console.log(
+      JSON.stringify({
+        type: 'pool_lifecycle',
+        event: 'connect',
+        pool: label,
+        instanceId,
+        region: VERCEL_REGION ?? 'unknown',
+        total: targetPool.totalCount,
+        idle: targetPool.idleCount,
+        waiting: targetPool.waitingCount,
+      })
+    );
+  });
+
+  targetPool.on('remove', () => {
+    console.log(
+      JSON.stringify({
+        type: 'pool_lifecycle',
+        event: 'remove',
+        pool: label,
+        instanceId,
+        region: VERCEL_REGION ?? 'unknown',
+        total: targetPool.totalCount,
+        idle: targetPool.idleCount,
+        waiting: targetPool.waitingCount,
+      })
+    );
+  });
+}
+
+const IS_PROD = VERCEL_ENV === 'production';
+
+if (IS_PROD) {
+  attachPoolLifecycleLogging(pool, 'primary');
+  if (usesSeparateReplica) {
+    attachPoolLifecycleLogging(replicaPool, 'replica');
+  }
+}
+
+function logPoolMetrics() {
+  const primary = {
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+    max: pool.options.max,
+  };
+  const replica = usesSeparateReplica
+    ? {
+        total: replicaPool.totalCount,
+        idle: replicaPool.idleCount,
+        waiting: replicaPool.waitingCount,
+        max: replicaPool.options.max,
+      }
+    : null;
+  console.log(
+    JSON.stringify({
+      type: 'pool_metrics',
+      instanceId,
+      region: VERCEL_REGION ?? 'unknown',
+      primary,
+      replica,
+    })
+  );
+}
+
+if (IS_PROD) {
+  logPoolMetrics();
+  setInterval(logPoolMetrics, 30_000).unref();
 }
 
 /**

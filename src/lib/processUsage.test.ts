@@ -337,6 +337,7 @@ describe('logMicrodollarUsage', () => {
       user_byok: false,
       has_tools: false,
       feature: 'vscode-extension',
+      session_id: null,
     }) satisfies MicrodollarUsageContext;
 
   test('stores usage data and increments user microdollars for positive cost', async () => {
@@ -375,9 +376,36 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.user_prompt_prefix).toBe('Please help me with');
     expect(metadataRecord?.max_tokens).toBe(200);
     expect(metadataRecord?.has_middle_out_transform).toBe(true);
+    expect(metadataRecord?.session_id).toBeNull();
     expect(usageRecord?.has_error).toBe(false);
     expect(usageRecord?.created_at).toBeTruthy();
     expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
+  });
+
+  test('stores session_id when provided', async () => {
+    const user = await insertTestUser({
+      id: 'test-log-user-session',
+      microdollars_used: 0,
+      google_user_email: 'session-test@example.com',
+    });
+
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-msg-session',
+    };
+
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      session_id: 'task-abc123',
+    };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-msg-session'),
+    });
+    expect(metadataRecord).toBeTruthy();
+    expect(metadataRecord?.session_id).toBe('task-abc123');
   });
 
   test('stores usage data without incrementing user microdollars for zero cost', async () => {

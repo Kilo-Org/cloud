@@ -24,15 +24,18 @@ const setCookie = (name: string, value: string) => {
 type Props = {
   sessionId: string;
   defaultEditor?: EditorOption;
+  pathOverride?: string;
 };
 
-export function OpenInEditorButton({ sessionId, defaultEditor }: Props) {
+export function OpenInEditorButton({ sessionId, defaultEditor, pathOverride }: Props) {
   const [preferredEditor, setPreferredEditor] = useState<EditorOption>(
     defaultEditor ?? DEFAULT_EDITOR
   );
 
   const buildUrl = (editor: EditorOption) =>
-    `${editor.scheme}://${editor.host}${editor.path}/fork?id=${sessionId}`;
+    pathOverride
+      ? `${editor.scheme}://${editor.host}${editor.path}${pathOverride}`
+      : `${editor.scheme}://${editor.host}${editor.path}/fork?id=${sessionId}`;
 
   const handleEditorClick = (editor: EditorOption) => {
     setCookie(EDITOR_SOURCE_COOKIE_NAME, editor.source);

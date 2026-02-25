@@ -35,9 +35,11 @@ export type KiloClawEnv = {
   FLY_REGISTRY_APP?: string; // Shared app for Docker image registry
   FLY_REGION?: string;
   FLY_IMAGE_TAG?: string;
+  OPENCLAW_VERSION?: string;
 
   // OpenClaw gateway configuration
   OPENCLAW_ALLOWED_ORIGINS?: string;
+  REQUIRE_PROXY_TOKEN?: string;
 };
 
 /**

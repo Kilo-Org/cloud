@@ -4,7 +4,7 @@ FROM debian:bookworm-slim
 ENV NODE_VERSION=22.13.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       ca-certificates curl git xz-utils \
+       ca-certificates curl git xz-utils unzip jq \
     && ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \
          amd64) NODE_ARCH="x64" ;; \
@@ -25,8 +25,19 @@ RUN npm install -g pnpm
 
 # Install OpenClaw
 # Pin to specific version for reproducible builds
-RUN npm install -g openclaw@2026.2.9 \
+RUN npm install -g openclaw@2026.2.22 \
     && openclaw --version
+
+# Install pinned Bun (build-time only) and compile the controller bundle.
+ARG BUN_VERSION=1.2.4
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+ENV PATH="/root/.bun/bin:$PATH"
+
+COPY controller/ /tmp/controller-build/
+RUN cd /tmp/controller-build \
+    && bun install --frozen-lockfile \
+    && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
+    && rm -rf /tmp/controller-build
 
 # Create OpenClaw directories
 # When a Fly Volume is mounted at /root, these dirs persist across restarts.
@@ -35,10 +46,11 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy startup script
-# Build cache bust: 2026-02-18-v46-discord-slack-plugins
+# Build cache bust: 2026-02-25-v52-exec-host-gateway
 RUN echo "4"
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
+COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 RUN chmod +x /usr/local/bin/start-openclaw.sh
 RUN ls -l /usr/local/bin/start-openclaw.sh \
     && head -n 1 /usr/local/bin/start-openclaw.sh | cat -v \
@@ -51,5 +63,5 @@ COPY skills/ /root/clawd/skills/
 # Expose the gateway port
 EXPOSE 18789
 
-# Entrypoint: start the OpenClaw gateway
+# Entrypoint: start the KiloClaw controller daemon
 CMD ["/usr/local/bin/start-openclaw.sh"]

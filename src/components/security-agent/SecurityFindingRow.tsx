@@ -1,14 +1,14 @@
 'use client';
 
+import { differenceInDays, differenceInHours, differenceInMinutes, isPast } from 'date-fns';
+import { Brain, CheckCircle2, ChevronRight, Clock, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SeverityBadge } from './SeverityBadge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import type { SecurityFinding } from '@/db/schema';
+import { cn } from '@/lib/utils';
 import { AnalysisStatusBadge } from './AnalysisStatusBadge';
 import { FindingStatusBadge } from './FindingStatusBadge';
-import { ExploitabilityBadge } from './ExploitabilityBadge';
-import { cn } from '@/lib/utils';
-import { formatDistanceToNow, isPast } from 'date-fns';
-import { ExternalLink, Package, Clock, CheckCircle2, Brain, Loader2 } from 'lucide-react';
-import type { SecurityFinding } from '@/db/schema';
+import { SeverityBadge } from './SeverityBadge';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -19,21 +19,31 @@ function isSeverity(value: string): value is Severity {
 type SecurityFindingRowProps = {
   finding: SecurityFinding;
   onClick: () => void;
-  onStartAnalysis?: (findingId: string) => void;
+  onStartAnalysis?: (findingId: string, options?: { retrySandboxOnly?: boolean }) => void;
   isStartingAnalysis?: boolean;
 };
+
+function formatCompactDistance(date: Date) {
+  const now = new Date();
+  const days = Math.abs(differenceInDays(now, date));
+  if (days >= 1) return `${days}d`;
+  const hours = Math.abs(differenceInHours(now, date));
+  if (hours >= 1) return `${hours}h`;
+  const minutes = Math.abs(differenceInMinutes(now, date));
+  return `${minutes}m`;
+}
 
 function getSlaStatus(slaDueAt: string | null, status: string) {
   if (status !== 'open' || !slaDueAt) return null;
 
   const dueDate = new Date(slaDueAt);
-  const isOverdue = isPast(dueDate);
+  const compact = formatCompactDistance(dueDate);
 
-  if (isOverdue) {
+  if (isPast(dueDate)) {
     return (
       <span className="flex items-center gap-1 text-xs text-red-400">
         <Clock className="h-3 w-3" />
-        {formatDistanceToNow(dueDate)} overdue
+        {compact} overdue
       </span>
     );
   }
@@ -41,7 +51,7 @@ function getSlaStatus(slaDueAt: string | null, status: string) {
   return (
     <span className="text-muted-foreground flex items-center gap-1 text-xs">
       <Clock className="h-3 w-3" />
-      Due in {formatDistanceToNow(dueDate)}
+      Due {compact}
     </span>
   );
 }
@@ -53,73 +63,90 @@ export function SecurityFindingRow({
   isStartingAnalysis,
 }: SecurityFindingRowProps) {
   const severity: Severity = isSeverity(finding.severity) ? finding.severity : 'medium';
-  const hasAnalysis = !!finding.analysis_status;
   const canStartAnalysis =
-    finding.status === 'open' && !hasAnalysis && onStartAnalysis && !isStartingAnalysis;
+    finding.status === 'open' &&
+    (!finding.analysis_status || finding.analysis_status === 'failed') &&
+    onStartAnalysis &&
+    !isStartingAnalysis;
 
   const handleStartAnalysis = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onStartAnalysis) {
-      onStartAnalysis(finding.id);
+      const retrySandboxOnly = !!finding.analysis?.triage && finding.analysis_status === 'failed';
+      onStartAnalysis(finding.id, { retrySandboxOnly });
     }
   };
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={cn(
-        'hover:bg-muted/50 cursor-pointer rounded-lg border p-4 transition-colors',
+        'hover:bg-muted/50 grid w-full cursor-pointer grid-cols-[96px_1fr_80px_100px_16px] items-center gap-x-1.5 px-4 py-3 text-left transition-colors',
         finding.status === 'open' && finding.sla_due_at && isPast(new Date(finding.sla_due_at))
-          ? 'border-red-500/30'
+          ? 'bg-red-500/5'
           : ''
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <h4 className="truncate font-medium">{finding.title}</h4>
-            <SeverityBadge severity={severity} size="sm" />
-          </div>
+      {/* Severity */}
+      <div>
+        <SeverityBadge severity={severity} size="sm" />
+      </div>
 
-          <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
-            <span className="flex items-center gap-1">
-              <Package className="h-3 w-3" />
-              {finding.package_name}
+      {/* Title + package */}
+      <div className="min-w-0">
+        <h4 className="truncate text-sm font-medium">{finding.title}</h4>
+        <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+          <Package className="h-3 w-3" />
+          {finding.package_name}
+        </span>
+      </div>
+
+      {/* Status + SLA/Fixed */}
+      <div className="text-xs">
+        <FindingStatusBadge status={finding.status} />
+        <div className="mt-1">
+          {getSlaStatus(finding.sla_due_at, finding.status)}
+          {finding.status === 'fixed' && finding.fixed_at && (
+            <span className="flex items-center gap-1 text-xs text-green-400">
+              <CheckCircle2 className="h-3 w-3" />
+              {formatCompactDistance(new Date(finding.fixed_at))} ago
             </span>
-            <span>•</span>
-            <span>{finding.package_ecosystem}</span>
-            <span>•</span>
-            <span>{finding.repo_full_name}</span>
-            {finding.cve_id && (
-              <>
-                <span>•</span>
-                <span className="font-mono text-xs">{finding.cve_id}</span>
-              </>
-            )}
-            {!finding.cve_id && finding.ghsa_id && (
-              <>
-                <span>•</span>
-                <span className="font-mono text-xs">{finding.ghsa_id}</span>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            {getSlaStatus(finding.sla_due_at, finding.status)}
-            {finding.status === 'fixed' && finding.fixed_at && (
-              <span className="flex items-center gap-1 text-xs text-green-400">
-                <CheckCircle2 className="h-3 w-3" />
-                Fixed {formatDistanceToNow(new Date(finding.fixed_at), { addSuffix: true })}
-              </span>
-            )}
-            <AnalysisStatusBadge status={finding.analysis_status} isStarting={isStartingAnalysis} />
-            <ExploitabilityBadge analysis={finding.analysis} size="sm" />
-          </div>
+          )}
         </div>
+      </div>
 
-        <div className="flex flex-col items-end gap-2">
-          <FindingStatusBadge status={finding.status} />
-          {canStartAnalysis && (
+      {/* Analysis */}
+      <div className="flex items-center justify-end">
+        {canStartAnalysis ? (
+          finding.analysis_status === 'failed' ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleStartAnalysis}
+                  disabled={isStartingAnalysis}
+                  className="gap-1 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                >
+                  <Brain className="h-3 w-3" />
+                  Retry
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={4}>
+                {finding.analysis_error ||
+                  finding.analysis?.triage?.needsSandboxReasoning ||
+                  'Analysis failed'}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
             <Button
               variant="outline"
               size="sm"
@@ -127,28 +154,17 @@ export function SecurityFindingRow({
               disabled={isStartingAnalysis}
               className="gap-1"
             >
-              {isStartingAnalysis ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Brain className="h-3 w-3" />
-              )}
+              <Brain className="h-3 w-3" />
               Analyze
             </Button>
-          )}
-          {finding.dependabot_html_url && (
-            <a
-              href={finding.dependabot_html_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
-            >
-              <ExternalLink className="h-3 w-3" />
-              View on GitHub
-            </a>
-          )}
-        </div>
+          )
+        ) : (
+          <AnalysisStatusBadge status={finding.analysis_status} isStarting={isStartingAnalysis} />
+        )}
       </div>
+
+      {/* Detail chevron */}
+      <ChevronRight className="text-muted-foreground h-4 w-4" />
     </div>
   );
 }

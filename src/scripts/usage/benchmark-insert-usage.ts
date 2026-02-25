@@ -190,6 +190,7 @@ function generateRandomRecord(
       pickRandom(['vscode-extension', 'cloud-agent', 'autocomplete', 'cli'], Math.random()),
       50
     ),
+    session_id: maybeNull(`session-${Math.random().toString(36).substring(2, 10)}`, 60),
   };
 
   return { core, metadata };

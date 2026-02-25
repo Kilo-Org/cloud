@@ -1,7 +1,9 @@
 'use client';
 
+import { TriangleAlert } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
@@ -11,7 +13,7 @@ import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
 import { SettingsTab } from './SettingsTab';
 import { ChangelogCard } from './ChangelogCard';
-import { DevicePairingCard } from './DevicePairingCard';
+import { PairingCard } from './PairingCard';
 
 type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -27,6 +29,12 @@ export function ClawDashboard({ status }: { status: KiloClawDashboardStatus | un
   const mutations = useKiloClawMutations();
   const gatewayUrl = useGatewayUrl(status);
   const instanceStatus = hasPopulatedStatus(status) ? status : null;
+  const isRunning = instanceStatus?.status === 'running';
+  const {
+    data: gatewayStatus,
+    isLoading: gatewayLoading,
+    error: gatewayError,
+  } = useKiloClawGatewayStatus(isRunning);
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -35,7 +43,16 @@ export function ClawDashboard({ status }: { status: KiloClawDashboardStatus | un
         sandboxId={status?.sandboxId || null}
         region={status?.flyRegion || null}
         gatewayUrl={gatewayUrl}
+        gatewayReady={gatewayStatus?.state === 'running'}
       />
+
+      <Alert variant="warning">
+        <TriangleAlert className="size-4" />
+        <AlertDescription>
+          KiloClaw ended up being really popular! We&apos;re working on getting additional capacity.
+          If you have trouble starting a machine, please try again in a few minutes.
+        </AlertDescription>
+      </Alert>
 
       <Card className="mt-6">
         {!instanceStatus ? (
@@ -54,7 +71,7 @@ export function ClawDashboard({ status }: { status: KiloClawDashboardStatus | un
                     value="instance"
                     className="text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
                   >
-                    Instance
+                    Gateway Process
                   </TabsTrigger>
                   <TabsTrigger
                     value="settings"
@@ -66,7 +83,12 @@ export function ClawDashboard({ status }: { status: KiloClawDashboardStatus | un
               </div>
               <CardContent className="p-5">
                 <TabsContent value="instance" className="mt-0">
-                  <InstanceTab status={instanceStatus} />
+                  <InstanceTab
+                    status={instanceStatus}
+                    gatewayStatus={gatewayStatus}
+                    gatewayLoading={gatewayLoading}
+                    gatewayError={gatewayError}
+                  />
                 </TabsContent>
                 <TabsContent value="settings" className="mt-0">
                   <SettingsTab status={instanceStatus} mutations={mutations} />
@@ -77,7 +99,7 @@ export function ClawDashboard({ status }: { status: KiloClawDashboardStatus | un
         )}
       </Card>
 
-      {instanceStatus?.status === 'running' && <DevicePairingCard mutations={mutations} />}
+      {instanceStatus?.status === 'running' && <PairingCard mutations={mutations} />}
 
       <ChangelogCard />
     </div>

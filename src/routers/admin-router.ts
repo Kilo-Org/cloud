@@ -3,13 +3,17 @@ import { db } from '@/lib/drizzle';
 import {
   user_admin_notes,
   kilocode_users,
+  kilo_pass_subscriptions,
   stytch_fingerprints,
   enrichment_data,
   user_auth_provider,
   modelStats,
   cliSessions,
+  cli_sessions_v2,
   credit_transactions,
 } from '@/db/schema';
+import { isNewSession } from '@/lib/cloud-agent/session-type';
+import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
@@ -38,6 +42,9 @@ import { APP_URL } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
 import { recomputeUserBalances } from '@/lib/recomputeUserBalances';
 import { getStripeInvoices } from '@/lib/stripe';
+import { client as stripeClient } from '@/lib/stripe-client';
+import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
+import { kilo_pass_scheduled_changes } from '@/db/schema';
 import {
   getKilocodeRepoOpenPullRequestCounts,
   getKilocodeRepoOpenPullRequestsSummary,
@@ -64,6 +71,14 @@ const AddNoteSchema = z.object({
 const DeleteNoteSchema = z.object({
   note_id: z.string(),
 });
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const sessionIdSchema = z
+  .string()
+  .min(1)
+  .refine(s => UUID_REGEX.test(s) || s.startsWith('ses_'), {
+    message: 'Must be a UUID or ses_-prefixed session ID',
+  });
 
 const ResetAPIKeySchema = z.object({
   userId: z.string(),
@@ -128,6 +143,11 @@ const UpdateModelSchema = z.object({
 
 const GetUserInvoicesSchema = z.object({
   stripe_customer_id: z.string(),
+});
+
+const CancelAndRefundKiloPassSchema = z.object({
+  userId: z.string(),
+  reason: z.string().min(1, 'Reason is required').trim(),
 });
 
 export const adminRouter = createTRPCRouter({
@@ -464,6 +484,176 @@ export const adminRouter = createTRPCRouter({
 
         return { success: true };
       }),
+
+    cancelAndRefundKiloPass: adminProcedure
+      .input(CancelAndRefundKiloPassSchema)
+      .mutation(async ({ input, ctx }) => {
+        const user = await db.query.kilocode_users.findFirst({
+          columns: {
+            id: true,
+            stripe_customer_id: true,
+            blocked_reason: true,
+          },
+          where: eq(kilocode_users.id, input.userId),
+        });
+
+        if (!user) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+
+        const subscription = await getKiloPassStateForUser(db, input.userId);
+        if (!subscription) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'No Kilo Pass subscription found for this user',
+          });
+        }
+
+        if (subscription.status === 'canceled') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Kilo Pass subscription is already canceled',
+          });
+        }
+
+        const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+          columns: { stripe_schedule_id: true },
+          where: and(
+            eq(
+              kilo_pass_scheduled_changes.stripe_subscription_id,
+              subscription.stripeSubscriptionId
+            ),
+            isNull(kilo_pass_scheduled_changes.deleted_at)
+          ),
+        });
+
+        if (scheduledChange) {
+          await releaseScheduledChangeForSubscription({
+            dbOrTx: db,
+            stripe: stripeClient,
+            stripeSubscriptionId: subscription.stripeSubscriptionId,
+            stripeScheduleIdIfMissingRow: scheduledChange.stripe_schedule_id,
+            kiloUserIdIfMissingRow: input.userId,
+            reason: 'cancel_subscription',
+          });
+        }
+
+        await stripeClient.subscriptions.cancel(subscription.stripeSubscriptionId);
+
+        let refundedAmountCents: number | null = null;
+        const paidInvoices = await stripeClient.invoices.list({
+          subscription: subscription.stripeSubscriptionId,
+          status: 'paid',
+          limit: 1,
+        });
+        const paidInvoice = paidInvoices.data[0];
+        if (paidInvoice) {
+          const payments = await stripeClient.invoicePayments.list({
+            invoice: paidInvoice.id,
+            status: 'paid',
+            limit: 1,
+          });
+          const rawPaymentIntent = payments.data[0]?.payment.payment_intent;
+          const paymentIntentId =
+            typeof rawPaymentIntent === 'string' ? rawPaymentIntent : rawPaymentIntent?.id;
+          if (paymentIntentId) {
+            try {
+              const refund = await stripeClient.refunds.create({
+                payment_intent: paymentIntentId,
+              });
+              refundedAmountCents = refund.amount;
+            } catch (err) {
+              if (
+                !(err instanceof stripeClient.errors.StripeInvalidRequestError) ||
+                err.code !== 'charge_already_refunded'
+              ) {
+                throw err;
+              }
+            }
+          }
+        }
+
+        const balanceResetAmountUsd = await db.transaction(async tx => {
+          await tx
+            .update(kilo_pass_subscriptions)
+            .set({
+              status: 'canceled',
+              cancel_at_period_end: false,
+              ended_at: new Date().toISOString(),
+              current_streak_months: 0,
+            })
+            .where(
+              eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.stripeSubscriptionId)
+            );
+
+          if (!user.blocked_reason) {
+            await tx
+              .update(kilocode_users)
+              .set({ blocked_reason: input.reason })
+              .where(eq(kilocode_users.id, input.userId));
+          }
+
+          const freshUserRows = await tx
+            .select({
+              microdollars_used: kilocode_users.microdollars_used,
+              total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+            })
+            .from(kilocode_users)
+            .where(eq(kilocode_users.id, input.userId))
+            .for('update')
+            .limit(1);
+          const freshUser = freshUserRows[0];
+          const currentBalanceMicrodollars = freshUser
+            ? freshUser.total_microdollars_acquired - freshUser.microdollars_used
+            : 0;
+
+          let balanceReset: number | null = null;
+          if (currentBalanceMicrodollars > 0 && freshUser) {
+            await tx.insert(credit_transactions).values({
+              kilo_user_id: input.userId,
+              organization_id: null,
+              is_free: true,
+              amount_microdollars: -currentBalanceMicrodollars,
+              credit_category: 'admin-cancel-refund-kilo-pass',
+              description: `Balance zeroed by admin: ${input.reason}`,
+              original_baseline_microdollars_used: freshUser.microdollars_used,
+            });
+            await tx
+              .update(kilocode_users)
+              .set({
+                total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${currentBalanceMicrodollars}`,
+              })
+              .where(eq(kilocode_users.id, input.userId));
+            balanceReset = fromMicrodollars(currentBalanceMicrodollars);
+          }
+
+          const noteParts = [
+            `Kilo Pass cancelled and refunded by admin.`,
+            `Reason: ${input.reason}`,
+            refundedAmountCents != null
+              ? `Refunded: $${(refundedAmountCents / 100).toFixed(2)}`
+              : 'No invoice to refund.',
+            balanceReset != null
+              ? `Balance reset: $${balanceReset.toFixed(2)} zeroed.`
+              : 'Balance was already $0.',
+            !user.blocked_reason ? 'Account blocked.' : 'Account was already blocked.',
+          ];
+          await tx.insert(user_admin_notes).values({
+            kilo_user_id: input.userId,
+            note_content: noteParts.join(' '),
+            admin_kilo_user_id: ctx.user.id,
+          });
+
+          return balanceReset;
+        });
+
+        return {
+          success: true,
+          refundedAmountCents,
+          balanceResetAmountUsd,
+          alreadyBlocked: !!user.blocked_reason,
+        };
+      }),
   }),
 
   enrichmentData: createTRPCRouter({
@@ -693,9 +883,74 @@ export const adminRouter = createTRPCRouter({
   codeReviews: adminCodeReviewsRouter,
 
   sessionTraces: createTRPCRouter({
-    get: adminProcedure
-      .input(z.object({ session_id: z.string().uuid() }))
+    resolveCloudAgentSession: adminProcedure
+      .input(z.object({ cloud_agent_session_id: z.string().startsWith('agent_') }))
       .query(async ({ input }) => {
+        // Check v1 first
+        const [v1] = await db
+          .select({ session_id: cliSessions.session_id })
+          .from(cliSessions)
+          .where(eq(cliSessions.cloud_agent_session_id, input.cloud_agent_session_id))
+          .limit(1);
+
+        if (v1) {
+          return { session_id: v1.session_id };
+        }
+
+        // Then check v2
+        const [v2] = await db
+          .select({ session_id: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.cloud_agent_session_id, input.cloud_agent_session_id))
+          .limit(1);
+
+        if (v2) {
+          return { session_id: v2.session_id };
+        }
+
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No CLI session found for this cloud agent session ID',
+        });
+      }),
+
+    get: adminProcedure
+      .input(z.object({ session_id: sessionIdSchema }))
+      .query(async ({ input }) => {
+        if (isNewSession(input.session_id)) {
+          // V2 session — query cli_sessions_v2
+          const [session] = await db
+            .select()
+            .from(cli_sessions_v2)
+            .where(eq(cli_sessions_v2.session_id, input.session_id))
+            .limit(1);
+
+          if (!session) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Session not found',
+            });
+          }
+
+          const user = await findUserById(session.kilo_user_id);
+
+          return {
+            ...session,
+            // Fields that don't exist in v2 — null them out so the UI can handle both shapes
+            last_mode: null,
+            last_model: null,
+            user: user
+              ? {
+                  id: user.id,
+                  email: user.google_user_email,
+                  name: user.google_user_name,
+                  image: user.google_user_image_url,
+                }
+              : null,
+          };
+        }
+
+        // V1 session — original logic
         const [session] = await db
           .select()
           .from(cliSessions)
@@ -713,6 +968,8 @@ export const adminRouter = createTRPCRouter({
 
         return {
           ...session,
+          // V1 doesn't have git_branch — null it out for a consistent shape
+          git_branch: null,
           user: user
             ? {
                 id: user.id,
@@ -725,8 +982,40 @@ export const adminRouter = createTRPCRouter({
       }),
 
     getMessages: adminProcedure
-      .input(z.object({ session_id: z.string().uuid() }))
+      .input(z.object({ session_id: sessionIdSchema }))
       .query(async ({ input }) => {
+        if (isNewSession(input.session_id)) {
+          // V2 session — fetch messages from the session-ingest worker.
+          // We need the owner's kilo_user_id to generate a service token.
+          const [session] = await db
+            .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
+            .from(cli_sessions_v2)
+            .where(eq(cli_sessions_v2.session_id, input.session_id))
+            .limit(1);
+
+          if (!session) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Session not found',
+            });
+          }
+
+          try {
+            const snapshot = await fetchSessionSnapshot(input.session_id, session.kilo_user_id);
+            return {
+              messages: snapshot?.messages ?? ([] satisfies SessionMessage[]),
+              format: 'v2' as const,
+            };
+          } catch (error) {
+            console.error('[SessionTraces] Failed to fetch v2 session snapshot', {
+              sessionId: input.session_id,
+              error,
+            });
+            return { messages: [], format: 'v2' as const };
+          }
+        }
+
+        // V1 session — original logic
         const [session] = await db
           .select({
             ui_messages_blob_url: cliSessions.ui_messages_blob_url,
@@ -743,20 +1032,26 @@ export const adminRouter = createTRPCRouter({
         }
 
         if (!session.ui_messages_blob_url) {
-          return { messages: [] };
+          return { messages: [], format: 'v1' as const };
         }
 
         try {
           const messages = await getBlobContent(session.ui_messages_blob_url);
-          return { messages: (messages as unknown[]) ?? [] };
+          return { messages: (messages as unknown[]) ?? [], format: 'v1' as const };
         } catch {
-          return { messages: [] };
+          return { messages: [], format: 'v1' as const };
         }
       }),
 
     getApiConversationHistory: adminProcedure
-      .input(z.object({ session_id: z.string().uuid() }))
+      .input(z.object({ session_id: sessionIdSchema }))
       .query(async ({ input }) => {
+        if (isNewSession(input.session_id)) {
+          // V2 sessions have no separate raw API conversation history
+          return { history: null };
+        }
+
+        // V1 session — original logic
         const [session] = await db
           .select({
             api_conversation_history_blob_url: cliSessions.api_conversation_history_blob_url,

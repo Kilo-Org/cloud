@@ -200,7 +200,10 @@ export const appBuilderRouter = createTRPCRouter({
       model: input.model,
     });
 
-    return { cloudAgentSessionId: result.cloudAgentSessionId };
+    return {
+      cloudAgentSessionId: result.cloudAgentSessionId,
+      workerVersion: result.workerVersion,
+    };
   }),
 
   /**

@@ -7,65 +7,39 @@ import type { Images } from './schemas.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
 
 /**
- * Base configuration shared by all MCP server types
+ * Local MCP server configuration (runs a command)
  */
-export type BaseConfig = {
-  /** Whether this server is disabled */
-  disabled?: boolean;
-  /** Timeout in seconds (1-3600), default 60 */
-  timeout?: number;
-  /** Tools that are always allowed without user confirmation */
-  alwaysAllow?: string[];
-  /** File paths to watch for changes */
-  watchPaths?: string[];
-  /** Tools that should be disabled */
-  disabledTools?: string[];
-};
-
-/**
- * Stdio-based MCP server configuration (local process)
- */
-export type StdioServerConfig = BaseConfig & {
-  /** Transport type - defaults to stdio */
-  type?: 'stdio';
-  /** Command to execute */
-  command: string;
-  /** Command arguments */
-  args?: string[];
-  /** Working directory for the command */
-  cwd?: string;
+export type MCPLocalServerConfig = {
+  type: 'local';
+  /** Command to execute — first element is the binary, rest are args */
+  command: string[];
   /** Environment variables for the command */
-  env?: Record<string, string>;
+  environment?: Record<string, string>;
+  /** Whether this server is enabled (default true) */
+  enabled?: boolean;
+  /** Timeout in milliseconds */
+  timeout?: number;
 };
 
 /**
- * SSE-based MCP server configuration (Server-Sent Events)
+ * Remote MCP server configuration (connects to a URL)
  */
-export type SseServerConfig = BaseConfig & {
-  /** Transport type */
-  type: 'sse';
+export type MCPRemoteServerConfig = {
+  type: 'remote';
   /** Server URL */
   url: string;
   /** HTTP headers */
   headers?: Record<string, string>;
+  /** Whether this server is enabled (default true) */
+  enabled?: boolean;
+  /** Timeout in milliseconds */
+  timeout?: number;
 };
 
 /**
- * Streamable HTTP-based MCP server configuration
+ * MCP Server configuration — CLI-native local/remote discriminated union
  */
-export type StreamableHttpServerConfig = BaseConfig & {
-  /** Transport type */
-  type: 'streamable-http';
-  /** Server URL */
-  url: string;
-  /** HTTP headers */
-  headers?: Record<string, string>;
-};
-
-/**
- * MCP Server configuration - discriminated union of three transport types
- */
-export type MCPServerConfig = StdioServerConfig | SseServerConfig | StreamableHttpServerConfig;
+export type MCPServerConfig = MCPLocalServerConfig | MCPRemoteServerConfig;
 
 export type CloudAgentSessionState = {
   /** Current version timestamp (for cache invalidation) */
@@ -78,6 +52,8 @@ export type CloudAgentSessionState = {
   userId: string;
   /** Bot/service identifier (if token is for a bot) */
   botId?: string;
+  /** Platform that created this session (e.g. slack, app-builder) */
+  createdOnPlatform?: string;
   /** Kilocode authentication token for CLI (stored securely, never exposed in getSession) */
   kilocodeToken?: string;
   /** Last save timestamp */
@@ -106,7 +82,7 @@ export type CloudAgentSessionState = {
   encryptedSecrets?: EncryptedSecrets;
   /** Installation commands to run on init/resume */
   setupCommands?: string[];
-  /** MCP server configurations written to .kilocode/cli/global/setting/mcp_settings.json */
+  /** MCP server configurations injected via KILO_CONFIG_CONTENT env var */
   mcpServers?: Record<string, MCPServerConfig>;
   /** Upstream branch to checkout when cloning the repo */
   upstreamBranch?: string;

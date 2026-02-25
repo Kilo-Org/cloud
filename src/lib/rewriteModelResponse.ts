@@ -1,5 +1,6 @@
 import { ReasoningDetailType } from '@/lib/custom-llm/reasoning-details';
 import { getOutputHeaders } from '@/lib/llm-proxy-helpers';
+import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/processUsage';
 import type { MessageWithReasoning } from '@/lib/providers/openrouter/types';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
@@ -24,7 +25,14 @@ function convertReasoningToOpenRouterFormat(message: MessageWithReasoning) {
   delete message.reasoning_content;
 }
 
-export async function rewriteModelResponse(response: Response, model: string) {
+function removeCostInfo(usage: OpenRouterUsage) {
+  // We only rewrite the response for free models, strip upstream cost
+  delete usage.cost;
+  delete usage.cost_details;
+  delete usage.is_byok;
+}
+
+export async function rewriteFreeModelResponse(response: Response, model: string) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -37,6 +45,12 @@ export async function rewriteModelResponse(response: Response, model: string) {
     if (message) {
       convertReasoningToOpenRouterFormat(message as MessageWithReasoning);
     }
+
+    const usage = json.usage as OpenRouterUsage;
+    if (usage) {
+      removeCostInfo(usage);
+    }
+
     return NextResponse.json(json, {
       status: response.status,
       statusText: response.statusText,
@@ -57,7 +71,7 @@ export async function rewriteModelResponse(response: Response, model: string) {
           if (event.data === '[DONE]') {
             return;
           }
-          const json = JSON.parse(event.data) as OpenAI.ChatCompletionChunk;
+          const json = JSON.parse(event.data) as ChatCompletionChunk;
           if (json.model) {
             json.model = model;
           }
@@ -77,7 +91,14 @@ export async function rewriteModelResponse(response: Response, model: string) {
             json.choices = [];
           }
 
+          if (json.usage) {
+            removeCostInfo(json.usage);
+          }
+
           controller.enqueue('data: ' + JSON.stringify(json) + '\n\n');
+        },
+        onComment() {
+          controller.enqueue(': KILO PROCESSING\n\n');
         },
       });
 

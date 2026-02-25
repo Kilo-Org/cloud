@@ -371,6 +371,35 @@ export async function findKiloReviewComment(
 }
 
 /**
+ * Updates an existing Kilo review comment on a GitHub PR
+ * Used to append usage footer (model + token count) after review completion
+ */
+export async function updateKiloReviewComment(
+  installationId: string,
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string,
+  appType: GitHubAppType = 'standard'
+): Promise<void> {
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  await octokit.issues.updateComment({
+    owner,
+    repo,
+    comment_id: commentId,
+    body,
+  });
+
+  logExceptInTest('[updateKiloReviewComment] Updated comment', {
+    owner,
+    repo,
+    commentId,
+  });
+}
+
+/**
  * Fetches existing inline review comments on a PR
  * Used to detect duplicates and track outdated comments
  * @param appType - The type of GitHub App to use (defaults to 'standard')

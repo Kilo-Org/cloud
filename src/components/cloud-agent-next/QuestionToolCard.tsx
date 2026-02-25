@@ -1,15 +1,11 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useAtomValue } from 'jotai';
+
 import { ChevronDown, Loader2, XCircle, Check, Send, X, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
-import {
-  questionRequestIdsAtom,
-  currentSessionIdAtom,
-  sessionOrganizationIdAtom,
-} from './store/atoms';
+import { useQuestionContext } from './QuestionContext';
 import type { ToolPart } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 
@@ -278,9 +274,11 @@ export function QuestionToolCard({ toolPart }: QuestionToolCardProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const trpcClient = useRawTRPCClient();
-  const questionRequestIds = useAtomValue(questionRequestIdsAtom);
-  const sessionId = useAtomValue(currentSessionIdAtom);
-  const organizationId = useAtomValue(sessionOrganizationIdAtom);
+  const {
+    questionRequestIds,
+    cloudAgentSessionId: sessionId,
+    organizationId,
+  } = useQuestionContext();
 
   const requestId = toolPart.callID ? questionRequestIds.get(toolPart.callID) : undefined;
 

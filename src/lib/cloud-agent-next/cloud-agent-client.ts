@@ -19,37 +19,24 @@ import { INTERNAL_API_SECRET } from '@/lib/config.server';
 // TODO: Update this URL when the new cloud-agent-next worker is deployed
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
 
-// MCP server config types (local definition to avoid importing from cloud-agent)
-// Supports three transport types: stdio, sse, and streamable-http
-type MCPServerBaseConfig = {
-  disabled?: boolean;
+// MCP server config types — CLI-native local/remote format
+type MCPLocalServerConfig = {
+  type: 'local';
+  command: string[];
+  environment?: Record<string, string>;
+  enabled?: boolean;
   timeout?: number;
-  alwaysAllow?: string[];
-  watchPaths?: string[];
-  disabledTools?: string[];
 };
 
-type MCPStdioServerConfig = MCPServerBaseConfig & {
-  type?: 'stdio';
-  command: string;
-  args?: string[];
-  cwd?: string;
-  env?: Record<string, string>;
-};
-
-type MCPSseServerConfig = MCPServerBaseConfig & {
-  type: 'sse';
+type MCPRemoteServerConfig = {
+  type: 'remote';
   url: string;
   headers?: Record<string, string>;
+  enabled?: boolean;
+  timeout?: number;
 };
 
-type MCPStreamableHttpServerConfig = MCPServerBaseConfig & {
-  type: 'streamable-http';
-  url: string;
-  headers?: Record<string, string>;
-};
-
-type MCPServerConfig = MCPStdioServerConfig | MCPSseServerConfig | MCPStreamableHttpServerConfig;
+type MCPServerConfig = MCPLocalServerConfig | MCPRemoteServerConfig;
 
 /**
  * Type definitions for cloud-agent-next API procedures
@@ -63,11 +50,19 @@ export type CallbackTarget = {
 
 /**
  * Agent modes accepted by the API.
- * - plan, architect, ask: Planning/analysis mode
- * - code, build, orchestrator: Code generation mode
+ * - code, plan, debug, orchestrator, ask: CLI agent modes
+ * - build, architect: Backward-compatible aliases (build → code, architect → plan)
  * - custom: Custom mode (requires appendSystemPrompt)
  */
-export type AgentMode = 'plan' | 'code' | 'build' | 'orchestrator' | 'architect' | 'ask' | 'custom';
+export type AgentMode =
+  | 'code'
+  | 'plan'
+  | 'debug'
+  | 'orchestrator'
+  | 'ask'
+  | 'build'
+  | 'architect'
+  | 'custom';
 
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = {
@@ -98,6 +93,8 @@ export type PrepareSessionInput = {
   images?: Images;
   /** Callback configuration for execution completion events */
   callbackTarget?: CallbackTarget;
+  /** Platform that created this session (e.g. 'security-agent', 'slack', 'app-builder') */
+  createdOnPlatform?: string;
 };
 
 /** Output from prepareSession procedure */
@@ -117,7 +114,7 @@ export type InitiateFromPreparedSessionInput = {
 export type SendMessageInput = {
   cloudAgentSessionId: string;
   prompt: string;
-  mode: 'plan' | 'build';
+  mode: 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
   model: string;
   autoCommit?: boolean;
   githubToken?: string;

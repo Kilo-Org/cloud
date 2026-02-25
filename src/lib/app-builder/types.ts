@@ -52,6 +52,61 @@ export type SendMessageInput = {
 };
 
 /**
+ * Result of sendMessage — includes the worker version of the session that handled
+ * the message, so the client can distinguish upgrades from GitHub migrations.
+ */
+export type SendMessageResult = {
+  cloudAgentSessionId: string;
+  workerVersion: WorkerVersion;
+};
+
+/**
+ * Worker version for cloud agent sessions
+ */
+export type WorkerVersion = 'v1' | 'v2';
+
+/**
+ * Session info returned with project data.
+ * `initiated` and `prepared` are only populated for the active session
+ * (the one fetched from the cloud-agent DO). Ended sessions have both as null.
+ *
+ * Used in ProjectManager.buildSessions() for routing decisions; not stored on sessions.
+ */
+export type ProjectSessionInfo = {
+  id: string;
+  cloud_agent_session_id: string;
+  worker_version: WorkerVersion;
+  ended_at: string | null;
+  title: string | null;
+  /**
+   * Whether the cloud agent session has been initiated (agent started executing).
+   * - false: Session is prepared but not yet initiated (need to call startSessionForProject)
+   * - true: Session has been initiated
+   * - null: Ended session, unknown, or error state
+   */
+  initiated: boolean | null;
+  /**
+   * Whether the cloud agent session has been prepared (DO has state stored).
+   * - false: Legacy session — DO has no state, needs prepareLegacySession before messaging
+   * - true: Session is prepared and can use WebSocket-based messaging
+   * - null: Ended session, unknown, or error state
+   */
+  prepared: boolean | null;
+};
+
+/**
+ * Subset of session info exposed on SessionBase for UI display and identity.
+ * Routing-only fields (worker_version, initiated, prepared) are consumed in
+ * buildSessions() and not stored on the session object.
+ */
+export type SessionDisplayInfo = {
+  id: string;
+  cloud_agent_session_id: string | null;
+  ended_at: string | null;
+  title: string | null;
+};
+
+/**
  * Result of deploying a project
  */
 export type DeployProjectResult =
@@ -59,27 +114,13 @@ export type DeployProjectResult =
   | { success: false; error: 'payment_required' | 'invalid_slug' | 'slug_taken'; message: string };
 
 /**
- * Project with all its messages and session state
+ * Project with all its messages and session state.
+ * Session-level initiated/prepared state lives on each ProjectSessionInfo.
  */
 export type ProjectWithMessages = AppBuilderProject & {
   messages: CloudMessage[];
-  /**
-   * Whether the cloud agent session has been initiated (already started streaming).
-   * - false: Session is prepared but not yet initiated (need to call startSessionForProject)
-   * - true: Session has been initiated and has received AI responses
-   * - null: No session exists (legacy project or error state)
-   */
-  sessionInitiated: boolean | null;
-  /**
-   * Whether the cloud agent session has been prepared (DO has state stored).
-   * - false: Legacy session - DO has no state, needs prepareLegacySession before messaging
-   * - true: Session is prepared and can use WebSocket-based messaging
-   * - null: No session exists or error state
-   *
-   * Legacy sessions (preparedAt is null) have their messages fetched from R2 instead
-   * of WebSocket replay.
-   */
-  sessionPrepared: boolean | null;
+  /** All sessions for this project, ordered by created_at ascending */
+  sessions: ProjectSessionInfo[];
 };
 
 /**

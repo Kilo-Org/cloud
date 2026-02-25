@@ -238,7 +238,7 @@ describe('authMiddleware', () => {
     );
     expect(res.status).toBe(401);
     const body = await jsonBody(res);
-    expect(body.error).toContain('env mismatch');
+    expect(body.error).toBe('Authentication failed');
   });
 });
 

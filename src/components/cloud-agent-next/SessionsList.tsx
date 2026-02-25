@@ -8,8 +8,8 @@ import Link from 'next/link';
 
 export type SessionsListItem = Pick<
   StoredSession,
-  'sessionId' | 'createdAt' | 'createdOnPlatform' | 'prompt' | 'repository' | 'mode'
->;
+  'sessionId' | 'createdAt' | 'createdOnPlatform' | 'prompt' | 'mode'
+> & { repository: string | null };
 
 export type SessionsListProps = {
   sessions: SessionsListItem[];
@@ -99,10 +99,12 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
                     </CardTitle>
                     {badge}
                   </div>
-                  <CardDescription className="mt-1 flex items-center gap-2">
-                    <GitBranch className="h-3 w-3" />
-                    <span className="truncate">{session.repository}</span>
-                  </CardDescription>
+                  {session.repository && (
+                    <CardDescription className="mt-1 flex items-center gap-2">
+                      <GitBranch className="h-3 w-3" />
+                      <span className="truncate">{session.repository}</span>
+                    </CardDescription>
+                  )}
                 </div>
               </div>
             </CardHeader>

@@ -4,7 +4,7 @@
  * Centralized logic for building, validating, and deriving SessionConfig.
  */
 
-import type { SessionConfig, ResumeConfig, StreamResumeConfig, AgentMode } from './types';
+import type { SessionConfig, ResumeConfig, AgentMode } from './types';
 
 // Re-export AgentMode for backwards compatibility
 export type { AgentMode };
@@ -53,7 +53,7 @@ export type BuildSessionConfigOptions = {
  * Precedence for mode/model:
  *   1. resumeConfig (from ResumeConfigModal or CLI resume flow)
  *   2. dbSession (last_mode/last_model from database)
- *   3. defaults (defaultMode/defaultModel or 'build'/'')
+ *   3. defaults (defaultMode/defaultModel or 'code'/'')
  *
  * @param options - Configuration sources and defaults
  * @returns Complete SessionConfig object
@@ -80,7 +80,7 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
     repository,
     resumeConfig,
     dbSession,
-    defaultMode = 'build',
+    defaultMode = 'code',
     defaultModel = '',
   } = options;
 
@@ -100,7 +100,7 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
  * Check if a SessionConfig has valid mode and model for sendMessage.
  *
  * The sendMessage schema requires:
- * - mode: one of the valid agent modes (plan, build)
+ * - mode: one of the valid agent modes (code, plan, debug, orchestrator, ask)
  * - model: non-empty string (min 1 character)
  *
  * @param config - SessionConfig to validate
@@ -109,8 +109,8 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
 export function isValidSessionConfig(config: SessionConfig | null): config is SessionConfig {
   if (!config) return false;
 
-  const validModes: AgentMode[] = ['plan', 'build'];
-  const hasValidMode = validModes.includes(config.mode as AgentMode);
+  const validModes: AgentMode[] = ['code', 'plan', 'debug', 'orchestrator', 'ask'];
+  const hasValidMode = (validModes as string[]).includes(config.mode);
   const hasValidModel = config.model.length > 0;
 
   return hasValidMode && hasValidModel;
@@ -129,7 +129,7 @@ export function getModeModelWithSource(options: {
   dbSession?: DbSessionInfo | null;
   defaults?: { mode: string; model: string };
 }): { mode: string; model: string; modeSource: string; modelSource: string } {
-  const { resumeConfig, dbSession, defaults = { mode: 'build', model: '' } } = options;
+  const { resumeConfig, dbSession, defaults = { mode: 'code', model: '' } } = options;
 
   let mode: string = defaults.mode;
   let model: string = defaults.model;
@@ -163,12 +163,12 @@ export function getModeModelWithSource(options: {
 export function needsResumeConfiguration(params: {
   currentDbSessionId: string | null;
   resumeConfig: ResumeConfig | null;
-  streamResumeConfig: StreamResumeConfig | null;
+  persistedResumeConfig: ResumeConfig | null;
   sessionConfig: SessionConfig | null;
 }): boolean {
-  const { currentDbSessionId, resumeConfig, streamResumeConfig, sessionConfig } = params;
+  const { currentDbSessionId, resumeConfig, persistedResumeConfig, sessionConfig } = params;
 
   if (!currentDbSessionId) return false;
-  if (resumeConfig || streamResumeConfig) return false;
+  if (resumeConfig || persistedResumeConfig) return false;
   return !isValidSessionConfig(sessionConfig);
 }

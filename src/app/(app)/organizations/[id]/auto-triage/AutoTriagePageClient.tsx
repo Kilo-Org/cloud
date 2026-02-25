@@ -29,7 +29,7 @@ export function AutoTriagePageClient({
   const trpc = useTRPC();
 
   // Fetch GitHub App installation status
-  const { data: statusData } = useQuery(
+  const { data: statusData, isLoading: isStatusLoading } = useQuery(
     trpc.organizations.autoTriage.getGitHubStatus.queryOptions({
       organizationId,
     })
@@ -61,7 +61,7 @@ export function AutoTriagePageClient({
           Automatically triage GitHub issues with AI-powered analysis for {organizationName}
         </p>
         <a
-          href="https://kilo.ai/docs/advanced-usage/auto-triage"
+          href="https://kilo.ai/docs/automate/auto-triage/overview"
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
@@ -72,7 +72,7 @@ export function AutoTriagePageClient({
       </div>
 
       {/* GitHub App Required Alert */}
-      {!isGitHubAppInstalled && (
+      {!isStatusLoading && !isGitHubAppInstalled && (
         <Alert>
           <Rocket className="h-4 w-4" />
           <AlertTitle>GitHub App Required</AlertTitle>
@@ -101,7 +101,7 @@ export function AutoTriagePageClient({
           <TabsTrigger
             value="tickets"
             className="flex items-center gap-2"
-            disabled={!isGitHubAppInstalled}
+            disabled={!isStatusLoading && !isGitHubAppInstalled}
           >
             <ListChecks className="h-4 w-4" />
             Tickets
@@ -115,7 +115,7 @@ export function AutoTriagePageClient({
 
         {/* Tickets Tab */}
         <TabsContent value="tickets" className="mt-6 space-y-4">
-          {isGitHubAppInstalled ? (
+          {isStatusLoading || isGitHubAppInstalled ? (
             <AutoTriageTicketsCard organizationId={organizationId} />
           ) : (
             <Alert>

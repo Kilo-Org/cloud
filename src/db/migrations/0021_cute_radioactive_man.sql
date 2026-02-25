@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_code_reviews" ADD COLUMN "agent_version" text DEFAULT 'v1';

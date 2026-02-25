@@ -3,7 +3,9 @@ import {
   FlyApiError,
   isFlyNotFound,
   isFlyInsufficientResources,
+  createMachine,
   createVolumeWithFallback,
+  listVolumeSnapshots,
 } from './client';
 import type { FlyClientConfig } from './client';
 
@@ -61,6 +63,27 @@ describe('isFlyInsufficientResources', () => {
     expect(isFlyInsufficientResources(err)).toBe(true);
   });
 
+  // -- Confirmed production 403 payload: org quota exceeded --
+
+  it('matches production 403 payload: org memory quota exceeded in region', () => {
+    const body =
+      '{"error":"organization \\"Kilo\\" is using 1970176 MB of memory in dfw which is over the allowed quota. please consider other regions"}';
+    const err = new FlyApiError(`Fly API createMachine failed (403): ${body}`, 403, body);
+    expect(isFlyInsufficientResources(err)).toBe(true);
+  });
+
+  // -- Non-capacity 403s: must NOT trigger recovery --
+
+  it('returns false for auth 403 errors', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const body = '{"error":"forbidden: insufficient permissions"}';
+    const err = new FlyApiError(`Fly API failed (403): ${body}`, 403, body);
+    expect(isFlyInsufficientResources(err)).toBe(false);
+
+    warnSpy.mockRestore();
+  });
+
   // -- Non-capacity 409s: must NOT trigger recovery --
 
   it('returns false for non-capacity 409 conflicts', () => {
@@ -108,6 +131,19 @@ describe('isFlyInsufficientResources', () => {
     warnSpy.mockRestore();
   });
 
+  it('returns false and logs warning for unclassified 403', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const body = '{"error":"some unknown 403 reason"}';
+    const err = new FlyApiError(`Fly API failed (403): ${body}`, 403, body);
+
+    expect(isFlyInsufficientResources(err)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[fly] Unclassified 403 error (not treated as capacity):',
+      body
+    );
+    warnSpy.mockRestore();
+  });
+
   it('returns false and logs warning for unclassified 409', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const body = '{"error":"some unknown 409 reason"}';
@@ -136,6 +172,59 @@ describe('isFlyInsufficientResources', () => {
     expect(isFlyInsufficientResources('string')).toBe(false);
     expect(isFlyInsufficientResources(null)).toBe(false);
     expect(isFlyInsufficientResources(undefined)).toBe(false);
+  });
+});
+
+describe('createMachine', () => {
+  it('passes checks through to Fly createMachine request body', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'machine-1',
+          name: 'm',
+          state: 'created',
+          region: 'iad',
+          instance_id: 'inst',
+          config: {},
+          created_at: '2026-02-21T00:00:00.000Z',
+          updated_at: '2026-02-21T00:00:00.000Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    await createMachine(
+      fakeConfig,
+      {
+        image: 'registry.fly.io/test:latest',
+        checks: {
+          controller: {
+            type: 'http',
+            port: 18789,
+            method: 'GET',
+            path: '/health',
+            interval: '30s',
+            timeout: '5s',
+          },
+        },
+      },
+      { region: 'iad' }
+    );
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string) as {
+      config: { checks?: Record<string, unknown> };
+    };
+    expect(body.config.checks).toEqual({
+      controller: {
+        type: 'http',
+        port: 18789,
+        method: 'GET',
+        path: '/health',
+        interval: '30s',
+        timeout: '5s',
+      },
+    });
+    fetchSpy.mockRestore();
   });
 });
 
@@ -249,5 +338,56 @@ describe('createVolumeWithFallback', () => {
 
     fetchSpy.mockRestore();
     warnSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// listVolumeSnapshots
+// ============================================================================
+
+describe('listVolumeSnapshots', () => {
+  it('returns snapshots array on success', async () => {
+    const snapshots = [
+      {
+        id: 'snap-1',
+        created_at: '2026-02-19T00:00:00Z',
+        digest: 'sha256:abc',
+        retention_days: 5,
+        size: 1048576,
+        status: 'complete',
+        volume_size: 10737418240,
+      },
+    ];
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(200, snapshots));
+
+    const result = await listVolumeSnapshots(fakeConfig, 'vol-123');
+
+    expect(result).toEqual(snapshots);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain('/volumes/vol-123/snapshots');
+    fetchSpy.mockRestore();
+  });
+
+  it('returns empty array when no snapshots exist', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(200, []));
+
+    const result = await listVolumeSnapshots(fakeConfig, 'vol-456');
+
+    expect(result).toEqual([]);
+    fetchSpy.mockRestore();
+  });
+
+  it('throws on Fly API error', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(404, { error: 'volume not found' }));
+
+    await expect(listVolumeSnapshots(fakeConfig, 'vol-gone')).rejects.toThrow('volume not found');
+    fetchSpy.mockRestore();
   });
 });

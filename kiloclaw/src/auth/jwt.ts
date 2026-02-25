@@ -65,11 +65,11 @@ export async function validateKiloToken(
   }
 
   if (payload.version !== KILO_TOKEN_VERSION) {
-    return { success: false, error: `Invalid token version: ${payload.version}` };
+    return { success: false, error: 'Invalid token' };
   }
 
   if (expectedEnv && payload.env && payload.env !== expectedEnv) {
-    return { success: false, error: `Token env mismatch: ${payload.env} !== ${expectedEnv}` };
+    return { success: false, error: 'Invalid token' };
   }
 
   return {

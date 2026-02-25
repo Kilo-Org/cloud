@@ -9,6 +9,7 @@
   "observability": {
     "enabled": true,
   },
+  "logpush": true,
   "dev": {
     "port": 8795,
   },
@@ -69,8 +70,10 @@
     "FLY_REGISTRY_APP": "kiloclaw-machines", // Shared Docker image registry
     "FLY_ORG_SLUG": "kilo-679", // Org for creating per-user Fly apps
     "FLY_IMAGE_TAG": "latest",
-    "FLY_REGION": "dfw,yyz,cdg",
+    "FLY_REGION": "ams,fra,lhr,arn,iad,ord,lax,sjc,ewr",
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
+    // Defaults to "production". For local dev, override to "development" in .dev.vars.
+    "WORKER_ENV": "production",
   },
   // Secrets (set via wrangler secret put):
   // FLY_API_TOKEN,

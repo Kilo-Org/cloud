@@ -46,7 +46,7 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   const result = await validateKiloToken(token, secret, c.env.WORKER_ENV);
   if (!result.success) {
     console.warn('[auth] Token validation failed:', result.error);
-    return c.json({ error: result.error }, 401);
+    return c.json({ error: 'Authentication failed' }, 401);
   }
 
   // Validate pepper against DB via Hyperdrive.

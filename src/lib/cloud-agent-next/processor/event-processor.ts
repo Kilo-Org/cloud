@@ -44,6 +44,7 @@ const HANDLED_EVENT_TYPES = new Set([
   'session.updated',
   'session.error',
   'session.idle',
+  'session.turn.close',
   'question.asked',
 ]);
 
@@ -91,6 +92,9 @@ function messageKey(sessionId: string, messageId: string): string {
 export type EventProcessor = {
   /** Process a cloud agent event from WebSocket */
   processEvent: (event: CloudAgentEvent) => void;
+
+  /** Force-complete all in-flight messages. Called on session interrupt. */
+  forceCompleteAll: () => void;
 
   /** Clear all state */
   clear: () => void;
@@ -386,6 +390,51 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   }
 
   /**
+   * Force-complete all in-flight messages.
+   * Stamps synthetic time.completed on assistant messages and completes user messages.
+   * Sets streaming to false via callback.
+   */
+  function forceCompleteAllMessages(): void {
+    const now = Date.now();
+    for (const [key, message] of messagesMap) {
+      if (isAssistantMessage(message.info) && !isAssistantMessageComplete(message)) {
+        message.info = {
+          ...message.info,
+          time: { ...message.info.time, completed: now },
+        };
+
+        const [sessionId, messageId] = key.split(':');
+        const parentSessionId = getParentSessionId(sessionId);
+        callbacks.onMessageCompleted?.(sessionId, messageId, message, parentSessionId);
+        completedMessages.add(key);
+        messagesMap.delete(key);
+      }
+    }
+
+    completeUserMessages();
+
+    if (streaming) {
+      streaming = false;
+      callbacks.onStreamingChanged?.(false);
+    }
+  }
+
+  /**
+   * Handle session.turn.close events.
+   * When reason is "error", force-complete all in-flight assistant messages
+   * that never received time.completed from the server.
+   */
+  function handleSessionTurnClose(data: { sessionID?: string; reason?: string }): void {
+    if (data.reason !== 'error') {
+      return;
+    }
+
+    forceCompleteAllMessages();
+
+    callbacks.onError?.('The model failed to generate a response', data.sessionID);
+  }
+
+  /**
    * Process a cloud agent event, dispatching to the appropriate handler.
    */
   function processEvent(event: CloudAgentEvent): void {
@@ -439,6 +488,10 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
         handleSessionIdle();
         break;
 
+      case 'session.turn.close':
+        handleSessionTurnClose(data as { sessionID?: string; reason?: string });
+        break;
+
       case 'question.asked':
         handleQuestionAsked(data as { id: string; tool?: { callID: string } });
         break;
@@ -458,6 +511,7 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
   return {
     processEvent,
+    forceCompleteAll: forceCompleteAllMessages,
     clear,
   };
 }

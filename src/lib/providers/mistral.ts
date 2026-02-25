@@ -8,6 +8,9 @@ import {
 export function isMistralModel(model: string) {
   return model.startsWith('mistralai/');
 }
+export function isCodestralModel(model: string) {
+  return model.startsWith('mistralai/codestral');
+}
 
 export function applyMistralModelSettings(requestToMutate: OpenRouterChatCompletionRequest) {
   // mistral recommends this

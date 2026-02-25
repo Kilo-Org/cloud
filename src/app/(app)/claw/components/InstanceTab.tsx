@@ -1,50 +1,128 @@
 'use client';
 
-import { Clock, Cpu, Globe, HardDrive, Hash } from 'lucide-react';
-import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { Separator } from '@/components/ui/separator';
-import { DEFAULT_CLAW_INSTANCE_TYPE } from './claw.types';
-import { DetailTile } from './DetailTile';
+import { Activity, Loader2 } from 'lucide-react';
+import type { KiloClawDashboardStatus, GatewayProcessStatusResponse } from '@/lib/kiloclaw/types';
+import { Badge } from '@/components/ui/badge';
 import { formatTs } from './time';
 
-const PUBLIC_IP_DISPLAY = 'None';
-const DISK_SIZE_DISPLAY = '20 GB';
+const GATEWAY_STATE_STYLES: Record<
+  GatewayProcessStatusResponse['state'],
+  { label: string; className: string }
+> = {
+  running: {
+    label: 'Running',
+    className: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400',
+  },
+  stopped: {
+    label: 'Stopped',
+    className: 'border-red-500/30 bg-red-500/15 text-red-400',
+  },
+  starting: {
+    label: 'Starting',
+    className: 'border-blue-500/30 bg-blue-500/15 text-blue-400',
+  },
+  stopping: {
+    label: 'Stopping',
+    className: 'border-amber-500/30 bg-amber-500/15 text-amber-400',
+  },
+  crashed: {
+    label: 'Crashed',
+    className: 'border-red-500/30 bg-red-500/15 text-red-400',
+  },
+  shutting_down: {
+    label: 'Shutting Down',
+    className: 'border-amber-500/30 bg-amber-500/15 text-amber-400 animate-pulse',
+  },
+};
 
-export function InstanceTab({ status }: { status: KiloClawDashboardStatus }) {
-  const details = [
-    { label: 'Instance ID', value: status.sandboxId || 'N/A', icon: Hash, mono: true },
-    {
-      label: 'Instance Type',
-      value: `${DEFAULT_CLAW_INSTANCE_TYPE.name} (${DEFAULT_CLAW_INSTANCE_TYPE.description})`,
-      icon: Cpu,
-      mono: false,
-    },
-    { label: 'Public IP', value: PUBLIC_IP_DISPLAY, icon: Globe, mono: true },
-    { label: 'Disk Size', value: DISK_SIZE_DISPLAY, icon: HardDrive, mono: false },
-    { label: 'Provisioned', value: formatTs(status.provisionedAt), icon: Clock, mono: false },
-    { label: 'Last Started', value: formatTs(status.lastStartedAt), icon: Clock, mono: false },
-  ];
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+function formatLastExit(lastExit: NonNullable<GatewayProcessStatusResponse['lastExit']>): string {
+  const code = lastExit.code ?? 'null';
+  const signal = lastExit.signal ?? 'none';
+  const at = new Date(lastExit.at);
+  const timeStr = at.toLocaleString();
+  return `exit ${code} / ${signal} at ${timeStr}`;
+}
+
+export function InstanceTab({
+  status,
+  gatewayStatus,
+  gatewayLoading,
+  gatewayError,
+}: {
+  status: KiloClawDashboardStatus;
+  gatewayStatus: GatewayProcessStatusResponse | undefined;
+  gatewayLoading: boolean;
+  gatewayError: { message: string } | null;
+}) {
+  const isRunning = status.status === 'running';
+
+  if (!isRunning) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Gateway status is available when the machine is running.
+      </p>
+    );
+  }
+
+  if (gatewayLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-muted-foreground text-sm">Loading gateway status...</span>
+      </div>
+    );
+  }
+
+  if (gatewayError) {
+    const isControllerError = gatewayError.message.includes('GatewayControllerError');
+    return (
+      <p className="text-muted-foreground text-sm">
+        {isControllerError
+          ? 'Gateway control unavailable. Redeploy to update instance to use this feature.'
+          : `Failed to load gateway status: ${gatewayError.message}`}
+      </p>
+    );
+  }
+
+  if (!gatewayStatus) return null;
+
+  const stateStyle = GATEWAY_STATE_STYLES[gatewayStatus.state];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {details.map(detail => (
-          <DetailTile
-            key={detail.label}
-            label={detail.label}
-            value={detail.value}
-            icon={detail.icon}
-            mono={detail.mono}
-          />
-        ))}
+    <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-5">
+      <div>
+        <p className="text-muted-foreground mb-1.5 text-xs">State</p>
+        <Badge variant="outline" className={stateStyle.className}>
+          <Activity className="mr-1 h-3 w-3" />
+          {stateStyle.label}
+        </Badge>
       </div>
-
-      <Separator />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <DetailTile label="Env Vars" value={String(status.envVarCount)} icon={Hash} />
-        <DetailTile label="Secrets" value={String(status.secretCount)} icon={Hash} />
-        <DetailTile label="Channels" value={String(status.channelCount)} icon={Hash} />
+      <div>
+        <p className="text-muted-foreground mb-1.5 text-xs">Uptime</p>
+        <p className="text-foreground text-sm font-medium">{formatUptime(gatewayStatus.uptime)}</p>
+      </div>
+      <div>
+        <p className="text-muted-foreground mb-1.5 text-xs">Restarts</p>
+        <p className="text-foreground text-sm font-medium">{gatewayStatus.restarts}</p>
+      </div>
+      <div>
+        <p className="text-muted-foreground mb-1.5 text-xs">Last Exit</p>
+        <p className="text-muted-foreground text-sm font-medium">
+          {gatewayStatus.lastExit ? formatLastExit(gatewayStatus.lastExit) : '—'}
+        </p>
+      </div>
+      <div>
+        <p className="text-muted-foreground mb-1.5 text-xs">Provisioned</p>
+        <p className="text-foreground text-sm font-medium">{formatTs(status.provisionedAt)}</p>
       </div>
     </div>
   );

@@ -47,11 +47,22 @@ export type FlyMachineMount = {
   name?: string;
 };
 
+export type FlyMachineCheck = {
+  type: 'http' | 'tcp';
+  port: number;
+  interval?: string;
+  timeout?: string;
+  grace_period?: string;
+  method?: string;
+  path?: string;
+};
+
 export type FlyMachineConfig = {
   image: string;
   env?: Record<string, string>;
   guest?: FlyMachineGuest;
   services?: FlyMachineService[];
+  checks?: Record<string, FlyMachineCheck>;
   mounts?: FlyMachineMount[];
   metadata?: Record<string, string>;
   auto_destroy?: boolean;
@@ -107,6 +118,18 @@ export type CreateVolumeRequest = {
   source_volume_id?: string;
   /** Expected machine spec — helps Fly pick a host with capacity. */
   compute?: VolumeComputeHint;
+};
+
+// -- Volume snapshot types --
+
+export type FlyVolumeSnapshot = {
+  id: string;
+  created_at: string;
+  digest: string;
+  retention_days: number;
+  size: number;
+  status: string;
+  volume_size: number;
 };
 
 // -- Exec types --

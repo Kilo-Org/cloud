@@ -28,7 +28,6 @@ import Link from 'next/link';
 
 type SecurityAgentPageClientProps = {
   organizationId?: string;
-  isAdmin: boolean;
 };
 
 const PAGE_SIZE = 20;
@@ -47,7 +46,7 @@ function isGitHubIntegrationError(error: unknown): boolean {
   );
 }
 
-export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAgentPageClientProps) {
+export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageClientProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -476,6 +475,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
         modelSlug: string;
+        analysisMode: 'auto' | 'shallow' | 'deep';
         autoDismissEnabled: boolean;
         autoDismissConfidenceThreshold: 'high' | 'medium' | 'low';
       }
@@ -490,6 +490,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
           repositorySelectionMode: config.repositorySelectionMode,
           selectedRepositoryIds: config.selectedRepositoryIds,
           modelSlug: config.modelSlug,
+          analysisMode: config.analysisMode,
           autoDismissEnabled: config.autoDismissEnabled,
           autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
         });
@@ -502,6 +503,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
           repositorySelectionMode: config.repositorySelectionMode,
           selectedRepositoryIds: config.selectedRepositoryIds,
           modelSlug: config.modelSlug,
+          analysisMode: config.analysisMode,
           autoDismissEnabled: config.autoDismissEnabled,
           autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
         });
@@ -547,12 +549,12 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
   }, []);
 
   const handleStartAnalysis = useCallback(
-    (findingId: string) => {
+    (findingId: string, { retrySandboxOnly }: { retrySandboxOnly?: boolean } = {}) => {
       setStartingAnalysisId(findingId);
       if (isOrg && organizationId) {
-        orgStartAnalysisMutate({ organizationId, findingId });
+        orgStartAnalysisMutate({ organizationId, findingId, retrySandboxOnly });
       } else {
-        personalStartAnalysisMutate({ findingId });
+        personalStartAnalysisMutate({ findingId, retrySandboxOnly });
       }
     },
     [isOrg, organizationId, orgStartAnalysisMutate, personalStartAnalysisMutate]
@@ -661,7 +663,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <h1 className="text-3xl font-bold">Security Agent</h1>
-          <Badge variant="new">new</Badge>
+          <Badge variant="beta">Beta</Badge>
         </div>
         <p className="text-muted-foreground">
           Monitor and manage Dependabot security alerts for your repositories
@@ -804,7 +806,6 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
             lastSyncTime={lastSyncData?.lastSyncTime}
             onStartAnalysis={handleStartAnalysis}
             startingAnalysisId={startingAnalysisId}
-            isAdmin={isAdmin}
           />
         </TabsContent>
 
@@ -824,6 +825,7 @@ export function SecurityAgentPageClient({ organizationId, isAdmin }: SecurityAge
               repositorySelectionMode={configData?.repositorySelectionMode ?? 'selected'}
               selectedRepositoryIds={configData?.selectedRepositoryIds ?? []}
               modelSlug={configData?.modelSlug ?? ''}
+              analysisMode={configData?.analysisMode ?? 'auto'}
               autoDismissEnabled={configData?.autoDismissEnabled ?? false}
               autoDismissConfidenceThreshold={configData?.autoDismissConfidenceThreshold ?? 'high'}
               repositories={allRepositories}

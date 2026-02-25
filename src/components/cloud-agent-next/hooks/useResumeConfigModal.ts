@@ -1,44 +1,32 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { type DbSessionDetails, type IndexedDbSessionData } from '../store/db-session-atoms';
-import { extractRepoFromGitUrl } from '../utils/git-utils';
-import type { ResumeConfig, StreamResumeConfig } from '../types';
-
-// Re-export StreamResumeConfig for backwards compatibility
-export type { StreamResumeConfig };
+import type { ResumeConfig } from '../types';
 
 /**
- * Build streamResumeConfig from available sources.
- * Priority: local resumeConfig > IndexedDB stored config
+ * Get the persisted ResumeConfig from available sources.
+ * Priority: in-memory resumeConfig > IndexedDB stored config
  *
  * Exported for testing.
  */
-export function buildStreamResumeConfig(params: {
+export function getPersistedResumeConfig(params: {
   resumeConfig: ResumeConfig | null;
-  pendingResumeSession: DbSessionDetails | null;
   currentIndexedDbSession: IndexedDbSessionData | null;
-}): StreamResumeConfig | null {
-  const { resumeConfig, pendingResumeSession, currentIndexedDbSession } = params;
+}): ResumeConfig | null {
+  const { resumeConfig, currentIndexedDbSession } = params;
 
-  // Local state takes priority (just configured in modal)
-  if (resumeConfig && pendingResumeSession) {
-    const repository = extractRepoFromGitUrl(pendingResumeSession.git_url) || '';
-    return {
-      mode: resumeConfig.mode,
-      model: resumeConfig.model,
-      envVars: resumeConfig.envVars,
-      setupCommands: resumeConfig.setupCommands,
-      githubRepo: repository,
-    };
+  // In-memory state takes priority (just configured in modal)
+  if (resumeConfig) {
+    return resumeConfig;
   }
 
   // Fall back to IndexedDB stored config
-  if (currentIndexedDbSession?.resumeConfig && currentIndexedDbSession.repository) {
+  if (currentIndexedDbSession?.resumeConfig) {
+    const stored = currentIndexedDbSession.resumeConfig;
     return {
-      mode: currentIndexedDbSession.resumeConfig.mode as StreamResumeConfig['mode'],
-      model: currentIndexedDbSession.resumeConfig.model,
-      envVars: currentIndexedDbSession.resumeConfig.envVars,
-      setupCommands: currentIndexedDbSession.resumeConfig.setupCommands,
-      githubRepo: currentIndexedDbSession.repository,
+      mode: stored.mode,
+      model: stored.model,
+      envVars: stored.envVars,
+      setupCommands: stored.setupCommands,
     };
   }
 
@@ -66,6 +54,12 @@ export function needsResumeConfigModal(params: {
 
   const isCliSession = !loadedDbSession.cloud_agent_session_id;
 
+  // CLI sessions are only resumable if they have both git_url and git_branch.
+  // Without repo info, the session cannot be resumed — it's shown as read-only history.
+  if (isCliSession && (!loadedDbSession.git_url || !loadedDbSession.git_branch)) {
+    return false;
+  }
+
   // Sessions from cli_sessions_v2 table store mode/model in the cloud-agent DO,
   // so they don't need the resume config modal.
   // Only CLI sessions (no cloud_agent_session_id) need the modal to configure mode/model.
@@ -86,7 +80,7 @@ type UseResumeConfigModalOptions = {
   loadedDbSession: DbSessionDetails | null;
   /**
    * Resume config that has been successfully persisted to IndexedDB.
-   * Used to build streamResumeConfig only after persistence succeeds.
+   * Used to resolve the effective ResumeConfig only after persistence succeeds.
    * This prevents enabling chat input while persistence is pending or if it failed.
    */
   persistedResumeConfig: ResumeConfig | null;
@@ -97,10 +91,8 @@ type UseResumeConfigModalReturn = {
   showResumeModal: boolean;
   /** The session being configured (null if modal closed) */
   pendingResumeSession: DbSessionDetails | null;
-  /** Git state for the pending session */
-  pendingGitState: { branch?: string } | null;
-  /** Config for useCloudAgentStream (from modal or IndexedDB) */
-  streamResumeConfig: StreamResumeConfig | null;
+  /** Persisted ResumeConfig (from modal or IndexedDB fallback) */
+  persistedResumeConfig: ResumeConfig | null;
   /** The confirmed config from modal (for needsResumeConfig check) */
   resumeConfig: ResumeConfig | null;
   /** Reopen the modal (for "Configure now" banner) */
@@ -123,7 +115,7 @@ type UseResumeConfigModalReturn = {
  *
  * Handles:
  * - Derived modal visibility based on loadedDbSession
- * - Building streamResumeConfig for useCloudAgentStream
+ * - Resolving effective ResumeConfig from available sources
  * - Persisting config to IndexedDB on confirm
  * - Updating sessionConfig atom for UI
  * - Resetting state when switching sessions
@@ -140,9 +132,6 @@ export function useResumeConfigModal({
   // Track if user has explicitly re-opened the modal (from "Configure now" banner)
   const [forceShowModal, setForceShowModal] = useState(false);
 
-  // Pending git state for the modal (not currently used but kept for API compatibility)
-  const [pendingGitState, setPendingGitState] = useState<{ branch?: string } | null>(null);
-
   // Confirmed config from modal
   const [resumeConfig, setResumeConfig] = useState<ResumeConfig | null>(null);
 
@@ -158,7 +147,6 @@ export function useResumeConfigModal({
       setDismissedSessionId(null);
       setForceShowModal(false);
       setResumeConfig(null);
-      setPendingGitState(null);
     }
 
     prevDbSessionIdRef.current = currentDbSessionId;
@@ -180,17 +168,16 @@ export function useResumeConfigModal({
   // The pending session is the loaded session when modal should show
   const pendingResumeSession = showResumeModal ? loadedDbSession : null;
 
-  // Build resumeConfig for useCloudAgentStream
-  // IMPORTANT: Uses persistedResumeConfig (not transient resumeConfig) to ensure
+  // Resolve the effective ResumeConfig from available sources.
+  // IMPORTANT: Uses persistedResumeConfigProp (not transient resumeConfig) to ensure
   // config has been successfully saved before enabling chat input
-  const streamResumeConfig = useMemo<StreamResumeConfig | null>(
+  const resolvedResumeConfig = useMemo<ResumeConfig | null>(
     () =>
-      buildStreamResumeConfig({
+      getPersistedResumeConfig({
         resumeConfig: persistedResumeConfig,
-        pendingResumeSession: loadedDbSession, // Use loadedDbSession for repo extraction
         currentIndexedDbSession,
       }),
-    [persistedResumeConfig, loadedDbSession, currentIndexedDbSession]
+    [persistedResumeConfig, currentIndexedDbSession]
   );
 
   // Reopen the modal (for "Configure now" banner)
@@ -222,8 +209,7 @@ export function useResumeConfigModal({
   return {
     showResumeModal,
     pendingResumeSession,
-    pendingGitState,
-    streamResumeConfig,
+    persistedResumeConfig: resolvedResumeConfig,
     resumeConfig,
     reopenResumeModal,
     handleResumeConfirm,

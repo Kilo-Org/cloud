@@ -2,10 +2,23 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Coins } from 'lucide-react';
+import { useState } from 'react';
 import { formatMicrodollars, formatDate } from '@/lib/admin-utils';
 import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import CheckKiloPassButton from './CheckKiloPassButton';
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 
@@ -19,6 +32,38 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
   const trpc = useTRPC();
   const { data, isLoading, error } = useQuery(
     trpc.admin.users.getKiloPassState.queryOptions({ userId })
+  );
+
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const queryClient = useQueryClient();
+
+  const cancelMutation = useMutation(
+    trpc.admin.users.cancelAndRefundKiloPass.mutationOptions({
+      onSuccess: result => {
+        setCancelDialogOpen(false);
+        setCancelReason('');
+        void queryClient.invalidateQueries(
+          trpc.admin.users.getKiloPassState.queryOptions({ userId })
+        );
+        const parts = ['Kilo Pass cancelled.'];
+        if (result.refundedAmountCents != null) {
+          parts.push(`Refunded $${(result.refundedAmountCents / 100).toFixed(2)}.`);
+        } else {
+          parts.push('No invoice to refund.');
+        }
+        if (result.balanceResetAmountUsd != null) {
+          parts.push(`Balance reset ($${result.balanceResetAmountUsd.toFixed(2)} zeroed).`);
+        }
+        if (!result.alreadyBlocked) {
+          parts.push('Account blocked.');
+        }
+        toast.success(parts.join(' '));
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to cancel Kilo Pass');
+      },
+    })
   );
 
   if (isLoading) {
@@ -65,6 +110,8 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
   }
 
   const { subscription, issuances, currentPeriodUsageUsd, thresholds } = data;
+
+  const canCancel = subscription.status !== 'canceled';
 
   const statusColor =
     subscription.status === 'active'
@@ -124,6 +171,13 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
             <p className="font-mono text-sm">{subscription.currentStreakMonths} months</p>
           </div>
         </div>
+        {canCancel && (
+          <div>
+            <Button size="sm" variant="destructive" onClick={() => setCancelDialogOpen(true)}>
+              Nuke Pass
+            </Button>
+          </div>
+        )}
 
         {/* Current Period Usage */}
         {currentPeriodUsageUsd != null && (
@@ -248,6 +302,48 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
           </div>
         </div>
       </CardContent>
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuke Pass</DialogTitle>
+            <DialogDescription>
+              This will perform all of the following actions:
+              <ul className="mt-2 list-disc pl-4 text-sm">
+                <li>Cancel the Stripe subscription immediately</li>
+                <li>Refund the latest paid invoice</li>
+                <li>Block this account</li>
+                <li>Reset the user&apos;s balance to $0</li>
+              </ul>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="cancel-reason">Reason (required)</Label>
+            <Textarea
+              id="cancel-reason"
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              placeholder="Enter the reason for this action..."
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={cancelMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cancelMutation.isPending || cancelReason.trim().length === 0}
+              onClick={() => cancelMutation.mutate({ userId, reason: cancelReason.trim() })}
+            >
+              {cancelMutation.isPending ? 'Processing...' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -57,6 +57,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     is_user_byok: false,
     has_tools: false,
     feature: null,
+    session_id: null,
   };
 }
 
@@ -109,6 +110,7 @@ export function createMockUsageContext(
     user_byok: false,
     has_tools: false,
     feature: 'vscode-extension',
+    session_id: null,
   };
 }
 

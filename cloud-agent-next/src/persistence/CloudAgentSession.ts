@@ -642,6 +642,7 @@ export class CloudAgentSession extends DurableObject {
     githubAppType?: 'standard' | 'lite';
     gitUrl?: string;
     gitToken?: string;
+    platform?: 'github' | 'gitlab';
     envVars?: Record<string, string>;
     encryptedSecrets?: EncryptedSecrets;
     setupCommands?: string[];
@@ -652,6 +653,7 @@ export class CloudAgentSession extends DurableObject {
     upstreamBranch?: string;
     callbackTarget?: CallbackTarget;
     images?: Images;
+    createdOnPlatform?: string;
     // Workspace metadata (set during prepareSession)
     workspacePath?: string;
     sessionHome?: string;
@@ -1445,6 +1447,7 @@ export class CloudAgentSession extends DurableObject {
           upstreamBranch: request.upstreamBranch,
           botId: request.botId,
           platform: request.platform,
+          createdOnPlatform: request.createdOnPlatform,
         };
 
         const plan = this.buildExecutionPlan({
@@ -1529,6 +1532,7 @@ export class CloudAgentSession extends DurableObject {
           isPreparedSession: true,
           githubAppType: metadata.githubAppType,
           platform: metadata.platform,
+          createdOnPlatform: metadata.createdOnPlatform,
         };
 
         const plan = this.buildExecutionPlan({
@@ -1568,7 +1572,7 @@ export class CloudAgentSession extends DurableObject {
         metadata.gitToken = request.tokenOverrides.gitToken;
       }
 
-      const mode = (request.mode ?? metadata.mode ?? 'build') as ExecutionMode;
+      const mode = (request.mode ?? metadata.mode ?? 'code') as ExecutionMode;
       const model = normalizeKilocodeModel(request.model ?? metadata.model);
       if (!model) {
         return this.buildStartError(

@@ -31,10 +31,14 @@ export type Database = {
   cli_sessions_v2: CliSessionsV2Table;
 };
 
+/**
+ * Hyperdrive pools connections at the infrastructure level,
+ * so we use max:1 to avoid holding extra connections open.
+ */
 export function getDb(hyperdrive: HyperdriveBinding): Kysely<Database> {
   const pool = new Pool({
     connectionString: hyperdrive.connectionString,
-    max: 5,
+    max: 1,
   });
 
   pool.on('error', error => {

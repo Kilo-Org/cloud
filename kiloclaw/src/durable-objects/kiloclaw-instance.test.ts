@@ -49,6 +49,8 @@ vi.mock('../fly/client', async () => {
     deleteVolume: vi.fn(),
     getVolume: vi.fn(),
     listMachines: vi.fn().mockResolvedValue([]),
+    listVolumeSnapshots: vi.fn().mockResolvedValue([]),
+    execCommand: vi.fn(),
   };
 });
 
@@ -142,6 +144,11 @@ function createFakeEnv() {
       get: vi.fn().mockReturnValue(appStub),
     } as unknown,
     HYPERDRIVE: { connectionString: '' } as unknown,
+    KV_CLAW_CACHE: {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown,
   };
 }
 
@@ -209,6 +216,23 @@ beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
+
+  // Mock global fetch for waitForHealthy() health probe.
+  // Returns gateway running + root 200 so start() doesn't block.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/_kilo/gateway/status')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ state: 'running' }),
+        });
+      }
+      // Root path probe — return non-502
+      return Promise.resolve({ ok: true, status: 200 });
+    })
+  );
 });
 
 describe('two-phase destroy', () => {
@@ -621,6 +645,38 @@ describe('createNewMachine: persist ID before waitForState', () => {
     expect(idAtWaitTime).toBe('machine-fresh');
   });
 
+  it('includes Fly HTTP health check config in machine create request', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped', flyMachineId: null });
+
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-health-check',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.start('user-1');
+
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        checks: {
+          controller: {
+            type: 'http',
+            port: 18789,
+            method: 'GET',
+            path: '/_kilo/health',
+            interval: '30s',
+            timeout: '5s',
+            grace_period: '60s',
+          },
+        },
+      }),
+      expect.anything()
+    );
+  });
+
   it('preserves machine ID in storage even if waitForState fails', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'stopped', flyMachineId: null });
@@ -639,11 +695,167 @@ describe('createNewMachine: persist ID before waitForState', () => {
   });
 });
 
+describe('gateway process control via controller', () => {
+  it('allows gateway status calls when machine ID exists even if DO status is stale', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          state: 'running',
+          pid: 123,
+          uptime: 42,
+          restarts: 1,
+          lastExit: null,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const status = await instance.getGatewayProcessStatus();
+    expect(status.state).toBe('running');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
+  });
+
+  it('calls gateway status through Fly Proxy with controller auth headers', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyMachineId: 'machine-1', flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          state: 'running',
+          pid: 123,
+          uptime: 42,
+          restarts: 1,
+          lastExit: null,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const status = await instance.getGatewayProcessStatus();
+
+    expect(status.state).toBe('running');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://acct-test.fly.dev/_kilo/gateway/status',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Accept: 'application/json',
+          'fly-force-instance-id': 'machine-1',
+        }),
+      })
+    );
+
+    const call = fetchSpy.mock.calls[0];
+    const headers = new Headers(call[1]?.headers);
+    expect(headers.get('authorization')).toMatch(/^Bearer [a-f0-9]{64}$/);
+    fetchSpy.mockRestore();
+  });
+
+  it('starts, stops, and restarts the gateway process through controller routes', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyMachineId: 'machine-1', flyAppName: 'acct-test' });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+    await instance.startGatewayProcess();
+    await instance.stopGatewayProcess();
+    await instance.restartGatewayProcess();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://acct-test.fly.dev/_kilo/gateway/start');
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe('https://acct-test.fly.dev/_kilo/gateway/stop');
+    expect(fetchSpy.mock.calls[2]?.[0]).toBe('https://acct-test.fly.dev/_kilo/gateway/restart');
+    fetchSpy.mockRestore();
+  });
+
+  it('surfaces controller HTTP status errors', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyMachineId: 'machine-1', flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Gateway already running or starting' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.startGatewayProcess()).rejects.toSatisfy((err: unknown) => {
+      if (typeof err !== 'object' || err === null) return false;
+      return (
+        'status' in err &&
+        (err as { status: number }).status === 409 &&
+        'message' in err &&
+        (err as { message: string }).message.includes('already running')
+      );
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it('rejects invalid controller success payload shape', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyMachineId: 'machine-1', flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: 'yes' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.startGatewayProcess()).rejects.toSatisfy((err: unknown) => {
+      if (typeof err !== 'object' || err === null) return false;
+      return (
+        'status' in err &&
+        (err as { status: number }).status === 502 &&
+        'message' in err &&
+        (err as { message: string }).message.includes('invalid response')
+      );
+    });
+
+    fetchSpy.mockRestore();
+  });
+});
+
 // ============================================================================
 // selectRecoveryCandidate (pure function, no mocks needed)
 // ============================================================================
 
-import { selectRecoveryCandidate, parseRegions, deprioritizeRegion } from './kiloclaw-instance';
+import {
+  selectRecoveryCandidate,
+  parseRegions,
+  deprioritizeRegion,
+  shuffleRegions,
+} from './kiloclaw-instance';
 import type { FlyMachine } from '../fly/types';
 
 function fakeMachine(overrides: Partial<FlyMachine>): FlyMachine {
@@ -892,6 +1104,38 @@ describe('deprioritizeRegion', () => {
   });
 });
 
+describe('shuffleRegions', () => {
+  it('returns the same elements', () => {
+    const input = ['cdg', 'arn', 'yyz', 'ord', 'dfw', 'lax'];
+    const result = shuffleRegions([...input]);
+    expect(result.sort()).toEqual(input.sort());
+  });
+
+  it('returns a single-element array unchanged', () => {
+    expect(shuffleRegions(['dfw'])).toEqual(['dfw']);
+  });
+
+  it('returns an empty array unchanged', () => {
+    expect(shuffleRegions([])).toEqual([]);
+  });
+
+  it('mutates in place and returns the same reference', () => {
+    const arr = ['a', 'b', 'c'];
+    const result = shuffleRegions(arr);
+    expect(result).toBe(arr);
+  });
+
+  it('produces different orderings over many runs', () => {
+    const input = ['cdg', 'arn', 'yyz', 'ord', 'dfw', 'lax'];
+    const orderings = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      orderings.add(shuffleRegions([...input]).join(','));
+    }
+    // With 6 elements (720 permutations), 50 shuffles should produce at least 2 distinct orderings
+    expect(orderings.size).toBeGreaterThan(1);
+  });
+});
+
 // ============================================================================
 // Live check in getStatus()
 // ============================================================================
@@ -1117,14 +1361,15 @@ describe('start: 412 insufficient resources recovery', () => {
     // Old volume was deleted
     expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-1');
     // New volume created via fallback with deprioritized regions and compute hint
-    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledWith(
-      expect.anything(),
+    const regions412Call = (flyClient.createVolumeWithFallback as Mock).mock.calls[0];
+    expect(regions412Call[1]).toEqual(
       expect.objectContaining({
         compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
-      }),
-      // 'iad' not in FLY_REGION='us,eu', so deprioritizeRegion returns unchanged
-      ['us', 'eu']
+      })
     );
+    // Regions are shuffled, so just check the set (deprioritize is a no-op here
+    // because 'iad' is not in FLY_REGION='us,eu')
+    expect(regions412Call[2].sort()).toEqual(['eu', 'us']);
     // source_volume_id should NOT be set for fresh provision
     const createVolumeCall = (flyClient.createVolumeWithFallback as Mock).mock.calls[0][1];
     expect(createVolumeCall.source_volume_id).toBeUndefined();
@@ -1162,14 +1407,15 @@ describe('start: 412 insufficient resources recovery', () => {
     await instance.start('user-1');
 
     // Volume was forked (source_volume_id set) with compute hint and deprioritized regions
-    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledWith(
-      expect.anything(),
+    const regionsForkCall = (flyClient.createVolumeWithFallback as Mock).mock.calls[0];
+    expect(regionsForkCall[1]).toEqual(
       expect.objectContaining({
         source_volume_id: 'vol-1',
         compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
-      }),
-      ['us', 'eu']
+      })
     );
+    // Regions are shuffled — check the set
+    expect(regionsForkCall[2].sort()).toEqual(['eu', 'us']);
     // Old volume was deleted
     expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-1');
     // Machine was retried
@@ -1226,14 +1472,15 @@ describe('start: 412 insufficient resources recovery', () => {
     // Old machine was destroyed
     expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
     // Volume was forked (has user data) with compute hint
-    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledWith(
-      expect.anything(),
+    const regionsUpdateCall = (flyClient.createVolumeWithFallback as Mock).mock.calls[0];
+    expect(regionsUpdateCall[1]).toEqual(
       expect.objectContaining({
         source_volume_id: 'vol-1',
         compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
-      }),
-      ['us', 'eu']
+      })
     );
+    // Regions are shuffled then deprioritized — check the set
+    expect(regionsUpdateCall[2].sort()).toEqual(['eu', 'us']);
     // New machine was created
     expect(storage._store.get('flyMachineId')).toBe('machine-new');
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');
@@ -1357,5 +1604,196 @@ describe('stop: error propagation', () => {
 
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeDefined();
+  });
+});
+
+// ============================================================================
+// listVolumeSnapshots
+// ============================================================================
+
+describe('listVolumeSnapshots', () => {
+  it('returns snapshots from Fly API when volume exists', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const snapshots = [
+      {
+        id: 'snap-1',
+        created_at: '2026-02-19T00:00:00Z',
+        digest: 'sha256:abc',
+        retention_days: 5,
+        size: 1048576,
+        status: 'complete',
+        volume_size: 10737418240,
+      },
+    ];
+    (flyClient.listVolumeSnapshots as Mock).mockResolvedValue(snapshots);
+
+    const result = await instance.listVolumeSnapshots();
+
+    expect(result).toEqual(snapshots);
+    expect(flyClient.listVolumeSnapshots).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'test-app' },
+      'vol-1'
+    );
+  });
+
+  it('returns empty array when no volume exists', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyVolumeId: null });
+
+    const result = await instance.listVolumeSnapshots();
+
+    expect(result).toEqual([]);
+    expect(flyClient.listVolumeSnapshots).not.toHaveBeenCalled();
+  });
+
+  it('returns empty array for unprovisioned instance', async () => {
+    const { instance } = createInstance();
+
+    const result = await instance.listVolumeSnapshots();
+
+    expect(result).toEqual([]);
+    expect(flyClient.listVolumeSnapshots).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Device pairing
+// ============================================================================
+describe('listDevicePairingRequests', () => {
+  it('returns empty when not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result).toEqual({ requests: [] });
+  });
+
+  it('calls execCommand and parses JSON output', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fakeOutput = JSON.stringify({
+      requests: [
+        { requestId: 'abc-123', deviceId: 'dev-1', role: 'operator', platform: 'MacIntel' },
+      ],
+    });
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: fakeOutput,
+      stderr: '',
+    });
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result.requests).toHaveLength(1);
+    expect(result.requests[0].requestId).toBe('abc-123');
+    expect(flyClient.execCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      'machine-1',
+      ['/usr/bin/env', 'HOME=/root', 'node', '/usr/local/bin/openclaw-device-pairing-list.js'],
+      60
+    );
+  });
+
+  it('returns empty on exec failure', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 1,
+      stdout: '',
+      stderr: 'something went wrong',
+    });
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result).toEqual({ requests: [] });
+  });
+});
+
+describe('approveDevicePairingRequest', () => {
+  it('rejects invalid requestId format', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const result = await instance.approveDevicePairingRequest('not-a-uuid');
+
+    expect(result).toEqual({ success: false, message: 'Invalid request ID' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('returns not running when instance is stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.approveDevicePairingRequest(
+      '58f4ac67-12b4-4f6e-adee-ff3463a7c30c'
+    );
+
+    expect(result).toEqual({ success: false, message: 'Instance is not running' });
+  });
+
+  it('calls openclaw devices approve with the requestId', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'approved',
+      stderr: '',
+    });
+
+    const requestId = '58f4ac67-12b4-4f6e-adee-ff3463a7c30c';
+    const result = await instance.approveDevicePairingRequest(requestId);
+
+    expect(result).toEqual({ success: true, message: 'Device pairing approved' });
+    expect(flyClient.execCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      'machine-1',
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'devices', 'approve', requestId],
+      60
+    );
+  });
+
+  it('accepts uppercase UUIDs', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'approved',
+      stderr: '',
+    });
+
+    const requestId = '58F4AC67-12B4-4F6E-ADEE-FF3463A7C30C';
+    const result = await instance.approveDevicePairingRequest(requestId);
+
+    expect(result).toEqual({ success: true, message: 'Device pairing approved' });
+    expect(flyClient.execCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      'machine-1',
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'devices', 'approve', requestId],
+      60
+    );
+  });
+
+  it('returns failure message on exec error', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 1,
+      stdout: '',
+      stderr: 'request not found',
+    });
+
+    const result = await instance.approveDevicePairingRequest(
+      '58f4ac67-12b4-4f6e-adee-ff3463a7c30c'
+    );
+
+    expect(result).toEqual({ success: false, message: 'request not found' });
   });
 });

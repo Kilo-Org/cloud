@@ -4,7 +4,7 @@
 # 1. Decrypts KILOCLAW_ENC_* environment variables (if encryption key is present)
 # 2. Runs openclaw onboard --non-interactive to configure from env vars (first run only)
 # 3. Patches config for features onboard doesn't cover (channels, gateway auth)
-# 4. Starts the gateway
+# 4. Starts the controller (which supervises the gateway)
 
 set -e
 
@@ -123,15 +123,16 @@ if [ ! -f "$CONFIG_FILE" ]; then
 
     openclaw onboard --non-interactive --accept-risk \
         --mode local \
-        --gateway-port 18789 \
-        --gateway-bind lan \
+        --gateway-port 3001 \
+        --gateway-bind loopback \
         --skip-channels \
         --skip-skills \
         --skip-health
 
     echo "Onboard completed"
 else
-    echo "Using existing config"
+    echo "Using existing config, running doctor..."
+    openclaw doctor --fix --non-interactive
 fi
 
 # ============================================================
@@ -158,10 +159,9 @@ config.gateway = config.gateway || {};
 config.channels = config.channels || {};
 
 // Gateway configuration
-config.gateway.port = 18789;
+config.gateway.port = 3001;
 config.gateway.mode = 'local';
-// Set bind to loopback so agent tools connect via 127.0.0.1 (auto-approved for pairing).
-// The actual server bind is controlled by --bind lan on the command line, not this config.
+// Bind to loopback only. External traffic is handled by the controller proxy.
 config.gateway.bind = 'loopback';
 
 if (process.env.OPENCLAW_GATEWAY_TOKEN) {
@@ -174,9 +174,11 @@ if (process.env.OPENCLAW_DEV_MODE === 'true') {
     config.gateway.controlUi.allowInsecureAuth = true;
 }
 
-// Multi-tenant: auto-approve devices so users don't need to pair.
-// Worker-level JWT auth is the real access control -- each user's machine
-// is only reachable via their signed token.
+// Allow Control UI connections from localhost without WebCrypto device identity.
+// This is a fallback for insecure HTTP contexts where SubtleCrypto is unavailable.
+// It does NOT bypass device pairing -- pairing is handled separately via the
+// controller proxy's loopback headers (auto-approve for local connections) and
+// the device pairing approval UI for role-upgrade scenarios.
 if (process.env.AUTO_APPROVE_DEVICES === 'true') {
     config.gateway.controlUi = config.gateway.controlUi || {};
     config.gateway.controlUi.allowInsecureAuth = true;
@@ -244,12 +246,13 @@ config.agents.defaults = config.agents.defaults || {};
 config.agents.defaults.model = { primary: defaultModel };
 console.log('KiloCode provider configured with base URL ' + baseUrl);
 
-// Explicitly lock down exec tool security (defense-in-depth).
-// OpenClaw defaults to these values, but pinning them here prevents
-// silent regression if upstream defaults change in a future version.
+// Exec: KiloClaw machines have no Docker sandbox, so exec must target the
+// gateway host directly. Allowlist mode gates unknown commands via the
+// Control UI approval dialog; safe bins (jq, head, tail, etc.) auto-allow.
 config.tools = config.tools || {};
 config.tools.exec = config.tools.exec || {};
-config.tools.exec.security = 'deny';
+config.tools.exec.host = 'gateway';
+config.tools.exec.security = 'allowlist';
 config.tools.exec.ask = 'on-miss';
 
 // Telegram configuration
@@ -313,20 +316,24 @@ console.log('Configuration patched successfully');
 EOFPATCH
 
 # ============================================================
-# START GATEWAY
+# START CONTROLLER
 # ============================================================
-echo "Starting OpenClaw Gateway..."
-echo "Gateway will be available on port 18789"
+# Tell the gateway it's running under a supervisor. On SIGUSR1 restart,
+# the gateway will exit cleanly (code 0) instead of spawning a detached
+# child process. The controller's supervisor detects the clean exit and
+# respawns the gateway immediately without backoff.
+export INVOCATION_ID=1
 
-rm -f /tmp/openclaw-gateway.lock 2>/dev/null || true
-rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
+echo 'Starting KiloClaw controller...'
 
-echo "Dev mode: ${OPENCLAW_DEV_MODE:-false}"
+# Build gateway args as a JSON array (safe quoting through node serialization).
+KILOCLAW_GATEWAY_ARGS=$(node -e "
+  const args = ['--port', '3001', '--verbose', '--allow-unconfigured', '--bind', 'loopback'];
+  if (process.env.OPENCLAW_GATEWAY_TOKEN) {
+    args.push('--token', process.env.OPENCLAW_GATEWAY_TOKEN);
+  }
+  console.log(JSON.stringify(args));
+")
+export KILOCLAW_GATEWAY_ARGS
 
-if [ -n "$OPENCLAW_GATEWAY_TOKEN" ]; then
-    echo "Starting gateway with token auth..."
-    exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan --token "$OPENCLAW_GATEWAY_TOKEN"
-else
-    echo "Starting gateway with device pairing (no token)..."
-    exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan
-fi
+exec node /usr/local/bin/kiloclaw-controller.js

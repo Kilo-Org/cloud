@@ -1,5 +1,5 @@
 import type { ModelSettings, VersionedSettings } from '@/lib/organizations/model-settings';
-import { giga_potato_model } from '@/lib/providers/gigapotato';
+import { giga_potato_model, giga_potato_thinking_model } from '@/lib/providers/gigapotato';
 import { isOpenAiModel } from '@/lib/providers/openai';
 
 export function getModelSettings(model: string): ModelSettings | undefined {
@@ -22,7 +22,8 @@ export function getVersionedModelSettings(model: string): VersionedSettings | un
   if (
     model.startsWith('google/gemini') ||
     model.startsWith('z-ai/') ||
-    model === giga_potato_model.public_id
+    model === giga_potato_model.public_id ||
+    model === giga_potato_thinking_model.public_id
   ) {
     return {
       '4.146.0': {

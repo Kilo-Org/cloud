@@ -90,6 +90,7 @@ export type InitializeContext = {
   githubAppType?: 'standard' | 'lite';
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
+  createdOnPlatform?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -127,6 +128,7 @@ type InitiateExecutionRequest = BaseExecutionRequest & {
   orgId?: string;
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
+  createdOnPlatform?: string;
 };
 
 /**
@@ -247,6 +249,7 @@ export type InitContext = {
   githubAppType?: 'lite' | 'standard';
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
+  createdOnPlatform?: string;
 };
 
 /**

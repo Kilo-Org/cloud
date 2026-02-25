@@ -119,14 +119,15 @@ export async function POST(request: NextRequest) {
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
 
   // Extract properties for usage context
   const tokenEstimates = estimateFimTokens(requestBody);
   const promptInfo = extractFimPromptInfo(requestBody);
 
   const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, 'codestral')
-    : await getBYOKforUser(readDb, user.id, 'codestral');
+    ? await getBYOKforOrganization(readDb, organizationId, ['codestral'])
+    : await getBYOKforUser(readDb, user.id, ['codestral']);
 
   const usageContext: MicrodollarUsageContext = {
     kiloUserId: user.id,
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
     user_byok: !!userByok,
     has_tools: false,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
+    session_id: taskId ?? null,
   };
 
   setTag('ui.ai_model', fimModel_withOpenRouterStyleProviderPrefix);
@@ -186,7 +188,7 @@ export async function POST(request: NextRequest) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${userByok?.decryptedAPIKey ?? MISTRAL_API_KEY}`,
+      Authorization: `Bearer ${userByok?.at(0)?.decryptedAPIKey ?? MISTRAL_API_KEY}`,
     },
     body: JSON.stringify(bodyWithCorrectedModel),
   });

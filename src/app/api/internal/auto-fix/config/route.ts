@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   try {
     // Validate internal API secret
     const secret = req.headers.get('X-Internal-Secret');
-    if (secret !== INTERNAL_API_SECRET) {
+    if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

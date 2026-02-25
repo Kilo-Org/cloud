@@ -2,13 +2,15 @@ import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { eq, and, desc, lt } from 'drizzle-orm';
+import { eq, and, desc, lt, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { TRPCClientError } from '@trpc/client';
 import { cli_sessions_v2 } from '@/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateApiToken } from '@/lib/tokens';
+import { fetchSessionMessages } from '@/lib/session-ingest-client';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
+import { sanitizeGitUrl } from '@/routers/cli-sessions-router';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -73,6 +75,9 @@ const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
+  includeChildren: z.boolean().optional().default(false),
+  gitUrl: z.string().optional(),
+  version: z.number().optional(),
 });
 
 const GetSessionInputSchema = z.object({
@@ -95,7 +100,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * List sessions for the current user with cursor-based pagination.
    */
   list: baseProcedure.input(ListSessionsInputSchema).query(async ({ ctx, input }) => {
-    const { cursor, limit, orderBy } = input;
+    const { cursor, limit, orderBy, includeChildren, gitUrl, version } = input;
 
     const orderColumn =
       orderBy === 'updated_at' ? cli_sessions_v2.updated_at : cli_sessions_v2.created_at;
@@ -104,6 +109,18 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     if (cursor) {
       whereConditions.push(lt(orderColumn, cursor));
+    }
+
+    if (!includeChildren) {
+      whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
+    }
+
+    if (gitUrl) {
+      whereConditions.push(eq(cli_sessions_v2.git_url, sanitizeGitUrl(gitUrl)));
+    }
+
+    if (version !== undefined) {
+      whereConditions.push(eq(cli_sessions_v2.version, version));
     }
 
     const results = await db
@@ -189,30 +206,27 @@ export const cliSessionsV2Router = createTRPCRouter({
     }),
 
   /**
-   * Get messages for a V2 session from R2.
-   * Messages are stored as JSON blobs in R2.
+   * Get messages for a V2 session from the session ingest worker.
    */
   getSessionMessages: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
     .query(async ({ ctx, input }) => {
-      // Verify ownership
       await getSessionWithOwnerCheck(input.session_id, ctx.user.id);
-      return { messages: [] };
 
-      // TODO: cloud-agent-next
-      // const blobKey = getV2MessagesBlobKey(input.session_id);
-
-      // try {
-      //   const messages = await getBlobContent(blobKey);
-      //   return { messages: messages ?? [] };
-      // } catch (error) {
-      //   // If blob doesn't exist yet, return empty messages
-      //   // This is expected for new sessions before first sync
-      //   if (error instanceof Error && error.name === 'NoSuchKey') {
-      //     return { messages: [] };
-      //   }
-      //   throw error;
-      // }
+      try {
+        const messages = await fetchSessionMessages(input.session_id, ctx.user);
+        return { messages: messages ?? [] };
+      } catch (error) {
+        console.error(
+          `Failed to fetch messages for session ${input.session_id}:`,
+          error instanceof Error ? error.message : error
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session messages',
+          cause: error,
+        });
+      }
     }),
 
   /**
@@ -234,6 +248,8 @@ export const cliSessionsV2Router = createTRPCRouter({
         title: z.string().nullable(),
         cloud_agent_session_id: z.string().nullable(),
         organization_id: z.string().nullable(),
+        git_url: z.string().nullable(),
+        git_branch: z.string().nullable(),
         created_at: z.coerce.date(),
         updated_at: z.coerce.date(),
         version: z.number(),
@@ -298,6 +314,8 @@ export const cliSessionsV2Router = createTRPCRouter({
         title: session.title,
         cloud_agent_session_id: session.cloud_agent_session_id,
         organization_id: session.organization_id ?? null,
+        git_url: session.git_url ?? null,
+        git_branch: session.git_branch ?? null,
         created_at: session.created_at,
         updated_at: session.updated_at,
         version: session.version,

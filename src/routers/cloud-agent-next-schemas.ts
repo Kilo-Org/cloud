@@ -3,62 +3,52 @@ import * as z from 'zod';
 /**
  * Shared schemas for cloud-agent-next routers
  *
- * Uses new modes (plan, build) and V2 WebSocket-based API only.
+ * Uses V2 WebSocket-based API only.
  */
 
 /**
  * Agent mode enum - all supported modes.
- * - plan, architect, ask: Planning/analysis mode
- * - code, build, orchestrator: Code generation mode
+ * - code, plan, debug, orchestrator, ask: CLI agent modes
+ * - build, architect: Backward-compatible aliases (build → code, architect → plan)
  * - custom: Custom mode (requires appendSystemPrompt)
  */
 export const agentModeNextSchema = z.enum([
-  'plan',
   'code',
-  'build',
+  'plan',
+  'debug',
   'orchestrator',
-  'architect',
   'ask',
+  'build',
+  'architect',
   'custom',
 ]);
 
-// Base configuration shared by all MCP server types
-const mcpServerBaseConfigSchema = z.object({
-  disabled: z.boolean().optional(),
-  timeout: z.number().min(1).max(3600).optional(),
-  alwaysAllow: z.array(z.string()).optional(),
-  watchPaths: z.array(z.string()).optional(),
-  disabledTools: z.array(z.string()).optional(),
-});
+// Local MCP server configuration (runs a command)
+const mcpLocalServerConfigSchema = z
+  .object({
+    type: z.literal('local'),
+    command: z.string().array().min(1, 'Command array must have at least one element'),
+    environment: z.record(z.string(), z.string()).optional(),
+    enabled: z.boolean().optional(),
+    timeout: z.number().min(1).max(3_600_000).optional(),
+  })
+  .strict();
 
-// Stdio MCP server configuration (local process execution)
-const mcpStdioServerConfigSchema = mcpServerBaseConfigSchema.extend({
-  type: z.literal('stdio').optional(),
-  command: z.string().min(1, 'Command cannot be empty'),
-  args: z.array(z.string()).optional(),
-  cwd: z.string().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-});
+// Remote MCP server configuration (connects to a URL)
+const mcpRemoteServerConfigSchema = z
+  .object({
+    type: z.literal('remote'),
+    url: z.string().url('URL must be a valid URL format'),
+    headers: z.record(z.string(), z.string()).optional(),
+    enabled: z.boolean().optional(),
+    timeout: z.number().min(1).max(3_600_000).optional(),
+  })
+  .strict();
 
-// SSE MCP server configuration (Server-Sent Events)
-const mcpSseServerConfigSchema = mcpServerBaseConfigSchema.extend({
-  type: z.literal('sse'),
-  url: z.string().url('URL must be a valid URL format'),
-  headers: z.record(z.string(), z.string()).optional(),
-});
-
-// Streamable HTTP MCP server configuration
-const mcpStreamableHttpServerConfigSchema = mcpServerBaseConfigSchema.extend({
-  type: z.literal('streamable-http'),
-  url: z.string().url('URL must be a valid URL format'),
-  headers: z.record(z.string(), z.string()).optional(),
-});
-
-// Combined MCP server configuration schema supporting all transport types
-export const mcpServerConfigNextSchema = z.union([
-  mcpStdioServerConfigSchema,
-  mcpSseServerConfigSchema,
-  mcpStreamableHttpServerConfigSchema,
+// Combined MCP server configuration schema — CLI-native local/remote format
+export const mcpServerConfigNextSchema = z.discriminatedUnion('type', [
+  mcpLocalServerConfigSchema,
+  mcpRemoteServerConfigSchema,
 ]);
 
 // Schema for preparing a session
@@ -113,7 +103,7 @@ export const baseInitiateFromPreparedSessionNextSchema = z.object({
 });
 
 // Agent mode for sendMessage (excludes custom - use prepareSession/updateSession for custom mode)
-export const agentModeSendMessageSchema = z.enum(['plan', 'build']);
+export const agentModeSendMessageSchema = z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask']);
 
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 // Note: custom mode is not allowed for sendMessage - use prepareSession/updateSession instead

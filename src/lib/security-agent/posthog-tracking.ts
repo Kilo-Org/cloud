@@ -27,6 +27,7 @@ type SecurityAgentEnabledEvent = BaseSecurityAgentEvent & {
 
 type SecurityAgentConfigSavedEvent = BaseSecurityAgentEvent & {
   autoSyncEnabled?: boolean;
+  analysisMode?: string;
   autoDismissEnabled?: boolean;
   autoDismissConfidenceThreshold?: string;
   modelSlug?: string;
@@ -44,7 +45,7 @@ type SecurityAgentSyncEvent = BaseSecurityAgentEvent & {
 type SecurityAgentAnalysisStartedEvent = BaseSecurityAgentEvent & {
   findingId: string;
   model: string;
-  forceSandbox: boolean;
+  analysisMode?: string;
 };
 
 type SecurityAgentAnalysisCompletedEvent = BaseSecurityAgentEvent & {

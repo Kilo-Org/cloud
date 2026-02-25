@@ -200,7 +200,7 @@ function getPreferredProvider(requestedModel: string): OpenRouterInferenceProvid
     return OpenRouterInferenceProviderIdSchema.enum.moonshotai;
   }
   if (requestedModel.startsWith('z-ai/')) {
-    return OpenRouterInferenceProviderIdSchema.enum['z-ai'];
+    return OpenRouterInferenceProviderIdSchema.enum['novita'];
   }
   return null;
 }

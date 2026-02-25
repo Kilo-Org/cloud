@@ -21,7 +21,6 @@ export const PRIMARY_DEFAULT_MODEL = DEFAULT_MODEL_CHOICES[0];
 export const preferredModels = [
   KILO_AUTO_MODEL_ID,
   minimax_m25_free_model.is_enabled ? minimax_m25_free_model.public_id : 'minimax/minimax-m2.5',
-  zai_glm5_free_model.is_enabled ? zai_glm5_free_model.public_id : 'z-ai/glm-5',
   giga_potato_model.is_enabled ? giga_potato_model.public_id : null,
   giga_potato_thinking_model.is_enabled ? giga_potato_thinking_model.public_id : null,
   'arcee-ai/trinity-large-preview:free',
@@ -32,6 +31,7 @@ export const preferredModels = [
   'openai/gpt-5.3-codex',
   'google/gemini-3.1-pro-preview',
   'google/gemini-3-flash-preview',
+  zai_glm5_free_model.is_enabled ? zai_glm5_free_model.public_id : 'z-ai/glm-5',
   'moonshotai/kimi-k2.5',
   'x-ai/grok-code-fast-1',
 ].filter(Boolean) as string[];

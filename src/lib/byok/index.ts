@@ -1,6 +1,6 @@
 import { readDb, type db } from '@/lib/drizzle';
 import { byok_api_keys, modelsByProvider } from '@/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, type SQL } from 'drizzle-orm';
 import { desc } from 'drizzle-orm';
 import { decryptApiKey } from '@/lib/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -53,9 +53,9 @@ export async function getModelUserByokProviders(model: string): Promise<UserByok
   return isCodestralModel(model) ? ['codestral'] : await getModelUserByokProviders_cached(model);
 }
 
-export async function getBYOKforUser(
+async function getBYOKbyOwner(
   fromDb: typeof db,
-  userId: string,
+  ownerFilter: SQL,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
   const rows = await fromDb
@@ -66,7 +66,7 @@ export async function getBYOKforUser(
     .from(byok_api_keys)
     .where(
       and(
-        eq(byok_api_keys.kilo_user_id, userId),
+        ownerFilter,
         eq(byok_api_keys.is_enabled, true),
         inArray(byok_api_keys.provider_id, providerIds)
       )
@@ -83,32 +83,18 @@ export async function getBYOKforUser(
   }));
 }
 
+export async function getBYOKforUser(
+  fromDb: typeof db,
+  userId: string,
+  providerIds: UserByokProviderId[]
+): Promise<BYOKResult[] | null> {
+  return getBYOKbyOwner(fromDb, eq(byok_api_keys.kilo_user_id, userId), providerIds);
+}
+
 export async function getBYOKforOrganization(
   fromDb: typeof db,
   organizationId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
-  const rows = await fromDb
-    .select({
-      encrypted_api_key: byok_api_keys.encrypted_api_key,
-      provider_id: byok_api_keys.provider_id,
-    })
-    .from(byok_api_keys)
-    .where(
-      and(
-        eq(byok_api_keys.organization_id, organizationId),
-        eq(byok_api_keys.is_enabled, true),
-        inArray(byok_api_keys.provider_id, providerIds)
-      )
-    )
-    .orderBy(byok_api_keys.created_at);
-
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return rows.map(row => ({
-    decryptedAPIKey: decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY),
-    providerId: UserByokProviderIdSchema.parse(row.provider_id),
-  }));
+  return getBYOKbyOwner(fromDb, eq(byok_api_keys.organization_id, organizationId), providerIds);
 }

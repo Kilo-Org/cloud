@@ -147,3 +147,7 @@ export function validateAuthorizationHeader(headers: Headers) {
 export function generateCloudAgentToken(user: User) {
   return generateApiToken(user, { tokenSource: 'cloud-agent' });
 }
+
+export function generateClawToken(user: User) {
+  return generateApiToken(user, { tokenSource: 'claw' }, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+}

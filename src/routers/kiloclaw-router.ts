@@ -2,7 +2,7 @@ import 'server-only';
 
 import * as z from 'zod';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateApiToken, generateClawToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -108,8 +108,10 @@ function sanitizeKiloCodeConfigResponse(
   };
 }
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
 async function provisionInstance(
-  user: Parameters<typeof generateApiToken>[0],
+  user: Parameters<typeof generateClawToken>[0],
   input: z.infer<typeof updateConfigSchema>
 ) {
   await ensureActiveInstance(user.id);
@@ -120,11 +122,8 @@ async function provisionInstance(
       )
     : undefined;
 
-  const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-  const kilocodeApiKey = generateApiToken(user, undefined, {
-    expiresIn: expiresInSeconds,
-  });
-  const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+  const kilocodeApiKey = generateClawToken(user);
+  const kilocodeApiKeyExpiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
 
   const client = new KiloClawInternalClient();
   return client.provision(user.id, {
@@ -139,15 +138,12 @@ async function provisionInstance(
 }
 
 async function patchConfig(
-  user: Parameters<typeof generateApiToken>[0],
+  user: Parameters<typeof generateClawToken>[0],
   input: z.infer<typeof updateKiloCodeConfigSchema>
 ): Promise<KiloCodeConfigPublicResponse> {
   const client = new KiloClawInternalClient();
-  const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-  const kilocodeApiKey = generateApiToken(user, undefined, {
-    expiresIn: expiresInSeconds,
-  });
-  const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+  const kilocodeApiKey = generateClawToken(user);
+  const kilocodeApiKeyExpiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
 
   const response = await client.patchKiloCodeConfig(user.id, {
     ...input,

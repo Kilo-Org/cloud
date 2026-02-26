@@ -65,6 +65,7 @@ import { normalizeModelId } from '@/lib/model-utils';
 import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
 import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
 import { isActiveCloudAgentPromo } from '@/lib/promotions/cloud-agent-promo';
+import { isActiveKiloClawPromo } from '@/lib/promotions/kiloclaw-promo';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -331,7 +332,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       !isFreeModel(originalModelIdLowerCased) &&
       !userByok &&
       !isActiveReviewPromo(botId, originalModelIdLowerCased) &&
-      !isActiveCloudAgentPromo(tokenSource, originalModelIdLowerCased)
+      !isActiveCloudAgentPromo(tokenSource, originalModelIdLowerCased) &&
+      !isActiveKiloClawPromo(tokenSource, originalModelIdLowerCased)
     ) {
       return await usageLimitExceededResponse(user, balance);
     }
@@ -511,7 +513,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider.id !== 'custom' &&
     (isKiloFreeModel(originalModelIdLowerCased) ||
       isActiveReviewPromo(botId, originalModelIdLowerCased) ||
-      isActiveCloudAgentPromo(tokenSource, originalModelIdLowerCased))
+      isActiveCloudAgentPromo(tokenSource, originalModelIdLowerCased) ||
+      isActiveKiloClawPromo(tokenSource, originalModelIdLowerCased))
   ) {
     return rewriteFreeModelResponse(response, originalModelIdLowerCased);
   }

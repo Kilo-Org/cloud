@@ -8,7 +8,7 @@ export const kimi_k25_free_model: KiloFreeModel = {
     "Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual coding capability and a self-directed agent swarm paradigm. Built on Kimi K2 with continued pretraining over approximately 15T mixed visual and text tokens, it delivers strong performance in general reasoning, visual coding, and agentic tool-calling.",
   context_length: 262144,
   max_completion_tokens: 65536,
-  is_enabled: false,
+  is_enabled: true,
   flags: ['reasoning', 'prompt_cache', 'vision'],
   gateway: 'openrouter',
   internal_id: 'moonshotai/kimi-k2.5',

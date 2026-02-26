@@ -33,7 +33,7 @@ export const preferredModels = [
   'google/gemini-3.1-pro-preview',
   'google/gemini-3-flash-preview',
   'z-ai/glm-5',
-  'moonshotai/kimi-k2.5',
+  kimi_k25_free_model.is_enabled ? kimi_k25_free_model.public_id : 'moonshotai/kimi-k2.5',
   'x-ai/grok-code-fast-1',
 ].filter(m => m !== null);
 

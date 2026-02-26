@@ -11,6 +11,8 @@ import { UserGitHubAppsProvider } from '@/components/integrations/UserGitHubApps
 import { useGitHubAppsQueries } from '@/components/integrations/GitHubAppsContext';
 import { UserSlackProvider } from '@/components/integrations/UserSlackProvider';
 import { useSlackQueries } from '@/components/integrations/SlackContext';
+import { UserDiscordProvider } from '@/components/integrations/UserDiscordProvider';
+import { useDiscordQueries } from '@/components/integrations/DiscordContext';
 import { UserGitLabProvider } from '@/components/integrations/UserGitLabProvider';
 import { useGitLabQueries } from '@/components/integrations/GitLabContext';
 import { PageContainer } from '@/components/layouts/PageContainer';
@@ -19,6 +21,7 @@ function IntegrationsPageContent() {
   const router = useRouter();
   const { queries: githubQueries } = useGitHubAppsQueries();
   const { queries: slackQueries } = useSlackQueries();
+  const { queries: discordQueries } = useDiscordQueries();
   const { queries: gitlabQueries } = useGitLabQueries();
 
   // Fetch GitHub App installation status
@@ -27,10 +30,13 @@ function IntegrationsPageContent() {
   // Fetch Slack installation status
   const { data: slackInstallation, isLoading: slackLoading } = slackQueries.getInstallation();
 
+  // Fetch Discord installation status
+  const { data: discordInstallation, isLoading: discordLoading } = discordQueries.getInstallation();
+
   // Fetch GitLab installation status
   const { data: gitlabInstallation, isLoading: gitlabLoading } = gitlabQueries.getInstallation();
 
-  const isLoading = githubLoading || slackLoading || gitlabLoading;
+  const isLoading = githubLoading || slackLoading || discordLoading || gitlabLoading;
 
   if (isLoading) {
     return (
@@ -54,6 +60,7 @@ function IntegrationsPageContent() {
   const platforms = buildPlatformsForPersonal({
     github: githubInstallation,
     slack: slackInstallation,
+    discord: discordInstallation,
     gitlab: gitlabInstallation,
   });
 
@@ -85,9 +92,11 @@ export function IntegrationsPageClient() {
   return (
     <UserGitHubAppsProvider>
       <UserSlackProvider>
-        <UserGitLabProvider>
-          <IntegrationsPageContent />
-        </UserGitLabProvider>
+        <UserDiscordProvider>
+          <UserGitLabProvider>
+            <IntegrationsPageContent />
+          </UserGitLabProvider>
+        </UserDiscordProvider>
       </UserSlackProvider>
     </UserGitHubAppsProvider>
   );

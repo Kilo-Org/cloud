@@ -1,7 +1,6 @@
 import { readDb, type db } from '@/lib/drizzle';
 import { byok_api_keys, modelsByProvider } from '@/db/schema';
-import { eq, and, inArray, type SQL } from 'drizzle-orm';
-import { desc } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { decryptApiKey } from '@/lib/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {

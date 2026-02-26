@@ -11,10 +11,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 
 type DoctorMutation = ReturnType<typeof useKiloClawMutations>['runDoctor'];
+
+/** Strip ANSI escape codes so raw terminal output can render in a browser &lt;pre&gt;. */
+function stripAnsi(raw: string): string {
+  // eslint-disable-next-line no-control-regex
+  return raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
+}
 
 export function RunDoctorDialog({
   open,
@@ -40,13 +45,19 @@ export function RunDoctorDialog({
     }
   }, [open]);
 
-  const result = mutation.data;
+  const rawResult = mutation.data;
+  const result = rawResult
+    ? {
+        ...rawResult,
+        output: stripAnsi(rawResult.output),
+      }
+    : rawResult;
   const isPending = mutation.isPending;
   const isError = mutation.isError;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[750px]">
         <DialogHeader>
           <DialogTitle>OpenClaw Doctor</DialogTitle>
           <DialogDescription>
@@ -82,12 +93,13 @@ export function RunDoctorDialog({
                 {result.success ? 'Executed successfully' : 'Issues detected'}
               </span>
             </div>
-            <Textarea
-              readOnly
-              value={result.output}
-              className="min-h-[300px] font-mono text-xs"
-              rows={20}
-            />
+            <div className="border-border bg-background max-h-[400px] overflow-auto rounded-md border">
+              {/* prettier-ignore */}
+              <pre
+                className="p-3 text-xs leading-relaxed whitespace-pre"
+                style={{ fontFamily: "'Courier New', Courier, monospace", tabSize: 8 }}
+              >{result.output}</pre>
+            </div>
           </div>
         )}
 

@@ -23,3 +23,38 @@ export type ModelSettings = z.infer<typeof ModelSettingsSchema>;
 export const VersionedSettingsSchema = z.record(z.string(), ModelSettingsSchema);
 
 export type VersionedSettings = z.infer<typeof VersionedSettingsSchema>;
+
+export const OpenCodePromptSchema = z.enum([
+  'codex',
+  'gemini',
+  'beast',
+  'anthropic',
+  'trinity',
+  'anthropic_without_todo',
+]);
+
+export type OpenCodePrompt = z.infer<typeof OpenCodePromptSchema>;
+
+export const OpenCodeFamilySchema = z.enum(['claude', 'gpt', 'gemini', 'llama', 'mistral']);
+
+export type OpenCodeFamily = z.infer<typeof OpenCodeFamilySchema>;
+
+export const OpenCodeVariantSchema = z.object({
+  verbosity: z.enum(['low', 'medium', 'high', 'max']).optional(),
+  reasoning: z
+    .object({
+      enabled: z.boolean().optional(),
+      effort: z.enum(['none', 'low', 'medium', 'high', 'xhigh']).optional(),
+    })
+    .optional(),
+});
+
+export type OpenCodeVariant = z.infer<typeof OpenCodeVariantSchema>;
+
+export const OpenCodeSettingsSchema = z.object({
+  family: OpenCodeFamilySchema.optional(),
+  prompt: OpenCodePromptSchema.optional(),
+  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+});
+
+export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;

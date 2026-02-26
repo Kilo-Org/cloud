@@ -5,7 +5,7 @@ import {
   createCloudAgentNextClient,
   rethrowAsPaymentRequired,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateApiToken } from '@/lib/tokens';
+import { generateCloudAgentToken } from '@/lib/tokens';
 import {
   mergeProfileConfiguration,
   ProfileNotFoundError,
@@ -58,7 +58,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(basePrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
       const { envVars, setupCommands, profileName, gitlabProject, githubRepo, ...restInput } =
@@ -125,7 +125,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseInitiateFromPreparedSessionNextSchema)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const githubToken = await getGitHubTokenForUser(ctx.user.id);
       const client = createCloudAgentNextClient(authToken);
 
@@ -150,7 +150,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseSendMessageNextSchema)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const githubToken = await getGitHubTokenForUser(ctx.user.id);
       const client = createCloudAgentNextClient(authToken);
 
@@ -179,7 +179,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
       return await client.interruptSession(input.sessionId);
@@ -189,7 +189,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseAnswerQuestionNextSchema)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.answerQuestion(input);
     }),
@@ -198,7 +198,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseRejectQuestionNextSchema)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.rejectQuestion(input);
     }),
@@ -211,7 +211,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseGetSessionNextSchema)
     .output(baseGetSessionNextOutputSchema)
     .query(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);

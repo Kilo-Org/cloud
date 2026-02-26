@@ -18,6 +18,7 @@ type CodeReviewExportRow = {
   started_at: Date | string | null;
   completed_at: Date | string | null;
   created_at: Date | string | null;
+  session_id: string | null;
 };
 
 /**
@@ -76,6 +77,7 @@ export function exportCodeReviewsToCSV(
     'started_at',
     'completed_at',
     'created_at',
+    'session_id',
   ];
 
   const csvRows = [
@@ -95,6 +97,7 @@ export function exportCodeReviewsToCSV(
         escapeCsvValue(row.started_at ? String(row.started_at) : ''),
         escapeCsvValue(row.completed_at ? String(row.completed_at) : ''),
         escapeCsvValue(row.created_at ? String(row.created_at) : ''),
+        escapeCsvValue(row.session_id),
       ].join(',')
     ),
   ];

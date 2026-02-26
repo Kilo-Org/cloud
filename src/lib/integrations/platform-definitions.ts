@@ -1,6 +1,6 @@
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
-export type PlatformType = 'github' | 'gitlab' | 'bitbucket' | 'slack';
+export type PlatformType = 'github' | 'gitlab' | 'bitbucket' | 'slack' | 'discord';
 
 export type PlatformStatus = 'installed' | 'not_installed' | 'coming_soon';
 
@@ -49,6 +49,15 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/gitlab`,
   },
   {
+    id: 'discord',
+    name: 'Discord',
+    description:
+      'Create PRs, debug code, ask questions about your repos, etc. directly from Discord',
+    enabled: true,
+    personalRoute: '/integrations/discord',
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/discord`,
+  },
+  {
     id: 'bitbucket',
     name: 'Bitbucket',
     description: 'Integrate Bitbucket repositories for intelligent code analysis and automation',
@@ -60,6 +69,7 @@ type InstallationStatus = {
   github?: { installed: boolean };
   slack?: { installed: boolean };
   gitlab?: { installed: boolean };
+  discord?: { installed: boolean };
 };
 
 function getStatus(id: PlatformType, installations: InstallationStatus): PlatformStatus {
@@ -71,6 +81,9 @@ function getStatus(id: PlatformType, installations: InstallationStatus): Platfor
   }
   if (id === PLATFORM.GITLAB) {
     return installations.gitlab?.installed ? 'installed' : 'not_installed';
+  }
+  if (id === PLATFORM.DISCORD) {
+    return installations.discord?.installed ? 'installed' : 'not_installed';
   }
   return 'coming_soon';
 }

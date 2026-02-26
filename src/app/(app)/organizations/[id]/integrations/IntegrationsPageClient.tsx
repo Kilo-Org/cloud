@@ -11,6 +11,8 @@ import { OrgGitHubAppsProvider } from '@/components/integrations/OrgGitHubAppsPr
 import { useGitHubAppsQueries } from '@/components/integrations/GitHubAppsContext';
 import { OrgSlackProvider } from '@/components/integrations/OrgSlackProvider';
 import { useSlackQueries } from '@/components/integrations/SlackContext';
+import { OrgDiscordProvider } from '@/components/integrations/OrgDiscordProvider';
+import { useDiscordQueries } from '@/components/integrations/DiscordContext';
 import { OrgGitLabProvider } from '@/components/integrations/OrgGitLabProvider';
 import { useGitLabQueries } from '@/components/integrations/GitLabContext';
 
@@ -22,6 +24,7 @@ function IntegrationsPageContent({ organizationId }: IntegrationsPageClientProps
   const router = useRouter();
   const { queries: githubQueries } = useGitHubAppsQueries();
   const { queries: slackQueries } = useSlackQueries();
+  const { queries: discordQueries } = useDiscordQueries();
   const { queries: gitlabQueries } = useGitLabQueries();
 
   // Fetch GitHub App installation status
@@ -30,10 +33,13 @@ function IntegrationsPageContent({ organizationId }: IntegrationsPageClientProps
   // Fetch Slack installation status
   const { data: slackInstallation, isLoading: slackLoading } = slackQueries.getInstallation();
 
+  // Fetch Discord installation status
+  const { data: discordInstallation, isLoading: discordLoading } = discordQueries.getInstallation();
+
   // Fetch GitLab installation status
   const { data: gitlabInstallation, isLoading: gitlabLoading } = gitlabQueries.getInstallation();
 
-  const isLoading = githubLoading || slackLoading || gitlabLoading;
+  const isLoading = githubLoading || slackLoading || discordLoading || gitlabLoading;
 
   if (isLoading) {
     return (
@@ -55,6 +61,7 @@ function IntegrationsPageContent({ organizationId }: IntegrationsPageClientProps
   const platforms = buildPlatformsForOrg(organizationId, {
     github: githubInstallation,
     slack: slackInstallation,
+    discord: discordInstallation,
     gitlab: gitlabInstallation,
   });
 
@@ -78,9 +85,11 @@ export function IntegrationsPageClient({ organizationId }: IntegrationsPageClien
   return (
     <OrgGitHubAppsProvider organizationId={organizationId}>
       <OrgSlackProvider organizationId={organizationId}>
-        <OrgGitLabProvider organizationId={organizationId}>
-          <IntegrationsPageContent organizationId={organizationId} />
-        </OrgGitLabProvider>
+        <OrgDiscordProvider organizationId={organizationId}>
+          <OrgGitLabProvider organizationId={organizationId}>
+            <IntegrationsPageContent organizationId={organizationId} />
+          </OrgGitLabProvider>
+        </OrgDiscordProvider>
       </OrgSlackProvider>
     </OrgGitHubAppsProvider>
   );

@@ -1,1 +1,1 @@
-export { GET, revalidate } from '@/app/api/openrouter/providers/route';
+export { GET } from '@/app/api/openrouter/providers/route';

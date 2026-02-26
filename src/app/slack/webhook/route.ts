@@ -23,7 +23,7 @@ import { getDevUserSuffix } from '@/lib/slack-bot/dev-user-info';
 import { APP_URL } from '@/lib/constants';
 import { verifySlackRequest } from '@/lib/slack/verify-request';
 import { db } from '@/lib/drizzle';
-import { cliSessions } from '@/db/schema';
+import { cli_sessions_v2 } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 import type { Owner } from '@/lib/integrations/core/types';
@@ -52,9 +52,9 @@ function buildSessionUrl(dbSessionId: string, owner: Owner): string {
  */
 async function getDbSessionIdFromCloudAgentId(cloudAgentSessionId: string): Promise<string | null> {
   const [session] = await db
-    .select({ session_id: cliSessions.session_id })
-    .from(cliSessions)
-    .where(eq(cliSessions.cloud_agent_session_id, cloudAgentSessionId))
+    .select({ session_id: cli_sessions_v2.session_id })
+    .from(cli_sessions_v2)
+    .where(eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId))
     .limit(1);
 
   return session?.session_id ?? null;

@@ -18,6 +18,7 @@ import {
   useAdminSessionTrace,
   useAdminSessionMessages,
   useAdminApiConversationHistory,
+  useAdminResolveCloudAgentSession,
 } from '@/app/admin/api/session-traces/hooks';
 import { Search, User, Calendar, Globe, GitBranch, Loader2, Download } from 'lucide-react';
 import type { CloudMessage, Message } from '@/components/cloud-agent/types';
@@ -25,6 +26,7 @@ import type { StoredMessage } from '@/components/cloud-agent-next/types';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SES_PREFIX = 'ses_';
+const AGENT_PREFIX = 'agent_';
 
 function convertToMessage(cloudMessage: CloudMessage): Message & {
   say?: string;
@@ -57,13 +59,30 @@ export function SessionTraceViewer() {
   const [inputValue, setInputValue] = useState('');
   const [searchedSessionId, setSearchedSessionId] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [pendingAgentId, setPendingAgentId] = useState<string | null>(null);
+  const [resolvedFromAgent, setResolvedFromAgent] = useState<string | null>(null);
+
+  const resolveQuery = useAdminResolveCloudAgentSession(pendingAgentId);
+
+  // When the agent ID resolves, transition to the CLI session ID
+  useEffect(() => {
+    if (resolveQuery.data?.session_id && pendingAgentId) {
+      const resolved = resolveQuery.data.session_id;
+      setResolvedFromAgent(pendingAgentId);
+      setPendingAgentId(null);
+      setSearchedSessionId(resolved);
+      router.replace(`/admin/session-traces?sessionId=${resolved}`);
+    }
+  }, [resolveQuery.data, pendingAgentId, router]);
 
   // Initialize from URL parameter on mount
   useEffect(() => {
-    if (
-      sessionIdFromUrl &&
-      (UUID_REGEX.test(sessionIdFromUrl) || sessionIdFromUrl.startsWith(SES_PREFIX))
-    ) {
+    if (!sessionIdFromUrl) return;
+    if (sessionIdFromUrl.startsWith(AGENT_PREFIX)) {
+      setInputValue(sessionIdFromUrl);
+      setPendingAgentId(sessionIdFromUrl);
+      setSearchedSessionId(null);
+    } else if (UUID_REGEX.test(sessionIdFromUrl) || sessionIdFromUrl.startsWith(SES_PREFIX)) {
       setInputValue(sessionIdFromUrl);
       setSearchedSessionId(sessionIdFromUrl);
     }
@@ -79,16 +98,26 @@ export function SessionTraceViewer() {
       setValidationError('Please enter a session ID');
       return;
     }
-    if (!UUID_REGEX.test(trimmed) && !trimmed.startsWith(SES_PREFIX)) {
+
+    const isAgent = trimmed.startsWith(AGENT_PREFIX);
+    if (!UUID_REGEX.test(trimmed) && !trimmed.startsWith(SES_PREFIX) && !isAgent) {
       setValidationError(
-        'Invalid session ID. Expected a UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) or a v2 ID (ses_...)'
+        'Invalid session ID. Expected a UUID, a v2 ID (ses_...), or a cloud agent session ID (agent_...)'
       );
       return;
     }
+
     setValidationError(null);
-    setSearchedSessionId(trimmed);
-    // Update URL to make the link shareable (replace to avoid growing history stack)
-    router.replace(`/admin/session-traces?sessionId=${trimmed}`);
+    setResolvedFromAgent(null);
+
+    if (isAgent) {
+      setPendingAgentId(trimmed);
+      setSearchedSessionId(null);
+    } else {
+      setPendingAgentId(null);
+      setSearchedSessionId(trimmed);
+      router.replace(`/admin/session-traces?sessionId=${trimmed}`);
+    }
   };
 
   const downloadJson = (data: unknown, filename: string) => {
@@ -157,30 +186,57 @@ export function SessionTraceViewer() {
           <CardHeader>
             <CardTitle>Session Trace Viewer</CardTitle>
             <CardDescription>
-              Enter a CLI session ID (UUID or ses_...) to view the full session trace
+              Enter a CLI session ID (UUID or ses_...) or a cloud agent session ID (agent_...) to
+              view the full session trace
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
               <Input
-                placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000 or ses_abc123..."
+                placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000, ses_abc123..., or agent_..."
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 className="font-mono"
               />
-              <Button onClick={handleSearch} disabled={sessionQuery.isLoading}>
-                {sessionQuery.isLoading ? (
+              <Button
+                onClick={handleSearch}
+                disabled={sessionQuery.isLoading || resolveQuery.isLoading}
+              >
+                {sessionQuery.isLoading || resolveQuery.isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Search className="mr-2 h-4 w-4" />
                 )}
-                {sessionQuery.isLoading ? 'Loading...' : 'Search'}
+                {resolveQuery.isLoading
+                  ? 'Resolving...'
+                  : sessionQuery.isLoading
+                    ? 'Loading...'
+                    : 'Search'}
               </Button>
             </div>
             {validationError && <p className="mt-2 text-sm text-red-500">{validationError}</p>}
           </CardContent>
         </Card>
+
+        {pendingAgentId && resolveQuery.isError && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              {resolveQuery.error?.message || 'Could not resolve cloud agent session ID'}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {resolvedFromAgent && (
+          <Alert>
+            <AlertDescription>
+              Resolved from cloud agent session{' '}
+              <code className="bg-muted rounded px-1 py-0.5 font-mono text-sm">
+                {resolvedFromAgent}
+              </code>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {sessionQuery.isError && (
           <Alert variant="destructive">

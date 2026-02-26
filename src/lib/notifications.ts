@@ -1,4 +1,4 @@
-import { type User, microdollar_usage } from '@/db/schema';
+import { type User } from '@/db/schema';
 import { getBalanceForUser } from './user.balance';
 import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@/lib/constants';
 import {
@@ -11,8 +11,7 @@ import { cachedPosthogQuery } from '@/lib/posthog-query';
 import * as z from 'zod';
 import { subDays } from 'date-fns';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
-import { readDb } from '@/lib/drizzle';
-import { and, eq, inArray, gte } from 'drizzle-orm';
+
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { db } from '@/lib/drizzle';
 import { fromMicrodollars } from '@/lib/utils';
@@ -35,14 +34,10 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
-    id: 'feb-12-free-glm-5',
-    title: 'GLM-5 is free (for a limited time)',
-    message: 'Get Opus-level performance, for free.',
-    action: {
-      actionText: 'Learn More',
-      actionURL: 'https://blog.kilo.ai/p/glm-5-free-limited-time',
-    },
-    suggestModelId: 'z-ai/glm-5:free',
+    id: 'feb-25-glm5-free-ended',
+    title: 'GLM-5 Free Period Ended',
+    message:
+      'The free period for GLM-5 has ended. Try another free model like MiniMax M2.5 or Trinity Large Preview!',
     showIn: ['extension', 'cli'],
   },
   {
@@ -73,7 +68,6 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateByokProvidersNotification,
     generateFirstDayWelcomeNotification,
-    generateAutocompleteNotification,
     generateKiloPassNotification,
   ];
 
@@ -259,50 +253,6 @@ async function generateFirstDayWelcomeNotification(user: User): Promise<KiloNoti
   ];
 }
 
-async function generateAutocompleteNotification(user: User): Promise<KiloNotification[]> {
-  try {
-    // Query the database directly for this specific user instead of fetching all users
-    const codestralModels = ['codestral-2508', 'mistralai/codestral-2508'];
-    const result = await readDb
-      .select({ kilo_user_id: microdollar_usage.kilo_user_id })
-      .from(microdollar_usage)
-      .where(
-        and(
-          eq(microdollar_usage.kilo_user_id, user.id),
-          inArray(microdollar_usage.model, codestralModels),
-          gte(microdollar_usage.created_at, '2025-01-01')
-        )
-      )
-      .limit(1);
-
-    if (result.length > 0) {
-      console.debug(
-        '[generateAutocompleteNotification] user has used autocomplete through gateway'
-      );
-      return [];
-    }
-  } catch (e) {
-    console.error('[generateAutocompleteNotification]', e);
-    return [];
-  }
-
-  console.debug(
-    '[generateAutocompleteNotification] user has not used autocomplete through gateway'
-  );
-  return [
-    {
-      id: 'autocomplete-free-jan-14',
-      title: 'How to use autocomplete for 100% free',
-      message:
-        'Integrate Mistrals Codestral with a generous free tier and use inline & prompt autocomplete for free',
-      action: {
-        actionText: 'See how',
-        actionURL: 'https://kilo.ai/docs/basic-usage/autocomplete/mistral-setup',
-      },
-      showIn: ['cli', 'extension'],
-    },
-  ];
-}
 async function generateKiloPassNotification(user: User): Promise<KiloNotification[]> {
   // Exclude users who already have a Kilo Pass
   const kiloPassState = await getKiloPassStateForUser(db, user.id);

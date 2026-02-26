@@ -19,7 +19,11 @@ export {
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
-import { ModelSettingsSchema, VersionedSettingsSchema } from '@/lib/organizations/model-settings';
+import {
+  ModelSettingsSchema,
+  OpenCodeSettingsSchema,
+  VersionedSettingsSchema,
+} from '@/lib/organizations/model-settings';
 
 export const OrganizationNameSchema = z
   .string()
@@ -181,6 +185,7 @@ const OpenRouterModelSchema = z.object({
   preferredIndex: z.number().optional(),
   settings: ModelSettingsSchema.optional(),
   versioned_settings: VersionedSettingsSchema.optional(),
+  opencode: OpenCodeSettingsSchema.optional(),
 
   id: z.string(),
   name: z.string(),

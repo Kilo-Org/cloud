@@ -10,8 +10,9 @@ import { getOrganizationMemberByEmail } from '@/lib/organizations/organizations'
 export async function getSlackbotAuthTokenForOwner(
   owner: Owner,
   slackUserEmail?: string
-): Promise<{ authToken: string; error?: undefined } | { authToken?: undefined; error: string }> {
+): Promise<{ authToken: string; userId: string } | { error: string }> {
   let authToken: string | undefined;
+  let userId: string | undefined;
   if (owner.type === 'org') {
     const memberInfo =
       slackUserEmail && (await getOrganizationMemberByEmail(owner.id, slackUserEmail));
@@ -20,21 +21,24 @@ export async function getSlackbotAuthTokenForOwner(
 
     if (memberInfo) {
       authToken = generateApiToken(memberInfo.kilocode_users, { internalApiUse: true });
+      userId = memberInfo.kilocode_users.id;
     } else {
       const user = await ensureBotUserForOrg(owner.id, 'slack-bot');
       authToken = generateApiToken(user, { botId: 'slack-bot', internalApiUse: true });
+      userId = user.id;
     }
   } else {
     const user = await findUserById(owner.id);
 
     if (user) {
       authToken = generateApiToken(user, { internalApiUse: true });
+      userId = user.id;
     }
   }
 
-  if (!authToken) {
-    throw new Error(`Slackbot User not found for ID: ${owner.id} and type: ${owner.type}`);
+  if (!authToken || !userId) {
+    return { error: `Slackbot User not found for ID: ${owner.id} and type: ${owner.type}` };
   }
 
-  return { authToken };
+  return { authToken, userId };
 }

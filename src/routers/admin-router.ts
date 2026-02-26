@@ -883,6 +883,37 @@ export const adminRouter = createTRPCRouter({
   codeReviews: adminCodeReviewsRouter,
 
   sessionTraces: createTRPCRouter({
+    resolveCloudAgentSession: adminProcedure
+      .input(z.object({ cloud_agent_session_id: z.string().startsWith('agent_') }))
+      .query(async ({ input }) => {
+        // Check v1 first
+        const [v1] = await db
+          .select({ session_id: cliSessions.session_id })
+          .from(cliSessions)
+          .where(eq(cliSessions.cloud_agent_session_id, input.cloud_agent_session_id))
+          .limit(1);
+
+        if (v1) {
+          return { session_id: v1.session_id };
+        }
+
+        // Then check v2
+        const [v2] = await db
+          .select({ session_id: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.cloud_agent_session_id, input.cloud_agent_session_id))
+          .limit(1);
+
+        if (v2) {
+          return { session_id: v2.session_id };
+        }
+
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No CLI session found for this cloud agent session ID',
+        });
+      }),
+
     get: adminProcedure
       .input(z.object({ session_id: sessionIdSchema }))
       .query(async ({ input }) => {

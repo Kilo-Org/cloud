@@ -21,6 +21,7 @@ import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { registerVersionIfNeeded } from './lib/image-version';
 import { startingUpPage } from './pages/starting-up';
+import { buildForwardHeaders } from './utils/proxy-headers';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
@@ -249,11 +250,17 @@ app.all('*', async c => {
 
   const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
-  // Build headers to forward, adding the fly-force-instance-id header
-  const forwardHeaders = new Headers(request.headers);
-  forwardHeaders.set('fly-force-instance-id', machineId);
-  // Remove hop-by-hop headers that shouldn't be forwarded
-  forwardHeaders.delete('host');
+  if (!c.env.GATEWAY_TOKEN_SECRET) {
+    console.error('[CONFIG] Missing required environment variables: GATEWAY_TOKEN_SECRET');
+    return c.json({ error: 'Configuration error' }, 503);
+  }
+
+  const forwardHeaders = await buildForwardHeaders({
+    requestHeaders: request.headers,
+    machineId,
+    sandboxId,
+    gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+  });
 
   // WebSocket proxy
   if (isWebSocketRequest) {

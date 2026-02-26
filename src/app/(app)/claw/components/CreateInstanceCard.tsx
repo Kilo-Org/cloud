@@ -94,7 +94,7 @@ export function CreateInstanceCard({ mutations }: { mutations: ClawMutations }) 
         channels: buildChannelsPayload(),
       },
       {
-        onSuccess: () => toast.success('Instance created'),
+        onSuccess: () => toast.success('Instance created and starting'),
         onError: err => toast.error(`Failed to create: ${err.message}`),
       }
     );

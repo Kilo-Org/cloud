@@ -2,9 +2,9 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
-import { byok_api_keys } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { db, readDb } from '@/lib/drizzle';
+import { byok_api_keys, modelsByProvider } from '@/db/schema';
+import { desc, eq } from 'drizzle-orm';
 import { encryptApiKey } from '@/lib/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -17,8 +17,63 @@ import {
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
 } from '@/lib/byok/types';
+import { VercelUserByokInferenceProviderIdSchema } from '@/lib/providers/openrouter/inference-provider-id';
+import { unstable_cache } from 'next/cache';
+import { StoredModelSchema } from '@/lib/providers/vercel/types';
+
+const fetchSupportedModels = unstable_cache(
+  async (): Promise<Record<string, string[]>> => {
+    const vercelModelMetadata = z
+      .record(z.string(), StoredModelSchema)
+      .safeParse(
+        (
+          await readDb
+            .select({ vercel: modelsByProvider.vercel })
+            .from(modelsByProvider)
+            .orderBy(desc(modelsByProvider.id))
+            .limit(1)
+        ).at(0)?.vercel
+      );
+
+    if (!vercelModelMetadata.success) {
+      console.error(
+        '[fetchSupportedModels] failed to parse Vercel model metadata',
+        z.treeifyError(vercelModelMetadata.error)
+      );
+      return {};
+    }
+
+    const result: Record<string, string[]> = {};
+
+    result['codestral'] = ['Codestral'];
+
+    for (const model of Object.values(vercelModelMetadata.data)) {
+      if (model.id.includes('codestral')) continue;
+      if (model.type !== 'language') continue;
+      for (const endpoint of model.endpoints) {
+        const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(endpoint.tag);
+        if (!providerParsed.success) continue;
+        const providerId = providerParsed.data;
+        if (!result[providerId]) result[providerId] = [];
+        result[providerId].push(model.name);
+      }
+    }
+
+    for (const models of Object.values(result)) {
+      models.sort();
+    }
+
+    return result;
+  },
+  undefined,
+  { revalidate: 300 }
+);
 
 export const byokRouter = createTRPCRouter({
+  listSupportedModels: baseProcedure
+    .output(z.record(z.string(), z.array(z.string())))
+    .query(fetchSupportedModels),
+
   list: baseProcedure
     .input(ListBYOKKeysInputSchema)
     .output(z.array(BYOKApiKeyResponseSchema))

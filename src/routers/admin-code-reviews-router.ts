@@ -335,6 +335,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         started_at: cloud_agent_code_reviews.started_at,
         completed_at: cloud_agent_code_reviews.completed_at,
         created_at: cloud_agent_code_reviews.created_at,
+        session_id: cloud_agent_code_reviews.session_id,
       })
       .from(cloud_agent_code_reviews)
       .where(and(...conditions))

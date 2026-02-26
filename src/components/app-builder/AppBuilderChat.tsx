@@ -391,7 +391,7 @@ function V2SessionMessages({
   // whose child sessions are still streaming.
   const getChildMessages = useCallback(
     (childSessionId: string) => session.getChildSessionMessages(childSessionId),
-    [session, sessionState.childSessionMessages] // eslint-disable-line react-hooks/exhaustive-deps -- childSessionMessages triggers re-render
+    [session, sessionState.childSessionMessages]
   );
 
   if (sessionState.messages.length === 0 && !sessionState.isStreaming) {

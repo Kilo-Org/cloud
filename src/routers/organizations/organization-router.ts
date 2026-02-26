@@ -53,6 +53,7 @@ import { organizationAppBuilderRouter } from '@/routers/organizations/organizati
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSecurityAuditLogRouter } from '@/routers/organizations/organization-security-audit-log-router';
 import { organizationSlackRouter } from '@/routers/organizations/organization-slack-router';
+import { organizationDiscordRouter } from '@/routers/organizations/organization-discord-router';
 import { organizationAutoTriageRouter } from '@/routers/organizations/organization-auto-triage-router';
 import { organizationAutoFixRouter } from '@/routers/organizations/organization-auto-fix-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
@@ -109,6 +110,7 @@ export const organizationsRouter = createTRPCRouter({
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,
   slack: organizationSlackRouter,
+  discord: organizationDiscordRouter,
   autoTriage: organizationAutoTriageRouter,
   autoFix: organizationAutoFixRouter,
   autoTopUp: organizationAutoTopUpRouter,

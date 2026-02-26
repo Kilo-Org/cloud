@@ -94,6 +94,13 @@ export type DevicePairingApproveResponse = {
   message: string;
 };
 
+/** Fly Machine guest spec (CPU/memory configuration) */
+export type MachineSize = {
+  cpus: number;
+  memory_mb: number;
+  cpu_kind?: 'shared' | 'performance';
+};
+
 /** Response from GET /api/platform/status and GET /api/kiloclaw/status */
 export type PlatformStatusResponse = {
   userId: string | null;
@@ -109,6 +116,7 @@ export type PlatformStatusResponse = {
   flyMachineId: string | null;
   flyVolumeId: string | null;
   flyRegion: string | null;
+  machineSize: MachineSize | null;
 };
 
 /** A Fly volume snapshot. */

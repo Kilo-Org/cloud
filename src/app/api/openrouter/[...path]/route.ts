@@ -49,7 +49,6 @@ import {
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import { classifyAbuse } from '@/lib/abuse-service';
-import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
 import {
   emitApiMetricsForResponse,
   getToolsAvailable,
@@ -64,6 +63,13 @@ import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
 import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
+import { isActiveCloudAgentPromo } from '@/lib/promotions/cloud-agent-promo';
+import {
+  isKiloAutoModel,
+  KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_SMALL_MODEL,
+} from '@/lib/kilo-auto-model';
+import { minimax_m25_free_model } from '@/lib/providers/minimax';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -88,7 +94,13 @@ const MODE_TO_MODEL = new Map<string, string>([
 
 const DEFAULT_AUTO_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
-function resolveAutoModel(modeHeader: string | null) {
+function resolveAutoModel(model: string, modeHeader: string | null) {
+  if (model === KILO_AUTO_FREE_MODEL.id) {
+    return minimax_m25_free_model.public_id;
+  }
+  if (model === KILO_AUTO_SMALL_MODEL.id) {
+    return 'openai/gpt-5-nano';
+  }
   const mode = modeHeader?.trim().toLowerCase() ?? 'code';
   return MODE_TO_MODEL.get(mode) ?? DEFAULT_AUTO_MODEL;
 }
@@ -138,14 +150,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  const requestedAutoModel = requestedModelLowerCased === KILO_AUTO_MODEL_ID;
-
   // "kilo/auto" is a quasi-model id that resolves to a real model based on x-kilocode-mode.
   // After this resolution, the rest of the proxy flow behaves as if the client requested
   // the resolved model directly.
-  if (requestedAutoModel) {
+  if (isKiloAutoModel(requestedModelLowerCased)) {
     const modeHeader = request.headers.get('x-kilocode-mode');
-    requestBodyParsed.model = resolveAutoModel(modeHeader);
+    requestBodyParsed.model = resolveAutoModel(requestedModelLowerCased, modeHeader);
   }
 
   const originalModelIdLowerCased = requestBodyParsed.model.toLowerCase();
@@ -183,12 +193,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     authFailedResponse,
     organizationId: authOrganizationId,
     botId: authBotId,
+    tokenSource: authTokenSource,
   } = await getUserFromAuth({ adminOnly: false });
   authSpan.end();
 
   let user: typeof maybeUser | AnonymousUserContext;
   let organizationId: string | undefined = authOrganizationId;
   let botId: string | undefined = authBotId;
+  let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
     // No valid auth
@@ -232,6 +244,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;
+    tokenSource = undefined;
   } else {
     user = maybeUser;
   }
@@ -309,6 +322,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
     botId,
+    tokenSource,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
     session_id: taskId ?? null,
   };
@@ -325,7 +339,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       balance <= 0 &&
       !isFreeModel(originalModelIdLowerCased) &&
       !userByok &&
-      !isActiveReviewPromo(botId, originalModelIdLowerCased)
+      !isActiveReviewPromo(botId, originalModelIdLowerCased) &&
+      !isActiveCloudAgentPromo(tokenSource, originalModelIdLowerCased)
     ) {
       return await usageLimitExceededResponse(user, balance);
     }
@@ -504,7 +519,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (
     provider.id !== 'custom' &&
     (isKiloFreeModel(originalModelIdLowerCased) ||
-      isActiveReviewPromo(botId, originalModelIdLowerCased))
+      isActiveReviewPromo(botId, originalModelIdLowerCased) ||
+      isActiveCloudAgentPromo(tokenSource, originalModelIdLowerCased))
   ) {
     return rewriteFreeModelResponse(response, originalModelIdLowerCased);
   }

@@ -4,6 +4,7 @@ import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import {
   AutocompleteUserByokProviderIdSchema,
+  AwsCredentialsSchema,
   openRouterToVercelInferenceProviderId,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/providers/openrouter/inference-provider-id';
@@ -101,6 +102,14 @@ function convertProviderOptions(
   };
 }
 
+function parseAwsCredentials(input: string) {
+  try {
+    return AwsCredentialsSchema.parse(JSON.parse(input));
+  } catch {
+    throw new Error('Failed to parse AWS credentials');
+  }
+}
+
 export function applyVercelSettings(
   requestedModel: string,
   requestToMutate: OpenRouterChatCompletionRequest,
@@ -128,6 +137,7 @@ export function applyVercelSettings(
           ? VercelUserByokInferenceProviderIdSchema.enum.mistral
           : provider.providerId;
       const list = new Array<VercelInferenceProviderConfig>();
+
       if (key === VercelUserByokInferenceProviderIdSchema.enum.zai) {
         // Z.AI Coding Plan support
         list.push({
@@ -135,7 +145,13 @@ export function applyVercelSettings(
           baseURL: 'https://api.z.ai/api/coding/paas/v4',
         });
       }
-      list.push({ apiKey: provider.decryptedAPIKey });
+
+      if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
+        list.push(parseAwsCredentials(provider.decryptedAPIKey));
+      } else {
+        list.push({ apiKey: provider.decryptedAPIKey });
+      }
+
       byokProviders[key] = [...(byokProviders[key] ?? []), ...list];
     }
 

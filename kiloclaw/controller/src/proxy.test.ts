@@ -4,6 +4,16 @@ import type { Duplex } from 'node:stream';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import { createHttpProxy, handleWebSocketUpgrade } from './proxy';
+import type { Supervisor } from './supervisor';
+
+function createMockSupervisor(state: string): Supervisor {
+  return {
+    getState: () => state,
+    getStats: () => ({ state, uptime: 0, restarts: 0, lastExit: null }),
+    start: vi.fn(),
+    stop: vi.fn(),
+  } as unknown as Supervisor;
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -64,6 +74,46 @@ describe('HTTP proxy', () => {
     expect(await resp.json()).toEqual({ error: 'Bad Gateway' });
   });
 
+  it('returns 503 when supervisor is not running (after auth)', async () => {
+    const app = new Hono();
+    app.all(
+      '*',
+      createHttpProxy({
+        expectedToken: 'token-1',
+        requireProxyToken: true,
+        supervisor: createMockSupervisor('starting'),
+      })
+    );
+
+    // Unauthenticated callers still get 401, not 503
+    const noToken = await app.request('/x');
+    expect(noToken.status).toBe(401);
+
+    // Authenticated callers get 503 when gateway is not ready
+    const resp = await app.request('/x', {
+      headers: { 'x-kiloclaw-proxy-token': 'token-1' },
+    });
+    expect(resp.status).toBe(503);
+    expect(await resp.json()).toEqual({ error: 'Gateway not ready' });
+  });
+
+  it('proxies normally when supervisor is running', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    const app = new Hono();
+    app.all(
+      '*',
+      createHttpProxy({
+        expectedToken: 'token-1',
+        requireProxyToken: false,
+        supervisor: createMockSupervisor('running'),
+      })
+    );
+
+    const resp = await app.request('/x');
+    expect(resp.status).toBe(204);
+  });
+
   it('allows passthrough when proxy token is disabled', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
 
@@ -113,6 +163,20 @@ class FakeSocket extends EventEmitter {
 }
 
 describe('WebSocket proxy', () => {
+  it('rejects upgrade when supervisor is not running', () => {
+    const req = createIncomingMessage({ 'x-kiloclaw-proxy-token': 'token-1' });
+    const socket = new FakeSocket() as unknown as Duplex;
+
+    handleWebSocketUpgrade(req, socket, Buffer.alloc(0), {
+      expectedToken: 'token-1',
+      requireProxyToken: true,
+      supervisor: createMockSupervisor('crashed'),
+    });
+
+    expect((socket as unknown as FakeSocket).written.join('')).toContain('HTTP/1.1 503');
+    expect((socket as unknown as FakeSocket).destroyed).toBe(true);
+  });
+
   it('rejects upgrade without proxy token when enforcement is enabled', () => {
     const req = createIncomingMessage({});
     const socket = new FakeSocket() as unknown as Duplex;

@@ -1,4 +1,9 @@
-import type { ModelSettings, VersionedSettings } from '@/lib/organizations/model-settings';
+import type {
+  ModelSettings,
+  OpenCodeSettings,
+  VersionedSettings,
+} from '@/lib/organizations/model-settings';
+import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { giga_potato_model, giga_potato_thinking_model } from '@/lib/providers/gigapotato';
 import { isOpenAiModel } from '@/lib/providers/openai';
 
@@ -29,6 +34,21 @@ export function getVersionedModelSettings(model: string): VersionedSettings | un
       '4.146.0': {
         included_tools: ['write_file', 'edit_file'],
         excluded_tools: ['apply_diff'],
+      },
+    };
+  }
+  return undefined;
+}
+
+export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined {
+  if (isAnthropicModel(model)) {
+    return {
+      variants: {
+        none: { reasoning: { enabled: false } },
+        low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+        medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+        high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+        max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
       },
     };
   }

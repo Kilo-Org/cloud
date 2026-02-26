@@ -2,7 +2,7 @@
  * Utility functions for working with AI models
  */
 
-import { KILO_AUTO_MODEL_ID } from '@/lib/kilo-auto-model';
+import { KILO_AUTO_FRONTIER_MODEL } from '@/lib/kilo-auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
@@ -11,6 +11,7 @@ import { corethink_free_model } from '@/lib/providers/corethink';
 import { giga_potato_model, giga_potato_thinking_model } from '@/lib/providers/gigapotato';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m25_free_model } from '@/lib/providers/minimax';
+import { kimi_k25_free_model } from '@/lib/providers/moonshotai';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { zai_glm5_free_model } from '@/lib/providers/zai';
 
@@ -19,9 +20,8 @@ export const DEFAULT_MODEL_CHOICES = [CLAUDE_SONNET_CURRENT_MODEL_ID, CLAUDE_OPU
 export const PRIMARY_DEFAULT_MODEL = DEFAULT_MODEL_CHOICES[0];
 
 export const preferredModels = [
-  KILO_AUTO_MODEL_ID,
+  KILO_AUTO_FRONTIER_MODEL.id,
   minimax_m25_free_model.is_enabled ? minimax_m25_free_model.public_id : 'minimax/minimax-m2.5',
-  zai_glm5_free_model.is_enabled ? zai_glm5_free_model.public_id : 'z-ai/glm-5',
   giga_potato_model.is_enabled ? giga_potato_model.public_id : null,
   giga_potato_thinking_model.is_enabled ? giga_potato_thinking_model.public_id : null,
   'arcee-ai/trinity-large-preview:free',
@@ -32,9 +32,10 @@ export const preferredModels = [
   'openai/gpt-5.3-codex',
   'google/gemini-3.1-pro-preview',
   'google/gemini-3-flash-preview',
+  'z-ai/glm-5',
   'moonshotai/kimi-k2.5',
   'x-ai/grok-code-fast-1',
-].filter(Boolean) as string[];
+].filter(m => m !== null);
 
 export function getFirstFreeModel() {
   return preferredModels.find(m => isFreeModel(m)) ?? PRIMARY_DEFAULT_MODEL;
@@ -61,6 +62,7 @@ export const kiloFreeModels = [
   corethink_free_model,
   giga_potato_model,
   giga_potato_thinking_model,
+  kimi_k25_free_model,
   minimax_m25_free_model,
   grok_code_fast_1_optimized_free_model,
   zai_glm5_free_model,

@@ -16,7 +16,7 @@
     "incremental": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "plugins": [
       {
         "name": "next"
@@ -39,7 +39,8 @@
     "knip.ts",
     "instrumentation-client.ts",
     "sentry.edge.config.ts",
-    "sentry.server.config.ts"
+    "sentry.server.config.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules", ".next", "cloud-agent"]
 }

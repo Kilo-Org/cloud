@@ -601,6 +601,201 @@ describe('createEventProcessor', () => {
     });
   });
 
+  describe('child session event filtering', () => {
+    // Helper: register a child session
+    function registerChildSession(
+      processor: ReturnType<typeof createEventProcessor>,
+      childId: string,
+      parentId: string
+    ) {
+      processor.processEvent(
+        createKilocodeEvent('session.created', {
+          info: {
+            id: childId,
+            slug: 'child',
+            projectID: 'proj-1',
+            directory: '/test',
+            parentID: parentId,
+            title: 'Child Session',
+            version: '1.0',
+            time: { created: Date.now(), updated: Date.now() },
+          },
+        })
+      );
+    }
+
+    it('should not fire onSessionStatusChanged or onStreamingChanged for child session status events', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onSessionStatusChanged: jest.fn(),
+        onStreamingChanged: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      registerChildSession(processor, 'child-1', 'session-123');
+
+      // Child session goes busy
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'child-1',
+          status: { type: 'busy' },
+        })
+      );
+
+      expect(callbacks.onSessionStatusChanged).not.toHaveBeenCalled();
+      expect(callbacks.onStreamingChanged).not.toHaveBeenCalled();
+
+      // Child session goes idle
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'child-1',
+          status: { type: 'idle' },
+        })
+      );
+
+      expect(callbacks.onSessionStatusChanged).not.toHaveBeenCalled();
+      expect(callbacks.onStreamingChanged).not.toHaveBeenCalled();
+    });
+
+    it('should not toggle streaming when child session emits session.idle', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+        onMessageCompleted: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      registerChildSession(processor, 'child-1', 'session-123');
+
+      // Root session goes busy (sets streaming = true)
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
+
+      // Child session emits idle — should NOT set streaming false
+      processor.processEvent(createKilocodeEvent('session.idle', { sessionID: 'child-1' }));
+
+      // onStreamingChanged should only have been called once (the busy=true)
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still complete user messages when child session goes idle', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onMessageUpdated: jest.fn(),
+        onMessageCompleted: jest.fn(),
+        onStreamingChanged: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      registerChildSession(processor, 'child-1', 'session-123');
+
+      // Create a user message in the child session
+      processor.processEvent(
+        createKilocodeEvent(
+          'message.updated',
+          { info: createUserInfo('child-user-msg', 'child-1') },
+          'child-1'
+        )
+      );
+
+      expect(callbacks.onMessageCompleted).not.toHaveBeenCalled();
+
+      // Child session goes idle — user messages should still complete
+      processor.processEvent(createKilocodeEvent('session.idle', { sessionID: 'child-1' }));
+
+      expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
+      expect(callbacks.onMessageCompleted).toHaveBeenCalledWith(
+        'child-1',
+        'child-user-msg',
+        expect.objectContaining({ info: expect.objectContaining({ role: 'user' }) }),
+        'session-123'
+      );
+    });
+
+    it('should not toggle streaming for child session error, but still fire onError', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onError: jest.fn(),
+        onStreamingChanged: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      registerChildSession(processor, 'child-1', 'session-123');
+
+      // Root session goes busy
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
+
+      // Child session error — should NOT toggle streaming
+      processor.processEvent(
+        createKilocodeEvent('session.error', {
+          sessionID: 'child-1',
+          error: 'Child failed',
+        })
+      );
+
+      // onError should fire for child sessions
+      expect(callbacks.onError).toHaveBeenCalledWith('Child failed', 'child-1');
+      // streaming should still be true (only 1 call: the busy=true)
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not toggle streaming for child session turn close error, but still complete messages', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onMessageUpdated: jest.fn(),
+        onMessageCompleted: jest.fn(),
+        onStreamingChanged: jest.fn(),
+        onError: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      registerChildSession(processor, 'child-1', 'session-123');
+
+      // Root session goes busy
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // Create an in-flight assistant message in the child session
+      processor.processEvent(
+        createKilocodeEvent(
+          'message.updated',
+          { info: createAssistantInfo('child-msg-1', 'child-1') },
+          'child-1'
+        )
+      );
+
+      // Child turn closes with error
+      processor.processEvent(
+        createKilocodeEvent('session.turn.close', {
+          sessionID: 'child-1',
+          reason: 'error',
+        })
+      );
+
+      // Message should be force-completed
+      expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
+      // onError should fire
+      expect(callbacks.onError).toHaveBeenCalledWith(
+        'The model failed to generate a response',
+        'child-1'
+      );
+      // streaming should still be true (only 1 call: the busy=true)
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('session.error events', () => {
     it('should call onError callback and stop streaming', () => {
       const callbacks: EventProcessorCallbacks = {

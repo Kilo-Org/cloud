@@ -25,6 +25,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
 
 export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
+  'bedrock',
   'google', // Google AI Studio
   'openai',
   'minimax',
@@ -47,7 +48,7 @@ export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
-export const VercelNonUserByokInferenceProviderIdSchema = z.enum(['alibaba', 'bedrock', 'vertex']);
+export const VercelNonUserByokInferenceProviderIdSchema = z.enum(['alibaba', 'vertex']);
 
 export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
   VercelNonUserByokInferenceProviderIdSchema
@@ -59,7 +60,7 @@ export type VercelInferenceProviderId = z.infer<typeof VercelInferenceProviderId
 
 const openRouterToVercelInferenceProviderMapping = {
   [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']]:
-    VercelNonUserByokInferenceProviderIdSchema.enum.bedrock,
+    VercelUserByokInferenceProviderIdSchema.enum.bedrock,
   [OpenRouterInferenceProviderIdSchema.enum['google-ai-studio']]:
     VercelUserByokInferenceProviderIdSchema.enum.google,
   [OpenRouterInferenceProviderIdSchema.enum['google-vertex']]:
@@ -94,3 +95,11 @@ export function inferVercelFirstPartyInferenceProviderForModel(
     ? null
     : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);
 }
+
+export const AwsCredentialsSchema = z.object({
+  accessKeyId: z.string(),
+  secretAccessKey: z.string(),
+  region: z.string(),
+});
+
+export type AwsCredentials = z.infer<typeof AwsCredentialsSchema>;

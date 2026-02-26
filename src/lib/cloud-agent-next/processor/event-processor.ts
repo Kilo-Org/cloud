@@ -141,6 +141,16 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   }
 
   /**
+   * Check if a session is a child/sub-agent session.
+   * A session is a child if it has a non-null parent in sessionParents.
+   * Unknown/unregistered sessions are treated as root (safe default).
+   */
+  function isChildSession(sessionId: string | undefined): boolean {
+    if (!sessionId) return false;
+    return getParentSessionId(sessionId) !== null;
+  }
+
+  /**
    * Apply pending parts to a message if any exist.
    */
   function applyPendingParts(
@@ -307,23 +317,28 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
   /**
    * Handle session.status events.
+   * Child session status events still trigger user message completion
+   * but do NOT fire onSessionStatusChanged, onStreamingChanged, or toggle the streaming flag.
    */
   function handleSessionStatus(data: EventSessionStatus['properties']): void {
-    const { status } = data;
+    const { status, sessionID } = data;
+    const fromChild = isChildSession(sessionID);
 
-    callbacks.onSessionStatusChanged?.(status);
+    if (!fromChild) {
+      callbacks.onSessionStatusChanged?.(status);
+    }
 
     // Update streaming state based on status
     if (status.type === 'idle') {
-      // Complete user messages when session becomes idle
+      // Complete user messages when session becomes idle (for both root and child)
       completeUserMessages();
 
-      if (streaming) {
+      if (!fromChild && streaming) {
         streaming = false;
         callbacks.onStreamingChanged?.(false);
       }
     } else if (status.type === 'busy') {
-      if (!streaming) {
+      if (!fromChild && !streaming) {
         streaming = true;
         callbacks.onStreamingChanged?.(true);
       }
@@ -353,11 +368,14 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
   /**
    * Handle session.error events.
+   * onError fires for all sessions (root and child).
+   * Streaming toggle only fires for root sessions.
    */
   function handleSessionError(data: { sessionID?: string; error?: unknown }): void {
     const errorMessage = typeof data.error === 'string' ? data.error : 'Session error occurred';
+    const fromChild = isChildSession(data.sessionID);
 
-    if (streaming) {
+    if (!fromChild && streaming) {
       streaming = false;
       callbacks.onStreamingChanged?.(false);
     }
@@ -379,11 +397,16 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   /**
    * Handle session.idle events.
    * Completes all pending user messages since they don't have their own completion signals.
+   * Child session idle events still trigger user message completion
+   * but do NOT toggle the streaming flag or fire onStreamingChanged.
    */
-  function handleSessionIdle(): void {
+  function handleSessionIdle(data: { sessionID: string }): void {
+    const fromChild = isChildSession(data.sessionID);
+
+    // Complete user messages for both root and child sessions
     completeUserMessages();
 
-    if (streaming) {
+    if (!fromChild && streaming) {
       streaming = false;
       callbacks.onStreamingChanged?.(false);
     }
@@ -392,9 +415,10 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   /**
    * Force-complete all in-flight messages.
    * Stamps synthetic time.completed on assistant messages and completes user messages.
-   * Sets streaming to false via callback.
+   * Sets streaming to false via callback unless skipStreamingToggle is true
+   * (used when called for child session events that shouldn't affect root streaming state).
    */
-  function forceCompleteAllMessages(): void {
+  function forceCompleteAllMessages(skipStreamingToggle = false): void {
     const now = Date.now();
     for (const [key, message] of messagesMap) {
       if (isAssistantMessage(message.info) && !isAssistantMessageComplete(message)) {
@@ -413,7 +437,7 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
     completeUserMessages();
 
-    if (streaming) {
+    if (!skipStreamingToggle && streaming) {
       streaming = false;
       callbacks.onStreamingChanged?.(false);
     }
@@ -423,13 +447,16 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
    * Handle session.turn.close events.
    * When reason is "error", force-complete all in-flight assistant messages
    * that never received time.completed from the server.
+   * Child session turn close events still complete messages and fire onError,
+   * but skip the streaming toggle.
    */
   function handleSessionTurnClose(data: { sessionID?: string; reason?: string }): void {
     if (data.reason !== 'error') {
       return;
     }
 
-    forceCompleteAllMessages();
+    const fromChild = isChildSession(data.sessionID);
+    forceCompleteAllMessages(fromChild);
 
     callbacks.onError?.('The model failed to generate a response', data.sessionID);
   }
@@ -485,7 +512,7 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
         break;
 
       case 'session.idle':
-        handleSessionIdle();
+        handleSessionIdle(data as { sessionID: string });
         break;
 
       case 'session.turn.close':

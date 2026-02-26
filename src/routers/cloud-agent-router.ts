@@ -5,7 +5,7 @@ import {
   createCloudChatClient,
   rethrowAsPaymentRequired,
 } from '@/lib/cloud-agent/cloud-agent-client';
-import { generateApiToken } from '@/lib/tokens';
+import { generateCloudAgentToken } from '@/lib/tokens';
 import {
   mergeProfileConfiguration,
   ProfileNotFoundError,
@@ -53,7 +53,7 @@ export const cloudAgentRouter = createTRPCRouter({
   initiateSessionStream: baseProcedure
     .input(baseInitiateSessionSchema)
     .subscription(async function* ({ ctx, input }) {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const githubToken = await getGitHubTokenForUser(ctx.user.id);
       const client = createCloudChatClient(authToken);
 
@@ -80,7 +80,7 @@ export const cloudAgentRouter = createTRPCRouter({
   initiateFromKilocodeSessionStream: baseProcedure
     .input(baseInitiateFromKilocodeSessionSchema)
     .subscription(async function* ({ ctx, input }) {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const githubToken = await getGitHubTokenForUser(ctx.user.id);
       const client = createCloudChatClient(authToken);
 
@@ -119,7 +119,7 @@ export const cloudAgentRouter = createTRPCRouter({
     .input(basePrepareSessionSchema)
     .output(basePrepareSessionOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudChatClient(authToken);
 
       const { envVars, setupCommands, profileName, gitlabProject, githubRepo, ...restInput } =
@@ -185,7 +185,7 @@ export const cloudAgentRouter = createTRPCRouter({
     .input(basePrepareLegacySessionSchema)
     .output(basePrepareLegacySessionOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudChatClient(authToken);
 
       const { envVars, setupCommands, profileName, gitlabProject, githubRepo, ...restInput } =
@@ -245,7 +245,7 @@ export const cloudAgentRouter = createTRPCRouter({
     ctx,
     input,
   }) {
-    const authToken = generateApiToken(ctx.user);
+    const authToken = generateCloudAgentToken(ctx.user);
     const githubToken = await getGitHubTokenForUser(ctx.user.id);
     const client = createCloudChatClient(authToken);
 
@@ -285,7 +285,7 @@ export const cloudAgentRouter = createTRPCRouter({
   deleteSession: baseProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudChatClient(authToken);
 
       // First, delete the cloud-agent session (idempotent - returns success if already deleted)
@@ -338,7 +338,7 @@ export const cloudAgentRouter = createTRPCRouter({
   interruptSession: baseProcedure
     .input(baseInterruptSessionSchema)
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudChatClient(authToken);
       return await client.interruptSession(input.sessionId);
     }),
@@ -354,7 +354,7 @@ export const cloudAgentRouter = createTRPCRouter({
     .input(baseGetSessionSchema)
     .output(baseGetSessionOutputSchema)
     .query(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudChatClient(authToken);
       return await client.getSession(input.cloudAgentSessionId);
     }),
@@ -413,7 +413,7 @@ export const cloudAgentRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const githubToken = await getGitHubTokenForUser(ctx.user.id);
       const client = createCloudChatClient(authToken);
 
@@ -455,7 +455,7 @@ export const cloudAgentRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const githubToken = await getGitHubTokenForUser(ctx.user.id);
       const client = createCloudChatClient(authToken);
 

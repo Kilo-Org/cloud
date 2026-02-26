@@ -68,15 +68,19 @@ function getReplicaUrl(): string {
   return postgresUrl;
 }
 
-// Primary pool - always points to Frankfurt (writes go here)
-// max: 15 — keep low because Vercel can spawn 100+ concurrent serverless instances,
+// Keep low because Vercel can spawn 100+ concurrent serverless instances,
 // each with its own pool, all hitting the same pgbouncer. At max:100, a cold-start
 // cascade can open 100×N connections simultaneously and overwhelm pgbouncer.
+const max = 10;
+
+const idleTimeoutMillis = 10_000;
+
+// Primary pool - always points to Frankfurt (writes go here)
 export const pool = new Pool({
   ...getDatabaseClientConfig(postgresUrl),
-  max: 15,
+  max,
   connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT || '30000'),
-  idleTimeoutMillis: 3000,
+  idleTimeoutMillis,
   application_name: appName,
 });
 
@@ -87,9 +91,9 @@ export const usesSeparateReplica = replicaUrl !== postgresUrl;
 const replicaPool = usesSeparateReplica
   ? new Pool({
       ...getDatabaseClientConfig(replicaUrl),
-      max: 15,
+      max,
       connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT || '30000'),
-      idleTimeoutMillis: 3000,
+      idleTimeoutMillis,
       application_name: `${appName}-replica`,
     })
   : pool; // Reuse primary pool if no separate replica

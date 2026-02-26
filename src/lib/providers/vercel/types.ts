@@ -1,6 +1,10 @@
 import * as z from 'zod';
 
-export const ModelSchema = z.object({ id: z.string(), name: z.string() });
+export const ModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string().optional(),
+});
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 

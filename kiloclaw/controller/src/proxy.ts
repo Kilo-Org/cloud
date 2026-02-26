@@ -3,6 +3,7 @@ import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import type { Context } from 'hono';
 import { timingSafeTokenEqual } from './auth';
+import type { Supervisor } from './supervisor';
 
 export const DEFAULT_WS_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 export const DEFAULT_WS_HANDSHAKE_TIMEOUT_MS = 5 * 1000;
@@ -11,6 +12,7 @@ export const DEFAULT_MAX_WS_CONNS = 100;
 export type ProxyOptions = {
   expectedToken: string;
   requireProxyToken: boolean;
+  supervisor?: Supervisor;
   backendHost?: string;
   backendPort?: number;
   wsIdleTimeoutMs?: number;
@@ -44,6 +46,10 @@ export function createHttpProxy(options: ProxyOptions) {
     const token = c.req.header('x-kiloclaw-proxy-token');
     if (!hasValidProxyToken(token, options.requireProxyToken, options.expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    if (options.supervisor && options.supervisor.getState() !== 'running') {
+      return c.json({ error: 'Gateway not ready' }, 503);
     }
 
     const incomingUrl = new URL(c.req.url);
@@ -112,10 +118,16 @@ export function handleWebSocketUpgrade(
   const wsHandshakeTimeoutMs = options.wsHandshakeTimeoutMs ?? DEFAULT_WS_HANDSHAKE_TIMEOUT_MS;
   const maxWsConnections = options.maxWsConnections ?? DEFAULT_MAX_WS_CONNS;
   const wsState = options.wsState ?? { activeConnections: 0 };
+
   const token = getHeaderToken(req.headers['x-kiloclaw-proxy-token']);
 
   if (!hasValidProxyToken(token, options.requireProxyToken, options.expectedToken)) {
     socketWriteUnauthorized(socket);
+    return;
+  }
+
+  if (options.supervisor && options.supervisor.getState() !== 'running') {
+    socketWriteServiceUnavailable(socket);
     return;
   }
   if (wsState.activeConnections >= maxWsConnections) {

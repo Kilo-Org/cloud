@@ -22,6 +22,7 @@ validateGitLfs();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
   devIndicators: { position: 'bottom-right' },
 
   async rewrites() {
@@ -74,8 +75,7 @@ const nextConfig = {
     return [
       {
         source: '/cli/install',
-        destination:
-          'https://raw.githubusercontent.com/Kilo-Org/kilo/refs/heads/dev/install',
+        destination: 'https://raw.githubusercontent.com/Kilo-Org/kilo/refs/heads/dev/install',
         permanent: false,
       },
       {
@@ -126,11 +126,6 @@ const nextConfig = {
   // Configure `pageExtensions` to include markdown and MDX files
   pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
 
-  // Disable built-in ESLint integration
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-
   // Configure webpack to suppress warnings
   webpack: config => {
     // Suppress webpack warnings for MDX loader
@@ -177,44 +172,24 @@ const withMDX = createMDX({
 });
 
 const sentryConfig = {
-  // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
+  // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/build/
 
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
-  // Auth token for Sentry, required for uploading source maps
   authToken: process.env.SENTRY_AUTH_TOKEN,
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
 
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-
   // Upload a larger set of source maps for prettier stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  // tunnelRoute: '/monitoring',
-
-  // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
+  // Tree-shake Sentry debug statements to reduce bundle size
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+  },
 
   telemetry: false,
-
-  // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
-  // See the following for more information:
-  // https://docs.sentry.io/product/crons/
-  // https://vercel.com/docs/cron-jobs
-  automaticVercelMonitors: true,
-
-  // Enable React component stack traces in Sentry
-  reactComponentAnnotation: {
-    enabled: true,
-  },
 };
 
 export default withBundleAnalyzer(

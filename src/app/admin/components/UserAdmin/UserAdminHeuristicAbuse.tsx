@@ -13,6 +13,7 @@ import type {
 import { CopyJsonButton } from '@/components/admin/CopyJsonButton';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -289,7 +290,7 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
     key: 'session_id',
     title: 'Session',
     render: row => row.session_id || 'N/A',
-    visible: false,
+    visible: true,
   },
   {
     key: 'upstream_id',
@@ -372,10 +373,9 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
     return '';
   };
 
-  // Toggle column visibility
-  const toggleColumnVisibility = (columnKey: keyof UsageForTableDisplay) => {
+  const setColumnVisibility = (columnKey: keyof UsageForTableDisplay, visible: boolean) => {
     setColumns(prevColumns =>
-      prevColumns.map(col => (col.key === columnKey ? { ...col, visible: !col.visible } : col))
+      prevColumns.map(col => (col.key === columnKey ? { ...col, visible } : col))
     );
   };
 
@@ -544,20 +544,15 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
                 </DropdownMenuItem>
                 <div className="my-1 border-t"></div>
                 {columns.map(column => (
-                  <DropdownMenuItem
+                  <DropdownMenuCheckboxItem
                     key={String(column.key)}
-                    onClick={() => toggleColumnVisibility(column.key)}
+                    checked={column.visible}
+                    onCheckedChange={checked => {
+                      setColumnVisibility(column.key, checked === true);
+                    }}
                   >
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={column.visible}
-                        onChange={() => toggleColumnVisibility(column.key)}
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm">{column.title}</span>
-                    </label>
-                  </DropdownMenuItem>
+                    <span className="text-sm">{column.title}</span>
+                  </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>

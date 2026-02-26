@@ -9,51 +9,49 @@ import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloModel } from '@/lib/providers/kilo-free-model';
 import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
-import { getModelSettings, getVersionedModelSettings } from '@/lib/providers/recommended-models';
 import {
-  KILO_AUTO_MODEL_COMPLETION_PRICE,
-  KILO_AUTO_MODEL_CONTEXT_LENGTH,
-  KILO_AUTO_MODEL_DESCRIPTION,
-  KILO_AUTO_MODEL_ID,
-  KILO_AUTO_MODEL_MAX_COMPLETION_TOKENS,
-  KILO_AUTO_MODEL_NAME,
-  KILO_AUTO_MODEL_PROMPT_PRICE,
-} from '@/lib/kilo-auto-model';
+  getModelSettings,
+  getOpenCodeSettings,
+  getVersionedModelSettings,
+} from '@/lib/providers/recommended-models';
+import { AUTO_MODELS } from '@/lib/kilo-auto-model';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/model-utils';
 
-function buildAutoModel(): OpenRouterModel {
-  return {
-    id: KILO_AUTO_MODEL_ID,
-    name: KILO_AUTO_MODEL_NAME,
+function buildAutoModels(): OpenRouterModel[] {
+  return AUTO_MODELS.map(m => ({
+    id: m.id,
+    name: m.name,
     created: 0,
-    description: KILO_AUTO_MODEL_DESCRIPTION,
+    description: m.description,
     architecture: {
-      input_modalities: ['text', 'image'],
+      input_modalities: m.supports_images ? ['text', 'image'] : ['text'],
       output_modalities: ['text'],
       tokenizer: 'Other',
     },
     top_provider: {
       is_moderated: false,
-      context_length: KILO_AUTO_MODEL_CONTEXT_LENGTH,
-      max_completion_tokens: KILO_AUTO_MODEL_MAX_COMPLETION_TOKENS,
+      context_length: m.context_length,
+      max_completion_tokens: m.max_completion_tokens,
     },
     pricing: {
-      prompt: KILO_AUTO_MODEL_PROMPT_PRICE,
-      completion: KILO_AUTO_MODEL_COMPLETION_PRICE,
+      prompt: m.prompt_price,
+      completion: m.completion_price,
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
     },
-    context_length: KILO_AUTO_MODEL_CONTEXT_LENGTH,
+    context_length: m.context_length,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
-  };
+    settings: m.roocode_settings,
+    opencode: m.opencode_settings,
+  }));
 }
 
 function enhancedModelList(models: OpenRouterModel[]) {
-  const autoModel = buildAutoModel();
+  const autoModels = buildAutoModels();
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
@@ -61,10 +59,9 @@ function enhancedModelList(models: OpenRouterModel[]) {
         !isRateLimitedToDeath(model.id)
     )
     .concat(kiloFreeModels.filter(m => m.is_enabled).map(model => convertFromKiloModel(model)))
-    .concat([autoModel])
+    .concat(autoModels)
     .map((model: OpenRouterModel) => {
-      const preferredIndex =
-        model.id === KILO_AUTO_MODEL_ID ? -1 : preferredModels.indexOf(model.id);
+      const preferredIndex = preferredModels.indexOf(model.id);
       const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
       const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
       const nameEndsWithParen = model.name.endsWith(')');
@@ -77,10 +74,10 @@ function enhancedModelList(models: OpenRouterModel[]) {
             : isNew
               ? model.name + ' (new)'
               : model.name,
-        preferredIndex:
-          preferredIndex >= 0 || model.id === KILO_AUTO_MODEL_ID ? preferredIndex : undefined,
-        settings: getModelSettings(model.id),
-        versioned_settings: getVersionedModelSettings(model.id),
+        preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
+        settings: model.settings ?? getModelSettings(model.id),
+        versioned_settings: model.versioned_settings ?? getVersionedModelSettings(model.id),
+        opencode: model.opencode ?? getOpenCodeSettings(model.id),
       };
     });
   const sortedModels = enhancedModels.sort((a, b) => {

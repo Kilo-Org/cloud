@@ -18,11 +18,11 @@
       "top_provider": {
         "is_moderated": false,
         "context_length": 1000000,
-        "max_completion_tokens": 64000
+        "max_completion_tokens": 128000
       },
       "pricing": {
-        "prompt": "0.0000010",
-        "completion": "0.0000010",
+        "prompt": "0.000005",
+        "completion": "0.000025",
         "request": "0",
         "image": "0",
         "web_search": "0",
@@ -36,7 +36,11 @@
         "reasoning",
         "include_reasoning"
       ],
-      "preferredIndex": -1
+      "opencode": {
+        "family": "claude",
+        "prompt": "anthropic"
+      },
+      "preferredIndex": 0
     },
     {
       "id": "minimax/minimax-m2.5:free",
@@ -92,61 +96,6 @@
       }
     },
     {
-      "id": "z-ai/glm-5:free",
-      "canonical_slug": "z-ai/glm-5:free",
-      "hugging_face_id": "",
-      "name": "Z.ai: GLM 5 (free)",
-      "created": 1756238927,
-      "description": "GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading closed-source models. With advanced agentic planning, deep backend reasoning, and iterative self-correction, GLM-5 moves beyond code generation to full-system construction and autonomous execution.",
-      "context_length": 202800,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000000"
-      },
-      "top_provider": {
-        "context_length": 202800,
-        "max_completion_tokens": 131072,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "preferredIndex": 2,
-      "versioned_settings": {
-        "4.146.0": {
-          "included_tools": [
-            "write_file",
-            "edit_file"
-          ],
-          "excluded_tools": [
-            "apply_diff"
-          ]
-        }
-      }
-    },
-    {
       "id": "giga-potato",
       "canonical_slug": "giga-potato",
       "hugging_face_id": "",
@@ -187,7 +136,7 @@
         "tools"
       ],
       "default_parameters": {},
-      "preferredIndex": 3,
+      "preferredIndex": 2,
       "versioned_settings": {
         "4.146.0": {
           "included_tools": [
@@ -243,7 +192,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 4,
+      "preferredIndex": 3,
       "versioned_settings": {
         "4.146.0": {
           "included_tools": [
@@ -283,7 +232,44 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 200000
+      "context_length": 200000,
+      "opencode": {
+        "variants": {
+          "none": {
+            "reasoning": {
+              "enabled": false
+            }
+          },
+          "low": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "low"
+            },
+            "verbosity": "low"
+          },
+          "medium": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            },
+            "verbosity": "medium"
+          },
+          "high": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "high"
+            },
+            "verbosity": "high"
+          },
+          "max": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "xhigh"
+            },
+            "verbosity": "max"
+          }
+        }
+      }
     },
     {
       "id": "anthropic/claude-3.7-sonnet",
@@ -312,7 +298,44 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 200000
+      "context_length": 200000,
+      "opencode": {
+        "variants": {
+          "none": {
+            "reasoning": {
+              "enabled": false
+            }
+          },
+          "low": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "low"
+            },
+            "verbosity": "low"
+          },
+          "medium": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            },
+            "verbosity": "medium"
+          },
+          "high": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "high"
+            },
+            "verbosity": "high"
+          },
+          "max": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "xhigh"
+            },
+            "verbosity": "max"
+          }
+        }
+      }
     },
     {
       "id": "google/gemini-2.5-pro",
@@ -491,6 +514,92 @@
         "tools"
       ],
       "default_parameters": {}
+    },
+    {
+      "id": "kilo/auto-free",
+      "name": "Kilo: Auto Free",
+      "created": 0,
+      "description": "Automatically routes your request to a free model.",
+      "architecture": {
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other"
+      },
+      "top_provider": {
+        "is_moderated": false,
+        "context_length": 204800,
+        "max_completion_tokens": 131072
+      },
+      "pricing": {
+        "prompt": "0",
+        "completion": "0",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0"
+      },
+      "context_length": 204800,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "settings": {
+        "included_tools": [
+          "search_and_replace"
+        ],
+        "excluded_tools": [
+          "apply_diff",
+          "edit_file"
+        ]
+      }
+    },
+    {
+      "id": "kilo/auto-small",
+      "name": "Kilo: Auto Small",
+      "created": 0,
+      "description": "Automatically routes your request to a small model.",
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other"
+      },
+      "top_provider": {
+        "is_moderated": false,
+        "context_length": 400000,
+        "max_completion_tokens": 128000
+      },
+      "pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.0000004",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0"
+      },
+      "context_length": 400000,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "opencode": {
+        "family": "gpt",
+        "prompt": "codex"
+      }
     }
   ]
 }

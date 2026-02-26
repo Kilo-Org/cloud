@@ -21,10 +21,10 @@ export const KILOCLAW_AUTH_COOKIE_MAX_AGE = 60 * 60 * 24;
 /** Expected JWT token version -- must match cloud's JWT_TOKEN_VERSION */
 export const KILO_TOKEN_VERSION = 3;
 
-/** Default Fly Machine guest spec (shared-cpu-2x, 4GB) */
+/** Default Fly Machine guest spec (shared-cpu-2x, 3GB) */
 export const DEFAULT_MACHINE_GUEST = {
   cpus: 2,
-  memory_mb: 4096,
+  memory_mb: 3072,
   cpu_kind: 'shared' as const,
 };
 
@@ -33,7 +33,7 @@ export const DEFAULT_VOLUME_SIZE_GB = 10;
 
 /** Default Fly region priority list when FLY_REGION env var is not set.
  *  Callers shuffle before selecting so order here doesn't matter. */
-export const DEFAULT_FLY_REGION = 'cdg,arn,yyz,ord,iad,lax';
+export const DEFAULT_FLY_REGION = 'us,eu';
 
 // Alarm cadence by instance status
 /** Running machines: fast health checks */
@@ -57,3 +57,6 @@ export const HEALTH_PROBE_TIMEOUT_SECONDS = 60;
 
 /** Interval between health probe retries during startup */
 export const HEALTH_PROBE_INTERVAL_MS = 3_000;
+
+/** Auto-destroy provisioned instances that never started after this duration */
+export const STALE_PROVISION_THRESHOLD_MS = 8 * 60 * 60 * 1000; // 8 hours

@@ -14,6 +14,7 @@ import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
 import { slackRouter } from '@/routers/slack-router';
+import { discordRouter } from '@/routers/discord-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
@@ -47,6 +48,7 @@ export const rootRouter = createTRPCRouter({
   githubApps: githubAppsRouter,
   gitlab: gitlabRouter,
   slack: slackRouter,
+  discord: discordRouter,
   cloudAgent: cloudAgentRouter,
   cloudAgentNext: cloudAgentNextRouter,
   codeReviews: codeReviewRouter,

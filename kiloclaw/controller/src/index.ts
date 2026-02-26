@@ -122,6 +122,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     createHttpProxy({
       expectedToken: config.expectedToken,
       requireProxyToken: config.requireProxyToken,
+      supervisor,
     })
   );
 
@@ -139,6 +140,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     handleWebSocketUpgrade(req, socket, head, {
       expectedToken: config.expectedToken,
       requireProxyToken: config.requireProxyToken,
+      supervisor,
       wsIdleTimeoutMs: config.wsIdleTimeoutMs,
       wsHandshakeTimeoutMs: config.wsHandshakeTimeoutMs,
       maxWsConnections: config.maxWsConnections,

@@ -77,12 +77,14 @@ vi.mock('../utils/env-encryption', () => ({
 import { KiloClawInstance } from './kiloclaw-instance';
 import * as flyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
+import * as db from '../db';
 import {
   ALARM_INTERVAL_RUNNING_MS,
   ALARM_INTERVAL_DESTROYING_MS,
   ALARM_INTERVAL_IDLE_MS,
   ALARM_JITTER_MS,
   SELF_HEAL_THRESHOLD,
+  STALE_PROVISION_THRESHOLD_MS,
 } from '../config';
 
 // ============================================================================
@@ -124,6 +126,7 @@ function createFakeStorage() {
 
 function createFakeAppStub() {
   return {
+    ensureApp: vi.fn().mockResolvedValue({ appName: 'claw-user-1' }),
     ensureEnvKey: vi.fn().mockResolvedValue({
       key: 'dGVzdC1rZXktMzItYnl0ZXMtcGFkZGVkLi4uLg==',
       secretsVersion: 1,
@@ -669,7 +672,7 @@ describe('createNewMachine: persist ID before waitForState', () => {
             path: '/_kilo/health',
             interval: '30s',
             timeout: '5s',
-            grace_period: '60s',
+            grace_period: '120s',
           },
         },
       }),
@@ -1364,7 +1367,7 @@ describe('start: 412 insufficient resources recovery', () => {
     const regions412Call = (flyClient.createVolumeWithFallback as Mock).mock.calls[0];
     expect(regions412Call[1]).toEqual(
       expect.objectContaining({
-        compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
+        compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }),
       })
     );
     // Regions are shuffled, so just check the set (deprioritize is a no-op here
@@ -1411,7 +1414,7 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(regionsForkCall[1]).toEqual(
       expect.objectContaining({
         source_volume_id: 'vol-1',
-        compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
+        compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }),
       })
     );
     // Regions are shuffled — check the set
@@ -1476,7 +1479,7 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(regionsUpdateCall[1]).toEqual(
       expect.objectContaining({
         source_volume_id: 'vol-1',
-        compute: expect.objectContaining({ cpus: 2, memory_mb: 4096 }),
+        compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }),
       })
     );
     // Regions are shuffled then deprioritized — check the set
@@ -1795,5 +1798,291 @@ describe('approveDevicePairingRequest', () => {
     );
 
     expect(result).toEqual({ success: false, message: 'request not found' });
+  });
+});
+
+// ============================================================================
+// provision: auto-start
+// ============================================================================
+
+describe('provision: auto-start after fresh provision', () => {
+  it('calls start() on fresh provision and ends in running state', async () => {
+    const { instance, storage } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    const result = await instance.provision('user-1', {});
+
+    expect(result.sandboxId).toBeDefined();
+    expect(flyClient.createMachine).toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('flyMachineId')).toBe('machine-1');
+  });
+
+  it('skips auto-start on re-provision of existing instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    // Re-provision with new config — should NOT call createMachine again
+    (flyClient.createMachine as Mock).mockClear();
+
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(flyClient.createMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('running');
+  });
+});
+
+describe('auto-destroy stale provisioned instances', () => {
+  // Reset listMachines to return [] for each test in this block, since
+  // earlier metadata-recovery tests may have set it to return machines
+  // and vi.clearAllMocks() does not reset implementations.
+  beforeEach(() => {
+    (flyClient.listMachines as Mock).mockResolvedValue([]);
+  });
+
+  function createInstanceWithPostgres(markImpl: () => Promise<void> = () => Promise.resolve()): {
+    instance: KiloClawInstance;
+    storage: ReturnType<typeof createFakeStorage>;
+    markDestroyed: Mock;
+  } {
+    const env = {
+      ...createFakeEnv(),
+      HYPERDRIVE: { connectionString: 'postgres://test' } as unknown,
+    };
+
+    const markDestroyed = vi.fn(markImpl);
+    (db.createDatabaseConnection as Mock).mockReturnValue({});
+    (db.InstanceStore as Mock).mockImplementation(function instanceStoreMock() {
+      return {
+        markDestroyed,
+        getActiveInstance: vi.fn().mockResolvedValue(null),
+      };
+    });
+
+    const { instance, storage } = createInstance(undefined, env);
+    return { instance, storage, markDestroyed };
+  }
+
+  it('auto-destroys provisioned instance older than threshold with no machine', async () => {
+    const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000; // 1 min past threshold
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    await seedProvisioned(storage, {
+      provisionedAt: staleTime,
+      flyMachineId: null,
+      lastStartedAt: null,
+    });
+
+    await instance.alarm();
+
+    // DO state should be fully cleared (destroy completed)
+    expect(storage._store.size).toBe(0);
+    // Postgres mark-destroyed should have been called
+    expect(markDestroyed).toHaveBeenCalledOnce();
+    expect(markDestroyed).toHaveBeenCalledWith('user-1', 'sandbox-1');
+    // Metadata recovery ran first (listMachines), but found nothing
+    expect(flyClient.listMachines).toHaveBeenCalled();
+    // Volume reconciliation should not have run (destroyed before that)
+    expect(flyClient.getVolume).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-destroy if provisionedAt is within threshold', async () => {
+    const recentTime = Date.now() - STALE_PROVISION_THRESHOLD_MS + 60_000; // 1 min before threshold
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    await seedProvisioned(storage, {
+      provisionedAt: recentTime,
+      flyMachineId: null,
+      lastStartedAt: null,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    // Instance should still exist, not destroyed
+    expect(storage._store.size).toBeGreaterThan(0);
+    expect(storage._store.get('status')).not.toBeNull();
+    expect(markDestroyed).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-destroy if instance has a machine ID', async () => {
+    const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000;
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    await seedProvisioned(storage, {
+      provisionedAt: staleTime,
+      flyMachineId: 'machine-1',
+      lastStartedAt: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped', config: {} });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    // Should still exist — machine exists so it's not a stale provision
+    expect(storage._store.get('status')).not.toBeNull();
+    expect(storage._store.size).toBeGreaterThan(0);
+    expect(markDestroyed).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-destroy if instance was previously started', async () => {
+    const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000;
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    await seedProvisioned(storage, {
+      provisionedAt: staleTime,
+      flyMachineId: null,
+      lastStartedAt: staleTime + 1000, // was started at some point
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    // Should still exist — was previously started so not an abandoned provision
+    expect(storage._store.size).toBeGreaterThan(0);
+    expect(storage._store.get('status')).not.toBeNull();
+    expect(markDestroyed).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-destroy when metadata recovery fails with transient error', async () => {
+    const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000;
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    await seedProvisioned(storage, {
+      provisionedAt: staleTime,
+      flyMachineId: null,
+      lastStartedAt: null,
+    });
+
+    // Fly API fails transiently — we can't confirm whether a machine exists
+    (flyClient.listMachines as Mock).mockRejectedValue(
+      new FlyApiError('server error', 500, 'internal')
+    );
+
+    await instance.alarm();
+
+    // Should NOT auto-destroy — recovery was inconclusive
+    expect(storage._store.size).toBeGreaterThan(0);
+    expect(storage._store.get('status')).not.toBeNull();
+    expect(markDestroyed).not.toHaveBeenCalled();
+  });
+
+  it('recovers machine via metadata before considering auto-destroy', async () => {
+    const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000;
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    await seedProvisioned(storage, {
+      provisionedAt: staleTime,
+      flyMachineId: null,
+      lastStartedAt: null,
+    });
+
+    // Fly still has a live machine — metadata recovery should find it
+    (flyClient.listMachines as Mock).mockResolvedValue([
+      fakeMachine({
+        id: 'recovered-machine',
+        state: 'stopped',
+        region: 'iad',
+        config: { image: 'test:latest', mounts: [{ volume: 'vol-1', path: '/root' }] },
+      }),
+    ]);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    // Machine recovered — instance should NOT be auto-destroyed
+    expect(storage._store.get('flyMachineId')).toBe('recovered-machine');
+    expect(storage._store.size).toBeGreaterThan(0);
+    expect(markDestroyed).not.toHaveBeenCalled();
+  });
+
+  it('logs reconciliation action with structured details', async () => {
+    const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 3600_000; // 1 hour past threshold
+    const { instance, storage } = createInstanceWithPostgres();
+    await seedProvisioned(storage, {
+      provisionedAt: staleTime,
+      flyMachineId: null,
+      lastStartedAt: null,
+    });
+
+    await instance.alarm();
+
+    const logCalls = (console.log as Mock).mock.calls;
+    const autoDestroyLog = logCalls.find((args: unknown[]) => {
+      const msg = String(args[0]);
+      return msg.includes('auto_destroy_stale_provision');
+    });
+    expect(autoDestroyLog).toBeDefined();
+    const parsed: unknown = JSON.parse(String(autoDestroyLog![0]));
+    expect(parsed).toMatchObject({
+      tag: 'reconcile',
+      reason: 'alarm',
+      action: 'auto_destroy_stale_provision',
+      user_id: 'user-1',
+    });
+  });
+
+  it('proceeds with destroy when markDestroyedInPostgres completes', async () => {
+    const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000;
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    await seedProvisioned(storage, {
+      provisionedAt: staleTime,
+      flyMachineId: null,
+      lastStartedAt: null,
+    });
+
+    await instance.alarm();
+
+    // Both markDestroyedInPostgres and destroy should have completed
+    expect(markDestroyed).toHaveBeenCalledOnce();
+    expect(storage._store.size).toBe(0);
+    // Alarm should not be rescheduled (DO is fully destroyed)
+    expect(storage._getAlarm()).toBeNull();
+  });
+
+  it('retries Postgres mark on later alarms after Fly cleanup is complete', async () => {
+    const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000;
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    markDestroyed
+      .mockRejectedValueOnce(new Error('transient hyperdrive error'))
+      .mockResolvedValueOnce(undefined);
+
+    await seedProvisioned(storage, {
+      provisionedAt: staleTime,
+      flyMachineId: null,
+      lastStartedAt: null,
+    });
+
+    await instance.alarm();
+
+    // Fly cleanup completed, but PG mark failed so DO stays in destroying state for retry
+    expect(storage._store.get('status')).toBe('destroying');
+    expect(storage._store.get('pendingDestroyMachineId')).toBeNull();
+    expect(storage._store.get('pendingDestroyVolumeId')).toBeNull();
+    expect(storage._store.get('pendingPostgresMarkOnFinalize')).toBe(true);
+    expect(storage._getAlarm()).not.toBeNull();
+
+    await instance.alarm();
+
+    expect(markDestroyed).toHaveBeenCalledTimes(2);
+    expect(storage._store.size).toBe(0);
+    expect(storage._getAlarm()).toBeNull();
+  });
+
+  it('does not mark Postgres for manual destroy path', async () => {
+    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.destroy();
+
+    expect(markDestroyed).not.toHaveBeenCalled();
+    expect(storage._store.size).toBe(0);
   });
 });

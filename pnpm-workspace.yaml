@@ -1,4 +1,5 @@
 packages:
+  - '!.kilocode/**'
   - 'storybook'
   - 'cloudflare-deploy-infra/builder'
   - 'cloudflare-deploy-infra/dispatcher'

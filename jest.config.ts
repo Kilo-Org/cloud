@@ -30,6 +30,7 @@ const config: Config = {
   },
   testMatch: ['**/src/**/*.test.ts'],
   testPathIgnorePatterns: [
+    '<rootDir>/.kilocode/',
     '<rootDir>/cloud-agent/',
     '<rootDir>/cloud-agent-next/',
     '<rootDir>/cloudflare-app-builder/',

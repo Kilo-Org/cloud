@@ -1,3 +1,7 @@
+catalog:
+  drizzle-orm: ^0.44.7
+  zod: ^4.3.4
+
 packages:
   - 'packages/db'
   - 'storybook'

@@ -2,7 +2,7 @@
  * Utility functions for working with AI models
  */
 
-import { KILO_AUTO_FRONTIER_MODEL } from '@/lib/kilo-auto-model';
+import { KILO_AUTO_FREE_MODEL, KILO_AUTO_FRONTIER_MODEL } from '@/lib/kilo-auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
@@ -21,6 +21,7 @@ export const PRIMARY_DEFAULT_MODEL = DEFAULT_MODEL_CHOICES[0];
 
 export const preferredModels = [
   KILO_AUTO_FRONTIER_MODEL.id,
+  KILO_AUTO_FREE_MODEL.id,
   minimax_m25_free_model.is_enabled ? minimax_m25_free_model.public_id : 'minimax/minimax-m2.5',
   giga_potato_model.is_enabled ? giga_potato_model.public_id : null,
   giga_potato_thinking_model.is_enabled ? giga_potato_thinking_model.public_id : null,

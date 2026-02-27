@@ -4,6 +4,15 @@ settings:
   autoInstallPeers: false
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    drizzle-orm:
+      specifier: ^0.44.7
+      version: 0.44.7
+    zod:
+      specifier: ^4.3.4
+      version: 4.3.6
+
 overrides:
   mdast-util-to-hast: ^13.2.1
   storybook: ^9.1.17
@@ -23,16 +32,16 @@ importers:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: ^3.0.41
-        version: 3.0.41(zod@4.3.4)
+        version: 3.0.41(zod@4.3.6)
       '@ai-sdk/gateway':
         specifier: ^3.0.16
-        version: 3.0.16(zod@4.3.4)
+        version: 3.0.16(zod@4.3.6)
       '@ai-sdk/mistral':
         specifier: ^3.0.19
-        version: 3.0.19(zod@4.3.4)
+        version: 3.0.19(zod@4.3.6)
       '@ai-sdk/openai':
         specifier: ^3.0.27
-        version: 3.0.27(zod@4.3.4)
+        version: 3.0.27(zod@4.3.6)
       '@aws-sdk/client-s3':
         specifier: ^3.980.0
         version: 3.980.0
@@ -179,7 +188,7 @@ importers:
         version: 8.2.0
       ai:
         specifier: ^6.0.78
-        version: 6.0.78(zod@4.3.4)
+        version: 6.0.78(zod@4.3.6)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -199,8 +208,8 @@ importers:
         specifier: ^1.11.19
         version: 1.11.19
       drizzle-orm:
-        specifier: ^0.44.7
-        version: 0.44.7(@cloudflare/workers-types@4.20260130.0)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(bun-types@1.3.9)(kysely@0.28.10)(pg@8.16.3)
+        specifier: 'catalog:'
+        version: 0.44.7(@cloudflare/workers-types@4.20260130.0)(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(bun-types@1.3.9)(kysely@0.28.10)(pg@8.18.0)
       event-source-polyfill:
         specifier: ^1.0.31
         version: 1.0.31
@@ -236,10 +245,7 @@ importers:
         version: 4.24.13(next@16.1.6(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       openai:
         specifier: ^6.22.0
-        version: 6.22.0(ws@8.18.2)(zod@4.3.4)
-      pg:
-        specifier: ^8.16.3
-        version: 8.16.3
+        version: 6.22.0(ws@8.18.2)(zod@4.3.6)
       posthog-js:
         specifier: ^1.275.1
         version: 1.275.1
@@ -289,8 +295,8 @@ importers:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       zod:
-        specifier: ^4.3.4
-        version: 4.3.4
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@chromatic-com/playwright':
         specifier: ^0.12.8
@@ -331,9 +337,6 @@ importers:
       '@types/node':
         specifier: ^22
         version: 22.19.1
-      '@types/pg':
-        specifier: ^8.15.6
-        version: 8.15.6
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.2
@@ -1084,13 +1087,23 @@ importers:
         version: 4.61.1(@cloudflare/workers-types@4.20260130.0)
 
   packages/db:
+    dependencies:
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.44.7(@cloudflare/workers-types@4.20260130.0)(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(bun-types@1.3.9)(kysely@0.28.10)(pg@8.18.0)
+      pg:
+        specifier: ^8.16.3
+        version: 8.18.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@types/pg':
         specifier: ^8.11.0
         version: 8.16.0
       drizzle-kit:
-        specifier: ^0.31.8
-        version: 0.31.8
+        specifier: ^0.31.9
+        version: 0.31.9
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
@@ -1119,12 +1132,12 @@ importers:
         specifier: ^3.3.1
         version: 3.3.1
       zod:
-        specifier: ^4.3.4
-        version: 4.3.4
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@anatine/zod-mock':
         specifier: ^3.13.4
-        version: 3.14.0(zod@4.3.4)
+        version: 3.14.0(zod@4.3.6)
       '@chromatic-com/storybook':
         specifier: ^4.1.3
         version: 4.1.3(@chromatic-com/playwright@0.12.8(@playwright/test@1.57.0)(@swc/core@1.12.5)(@types/react@19.2.2)(esbuild@0.27.0)(prettier@3.7.4)(typescript@5.9.3)(vite@7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1)))(storybook@9.1.17(prettier@3.7.4)(vite@7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1)))
@@ -7235,6 +7248,10 @@ packages:
     resolution: {integrity: sha512-O9EC/miwdnRDY10qRxM8P3Pg8hXe3LyU4ZipReKOgTwn4OqANmftj8XJz1UPUAS6NMHf0E2htjsbQujUTkncCg==}
     hasBin: true
 
+  drizzle-kit@0.31.9:
+    resolution: {integrity: sha512-GViD3IgsXn7trFyBUUHyTFBpH/FsHTxYJ66qdbVggxef4UBPHRYxQaRzYLTuekYnk9i5FIEL9pbBIwMqX/Uwrg==}
+    hasBin: true
+
   drizzle-orm@0.44.7:
     resolution: {integrity: sha512-quIpnYznjU9lHshEOAYLoZ9s3jweleHlZIAWR/jX9gAWNg/JhQ1wj0KGRf7/Zm+obRrYd9GjPVJg790QY9N5AQ==}
     peerDependencies:
@@ -11795,51 +11812,51 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/anthropic@3.0.41(zod@4.3.4)':
+  '@ai-sdk/anthropic@3.0.41(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.4)
-      zod: 4.3.4
+      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.6)
+      zod: 4.3.6
 
-  '@ai-sdk/gateway@3.0.16(zod@4.3.4)':
+  '@ai-sdk/gateway@3.0.16(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.4
-      '@ai-sdk/provider-utils': 4.0.8(zod@4.3.4)
+      '@ai-sdk/provider-utils': 4.0.8(zod@4.3.6)
       '@vercel/oidc': 3.1.0
-      zod: 4.3.4
+      zod: 4.3.6
 
-  '@ai-sdk/gateway@3.0.39(zod@4.3.4)':
+  '@ai-sdk/gateway@3.0.39(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.4)
+      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.6)
       '@vercel/oidc': 3.1.0
-      zod: 4.3.4
+      zod: 4.3.6
 
-  '@ai-sdk/mistral@3.0.19(zod@4.3.4)':
+  '@ai-sdk/mistral@3.0.19(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.4)
-      zod: 4.3.4
+      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.6)
+      zod: 4.3.6
 
-  '@ai-sdk/openai@3.0.27(zod@4.3.4)':
+  '@ai-sdk/openai@3.0.27(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.4)
-      zod: 4.3.4
+      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.6)
+      zod: 4.3.6
 
-  '@ai-sdk/provider-utils@4.0.14(zod@4.3.4)':
+  '@ai-sdk/provider-utils@4.0.14(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
-      zod: 4.3.4
+      zod: 4.3.6
 
-  '@ai-sdk/provider-utils@4.0.8(zod@4.3.4)':
+  '@ai-sdk/provider-utils@4.0.8(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.4
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
-      zod: 4.3.4
+      zod: 4.3.6
 
   '@ai-sdk/provider@3.0.4':
     dependencies:
@@ -11851,10 +11868,10 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@anatine/zod-mock@3.14.0(zod@4.3.4)':
+  '@anatine/zod-mock@3.14.0(zod@4.3.6)':
     dependencies:
       randexp: 0.5.3
-      zod: 4.3.4
+      zod: 4.3.6
 
   '@apm-js-collab/code-transformer@0.8.2': {}
 
@@ -17986,13 +18003,13 @@ snapshots:
       clean-stack: 2.2.0
       indent-string: 4.0.0
 
-  ai@6.0.78(zod@4.3.4):
+  ai@6.0.78(zod@4.3.6):
     dependencies:
-      '@ai-sdk/gateway': 3.0.39(zod@4.3.4)
+      '@ai-sdk/gateway': 3.0.39(zod@4.3.6)
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.4)
+      '@ai-sdk/provider-utils': 4.0.14(zod@4.3.6)
       '@opentelemetry/api': 1.9.0
-      zod: 4.3.4
+      zod: 4.3.6
 
   ajv-formats@2.1.1:
     dependencies:
@@ -19085,14 +19102,23 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.44.7(@cloudflare/workers-types@4.20260130.0)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(bun-types@1.3.9)(kysely@0.28.10)(pg@8.16.3):
+  drizzle-kit@0.31.9:
+    dependencies:
+      '@drizzle-team/brocli': 0.10.2
+      '@esbuild-kit/esm-loader': 2.6.5
+      esbuild: 0.27.0
+      esbuild-register: 3.6.0(esbuild@0.27.0)
+    transitivePeerDependencies:
+      - supports-color
+
+  drizzle-orm@0.44.7(@cloudflare/workers-types@4.20260130.0)(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(bun-types@1.3.9)(kysely@0.28.10)(pg@8.18.0):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260130.0
       '@opentelemetry/api': 1.9.0
-      '@types/pg': 8.15.6
+      '@types/pg': 8.16.0
       bun-types: 1.3.9
       kysely: 0.28.10
-      pg: 8.16.3
+      pg: 8.18.0
 
   dset@3.1.4: {}
 
@@ -22349,10 +22375,10 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@6.22.0(ws@8.18.2)(zod@4.3.4):
+  openai@6.22.0(ws@8.18.2)(zod@4.3.6):
     optionalDependencies:
       ws: 8.18.2
-      zod: 4.3.4
+      zod: 4.3.6
 
   opener@1.5.2: {}
 

@@ -40,7 +40,7 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
  * so we use max: 1 here. Pass env.HYPERDRIVE.connectionString directly.
  */
 export function getWorkerDb(connectionString: string) {
-  const pool = new pg.Pool({ connectionString, max: 1, ssl: false });
+  const pool = new pg.Pool({ connectionString, max: 1 });
   return drizzle(pool, { schema });
 }
 

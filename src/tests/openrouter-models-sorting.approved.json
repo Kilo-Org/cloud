@@ -43,6 +43,52 @@
       "preferredIndex": 0
     },
     {
+      "id": "kilo/auto-free",
+      "name": "Kilo: Auto Free",
+      "created": 0,
+      "description": "Automatically routes your request to a free model.",
+      "architecture": {
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other"
+      },
+      "top_provider": {
+        "is_moderated": false,
+        "context_length": 204800,
+        "max_completion_tokens": 131072
+      },
+      "pricing": {
+        "prompt": "0",
+        "completion": "0",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0"
+      },
+      "context_length": 204800,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "settings": {
+        "included_tools": [
+          "search_and_replace"
+        ],
+        "excluded_tools": [
+          "apply_diff",
+          "edit_file"
+        ]
+      },
+      "preferredIndex": 1
+    },
+    {
       "id": "minimax/minimax-m2.5:free",
       "canonical_slug": "minimax/minimax-m2.5:free",
       "hugging_face_id": "",
@@ -84,7 +130,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 1,
+      "preferredIndex": 2,
       "settings": {
         "included_tools": [
           "search_and_replace"
@@ -136,7 +182,7 @@
         "tools"
       ],
       "default_parameters": {},
-      "preferredIndex": 2,
+      "preferredIndex": 3,
       "versioned_settings": {
         "4.146.0": {
           "included_tools": [
@@ -192,7 +238,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 3,
+      "preferredIndex": 4,
       "versioned_settings": {
         "4.146.0": {
           "included_tools": [
@@ -248,7 +294,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 13,
+      "preferredIndex": 14,
       "opencode": {
         "variants": {
           "instant": {
@@ -607,51 +653,6 @@
         "tools"
       ],
       "default_parameters": {}
-    },
-    {
-      "id": "kilo/auto-free",
-      "name": "Kilo: Auto Free",
-      "created": 0,
-      "description": "Automatically routes your request to a free model.",
-      "architecture": {
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other"
-      },
-      "top_provider": {
-        "is_moderated": false,
-        "context_length": 204800,
-        "max_completion_tokens": 131072
-      },
-      "pricing": {
-        "prompt": "0",
-        "completion": "0",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0"
-      },
-      "context_length": 204800,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "settings": {
-        "included_tools": [
-          "search_and_replace"
-        ],
-        "excluded_tools": [
-          "apply_diff",
-          "edit_file"
-        ]
-      }
     },
     {
       "id": "kilo/auto-small",

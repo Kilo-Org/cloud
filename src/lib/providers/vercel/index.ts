@@ -1,6 +1,5 @@
 import type { BYOKResult } from '@/lib/byok';
 import { kiloFreeModels, preferredModels } from '@/lib/models';
-import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import {
   AutocompleteUserByokProviderIdSchema,
@@ -71,13 +70,6 @@ export async function shouldRouteToVercel(
     return true;
   }
 
-  if (isAnthropicModel(requestedModel)) {
-    console.debug(
-      `[shouldRouteToVercel] Anthropic models are not routed to Vercel pending fine-grained tool streaming support`
-    );
-    return false;
-  }
-
   if (!preferredModels.includes(requestedModel)) {
     console.debug(`[shouldRouteToVercel] only recommended models are tested for Vercel routing`);
     return false;
@@ -117,14 +109,6 @@ export function applyVercelSettings(
   userByok: BYOKResult[] | null
 ) {
   requestToMutate.model = mapModelIdToVercel(requestedModel);
-
-  if (isAnthropicModel(requestedModel)) {
-    // https://vercel.com/docs/ai-gateway/model-variants#anthropic-claude-sonnet-4:-1m-token-context-beta
-    extraHeaders['anthropic-beta'] = [extraHeaders['x-anthropic-beta'], 'context-1m-2025-08-07']
-      .filter(Boolean)
-      .join(',');
-    delete extraHeaders['x-anthropic-beta'];
-  }
 
   if (userByok) {
     if (userByok.length === 0) {

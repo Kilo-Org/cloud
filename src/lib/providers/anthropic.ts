@@ -17,9 +17,9 @@ export function isHaikuModel(requestedModel: string) {
 }
 
 function appendAnthropicBetaHeader(extraHeaders: Record<string, string>, betaFlag: string) {
-  extraHeaders['x-anthropic-beta'] = [extraHeaders['x-anthropic-beta'], betaFlag]
-    .filter(Boolean)
-    .join(',');
+  for (const header of ['anthropic-beta', 'x-anthropic-beta']) {
+    extraHeaders[header] = [extraHeaders[header], betaFlag].filter(Boolean).join(',');
+  }
 }
 
 function hasCacheControl(message: OpenAI.ChatCompletionMessageParam) {

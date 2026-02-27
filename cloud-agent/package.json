@@ -42,7 +42,6 @@
     "@eslint/js": "^9.38.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22",
-    "@types/pg": "^8.15.6",
     "@typescript/native-preview": "7.0.0-dev.20251019.1",
     "@vitest/ui": "^3.2.4",
     "eslint": "^9.38.0",

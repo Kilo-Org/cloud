@@ -34,6 +34,7 @@ import {
   Lock,
   ChevronDown,
   ChevronRight,
+  FlaskConical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -169,6 +170,21 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       },
       onError: (error: { message: string }) => {
         toast.error(`Failed to update API key status: ${error.message}`);
+      },
+    })
+  );
+
+  const testMutation = useMutation(
+    trpc.byok.testApiKey.mutationOptions({
+      onSuccess: result => {
+        if (result.success) {
+          toast.success(result.message);
+        } else {
+          toast.error(result.message);
+        }
+      },
+      onError: (error: { message: string }) => {
+        toast.error(`Test failed: ${error.message}`);
       },
     })
   );
@@ -332,6 +348,20 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           </div>
                         </td>
                         <td className="space-x-2 p-4 text-right">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              testMutation.mutate({
+                                ...(organizationId && { organizationId }),
+                                id: key.id,
+                              })
+                            }
+                            disabled={testMutation.isPending}
+                            title="Test API key"
+                          >
+                            <FlaskConical className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="secondary"
                             size="sm"

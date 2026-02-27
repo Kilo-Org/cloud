@@ -478,7 +478,7 @@ export const OpenRouterProviderInfo = z.object({
   editors: z.array(z.string()),
   owners: z.array(z.string()),
   adapterName: z.string(),
-  isMultipartSupported: z.boolean(),
+  isMultipartSupported: z.boolean().optional(),
   statusPageUrl: z.string().nullable(),
   byokEnabled: z.boolean(),
   icon: OpenRouterIcon.optional(),
@@ -636,7 +636,7 @@ export const OpenRouterProvider = z.object({
   editors: z.array(z.string()),
   owners: z.array(z.string()),
   adapterName: z.string(),
-  isMultipartSupported: z.boolean(),
+  isMultipartSupported: z.boolean().optional(),
   statusPageUrl: z.string().nullable(),
   byokEnabled: z.boolean(),
   icon: z

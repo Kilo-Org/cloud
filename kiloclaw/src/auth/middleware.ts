@@ -3,7 +3,7 @@ import { getCookie } from 'hono/cookie';
 import type { AppEnv } from '../types';
 import { KILOCLAW_AUTH_COOKIE } from '../config';
 import { validateKiloToken } from './jwt';
-import { createDatabaseConnection, UserStore } from '../db';
+import { getWorkerDb, findPepperByUserId } from '../db';
 
 /**
  * Auth middleware for user-facing routes.
@@ -53,9 +53,8 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   }
 
   try {
-    const db = createDatabaseConnection(c.env.HYPERDRIVE.connectionString);
-    const userStore = new UserStore(db);
-    const user = await userStore.findPepperByUserId(result.userId);
+    const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+    const user = await findPepperByUserId(db, result.userId);
     if (!user) {
       console.warn('[auth] User not found in DB:', result.userId);
       return c.json({ error: 'User not found' }, 401);

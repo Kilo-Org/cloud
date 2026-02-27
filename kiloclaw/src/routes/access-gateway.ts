@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import type { AppEnv } from '../types';
 import { KILOCLAW_AUTH_COOKIE, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
-import { createDatabaseConnection, AccessCodeStore, UserStore } from '../db';
+import { getWorkerDb, validateAndRedeemAccessCode, findPepperByUserId } from '../db';
 import { signKiloToken, validateKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
@@ -199,10 +199,9 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
     return c.html(renderPage({ userId, error: 'Server configuration error.' }), 500);
   }
 
-  const db = createDatabaseConnection(connectionString);
-  const accessCodeStore = new AccessCodeStore(db);
+  const db = getWorkerDb(connectionString);
 
-  const redeemedUserId = await accessCodeStore.validateAndRedeem(code, userId);
+  const redeemedUserId = await validateAndRedeemAccessCode(db, code, userId);
   if (!redeemedUserId) {
     return c.html(
       renderPage({
@@ -214,8 +213,7 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   }
 
   // Look up the user's pepper so the JWT matches what authMiddleware expects
-  const userStore = new UserStore(db);
-  const user = await userStore.findPepperByUserId(redeemedUserId);
+  const user = await findPepperByUserId(db, redeemedUserId);
   if (!user) {
     return c.html(renderPage({ userId, error: 'User not found.' }), 401);
   }

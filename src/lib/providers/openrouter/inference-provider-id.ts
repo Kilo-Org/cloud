@@ -48,6 +48,18 @@ export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
+export const UserByokTestModels = {
+  [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.google]: 'google/gemini-2.5-flash-lite',
+  [VercelUserByokInferenceProviderIdSchema.enum.minimax]: 'minimax/minimax-m2.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-small-2',
+  [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
+  [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
+  [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
+  [AutocompleteUserByokProviderIdSchema.enum.codestral]: 'mistral/codestral',
+} satisfies Record<UserByokProviderId, string>;
+
 export const VercelNonUserByokInferenceProviderIdSchema = z.enum(['alibaba', 'vertex']);
 
 export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(

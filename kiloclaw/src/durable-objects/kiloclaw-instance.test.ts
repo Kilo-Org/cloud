@@ -65,8 +65,9 @@ vi.mock('../lib/image-version', async () => {
 
 // -- Mock db --
 vi.mock('../db', () => ({
-  createDatabaseConnection: vi.fn(),
-  InstanceStore: vi.fn(),
+  getWorkerDb: vi.fn(() => ({})),
+  getActiveInstance: vi.fn().mockResolvedValue(null),
+  markInstanceDestroyed: vi.fn().mockResolvedValue(undefined),
 }));
 
 // -- Mock gateway/env --
@@ -1904,13 +1905,9 @@ describe('auto-destroy stale provisioned instances', () => {
     };
 
     const markDestroyed = vi.fn(markImpl);
-    (db.createDatabaseConnection as Mock).mockReturnValue({});
-    (db.InstanceStore as Mock).mockImplementation(function instanceStoreMock() {
-      return {
-        markDestroyed,
-        getActiveInstance: vi.fn().mockResolvedValue(null),
-      };
-    });
+    (db.getWorkerDb as Mock).mockReturnValue({});
+    (db.getActiveInstance as Mock).mockResolvedValue(null);
+    (db.markInstanceDestroyed as Mock).mockImplementation(markDestroyed);
 
     const { instance, storage } = createInstance(undefined, env);
     return { instance, storage, markDestroyed };
@@ -1931,7 +1928,7 @@ describe('auto-destroy stale provisioned instances', () => {
     expect(storage._store.size).toBe(0);
     // Postgres mark-destroyed should have been called
     expect(markDestroyed).toHaveBeenCalledOnce();
-    expect(markDestroyed).toHaveBeenCalledWith('user-1', 'sandbox-1');
+    expect(markDestroyed).toHaveBeenCalledWith(expect.anything(), 'user-1', 'sandbox-1');
     // Metadata recovery ran first (listMachines), but found nothing
     expect(flyClient.listMachines).toHaveBeenCalled();
     // Volume reconciliation should not have run (destroyed before that)

@@ -1,6 +1,7 @@
 import { readDb, type db } from '@/lib/drizzle';
 import { byok_api_keys, modelsByProvider } from '@kilocode/db/schema';
 import { eq, and, inArray, desc } from 'drizzle-orm';
+import type { EncryptedData } from '@/lib/byok/encryption';
 import { decryptApiKey } from '@/lib/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {
@@ -52,6 +53,19 @@ export async function getModelUserByokProviders(model: string): Promise<UserByok
   return isCodestralModel(model) ? ['codestral'] : await getModelUserByokProviders_cached(model);
 }
 
+export function decryptByokRow({
+  encrypted_api_key,
+  provider_id,
+}: {
+  encrypted_api_key: EncryptedData;
+  provider_id: string;
+}) {
+  return {
+    decryptedAPIKey: decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY),
+    providerId: UserByokProviderIdSchema.parse(provider_id),
+  };
+}
+
 export async function getBYOKforUser(
   fromDb: typeof db,
   userId: string,
@@ -76,10 +90,7 @@ export async function getBYOKforUser(
     return null;
   }
 
-  return rows.map(row => ({
-    decryptedAPIKey: decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY),
-    providerId: UserByokProviderIdSchema.parse(row.provider_id),
-  }));
+  return rows.map(row => decryptByokRow(row));
 }
 
 export async function getBYOKforOrganization(
@@ -106,8 +117,5 @@ export async function getBYOKforOrganization(
     return null;
   }
 
-  return rows.map(row => ({
-    decryptedAPIKey: decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY),
-    providerId: UserByokProviderIdSchema.parse(row.provider_id),
-  }));
+  return rows.map(row => decryptByokRow(row));
 }

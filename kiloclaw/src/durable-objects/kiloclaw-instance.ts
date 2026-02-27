@@ -25,7 +25,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { KiloClawEnv } from '../types';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { deriveGatewayToken } from '../auth/gateway-token';
-import { createDatabaseConnection, InstanceStore } from '../db';
+import { getWorkerDb, getActiveInstance, markInstanceDestroyed } from '../db';
 import { buildEnvVars } from '../gateway/env';
 import {
   PersistedStateSchema,
@@ -2465,9 +2465,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     try {
-      const db = createDatabaseConnection(connectionString);
-      const store = new InstanceStore(db);
-      const instance = await store.getActiveInstance(userId);
+      const db = getWorkerDb(connectionString);
+      const instance = await getActiveInstance(db, userId);
 
       if (!instance) {
         console.warn('[DO] No active instance found in Postgres for', userId);
@@ -2573,9 +2572,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     try {
-      const db = createDatabaseConnection(connectionString);
-      const store = new InstanceStore(db);
-      await store.markDestroyed(userId, sandboxId);
+      const db = getWorkerDb(connectionString);
+      await markInstanceDestroyed(db, userId, sandboxId);
       this.pendingPostgresMarkOnFinalize = false;
       await this.ctx.storage.put(storageUpdate({ pendingPostgresMarkOnFinalize: false }));
       return true;

@@ -4,6 +4,7 @@ export {
   createDrizzleClient,
   type CreateDrizzleClientOptions,
   getWorkerDb,
+  type GetWorkerDbOptions,
   type WorkerDb,
 } from './client';
 export { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';

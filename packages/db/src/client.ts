@@ -42,7 +42,7 @@ export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max'>
  * so we use max: 1 here. Pass env.HYPERDRIVE.connectionString directly.
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
-  const pool = new pg.Pool({ connectionString, max: 1, ...options });
+  const pool = new pg.Pool({ connectionString, max: 1, statement_timeout: 10_000, ...options });
   return drizzle(pool, { schema });
 }
 

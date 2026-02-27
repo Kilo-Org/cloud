@@ -1,10 +1,10 @@
-import { Client, types } from 'pg';
+import { pg } from '@kilocode/db/client';
 
 import type { CreateDatabaseConnection, Database } from './database.js';
 
 // Default postgres behavior is to use strings for big ints. This parses them
 // as regular numbers
-types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
+pg.types.setTypeParser(pg.types.builtins.INT8, (val: string) => parseInt(val, 10));
 
 // Ensure timestamptz values are properly handled as Date objects
 // types.setTypeParser(types.builtins.TIMESTAMPTZ, (val) => new Date(val))
@@ -15,8 +15,8 @@ types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
  */
 export const createNodePostgresConnection: CreateDatabaseConnection = connectionString => {
   // Helper to create and connect a new client
-  const createConnectedClient = async (): Promise<Client> => {
-    const client = new Client({ connectionString });
+  const createConnectedClient = async (): Promise<pg.Client> => {
+    const client = new pg.Client({ connectionString });
     await client.connect();
     return client;
   };

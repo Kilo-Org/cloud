@@ -23,7 +23,6 @@
     "drizzle-orm": "catalog:",
     "hono": "^4.11.6",
     "jose": "^6.0.0",
-    "pg": "^8.18.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

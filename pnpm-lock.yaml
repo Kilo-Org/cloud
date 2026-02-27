@@ -512,6 +512,9 @@ importers:
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.9.0(typescript@5.9.3))(hono@4.11.7)
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../packages/db
       '@octokit/auth-app':
         specifier: ^8.1.2
         version: 8.1.2
@@ -527,9 +530,6 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.3
-      pg:
-        specifier: ^8.16.3
-        version: 8.18.0
       ulid:
         specifier: 3.0.1
         version: 3.0.1
@@ -558,9 +558,6 @@ importers:
       '@types/node':
         specifier: ^22
         version: 22.19.1
-      '@types/pg':
-        specifier: ^8.15.6
-        version: 8.16.0
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20251019.1
         version: 7.0.0-dev.20251019.1
@@ -947,6 +944,9 @@ importers:
 
   cloudflare-session-ingest:
     dependencies:
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../packages/db
       hono:
         specifier: ^4.11.4
         version: 4.11.7
@@ -956,9 +956,6 @@ importers:
       kysely:
         specifier: ^0.28.10
         version: 0.28.10
-      pg:
-        specifier: ^8.17.2
-        version: 8.18.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -981,12 +978,12 @@ importers:
 
   cloudflare-webhook-agent-ingest:
     dependencies:
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../packages/db
       hono:
         specifier: ^4.11.4
         version: 4.11.7
-      pg:
-        specifier: ^8.13.1
-        version: 8.18.0
       workers-tagged-logger:
         specifier: ^1.0.0
         version: 1.0.0
@@ -1006,9 +1003,6 @@ importers:
       '@types/node':
         specifier: ^22
         version: 22.19.1
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.16.0
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20251019.1
         version: 7.0.0-dev.20251019.1
@@ -1048,9 +1042,6 @@ importers:
       jose:
         specifier: ^6.0.0
         version: 6.1.3
-      pg:
-        specifier: ^8.18.0
-        version: 8.18.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6

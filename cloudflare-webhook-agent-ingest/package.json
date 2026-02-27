@@ -22,8 +22,8 @@
     "typecheck": "tsgo --noEmit --incremental false"
   },
   "dependencies": {
+    "@kilocode/db": "workspace:*",
     "hono": "^4.11.4",
-    "pg": "^8.13.1",
     "workers-tagged-logger": "^1.0.0",
     "zod": "^4.3.5"
   },
@@ -32,7 +32,6 @@
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.0",
     "@types/node": "^22",
-    "@types/pg": "^8.11.10",
     "@typescript/native-preview": "7.0.0-dev.20251019.1",
     "@vitest/ui": "^3.2.4",
     "eslint": "^9.39.2",

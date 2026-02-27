@@ -1,12 +1,12 @@
 import { Kysely, PostgresDialect, type Generated, type ColumnType } from 'kysely';
-import { Pool, types } from 'pg';
+import { pg } from '@kilocode/db/client';
 
 export type HyperdriveBinding = {
   connectionString: string;
 };
 
 // Default node-postgres behavior is to use strings for bigints. Parse as numbers.
-types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
+pg.types.setTypeParser(pg.types.builtins.INT8, (val: string) => parseInt(val, 10));
 
 /**
  * Keep this in sync with the schema in `src/db/schema.ts` in the main repository.
@@ -41,12 +41,12 @@ export type Database = {
  * so we use max:1 to avoid holding extra connections open.
  */
 export function getDb(hyperdrive: HyperdriveBinding): Kysely<Database> {
-  const pool = new Pool({
+  const pool = new pg.Pool({
     connectionString: hyperdrive.connectionString,
     max: 1,
   });
 
-  pool.on('error', error => {
+  pool.on('error', (error: Error) => {
     console.error('pg Pool error', error);
   });
 

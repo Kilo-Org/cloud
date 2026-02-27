@@ -5,17 +5,17 @@
  * for Cloudflare Hyperdrive, which pools connections at the infrastructure level.
  */
 
-import { Client, types } from 'pg';
+import { pg } from '@kilocode/db/client';
 
 import type { CreateDatabaseConnection, Database } from './database.js';
 
 // Default postgres behavior is to use strings for big ints. This parses them
 // as regular numbers
-types.setTypeParser(types.builtins.INT8, val => parseInt(val, 10));
+pg.types.setTypeParser(pg.types.builtins.INT8, (val: string) => parseInt(val, 10));
 
 export const createNodePostgresConnection: CreateDatabaseConnection = connectionString => {
-  const createConnectedClient = async (): Promise<Client> => {
-    const client = new Client({ connectionString, statement_timeout: 10_000 });
+  const createConnectedClient = async (): Promise<pg.Client> => {
+    const client = new pg.Client({ connectionString, statement_timeout: 10_000 });
     await client.connect();
     return client;
   };

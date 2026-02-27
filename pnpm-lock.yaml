@@ -857,6 +857,9 @@ importers:
 
   cloudflare-git-token-service:
     dependencies:
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../packages/db
       '@octokit/auth-app':
         specifier: ^8.1.2
         version: 8.1.2
@@ -867,9 +870,6 @@ importers:
         specifier: ^4.3.5
         version: 4.3.6
     devDependencies:
-      '@types/pg':
-        specifier: ^8.15.6
-        version: 8.15.6
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

@@ -30,7 +30,7 @@
     "@octokit/auth-app": "^8.1.2",
     "@trpc/server": "^11.0.0",
     "aws4fetch": "^1.0.20",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-orm": "catalog:",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.16.3",
     "workers-tagged-logger": "^1.0.0",

@@ -30,11 +30,7 @@ export type GetTokenForRepoResult =
     }
   | {
       success: false;
-      reason:
-        | 'database_not_configured'
-        | 'invalid_repo_format'
-        | 'no_installation_found'
-        | 'invalid_org_id';
+      reason: 'database_not_configured' | 'invalid_params' | 'no_installation_found';
     };
 
 /**

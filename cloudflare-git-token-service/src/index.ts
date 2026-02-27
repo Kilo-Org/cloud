@@ -18,11 +18,7 @@ export type GetTokenForRepoSuccess = {
 
 export type GetTokenForRepoFailure = {
   success: false;
-  reason:
-    | 'database_not_configured'
-    | 'invalid_repo_format'
-    | 'no_installation_found'
-    | 'invalid_org_id';
+  reason: 'database_not_configured' | 'invalid_params' | 'no_installation_found';
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;

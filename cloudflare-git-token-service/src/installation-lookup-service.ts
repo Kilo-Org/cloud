@@ -13,16 +13,10 @@ export type FindInstallationParams = {
   orgId?: string;
 };
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isValidUuid(value: string): boolean {
-  return UUID_REGEX.test(value);
-}
-
-const InstallationLookupResultSchema = z.object({
-  platform_installation_id: z.string(),
-  platform_account_login: z.string(),
-  github_app_type: z.enum(['standard', 'lite']).nullable().optional(),
+const FindInstallationParamsSchema = z.object({
+  githubRepo: z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/),
+  userId: z.string(),
+  orgId: z.string().uuid().optional(),
 });
 
 export type InstallationLookupSuccess = {
@@ -34,11 +28,7 @@ export type InstallationLookupSuccess = {
 
 export type InstallationLookupFailure = {
   success: false;
-  reason:
-    | 'database_not_configured'
-    | 'invalid_repo_format'
-    | 'no_installation_found'
-    | 'invalid_org_id';
+  reason: 'database_not_configured' | 'invalid_params' | 'no_installation_found';
 };
 
 export type InstallationLookupResult = InstallationLookupSuccess | InstallationLookupFailure;
@@ -57,7 +47,7 @@ export class InstallationLookupService {
       if (!this.env.HYPERDRIVE) {
         throw new Error('Hyperdrive not configured');
       }
-      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
     }
     return this.db;
   }
@@ -76,20 +66,13 @@ export class InstallationLookupService {
       return { success: false, reason: 'database_not_configured' };
     }
 
-    // Validate orgId is a valid UUID if provided, to prevent database errors
-    if (params.orgId !== undefined && !isValidUuid(params.orgId)) {
-      return { success: false, reason: 'invalid_org_id' };
+    const parsed = FindInstallationParamsSchema.safeParse(params);
+    if (!parsed.success) {
+      return { success: false, reason: 'invalid_params' };
     }
 
-    // Validate githubRepo format (expected: "owner/repo")
-    if (!params.githubRepo || !params.githubRepo.includes('/')) {
-      return { success: false, reason: 'invalid_repo_format' };
-    }
-
-    const [repoOwner] = params.githubRepo.split('/');
-    if (!repoOwner) {
-      return { success: false, reason: 'invalid_repo_format' };
-    }
+    const { githubRepo, userId, orgId } = parsed.data;
+    const [repoOwner] = githubRepo.split('/');
 
     const db = this.getDb();
 
@@ -107,12 +90,12 @@ export class InstallationLookupService {
             platform_integrations.owned_by_organization_id,
             organization_memberships.organization_id
           ),
-          eq(organization_memberships.kilo_user_id, params.userId)
+          eq(organization_memberships.kilo_user_id, userId)
         )
       )
       .innerJoin(
         kilocode_users,
-        and(eq(kilocode_users.id, params.userId), isNull(kilocode_users.blocked_reason))
+        and(eq(kilocode_users.id, userId), isNull(kilocode_users.blocked_reason))
       )
       .where(
         and(
@@ -123,15 +106,12 @@ export class InstallationLookupService {
           or(
             and(
               isNotNull(platform_integrations.owned_by_organization_id),
-              eq(
-                platform_integrations.owned_by_organization_id,
-                sql`${params.orgId ?? null}::uuid`
-              ),
+              eq(platform_integrations.owned_by_organization_id, sql`${orgId ?? null}::uuid`),
               isNotNull(organization_memberships.id)
             ),
             and(
               isNotNull(platform_integrations.owned_by_user_id),
-              eq(platform_integrations.owned_by_user_id, params.userId)
+              eq(platform_integrations.owned_by_user_id, userId)
             )
           )
         )
@@ -145,12 +125,16 @@ export class InstallationLookupService {
       return { success: false, reason: 'no_installation_found' };
     }
 
-    const parsed = InstallationLookupResultSchema.parse(rows[0]);
+    const row = rows[0];
+    if (!row?.platform_installation_id || !row.platform_account_login) {
+      return { success: false, reason: 'no_installation_found' };
+    }
+
     return {
       success: true,
-      installationId: parsed.platform_installation_id,
-      accountLogin: parsed.platform_account_login,
-      githubAppType: parsed.github_app_type ?? 'standard',
+      installationId: row.platform_installation_id,
+      accountLogin: row.platform_account_login,
+      githubAppType: row.github_app_type ?? 'standard',
     };
   }
 }

@@ -30,7 +30,7 @@ export class InstallationLookupService {
   private getDb(): WorkerDb {
     if (!this.db) {
       if (!this.env.HYPERDRIVE) throw new Error('Hyperdrive not configured');
-      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
     }
     return this.db;
   }

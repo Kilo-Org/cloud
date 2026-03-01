@@ -1,35 +1,60 @@
 /**
  * Reverse-lookup a Kilo user from an OpenAI safety ID.
  *
- * OpenAI safety IDs are hex-encoded SHA-256 hashes that we set via
- * `generateProviderSpecificHash(user.id, provider)` when proxying through
- * OpenRouter. This script iterates all users and compares the hash bytes.
+ * We set `safety_identifier` via `generateProviderSpecificHash(user.id, provider)`
+ * when proxying requests. That function returns a **base64-encoded** SHA-256 hash.
+ * The pepper differs per provider ("henk is a boss" for OpenRouter, "vercel" for
+ * Vercel AI Gateway). This script tries both and compares raw digest bytes so it
+ * works regardless of whether the input is hex or base64.
  *
  * Usage:
- *   pnpm script src/scripts/reverse-safety-id.ts [optional-safety-id-hex]
+ *   pnpm script src/scripts/reverse-safety-id.ts <safety-id>
+ *
+ * The safety ID can be provided as either hex or base64.
  */
 
 import crypto from 'crypto';
 import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 
-// Same salt and pepper used in src/lib/providerHash.ts for OpenRouter
+// Same salt used in src/lib/providerHash.ts
 const SALT = 'd20250815';
-const OPENROUTER_PEPPER = 'henk is a boss';
 
-const DEFAULT_TARGET_HEX = '3778592b5d1cca4db155ca83cd89617856576d0f8d74fe47506f5b3f6f3c1e61';
+// Peppers per provider — see src/lib/providerHash.ts and src/lib/providers/index.ts
+const PEPPERS: Record<string, string> = {
+  openrouter: 'henk is a boss',
+  vercel: 'vercel',
+};
 
-function hashUserIdHex(userId: string): string {
+function hashUserId(userId: string, pepper: string): Buffer {
   return crypto
     .createHash('sha256')
-    .update(SALT + OPENROUTER_PEPPER + userId)
-    .digest('hex');
+    .update(SALT + pepper + userId)
+    .digest();
 }
 
-async function reverseLookup(targetHex: string) {
-  console.log(`Looking up safety ID: ${targetHex}\n`);
+function parseTarget(input: string): Buffer {
+  // Try hex first (64 hex chars = 32 bytes)
+  if (/^[0-9a-f]{64}$/i.test(input)) {
+    return Buffer.from(input, 'hex');
+  }
+  // Otherwise treat as base64
+  const buf = Buffer.from(input, 'base64');
+  if (buf.length === 32) return buf;
+  throw new Error(
+    `Cannot parse safety ID: expected 64 hex chars or 44-char base64, got "${input}"`
+  );
+}
 
-  const PAGE_SIZE = 1000;
+async function reverseLookup(target: Buffer) {
+  const targetHex = target.toString('hex');
+  const targetB64 = target.toString('base64');
+  console.log(`Looking up safety ID:`);
+  console.log(`  hex:    ${targetHex}`);
+  console.log(`  base64: ${targetB64}`);
+  console.log(`  trying peppers: ${Object.keys(PEPPERS).join(', ')}\n`);
+
+  const PAGE_SIZE = 50_000;
   let offset = 0;
   let totalChecked = 0;
 
@@ -43,18 +68,18 @@ async function reverseLookup(targetHex: string) {
     if (users.length === 0) break;
 
     for (const user of users) {
-      if (hashUserIdHex(user.id) === targetHex) {
-        console.log(`Match found!`);
-        console.log(`  User ID: ${user.id}`);
-        console.log(`  Email:   ${user.email}`);
-        return;
+      for (const [provider, pepper] of Object.entries(PEPPERS)) {
+        if (hashUserId(user.id, pepper).equals(target)) {
+          console.log(`Match found! (provider pepper: ${provider})`);
+          console.log(`  User ID: ${user.id}`);
+          console.log(`  Email:   ${user.email}`);
+          return;
+        }
       }
     }
 
     totalChecked += users.length;
-    if (totalChecked % 10_000 === 0) {
-      console.log(`  checked ${totalChecked} users...`);
-    }
+    console.log(`  checked ${totalChecked} users...`);
 
     offset += PAGE_SIZE;
   }
@@ -62,9 +87,15 @@ async function reverseLookup(targetHex: string) {
   console.log(`No matching user found after checking ${totalChecked} users.`);
 }
 
-const targetHex = (process.argv[2] ?? DEFAULT_TARGET_HEX).toLowerCase();
+const input = process.argv[2];
+if (!input) {
+  console.error('Usage: pnpm script src/scripts/reverse-safety-id.ts <safety-id-hex-or-base64>');
+  process.exit(1);
+}
 
-reverseLookup(targetHex)
+const target = parseTarget(input.trim());
+
+reverseLookup(target)
   .then(async () => {
     await closeAllDrizzleConnections();
     process.exit(0);

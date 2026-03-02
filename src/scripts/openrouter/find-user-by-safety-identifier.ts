@@ -2,15 +2,13 @@ import { db, sql } from '@/lib/drizzle';
 import { generateProviderSpecificHash } from '@/lib/providerHash';
 import { PROVIDERS } from '@/lib/providers';
 import crypto from 'crypto';
+import * as z from 'zod';
 
 // Usage:
 // Run `USE_PRODUCTION_DB=true pnpm script:run openrouter find-user-by-safety-id <openrouter-org-id> <safety-identifier>`
 // If you get errors about Abuse Service or Gastown, find the relevant code and comment it out.
 
-async function run() {
-  const openrouterOrgId = process.argv[4];
-  const safetyIdentifierToFind = process.argv[5];
-
+async function run(openrouterOrgId: string, safetyIdentifierToFind: string) {
   if (!openrouterOrgId) {
     throw new Error('Please specify an OpenRouter org as the first argument');
   }
@@ -27,7 +25,8 @@ async function run() {
     order by ku.created_at desc
   `);
 
-  const userIds = rows.map(row => row.id as string);
+  const userIds = rows.map(row => z.string().parse(row.id));
+  console.log(`Scanning up to ${userIds.length} users...`);
 
   let foundUserId: string | null = null;
 
@@ -36,7 +35,6 @@ async function run() {
       .createHash('sha256')
       .update(openrouterOrgId + '-' + generateProviderSpecificHash(userId, PROVIDERS.OPENROUTER))
       .digest('hex');
-    console.log(`User ID: ${userId} -> Safety Identifier: ${hash}`);
     if (hash === safetyIdentifierToFind) {
       foundUserId = userId;
       break;

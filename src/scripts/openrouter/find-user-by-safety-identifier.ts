@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import * as z from 'zod';
 
 // Usage:
-// Run `USE_PRODUCTION_DB=true pnpm script:run openrouter find-user-by-safety-id <openrouter-org-id> <safety-identifier>`
+// Run `USE_PRODUCTION_DB=true pnpm script:run openrouter find-user-by-safety-identifier <openrouter-org-id> <safety-identifier>`
 // If you get errors about Abuse Service or Gastown, find the relevant code and comment it out.
 
 async function run(openrouterOrgId: string, safetyIdentifierToFind: string) {

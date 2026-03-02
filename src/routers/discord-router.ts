@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as discordService from '@/lib/integrations/discord-service';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
@@ -28,6 +29,7 @@ export const discordRouter = createTRPCRouter({
     }
 
     const isInstalled = integration.integration_status === 'active';
+    const metadata = integration.metadata as { model_slug?: string } | null;
 
     return {
       installed: isInstalled,
@@ -36,6 +38,7 @@ export const discordRouter = createTRPCRouter({
         guildName: integration.platform_account_login,
         scopes: integration.scopes,
         installedAt: integration.installed_at,
+        modelSlug: metadata?.model_slug || null,
       },
     };
   }),
@@ -81,6 +84,32 @@ export const discordRouter = createTRPCRouter({
     const owner = resolveOwner(ctx, input?.organizationId);
     return discordService.testConnection(owner);
   }),
+
+  // Update the model for Discord integration
+  updateModel: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        modelSlug: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
+      const result = await discordService.updateModel(owner, input.modelSlug);
+
+      if (input.organizationId && result.success) {
+        await createAuditLog({
+          organization_id: input.organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: `Updated Discord integration model to ${input.modelSlug}`,
+        });
+      }
+
+      return result;
+    }),
 
   // Dev-only: Remove only the database row without revoking the Discord token
   devRemoveDbRowOnly: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {

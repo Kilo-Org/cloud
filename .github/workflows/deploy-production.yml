@@ -151,6 +151,63 @@ jobs:
       - name: Deploy Project Artifacts to Vercel
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
+  deploy-gateway:
+    # Disabled: R2_ACCOUNT_ID env var is missing, causing deploy failures
+    if: false
+    runs-on: ubuntu-24.04-8core
+    needs: run-migrations
+    environment: production
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_GATEWAY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
+
+      - name: Install Vercel CLI
+        run: pnpm install --global vercel@latest
+
+      - run: vercel link --project=kilocode-gateway --token=${{ secrets.VERCEL_TOKEN }} --yes
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Project Artifacts to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
   check-cloud-agent-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -274,6 +331,32 @@ jobs:
     if: needs.check-git-token-service-changes.outputs.changed == 'true'
     uses: ./.github/workflows/deploy-git-token-service.yml
     secrets: inherit
+
+  check-security-sync-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs['security-sync'] }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for security-sync changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            security-sync:
+              - 'cloudflare-security-sync/**'
+
+  deploy-security-sync:
+    needs: [check-security-sync-changes]
+    if: needs.check-security-sync-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-security-sync.yml
+    secrets: inherit
+    with:
+      environment: prod
 
   check-deployment-dispatcher-changes:
     runs-on: ubuntu-latest

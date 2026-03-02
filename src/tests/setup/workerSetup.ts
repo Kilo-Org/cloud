@@ -42,7 +42,7 @@ beforeAll(async () => {
   });
   try {
     const testDb = drizzle(testPool);
-    await migrate(testDb, { migrationsFolder: './src/db/migrations' });
+    await migrate(testDb, { migrationsFolder: './packages/db/src/migrations' });
   } finally {
     await testPool.end();
   }

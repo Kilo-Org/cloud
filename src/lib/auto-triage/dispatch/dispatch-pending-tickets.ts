@@ -10,7 +10,7 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { auto_triage_tickets, type AutoTriageTicket } from '@/db/schema';
+import { auto_triage_tickets, type AutoTriageTicket } from '@kilocode/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareTriagePayload } from '../triggers/prepare-triage-payload';

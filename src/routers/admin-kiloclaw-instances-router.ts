@@ -1,6 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_instances, kilocode_users } from '@/db/schema';
+import { kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   markActiveInstanceDestroyed,

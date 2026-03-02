@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
-import { zodJsonValidator } from './util/validation';
+import { zodJsonValidator } from '@kilocode/worker-utils';
 import { writeApiMetricsDataPoint } from './o11y-analytics';
 import { requireAdmin } from './admin-middleware';
 

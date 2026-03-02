@@ -414,12 +414,12 @@ describe('GitReceivePackService', () => {
         {
           status: 'ng',
           refName: 'refs/heads/main',
-          message: expect.stringContaining('Packfile too large'),
+          message: expect.stringContaining('Packfile too large') as unknown,
         },
         {
           status: 'ng',
           refName: 'refs/heads/feature',
-          message: expect.stringContaining('Packfile too large'),
+          message: expect.stringContaining('Packfile too large') as unknown,
         },
       ]);
     });
@@ -442,12 +442,12 @@ describe('GitReceivePackService', () => {
         {
           status: 'ng',
           refName: 'refs/heads/main',
-          message: expect.stringContaining('Failed to index packfile'),
+          message: expect.stringContaining('Failed to index packfile') as unknown,
         },
         {
           status: 'ng',
           refName: 'refs/heads/feature',
-          message: expect.stringContaining('Failed to index packfile'),
+          message: expect.stringContaining('Failed to index packfile') as unknown,
         },
       ]);
     });

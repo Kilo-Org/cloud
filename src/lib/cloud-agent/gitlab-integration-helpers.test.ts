@@ -1,5 +1,5 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
-import type { PlatformIntegration } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import { buildGitLabCloneUrl } from './gitlab-integration-helpers';
 
@@ -351,9 +351,8 @@ describe('gitlab-integration-helpers', () => {
         repositories_synced_at: '2024-01-01T00:00:00Z',
       } as PlatformIntegration);
 
-      const { validateGitLabRepoAccessForOrganization } = await import(
-        './gitlab-integration-helpers'
-      );
+      const { validateGitLabRepoAccessForOrganization } =
+        await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/project');
 
       expect(result).toBe(true);
@@ -367,9 +366,8 @@ describe('gitlab-integration-helpers', () => {
         repositories_synced_at: '2024-01-01T00:00:00Z',
       } as PlatformIntegration);
 
-      const { validateGitLabRepoAccessForOrganization } = await import(
-        './gitlab-integration-helpers'
-      );
+      const { validateGitLabRepoAccessForOrganization } =
+        await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/nonexistent');
 
       expect(result).toBe(false);
@@ -383,9 +381,8 @@ describe('gitlab-integration-helpers', () => {
         repositories_synced_at: '2024-01-01T00:00:00Z',
       } as PlatformIntegration);
 
-      const { validateGitLabRepoAccessForOrganization } = await import(
-        './gitlab-integration-helpers'
-      );
+      const { validateGitLabRepoAccessForOrganization } =
+        await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/project');
 
       expect(result).toBe(true);
@@ -394,9 +391,8 @@ describe('gitlab-integration-helpers', () => {
     it('should return false when no integration exists', async () => {
       mockGetIntegrationForOrganization.mockResolvedValue(null);
 
-      const { validateGitLabRepoAccessForOrganization } = await import(
-        './gitlab-integration-helpers'
-      );
+      const { validateGitLabRepoAccessForOrganization } =
+        await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/project');
 
       expect(result).toBe(false);
@@ -410,9 +406,8 @@ describe('gitlab-integration-helpers', () => {
         repositories_synced_at: '2024-01-01T00:00:00Z',
       } as PlatformIntegration);
 
-      const { validateGitLabRepoAccessForOrganization } = await import(
-        './gitlab-integration-helpers'
-      );
+      const { validateGitLabRepoAccessForOrganization } =
+        await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/project');
 
       expect(result).toBe(false);
@@ -428,9 +423,8 @@ describe('gitlab-integration-helpers', () => {
         repositories_synced_at: '2024-01-01T00:00:00Z',
       } as PlatformIntegration);
 
-      const { validateGitLabRepoAccessForOrganization } = await import(
-        './gitlab-integration-helpers'
-      );
+      const { validateGitLabRepoAccessForOrganization } =
+        await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForOrganization(
         'org-123',
         'org/subgroup/project'

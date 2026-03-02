@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage_view } from '@/db/schema';
+import { microdollar_usage_view } from '@kilocode/db/schema';
 import { eq, desc, count, and, gt } from 'drizzle-orm';
 import type { HeuristicAnalysisResponse } from '../types';
 import { ABUSE_CLASSIFICATION } from '@/types/AbuseClassification';

@@ -8,7 +8,7 @@
  *   pnpm script src/scripts/test-sonnet-46-review-promo.ts
  */
 
-import pg from 'pg';
+import { pg } from '@kilocode/db/client';
 import jwt from 'jsonwebtoken';
 import * as dotenv from 'dotenv';
 import * as path from 'path';

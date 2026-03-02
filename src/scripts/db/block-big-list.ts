@@ -1,4 +1,4 @@
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { pool, db } from '@/lib/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';
 import fs from 'node:fs';

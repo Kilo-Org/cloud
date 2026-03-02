@@ -11,6 +11,8 @@
  */
 
 import type { IngestEvent } from '../../src/shared/protocol.js';
+import type { LogUploader } from './log-uploader.js';
+export type { LogUploader } from './log-uploader.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,6 +78,9 @@ export class WrapperState {
   // Callbacks for sending events to ingest
   private _sendToIngestFn: ((event: IngestEvent) => void) | null = null;
 
+  // Log uploader (set per-job, cleared on job end)
+  private _logUploader: LogUploader | null = null;
+
   // ---------------------------------------------------------------------------
   // State Queries
   // ---------------------------------------------------------------------------
@@ -135,6 +140,8 @@ export class WrapperState {
    * Clear job context. Called on idle timeout or explicit reset.
    */
   clearJob(): void {
+    this._logUploader?.stop();
+    this._logUploader = null;
     this.job = null;
     this.inflight.clear();
     this.messageCounter = 0;
@@ -254,6 +261,19 @@ export class WrapperState {
       return;
     }
     this._sendToIngestFn(event);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Log Uploader
+  // ---------------------------------------------------------------------------
+
+  get logUploader(): LogUploader | null {
+    return this._logUploader;
+  }
+
+  setLogUploader(uploader: LogUploader | null): void {
+    this._logUploader?.stop();
+    this._logUploader = uploader;
   }
 
   // ---------------------------------------------------------------------------

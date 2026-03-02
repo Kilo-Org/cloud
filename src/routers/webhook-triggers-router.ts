@@ -4,7 +4,11 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, isNull, inArray } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { cloud_agent_webhook_triggers, agent_environment_profiles, cliSessions } from '@/db/schema';
+import {
+  cloud_agent_webhook_triggers,
+  agent_environment_profiles,
+  cliSessions,
+} from '@kilocode/db/schema';
 import { triggerIdSchema } from '@/lib/webhook-trigger-validation';
 import {
   createWorkerTrigger,

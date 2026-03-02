@@ -119,6 +119,16 @@ const nextConfig = {
     ];
   },
 
+  // discord.js uses optional native modules (zlib-sync, bufferutil, utf-8-validate)
+  // that cannot be bundled by webpack. Mark them as external so Node.js resolves them at runtime.
+  serverExternalPackages: [
+    'discord.js',
+    '@discordjs/ws',
+    'zlib-sync',
+    'bufferutil',
+    'utf-8-validate',
+  ],
+
   // This is required to support PostHog trailing slash API requests
   skipTrailingSlashRedirect: true,
   // Maximize chance of decent client-side stack traces

@@ -1,9 +1,14 @@
 import { db } from '@/lib/drizzle';
-import { cliSessions, sharedCliSessions, cli_sessions_v2, kilocode_users } from '@/db/schema';
+import {
+  cliSessions,
+  sharedCliSessions,
+  cli_sessions_v2,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { softDeleteUserExternalServices } from './external-services';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),

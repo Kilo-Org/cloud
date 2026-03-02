@@ -10,7 +10,7 @@ import { TRPCError } from '@trpc/server';
 import { GeneratePortalLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { organizations } from '@/db/schema';
+import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { OrganizationSSODomainSchema } from '@/lib/organizations/organization-types';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { MicrodollarUsage } from '@/db/schema';
+import type { MicrodollarUsage } from '@kilocode/db/schema';
 
 export const CopyJsonButton: React.FC<{ rawData: MicrodollarUsage }> = ({ rawData }) => {
   const [copied, setCopied] = useState(false);

@@ -1,9 +1,9 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import * as z from 'zod';
 import { posthogQuery } from '@/lib/posthog-query';
-import type { Organization } from '@/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 
 // UUID validation regex
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

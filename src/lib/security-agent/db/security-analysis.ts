@@ -6,10 +6,10 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { security_findings } from '@/db/schema';
+import { security_findings } from '@kilocode/db/schema';
 import { eq, and, sql, count, isNotNull, desc, or } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import type { SecurityFinding } from '@/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 import type {
   SecurityReviewOwner,
   SecurityFindingAnalysis,

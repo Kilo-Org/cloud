@@ -476,9 +476,12 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     const result = await sandbox.exec('cat /workspace/project/package.json');
     if (!result.success) return false;
     try {
-      const pkg = JSON.parse(result.stdout);
-      const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-      return '@kilocode/app-builder-db' in allDeps && 'db:migrate' in (pkg.scripts || {});
+      const pkg = JSON.parse(result.stdout) as Record<string, unknown>;
+      const deps = (pkg.dependencies ?? {}) as Record<string, unknown>;
+      const devDeps = (pkg.devDependencies ?? {}) as Record<string, unknown>;
+      const allDeps = { ...deps, ...devDeps };
+      const scripts = (pkg.scripts ?? {}) as Record<string, unknown>;
+      return '@kilocode/app-builder-db' in allDeps && 'db:migrate' in scripts;
     } catch {
       return false;
     }

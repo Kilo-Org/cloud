@@ -1,5 +1,9 @@
 import { type KiloFreeModel } from '@/lib/providers/kilo-free-model';
 
+export function isZaiModel(model: string) {
+  return model.startsWith('z-ai/');
+}
+
 export const zai_glm5_free_model = {
   public_id: 'z-ai/glm-5:free',
   display_name: 'Z.ai: GLM 5 (free)',

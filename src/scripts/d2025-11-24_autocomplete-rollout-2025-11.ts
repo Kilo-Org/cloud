@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users, type User } from '@/db/schema';
+import { kilocode_users, type User } from '@kilocode/db/schema';
 import { isNull, gt, and } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import pLimit from 'p-limit';

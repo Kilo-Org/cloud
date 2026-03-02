@@ -3,6 +3,7 @@
  */
 
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { bearerAuth } from 'hono/bearer-auth';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
@@ -19,7 +20,7 @@ import {
 export const api = new Hono<{ Bindings: Env }>();
 
 // Bearer auth middleware for all routes
-api.use('*', async (c, next) => {
+api.use('*', async (c: Context<{ Bindings: Env }, string>, next) => {
   const token = c.env.BACKEND_AUTH_TOKEN;
   if (!token) {
     return c.json({ error: 'Unauthorized' }, 401);

@@ -1,5 +1,7 @@
 import { WorkersLogger } from 'workers-tagged-logger';
 
+export { formatError } from '@kilocode/worker-utils';
+
 /**
  * Tag types for structured logging across db-proxy
  */
@@ -21,13 +23,3 @@ export const logger = new WorkersLogger<DbProxyTags>({
 });
 
 export { withLogTags, WithLogTags } from 'workers-tagged-logger';
-
-/**
- * Format an error for structured logging with message and optional stack trace
- */
-export function formatError(error: unknown): { error: string; stack?: string } {
-  if (error instanceof Error) {
-    return { error: error.message, stack: error.stack };
-  }
-  return { error: String(error) };
-}

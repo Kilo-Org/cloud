@@ -1,5 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
+import { eq, ne, inArray } from 'drizzle-orm';
+import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
+import { ingestItems, ingestMeta } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
@@ -19,6 +23,7 @@ import {
   POST_CLOSE_DRAIN_MS,
   type TerminationReason,
 } from './session-metrics';
+import migrations from '../../drizzle/migrations';
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -31,29 +36,24 @@ type IngestMetaKey =
 type ExtractableMetaKey = 'title' | 'parentId' | 'platform' | 'orgId' | 'gitUrl' | 'gitBranch';
 
 function writeIngestMetaIfChanged(
-  sql: SqlStorage,
+  db: DrizzleSqliteDODatabase,
   params: { key: IngestMetaKey; incomingValue: string | null }
 ): { changed: boolean; value: string | null } {
-  const existing = sql
-    .exec<{
-      value: string | null;
-    }>('SELECT value FROM ingest_meta WHERE key = ? LIMIT 1', params.key)
-    .toArray();
-  const currentValue = existing[0]?.value ?? null;
+  const existing = db
+    .select({ value: ingestMeta.value })
+    .from(ingestMeta)
+    .where(eq(ingestMeta.key, params.key))
+    .get();
+  const currentValue = existing?.value ?? null;
 
   if (currentValue === params.incomingValue) {
     return { changed: false, value: params.incomingValue };
   }
 
-  sql.exec(
-    `
-      INSERT INTO ingest_meta (key, value)
-      VALUES (?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `,
-    params.key,
-    params.incomingValue
-  );
+  db.insert(ingestMeta)
+    .values({ key: params.key, value: params.incomingValue })
+    .onConflictDoUpdate({ target: ingestMeta.key, set: { value: params.incomingValue } })
+    .run();
 
   return { changed: true, value: params.incomingValue };
 }
@@ -73,40 +73,15 @@ const INGEST_META_EXTRACTORS: Array<{
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
 
 export class SessionIngestDO extends DurableObject<Env> {
-  private sql: SqlStorage;
-  private initialized = false;
+  private db: DrizzleSqliteDODatabase;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
-    this.sql = state.storage.sql;
+    this.db = drizzle(state.storage, { logger: false });
 
-    void state.blockConcurrencyWhile(async () => {
-      this.initSchema();
+    void state.blockConcurrencyWhile(() => {
+      return migrate(this.db, migrations);
     });
-  }
-
-  private initSchema() {
-    if (this.initialized) {
-      return;
-    }
-
-    this.sql.exec(/* sql */ `
-      CREATE TABLE IF NOT EXISTS ingest_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        item_id TEXT NOT NULL UNIQUE,
-        item_type TEXT NOT NULL,
-        item_data TEXT NOT NULL
-      );
-    `);
-
-    this.sql.exec(/* sql */ `
-      CREATE TABLE IF NOT EXISTS ingest_meta (
-        key TEXT PRIMARY KEY,
-        value TEXT
-      );
-    `);
-
-    this.initialized = true;
   }
 
   async ingest(
@@ -117,12 +92,9 @@ export class SessionIngestDO extends DurableObject<Env> {
   ): Promise<{
     changes: Changes;
   }> {
-    this.initSchema();
-
-    // Persist identity and version so alarm() can recover after hibernation
-    writeIngestMetaIfChanged(this.sql, { key: 'kiloUserId', incomingValue: kiloUserId });
-    writeIngestMetaIfChanged(this.sql, { key: 'sessionId', incomingValue: sessionId });
-    writeIngestMetaIfChanged(this.sql, {
+    writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: kiloUserId });
+    writeIngestMetaIfChanged(this.db, { key: 'sessionId', incomingValue: sessionId });
+    writeIngestMetaIfChanged(this.db, {
       key: 'ingestVersion',
       incomingValue: String(ingestVersion),
     });
@@ -144,18 +116,14 @@ export class SessionIngestDO extends DurableObject<Env> {
 
       const itemDataJson = JSON.stringify(item.data);
 
-      this.sql.exec(
-        `
-          INSERT INTO ingest_items (item_id, item_type, item_data)
-          VALUES (?, ?, ?)
-          ON CONFLICT(item_id) DO UPDATE SET
-            item_type = excluded.item_type,
-            item_data = excluded.item_data
-        `,
-        item_id,
-        item_type,
-        itemDataJson
-      );
+      this.db
+        .insert(ingestItems)
+        .values({ item_id, item_type, item_data: itemDataJson })
+        .onConflictDoUpdate({
+          target: ingestItems.item_id,
+          set: { item_type, item_data: itemDataJson },
+        })
+        .run();
 
       for (const extractor of INGEST_META_EXTRACTORS) {
         const maybeValue = extractor.extract(item);
@@ -176,7 +144,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
       const incoming = incomingByKey[key];
       if (incoming === undefined) continue;
-      const meta = writeIngestMetaIfChanged(this.sql, {
+      const meta = writeIngestMetaIfChanged(this.db, {
         key,
         incomingValue: incoming,
       });
@@ -189,11 +157,14 @@ export class SessionIngestDO extends DurableObject<Env> {
       // v1 clients send explicit open/close pairs. Only those events drive alarms.
       if (hasSessionOpen) {
         // New turn starting — clear prior emission so metrics are re-computed.
-        this.sql.exec(`DELETE FROM ingest_meta WHERE key IN ('metricsEmitted', 'closeReason')`);
+        this.db
+          .delete(ingestMeta)
+          .where(inArray(ingestMeta.key, ['metricsEmitted', 'closeReason']))
+          .run();
         await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
       }
       if (closeReason) {
-        writeIngestMetaIfChanged(this.sql, { key: 'closeReason', incomingValue: closeReason });
+        writeIngestMetaIfChanged(this.db, { key: 'closeReason', incomingValue: closeReason });
         await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
       }
       // Events without open/close (stragglers) don't touch the alarm.
@@ -208,13 +179,16 @@ export class SessionIngestDO extends DurableObject<Env> {
   }
 
   async getAll(): Promise<string> {
-    this.initSchema();
-
-    const rows = this.sql
-      .exec(
-        "SELECT item_id, item_type, item_data FROM ingest_items WHERE item_type != 'session_diff' ORDER BY id"
-      )
-      .toArray() as Array<{ item_id: string; item_type: string; item_data: string }>;
+    const rows = this.db
+      .select({
+        item_id: ingestItems.item_id,
+        item_type: ingestItems.item_type,
+        item_data: ingestItems.item_data,
+      })
+      .from(ingestItems)
+      .where(ne(ingestItems.item_type, 'session_diff'))
+      .orderBy(ingestItems.id)
+      .all();
 
     const items: IngestBatch = [];
     for (const row of rows) {
@@ -245,39 +219,36 @@ export class SessionIngestDO extends DurableObject<Env> {
     closeReason: TerminationReason,
     ingestVersion: number
   ): Promise<boolean> {
-    this.initSchema();
-
-    // Check if metrics have already been emitted
-    const emittedRows = this.sql
-      .exec<{
-        value: string | null;
-      }>(`SELECT value FROM ingest_meta WHERE key = 'metricsEmitted' LIMIT 1`)
-      .toArray();
-    if (emittedRows[0]?.value === 'true') {
+    const emittedRow = this.db
+      .select({ value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(eq(ingestMeta.key, 'metricsEmitted'))
+      .get();
+    if (emittedRow?.value === 'true') {
       return false;
     }
 
-    const rows = this.sql
-      .exec<{
-        item_type: string;
-        item_data: string;
-      }>(
-        "SELECT item_id, item_type, item_data FROM ingest_items WHERE item_type != 'session_diff' ORDER BY id"
-      )
-      .toArray();
+    const rows = this.db
+      .select({
+        item_type: ingestItems.item_type,
+        item_data: ingestItems.item_data,
+      })
+      .from(ingestItems)
+      .where(ne(ingestItems.item_type, 'session_diff'))
+      .orderBy(ingestItems.id)
+      .all();
 
-    // Skip emission if the session has no meaningful data
     if (rows.length === 0) {
       return false;
     }
 
     const metrics = computeSessionMetrics(rows, closeReason);
 
-    const modelRow = this.sql
-      .exec<{
-        item_data: string;
-      }>(`SELECT item_data FROM ingest_items WHERE item_id = 'model' LIMIT 1`)
-      .toArray()[0];
+    const modelRow = this.db
+      .select({ item_data: ingestItems.item_data })
+      .from(ingestItems)
+      .where(eq(ingestItems.item_id, 'model'))
+      .get();
     let model: string | undefined;
     if (modelRow) {
       try {
@@ -302,10 +273,11 @@ export class SessionIngestDO extends DurableObject<Env> {
     });
 
     // Mark metrics as emitted to prevent duplicates
-    this.sql.exec(
-      `INSERT INTO ingest_meta (key, value) VALUES ('metricsEmitted', 'true')
-       ON CONFLICT(key) DO UPDATE SET value = 'true'`
-    );
+    this.db
+      .insert(ingestMeta)
+      .values({ key: 'metricsEmitted', value: 'true' })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
+      .run();
 
     await this.ctx.storage.deleteAlarm();
 
@@ -318,16 +290,11 @@ export class SessionIngestDO extends DurableObject<Env> {
    * ingest_meta if present, otherwise falls back to 'abandoned'.
    */
   async alarm(): Promise<void> {
-    this.initSchema();
-
-    const metaRows = this.sql
-      .exec<{
-        key: string;
-        value: string | null;
-      }>(
-        `SELECT key, value FROM ingest_meta WHERE key IN ('kiloUserId', 'sessionId', 'closeReason', 'ingestVersion')`
-      )
-      .toArray();
+    const metaRows = this.db
+      .select()
+      .from(ingestMeta)
+      .where(inArray(ingestMeta.key, ['kiloUserId', 'sessionId', 'closeReason', 'ingestVersion']))
+      .all();
 
     const meta = Object.fromEntries(metaRows.map(r => [r.key, r.value]));
     const kiloUserId = meta['kiloUserId'];
@@ -338,14 +305,28 @@ export class SessionIngestDO extends DurableObject<Env> {
     const closeReason = (meta['closeReason'] ?? 'abandoned') as TerminationReason;
     const ingestVersion = Number(meta['ingestVersion'] ?? '0') || 0;
 
-    await this.emitSessionMetrics(kiloUserId, sessionId, closeReason, ingestVersion);
+    // DO alarm exceptions don't populate the Exceptions array in logpush traces,
+    // so without this catch we get outcome=exception with zero diagnostics.
+    try {
+      await this.emitSessionMetrics(kiloUserId, sessionId, closeReason, ingestVersion);
+    } catch (error) {
+      console.error('SessionIngestDO alarm failed', {
+        sessionId,
+        kiloUserId,
+        closeReason,
+        ingestVersion,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      throw error;
+    }
   }
 
   async clear(): Promise<void> {
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
-
-    this.initialized = false;
+    await migrate(this.db, migrations);
   }
 }
 

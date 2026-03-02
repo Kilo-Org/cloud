@@ -4,7 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { generateInternalServiceToken } from '@/lib/tokens';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 
 // ---------------------------------------------------------------------------
 // Zod schema (mirrors cloudflare-session-ingest SharedSessionSnapshotSchema)

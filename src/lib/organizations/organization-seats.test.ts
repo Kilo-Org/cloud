@@ -1,6 +1,10 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { db, sql } from '@/lib/drizzle';
-import { organizations, organization_seats_purchases, organization_invitations } from '@/db/schema';
+import {
+  organizations,
+  organization_seats_purchases,
+  organization_invitations,
+} from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   getUserOrganizationsWithSeats,

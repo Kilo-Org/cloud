@@ -8,6 +8,7 @@ import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kilocla
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
   ensureActiveInstance,
@@ -153,7 +154,41 @@ async function patchConfig(
   return sanitizeKiloCodeConfigResponse(response);
 }
 
+const KILOCLAW_STATUS_PAGE_RESOURCE_ID = '8737418';
+const STATUS_PAGE_TIMEOUT_MS = 5_000;
+
+const logStatusPageWarning = sentryLogger('kiloclaw-status-page', 'warning');
+
+async function fetchKiloClawServiceDegraded(): Promise<boolean> {
+  try {
+    const response = await fetch('https://status.kilo.ai/index.json', {
+      signal: AbortSignal.timeout(STATUS_PAGE_TIMEOUT_MS),
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    const included: Array<{ id: string; type: string; attributes?: { status?: string } }> =
+      data.included ?? [];
+    const resource = included.find(
+      entry =>
+        entry.type === 'status_page_resource' && entry.id === KILOCLAW_STATUS_PAGE_RESOURCE_ID
+    );
+    if (!resource) {
+      logStatusPageWarning(
+        `Status page resource ${KILOCLAW_STATUS_PAGE_RESOURCE_ID} not found in status page response`
+      );
+      return false;
+    }
+    return resource.attributes?.status != null && resource.attributes.status !== 'operational';
+  } catch {
+    return false;
+  }
+}
+
 export const kiloclawRouter = createTRPCRouter({
+  serviceDegraded: baseProcedure.query(async () => {
+    return fetchKiloClawServiceDegraded();
+  }),
+
   // Status + gateway token (two internal client calls, merged for the dashboard)
   getStatus: baseProcedure.query(async ({ ctx }) => {
     const client = new KiloClawInternalClient();
@@ -303,6 +338,11 @@ export const kiloclawRouter = createTRPCRouter({
     }
   }),
 
+  controllerVersion: baseProcedure.query(async ({ ctx }) => {
+    const client = new KiloClawInternalClient();
+    return client.getControllerVersion(ctx.user.id);
+  }),
+
   restartOpenClaw: baseProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();
     return client.restartGatewayProcess(ctx.user.id);
@@ -311,5 +351,10 @@ export const kiloclawRouter = createTRPCRouter({
   runDoctor: baseProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();
     return client.runDoctor(ctx.user.id);
+  }),
+
+  restoreConfig: baseProcedure.mutation(async ({ ctx }) => {
+    const client = new KiloClawInternalClient();
+    return client.restoreConfig(ctx.user.id);
   }),
 });

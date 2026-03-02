@@ -5,7 +5,7 @@ import {
   agent_environment_profile_vars,
   agent_environment_profile_commands,
   type AgentEnvironmentProfile,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
 import type { ProfileOwner, ProfileSummary, ProfileResponse } from './types';
 import { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils';

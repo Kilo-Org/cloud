@@ -96,6 +96,7 @@ export type CloudAgentSessionState = {
   mode?: string;
   /** The model to use */
   model?: string;
+  variant?: string;
   /** Whether to auto-commit changes */
   autoCommit?: boolean;
   /** Whether to condense context after execution */

@@ -6,7 +6,7 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { auto_fix_tickets } from '@/db/schema';
+import { auto_fix_tickets } from '@kilocode/db/schema';
 import { eq, and, desc, count, or } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { AUTO_FIX_CONSTANTS } from '../core/schemas';
@@ -18,7 +18,7 @@ import type {
   FixStatus,
   FixClassificationType,
 } from '../core/schemas';
-import type { AutoFixTicket } from '@/db/schema';
+import type { AutoFixTicket } from '@kilocode/db/schema';
 
 /**
  * Creates a new fix ticket record

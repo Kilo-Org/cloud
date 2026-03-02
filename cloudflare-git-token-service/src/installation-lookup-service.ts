@@ -1,6 +1,11 @@
 import * as z from 'zod';
-import { createDatabaseConnection, type Database } from './db/database.js';
-import { platform_integrations, organization_memberships, kilocode_users } from './db/tables.js';
+import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
+import {
+  platform_integrations,
+  organization_memberships,
+  kilocode_users,
+} from '@kilocode/db/schema';
+import { eq, and, isNull, isNotNull, or, sql } from 'drizzle-orm';
 
 export type FindInstallationParams = {
   githubRepo: string;
@@ -39,7 +44,7 @@ export type InstallationLookupFailure = {
 export type InstallationLookupResult = InstallationLookupSuccess | InstallationLookupFailure;
 
 export class InstallationLookupService {
-  private db: Database | null = null;
+  private db: WorkerDb | null = null;
 
   constructor(private env: CloudflareEnv) {}
 
@@ -47,12 +52,12 @@ export class InstallationLookupService {
     return Boolean(this.env.HYPERDRIVE);
   }
 
-  private getDb(): Database {
+  private getDb(): WorkerDb {
     if (!this.db) {
       if (!this.env.HYPERDRIVE) {
         throw new Error('Hyperdrive not configured');
       }
-      this.db = createDatabaseConnection(this.env.HYPERDRIVE.connectionString);
+      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
     }
     return this.db;
   }
@@ -88,41 +93,57 @@ export class InstallationLookupService {
 
     const db = this.getDb();
 
-    const rows = await db.query(
-      /* sql */ `
-        SELECT
-          ${platform_integrations.platform_installation_id},
-          ${platform_integrations.platform_account_login},
-          ${platform_integrations.github_app_type}
-        FROM ${platform_integrations}
-        -- For org installations, verify user is a member of the org
-        LEFT JOIN ${organization_memberships}
-          ON ${platform_integrations.owned_by_organization_id} = ${organization_memberships.organization_id}
-          AND ${organization_memberships.kilo_user_id} = $3
-        -- Verify user is not blocked
-        INNER JOIN ${kilocode_users}
-          ON ${kilocode_users.id} = $3
-          AND ${kilocode_users.blocked_reason} IS NULL
-        WHERE ${platform_integrations.platform} = 'github'
-          AND ${platform_integrations.integration_type} = 'app'
-          AND ${platform_integrations.integration_status} = 'active'
-          AND ${platform_integrations.platform_account_login} = $1
-          AND (
-            -- Org installation: must match org ID AND user must be a member
-            (${platform_integrations.owned_by_organization_id} IS NOT NULL
-             AND ${platform_integrations.owned_by_organization_id} = $2::uuid
-             AND ${organization_memberships.id} IS NOT NULL)
-            OR
-            -- User installation: must match user ID directly
-            (${platform_integrations.owned_by_user_id} IS NOT NULL
-             AND ${platform_integrations.owned_by_user_id} = $3)
+    const rows = await db
+      .select({
+        platform_installation_id: platform_integrations.platform_installation_id,
+        platform_account_login: platform_integrations.platform_account_login,
+        github_app_type: platform_integrations.github_app_type,
+      })
+      .from(platform_integrations)
+      // For org installations, verify user is a member of the org
+      .leftJoin(
+        organization_memberships,
+        and(
+          eq(
+            platform_integrations.owned_by_organization_id,
+            organization_memberships.organization_id
+          ),
+          eq(organization_memberships.kilo_user_id, params.userId)
+        )
+      )
+      // Verify user is not blocked
+      .innerJoin(
+        kilocode_users,
+        and(eq(kilocode_users.id, params.userId), isNull(kilocode_users.blocked_reason))
+      )
+      .where(
+        and(
+          eq(platform_integrations.platform, 'github'),
+          eq(platform_integrations.integration_type, 'app'),
+          eq(platform_integrations.integration_status, 'active'),
+          eq(platform_integrations.platform_account_login, repoOwner),
+          or(
+            // Org installation: must match org ID AND user must be a member
+            and(
+              isNotNull(platform_integrations.owned_by_organization_id),
+              eq(
+                platform_integrations.owned_by_organization_id,
+                sql`${params.orgId ?? null}::uuid`
+              ),
+              isNotNull(organization_memberships.id)
+            ),
+            // User installation: must match user ID directly
+            and(
+              isNotNull(platform_integrations.owned_by_user_id),
+              eq(platform_integrations.owned_by_user_id, params.userId)
+            )
           )
-        ORDER BY
-          CASE WHEN ${platform_integrations.owned_by_organization_id} IS NOT NULL THEN 0 ELSE 1 END
-        LIMIT 1
-      `,
-      [repoOwner, params.orgId ?? null, params.userId]
-    );
+        )
+      )
+      .orderBy(
+        sql`CASE WHEN ${platform_integrations.owned_by_organization_id} IS NOT NULL THEN 0 ELSE 1 END`
+      )
+      .limit(1);
 
     if (rows.length === 0) {
       return { success: false, reason: 'no_installation_found' };

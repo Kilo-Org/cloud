@@ -6,7 +6,7 @@ import type * as analysisServiceModule from '@/lib/security-agent/services/analy
 import type * as sessionIngestModule from '@/lib/session-ingest-client';
 import type * as posthogModule from '@/lib/security-agent/posthog-tracking';
 import type * as tokensModule from '@/lib/tokens';
-import type { SecurityFinding, User } from '@/db/schema';
+import type { SecurityFinding, User } from '@kilocode/db/schema';
 import type { SecurityFindingAnalysis } from '@/lib/security-agent/core/types';
 
 // --- Mock functions ---
@@ -89,6 +89,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/utils.server', () => ({
   sentryLogger: () => jest.fn(),
+  logExceptInTest: jest.fn(),
 }));
 
 jest.mock('@/lib/drizzle', () => {
@@ -105,7 +106,7 @@ jest.mock('@/lib/drizzle', () => {
   };
 });
 
-jest.mock('@/db/schema', () => ({
+jest.mock('@kilocode/db/schema', () => ({
   kilocode_users: { id: 'id' },
 }));
 

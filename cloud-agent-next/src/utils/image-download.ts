@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 import type { ExecutionSession } from '../types.js';
 import type { Images } from '../router/schemas.js';
 import { logger } from '../logger.js';
-import type { R2Client } from './r2-client.js';
+import type { R2Client } from '@kilocode/worker-utils';
 
 export type ImageDownloadResult = {
   localPaths: string[];

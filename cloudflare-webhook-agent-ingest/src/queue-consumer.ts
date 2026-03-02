@@ -217,7 +217,7 @@ async function processWebhookMessage(
       });
 
       const profileService = getProfileResolutionService(env);
-      const resolvedProfile = await profileService.resolveProfile({
+      const resolvedProfile = await profileService.resolveProfileConfig({
         profileId: triggerConfig.profileId,
         userId: triggerConfig.userId,
         orgId: triggerConfig.orgId,

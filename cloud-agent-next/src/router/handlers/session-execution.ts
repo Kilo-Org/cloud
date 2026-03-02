@@ -170,6 +170,7 @@ export function createSessionExecutionV2Handlers() {
             prompt: input.prompt,
             mode: input.mode,
             model: input.model,
+            variant: input.variant,
             autoCommit: input.autoCommit,
             condenseOnComplete: input.condenseOnComplete,
             tokenOverrides: {

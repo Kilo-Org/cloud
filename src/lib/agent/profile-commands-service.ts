@@ -1,6 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import { agent_environment_profile_commands } from '@/db/schema';
+import { agent_environment_profile_commands } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { ProfileOwner, ProfileCommandResponse } from './types';
 import { verifyProfileOwnership } from './profile-utils';

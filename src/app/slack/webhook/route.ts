@@ -23,11 +23,13 @@ import { getDevUserSuffix } from '@/lib/slack-bot/dev-user-info';
 import { APP_URL } from '@/lib/constants';
 import { verifySlackRequest } from '@/lib/slack/verify-request';
 import { db } from '@/lib/drizzle';
-import { cli_sessions_v2 } from '@/db/schema';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 import type { Owner } from '@/lib/integrations/core/types';
-import type { PlatformIntegration } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
+
+export const maxDuration = 800;
 
 /**
  * Reaction emoji names

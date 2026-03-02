@@ -4,7 +4,7 @@ import * as z from 'zod';
 import { db } from '@/lib/drizzle';
 import { eq, and, desc, lt, or, ilike, sql, isNull, notInArray, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { cliSessions, sharedCliSessions, cloud_agent_webhook_triggers } from '@/db/schema';
+import { cliSessions, sharedCliSessions, cloud_agent_webhook_triggers } from '@kilocode/db/schema';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import {
   generateSignedUrls,

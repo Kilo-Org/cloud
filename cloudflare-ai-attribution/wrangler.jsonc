@@ -28,6 +28,13 @@
       "new_sqlite_classes": ["AttributionTrackerDO"],
     },
   ],
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+  ],
   "secrets_store_secrets": [
     {
       "binding": "NEXTAUTH_SECRET",

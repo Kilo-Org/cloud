@@ -3,7 +3,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 import { randomUUID } from 'crypto';
 
 let owner: User;

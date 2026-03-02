@@ -7,8 +7,8 @@ import {
   organizations,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
-} from '@/db/schema';
-import type { Organization } from '@/db/schema';
+} from '@kilocode/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';

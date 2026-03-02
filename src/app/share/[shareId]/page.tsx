@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
-import { cliSessions, sharedCliSessions, kilocode_users } from '@/db/schema';
+import { cliSessions, sharedCliSessions, kilocode_users } from '@kilocode/db/schema';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import { notFound } from 'next/navigation';
 import { AnimatedLogo } from '@/components/AnimatedLogo';

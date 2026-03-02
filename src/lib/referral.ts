@@ -1,6 +1,6 @@
 import 'server-only';
 import assert from 'node:assert';
-import { referral_code_usages, referral_codes } from '@/db/schema';
+import { referral_code_usages, referral_codes } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, and, count, sql, isNull, isNotNull } from 'drizzle-orm';
 import { captureMessage } from '@sentry/nextjs';

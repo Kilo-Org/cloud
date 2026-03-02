@@ -297,7 +297,7 @@ describe('prepareSession endpoint', () => {
       expect(result.kiloSessionId).toBe('cli-session-abc123');
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
-          sessionId: expect.stringMatching(/^agent_/),
+          sessionId: expect.stringMatching(/^agent_/) as unknown,
           userId: 'test-user-123',
           kiloSessionId: 'cli-session-abc123',
           prompt: 'Test prompt',
@@ -334,6 +334,29 @@ describe('prepareSession endpoint', () => {
       );
     });
 
+    it('should forward variant to DO prepare', async () => {
+      const doStub = createMockDOStub({
+        prepare: vi.fn().mockResolvedValue({ success: true }),
+      });
+      const ctx = createInternalApiContext({ doStub });
+
+      const caller = appRouter.createCaller(ctx);
+      await caller.prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        githubToken: 'ghp_token',
+        variant: 'high',
+      });
+
+      expect(doStub.prepare).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'high',
+        })
+      );
+    });
+
     it('should pass optional configuration to DO', async () => {
       const doStub = createMockDOStub({
         prepare: vi.fn().mockResolvedValue({ success: true }),
@@ -357,13 +380,16 @@ describe('prepareSession endpoint', () => {
 
       // Verify the DO was called with the expected configuration
       expect(doStub.prepare).toHaveBeenCalledTimes(1);
-      const callArg = doStub.prepare.mock.calls[0][0];
+      const callArg = doStub.prepare.mock.calls[0][0] as Record<string, unknown>;
       expect(callArg.envVars).toEqual({ API_KEY: 'secret' });
       expect(callArg.setupCommands).toEqual(['npm install']);
       expect(callArg.upstreamBranch).toBe('feature/test-branch');
       expect(callArg.autoCommit).toBe(true);
       expect(callArg.orgId).toBe('f47ac10b-58cc-4372-a567-0e02b2c3d479');
-      expect(callArg.mcpServers.test).toEqual({ type: 'local', command: ['npx', 'test-server'] });
+      expect((callArg.mcpServers as Record<string, unknown>).test).toEqual({
+        type: 'local',
+        command: ['npx', 'test-server'],
+      });
     });
   });
 
@@ -535,6 +561,25 @@ describe('updateSession endpoint', () => {
       );
     });
 
+    it('should forward variant via tryUpdate', async () => {
+      const doStub = createMockDOStub({
+        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
+      });
+      const ctx = createInternalApiContext({ doStub });
+
+      const caller = appRouter.createCaller(ctx);
+      await caller.updateSession({
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
+        variant: 'low',
+      });
+
+      expect(doStub.tryUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'low',
+        })
+      );
+    });
+
     it('should update collections with values', async () => {
       const doStub = createMockDOStub({
         tryUpdate: vi.fn().mockResolvedValue({ success: true }),
@@ -689,7 +734,11 @@ describe('DO state machine methods', () => {
         }),
       });
 
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as {
+        success: boolean;
+        error?: string;
+        data?: Record<string, unknown>;
+      };
       expect(result.success).toBe(false);
       expect(result.error).toBe('Session has not been prepared');
     });
@@ -702,7 +751,11 @@ describe('DO state machine methods', () => {
         }),
       });
 
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as {
+        success: boolean;
+        error?: string;
+        data?: Record<string, unknown>;
+      };
       expect(result.success).toBe(false);
       expect(result.error).toBe('Session has already been initiated');
     });
@@ -1067,7 +1120,11 @@ describe('DO state machine edge cases', () => {
 
       // The router handler should validate required fields after tryInitiate
       // This tests that the validation catches missing prompt
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as {
+        success: boolean;
+        error?: string;
+        data: Record<string, unknown>;
+      };
       expect(result.success).toBe(true);
       expect(result.data.prompt).toBeUndefined();
     });
@@ -1094,7 +1151,11 @@ describe('DO state machine edge cases', () => {
         }),
       });
 
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as {
+        success: boolean;
+        error?: string;
+        data: Record<string, unknown>;
+      };
       expect(result.success).toBe(true);
       expect(result.data.mode).toBeUndefined();
     });
@@ -1121,7 +1182,11 @@ describe('DO state machine edge cases', () => {
         }),
       });
 
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as {
+        success: boolean;
+        error?: string;
+        data: Record<string, unknown>;
+      };
       expect(result.success).toBe(true);
       expect(result.data.kiloSessionId).toBeUndefined();
     });
@@ -1155,11 +1220,15 @@ describe('DO state machine edge cases', () => {
       });
 
       // First call succeeds
-      const firstResult = await doStub.tryInitiate();
+      const firstResult = (await doStub.tryInitiate()) as {
+        success: boolean;
+        error?: string;
+        data?: Record<string, unknown>;
+      };
       expect(firstResult.success).toBe(true);
 
       // Second call fails
-      const secondResult = await doStub.tryInitiate();
+      const secondResult = (await doStub.tryInitiate()) as { success: boolean; error?: string };
       expect(secondResult.success).toBe(false);
       expect(secondResult.error).toBe('Session has already been initiated');
     });
@@ -1195,17 +1264,20 @@ describe('DO state machine edge cases', () => {
       });
 
       // First call succeeds and sets initiatedAt
-      const firstResult = await doStub.tryInitiate();
+      const firstResult = (await doStub.tryInitiate()) as {
+        success: boolean;
+        data: Record<string, unknown>;
+      };
       expect(firstResult.success).toBe(true);
       expect(firstResult.data.initiatedAt).toBe(firstInitiatedAt);
 
       // Second call fails
-      const secondResult = await doStub.tryInitiate();
+      const secondResult = (await doStub.tryInitiate()) as { success: boolean; error?: string };
       expect(secondResult.success).toBe(false);
       expect(secondResult.error).toBe('Session has already been initiated');
 
       // Verify storage wasn't mutated - initiatedAt is still the first timestamp
-      const metadata = await doStub.getMetadata();
+      const metadata = (await doStub.getMetadata()) as CloudAgentSessionState | null;
       expect(metadata).not.toBeNull();
       expect(metadata!.initiatedAt).toBe(firstInitiatedAt);
     });

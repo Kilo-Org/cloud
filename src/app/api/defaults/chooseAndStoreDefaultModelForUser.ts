@@ -1,5 +1,5 @@
-import type { User } from '@/db/schema';
-import { kilocode_users } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_MODEL_CHOICES } from '@/lib/models';

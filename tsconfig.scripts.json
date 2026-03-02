@@ -4,6 +4,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@kilocode/db": ["./packages/db/src/index.ts"],
+      "@kilocode/db/*": ["./packages/db/src/*"],
       "server-only": ["src/scripts/lib/server-only-shim.ts"]
     }
   }

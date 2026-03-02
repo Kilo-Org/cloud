@@ -10,7 +10,7 @@ import {
   microdollar_usage,
   credit_transactions,
   auto_top_up_configs,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';

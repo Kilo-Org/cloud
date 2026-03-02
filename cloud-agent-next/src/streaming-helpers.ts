@@ -9,7 +9,7 @@ export function tryParseJson(line: string): Record<string, unknown> | null {
   // Try both original and ANSI-stripped versions
   for (const candidate of [line, stripVTControlCharacters(line)]) {
     try {
-      const parsed = JSON.parse(candidate);
+      const parsed: unknown = JSON.parse(candidate);
       if (typeof parsed === 'object' && parsed !== null) {
         return parsed as Record<string, unknown>;
       }

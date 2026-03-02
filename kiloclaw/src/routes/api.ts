@@ -40,8 +40,8 @@ adminApi.post('/storage/sync', async c => {
 // POST /api/admin/gateway/restart - Restart the Fly Machine via the DO
 adminApi.post('/gateway/restart', async c => {
   const stub = resolveStub(c);
-  const body = await c.req.json().catch(() => ({}));
-  const rawTag = typeof body?.imageTag === 'string' ? body.imageTag : undefined;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const rawTag = typeof body.imageTag === 'string' ? body.imageTag : undefined;
 
   if (rawTag && !isValidImageTag(rawTag)) {
     return c.json({ success: false, error: 'Invalid image tag format' }, 400);

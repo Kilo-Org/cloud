@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 
-import { credit_transactions } from '@/db/schema';
+import { credit_transactions } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { client } from '@/lib/stripe-client';
 import { captureMessage } from '@sentry/nextjs';

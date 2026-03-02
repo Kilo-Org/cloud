@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { CRON_SECRET } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { sentryLogger } from '@/lib/utils.server';
-import { deployments } from '@/db/schema';
+import { deployments } from '@kilocode/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { scanDeployment } from '@/lib/webrisk';
 

@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import { zodJsonValidator } from '../util/validation';
+import { zodJsonValidator } from '@kilocode/worker-utils';
 import { requireAdmin } from '../admin-middleware';
 import { AlertingConfigInputSchema, deleteAlertingConfig, listAlertingConfigs, upsertAlertingConfig } from './config-store';
 import {

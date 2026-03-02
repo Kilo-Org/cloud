@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { webhook_events } from '@/db/schema';
+import { webhook_events } from '@kilocode/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import type { Owner } from '@/lib/integrations/core/types';
 

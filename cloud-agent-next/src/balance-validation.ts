@@ -88,9 +88,9 @@ export function extractOrgIdFromUrl(url: URL): string | undefined {
   if (!inputParam) return undefined;
 
   try {
-    const input = JSON.parse(inputParam);
+    const input: unknown = JSON.parse(inputParam);
     if (input && typeof input === 'object' && 'kilocodeOrganizationId' in input) {
-      const value = input.kilocodeOrganizationId;
+      const value = (input as Record<string, unknown>).kilocodeOrganizationId;
       if (typeof value === 'string') {
         return value;
       }

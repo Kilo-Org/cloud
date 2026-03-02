@@ -2,7 +2,7 @@ import { describe, test, expect } from '@jest/globals';
 import { bulkBlockUsers } from '@/lib/abuse/bulkBlock';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 
 describe('bulkBlockUsers (integration)', () => {

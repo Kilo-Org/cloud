@@ -1,0 +1,22 @@
+{
+  "name": "@kilocode/encryption",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
+  },
+  "devDependencies": {
+    "@kilocode/eslint-config": "workspace:*",
+    "@types/node": "^22",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "~3.2.0"
+  }
+}

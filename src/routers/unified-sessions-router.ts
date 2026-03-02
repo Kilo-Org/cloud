@@ -3,7 +3,7 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
 import { sql, type SQL } from 'drizzle-orm';
-import { cliSessions, cli_sessions_v2 } from '@/db/schema';
+import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { KNOWN_PLATFORMS } from '@/routers/cli-sessions-router';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 

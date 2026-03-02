@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { cli_sessions_v2, kilocode_users } from '@/db/schema';
+import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
 import { notFound } from 'next/navigation';
 import { validate as isValidUUID } from 'uuid';
 import { AnimatedLogo } from '@/components/AnimatedLogo';

@@ -1,6 +1,6 @@
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { auto_top_up_configs, kilocode_users, organizations } from '@/db/schema';
-import type { User, Organization } from '@/db/schema';
+import { auto_top_up_configs, kilocode_users, organizations } from '@kilocode/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
@@ -15,7 +15,7 @@ import {
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_subscriptions,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import {
   KiloPassCadence,
   KiloPassIssuanceItemKind,

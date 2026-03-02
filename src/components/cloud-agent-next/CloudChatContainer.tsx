@@ -434,8 +434,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
           // Check if session has been initiated - prefer DO state, fallback to message check
           const hasMessages = Boolean(
             messagesResult.data &&
-              Array.isArray(messagesResult.data.messages) &&
-              messagesResult.data.messages.length > 0
+            Array.isArray(messagesResult.data.messages) &&
+            messagesResult.data.messages.length > 0
           );
           const isInitiated = runtimeState?.initiatedAt ? true : hasMessages;
           setIsSessionInitiated(isInitiated);

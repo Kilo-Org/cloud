@@ -1,6 +1,6 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 
 // Test users will be created dynamically
 let regularUser: User;

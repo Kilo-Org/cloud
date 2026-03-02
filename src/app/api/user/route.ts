@@ -1,4 +1,4 @@
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@/lib/user.server';
 import { NextResponse } from 'next/server';
 

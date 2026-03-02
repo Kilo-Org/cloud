@@ -11,7 +11,7 @@ import {
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_subscriptions,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import {
   KiloPassCadence,
   KiloPassIssuanceItemKind,

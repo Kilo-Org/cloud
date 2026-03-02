@@ -17,7 +17,7 @@ import {
   credit_transactions,
   microdollar_usage,
   type Organization,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq, and, asc, gt } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@/lib/maybe-result';
 import { computeExpiration } from '@/lib/creditExpiration';

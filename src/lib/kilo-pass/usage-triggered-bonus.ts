@@ -5,7 +5,7 @@ import {
   kilo_pass_issuances,
   kilo_pass_subscriptions,
   kilocode_users,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { db as defaultDb } from '@/lib/drizzle';
 import {
   KiloPassCadence,

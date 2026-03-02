@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { db, sql } from '@/lib/drizzle';
-import { kilocode_users, credit_transactions } from '@/db/schema';
+import { kilocode_users, credit_transactions } from '@kilocode/db/schema';
 import { asc, count, desc, ilike, eq } from 'drizzle-orm';
 import { describePaymentMethods, getPaymentStatusByUserIds } from '@/lib/admin-utils-serverside';
 import { getUsersWithAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';

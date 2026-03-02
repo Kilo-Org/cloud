@@ -4,11 +4,11 @@ import {
   organization_memberships,
   credit_transactions,
   organization_audit_logs,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
 import { eq } from 'drizzle-orm';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 
 // Mock the Stripe function to avoid API calls in tests
 jest.mock('@/lib/stripe', () => ({

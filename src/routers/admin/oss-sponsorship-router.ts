@@ -7,8 +7,8 @@ import {
   organization_memberships,
   kilocode_users,
   cloud_agent_code_reviews,
-} from '@/db/schema';
-import type { User, Organization } from '@/db/schema';
+} from '@kilocode/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { eq, isNull, and, or, ilike, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';

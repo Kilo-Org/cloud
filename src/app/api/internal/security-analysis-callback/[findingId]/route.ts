@@ -24,9 +24,9 @@ import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { trackSecurityAgentAnalysisCompleted } from '@/lib/security-agent/posthog-tracking';
 import { generateApiToken } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { sentryLogger } from '@/lib/utils.server';
+import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import {
   logSecurityAudit,
@@ -319,13 +319,21 @@ async function handleAnalysisFailed(
       ? `Analysis interrupted: ${payload.errorMessage ?? 'unknown reason'}`
       : (payload.errorMessage ?? 'Analysis failed');
 
-  const logger = payload.status === 'interrupted' ? log : logError;
-  logger('Analysis failed/interrupted', {
-    findingId,
-    correlationId,
-    status: payload.status,
-    errorMessage,
-  });
+  if (payload.status === 'interrupted') {
+    logExceptInTest('Analysis interrupted by user', {
+      findingId,
+      correlationId,
+      status: payload.status,
+      errorMessage,
+    });
+  } else {
+    logError('Analysis failed/interrupted', {
+      findingId,
+      correlationId,
+      status: payload.status,
+      errorMessage,
+    });
+  }
 
   await updateAnalysisStatus(findingId, 'failed', { error: errorMessage });
 

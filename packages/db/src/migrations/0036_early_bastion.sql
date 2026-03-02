@@ -1,0 +1,2 @@
+ALTER TABLE "kilocode_users" ADD COLUMN "openrouter_upstream_safety_identifier" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_kilocode_users_openrouter_upstream_safety_identifier" ON "kilocode_users" USING btree ("openrouter_upstream_safety_identifier") WHERE "kilocode_users"."openrouter_upstream_safety_identifier" IS NOT NULL;

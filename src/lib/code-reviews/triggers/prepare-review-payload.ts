@@ -9,7 +9,7 @@
 
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
 import {
@@ -76,7 +76,8 @@ export type SessionInput = {
   githubToken?: string;
   /** Generic git token for authentication (for GitLab and other platforms) */
   gitToken?: string;
-  // Note: envVars not needed - cloud-agent auto-sets GH_TOKEN/GITLAB_TOKEN from tokens
+  /** Git platform type for correct token/env var handling */
+  platform?: 'github' | 'gitlab';
 };
 
 export type CodeReviewPayload = {
@@ -140,10 +141,10 @@ export async function prepareReviewPayload(
     let gitlabContext: GitLabDiffContext | undefined;
 
     if (review.platform_integration_id) {
-      try {
-        const integration = await getIntegrationById(review.platform_integration_id);
+      const integration = await getIntegrationById(review.platform_integration_id);
 
-        if (platform === 'github' && integration?.platform_installation_id) {
+      if (platform === 'github' && integration?.platform_installation_id) {
+        try {
           // Use the stored app type (defaults to 'standard' for existing integrations)
           const appType: GitHubAppType = integration.github_app_type || 'standard';
           // GitHub: Use installation token
@@ -198,116 +199,113 @@ export async function prepareReviewPayload(
               error: stateLookupError,
             });
           }
-        } else if (platform === PLATFORM.GITLAB && integration) {
-          // GitLab: Use Project Access Token (PrAT) for all operations
-          // PrAT is required for the glab CLI and Kilocode to work correctly
-          const metadata = integration.metadata as GitLabIntegrationMetadata | null;
-          gitlabInstanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
-          const instanceUrl = gitlabInstanceUrl;
-
-          logExceptInTest('[prepareReviewPayload] GitLab integration found', {
-            integrationId: integration.id,
-            instanceUrl,
+        } catch (authError) {
+          captureException(authError, {
+            tags: { operation: 'prepareReviewPayload', step: 'get-github-token' },
+            extra: { reviewId, platformIntegrationId: review.platform_integration_id },
           });
-
-          // Get or create Project Access Token (PrAT) for all GitLab operations
-          // This is required because:
-          // 1. The glab CLI needs a proper access token (not OAuth)
-          // 2. Comments should appear as a bot identity, not the user
-          const projectId = review.platform_project_id;
-
-          if (!projectId) {
-            throw new Error(
-              `GitLab code review requires platform_project_id. ` +
-                `Review ${reviewId} for ${review.repo_full_name} is missing this field.`
-            );
-          }
-
-          try {
-            gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
-            logExceptInTest('[prepareReviewPayload] Using PrAT for code review', {
-              reviewId,
-              repoFullName: review.repo_full_name,
-              projectId,
-            });
-          } catch (pratError) {
-            // PrAT creation failed - this is a hard failure, not a fallback situation
-            // OAuth tokens don't work with glab CLI, so we can't proceed
-            if (pratError instanceof GitLabProjectAccessTokenPermissionError) {
-              throw new Error(
-                `Cannot create Project Access Token for GitLab code review. ` +
-                  `You need Maintainer role or higher on project ${review.repo_full_name}. ` +
-                  `Error: ${pratError.message}`
-              );
-            }
-            throw new Error(
-              `Failed to create Project Access Token for GitLab code review on ${review.repo_full_name}. ` +
-                `Error: ${pratError instanceof Error ? pratError.message : String(pratError)}`
-            );
-          }
-
-          // Build complete review state for GitLab (using PrAT for reading)
-          try {
-            const mrIid = review.pr_number;
-            // Use repo_full_name as the project path for GitLab API calls
-            const repoPath = review.repo_full_name;
-
-            // Fetch all state in parallel for efficiency (using PrAT)
-            const [summaryNote, inlineComments, headCommitSha, diffRefs] = await Promise.all([
-              findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
-              fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
-              getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
-              getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
-            ]);
-
-            // Convert GitLab note format to common format
-            const summaryComment = summaryNote
-              ? { commentId: summaryNote.noteId, body: summaryNote.body }
-              : null;
-
-            // Convert GitLab inline comments to common format
-            const convertedInlineComments = inlineComments.map(c => ({
-              id: c.id,
-              path: c.path,
-              line: c.line,
-              body: c.body,
-              isOutdated: c.isOutdated,
-            }));
-
-            existingReviewState = buildReviewState(
-              summaryComment,
-              convertedInlineComments,
-              headCommitSha
-            );
-
-            // Store GitLab diff context for prompt generation
-            gitlabContext = {
-              baseSha: diffRefs.baseSha,
-              startSha: diffRefs.startSha,
-              headSha: diffRefs.headSha,
-            };
-
-            logExceptInTest('[prepareReviewPayload] Built GitLab review state', {
-              reviewId,
-              hasSummary: !!summaryNote,
-              inlineCount: inlineComments.length,
-              previousStatus: existingReviewState.previousStatus,
-              headCommitSha: headCommitSha.substring(0, 8),
-            });
-          } catch (stateLookupError) {
-            // Non-critical - continue without state info
-            logExceptInTest('[prepareReviewPayload] Failed to build GitLab review state:', {
-              reviewId,
-              error: stateLookupError,
-            });
-          }
+          // Continue without token - cloud agent may still work with public repos
         }
-      } catch (authError) {
-        captureException(authError, {
-          tags: { operation: 'prepareReviewPayload', step: `get-${platform}-token` },
-          extra: { reviewId, platformIntegrationId: review.platform_integration_id },
+      } else if (platform === PLATFORM.GITLAB && integration) {
+        // GitLab: Use Project Access Token (PrAT) for all operations
+        // PrAT is required for cloning private repos and for the glab CLI.
+        // Unlike GitHub, we cannot fall back to no-token for GitLab private repos,
+        // so auth errors here are hard failures that must propagate.
+        const metadata = integration.metadata as GitLabIntegrationMetadata | null;
+        gitlabInstanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+        const instanceUrl = gitlabInstanceUrl;
+
+        logExceptInTest('[prepareReviewPayload] GitLab integration found', {
+          integrationId: integration.id,
+          instanceUrl,
         });
-        // Continue without token - cloud agent may still work with public repos
+
+        // Get or create Project Access Token (PrAT) for all GitLab operations
+        const projectId = review.platform_project_id;
+
+        if (!projectId) {
+          throw new Error(
+            `GitLab code review requires platform_project_id. ` +
+              `Review ${reviewId} for ${review.repo_full_name} is missing this field.`
+          );
+        }
+
+        try {
+          gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
+          logExceptInTest('[prepareReviewPayload] Using PrAT for code review', {
+            reviewId,
+            repoFullName: review.repo_full_name,
+            projectId,
+          });
+        } catch (pratError) {
+          if (pratError instanceof GitLabProjectAccessTokenPermissionError) {
+            throw new Error(
+              `Cannot create Project Access Token for GitLab code review. ` +
+                `You need Maintainer role or higher on project ${review.repo_full_name}. ` +
+                `Error: ${pratError.message}`
+            );
+          }
+          throw new Error(
+            `Failed to create Project Access Token for GitLab code review on ${review.repo_full_name}. ` +
+              `Error: ${pratError instanceof Error ? pratError.message : String(pratError)}`
+          );
+        }
+
+        // Build complete review state for GitLab (using PrAT for reading)
+        try {
+          const mrIid = review.pr_number;
+          // Use repo_full_name as the project path for GitLab API calls
+          const repoPath = review.repo_full_name;
+
+          // Fetch all state in parallel for efficiency (using PrAT)
+          const [summaryNote, inlineComments, headCommitSha, diffRefs] = await Promise.all([
+            findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
+            fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
+            getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
+            getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
+          ]);
+
+          // Convert GitLab note format to common format
+          const summaryComment = summaryNote
+            ? { commentId: summaryNote.noteId, body: summaryNote.body }
+            : null;
+
+          // Convert GitLab inline comments to common format
+          const convertedInlineComments = inlineComments.map(c => ({
+            id: c.id,
+            path: c.path,
+            line: c.line,
+            body: c.body,
+            isOutdated: c.isOutdated,
+          }));
+
+          existingReviewState = buildReviewState(
+            summaryComment,
+            convertedInlineComments,
+            headCommitSha
+          );
+
+          // Store GitLab diff context for prompt generation
+          gitlabContext = {
+            baseSha: diffRefs.baseSha,
+            startSha: diffRefs.startSha,
+            headSha: diffRefs.headSha,
+          };
+
+          logExceptInTest('[prepareReviewPayload] Built GitLab review state', {
+            reviewId,
+            hasSummary: !!summaryNote,
+            inlineCount: inlineComments.length,
+            previousStatus: existingReviewState.previousStatus,
+            headCommitSha: headCommitSha.substring(0, 8),
+          });
+        } catch (stateLookupError) {
+          // Non-critical - continue without state info
+          logExceptInTest('[prepareReviewPayload] Failed to build GitLab review state:', {
+            reviewId,
+            error: stateLookupError,
+          });
+        }
       }
     }
 
@@ -346,6 +344,7 @@ export async function prepareReviewPayload(
             // GitLab: use full git URL for cloning
             gitUrl: `${gitlabInstanceUrl || 'https://gitlab.com'}/${review.repo_full_name}.git`,
             gitToken: gitlabToken,
+            platform: 'gitlab',
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',
@@ -356,6 +355,7 @@ export async function prepareReviewPayload(
             // GitHub: use owner/repo format
             githubRepo: review.repo_full_name,
             githubToken,
+            platform: 'github',
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',

@@ -2,9 +2,9 @@ import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { cliSessions, sharedCliSessions, cli_sessions_v2 } from '@/db/schema';
+import { cliSessions, sharedCliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
 import { errorExceptInTest, logExceptInTest, warnExceptInTest } from '@/lib/utils.server';

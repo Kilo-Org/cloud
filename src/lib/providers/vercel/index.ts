@@ -1,6 +1,7 @@
 import type { BYOKResult } from '@/lib/byok';
 import { kiloFreeModels, preferredModels } from '@/lib/models';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
+import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   AutocompleteUserByokProviderIdSchema,
   AwsCredentialsSchema,
@@ -102,6 +103,31 @@ function parseAwsCredentials(input: string) {
   }
 }
 
+export function getVercelInferenceProviderConfigForUserByok(
+  provider: BYOKResult
+): [VercelUserByokInferenceProviderId, VercelInferenceProviderConfig[]] {
+  const key =
+    provider.providerId === AutocompleteUserByokProviderIdSchema.enum.codestral
+      ? VercelUserByokInferenceProviderIdSchema.enum.mistral
+      : provider.providerId;
+  const list = new Array<VercelInferenceProviderConfig>();
+
+  if (key === VercelUserByokInferenceProviderIdSchema.enum.zai) {
+    // Z.AI Coding Plan support
+    list.push({
+      apiKey: provider.decryptedAPIKey,
+      baseURL: 'https://api.z.ai/api/coding/paas/v4',
+    });
+  }
+
+  if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
+    list.push(parseAwsCredentials(provider.decryptedAPIKey));
+  } else {
+    list.push({ apiKey: provider.decryptedAPIKey });
+  }
+  return [key, list];
+}
+
 export function applyVercelSettings(
   requestedModel: string,
   requestToMutate: OpenRouterChatCompletionRequest,
@@ -116,26 +142,7 @@ export function applyVercelSettings(
     }
     const byokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
     for (const provider of userByok) {
-      const key =
-        provider.providerId === AutocompleteUserByokProviderIdSchema.enum.codestral
-          ? VercelUserByokInferenceProviderIdSchema.enum.mistral
-          : provider.providerId;
-      const list = new Array<VercelInferenceProviderConfig>();
-
-      if (key === VercelUserByokInferenceProviderIdSchema.enum.zai) {
-        // Z.AI Coding Plan support
-        list.push({
-          apiKey: provider.decryptedAPIKey,
-          baseURL: 'https://api.z.ai/api/coding/paas/v4',
-        });
-      }
-
-      if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
-        list.push(parseAwsCredentials(provider.decryptedAPIKey));
-      } else {
-        list.push({ apiKey: provider.decryptedAPIKey });
-      }
-
+      const [key, list] = getVercelInferenceProviderConfigForUserByok(provider);
       byokProviders[key] = [...(byokProviders[key] ?? []), ...list];
     }
 

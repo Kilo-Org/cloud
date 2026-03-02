@@ -17,7 +17,7 @@ import {
   ProfileNotFoundError,
   type MergeProfileConfigurationResult,
 } from '@/lib/agent/profile-session-config';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 
 jest.mock('@/lib/user.server');
 jest.mock('@/routers/organizations/utils');
@@ -96,6 +96,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     completed_welcome_form: false,
     linkedin_url: null,
     github_url: null,
+    openrouter_upstream_safety_identifier: null,
     ...overrides,
   };
 }

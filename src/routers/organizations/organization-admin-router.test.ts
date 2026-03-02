@@ -1,10 +1,10 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { organizations, credit_transactions } from '@/db/schema';
+import { organizations, credit_transactions } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 
 let adminUser: User;
 let nonAdminUser: User;

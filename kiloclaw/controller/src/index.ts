@@ -12,6 +12,7 @@ import { createSupervisor } from './supervisor';
 import { registerHealthRoute } from './routes/health';
 import { registerGatewayRoutes } from './routes/gateway';
 import { registerConfigRoutes } from './routes/config';
+import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 
 export type RuntimeConfig = {
   port: number;
@@ -116,9 +117,9 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   });
 
   const app = new Hono();
-  registerHealthRoute(app, supervisor);
+  registerHealthRoute(app, supervisor, config.expectedToken);
   registerGatewayRoutes(app, supervisor, config.expectedToken);
-  registerConfigRoutes(app, config.expectedToken);
+  registerConfigRoutes(app, supervisor, config.expectedToken);
   app.all(
     '*',
     createHttpProxy({
@@ -155,7 +156,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   await new Promise<void>(resolve => {
     server.listen(config.port, '0.0.0.0', () => {
       console.log(
-        `[controller] Listening on :${config.port} requireProxyToken=${config.requireProxyToken} wsIdleTimeoutMs=${config.wsIdleTimeoutMs} wsHandshakeTimeoutMs=${config.wsHandshakeTimeoutMs} maxWsConnections=${config.maxWsConnections}`
+        `[controller] Listening on :${config.port} version=${CONTROLLER_VERSION} commit=${CONTROLLER_COMMIT} requireProxyToken=${config.requireProxyToken} wsIdleTimeoutMs=${config.wsIdleTimeoutMs} wsHandshakeTimeoutMs=${config.wsHandshakeTimeoutMs} maxWsConnections=${config.maxWsConnections}`
       );
       resolve();
     });

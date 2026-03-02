@@ -1,10 +1,10 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { organizations } from '@/db/schema';
+import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 
 // Test users and organization will be created dynamically
 let regularUser: User;

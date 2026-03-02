@@ -37,7 +37,7 @@ import {
 } from '../cloud-agent-schemas';
 import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
 import { db } from '@/lib/drizzle';
-import { cliSessions } from '@/db/schema';
+import { cliSessions } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
 import { PLATFORM } from '@/lib/integrations/core/constants';

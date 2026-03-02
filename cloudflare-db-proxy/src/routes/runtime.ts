@@ -44,6 +44,7 @@ runtime.post('/:appId/query', async c => {
   // Execute query
   logger.setTags({ operation: 'query' });
   try {
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC stub wraps return in Rpc.Promisified
     const result = (await db.executeQuery(
       parsed.data.sql,
       parsed.data.params,
@@ -94,6 +95,7 @@ runtime.post('/:appId/batch', async c => {
   // Execute batch
   logger.setTags({ operation: 'batch' });
   try {
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC stub wraps return in Rpc.Promisified
     const results = (await db.executeBatch(parsed.data.queries)) as BatchSuccessResponse;
     return c.json(results);
   } catch (error) {

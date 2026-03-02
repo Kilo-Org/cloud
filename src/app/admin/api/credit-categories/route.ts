@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
-import { credit_transactions, kilocode_users } from '@/db/schema';
+import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { sql, eq, isNull } from 'drizzle-orm';
 import type {
   GuiCreditCategoryStatistics,

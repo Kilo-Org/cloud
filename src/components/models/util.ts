@@ -44,7 +44,7 @@ export interface OpenRouterProvider {
   editors: string[];
   owners: string[];
   adapterName: string;
-  isMultipartSupported: boolean;
+  isMultipartSupported?: boolean;
   statusPageUrl: string | null;
   byokEnabled: boolean;
   icon?: {

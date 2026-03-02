@@ -9,7 +9,7 @@ import { extractProcedureName } from '../balance-validation.js';
 export const authMiddleware = createMiddleware<HonoContext>(
   async (c: Context<HonoContext>, next: Next) => {
     const authHeader = c.req.header('authorization');
-    const result = validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
+    const result = await validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
 
     if (!result.success) {
       logger.withFields({ error: result.error }).warn('Authentication failed');

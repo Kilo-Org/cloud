@@ -81,3 +81,6 @@ run-milvus-test.sh
 .wrangler/
 .env*.local
 /.superset
+
+# Git worktrees
+.worktrees/

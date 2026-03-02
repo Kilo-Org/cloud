@@ -10,7 +10,7 @@ import type {
   ManifestResult,
 } from './types';
 import { db } from '@/lib/drizzle';
-import { code_indexing_manifest } from '@/db/schema';
+import { code_indexing_manifest } from '@kilocode/db/schema';
 import { eq, and, isNull, sql, inArray, lt } from 'drizzle-orm';
 import { createHash } from 'crypto';
 

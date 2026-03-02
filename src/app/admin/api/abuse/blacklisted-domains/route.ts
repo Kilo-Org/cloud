@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, or } from 'drizzle-orm';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getEnvVariable } from '@/lib/dotenvx';

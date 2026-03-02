@@ -1,4 +1,4 @@
-import type { PlatformIntegration } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import type {
   GitHubInstallationData,
   PendingApprovalMetadata,

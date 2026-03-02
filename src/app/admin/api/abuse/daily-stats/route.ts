@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage } from '@/db/schema';
+import { microdollar_usage } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 
 type DailyData = {

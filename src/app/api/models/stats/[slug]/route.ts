@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
-import { modelStats } from '@/db/schema';
+import { modelStats } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 

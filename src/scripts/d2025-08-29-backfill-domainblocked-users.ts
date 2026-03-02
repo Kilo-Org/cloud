@@ -1,6 +1,6 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { sql, eq, isNull, or } from 'drizzle-orm';
 import { isEmailBlacklistedByDomain } from '@/lib/user.server';
 

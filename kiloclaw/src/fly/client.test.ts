@@ -326,12 +326,18 @@ describe('createVolumeWithFallback', () => {
     await createVolumeWithFallback(fakeConfig, request, ['dfw', 'yyz']);
 
     // Both calls should have the full request body including compute and source_volume_id
-    const firstBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    const firstBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string) as Record<
+      string,
+      unknown
+    >;
     expect(firstBody.region).toBe('dfw');
     expect(firstBody.compute).toEqual({ cpus: 2, memory_mb: 4096 });
     expect(firstBody.source_volume_id).toBe('vol-old');
 
-    const secondBody = JSON.parse(fetchSpy.mock.calls[1][1]?.body as string);
+    const secondBody = JSON.parse(fetchSpy.mock.calls[1][1]?.body as string) as Record<
+      string,
+      unknown
+    >;
     expect(secondBody.region).toBe('yyz');
     expect(secondBody.compute).toEqual({ cpus: 2, memory_mb: 4096 });
     expect(secondBody.source_volume_id).toBe('vol-old');

@@ -8,7 +8,7 @@ import { getAuthToken } from '@/scripts/lib/auth';
 import { generateApiToken } from '@/lib/tokens';
 import { z } from 'zod';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 
 // Types
 type ManifestResponse = {

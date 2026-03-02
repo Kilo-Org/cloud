@@ -4,14 +4,14 @@ import type { UserDetailProps } from '@/types/admin';
 import { getUserFromAuth, isUserBlacklistedByDomain } from '@/lib/user.server';
 import { getPaymentStatusByUserIds, describePaymentMethods } from '@/lib/admin-utils-serverside';
 import { db } from '@/lib/drizzle';
-import type { PaymentMethod } from '@/db/schema';
+import type { PaymentMethod } from '@kilocode/db/schema';
 import {
   kilocode_users,
   user_admin_notes,
   organization_memberships,
   organizations,
   auto_top_up_configs,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq, inArray, desc } from 'drizzle-orm';
 import { findUserById } from '@/lib/user';
 import { getBalanceForUser } from '@/lib/user.balance';

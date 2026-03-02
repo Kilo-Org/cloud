@@ -1,5 +1,5 @@
 import { connection, NextResponse } from 'next/server';
-import { modelsByProvider } from '@/db/schema';
+import { modelsByProvider } from '@kilocode/db/schema';
 import { desc } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 

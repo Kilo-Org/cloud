@@ -2,7 +2,7 @@ import 'server-only';
 
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { app_builder_feedback } from '@/db/schema';
+import { app_builder_feedback } from '@kilocode/db/schema';
 import { getProjectWithOwnershipCheck } from '@/lib/app-builder/app-builder-service';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import * as z from 'zod';

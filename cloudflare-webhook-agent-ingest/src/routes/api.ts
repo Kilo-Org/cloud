@@ -10,9 +10,9 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import type { HonoContext } from '../index';
 import { logger } from '../util/logger';
-import { resError, resSuccess } from '../util/res';
-import { internalApiMiddleware } from '../util/auth';
+import { resError, resSuccess } from '@kilocode/worker-utils';
 import { withDORetry } from '../util/do-retry';
+import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
 import { decodeUserIdFromPath, encodeUserIdForPath } from '../util/user-id-encoding';
 

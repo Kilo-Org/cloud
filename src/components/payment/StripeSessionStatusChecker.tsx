@@ -1,6 +1,6 @@
 'use client';
 import BigLoader from '@/components/BigLoader';
-import type { Organization } from '@/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 import { useStripeSessionStatus } from '@/app/payments/hooks';
 import { redirect } from 'next/navigation';
 

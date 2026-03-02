@@ -1,4 +1,4 @@
-import { custom_llm, type CustomLlm } from '@/db/schema';
+import { custom_llm, type CustomLlm } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
 import { OpenCodeSettingsSchema, ToolArraySchema } from '@/lib/organizations/model-settings';
 

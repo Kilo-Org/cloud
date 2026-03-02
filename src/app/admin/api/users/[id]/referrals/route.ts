@@ -4,7 +4,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { findUserById, findUsersByIds } from '@/lib/user';
 import { getReferralCodeForUser, getReferralCodeUsages } from '@/lib/referral';
 import { db } from '@/lib/drizzle';
-import { referral_code_usages } from '@/db/schema';
+import { referral_code_usages } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { toNonNullish } from '@/lib/utils';
 

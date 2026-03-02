@@ -13,10 +13,6 @@
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/sync-security-alerts",
-      "schedule": "0 */6 * * *"
-    },
-    {
       "path": "/api/cron/cleanup-stale-analyses",
       "schedule": "*/15 * * * *"
     },
@@ -35,19 +31,12 @@
     {
       "path": "/api/cron/oss-monthly-reset",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/discord/gateway",
+      "schedule": "*/9 * * * *"
     }
   ],
-  "functions": {
-    "src/app/api/openrouter/[...path]/route.ts": {
-      "maxDuration": 800
-    },
-    "src/app/slack/webhook/route.ts": {
-      "maxDuration": 800
-    },
-    "src/app/api/trpc/[trpc]/route.ts": {
-      "maxDuration": 800
-    }
-  },
   "build": {
     "env": {
       "GIT_LFS_SKIP_SMUDGE": "0"

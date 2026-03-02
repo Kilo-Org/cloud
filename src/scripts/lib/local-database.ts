@@ -1,12 +1,10 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
-import * as schema from '@/db/schema';
+import { createDrizzleClient } from '@kilocode/db/client';
 
-export const localPool = new Pool({
+const { db: localDb, pool: localPool } = createDrizzleClient({
   connectionString: 'postgres://postgres:postgres@localhost:5432/postgres',
-  max: 10,
-  application_name: 'local-kilo-script',
+  poolConfig: { max: 10, application_name: 'local-kilo-script' },
+  logger: true,
   ssl: false,
 });
 
-export const localDb = drizzle(localPool, { schema, logger: true });
+export { localDb, localPool };

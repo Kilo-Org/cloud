@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getInitialsFromName } from '@/lib/utils';
 

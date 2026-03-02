@@ -4,7 +4,7 @@ import {
   OrganizationIdInputSchema,
   organizationOwnerProcedure,
 } from '@/routers/organizations/utils';
-import { security_audit_log } from '@/db/schema';
+import { security_audit_log } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import {
   and,

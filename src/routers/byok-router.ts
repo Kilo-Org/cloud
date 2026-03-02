@@ -3,7 +3,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db, readDb } from '@/lib/drizzle';
-import { byok_api_keys, modelsByProvider } from '@/db/schema';
+import { byok_api_keys, modelsByProvider } from '@kilocode/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { encryptApiKey } from '@/lib/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -14,12 +14,22 @@ import {
   DeleteBYOKKeyInputSchema,
   SetBYOKKeyEnabledInputSchema,
   ListBYOKKeysInputSchema,
+  TestBYOKKeyInputSchema,
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
 } from '@/lib/byok/types';
-import { VercelUserByokInferenceProviderIdSchema } from '@/lib/providers/openrouter/inference-provider-id';
+import {
+  UserByokProviderIdSchema,
+  UserByokTestModels,
+  VercelUserByokInferenceProviderIdSchema,
+} from '@/lib/providers/openrouter/inference-provider-id';
 import { unstable_cache } from 'next/cache';
 import { StoredModelSchema } from '@/lib/providers/vercel/types';
+import { createGateway, generateText } from 'ai';
+import { PROVIDERS } from '@/lib/providers';
+import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/vercel';
+import { decryptByokRow } from '@/lib/byok';
+import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 
 const fetchSupportedModels = unstable_cache(
   async (): Promise<Record<string, string[]>> => {
@@ -327,6 +337,82 @@ export const byokRouter = createTRPCRouter({
         ...updatedKey,
         provider_name: updatedKey.provider_id,
       };
+    }),
+
+  testApiKey: baseProcedure
+    .input(TestBYOKKeyInputSchema)
+    .output(z.object({ success: z.boolean(), message: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, id } = input;
+
+      if (organizationId) {
+        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+      }
+
+      const [existingKey] = await db
+        .select({
+          organization_id: byok_api_keys.organization_id,
+          kilo_user_id: byok_api_keys.kilo_user_id,
+          provider_id: byok_api_keys.provider_id,
+          encrypted_api_key: byok_api_keys.encrypted_api_key,
+        })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, id));
+
+      if (!existingKey) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+      }
+
+      if (organizationId) {
+        if (existingKey.organization_id !== organizationId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+        }
+      } else {
+        if (existingKey.kilo_user_id !== ctx.user.id) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+        }
+      }
+
+      const gateway = createGateway({
+        apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey,
+      });
+
+      const [provider, byokList] = getVercelInferenceProviderConfigForUserByok(
+        decryptByokRow(existingKey)
+      );
+
+      try {
+        const model = gateway(
+          UserByokTestModels[UserByokProviderIdSchema.parse(existingKey.provider_id)]
+        );
+
+        const output = await generateText({
+          model,
+          prompt: 'Say hi',
+          maxOutputTokens: 100,
+          providerOptions: {
+            gateway: {
+              only: [provider],
+              byok: { [provider]: byokList },
+            } satisfies GatewayProviderOptions,
+          },
+        });
+
+        const metadata = output.providerMetadata?.gateway?.routing as
+          | { originalModelId?: string; finalProvider?: string }
+          | undefined;
+
+        return {
+          success: true,
+          message: `API key test success. Provider: ${metadata?.finalProvider ?? 'unknown'}. Model: ${metadata?.originalModelId ?? 'unknown'}. Completion: ${output.text}`,
+        };
+      } catch (e) {
+        console.error(e);
+        return {
+          success: false,
+          message: `API key (${provider}) test failed with: ${e instanceof Error ? e.message : e}`,
+        };
+      }
     }),
 
   delete: baseProcedure

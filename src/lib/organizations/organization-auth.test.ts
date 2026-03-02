@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { getAuthorizedOrgContext } from './organization-auth';
 import { db } from '@/lib/drizzle';
-import { organization_memberships, organizations } from '@/db/schema';
+import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';

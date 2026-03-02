@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import type { PlatformIntegration } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import { logExceptInTest } from '@/lib/utils.server';
 import { createTriageTicket, findExistingTicket } from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -237,9 +237,8 @@ export class IssueWebhookProcessor {
     issueNumber: number
   ): Promise<void> {
     try {
-      const { tryDispatchPendingTickets } = await import(
-        '@/lib/auto-triage/dispatch/dispatch-pending-tickets'
-      );
+      const { tryDispatchPendingTickets } =
+        await import('@/lib/auto-triage/dispatch/dispatch-pending-tickets');
       await tryDispatchPendingTickets(owner);
       logExceptInTest(`Dispatched pending tickets for owner ${owner.type}:${owner.id}`);
     } catch (dispatchError) {

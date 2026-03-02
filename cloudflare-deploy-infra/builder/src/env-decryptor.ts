@@ -1,4 +1,4 @@
-import { decryptWithPrivateKey, type EncryptedEnvelope } from '../../../src/lib/encryption';
+import { decryptWithPrivateKey, type EncryptedEnvelope } from '@kilocode/encryption';
 import {
   type EncryptedEnvVar,
   type PlaintextEnvVar,

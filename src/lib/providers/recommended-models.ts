@@ -1,11 +1,15 @@
-import type {
-  ModelSettings,
-  OpenCodeSettings,
-  VersionedSettings,
+import {
+  ReasoningEffortSchema,
+  type ModelSettings,
+  type OpenCodeSettings,
+  type VersionedSettings,
 } from '@/lib/organizations/model-settings';
 import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { giga_potato_model, giga_potato_thinking_model } from '@/lib/providers/gigapotato';
+import { isGemini3Model, isGeminiModel } from '@/lib/providers/google';
+import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
+import { isZaiModel } from '@/lib/providers/zai';
 
 export function getModelSettings(model: string): ModelSettings | undefined {
   if (isOpenAiModel(model)) {
@@ -25,8 +29,8 @@ export function getModelSettings(model: string): ModelSettings | undefined {
 
 export function getVersionedModelSettings(model: string): VersionedSettings | undefined {
   if (
-    model.startsWith('google/gemini') ||
-    model.startsWith('z-ai/') ||
+    isGeminiModel(model) ||
+    isZaiModel(model) ||
     model === giga_potato_model.public_id ||
     model === giga_potato_thinking_model.public_id
   ) {
@@ -40,17 +44,37 @@ export function getVersionedModelSettings(model: string): VersionedSettings | un
   return undefined;
 }
 
-export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined {
+export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isAnthropicModel(model)) {
     return {
-      variants: {
-        none: { reasoning: { enabled: false } },
-        low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-        medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-        high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-        max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
-      },
+      none: { reasoning: { enabled: false } },
+      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+      max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
     };
+  }
+  if (isOpenAiModel(model) || isGemini3Model(model)) {
+    return Object.fromEntries(
+      ReasoningEffortSchema.options.map(effort => [
+        effort,
+        { reasoning: { enabled: effort !== 'none', effort } },
+      ])
+    );
+  }
+  if (isMoonshotModel(model) || isZaiModel(model)) {
+    return {
+      instant: { reasoning: { enabled: false } },
+      thinking: { reasoning: { enabled: true } },
+    };
+  }
+  return undefined;
+}
+
+export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined {
+  const variants = getModelVariants(model);
+  if (variants) {
+    return { variants };
   }
   return undefined;
 }

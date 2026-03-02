@@ -1,5 +1,9 @@
-import type { Organization, OrganizationSeatsPurchase } from '@/db/schema';
-import { organization_seats_purchases, organizations, credit_transactions } from '@/db/schema';
+import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
+import {
+  organization_seats_purchases,
+  organizations,
+  credit_transactions,
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import * as z from 'zod';

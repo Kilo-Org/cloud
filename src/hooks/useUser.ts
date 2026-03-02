@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 
 async function fetchUser(): Promise<User | null> {
   const res = await fetch('/api/user');

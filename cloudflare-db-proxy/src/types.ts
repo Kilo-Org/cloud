@@ -1,4 +1,4 @@
-export interface Env extends Cloudflare.Env {}
+export type Env = Cloudflare.Env;
 
 export type QueryMethod = 'get' | 'all' | 'run' | 'values';
 

@@ -1,7 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { auto_top_up_configs, organizations } from '@/db/schema';
-import type { User, Organization } from '@/db/schema';
+import { auto_top_up_configs, organizations } from '@kilocode/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';

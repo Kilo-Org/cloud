@@ -6,7 +6,7 @@ import type {
   SystemStatusEvent,
 } from './types.js';
 import { logger } from './logger.js';
-import { withTimeout } from './utils/timeout.js';
+import { withTimeout } from '@kilocode/worker-utils';
 
 /**
  * Sanitize a string for use in filesystem paths by replacing forbidden characters with dashes.
@@ -36,6 +36,104 @@ const CLI_DIR = `${KILOCODE_DIR}/cli`;
 const CLI_CONFIG_PATH = `${CLI_DIR}/config.json`;
 const CLI_GLOBAL_TASKS_PATH = `${CLI_DIR}/global/tasks`;
 const CLI_LOGS_PATH = `${CLI_DIR}/logs`;
+
+const DEFAULT_ALLOWED_COMMANDS = [
+  'ls',
+  'cat',
+  'echo',
+  'pwd',
+  'find',
+  'grep',
+  'node',
+  'npm',
+  'git',
+  'whoami',
+  'date',
+  'python3',
+  'head',
+  'tail',
+  'cd',
+  'mkdir',
+  'touch',
+];
+
+const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
+
+// Keep in sync with: cloud-agent-next/src/session-service.ts, cloudflare-code-review-infra/src/code-review-orchestrator.ts
+// mkdir and touch are intentionally allowed for agent scratch space during analysis
+const CODE_REVIEW_ALLOWED_COMMANDS = [
+  'ls',
+  'cat',
+  'echo',
+  'pwd',
+  'find',
+  'grep',
+  'git',
+  'gh',
+  'whoami',
+  'date',
+  'head',
+  'tail',
+  'cd',
+  'mkdir',
+  'touch',
+];
+
+const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
+  'git add',
+  'git commit',
+  'git push',
+  'git merge',
+  'git rebase',
+  'git cherry-pick',
+  'git reset',
+  'git checkout',
+  'git switch',
+  'git stash',
+  'git tag',
+  'git am',
+  'git apply',
+  'git remote set-url',
+  'gh pr merge',
+  'gh pr review',
+  'gh pr create',
+  'gh pr close',
+  'gh pr edit',
+  'gh issue',
+  'gh repo create',
+  'gh repo fork',
+  'npm test',
+  'pnpm test',
+  'bun test',
+  'yarn test',
+  'pytest',
+  'vitest',
+];
+
+type CommandPolicy = {
+  allowed: string[];
+  denied: string[];
+  policyName: string;
+  isReadOnly: boolean;
+};
+
+function getCommandPolicy(createdOnPlatform?: string): CommandPolicy {
+  if (createdOnPlatform === 'code-review') {
+    return {
+      allowed: CODE_REVIEW_ALLOWED_COMMANDS,
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
+      policyName: 'code-review-read-only',
+      isReadOnly: true,
+    };
+  }
+
+  return {
+    allowed: DEFAULT_ALLOWED_COMMANDS,
+    denied: DEFAULT_DENIED_COMMAND_PATTERNS,
+    policyName: 'default',
+    isReadOnly: false,
+  };
+}
 
 export function getBaseWorkspacePath(
   kilocodeOrganizationId: string | undefined,
@@ -98,8 +196,11 @@ export interface SessionPaths {
 function buildKilocodeConfig(
   kilocodeOrganizationId: string | undefined,
   kilocodeToken: string,
-  kilocodeModel: string
+  kilocodeModel: string,
+  commandPolicy: CommandPolicy
 ) {
+  const isReadOnly = commandPolicy.isReadOnly;
+
   const providerConfig: {
     id: string;
     provider: string;
@@ -127,7 +228,7 @@ function buildKilocodeConfig(
     autoApproval: {
       enabled: true,
       read: { enabled: true, outside: false },
-      write: { enabled: true, outside: false, protected: false },
+      write: { enabled: !isReadOnly, outside: false, protected: isReadOnly },
       browser: { enabled: false },
       retry: { enabled: false, delay: 10 },
       mcp: { enabled: true },
@@ -135,26 +236,8 @@ function buildKilocodeConfig(
       subtasks: { enabled: true },
       execute: {
         enabled: true,
-        allowed: [
-          'ls',
-          'cat',
-          'echo',
-          'pwd',
-          'find',
-          'grep',
-          'node',
-          'npm',
-          'git',
-          'whoami',
-          'date',
-          'python3',
-          'head',
-          'tail',
-          'cd',
-          'mkdir',
-          'touch',
-        ],
-        denied: ['rm -rf', 'sudo rm', 'mkfs', 'dd if='],
+        allowed: commandPolicy.allowed,
+        denied: commandPolicy.denied,
       },
       question: { enabled: false, timeout: 60 },
       todo: { enabled: true },
@@ -172,7 +255,8 @@ export async function configureKilocode(
   kilocodeToken: string,
   kilocodeModel: string,
   overrideToken?: string,
-  overrideOrgId?: string
+  overrideOrgId?: string,
+  createdOnPlatform?: string
 ): Promise<void> {
   // Use override values if provided, otherwise use original values
   const effectiveToken = overrideToken ?? kilocodeToken;
@@ -182,7 +266,21 @@ export async function configureKilocode(
     throw new Error('KILOCODE_TOKEN is missing or empty. Cannot configure Kilocode CLI.');
   }
 
-  const configJson = buildKilocodeConfig(effectiveOrgId, effectiveToken, kilocodeModel);
+  const commandPolicy = getCommandPolicy(createdOnPlatform);
+  logger
+    .withFields({
+      createdOnPlatform: createdOnPlatform ?? 'cloud-agent',
+      commandPolicy: commandPolicy.policyName,
+      deniedCommandPatterns: commandPolicy.denied.length,
+    })
+    .info('Applying Kilocode command policy');
+
+  const configJson = buildKilocodeConfig(
+    effectiveOrgId,
+    effectiveToken,
+    kilocodeModel,
+    commandPolicy
+  );
   const configPath = getKilocodeConfigPath(sessionHome);
 
   try {
@@ -202,7 +300,8 @@ export async function setupWorkspace(
   kilocodeModel: string,
   sessionId: string,
   overrideToken?: string,
-  overrideOrgId?: string
+  overrideOrgId?: string,
+  createdOnPlatform?: string
 ): Promise<SessionPaths> {
   const sessionWorkspacePath = getSessionWorkspacePath(kilocodeOrganizationId, userId, sessionId);
   const sessionHome = getSessionHomePath(sessionId);
@@ -234,7 +333,8 @@ export async function setupWorkspace(
       kilocodeToken,
       kilocodeModel,
       overrideToken,
-      overrideOrgId
+      overrideOrgId,
+      createdOnPlatform
     );
   } catch (error) {
     throw new Error(

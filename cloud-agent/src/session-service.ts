@@ -32,7 +32,7 @@ import type {
   MCPServerConfig,
 } from './persistence/types.js';
 import { MetadataSchema } from './persistence/schemas.js';
-import { withDORetry } from './utils/do-retry.js';
+import { withDORetry } from '@kilocode/worker-utils';
 import { mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import type { EncryptedSecrets, Images } from './router/schemas.js';
 
@@ -628,7 +628,8 @@ export class SessionService {
       kilocodeModel,
       sessionId,
       env.KILOCODE_TOKEN_OVERRIDE,
-      env.KILOCODE_ORG_ID_OVERRIDE
+      env.KILOCODE_ORG_ID_OVERRIDE,
+      createdOnPlatform
     );
 
     const context = this.buildContext({
@@ -723,6 +724,7 @@ export class SessionService {
         setupCommands,
         mcpServers,
         upstreamBranch,
+        createdOnPlatform,
       },
       existingMetadata ?? undefined
     );
@@ -761,10 +763,10 @@ export class SessionService {
           if (
             event.streamEventType === 'kilocode' &&
             event.payload?.event === 'session_created' &&
-            event.payload?.sessionId &&
+            typeof event.payload?.sessionId === 'string' &&
             !capturedKiloSessionId
           ) {
-            capturedKiloSessionId = String(event.payload.sessionId);
+            capturedKiloSessionId = event.payload.sessionId;
             logger.setTags({ kiloSessionId: capturedKiloSessionId });
             void linkKiloSessionInBackend(
               capturedKiloSessionId,
@@ -826,6 +828,7 @@ export class SessionService {
       skipLinking,
       githubAppType,
       existingMetadata,
+      createdOnPlatform,
     } = options;
 
     logger.setTags({
@@ -850,7 +853,8 @@ export class SessionService {
       kilocodeModel,
       sessionId,
       env.KILOCODE_TOKEN_OVERRIDE,
-      env.KILOCODE_ORG_ID_OVERRIDE
+      env.KILOCODE_ORG_ID_OVERRIDE,
+      createdOnPlatform ?? existingMetadata?.createdOnPlatform
     );
 
     // For prepared sessions, we may have an upstreamBranch to use
@@ -885,7 +889,8 @@ export class SessionService {
       env,
       kilocodeToken,
       orgId,
-      encryptedSecrets
+      encryptedSecrets,
+      createdOnPlatform ?? existingMetadata?.createdOnPlatform
     );
 
     // Check disk space before clone for observability (logs warning if low)
@@ -960,6 +965,7 @@ export class SessionService {
         setupCommands,
         mcpServers,
         kiloSessionId,
+        createdOnPlatform,
       },
       metadataToPreserve
     );
@@ -1153,7 +1159,8 @@ export class SessionService {
         kilocodeToken,
         kilocodeModel,
         env.KILOCODE_TOKEN_OVERRIDE,
-        env.KILOCODE_ORG_ID_OVERRIDE
+        env.KILOCODE_ORG_ID_OVERRIDE,
+        metadata?.createdOnPlatform
       );
     }
 
@@ -1438,6 +1445,7 @@ export class SessionService {
       mcpServers?: Record<string, MCPServerConfig>;
       upstreamBranch?: string;
       kiloSessionId?: string;
+      createdOnPlatform?: string;
     },
     existing?: CloudAgentSessionState
   ): Promise<void> {
@@ -1466,6 +1474,7 @@ export class SessionService {
       mcpServers: data.mcpServers,
       upstreamBranch: data.upstreamBranch,
       kiloSessionId: data.kiloSessionId,
+      createdOnPlatform: data.createdOnPlatform ?? existing?.createdOnPlatform,
     };
 
     // Validate before writing
@@ -1787,6 +1796,8 @@ type InitiateFromKiloSessionBaseOptions = {
   skipLinking?: boolean;
   /** GitHub App type for selecting correct slug/bot identity */
   githubAppType?: 'standard' | 'lite';
+  /** Platform identifier for session creation (e.g. code-review, slack). */
+  createdOnPlatform?: string;
   /**
    * Existing metadata from prepared session flow.
    * When provided, saveSessionMetadata will merge with it to preserve

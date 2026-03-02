@@ -1,7 +1,7 @@
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { code_indexing_search, code_indexing_manifest } from '@/db/schema';
+import { code_indexing_search, code_indexing_manifest } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, getTableName, sql, desc } from 'drizzle-orm';
 import {
@@ -15,7 +15,6 @@ import { getIndexStorage } from '@/lib/code-indexing/storage';
 import { getUserUUID } from '@/lib/user.server';
 import { findUserByEmail } from '@/lib/user';
 import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
-import { MANAGED_INDEXING_ENABLED } from '@/lib/config.server';
 import {
   trackCodeIndexingSearch,
   trackCodeIndexingDelete,
@@ -184,9 +183,6 @@ export const codeIndexingRouter = createTRPCRouter({
     .input(CodebaseIndexingSearchRequestSchema)
     .output(CodebaseIndexingSearchResponseSchema)
     .query(async ({ ctx, input }) => {
-      if (!MANAGED_INDEXING_ENABLED) {
-        return [];
-      }
       const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
       // Search using storage class with default provider and collection

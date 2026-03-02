@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import type { Organization, organization_invitations } from '@/db/schema';
+import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import type { Result } from '@/lib/maybe-result';
 import { CompanyDomainSchema } from './company-domain';
 

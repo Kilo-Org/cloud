@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { SecurityFinding } from '@/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 import { RepositoryFilter } from './RepositoryFilter';
 import { SecurityFindingRow } from './SecurityFindingRow';
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { Organization } from '@/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 import type { OrgTrialStatus } from '@/lib/organizations/organization-types';
 import {
   getDaysRemainingInTrial,

@@ -59,7 +59,7 @@ export function UserFilters({
             value={search}
             onChange={onSearchChange}
             isLoading={isLoading}
-            placeholder="by email/name/ID/referral-code..."
+            placeholder="by email/name/ID/referral-code/safety-id..."
           />
         </div>
       </div>

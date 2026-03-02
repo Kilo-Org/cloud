@@ -1,3 +1,5 @@
+import { timingSafeEqual } from '@kilocode/encryption';
+
 export type WebhookAuthInput = {
   header: string;
   secret: string;
@@ -29,17 +31,6 @@ export async function hashWebhookSecret(secret: string): Promise<string> {
 export async function compareWebhookSecret(hash: string, secret: string): Promise<boolean> {
   const candidateHash = await hashWebhookSecret(secret);
   return timingSafeEqual(hash, candidateHash);
-}
-
-export function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  let result = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    result |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return result === 0;
 }
 
 export function sanitizeWebhookAuth(auth: StoredWebhookAuth | null): {

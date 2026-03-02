@@ -19,23 +19,24 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "hono": "^4.11.6",
+    "@kilocode/db": "workspace:*",
+    "@kilocode/encryption": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
     "jose": "^6.0.0",
-    "pg": "^8.18.0",
-    "zod": "^4.3.6"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@eslint/js": "^9.38.0",
+    "@kilocode/eslint-config": "workspace:*",
     "@types/node": "^22.0.0",
-    "@types/pg": "^8.16.0",
     "@typescript/native-preview": "7.0.0-dev.20251019.1",
     "@vitest/coverage-v8": "^4.0.18",
-    "eslint": "^9.38.0",
-    "prettier": "^3.6.2",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.46.2",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
     "vitest": "^4.0.18",
-    "wrangler": "^4.50.0"
+    "wrangler": "catalog:"
   },
   "author": "",
   "license": "Apache-2.0"

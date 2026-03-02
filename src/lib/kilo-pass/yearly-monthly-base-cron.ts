@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { kilo_pass_subscriptions, kilocode_users } from '@/db/schema';
+import { kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
 import {
   KiloPassAuditLogResult,
   KiloPassCadence,

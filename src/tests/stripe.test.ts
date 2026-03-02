@@ -16,7 +16,7 @@ import {
   organizations,
   kilocode_users,
   auto_top_up_configs,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import { insertTestUser } from './helpers/user.helper';
 import { createTestPaymentMethod } from './helpers/payment-method.helper';

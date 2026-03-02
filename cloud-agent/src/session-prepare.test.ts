@@ -233,7 +233,7 @@ describe('prepareSession endpoint', () => {
       expect(result.kiloSessionId).toBe('123e4567-e89b-12d3-a456-426614174000');
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
-          sessionId: expect.stringMatching(/^agent_/),
+          sessionId: expect.stringMatching(/^agent_/) as unknown,
           userId: 'test-user-123',
           kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
           prompt: 'Test prompt',
@@ -294,7 +294,14 @@ describe('prepareSession endpoint', () => {
       // Verify the DO was called with the expected configuration
       // Note: mcpServers schema adds default values (type, timeout, alwaysAllow, disabledTools)
       expect(doStub.prepare).toHaveBeenCalledTimes(1);
-      const callArg = doStub.prepare.mock.calls[0][0];
+      const callArg = doStub.prepare.mock.calls[0][0] as unknown as {
+        envVars: unknown;
+        setupCommands: unknown;
+        upstreamBranch: unknown;
+        autoCommit: unknown;
+        orgId: unknown;
+        mcpServers: { test: { command: unknown; args: unknown } };
+      };
       expect(callArg.envVars).toEqual({ API_KEY: 'secret' });
       expect(callArg.setupCommands).toEqual(['npm install']);
       expect(callArg.upstreamBranch).toBe('feature/test-branch');
@@ -691,7 +698,7 @@ describe('DO state machine methods', () => {
         }),
       });
 
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as unknown as { success: boolean; error: string };
       expect(result.success).toBe(false);
       expect(result.error).toBe('Session has not been prepared');
     });
@@ -704,7 +711,7 @@ describe('DO state machine methods', () => {
         }),
       });
 
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as unknown as { success: boolean; error: string };
       expect(result.success).toBe(false);
       expect(result.error).toBe('Session has already been initiated');
     });
@@ -1056,7 +1063,10 @@ describe('DO state machine edge cases', () => {
 
       // The router handler should validate required fields after tryInitiate
       // This tests that the validation catches missing prompt
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as unknown as {
+        success: boolean;
+        data: Record<string, unknown>;
+      };
       expect(result.success).toBe(true);
       expect(result.data.prompt).toBeUndefined();
     });
@@ -1083,7 +1093,10 @@ describe('DO state machine edge cases', () => {
         }),
       });
 
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as unknown as {
+        success: boolean;
+        data: Record<string, unknown>;
+      };
       expect(result.success).toBe(true);
       expect(result.data.mode).toBeUndefined();
     });
@@ -1110,7 +1123,10 @@ describe('DO state machine edge cases', () => {
         }),
       });
 
-      const result = await doStub.tryInitiate();
+      const result = (await doStub.tryInitiate()) as unknown as {
+        success: boolean;
+        data: Record<string, unknown>;
+      };
       expect(result.success).toBe(true);
       expect(result.data.kiloSessionId).toBeUndefined();
     });
@@ -1144,11 +1160,14 @@ describe('DO state machine edge cases', () => {
       });
 
       // First call succeeds
-      const firstResult = await doStub.tryInitiate();
+      const firstResult = (await doStub.tryInitiate()) as unknown as { success: boolean };
       expect(firstResult.success).toBe(true);
 
       // Second call fails
-      const secondResult = await doStub.tryInitiate();
+      const secondResult = (await doStub.tryInitiate()) as unknown as {
+        success: boolean;
+        error: string;
+      };
       expect(secondResult.success).toBe(false);
       expect(secondResult.error).toBe('Session has already been initiated');
     });
@@ -1184,17 +1203,23 @@ describe('DO state machine edge cases', () => {
       });
 
       // First call succeeds and sets initiatedAt
-      const firstResult = await doStub.tryInitiate();
+      const firstResult = (await doStub.tryInitiate()) as unknown as {
+        success: boolean;
+        data: { initiatedAt: unknown };
+      };
       expect(firstResult.success).toBe(true);
       expect(firstResult.data.initiatedAt).toBe(firstInitiatedAt);
 
       // Second call fails
-      const secondResult = await doStub.tryInitiate();
+      const secondResult = (await doStub.tryInitiate()) as unknown as {
+        success: boolean;
+        error: string;
+      };
       expect(secondResult.success).toBe(false);
       expect(secondResult.error).toBe('Session has already been initiated');
 
       // Verify storage wasn't mutated - initiatedAt is still the first timestamp
-      const metadata = await doStub.getMetadata();
+      const metadata = (await doStub.getMetadata()) as unknown as { initiatedAt: unknown } | null;
       expect(metadata).not.toBeNull();
       expect(metadata!.initiatedAt).toBe(firstInitiatedAt);
     });

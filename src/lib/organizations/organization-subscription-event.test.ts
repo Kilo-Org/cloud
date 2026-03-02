@@ -1,12 +1,12 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { handleSubscriptionEvent } from '@/lib/organizations/organization-seats';
-import type { User, Organization, CreditTransaction } from '@/db/schema';
+import type { User, Organization, CreditTransaction } from '@kilocode/db/schema';
 import {
   organization_seats_purchases,
   organization_memberships,
   organizations,
   credit_transactions,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';

@@ -1,10 +1,11 @@
 import { db, sql } from '@/lib/drizzle';
-import { microdollar_usage } from '@/db/schema';
+import { microdollar_usage } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
+import { isKiloAutoModel } from '@/lib/kilo-auto-model';
 import { preferredModels } from '@/lib/models';
 
-const monitoredModels = [...new Set([...preferredModels])];
+const monitoredModels = [...new Set([...preferredModels])].filter(m => !isKiloAutoModel(m));
 
 // Simple hardcoded key for authentication
 const HEALTH_CHECK_KEY = 'kilo-models-health-check';

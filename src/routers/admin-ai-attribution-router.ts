@@ -2,7 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { getAIAttributionDebugData, deleteAIAttribution } from '@/lib/ai-attribution-service';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { code_indexing_manifest } from '@/db/schema';
+import { code_indexing_manifest } from '@kilocode/db/schema';
 import { eq, and, ilike, desc, sql } from 'drizzle-orm';
 
 const GetDebugDataSchema = z.object({

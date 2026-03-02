@@ -2,7 +2,7 @@
  * Auto Triage - Database Types
  */
 
-import type { AutoTriageTicket } from '@/db/schema';
+import type { AutoTriageTicket } from '@kilocode/db/schema';
 
 /**
  * Owner type - discriminated union for org or user ownership

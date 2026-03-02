@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import { free_model_usage } from '@/db/schema';
+import { free_model_usage } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,

@@ -1,11 +1,14 @@
 import { Hono } from 'hono';
 import type { Env } from './env';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
+import { getWorkerDb } from '@kilocode/db/client';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
+
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
 import { api } from './routes/api';
-import { getDb } from './db/kysely';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
-import { withDORetry } from './util/do-retry';
+import { withDORetry } from '@kilocode/worker-utils';
 export { SessionIngestDO } from './dos/SessionIngestDO';
 export { SessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 export { SessionIngestRPC } from './session-ingest-rpc';
@@ -32,12 +35,17 @@ app.get('/session/:sessionId', async c => {
     );
   }
 
-  const db = getDb(c.env.HYPERDRIVE);
-  const row = await db
-    .selectFrom('cli_sessions_v2')
-    .select(['session_id', 'kilo_user_id'])
-    .where('public_id', '=', parsedSessionId.data)
-    .executeTakeFirst();
+  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  const rows = await db
+    .select({
+      session_id: cli_sessions_v2.session_id,
+      kilo_user_id: cli_sessions_v2.kilo_user_id,
+    })
+    .from(cli_sessions_v2)
+    .where(eq(cli_sessions_v2.public_id, parsedSessionId.data))
+    .limit(1);
+
+  const row = rows[0];
 
   if (!row) {
     return c.json({ success: false, error: 'session_not_found' }, 404);

@@ -22,11 +22,14 @@ APP_NAME="${APP_NAME:-kiloclaw-dev}"
 
 TAG="dev-$(date +%s)"
 IMAGE="registry.fly.io/$APP_NAME:$TAG"
+GIT_SHA="$(git -C "$KILOCLAW_DIR" rev-parse HEAD 2>/dev/null || echo 'unknown')"
 
 echo "Building + pushing $IMAGE (linux/amd64) ..."
+echo "Controller commit: $GIT_SHA"
 docker buildx build \
   --platform linux/amd64 \
   -f "$KILOCLAW_DIR/Dockerfile" \
+  --build-arg "CONTROLLER_COMMIT=$GIT_SHA" \
   -t "$IMAGE" \
   --push \
   "$KILOCLAW_DIR"

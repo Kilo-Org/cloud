@@ -10,10 +10,10 @@
 import 'server-only';
 import type OpenAI from 'openai';
 import { sendProxiedChatCompletion } from '@/lib/llm-proxy-helpers';
-import type { SecurityFinding } from '@/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingTriage } from '../core/types';
 import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
-import { sentryLogger } from '@/lib/utils.server';
+import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import { emitApiMetrics } from '@/lib/o11y/api-metrics.server';
 import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@/lib/config.server';
 import { DEFAULT_SECURITY_AGENT_TRIAGE_MODEL } from '../core/constants';
@@ -256,6 +256,31 @@ export async function triageSecurityFinding(options: {
         span.setAttribute('security_agent.duration_ms', durationMs);
 
         if (!result.ok) {
+          if (result.status === 402) {
+            logExceptInTest('Triage skipped due to insufficient credits', {
+              correlationId,
+              findingId: finding.id,
+              status: result.status,
+            });
+
+            span.setAttribute('security_agent.status', 'payment_required');
+            span.setAttribute('security_agent.is_fallback', true);
+
+            addBreadcrumb({
+              category: 'security-agent.triage',
+              message: 'Triage fallback used (insufficient credits)',
+              level: 'info',
+              data: {
+                correlationId,
+                findingId: finding.id,
+                status: result.status,
+                isFallback: true,
+              },
+            });
+
+            return createFallbackTriage('Insufficient credits for triage API');
+          }
+
           logError('Triage API error', {
             correlationId,
             findingId: finding.id,

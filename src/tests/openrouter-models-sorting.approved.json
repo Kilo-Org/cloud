@@ -43,6 +43,52 @@
       "preferredIndex": 0
     },
     {
+      "id": "kilo/auto-free",
+      "name": "Kilo: Auto Free",
+      "created": 0,
+      "description": "Automatically routes your request to a free model.",
+      "architecture": {
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other"
+      },
+      "top_provider": {
+        "is_moderated": false,
+        "context_length": 204800,
+        "max_completion_tokens": 131072
+      },
+      "pricing": {
+        "prompt": "0",
+        "completion": "0",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0"
+      },
+      "context_length": 204800,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "settings": {
+        "included_tools": [
+          "search_and_replace"
+        ],
+        "excluded_tools": [
+          "apply_diff",
+          "edit_file"
+        ]
+      },
+      "preferredIndex": 1
+    },
+    {
       "id": "minimax/minimax-m2.5:free",
       "canonical_slug": "minimax/minimax-m2.5:free",
       "hugging_face_id": "",
@@ -84,7 +130,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 1,
+      "preferredIndex": 2,
       "settings": {
         "included_tools": [
           "search_and_replace"
@@ -96,13 +142,13 @@
       }
     },
     {
-      "id": "giga-potato",
-      "canonical_slug": "giga-potato",
+      "id": "moonshotai/kimi-k2.5:free",
+      "canonical_slug": "moonshotai/kimi-k2.5:free",
       "hugging_face_id": "",
-      "name": "Giga Potato (free)",
+      "name": "MoonshotAI: Kimi K2.5 (free)",
       "created": 1756238927,
-      "description": "Giga Potato is a stealth model deeply optimized for agentic programming, with visual understanding capability. It is provided free of charge in Kilo Code for a limited time.\n**Note:** Prompts and completions are logged and may be used to improve the model.",
-      "context_length": 256000,
+      "description": "Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual coding capability and a self-directed agent swarm paradigm. Built on Kimi K2 with continued pretraining over approximately 15T mixed visual and text tokens, it delivers strong performance in general reasoning, visual coding, and agentic tool-calling.",
+      "context_length": 262144,
       "architecture": {
         "modality": "text+image->text",
         "input_modalities": [
@@ -125,27 +171,32 @@
         "input_cache_read": "0.00000000"
       },
       "top_provider": {
-        "context_length": 256000,
-        "max_completion_tokens": 32000,
+        "context_length": 262144,
+        "max_completion_tokens": 65536,
         "is_moderated": false
       },
       "per_request_limits": null,
       "supported_parameters": [
         "max_tokens",
         "temperature",
-        "tools"
+        "tools",
+        "reasoning",
+        "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 2,
-      "versioned_settings": {
-        "4.146.0": {
-          "included_tools": [
-            "write_file",
-            "edit_file"
-          ],
-          "excluded_tools": [
-            "apply_diff"
-          ]
+      "preferredIndex": 3,
+      "opencode": {
+        "variants": {
+          "instant": {
+            "reasoning": {
+              "enabled": false
+            }
+          },
+          "thinking": {
+            "reasoning": {
+              "enabled": true
+            }
+          }
         }
       }
     },
@@ -192,7 +243,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 3,
+      "preferredIndex": 4,
       "versioned_settings": {
         "4.146.0": {
           "included_tools": [
@@ -204,51 +255,6 @@
           ]
         }
       }
-    },
-    {
-      "id": "moonshotai/kimi-k2.5:free",
-      "canonical_slug": "moonshotai/kimi-k2.5:free",
-      "hugging_face_id": "",
-      "name": "MoonshotAI: Kimi K2.5 (free)",
-      "created": 1756238927,
-      "description": "Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual coding capability and a self-directed agent swarm paradigm. Built on Kimi K2 with continued pretraining over approximately 15T mixed visual and text tokens, it delivers strong performance in general reasoning, visual coding, and agentic tool-calling.",
-      "context_length": 262144,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000000"
-      },
-      "top_provider": {
-        "context_length": 262144,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "preferredIndex": 13
     },
     {
       "id": "anthropic/claude-sonnet-4",
@@ -460,6 +466,40 @@
           "edit_file",
           "write_to_file"
         ]
+      },
+      "opencode": {
+        "variants": {
+          "none": {
+            "reasoning": {
+              "enabled": false,
+              "effort": "none"
+            }
+          },
+          "low": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "low"
+            }
+          },
+          "medium": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            }
+          },
+          "high": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "high"
+            }
+          },
+          "xhigh": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "xhigh"
+            }
+          }
+        }
       }
     },
     {
@@ -561,48 +601,56 @@
       "default_parameters": {}
     },
     {
-      "id": "kilo/auto-free",
-      "name": "Kilo: Auto Free",
-      "created": 0,
-      "description": "Automatically routes your request to a free model.",
+      "id": "giga-potato",
+      "canonical_slug": "giga-potato",
+      "hugging_face_id": "",
+      "name": "Giga Potato (free)",
+      "created": 1756238927,
+      "description": "Giga Potato is a stealth model deeply optimized for agentic programming, with visual understanding capability. It is provided free of charge in Kilo Code for a limited time.\n**Note:** Prompts and completions are logged and may be used to improve the model.",
+      "context_length": 256000,
       "architecture": {
+        "modality": "text+image->text",
         "input_modalities": [
-          "text"
+          "text",
+          "image"
         ],
         "output_modalities": [
           "text"
         ],
-        "tokenizer": "Other"
-      },
-      "top_provider": {
-        "is_moderated": false,
-        "context_length": 204800,
-        "max_completion_tokens": 131072
+        "tokenizer": "Other",
+        "instruct_type": null
       },
       "pricing": {
-        "prompt": "0",
-        "completion": "0",
+        "prompt": "0.0000000",
+        "completion": "0.0000000",
         "request": "0",
         "image": "0",
         "web_search": "0",
-        "internal_reasoning": "0"
+        "internal_reasoning": "0",
+        "input_cache_read": "0.00000000"
       },
-      "context_length": 204800,
+      "top_provider": {
+        "context_length": 256000,
+        "max_completion_tokens": 32000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
       "supported_parameters": [
         "max_tokens",
         "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
+        "tools"
       ],
-      "settings": {
-        "included_tools": [
-          "search_and_replace"
-        ],
-        "excluded_tools": [
-          "apply_diff",
-          "edit_file"
-        ]
+      "default_parameters": {},
+      "versioned_settings": {
+        "4.146.0": {
+          "included_tools": [
+            "write_file",
+            "edit_file"
+          ],
+          "excluded_tools": [
+            "apply_diff"
+          ]
+        }
       }
     },
     {

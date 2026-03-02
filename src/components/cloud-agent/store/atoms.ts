@@ -7,6 +7,7 @@
 
 import { atom } from 'jotai';
 import type { CloudMessage, SessionConfig } from '../types';
+import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
 
 // Primary state
 export const messagesAtom = atom<CloudMessage[]>([]);
@@ -26,15 +27,14 @@ export const filteredMessagesAtom = atom(get => {
   return messages.filter(msg => shouldDisplayMessage(msg));
 });
 
-export const staticMessagesAtom = atom(get => {
+const splitMessagesAtom = atom(get => {
   const messages = get(filteredMessagesAtom);
-  return splitMessages(messages).staticMessages;
+  return splitByContiguousPrefix(messages, isMessageComplete);
 });
 
-export const dynamicMessagesAtom = atom(get => {
-  const messages = get(filteredMessagesAtom);
-  return splitMessages(messages).dynamicMessages;
-});
+export const staticMessagesAtom = atom(get => get(splitMessagesAtom).staticItems);
+
+export const dynamicMessagesAtom = atom(get => get(splitMessagesAtom).dynamicItems);
 
 // Matches CLI's getApiMetrics logic
 export const totalCostAtom = atom(get => {
@@ -190,29 +190,4 @@ function isMessageComplete(message: CloudMessage): boolean {
   }
 
   return !message.partial;
-}
-
-// Matches CLI's splitMessages logic
-function splitMessages(messages: CloudMessage[]): {
-  staticMessages: CloudMessage[];
-  dynamicMessages: CloudMessage[];
-} {
-  let lastCompleteIndex = -1;
-
-  for (let i = 0; i < messages.length; i++) {
-    if (isMessageComplete(messages[i])) {
-      if (i === 0 || i === lastCompleteIndex + 1) {
-        lastCompleteIndex = i;
-      } else {
-        break;
-      }
-    } else {
-      break;
-    }
-  }
-
-  return {
-    staticMessages: messages.slice(0, lastCompleteIndex + 1),
-    dynamicMessages: messages.slice(lastCompleteIndex + 1),
-  };
 }

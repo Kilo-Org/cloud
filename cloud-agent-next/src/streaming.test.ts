@@ -103,7 +103,7 @@ function createFakeEnv(overrides?: {
 
   const env = {
     CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn(name => ({ name })),
+      idFromName: vi.fn((name: string) => ({ name })),
       get: vi.fn(() => metadataDO),
     },
     SESSION_INGEST: {

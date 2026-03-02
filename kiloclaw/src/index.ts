@@ -324,20 +324,29 @@ app.all('*', async c => {
     // Client -> Container relay
     serverWs.addEventListener('message', event => {
       if (containerWs.readyState === WebSocket.OPEN) {
-        containerWs.send(event.data);
+        containerWs.send(event.data as string | ArrayBuffer);
       }
     });
 
     // Container -> Client relay with error transformation
     containerWs.addEventListener('message', event => {
-      let data = event.data;
+      let data = event.data as string | ArrayBuffer;
 
       if (typeof data === 'string') {
         try {
-          const parsed = JSON.parse(data);
-          if (parsed.error?.message) {
-            parsed.error.message = transformErrorMessage(parsed.error.message);
-            data = JSON.stringify(parsed);
+          const parsed: unknown = JSON.parse(data);
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            'error' in parsed &&
+            typeof (parsed as Record<string, unknown>).error === 'object' &&
+            (parsed as Record<string, unknown>).error !== null
+          ) {
+            const error = (parsed as Record<string, Record<string, unknown>>).error;
+            if (typeof error.message === 'string') {
+              error.message = transformErrorMessage(error.message);
+              data = JSON.stringify(parsed);
+            }
           }
         } catch {
           // Not JSON -- pass through
@@ -445,7 +454,9 @@ export default {
           env.KV_CLAW_CACHE,
           env.OPENCLAW_VERSION,
           'default', // variant hardcoded day 1
-          env.FLY_IMAGE_TAG
+          env.FLY_IMAGE_TAG,
+          env.FLY_IMAGE_DIGEST ?? null,
+          env.HYPERDRIVE?.connectionString
         )
       );
     }

@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { fetchExpiringTransactions } from '@/lib/creditExpiration';
 

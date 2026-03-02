@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertTriangle } from 'lucide-react';
-import type { SecurityFinding } from '@/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 
 // GitHub Dependabot dismiss reasons
 const DISMISS_REASONS = [

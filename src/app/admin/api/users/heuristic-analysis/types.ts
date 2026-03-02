@@ -1,4 +1,4 @@
-import type { MicrodollarUsageView } from '@/db/schema';
+import type { MicrodollarUsageView } from '@kilocode/db/schema';
 import type { PaginationMetadata } from '@/types/pagination';
 
 export type ApiResponse = GroupedDataResponse | PaginatedRawDataResponse;

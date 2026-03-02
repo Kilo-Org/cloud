@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
-import { security_audit_log } from '@/db/schema';
+import { security_audit_log } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import {
   and,

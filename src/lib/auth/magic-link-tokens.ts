@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { sql, eq, and, isNull } from 'drizzle-orm';
-import { magic_link_tokens } from '@/db/schema';
+import { magic_link_tokens } from '@kilocode/db/schema';
 import * as z from 'zod';
 import 'server-only';
 import { NEXTAUTH_URL } from '@/lib/config.server';

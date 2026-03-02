@@ -6,7 +6,7 @@ import {
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage, kilocode_users } from '@/db/schema';
+import { microdollar_usage, kilocode_users } from '@kilocode/db/schema';
 import { eq, sum, count, sql, and, gte, lte } from 'drizzle-orm';
 import * as z from 'zod';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';

@@ -1,4 +1,4 @@
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';

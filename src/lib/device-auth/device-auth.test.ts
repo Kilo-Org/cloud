@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@/lib/drizzle';
-import { device_auth_requests, kilocode_users } from '@/db/schema';
+import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
   generateDeviceCode,

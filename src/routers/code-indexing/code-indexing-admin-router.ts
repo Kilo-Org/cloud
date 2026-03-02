@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { code_indexing_manifest, organizations, kilocode_users } from '@/db/schema';
+import { code_indexing_manifest, organizations, kilocode_users } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { getTableName, sql } from 'drizzle-orm';
 import * as z from 'zod';

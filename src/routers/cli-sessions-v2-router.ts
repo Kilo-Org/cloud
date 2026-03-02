@@ -5,7 +5,7 @@ import { db } from '@/lib/drizzle';
 import { eq, and, desc, lt, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { TRPCClientError } from '@trpc/client';
-import { cli_sessions_v2 } from '@/db/schema';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateApiToken } from '@/lib/tokens';
 import { fetchSessionMessages } from '@/lib/session-ingest-client';

@@ -6,7 +6,7 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { auto_triage_tickets } from '@/db/schema';
+import { auto_triage_tickets } from '@kilocode/db/schema';
 import { eq, and, desc, count, or } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { AUTO_TRIAGE_CONSTANTS } from '../core/constants';

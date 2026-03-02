@@ -322,9 +322,12 @@ export class KiloClient {
       let errorMessage = `HTTP ${httpStatus}: ${method} ${path}`;
 
       try {
-        const errorBody = JSON.parse(responseBody);
-        if (errorBody.message) {
-          errorMessage = `${errorMessage} - ${errorBody.message}`;
+        const errorBody = JSON.parse(responseBody) as unknown;
+        if (errorBody && typeof errorBody === 'object' && 'message' in errorBody) {
+          const msg = (errorBody as Record<string, unknown>).message;
+          if (typeof msg === 'string' && msg) {
+            errorMessage = `${errorMessage} - ${msg}`;
+          }
         }
       } catch {
         if (responseBody && responseBody.length < 200) {

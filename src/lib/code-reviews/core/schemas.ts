@@ -6,7 +6,7 @@
  */
 
 import * as z from 'zod';
-import type { CloudAgentCodeReview } from '@/db/schema';
+import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 
 // ============================================================================

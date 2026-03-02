@@ -1,6 +1,6 @@
 'use client';
 
-import type { Deployment, DeploymentBuild } from '@/db/schema';
+import type { Deployment, DeploymentBuild } from '@kilocode/db/schema';
 import { StatusBadge } from './StatusBadge';
 import { GitBranch, ExternalLink } from 'lucide-react';
 import { isDeploymentCompleted } from '@/lib/user-deployments/types';

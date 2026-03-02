@@ -42,12 +42,6 @@ export const NEXT_MODE_OPTIONS: ModeOption<'code' | 'plan' | 'debug' | 'orchestr
   { value: 'ask', label: 'Ask', description: 'Get answers and explanations' },
 ];
 
-/**
- * Default mode options (legacy modes for backward compatibility).
- * @deprecated Use LEGACY_MODE_OPTIONS or NEXT_MODE_OPTIONS explicitly.
- */
-export const MODE_OPTIONS = LEGACY_MODE_OPTIONS;
-
 export type ModeComboboxProps<T extends string = string> = {
   label?: string;
   helperText?: string;

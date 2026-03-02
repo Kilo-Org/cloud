@@ -5,7 +5,7 @@
  * for security reviews (vulnerability_alerts).
  */
 
-import type { PlatformIntegration } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 
 // Use the same env var as GitHubIntegrationDetails.tsx for consistency
 const GITHUB_APP_NAME = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';

@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@/db/schema';
+import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull, desc, sql } from 'drizzle-orm';
 import type {
   GitHubRequester,

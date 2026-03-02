@@ -4,14 +4,14 @@ import Stripe from 'stripe';
 import { client } from './stripe-client';
 import { captureException } from '@sentry/nextjs';
 import { db, auto_deleted_at } from '@/lib/drizzle';
-import type { User, PaymentMethod, Organization } from '@/db/schema';
+import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
 import {
   kilo_pass_scheduled_changes,
   payment_methods,
   kilocode_users,
   auto_top_up_configs,
   organizations,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import type { FraudDetectionHeaders } from './utils';

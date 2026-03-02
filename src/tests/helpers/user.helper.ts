@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
-import type { User } from '@/db/schema';
-import { kilocode_users, user_auth_provider } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
+import { kilocode_users, user_auth_provider } from '@kilocode/db/schema';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 
 export function defineTestUser(userData: Partial<User> = {}): User {
@@ -32,6 +32,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     completed_welcome_form: false,
     linkedin_url: null,
     github_url: null,
+    openrouter_upstream_safety_identifier: null,
     ...userData,
   } satisfies User;
 }

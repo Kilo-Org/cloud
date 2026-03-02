@@ -4,6 +4,9 @@
 
 import { z } from 'zod';
 import type { TriageOrchestrator } from './triage-orchestrator';
+import type { Owner, MCPServerConfig } from '@kilocode/worker-utils';
+
+export type { Owner, MCPServerConfig };
 
 export type TriageStatus = 'pending' | 'analyzing' | 'actioned' | 'failed' | 'skipped';
 
@@ -14,19 +17,6 @@ export type TriageAction =
   | 'comment_posted'
   | 'closed_duplicate'
   | 'needs_clarification';
-
-export interface Owner {
-  type: 'user' | 'org';
-  id: string;
-  userId: string;
-}
-
-export interface MCPServerConfig {
-  type: string;
-  url: string;
-  headers: Record<string, string>;
-  timeout: number;
-}
 
 export interface SessionInput {
   repoFullName: string;

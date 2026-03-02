@@ -2,5 +2,7 @@ export function normalizeKilocodeModel(model: string | undefined | null): string
   if (!model) return undefined;
   const trimmed = model.trim();
   if (!trimmed) return undefined;
-  return trimmed.startsWith('kilo/') ? trimmed : `kilo/${trimmed}`;
+  return trimmed.startsWith('kilo/') && !trimmed.startsWith('kilo/auto')
+    ? trimmed
+    : `kilo/${trimmed}`;
 }

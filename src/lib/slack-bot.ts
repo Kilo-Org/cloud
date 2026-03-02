@@ -7,6 +7,13 @@ import {
   getGitHubTokenForUser,
   getGitHubTokenForOrganization,
 } from '@/lib/cloud-agent/github-integration-helpers';
+import {
+  getGitLabTokenForUser,
+  getGitLabTokenForOrganization,
+  getGitLabInstanceUrlForUser,
+  getGitLabInstanceUrlForOrganization,
+  buildGitLabCloneUrl,
+} from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type OpenAI from 'openai';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
@@ -15,12 +22,16 @@ import {
   getModel,
   getAccessTokenFromInstallation,
 } from '@/lib/integrations/slack-service';
-import type { PlatformIntegration } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import { runBot } from '@/lib/bots/core/run-bot';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
 } from '@/lib/slack-bot/github-repository-context';
+import {
+  formatGitLabRepositoriesForPrompt,
+  getGitLabRepositoryContext,
+} from '@/lib/slack-bot/gitlab-repository-context';
 import {
   formatSlackConversationContextForPrompt,
   getSlackConversationContext,
@@ -66,23 +77,29 @@ const KILO_BOT_SYSTEM_PROMPT = `You are Kilo Bot, a helpful AI assistant integra
 Additional context may be appended to this prompt:
 - Slack conversation context (recent messages, thread context)
 - Available GitHub repositories for this Slack integration
+- Available GitLab projects for this Slack integration
 
-Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo and ensure it's accessible to the integration. Never invent repository names.
+Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
 
 ## Tool: spawn_cloud_agent
-You can call the tool "spawn_cloud_agent" to run a Cloud Agent session for coding work on a GitHub repository.
+You can call the tool "spawn_cloud_agent" to run a Cloud Agent session for coding work on a GitHub repository or GitLab project.
 
 ### When to use it
 Use spawn_cloud_agent when the user asks you to:
 - change code, fix bugs, implement features, or refactor
 - review/analyze code in a repo beyond a quick, high-level answer
-- do any task where you must inspect files, run tests, or open a PR
+- do any task where you must inspect files, run tests, or open a PR/MR
 
 If the user is only asking a question you can answer directly (conceptual, small snippet, explanation), do not call the tool.
 
 ### How to use it
-Provide:
-- githubRepo: "owner/repo"
+Provide exactly ONE of:
+- githubRepo: "owner/repo" — for GitHub repositories
+- gitlabProject: "group/project" or "group/subgroup/project" — for GitLab projects
+
+Determine which platform to use based on the repository context provided below. If the user mentions a repo that appears in the GitHub list, use githubRepo. If it appears in the GitLab list, use gitlabProject.
+
+Also provide:
 - mode:
   - code: implement changes
   - debug: investigate failures, flaky tests, production issues
@@ -94,11 +111,11 @@ Provide:
 Your prompt to the agent should usually include:
 - the desired outcome (what "done" looks like)
 - any constraints (keep changes minimal, follow existing patterns, etc.)
-- a request to open a PR and return the PR URL
+- a request to open a PR (GitHub) or MR (GitLab) and return the URL
 
 ## Accuracy & safety
-- Don't claim you ran tools, changed code, or created a PR unless the tool results confirm it.
-- Don't fabricate links (including PR URLs).
+- Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
+- Don't fabricate links (including PR/MR URLs).
 - If you can't proceed (missing repo, missing details, permissions), say what's missing and what you need next.`;
 
 /**
@@ -109,7 +126,7 @@ const SPAWN_CLOUD_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   function: {
     name: 'spawn_cloud_agent',
     description:
-      'Spawn a Cloud Agent session to perform coding tasks on a GitHub repository. The agent can make code changes, fix bugs, implement features, and more.',
+      'Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. Provide exactly one of githubRepo or gitlabProject.',
     parameters: {
       type: 'object',
       properties: {
@@ -117,6 +134,12 @@ const SPAWN_CLOUD_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           type: 'string',
           description: 'The GitHub repository in owner/repo format (e.g., "facebook/react")',
           pattern: '^[-a-zA-Z0-9_.]+/[-a-zA-Z0-9_.]+$',
+        },
+        gitlabProject: {
+          type: 'string',
+          description:
+            'The GitLab project path in group/project format (e.g., "mygroup/myproject"). May include nested groups (e.g., "group/subgroup/project").',
+          pattern: '^[-a-zA-Z0-9_.]+(/[-a-zA-Z0-9_.]+)+$',
         },
         prompt: {
           type: 'string',
@@ -131,7 +154,7 @@ const SPAWN_CLOUD_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           default: 'code',
         },
       },
-      required: ['githubRepo', 'prompt'],
+      required: ['prompt'],
     },
   },
 };
@@ -214,11 +237,13 @@ async function getSlackRequesterInfo(
 
 /**
  * Spawn a Cloud Agent session and collect the results.
+ * Supports both GitHub (githubRepo) and GitLab (gitlabProject) repositories.
  * Delegates to the shared runSessionToCompletion helper.
  */
 async function spawnCloudAgentSession(
   args: {
-    githubRepo: string;
+    githubRepo?: string;
+    gitlabProject?: string;
     prompt: string;
     mode?: string;
   },
@@ -231,25 +256,95 @@ async function spawnCloudAgentSession(
   console.log('[SlackBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
   console.log('[SlackBot] Owner:', JSON.stringify(owner, null, 2));
 
-  let githubToken: string | undefined;
-  let kilocodeOrganizationId: string | undefined;
-
-  // Handle organization-owned integrations
-  if (owner.type === 'org') {
-    githubToken = await getGitHubTokenForOrganization(owner.id);
-    kilocodeOrganizationId = owner.id;
-  } else {
-    githubToken = await getGitHubTokenForUser(owner.id);
+  if (args.githubRepo && args.gitlabProject) {
+    return {
+      response: 'Error: Both githubRepo and gitlabProject were specified. Provide exactly one.',
+    };
   }
 
-  // Append PR signature to the prompt if we have requester info
+  if (!args.githubRepo && !args.gitlabProject) {
+    return {
+      response: 'Error: No repository specified. Provide either githubRepo or gitlabProject.',
+    };
+  }
+
+  // Validate the repo identifier has at least "owner/repo" shape (non-empty segments around a slash)
+  const repoIdentifier = args.githubRepo ?? args.gitlabProject;
+  if (!repoIdentifier || !/\/./.test(repoIdentifier)) {
+    return {
+      response: `Error: Invalid repository identifier "${repoIdentifier ?? ''}". Expected format like "owner/repo".`,
+    };
+  }
+
+  let kilocodeOrganizationId: string | undefined;
+  if (owner.type === 'org') {
+    kilocodeOrganizationId = owner.id;
+  }
+
+  // Append PR/MR signature to the prompt if we have requester info
   const promptWithSignature = requesterInfo
     ? args.prompt + buildPrSignature(requesterInfo)
     : args.prompt;
 
-  const result = await runSessionToCompletion({
-    client: createCloudAgentNextClient(authToken, { skipBalanceCheck: true }),
-    prepareInput: {
+  // Build platform-specific prepareInput and initiateInput
+  let prepareInput: PrepareSessionInput;
+  let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
+
+  if (args.gitlabProject) {
+    // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
+    const gitlabToken =
+      owner.type === 'org'
+        ? await getGitLabTokenForOrganization(owner.id)
+        : await getGitLabTokenForUser(owner.id);
+
+    if (!gitlabToken) {
+      return {
+        response:
+          'Error: No GitLab token available. Please ensure a GitLab integration is connected in your Kilo Code settings.',
+      };
+    }
+
+    const instanceUrl =
+      owner.type === 'org'
+        ? await getGitLabInstanceUrlForOrganization(owner.id)
+        : await getGitLabInstanceUrlForUser(owner.id);
+
+    const gitUrl = buildGitLabCloneUrl(args.gitlabProject, instanceUrl);
+
+    const isSelfHosted = !/^https?:\/\/(www\.)?gitlab\.com(\/|$)/i.test(instanceUrl);
+    console.log(
+      '[SlackBot] GitLab session - project:',
+      args.gitlabProject,
+      'instance:',
+      isSelfHosted ? 'self-hosted' : 'gitlab.com'
+    );
+
+    prepareInput = {
+      prompt: promptWithSignature,
+      mode: (args.mode as PrepareSessionInput['mode']) || 'code',
+      model,
+      gitUrl,
+      gitToken: gitlabToken,
+      platform: 'gitlab',
+      kilocodeOrganizationId,
+      createdOnPlatform: 'slack',
+    };
+    initiateInput = { kilocodeOrganizationId };
+  } else {
+    // GitHub path: get token, use githubRepo/githubToken
+    const githubToken =
+      owner.type === 'org'
+        ? await getGitHubTokenForOrganization(owner.id)
+        : await getGitHubTokenForUser(owner.id);
+
+    if (!githubToken) {
+      return {
+        response:
+          'Error: No GitHub token available. Please ensure a GitHub integration is connected in your Kilo Code settings.',
+      };
+    }
+
+    prepareInput = {
       githubRepo: args.githubRepo,
       prompt: promptWithSignature,
       mode: (args.mode as PrepareSessionInput['mode']) || 'code',
@@ -257,11 +352,14 @@ async function spawnCloudAgentSession(
       githubToken,
       kilocodeOrganizationId,
       createdOnPlatform: 'slack',
-    },
-    initiateInput: {
-      githubToken,
-      kilocodeOrganizationId,
-    },
+    };
+    initiateInput = { githubToken, kilocodeOrganizationId };
+  }
+
+  const result = await runSessionToCompletion({
+    client: createCloudAgentNextClient(authToken, { skipBalanceCheck: true }),
+    prepareInput,
+    initiateInput,
     ticketPayload: {
       userId: ticketUserId,
       organizationId: owner.type === 'org' ? owner.id : undefined,
@@ -371,14 +469,29 @@ export async function processKiloBotMessage(
     ? await getSlackRequesterInfo(installation, slackEventContext)
     : undefined;
 
-  // Get repository context (no extra requests; uses the same integration row)
-  const repoContext = await getGitHubRepositoryContext(owner);
-  const repoCount = repoContext.repositories ? repoContext.repositories.length : 0;
-  console.log('[SlackBot] Found', repoCount, 'available repositories');
+  // Get repository context (no extra requests; uses the same integration rows)
+  const githubRepoContext = await getGitHubRepositoryContext(owner);
+  const gitlabRepoContext = await getGitLabRepositoryContext(owner);
+  const githubRepoCount = githubRepoContext.repositories
+    ? githubRepoContext.repositories.length
+    : 0;
+  const gitlabRepoCount = gitlabRepoContext.repositories
+    ? gitlabRepoContext.repositories.length
+    : 0;
+  console.log(
+    '[SlackBot] Found',
+    githubRepoCount,
+    'GitHub and',
+    gitlabRepoCount,
+    'GitLab repositories'
+  );
 
-  // Build system prompt with Slack context + repository context
+  // Build system prompt with Slack context + repository context for both platforms
   const systemPrompt =
-    KILO_BOT_SYSTEM_PROMPT + slackContextForPrompt + formatGitHubRepositoriesForPrompt(repoContext);
+    KILO_BOT_SYSTEM_PROMPT +
+    slackContextForPrompt +
+    formatGitHubRepositoriesForPrompt(githubRepoContext) +
+    formatGitLabRepositoriesForPrompt(gitlabRepoContext);
 
   const runResult = await runBot({
     authToken,

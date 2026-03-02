@@ -236,14 +236,29 @@ const prepareSessionHandler = internalApiProtectedProcedure
       );
 
       // 6. Clone repository
+      const cloneOptions = input.shallow ? { shallow: true } : undefined;
       logger.info('Cloning repository');
       if (input.gitUrl) {
-        await cloneGitRepo(session, workspacePath, input.gitUrl, input.gitToken);
+        await cloneGitRepo(
+          session,
+          workspacePath,
+          input.gitUrl,
+          input.gitToken,
+          undefined,
+          cloneOptions
+        );
       } else if (input.githubRepo) {
-        await cloneGitHubRepo(session, workspacePath, input.githubRepo, resolvedGithubToken, {
-          GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
-          GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
-        });
+        await cloneGitHubRepo(
+          session,
+          workspacePath,
+          input.githubRepo,
+          resolvedGithubToken,
+          {
+            GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
+            GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
+          },
+          cloneOptions
+        );
       } else {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -346,6 +361,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           prompt: input.prompt,
           mode: input.mode,
           model: input.model,
+          variant: input.variant,
           kilocodeToken: ctx.authToken,
           githubRepo: input.githubRepo,
           githubToken: input.githubToken,
@@ -443,6 +459,7 @@ const updateSessionHandler = internalApiProtectedProcedure
       // Scalar fields - pass through as-is (undefined skips, null clears, value sets)
       setUpdateValue(updates, 'mode', input.mode);
       setUpdateValue(updates, 'model', input.model);
+      setUpdateValue(updates, 'variant', input.variant);
       setUpdateValue(updates, 'githubToken', input.githubToken);
       setUpdateValue(updates, 'gitToken', input.gitToken);
       setUpdateValue(updates, 'upstreamBranch', input.upstreamBranch);

@@ -19,25 +19,6 @@
   a side effect. Where necessary refactor a dependency that really can't be tested indirectly into an explicit argument instead, and then pass a fake implementation if needed.
 - Keep functions simple: if an argument is merely used to splat in a bunch of options in a return value an the caller can do that equally well, KISS and don't add an argument. Every function argument has a small cost; add them only where they meaningfully simplify the caller somehow.
 
-# SQL Query Style (cloudflare-ai-attribution)
+# Durable Object SQLite
 
-When writing SQL queries in the cloudflare-ai-attribution worker using the table query interpolator objects:
-
-- NEVER use table aliases (e.g., `la`, `am`). Use the table interpolator object directly.
-- Use `${table_name.column_name}` to reference columns with their table prefix (translates to `"table_name"."column_name"`).
-- Use `${table_name.columns.column_name}` ONLY when you need the column name without the table prefix (translates to `"column_name"`).
-
-Example:
-
-```sql
--- GOOD: No aliases, direct table references
-SELECT ${lines_added.line_hash}, ${lines_added.line_number}
-FROM ${lines_added}
-INNER JOIN ${attributions_metadata} ON ${lines_added.attributions_metadata_id} = ${attributions_metadata.id}
-WHERE ${attributions_metadata.status} = 'accepted'
-
--- BAD: Using aliases
-SELECT la.line_hash, la.line_number
-FROM ${lines_added} la
-INNER JOIN ${attributions_metadata} am ON la.attributions_metadata_id = am.id
-```
+All Durable Object SQLite code uses `drizzle-orm/durable-sqlite`. Use Drizzle's query builder API for all queries. See `docs/do-sqlite-drizzle.md` for conventions.

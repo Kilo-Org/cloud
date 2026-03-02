@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import { AttributionTrackerDO, getAttributionTrackerDO } from './dos/AttributionTracker.do';
 import { logger } from './util/logger';
-import { resError, resSuccess } from './util/res';
+import { resError, resSuccess } from '@kilocode/worker-utils';
 import { authMiddleware } from './util/auth';
 import { adminAuthMiddleware } from './util/admin-auth';
 import {
@@ -30,7 +30,7 @@ export type HonoContext = {
 
 const app = new Hono<HonoContext>();
 
-// Logger middleware - must be first to establish context
+// @ts-expect-error workers-tagged-logger returns Handler typed against an older hono; incompatible with hono 4.12+
 app.use('*', useWorkersLogger('ai-attribution'));
 
 // Health check endpoint (no auth required)
@@ -64,7 +64,7 @@ app.post('/attributions/track', async c => {
   // Parse and validate request body
   let payload: AttributionsTrackRequestBody;
   try {
-    const body = await c.req.json();
+    const body: unknown = await c.req.json();
     payload = AttributionsTrackRequestBody.parse(body);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

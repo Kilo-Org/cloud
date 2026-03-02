@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { deployments } from '@/db/schema';
+import { deployments } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { createWebRiskClient, type CheckUrlResult } from './web-risk-client';
 import { handleThreatDetected } from './handler';

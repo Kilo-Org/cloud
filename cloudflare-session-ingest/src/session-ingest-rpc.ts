@@ -1,10 +1,13 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
+import { eq, and } from 'drizzle-orm';
+import { getWorkerDb } from '@kilocode/db/client';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
+
 import type { Env } from './env';
-import { getDb } from './db/kysely';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
-import { withDORetry } from './util/do-retry';
+import { withDORetry } from '@kilocode/worker-utils';
 import { getSessionExport } from './services/session-export';
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
@@ -52,10 +55,10 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
       })
       .parse(params);
 
-    const db = getDb(this.env.HYPERDRIVE);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
     await db
-      .insertInto('cli_sessions_v2')
+      .insert(cli_sessions_v2)
       .values({
         session_id: parsed.sessionId,
         kilo_user_id: parsed.kiloUserId,
@@ -64,15 +67,15 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
         created_on_platform: parsed.createdOnPlatform,
         version: 0,
       })
-      .onConflict(oc =>
-        oc.columns(['session_id', 'kilo_user_id']).doUpdateSet({
+      .onConflictDoUpdate({
+        target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+        set: {
           cloud_agent_session_id: parsed.cloudAgentSessionId,
           ...(parsed.organizationId !== undefined
             ? { organization_id: parsed.organizationId }
             : {}),
-        })
-      )
-      .execute();
+        },
+      });
 
     // Warm the session cache so subsequent ingests can skip Postgres.
     // Best-effort: cache miss is acceptable; don't fail the create if the DO is unavailable.
@@ -108,13 +111,16 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
       })
       .parse(params);
 
-    const db = getDb(this.env.HYPERDRIVE);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
     await db
-      .deleteFrom('cli_sessions_v2')
-      .where('session_id', '=', parsed.sessionId)
-      .where('kilo_user_id', '=', parsed.kiloUserId)
-      .execute();
+      .delete(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+        )
+      );
 
     // Clear caches — best-effort; don't fail the delete if DOs are unavailable.
     const cacheErrors: string[] = [];

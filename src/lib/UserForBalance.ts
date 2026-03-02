@@ -1,4 +1,4 @@
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 
 export type UserForBalance = Pick<
   User,

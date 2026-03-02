@@ -1,5 +1,8 @@
-import type { credit_transactions } from '@/db/schema';
-import { credit_transactions as creditTransactionsTable, kilocode_users } from '@/db/schema';
+import type { credit_transactions } from '@kilocode/db/schema';
+import {
+  credit_transactions as creditTransactionsTable,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { computeExpiration, processLocalExpirations } from './creditExpiration';
 import { db } from '@/lib/drizzle';
 import { defineTestUser } from '@/tests/helpers/user.helper';

@@ -20,7 +20,7 @@ import {
   AppBuilderSessionReason,
   cliSessions,
   cli_sessions_v2,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
 import { eq, and, sql, asc } from 'drizzle-orm';
 import type { CloudMessage } from '@/components/cloud-agent/types';

@@ -9,7 +9,7 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { organizations } from '@/db/schema';
+import { organizations } from '@kilocode/db/schema';
 import { sql, isNull } from 'drizzle-orm';
 
 export async function run() {

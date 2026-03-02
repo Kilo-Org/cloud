@@ -5,6 +5,10 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import migrations from '../drizzle/migrations';
 import git from '@ashishkumar472/cf-git';
 import http from '@ashishkumar472/cf-git/http/web';
 import { sanitizeGitUrl } from './utils/git-url';
@@ -14,40 +18,25 @@ import { logger, withLogTags, formatError } from './utils/logger';
 import type { Env, GitObject, RepositoryStats } from './types';
 
 export class GitRepositoryDO extends DurableObject<Env> {
-  /**
-   * Tagged template SQL helper for safe parameterized queries.
-   * Copied from cloudflare-db-proxy/src/app-db-do.ts
-   */
-  private sql<T = Record<string, unknown>>(
-    strings: TemplateStringsArray,
-    ...values: unknown[]
-  ): T[] {
-    let sql = strings[0];
-    const params: unknown[] = [];
-
-    for (let i = 0; i < values.length; i++) {
-      sql += `?${strings[i + 1]}`;
-      params.push(values[i]);
-    }
-
-    const cursor = this.ctx.storage.sql.exec(sql, ...params);
-    return cursor.toArray() as T[];
-  }
-
+  private db: DrizzleSqliteDODatabase;
   private fs: SqliteFS | null = null;
   private _initialized = false;
 
-  /**
-   * Initialize the git filesystem (internal method)
-   */
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.db = drizzle(ctx.storage, { logger: false });
+    void ctx.blockConcurrencyWhile(() => {
+      return migrate(this.db, migrations);
+    });
+  }
+
   private async initializeFS(): Promise<void> {
     if (this.fs) return;
 
     logger.debug('Initializing SqliteFS', { id: this.ctx.id.toString() });
 
     try {
-      // Use our sql() tagged template helper for safe SQL parameterization
-      this.fs = new SqliteFS(this.sql.bind(this));
+      this.fs = new SqliteFS(this.db);
       this.fs.init();
     } catch (error) {
       this.fs = null;
@@ -67,9 +56,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
     }
   }
 
-  /**
-   * Check if the repository is initialized (RPC method)
-   */
   async isInitialized(): Promise<boolean> {
     return withLogTags(
       { source: 'GitRepositoryDO', tags: { appId: this.ctx.id.name } },
@@ -80,9 +66,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
     );
   }
 
-  /**
-   * Initialize a new git repository (RPC method)
-   */
   async initialize(): Promise<void> {
     return withLogTags(
       { source: 'GitRepositoryDO', tags: { appId: this.ctx.id.name } },
@@ -111,7 +94,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
   }
 
   /**
-   * Create initial commit with the provided files (RPC method)
    * Files are expected to have base64-encoded content to safely handle binary data through RPC
    */
   async createInitialCommit(files: Record<string, string>): Promise<void> {
@@ -128,14 +110,11 @@ export class GitRepositoryDO extends DurableObject<Env> {
 
         // Write files (decode base64 to binary)
         for (const [path, base64Content] of Object.entries(files)) {
-          // Decode base64 to binary
           const bytes = Buffer.from(base64Content, 'base64');
-
           await this.fs.writeFile(path, bytes);
           await git.add({ fs: this.fs, dir: '/', filepath: path });
         }
 
-        // Commit
         await git.commit({
           fs: this.fs,
           dir: '/',
@@ -152,7 +131,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
   }
 
   /**
-   * Export git objects for cloning (RPC method)
    * Returns objects with base64-encoded data for serialization
    */
   async exportGitObjects(): Promise<GitObject[]> {
@@ -169,7 +147,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
 
         const objects = this.fs.exportGitObjects();
 
-        // Convert Uint8Array to base64 for JSON serialization
         return objects.map(obj => ({
           path: obj.path,
           data: Buffer.from(obj.data).toString('base64'),
@@ -179,7 +156,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
   }
 
   /**
-   * Import git objects from a push operation (RPC method)
    * Writes all objects to the filesystem, replacing existing ones
    */
   async importGitObjects(objects: GitObject[]): Promise<void> {
@@ -194,7 +170,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
           throw new Error('Filesystem not initialized');
         }
 
-        // Ensure repo is initialized
         if (!this._initialized) {
           await this.initialize();
         }
@@ -202,10 +177,7 @@ export class GitRepositoryDO extends DurableObject<Env> {
         logger.debug('Importing git objects', { count: objects.length });
 
         for (const obj of objects) {
-          // Convert base64 back to binary
           const bytes = Buffer.from(obj.data, 'base64');
-
-          // Write to filesystem
           await this.fs.writeFile(obj.path, bytes);
         }
 
@@ -214,9 +186,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
     );
   }
 
-  /**
-   * Get the latest commit hash on the main branch (RPC method)
-   */
   async getLatestCommit(): Promise<string | null> {
     return withLogTags(
       { source: 'GitRepositoryDO', tags: { appId: this.ctx.id.name } },
@@ -240,9 +209,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
     );
   }
 
-  /**
-   * Get storage statistics (RPC method)
-   */
   async getStats(): Promise<RepositoryStats> {
     return withLogTags(
       { source: 'GitRepositoryDO', tags: { appId: this.ctx.id.name } },
@@ -280,7 +246,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
   }
 
   /**
-   * Delete all repository data (RPC method)
    * Called when deleting a project to clean up storage
    */
   async deleteAll(): Promise<void> {
@@ -323,9 +288,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
     );
   }
 
-  /**
-   * Alarm handler: self-deletes all repository data.
-   */
   async alarm(): Promise<void> {
     return withLogTags(
       { source: 'GitRepositoryDO', tags: { appId: this.ctx.id.name } },
@@ -340,12 +302,8 @@ export class GitRepositoryDO extends DurableObject<Env> {
   }
 
   /**
-   * Push repository to a remote URL (RPC method)
-   * Used for GitHub migration - pushes all branches to the remote
-   *
-   * @param remoteUrl - The HTTPS URL of the remote repository (e.g., https://github.com/owner/repo.git)
-   * @param authToken - GitHub installation token for authentication
-   * @returns Object indicating success/failure
+   * Push repository to a remote URL.
+   * Used for GitHub migration - pushes all branches to the remote.
    */
   async pushToRemote(
     remoteUrl: string,
@@ -368,10 +326,9 @@ export class GitRepositoryDO extends DurableObject<Env> {
             remoteUrl: sanitizeGitUrl(remoteUrl),
           });
 
-          // Export git objects from SQLite storage
-          const gitObjects = this.fs.exportGitObjects();
+          const gitObjs = this.fs.exportGitObjects();
 
-          if (gitObjects.length === 0) {
+          if (gitObjs.length === 0) {
             return { success: false, error: 'No git objects to push' };
           }
 
@@ -379,26 +336,22 @@ export class GitRepositoryDO extends DurableObject<Env> {
           const memFs = new MemFS();
           await git.init({ fs: memFs, dir: '/', defaultBranch: 'main' });
 
-          // Import all git objects into the in-memory FS
-          for (const obj of gitObjects) {
+          for (const obj of gitObjs) {
             await memFs.writeFile(obj.path, obj.data);
           }
 
-          // Get all branches to push (uses isomorphic-git to handle nested refs like feature/foo)
           let branches: string[] = [];
           try {
             branches = await git.listBranches({ fs: memFs, dir: '/' });
           } catch {
-            branches = ['main']; // Default to main if no branches found
+            branches = ['main'];
           }
 
           logger.info('Pushing branches to remote', { branches });
 
-          // Track push results
           let mainPushed = false;
           const failedBranches: string[] = [];
 
-          // Push each branch to the remote
           for (const branch of branches) {
             try {
               await git.push({
@@ -409,7 +362,7 @@ export class GitRepositoryDO extends DurableObject<Env> {
                 ref: branch,
                 remoteRef: branch,
                 onAuth: () => ({ username: 'x-access-token', password: authToken }),
-                force: false, // Don't force push
+                force: false,
               });
 
               logger.info('Successfully pushed branch', { branch });
@@ -417,7 +370,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
                 mainPushed = true;
               }
             } catch (branchError) {
-              // Log but continue with other branches
               logger.warn('Failed to push branch', {
                 branch,
                 ...formatError(branchError),
@@ -426,7 +378,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
             }
           }
 
-          // Main branch must be pushed successfully
           if (!mainPushed) {
             const errorMessage = failedBranches.includes('main')
               ? 'Failed to push main branch'

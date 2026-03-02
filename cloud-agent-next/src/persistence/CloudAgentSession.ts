@@ -10,9 +10,11 @@ import type { CloudAgentSessionState, OperationResult, MCPServerConfig } from '.
 import { MetadataSchema, type Images } from './schemas.js';
 import type { EncryptedSecrets } from '../router/schemas.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
 import { Limits } from '../schema.js';
-import { runMigrations } from './migrations.js';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import migrations from '../../drizzle/migrations';
 import { normalizeKilocodeModel } from './model-utils.js';
 import {
   createExecutionQueries,
@@ -154,17 +156,15 @@ export class CloudAgentSession extends DurableObject {
     const sessionIdPart = doName?.split(':')[1];
     this.sessionId = sessionIdPart ? (sessionIdPart as SessionId) : undefined;
 
-    // Initialize query modules with storage
-    this.executionQueries = createExecutionQueries(ctx.storage);
-    this.eventQueries = createEventQueries(ctx.storage.sql);
-    this.leaseQueries = createLeaseQueries(ctx.storage.sql);
+    const db = drizzle(ctx.storage, { logger: false });
+    const rawSql = ctx.storage.sql;
 
-    // Run schema migrations on first access to this DO instance.
-    // blockConcurrencyWhile blocks all concurrent requests until completed,
-    // ensuring migrations complete before any handlers execute.
-    // Also ensures reaper alarm is scheduled.
+    this.executionQueries = createExecutionQueries(ctx.storage);
+    this.eventQueries = createEventQueries(db, rawSql);
+    this.leaseQueries = createLeaseQueries(db, rawSql);
+
     void ctx.blockConcurrencyWhile(async () => {
-      await runMigrations(ctx);
+      await migrate(db, migrations);
       await this.ensureAlarmScheduled();
     });
   }
@@ -635,6 +635,7 @@ export class CloudAgentSession extends DurableObject {
     prompt: string;
     mode: string;
     model: string;
+    variant?: string;
     kilocodeToken?: string;
     githubRepo?: string;
     githubToken?: string;
@@ -701,6 +702,7 @@ export class CloudAgentSession extends DurableObject {
   async tryUpdate(updates: {
     mode?: string | null;
     model?: string | null;
+    variant?: string | null;
     githubToken?: string | null;
     gitToken?: string | null;
     autoCommit?: boolean | null;
@@ -1215,6 +1217,7 @@ export class CloudAgentSession extends DurableObject {
     mode: ExecutionMode;
     prompt: string;
     model?: string;
+    variant?: string;
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
     initContext?: InitializeContext;
@@ -1281,6 +1284,7 @@ export class CloudAgentSession extends DurableObject {
         model: params.model ? { modelID: params.model.replace(/^kilo\//, '') } : undefined,
         autoCommit: params.autoCommit,
         condenseOnComplete: params.condenseOnComplete,
+        variant: params.variant,
       },
     };
   }
@@ -1333,12 +1337,13 @@ export class CloudAgentSession extends DurableObject {
   }
 
   private getGitHubTokenService(): GitHubTokenService {
+    const env = this.env as unknown as WorkerEnv;
     return new GitHubTokenService({
-      GITHUB_TOKEN_CACHE: Reflect.get(this.env, 'GITHUB_TOKEN_CACHE'),
-      GITHUB_APP_ID: Reflect.get(this.env, 'GITHUB_APP_ID'),
-      GITHUB_APP_PRIVATE_KEY: Reflect.get(this.env, 'GITHUB_APP_PRIVATE_KEY'),
-      GITHUB_LITE_APP_ID: Reflect.get(this.env, 'GITHUB_LITE_APP_ID'),
-      GITHUB_LITE_APP_PRIVATE_KEY: Reflect.get(this.env, 'GITHUB_LITE_APP_PRIVATE_KEY'),
+      GITHUB_TOKEN_CACHE: env.GITHUB_TOKEN_CACHE,
+      GITHUB_APP_ID: env.GITHUB_APP_ID,
+      GITHUB_APP_PRIVATE_KEY: env.GITHUB_APP_PRIVATE_KEY,
+      GITHUB_LITE_APP_ID: env.GITHUB_LITE_APP_ID,
+      GITHUB_LITE_APP_PRIVATE_KEY: env.GITHUB_LITE_APP_PRIVATE_KEY,
     });
   }
 
@@ -1400,6 +1405,7 @@ export class CloudAgentSession extends DurableObject {
           prompt: request.prompt,
           mode: request.mode,
           model: normalizedModel,
+          variant: request.variant,
           kilocodeToken: request.authToken,
           githubRepo: request.githubRepo,
           githubToken: request.githubToken,
@@ -1459,6 +1465,7 @@ export class CloudAgentSession extends DurableObject {
           mode: request.mode,
           prompt: request.prompt,
           model: normalizedModel,
+          variant: request.variant,
           autoCommit: request.autoCommit,
           condenseOnComplete: request.condenseOnComplete,
           initContext,
@@ -1544,6 +1551,7 @@ export class CloudAgentSession extends DurableObject {
           mode: metadata.mode as ExecutionMode,
           prompt: metadata.prompt,
           model: metadata.model,
+          variant: metadata.variant,
           autoCommit: metadata.autoCommit,
           condenseOnComplete: metadata.condenseOnComplete,
           initContext,
@@ -1574,6 +1582,7 @@ export class CloudAgentSession extends DurableObject {
 
       const mode = (request.mode ?? metadata.mode ?? 'code') as ExecutionMode;
       const model = normalizeKilocodeModel(request.model ?? metadata.model);
+      const variant = request.variant ?? metadata.variant;
       if (!model) {
         return this.buildStartError(
           'BAD_REQUEST',
@@ -1614,6 +1623,7 @@ export class CloudAgentSession extends DurableObject {
         mode,
         prompt: request.prompt,
         model,
+        variant,
         autoCommit: request.autoCommit ?? metadata.autoCommit,
         condenseOnComplete: request.condenseOnComplete ?? metadata.condenseOnComplete,
         resumeContext,

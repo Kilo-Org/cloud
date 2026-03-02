@@ -11,7 +11,7 @@ import {
   user_admin_notes,
   referral_codes,
   organization_memberships,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import {
   ilike,
   or,
@@ -78,6 +78,7 @@ export async function GET(
           ilike(kilocode_users.google_user_name, `%${searchTerm}%`),
           eq(kilocode_users.id, searchTerm),
           eq(kilocode_users.stripe_customer_id, searchTerm),
+          eq(kilocode_users.openrouter_upstream_safety_identifier, searchTerm),
           ...(referralCodeOwnerId ? [eq(kilocode_users.id, referralCodeOwnerId)] : [])
         )
       );

@@ -310,7 +310,9 @@ export function createLifecycleManager(
             timestamp: new Date().toISOString(),
           });
         } else {
-          logToFile('auto-commit complete');
+          logToFile(
+            `auto-commit complete: success=${result.success} skipped=${result.skipped ?? false} error=${result.error ?? '(none)'}`
+          );
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -378,12 +380,26 @@ export function createLifecycleManager(
     // Run post-completion tasks first (auto-commit, condense), THEN send the complete event.
     // The complete event must be sent after post-completion tasks so that clients don't
     // disconnect before autocommit output is streamed.
-    runPostCompletionTasks()
+    void runPostCompletionTasks()
       .catch(err =>
         logToFile(
           `post-completion tasks failed: ${err instanceof Error ? err.message : String(err)}`
         )
       )
+      .then(async () => {
+        // Final log upload before closing
+        const uploader = state.logUploader;
+        if (uploader) {
+          await uploader
+            .uploadNow()
+            .catch(err =>
+              logToFile(
+                `final log upload failed: ${err instanceof Error ? err.message : String(err)}`
+              )
+            );
+          uploader.stop();
+        }
+      })
       .finally(() => {
         // Send complete event to ingest so DO can update execution status and trigger callbacks
         // BUT only if not aborted - fatal errors already sent their own terminal event

@@ -43,6 +43,7 @@ export type WrapperPromptOptions = {
   messageId?: string;
   system?: string;
   tools?: Record<string, boolean>;
+  variant?: string;
 };
 
 export type WrapperPermissionResponse = 'always' | 'once' | 'reject';

@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { bulkUpdate } from './bulkUpdate';
 import { inArray } from 'drizzle-orm';

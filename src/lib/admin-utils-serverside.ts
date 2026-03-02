@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
-import type { PaymentMethod, User } from '@/db/schema';
-import { payment_methods } from '@/db/schema';
+import type { PaymentMethod, User } from '@kilocode/db/schema';
+import { payment_methods } from '@kilocode/db/schema';
 import { inArray, eq, and, isNull } from 'drizzle-orm';
 
 export const describePaymentMethods = (

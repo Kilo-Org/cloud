@@ -54,9 +54,14 @@ import { appRouter } from './router.js';
 import type { TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 
+type MockSessionStub = {
+  deleteSession: ReturnType<typeof vi.fn>;
+  markAsInterrupted: ReturnType<typeof vi.fn>;
+};
+
 type MockCAS = {
   idFromName: ReturnType<typeof vi.fn>;
-  get: ReturnType<typeof vi.fn>;
+  get: ReturnType<typeof vi.fn<() => MockSessionStub>>;
 };
 
 // Note: Balance validation is now handled in the worker entry point (index.ts)
@@ -246,15 +251,27 @@ describe('router sessionId validation', () => {
             failedProcessIds: [],
             message: 'stopped',
           });
-          buildContextMock.mockImplementation(({ sandboxId, orgId, userId, sessionId }) => ({
-            sandboxId,
-            orgId,
-            userId,
-            sessionId,
-            sessionHome: `/home/${sessionId}`,
-            workspacePath: `/workspace/${sessionId}`,
-            branchName: `session/${sessionId}`,
-          }));
+          buildContextMock.mockImplementation(
+            ({
+              sandboxId,
+              orgId,
+              userId,
+              sessionId,
+            }: {
+              sandboxId: string;
+              orgId: string | undefined;
+              userId: string;
+              sessionId: string;
+            }) => ({
+              sandboxId,
+              orgId,
+              userId,
+              sessionId,
+              sessionHome: `/home/${sessionId}`,
+              workspacePath: `/workspace/${sessionId}`,
+              branchName: `session/${sessionId}`,
+            })
+          );
           const mockSession = { token: 'session' };
           getOrCreateSessionMock.mockResolvedValue(mockSession);
 
@@ -267,7 +284,7 @@ describe('router sessionId validation', () => {
             env: {
               Sandbox: {} as TRPCContext['env']['Sandbox'],
               CLOUD_AGENT_SESSION: {
-                idFromName: vi.fn(id => ({ id })),
+                idFromName: vi.fn((id: string) => ({ id })),
                 get: vi.fn(() => ({
                   deleteSession: vi.fn().mockResolvedValue(undefined),
                   markAsInterrupted: vi.fn().mockResolvedValue(undefined),
@@ -278,6 +295,7 @@ describe('router sessionId validation', () => {
               SESSION_INGEST: {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
+              R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
               NEXTAUTH_SECRET: 'test-secret',
             },
           };
@@ -609,7 +627,7 @@ describe('router sessionId validation', () => {
           env: {
             Sandbox: {} as TRPCContext['env']['Sandbox'],
             CLOUD_AGENT_SESSION: {
-              idFromName: vi.fn(id => ({ id })),
+              idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
                 getMetadata: mockGetMetadata,
                 getActiveExecutionId: vi.fn().mockResolvedValue(null),
@@ -619,6 +637,7 @@ describe('router sessionId validation', () => {
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
+            R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
             NEXTAUTH_SECRET: 'test-secret',
           },
         };

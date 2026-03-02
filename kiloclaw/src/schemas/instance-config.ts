@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 export const EncryptedEnvelopeSchema = z.object({
-  encryptedData: z.string(),
-  encryptedDEK: z.string(),
+  // AES-256-GCM ciphertext: 16-byte IV + ciphertext + 16-byte tag, base64-encoded.
+  // 8 KiB is generous for token values (typical bot tokens are < 200 bytes).
+  encryptedData: z.string().max(8192),
+  // RSA-2048 OAEP ciphertext of the 32-byte DEK, base64-encoded (~344 chars).
+  encryptedDEK: z.string().max(1024),
   algorithm: z.literal('rsa-aes-256-gcm'),
   version: z.literal(1),
 });

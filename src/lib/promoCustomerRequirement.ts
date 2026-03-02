@@ -1,4 +1,4 @@
-import { user_auth_provider } from '@/db/schema';
+import { user_auth_provider } from '@kilocode/db/schema';
 import type { CustomerInfo } from '@/lib/customerInfo';
 import { db } from '@/lib/drizzle';
 import type { OptionalError } from '@/lib/maybe-result';

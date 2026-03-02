@@ -41,6 +41,10 @@ export const SetBYOKKeyEnabledInputSchema = OptionalOrganizationIdSchema.extend(
 // List schema with optional organizationId
 export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 
+export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
+  id: z.string().uuid(),
+});
+
 export const BYOKApiKeyResponseSchema = z.object({
   id: z.string().uuid(),
   provider_id: z.string(),

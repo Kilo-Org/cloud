@@ -1,5 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import { eq, inArray, sql, desc } from 'drizzle-orm';
 import { z } from 'zod';
+import migrations from '../../drizzle/migrations';
+import {
+  requests as requestsTable,
+  triggerConfig as triggerConfigTable,
+} from '../db/sqlite-schema';
+import type { ProcessStatus, RequestUpdates, RequestRow } from '../db/types';
 import { logger } from '../util/logger';
 import {
   MAX_INFLIGHT_REQUESTS,
@@ -7,19 +16,6 @@ import {
   MAX_REQUESTS,
   clampRequestLimit,
 } from '../util/constants';
-import {
-  requests,
-  createTableRequests,
-  getIndexesRequests,
-  RequestRecord,
-  type RequestUpdates,
-  type ProcessStatus,
-} from '../db/tables/requests.table';
-import {
-  createTableTriggerConfig,
-  TriggerConfigRecord,
-  triggerConfig,
-} from '../db/tables/trigger-config.table';
 import { enqueueWebhookDelivery, type WebhookDeliveryMessage } from '../util/queue';
 import {
   compareWebhookSecret,
@@ -29,6 +25,8 @@ import {
   type StoredWebhookAuth,
   type WebhookAuthInput,
 } from '../util/webhook-auth';
+
+export type { ProcessStatus, RequestUpdates } from '../db/types';
 
 export const TriggerConfig = z.object({
   triggerId: z.string(),
@@ -41,9 +39,7 @@ export const TriggerConfig = z.object({
   mode: z.string(),
   model: z.string(),
   promptTemplate: z.string(),
-  // Profile reference - resolved at runtime via Hyperdrive
   profileId: z.string(),
-  // Behavior flags (not profile-related)
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),
   webhookAuthHeader: z.string().optional(),
@@ -52,7 +48,6 @@ export const TriggerConfig = z.object({
 
 export type TriggerConfig = z.infer<typeof TriggerConfig>;
 
-// Response type for GET endpoint - same as TriggerConfig for profile-reference model
 export type TriggerConfigResponse = Omit<TriggerConfig, 'webhookAuthSecretHash'> & {
   webhookAuthConfigured: boolean;
 };
@@ -73,20 +68,6 @@ export type CapturedRequest = {
   cloudAgentSessionId: string | null;
   errorMessage: string | null;
 };
-
-type CountOccurrences<
-  String_ extends string,
-  SubString extends string,
-  Count extends unknown[] = [],
-> = String_ extends `${string}${SubString}${infer Tail}`
-  ? CountOccurrences<Tail, SubString, [unknown, ...Count]>
-  : Count['length'];
-
-type Tuple<T, N extends number, Acc extends T[] = []> = Acc['length'] extends N
-  ? Acc
-  : Tuple<T, N, [...Acc, T]>;
-
-type SqliteParams<Query extends string> = Tuple<unknown, CountOccurrences<Query, '?'>>;
 
 type ConfigureInput = {
   githubRepo: string;
@@ -116,56 +97,14 @@ type UpdateConfigInput = {
 };
 
 export class TriggerDO extends DurableObject<Env> {
-  private sql: SqlStorage;
-  private dbInitialized = false;
-  private initPromise: Promise<void> | null = null;
+  private db;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.sql = ctx.storage.sql;
-
+    this.db = drizzle(ctx.storage, { logger: false });
     void ctx.blockConcurrencyWhile(async () => {
-      await this.ensureDatabaseInitialized();
+      await migrate(this.db, migrations);
     });
-  }
-
-  private query<Query extends string>(query: Query, params: SqliteParams<Query>) {
-    // Cast required: SqliteParams<Query> is a tuple of exact length matching placeholders,
-    // but sql.exec() accepts variadic unknown[]. TypeScript cannot verify tuple-to-spread safety.
-    return this.sql.exec(query, ...(params as unknown[]));
-  }
-
-  private async initializeDatabase(): Promise<void> {
-    this.query(createTableRequests(), []);
-    this.query(createTableTriggerConfig(), []);
-
-    for (const idx of getIndexesRequests()) {
-      this.query(idx, []);
-    }
-
-    this.tryAddTriggerConfigColumn(triggerConfig.columns.webhook_auth_header, 'text');
-    this.tryAddTriggerConfigColumn(triggerConfig.columns.webhook_auth_secret_hash, 'text');
-
-    logger.debug('TriggerDO database initialized');
-    this.dbInitialized = true;
-  }
-
-  private tryAddTriggerConfigColumn(column: string, definition: string): void {
-    try {
-      this.query(`ALTER TABLE ${triggerConfig.toString()} ADD COLUMN ${column} ${definition}`, []);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('duplicate column name')) {
-        return;
-      }
-      throw error;
-    }
-  }
-
-  private async ensureDatabaseInitialized(): Promise<void> {
-    if (!this.initPromise) {
-      this.initPromise = this.initializeDatabase();
-    }
-    await this.initPromise;
   }
 
   async configure(
@@ -173,7 +112,6 @@ export class TriggerDO extends DurableObject<Env> {
     triggerId: string,
     configOverrides?: ConfigureInput
   ): Promise<{ success: boolean }> {
-    await this.ensureDatabaseInitialized();
     const { userId, orgId } = parseNamespace(namespace);
 
     if (!configOverrides) {
@@ -202,44 +140,36 @@ export class TriggerDO extends DurableObject<Env> {
 
     await this.ctx.storage.put('config', config);
 
-    this.query(
-      /* sql */ `
-        INSERT OR REPLACE INTO ${triggerConfig.toString()} (
-          ${triggerConfig.columns.trigger_id},
-          ${triggerConfig.columns.namespace},
-          ${triggerConfig.columns.user_id},
-          ${triggerConfig.columns.org_id},
-          ${triggerConfig.columns.created_at},
-          ${triggerConfig.columns.is_active},
-          ${triggerConfig.columns.github_repo},
-          ${triggerConfig.columns.mode},
-          ${triggerConfig.columns.model},
-          ${triggerConfig.columns.prompt_template},
-          ${triggerConfig.columns.profile_id},
-          ${triggerConfig.columns.auto_commit},
-          ${triggerConfig.columns.condense_on_complete},
-          ${triggerConfig.columns.webhook_auth_header},
-          ${triggerConfig.columns.webhook_auth_secret_hash}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        config.triggerId,
-        config.namespace,
-        config.userId,
-        config.orgId,
-        config.createdAt,
-        config.isActive ? 1 : 0,
-        config.githubRepo,
-        config.mode,
-        config.model,
-        config.promptTemplate,
-        config.profileId,
-        config.autoCommit !== undefined ? (config.autoCommit ? 1 : 0) : null,
+    const insertValues = {
+      trigger_id: config.triggerId,
+      namespace: config.namespace,
+      user_id: config.userId,
+      org_id: config.orgId,
+      created_at: config.createdAt,
+      is_active: config.isActive ? 1 : 0,
+      github_repo: config.githubRepo,
+      mode: config.mode,
+      model: config.model,
+      prompt_template: config.promptTemplate,
+      profile_id: config.profileId,
+      auto_commit: config.autoCommit !== undefined ? (config.autoCommit ? 1 : 0) : null,
+      condense_on_complete:
         config.condenseOnComplete !== undefined ? (config.condenseOnComplete ? 1 : 0) : null,
-        webhookAuth?.header ?? null,
-        webhookAuth?.secretHash ?? null,
-      ]
-    );
+      webhook_auth_header: webhookAuth?.header ?? null,
+      webhook_auth_secret_hash: webhookAuth?.secretHash ?? null,
+    };
+
+    // On conflict, update all fields except the PK and created_at (preserve original creation time)
+    const { trigger_id: _pk, created_at: _ca, ...updateValues } = insertValues;
+
+    this.db
+      .insert(triggerConfigTable)
+      .values(insertValues)
+      .onConflictDoUpdate({
+        target: triggerConfigTable.trigger_id,
+        set: updateValues,
+      })
+      .run();
 
     logger.info('Trigger configured', {
       triggerId,
@@ -258,20 +188,13 @@ export class TriggerDO extends DurableObject<Env> {
   }
 
   async getConfig(): Promise<TriggerConfig | null> {
-    await this.ensureDatabaseInitialized();
-    const row = this.query(
-      /* sql */ `
-        SELECT * FROM ${triggerConfig.toString()}
-        LIMIT 1
-      `,
-      []
-    ).toArray();
+    const rows = this.db.select().from(triggerConfigTable).limit(1).all();
 
-    if (row.length === 0) {
+    if (rows.length === 0) {
       return null;
     }
 
-    const record = TriggerConfigRecord.parse(row[0]);
+    const record = rows[0];
     return {
       triggerId: record.trigger_id,
       namespace: record.namespace,
@@ -292,18 +215,14 @@ export class TriggerDO extends DurableObject<Env> {
     };
   }
 
-  /**
-   * Get config for API response.
-   * With profile-reference model, this is the same as getConfig().
-   */
   async getConfigForResponse(): Promise<TriggerConfigResponse | null> {
     const config = await this.getConfig();
     return this.sanitizeConfigForResponse(config);
   }
 
   /**
-   * Update trigger config with partial updates
-   * Note: githubRepo and triggerId cannot be changed after creation
+   * Update trigger config with partial updates.
+   * Note: githubRepo and triggerId cannot be changed after creation.
    *
    * For optional fields (autoCommit, condenseOnComplete):
    * - undefined = leave unchanged
@@ -311,25 +230,22 @@ export class TriggerDO extends DurableObject<Env> {
    * - value = set to new value
    */
   async updateConfig(updates: UpdateConfigInput): Promise<{ success: boolean }> {
-    await this.ensureDatabaseInitialized();
     const existingConfig = await this.getConfig();
     if (!existingConfig) {
       return { success: false };
     }
 
-    // Helper to handle null-clears: null → undefined, undefined → keep existing
     const resolveNullable = <T>(
       update: T | null | undefined,
       existing: T | undefined
     ): T | undefined => {
-      if (update === null) return undefined; // explicit clear
-      if (update === undefined) return existing; // keep existing
-      return update; // new value
+      if (update === null) return undefined;
+      if (update === undefined) return existing;
+      return update;
     };
 
     const webhookAuth = await this.resolveWebhookAuthOnUpdate(existingConfig, updates.webhookAuth);
 
-    // Merge updates with existing config
     const updatedConfig: TriggerConfig = {
       ...existingConfig,
       mode: updates.mode ?? existingConfig.mode,
@@ -348,37 +264,27 @@ export class TriggerDO extends DurableObject<Env> {
 
     await this.ctx.storage.put('config', updatedConfig);
 
-    this.query(
-      /* sql */ `
-        UPDATE ${triggerConfig.toString()} SET
-          ${triggerConfig.columns.mode} = ?,
-          ${triggerConfig.columns.model} = ?,
-          ${triggerConfig.columns.prompt_template} = ?,
-          ${triggerConfig.columns.is_active} = ?,
-          ${triggerConfig.columns.profile_id} = ?,
-          ${triggerConfig.columns.auto_commit} = ?,
-          ${triggerConfig.columns.condense_on_complete} = ?,
-          ${triggerConfig.columns.webhook_auth_header} = ?,
-          ${triggerConfig.columns.webhook_auth_secret_hash} = ?
-        WHERE ${triggerConfig.columns.trigger_id} = ?
-      `,
-      [
-        updatedConfig.mode,
-        updatedConfig.model,
-        updatedConfig.promptTemplate,
-        updatedConfig.isActive ? 1 : 0,
-        updatedConfig.profileId,
-        updatedConfig.autoCommit !== undefined ? (updatedConfig.autoCommit ? 1 : 0) : null,
-        updatedConfig.condenseOnComplete !== undefined
-          ? updatedConfig.condenseOnComplete
-            ? 1
-            : 0
-          : null,
-        webhookAuth?.header ?? null,
-        webhookAuth?.secretHash ?? null,
-        updatedConfig.triggerId,
-      ]
-    );
+    this.db
+      .update(triggerConfigTable)
+      .set({
+        mode: updatedConfig.mode,
+        model: updatedConfig.model,
+        prompt_template: updatedConfig.promptTemplate,
+        is_active: updatedConfig.isActive ? 1 : 0,
+        profile_id: updatedConfig.profileId,
+        auto_commit:
+          updatedConfig.autoCommit !== undefined ? (updatedConfig.autoCommit ? 1 : 0) : null,
+        condense_on_complete:
+          updatedConfig.condenseOnComplete !== undefined
+            ? updatedConfig.condenseOnComplete
+              ? 1
+              : 0
+            : null,
+        webhook_auth_header: webhookAuth?.header ?? null,
+        webhook_auth_secret_hash: webhookAuth?.secretHash ?? null,
+      })
+      .where(eq(triggerConfigTable.trigger_id, updatedConfig.triggerId))
+      .run();
 
     logger.info('Trigger config updated', {
       triggerId: updatedConfig.triggerId,
@@ -390,7 +296,6 @@ export class TriggerDO extends DurableObject<Env> {
   }
 
   async getAuthConfig(): Promise<StoredWebhookAuth | null> {
-    await this.ensureDatabaseInitialized();
     const config = await this.getConfig();
     return extractStoredWebhookAuth(config);
   }
@@ -484,7 +389,6 @@ export class TriggerDO extends DurableObject<Env> {
     contentType: string | null;
     sourceIp: string | null;
   }): Promise<{ success: true; requestId: string } | { success: false; error: string }> {
-    await this.ensureDatabaseInitialized();
     const config = await this.getConfig();
     if (!config?.isActive) {
       return { success: false, error: 'Trigger not configured or inactive' };
@@ -513,15 +417,12 @@ export class TriggerDO extends DurableObject<Env> {
       }
     }
 
-    const inflightRow = this.query(
-      /* sql */ `
-        SELECT COUNT(*) as count
-        FROM ${requests.toString()}
-        WHERE ${requests.columns.process_status} IN ('captured', 'inprogress')
-      `,
-      []
-    ).toArray();
-    const inflightCount = inflightRow[0]?.count ? Number(inflightRow[0].count) : 0;
+    const inflightRows = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(requestsTable)
+      .where(inArray(requestsTable.process_status, ['captured', 'inprogress']))
+      .all();
+    const inflightCount = inflightRows[0]?.count ?? 0;
     if (inflightCount >= MAX_INFLIGHT_REQUESTS) {
       return { success: false, error: 'Too many in-flight requests' };
     }
@@ -533,46 +434,32 @@ export class TriggerDO extends DurableObject<Env> {
     const requestId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
 
-    this.query(
-      /* sql */ `
-        INSERT INTO ${requests.toString()} (
-          ${requests.columns.id},
-          ${requests.columns.timestamp},
-          ${requests.columns.method},
-          ${requests.columns.path},
-          ${requests.columns.query_string},
-          ${requests.columns.headers},
-          ${requests.columns.body},
-          ${requests.columns.content_type},
-          ${requests.columns.source_ip},
-          ${requests.columns.process_status}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'captured')
-      `,
-      [
-        requestId,
+    this.db
+      .insert(requestsTable)
+      .values({
+        id: requestId,
         timestamp,
-        request.method,
-        request.path,
-        request.queryString,
-        JSON.stringify(request.headers),
-        request.body,
-        request.contentType,
-        request.sourceIp,
-      ]
-    );
+        method: request.method,
+        path: request.path,
+        query_string: request.queryString,
+        headers: JSON.stringify(request.headers),
+        body: request.body,
+        content_type: request.contentType,
+        source_ip: request.sourceIp,
+        process_status: 'captured',
+      })
+      .run();
 
-    this.query(
-      /* sql */ `
-        DELETE FROM ${requests.toString()}
-        WHERE ${requests.columns.id} IN (
-          SELECT ${requests.columns.id} FROM ${requests.toString()}
-          WHERE ${requests.columns.process_status} NOT IN ('inprogress')
-          ORDER BY ${requests.columns.created_at} DESC
-          LIMIT -1 OFFSET ?
-        )
-      `,
-      [MAX_REQUESTS]
-    );
+    // Delete overflow rows, preserving in-progress requests
+    this.db.run(sql`
+      DELETE FROM ${requestsTable}
+      WHERE ${requestsTable.id} IN (
+        SELECT ${requestsTable.id} FROM ${requestsTable}
+        WHERE ${requestsTable.process_status} NOT IN ('inprogress')
+        ORDER BY ${requestsTable.created_at} DESC
+        LIMIT -1 OFFSET ${MAX_REQUESTS}
+      )
+    `);
 
     const message: WebhookDeliveryMessage = {
       namespace: config.namespace,
@@ -583,27 +470,20 @@ export class TriggerDO extends DurableObject<Env> {
     try {
       await enqueueWebhookDelivery(this.env.WEBHOOK_DELIVERY_QUEUE, message);
     } catch (enqueueError) {
-      // If queue enqueue fails, mark the request as failed to prevent orphaned captured requests
-      // with no processing path. The inbound call will return an error.
       logger.error('Failed to enqueue webhook delivery, marking request as failed', {
         requestId,
         error: enqueueError instanceof Error ? enqueueError.message : String(enqueueError),
       });
 
-      this.query(
-        /* sql */ `
-          UPDATE ${requests.toString()}
-          SET ${requests.columns.process_status} = 'failed',
-              ${requests.columns.completed_at} = ?,
-              ${requests.columns.error_message} = ?
-          WHERE ${requests.columns.id} = ?
-        `,
-        [
-          new Date().toISOString(),
-          `Queue enqueue failed: ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
-          requestId,
-        ]
-      );
+      this.db
+        .update(requestsTable)
+        .set({
+          process_status: 'failed',
+          completed_at: new Date().toISOString(),
+          error_message: `Queue enqueue failed: ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
+        })
+        .where(eq(requestsTable.id, requestId))
+        .run();
 
       return { success: false, error: 'Failed to queue request for processing' };
     }
@@ -619,75 +499,43 @@ export class TriggerDO extends DurableObject<Env> {
   }
 
   async listRequests(limit: number = 50): Promise<{ requests: CapturedRequest[] }> {
-    await this.ensureDatabaseInitialized();
     const clampedLimit = clampRequestLimit(limit);
-    const rows = this.query(
-      /* sql */ `
-        SELECT * FROM ${requests.toString()}
-        ORDER BY ${requests.columns.timestamp} DESC
-        LIMIT ?
-      `,
-      [clampedLimit]
-    ).toArray();
+    const rows = this.db
+      .select()
+      .from(requestsTable)
+      .orderBy(desc(requestsTable.timestamp))
+      .limit(clampedLimit)
+      .all();
 
-    const capturedRequests = rows.map(row => recordToCapturedRequest(RequestRecord.parse(row)));
+    const capturedRequests = rows.map(recordToCapturedRequest);
 
     return { requests: capturedRequests };
   }
 
   async getRequest(requestId: string): Promise<CapturedRequest | null> {
-    await this.ensureDatabaseInitialized();
-    const rows = this.query(
-      /* sql */ `
-        SELECT * FROM ${requests.toString()}
-        WHERE ${requests.columns.id} = ?
-      `,
-      [requestId]
-    ).toArray();
+    const rows = this.db.select().from(requestsTable).where(eq(requestsTable.id, requestId)).all();
 
     if (rows.length === 0) {
       return null;
     }
 
-    const record = RequestRecord.parse(rows[0]);
-    return recordToCapturedRequest(record);
+    return recordToCapturedRequest(rows[0]);
   }
 
   async updateRequest(requestId: string, updates: RequestUpdates): Promise<{ success: boolean }> {
-    await this.ensureDatabaseInitialized();
-    const setClauses: string[] = [];
-    const values: Array<RequestUpdates[keyof RequestUpdates]> = [];
+    const setValues: Partial<typeof requestsTable.$inferInsert> = {};
+    if (updates.process_status !== undefined) setValues.process_status = updates.process_status;
+    if (updates.cloud_agent_session_id !== undefined)
+      setValues.cloud_agent_session_id = updates.cloud_agent_session_id;
+    if (updates.started_at !== undefined) setValues.started_at = updates.started_at;
+    if (updates.completed_at !== undefined) setValues.completed_at = updates.completed_at;
+    if (updates.error_message !== undefined) setValues.error_message = updates.error_message;
 
-    if (updates.process_status !== undefined) {
-      setClauses.push(`${requests.columns.process_status} = ?`);
-      values.push(updates.process_status);
-    }
-    if (updates.cloud_agent_session_id !== undefined) {
-      setClauses.push(`${requests.columns.cloud_agent_session_id} = ?`);
-      values.push(updates.cloud_agent_session_id);
-    }
-    if (updates.started_at !== undefined) {
-      setClauses.push(`${requests.columns.started_at} = ?`);
-      values.push(updates.started_at);
-    }
-    if (updates.completed_at !== undefined) {
-      setClauses.push(`${requests.columns.completed_at} = ?`);
-      values.push(updates.completed_at);
-    }
-    if (updates.error_message !== undefined) {
-      setClauses.push(`${requests.columns.error_message} = ?`);
-      values.push(updates.error_message);
-    }
-
-    if (setClauses.length === 0) {
+    if (Object.keys(setValues).length === 0) {
       return { success: true };
     }
 
-    this.sql.exec(
-      `UPDATE ${requests.toString()} SET ${setClauses.join(', ')} WHERE ${requests.columns.id} = ?`,
-      ...values,
-      requestId
-    );
+    this.db.update(requestsTable).set(setValues).where(eq(requestsTable.id, requestId)).run();
 
     logger.info('Request updated', {
       requestId,
@@ -698,22 +546,11 @@ export class TriggerDO extends DurableObject<Env> {
   }
 
   async deleteTrigger(): Promise<{ success: boolean }> {
-    this.query(
-      /* sql */ `
-        DELETE FROM ${triggerConfig.toString()}
-      `,
-      []
-    );
-    this.query(
-      /* sql */ `
-        DELETE FROM ${requests.toString()}
-      `,
-      []
-    );
-
     await this.ctx.storage.deleteAll();
-    this.dbInitialized = false;
-    this.initPromise = null;
+
+    // Re-run migrations so the schema is present if this instance receives further requests
+    // before Cloudflare evicts it (deleteAll wipes the __drizzle_migrations tracking table too)
+    await migrate(this.db, migrations);
 
     logger.info('Trigger deleted');
 
@@ -750,7 +587,7 @@ function extractStoredWebhookAuth(config: TriggerConfig | null): StoredWebhookAu
   };
 }
 
-function recordToCapturedRequest(record: RequestRecord): CapturedRequest {
+function recordToCapturedRequest(record: RequestRow): CapturedRequest {
   const headers = parseRequestHeaders(record.headers);
   return {
     id: record.id,
@@ -772,7 +609,7 @@ function recordToCapturedRequest(record: RequestRecord): CapturedRequest {
 
 function parseRequestHeaders(value: string): Record<string, string> {
   try {
-    const parsed = JSON.parse(value);
+    const parsed: unknown = JSON.parse(value);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const headers: Record<string, string> = {};
       for (const [key, headerValue] of Object.entries(parsed)) {

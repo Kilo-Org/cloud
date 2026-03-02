@@ -1,13 +1,13 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import type { Deployment } from '@/db/schema';
+import type { Deployment } from '@kilocode/db/schema';
 import {
   deployments,
   deployment_builds,
   deployment_events,
   platform_integrations,
   app_builder_projects,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq, and, desc, gt, inArray, or } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { CreateDeploymentResponse } from '@/lib/user-deployments/deployment-builder-client';

@@ -71,11 +71,24 @@ export function useKiloClawGatewayStatus(enabled: boolean) {
   );
 }
 
+export function useControllerVersion(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.controllerVersion.queryOptions(undefined, {
+      enabled,
+      staleTime: 5 * 60_000, // version doesn't change without a redeploy
+    })
+  );
+}
+
 export function useKiloClawMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const invalidateStatus = async () => {
     await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
+    await queryClient.invalidateQueries({
+      queryKey: trpc.kiloclaw.controllerVersion.queryKey(),
+    });
   };
 
   return {
@@ -143,5 +156,29 @@ export function useKiloClawMutations() {
     runDoctor: useMutation(
       trpc.kiloclaw.runDoctor.mutationOptions({ onSuccess: invalidateStatus })
     ),
+    restoreConfig: useMutation(
+      trpc.kiloclaw.restoreConfig.mutationOptions({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.gatewayStatus.queryKey(),
+          });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getConfig.queryKey(),
+          });
+        },
+      })
+    ),
   };
+}
+
+/** Returns true when KiloClaw is experiencing issues (not "operational"). */
+export function useKiloClawServiceDegraded() {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.serviceDegraded.queryOptions(undefined, {
+      staleTime: 60_000,
+      refetchInterval: 60_000,
+    })
+  );
 }

@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { organizations, kilocode_users, type Organization } from '@/db/schema';
+import { organizations, kilocode_users, type Organization } from '@kilocode/db/schema';
 import { isNull, eq, and, or, gt, gte, sql } from 'drizzle-orm';
 import { updateOrganizationSettings } from '@/lib/organizations/organizations';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';

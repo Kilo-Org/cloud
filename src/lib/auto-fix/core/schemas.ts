@@ -6,7 +6,7 @@
  */
 
 import * as z from 'zod';
-import type { AutoFixTicket } from '@/db/schema';
+import type { AutoFixTicket } from '@kilocode/db/schema';
 
 // ============================================================================
 // Constants

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { payment_methods } from '@/db/schema';
+import type { payment_methods } from '@kilocode/db/schema';
 
 export const createTestPaymentMethod = (userId: string): typeof payment_methods.$inferInsert => ({
   id: randomUUID(),

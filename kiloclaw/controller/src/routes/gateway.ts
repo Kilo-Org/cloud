@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
 
-function getBearerToken(header: string | undefined): string | null {
+export function getBearerToken(header: string | undefined): string | null {
   if (!header) return null;
   const [scheme, token] = header.split(/\s+/, 2);
   if (!scheme || !token) return null;

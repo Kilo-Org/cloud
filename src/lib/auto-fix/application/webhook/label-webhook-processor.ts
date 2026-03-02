@@ -8,7 +8,7 @@
  * 3. Dispatches to Auto Fix worker
  */
 
-import type { PlatformIntegration } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';

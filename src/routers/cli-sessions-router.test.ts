@@ -6,10 +6,10 @@ import {
   sharedCliSessions,
   organizations,
   organization_memberships,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import { eq, and } from 'drizzle-orm';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 import {
   sanitizeGitUrl,
   isValidGitUrl,

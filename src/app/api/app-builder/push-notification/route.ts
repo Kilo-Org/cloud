@@ -7,7 +7,7 @@ import { eq, and } from 'drizzle-orm';
 import { APP_BUILDER_AUTH_TOKEN } from '@/lib/config.server';
 import { logExceptInTest } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
-import { deployments } from '@/db/schema';
+import { deployments } from '@kilocode/db/schema';
 import { redeploy } from '@/lib/user-deployments/deployments-service';
 
 /**

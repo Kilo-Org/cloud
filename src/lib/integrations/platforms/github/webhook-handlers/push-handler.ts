@@ -5,7 +5,7 @@ import {
   platform_integrations,
   app_builder_projects,
   type PlatformIntegration,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { redeploy } from '@/lib/user-deployments/deployments-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';

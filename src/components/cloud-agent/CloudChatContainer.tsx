@@ -68,9 +68,9 @@ function hasSessionBlobs(sessionData: {
 }): boolean {
   return Boolean(
     sessionData.api_conversation_history_blob_url ||
-      sessionData.task_metadata_blob_url ||
-      sessionData.ui_messages_blob_url ||
-      sessionData.git_state_blob_url
+    sessionData.task_metadata_blob_url ||
+    sessionData.ui_messages_blob_url ||
+    sessionData.git_state_blob_url
   );
 }
 

@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage_view, kilocode_users } from '@/db/schema';
+import { microdollar_usage_view, kilocode_users } from '@kilocode/db/schema';
 import { desc, and, gt, lt, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { ABUSE_CLASSIFICATION } from '@/types/AbuseClassification';
 

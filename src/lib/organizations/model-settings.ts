@@ -1,70 +1,24 @@
-import * as z from 'zod';
-
-export const ToolSchema = z.enum([
-  'apply_diff',
-  'apply_patch',
-  'delete_file',
-  'edit_file',
-  'search_replace',
-  'search_and_replace',
-  'write_file',
-  'write_to_file',
-]);
-
-export type Tool = z.infer<typeof ToolSchema>;
-
-export const ToolArraySchema = z.array(ToolSchema);
-
-export const ModelSettingsSchema = z.object({
-  included_tools: ToolArraySchema, // adds to the standard tool set
-  excluded_tools: ToolArraySchema, // removes from the standard tool set
-});
-
-export type ModelSettings = z.infer<typeof ModelSettingsSchema>;
-
-export const VersionedSettingsSchema = z.record(z.string(), ModelSettingsSchema);
-
-export type VersionedSettings = z.infer<typeof VersionedSettingsSchema>;
-
-export const OpenCodePromptSchema = z.enum([
-  'codex',
-  'gemini',
-  'beast',
-  'anthropic',
-  'trinity',
-  'anthropic_without_todo',
-]);
-
-export type OpenCodePrompt = z.infer<typeof OpenCodePromptSchema>;
-
-export const OpenCodeFamilySchema = z.enum(['claude', 'gpt', 'gemini', 'llama', 'mistral']);
-
-export type OpenCodeFamily = z.infer<typeof OpenCodeFamilySchema>;
-
-export const VerbositySchema = z.enum(['low', 'medium', 'high', 'max']);
-
-export type Verbosity = z.infer<typeof VerbositySchema>;
-
-export const ReasoningEffortSchema = z.enum(['none', 'low', 'medium', 'high', 'xhigh']);
-
-export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
-
-export const OpenCodeVariantSchema = z.object({
-  verbosity: VerbositySchema.optional(),
-  reasoning: z
-    .object({
-      enabled: z.boolean().optional(),
-      effort: ReasoningEffortSchema.optional(),
-    })
-    .optional(),
-});
-
-export type OpenCodeVariant = z.infer<typeof OpenCodeVariantSchema>;
-
-export const OpenCodeSettingsSchema = z.object({
-  family: OpenCodeFamilySchema.optional(),
-  prompt: OpenCodePromptSchema.optional(),
-  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
-});
-
-export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;
+// Re-export from @kilocode/db/schema-types — canonical source of truth
+export {
+  ToolSchema,
+  ToolArraySchema,
+  ModelSettingsSchema,
+  VersionedSettingsSchema,
+  OpenCodePromptSchema,
+  OpenCodeFamilySchema,
+  VerbositySchema,
+  ReasoningEffortSchema,
+  OpenCodeVariantSchema,
+  OpenCodeSettingsSchema,
+} from '@kilocode/db/schema-types';
+export type {
+  Tool,
+  ModelSettings,
+  VersionedSettings,
+  OpenCodePrompt,
+  OpenCodeFamily,
+  Verbosity,
+  ReasoningEffort,
+  OpenCodeVariant,
+  OpenCodeSettings,
+} from '@kilocode/db/schema-types';

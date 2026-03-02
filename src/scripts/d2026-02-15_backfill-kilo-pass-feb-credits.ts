@@ -27,7 +27,11 @@ import Stripe from 'stripe';
 import { execFileSync } from 'node:child_process';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { db } from '@/lib/drizzle';
-import { kilo_pass_audit_log, kilo_pass_issuances, kilo_pass_subscriptions } from '@/db/schema';
+import {
+  kilo_pass_audit_log,
+  kilo_pass_issuances,
+  kilo_pass_subscriptions,
+} from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import {
   KiloPassAuditLogAction,

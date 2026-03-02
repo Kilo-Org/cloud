@@ -12,7 +12,7 @@ import {
   OpenRouterProvidersResponse,
   OpenRouterSearchResponse,
 } from '@/lib/providers/openrouter/openrouter-types';
-import { modelsByProvider } from '@/db/schema';
+import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { lt } from 'drizzle-orm';
 import { type Provider, PROVIDERS } from '@/lib/providers';

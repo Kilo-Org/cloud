@@ -1,7 +1,7 @@
 import 'server-only';
 import { getUserFromAuth } from '@/lib/user.server';
-import type { Organization, User } from '@/db/schema';
-import { organization_memberships, organizations } from '@/db/schema';
+import type { Organization, User } from '@kilocode/db/schema';
+import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { db } from '@/lib/drizzle';

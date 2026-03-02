@@ -44,10 +44,16 @@ function emitCompleted(
 export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommitResult> {
   const { workspacePath, upstreamBranch, onEvent, kiloClient } = opts;
 
+  logToFile(
+    `auto-commit: starting workspacePath=${workspacePath} upstreamBranch=${upstreamBranch ?? '(none)'}`
+  );
+
   try {
     // Check current branch
     const branch = await getCurrentBranch(workspacePath);
+    logToFile(`auto-commit: branch=${branch || '(detached HEAD)'}`);
     if (!branch) {
+      logToFile('auto-commit: skipping - detached HEAD state');
       emitCompleted(onEvent, {
         success: true,
         message: 'Skipped: detached HEAD state',
@@ -59,6 +65,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     // Branch protection: don't commit to main/master without an explicit upstream
     const hasUpstream = upstreamBranch !== undefined && upstreamBranch !== '';
     if (!hasUpstream && (branch === 'main' || branch === 'master')) {
+      logToFile(`auto-commit: skipping - protected branch ${branch} with no upstream`);
       emitCompleted(onEvent, {
         success: true,
         message: `Skipped: cannot commit to ${branch}`,
@@ -72,7 +79,15 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
       cwd: workspacePath,
       timeoutMs: GIT_LOCAL_TIMEOUT_MS,
     });
+    if (status.exitCode === 124) {
+      const msg = 'git status timed out';
+      logToFile(`auto-commit: ${msg} (exit 124)`);
+      emitCompleted(onEvent, { success: false, message: msg });
+      return { success: false, error: msg };
+    }
+    logToFile(`auto-commit: git status exitCode=${status.exitCode}`);
     if (!status.stdout.trim()) {
+      logToFile('auto-commit: skipping - no uncommitted changes');
       emitCompleted(onEvent, { success: true, message: 'No uncommitted changes', skipped: true });
       return { success: true, skipped: true };
     }
@@ -92,6 +107,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
       );
       const result = await Promise.race([commitMsgPromise, timeoutPromise]);
       commitMessage = result.message;
+      logToFile(`auto-commit: generated commit message: ${commitMessage}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logToFile(`auto-commit: commit message generation failed: ${msg}`);
@@ -134,10 +150,11 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
         return { success: false, error: msg };
       }
     }
+    logToFile(`auto-commit: commit succeeded: ${commitResult.stdout.trim()}`);
 
     // Push
-    logToFile('auto-commit: pushing');
     const pushArgs = hasUpstream ? ['push'] : ['push', '-u', 'origin', branch];
+    logToFile(`auto-commit: pushing with args: git ${pushArgs.join(' ')}`);
 
     const pushResult = await git(pushArgs, { cwd: workspacePath, timeoutMs: GIT_PUSH_TIMEOUT_MS });
     if (pushResult.exitCode !== 0) {
@@ -151,6 +168,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
       return { success: true };
     }
 
+    logToFile('auto-commit: push succeeded');
     logToFile('auto-commit: completed successfully');
     emitCompleted(onEvent, { success: true, message: 'Changes committed and pushed' });
     return { success: true };

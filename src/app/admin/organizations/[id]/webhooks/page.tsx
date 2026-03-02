@@ -2,7 +2,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { redirect } from 'next/navigation';
 import { AdminWebhookTriggersList } from '@/app/admin/webhooks/AdminWebhookTriggersList';
 import { db } from '@/lib/drizzle';
-import { organizations } from '@/db/schema';
+import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 export default async function AdminOrganizationWebhooksPage({

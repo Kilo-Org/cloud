@@ -69,6 +69,7 @@ export type PrepareSessionInput = {
   prompt: string;
   mode: AgentMode;
   model: string;
+  variant?: string;
   // GitHub-specific params
   githubRepo?: string;
   /** GitHub Personal Access Token for private repositories */
@@ -116,6 +117,7 @@ export type SendMessageInput = {
   prompt: string;
   mode: 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
   model: string;
+  variant?: string;
   autoCommit?: boolean;
   githubToken?: string;
   gitToken?: string;
@@ -211,6 +213,7 @@ export type UpdateSessionInput = {
   // Scalar fields - null to clear, value to set, undefined to skip
   mode?: AgentMode | null;
   model?: string | null;
+  variant?: string | null;
   githubToken?: string | null;
   gitToken?: string | null;
   upstreamBranch?: string | null;
@@ -297,6 +300,20 @@ function isInsufficientCreditsError(err: unknown): boolean {
     }
   }
   return false;
+}
+
+function normalizeCloudAgentProtocolError(error: unknown): unknown {
+  if (!(error instanceof Error)) {
+    return error;
+  }
+
+  if (!error.message.includes('is not valid JSON')) {
+    return error;
+  }
+
+  const normalized = new Error('Cloud agent returned a non-JSON error response', { cause: error });
+  normalized.name = 'CloudAgentProtocolError';
+  return normalized;
 }
 
 /**
@@ -476,21 +493,23 @@ export class CloudAgentNextClient {
       });
       return result;
     } catch (error) {
+      const normalizedError = normalizeCloudAgentProtocolError(error);
+
       console.log('[CloudAgentNextClient.prepareSession] Request failed', {
         elapsed: Date.now() - startTime,
-        error: error instanceof Error ? error.message : String(error),
+        error: normalizedError instanceof Error ? normalizedError.message : String(normalizedError),
       });
 
       // Check for insufficient credits error
-      if (isInsufficientCreditsError(error)) {
+      if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
 
-      captureException(error, {
+      captureException(normalizedError, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'prepareSession' },
         extra: { input },
       });
-      throw error;
+      throw normalizedError;
     }
   }
 
@@ -526,16 +545,18 @@ export class CloudAgentNextClient {
     try {
       return await this.client.initiateFromKilocodeSessionV2.mutate(input);
     } catch (error) {
+      const normalizedError = normalizeCloudAgentProtocolError(error);
+
       // Check for insufficient credits error
-      if (isInsufficientCreditsError(error)) {
+      if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
 
-      captureException(error, {
+      captureException(normalizedError, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'initiateFromPreparedSession' },
         extra: { input },
       });
-      throw error;
+      throw normalizedError;
     }
   }
 
@@ -549,16 +570,18 @@ export class CloudAgentNextClient {
     try {
       return await this.client.sendMessageV2.mutate(input);
     } catch (error) {
+      const normalizedError = normalizeCloudAgentProtocolError(error);
+
       // Check for insufficient credits error
-      if (isInsufficientCreditsError(error)) {
+      if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
 
-      captureException(error, {
+      captureException(normalizedError, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'sendMessage' },
         extra: { input },
       });
-      throw error;
+      throw normalizedError;
     }
   }
 

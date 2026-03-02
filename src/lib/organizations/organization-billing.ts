@@ -1,5 +1,5 @@
-import type { Organization, User } from '@/db/schema';
-import { organizations, credit_transactions } from '@/db/schema';
+import type { Organization, User } from '@kilocode/db/schema';
+import { organizations, credit_transactions } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
 import { getOrganizationById } from '@/lib/organizations/organizations';

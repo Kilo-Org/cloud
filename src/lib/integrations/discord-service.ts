@@ -1,13 +1,23 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import type { PlatformIntegration } from '@/db/schema';
-import { platform_integrations } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
+import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
+import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
+import { createProviderAwareModelAllowPredicate } from '@/lib/model-allow.server';
+import { minimax_m25_free_model } from '@/lib/providers/minimax';
+import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/providers/anthropic';
+
+// Default model for Discord integrations - mirrors the Slack default
+const DISCORD_DEFAULT_MODEL = minimax_m25_free_model.is_enabled
+  ? minimax_m25_free_model.public_id
+  : CLAUDE_OPUS_CURRENT_MODEL_ID;
 
 // Discord OAuth2 scopes for the bot integration
 // 'bot' scope is needed for the bot to join servers
@@ -175,11 +185,15 @@ export async function upsertDiscordInstallation(
   // Note: We intentionally do NOT store the OAuth2 access_token or refresh_token.
   // Discord's OAuth2 user tokens are short-lived and not used for bot operations.
   // All bot API calls use the DISCORD_BOT_TOKEN env var instead.
-  const metadata = {
-    guild_icon: oauthResponse.guild.icon,
-  };
 
   if (existing) {
+    // Preserve existing model_slug when re-authorizing
+    const existingMetadata = existing.metadata || {};
+    const updatedMetadata = {
+      ...existingMetadata,
+      guild_icon: oauthResponse.guild.icon,
+    };
+
     const [updated] = await db
       .update(platform_integrations)
       .set({
@@ -187,7 +201,7 @@ export async function upsertDiscordInstallation(
         platform_account_login: guildName,
         scopes,
         integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata,
+        metadata: updatedMetadata,
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, existing.id))
@@ -195,6 +209,18 @@ export async function upsertDiscordInstallation(
 
     return updated;
   }
+
+  // For org integrations, get a model that respects the allow list
+  // For user integrations, use the Discord-specific default model
+  const defaultModel =
+    owner.type === 'org'
+      ? await getDefaultAllowedModel(owner.id, DISCORD_DEFAULT_MODEL)
+      : DISCORD_DEFAULT_MODEL;
+
+  const metadata = {
+    guild_icon: oauthResponse.guild.icon,
+    model_slug: defaultModel,
+  };
 
   const [created] = await db
     .insert(platform_integrations)
@@ -298,5 +324,182 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Get the model for a Discord integration.
+ * Reads model_slug from the given installation's metadata, falling back to
+ * the platform default for installations created before model config existed.
+ */
+export async function getModel(owner: Owner): Promise<string | null> {
+  const integration = await getInstallation(owner);
+  if (!integration) {
+    return null;
+  }
+
+  const metadata = integration.metadata as { model_slug?: string } | null;
+  if (metadata?.model_slug) {
+    return metadata.model_slug;
+  }
+
+  // Pre-existing installation without a stored model — resolve a default
+  return owner.type === 'org'
+    ? getDefaultAllowedModel(owner.id, DISCORD_DEFAULT_MODEL)
+    : DISCORD_DEFAULT_MODEL;
+}
+
+/**
+ * Update the model for a Discord integration.
+ * For organization-owned integrations, validates the model against the allow list.
+ */
+export async function updateModel(
+  owner: Owner,
+  modelSlug: string
+): Promise<{ success: boolean; error?: string }> {
+  const integration = await getInstallation(owner);
+
+  if (!integration) {
+    return { success: false, error: 'No Discord installation found' };
+  }
+
+  // For org integrations, validate the model against the allow list
+  if (owner.type === 'org') {
+    const organization = await getOrganizationById(owner.id);
+    if (organization) {
+      const modelAllowList = organization.settings?.model_allow_list || [];
+      if (modelAllowList.length > 0) {
+        const isAllowed = createProviderAwareModelAllowPredicate(modelAllowList);
+        if (!(await isAllowed(modelSlug))) {
+          return { success: false, error: 'Model is not allowed by organization policy' };
+        }
+      }
+    }
+  }
+
+  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: {
+        ...existingMetadata,
+        model_slug: modelSlug,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integration.id));
+
+  return { success: true };
+}
+
+/**
+ * Post a message to a Discord channel using the Bot Token.
+ */
+export async function postDiscordMessage(
+  channelId: string,
+  content: string,
+  options?: { messageReference?: { message_id: string } }
+): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  if (!DISCORD_BOT_TOKEN) {
+    return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
+  }
+
+  try {
+    const body: Record<string, unknown> = { content };
+    if (options?.messageReference) {
+      body.message_reference = options.messageReference;
+    }
+
+    const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { ok: false, error: `Discord API ${response.status}: ${errorText}` };
+    }
+
+    const data = (await response.json()) as { id: string };
+    return { ok: true, messageId: data.id };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[DiscordService] Error posting message:', errorMessage);
+    return { ok: false, error: errorMessage };
+  }
+}
+
+/**
+ * Add a reaction to a Discord message using the Bot Token.
+ */
+export async function addDiscordReaction(
+  channelId: string,
+  messageId: string,
+  emoji: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!DISCORD_BOT_TOKEN) {
+    return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
+  }
+
+  try {
+    const encodedEmoji = encodeURIComponent(emoji);
+    const response = await fetch(
+      `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { ok: false, error: `Discord API ${response.status}: ${errorText}` };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[DiscordService] Error adding reaction:', errorMessage);
+    return { ok: false, error: errorMessage };
+  }
+}
+
+/**
+ * Remove the bot's own reaction from a Discord message.
+ */
+export async function removeDiscordReaction(
+  channelId: string,
+  messageId: string,
+  emoji: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!DISCORD_BOT_TOKEN) {
+    return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
+  }
+
+  try {
+    const encodedEmoji = encodeURIComponent(emoji);
+    const response = await fetch(
+      `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { ok: false, error: `Discord API ${response.status}: ${errorText}` };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[DiscordService] Error removing reaction:', errorMessage);
+    return { ok: false, error: errorMessage };
   }
 }

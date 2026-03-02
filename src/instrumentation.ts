@@ -4,12 +4,10 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('../sentry.server.config');
 
-    const { getClient, SentryContextManager, validateOpenTelemetrySetup } = await import(
-      '@sentry/nextjs'
-    );
-    const { SentryPropagator, SentrySampler, SentrySpanProcessor } = await import(
-      '@sentry/opentelemetry'
-    );
+    const { getClient, SentryContextManager, validateOpenTelemetrySetup } =
+      await import('@sentry/nextjs');
+    const { SentryPropagator, SentrySampler, SentrySpanProcessor } =
+      await import('@sentry/opentelemetry');
 
     const sentryClient = getClient();
     if (!sentryClient) {

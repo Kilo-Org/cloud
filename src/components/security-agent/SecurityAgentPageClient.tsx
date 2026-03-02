@@ -23,8 +23,9 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { SecurityFinding } from '@/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 import Link from 'next/link';
+import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 
 type SecurityAgentPageClientProps = {
   organizationId?: string;
@@ -39,20 +40,6 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
 
   const value = Reflect.get(source, key);
   return typeof value === 'string' ? value : undefined;
-}
-
-// Helper to detect GitHub integration errors from error messages
-function isGitHubIntegrationError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes('GitHub token') ||
-    message.includes('GitHub installation') ||
-    message.includes('installation_id') ||
-    message.includes('Bad credentials') ||
-    message.includes('Not Found') || // GitHub API returns 404 for uninstalled apps
-    message.includes('Forbidden') || // GitHub API returns 403 for permission issues
-    message.includes('Resource not accessible') // GitHub returns this for missing permissions
-  );
 }
 
 export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageClientProps) {

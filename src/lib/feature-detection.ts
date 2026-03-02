@@ -25,6 +25,7 @@ export const FEATURE_VALUES = [
   'agent-manager',
   'security-agent',
   'slack',
+  'discord',
   'webhook',
   'kilo-claw',
   'direct-gateway',

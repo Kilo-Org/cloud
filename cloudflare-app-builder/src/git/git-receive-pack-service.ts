@@ -16,6 +16,7 @@ export type ReceivePackError =
 
 /** Collapse newlines and strip control characters so a message is safe for a single pkt-line. */
 function sanitizeStatusMessage(msg: string): string {
+  // eslint-disable-next-line no-control-regex
   return msg.replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1f]/g, '');
 }
 

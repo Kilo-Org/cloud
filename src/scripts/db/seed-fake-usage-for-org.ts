@@ -8,7 +8,7 @@ import {
   organization_memberships,
   kilocode_users,
   type MicrodollarUsage,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { cliConfirm } from '@/scripts/lib/cli-confirm';
 

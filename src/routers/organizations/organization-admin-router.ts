@@ -6,7 +6,7 @@ import {
   kilocode_users,
   organization_seats_purchases,
   credit_transactions,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { ilike, or, asc, desc, count, eq, and, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { OrganizationsApiGetResponseSchema } from '@/types/admin';

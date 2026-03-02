@@ -9,7 +9,7 @@
 import { createMiddleware } from 'hono/factory';
 import type { HonoContext } from '../index';
 import { logger } from './logger';
-import { resError } from './res';
+import { resError } from '@kilocode/worker-utils';
 
 /** Header name for internal API key */
 export const INTERNAL_API_KEY_HEADER = 'X-Internal-API-Key';

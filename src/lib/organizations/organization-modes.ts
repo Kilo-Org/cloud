@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { orgnaization_modes, ORGANIZATION_MODES_ORG_SLUG_CONSTRAINT } from '@/db/schema';
+import { orgnaization_modes, ORGANIZATION_MODES_ORG_SLUG_CONSTRAINT } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { OrganizationModeConfig } from '@/lib/organizations/organization-types';
 

@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { credit_transactions, kilocode_users } from '@/db/schema';
+import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { fetchExpiringTransactions } from './creditExpiration';
 import { recomputeNextCreditExpiration } from './recomputeNextCreditExpiration';

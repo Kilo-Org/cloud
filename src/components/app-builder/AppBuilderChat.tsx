@@ -30,6 +30,7 @@ import { TypingIndicator } from '@/components/cloud-agent/TypingIndicator';
 import type { CloudMessage } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import { isMessageStreaming } from '@/components/cloud-agent-next/types';
+import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
 import { MessageBubble as V2MessageBubble } from '@/components/cloud-agent-next/MessageBubble';
 import { QuestionContextProvider } from '@/components/cloud-agent-next/QuestionContext';
 import type { AppBuilderSession, V1Session, V2Session } from './project-manager/types';
@@ -328,16 +329,11 @@ function V1SessionMessages({
   );
 
   const { staticMessages, dynamicMessages } = useMemo(() => {
-    const staticMsgs: CloudMessage[] = [];
-    const dynamicMsgs: CloudMessage[] = [];
-    for (const msg of visibleMessages) {
-      if (msg.partial) {
-        dynamicMsgs.push(msg);
-      } else {
-        staticMsgs.push(msg);
-      }
-    }
-    return { staticMessages: staticMsgs, dynamicMessages: dynamicMsgs };
+    const { staticItems, dynamicItems } = splitByContiguousPrefix(
+      visibleMessages,
+      msg => !msg.partial
+    );
+    return { staticMessages: staticItems, dynamicMessages: dynamicItems };
   }, [visibleMessages]);
 
   if (visibleMessages.length === 0) {
@@ -372,17 +368,14 @@ function V2SessionMessages({
 }) {
   const sessionState = useSyncExternalStore(session.subscribe, session.getState);
 
+  // Contiguous-prefix split: prevents stale streaming messages from old
+  // executions from being reordered below newer complete messages.
   const { v2Static, v2Dynamic } = useMemo(() => {
-    const staticMsgs: StoredMessage[] = [];
-    const dynamicMsgs: StoredMessage[] = [];
-    for (const msg of sessionState.messages) {
-      if (isMessageStreaming(msg)) {
-        dynamicMsgs.push(msg);
-      } else {
-        staticMsgs.push(msg);
-      }
-    }
-    return { v2Static: staticMsgs, v2Dynamic: dynamicMsgs };
+    const { staticItems, dynamicItems } = splitByContiguousPrefix(
+      sessionState.messages,
+      msg => !isMessageStreaming(msg)
+    );
+    return { v2Static: staticItems, v2Dynamic: dynamicItems };
   }, [sessionState.messages]);
 
   // Identity changes when childSessionMessages changes, which forces memo'd

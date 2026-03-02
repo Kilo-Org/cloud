@@ -6,11 +6,11 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews } from '@/db/schema';
+import { cloud_agent_code_reviews } from '@kilocode/db/schema';
 import { eq, and, desc, count, ne, inArray } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
-import type { CloudAgentCodeReview } from '@/db/schema';
+import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 
 /**
  * Creates a new code review record

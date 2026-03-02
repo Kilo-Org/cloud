@@ -1,8 +1,8 @@
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { getCustomerInfo } from './customerInfo';
-import type { User, Organization } from '@/db/schema';
-import { credit_transactions, kilocode_users, organizations } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
+import { credit_transactions, kilocode_users, organizations } from '@kilocode/db/schema';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { createAuditLog } from './organizations/organization-audit-logs';
 import { promoCreditCategoriesByKey } from './promoCreditCategories';

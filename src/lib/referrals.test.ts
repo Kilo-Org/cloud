@@ -1,4 +1,4 @@
-import { referral_codes, referral_code_usages, credit_transactions } from '@/db/schema';
+import { referral_codes, referral_code_usages, credit_transactions } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import {
   getReferralCodeForUser,

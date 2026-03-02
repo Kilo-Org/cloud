@@ -6,7 +6,7 @@ import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
 import { shutdownPosthog } from '@/lib/posthog';
 import { sql } from 'drizzle-orm';
 import type { UsageMetaData } from '@/lib/processUsage';
-import type { MicrodollarUsage } from '@/db/schema';
+import type { MicrodollarUsage } from '@kilocode/db/schema';
 import stats from './stats.json';
 
 const TOTAL_RECORDS = 100_000;
@@ -191,6 +191,15 @@ function generateRandomRecord(
       50
     ),
     session_id: maybeNull(`session-${Math.random().toString(36).substring(2, 10)}`, 60),
+    mode: maybeNull(
+      pickRandom(['code', 'build', 'architect', 'ask', 'debug', 'plan', 'general'], Math.random()),
+      50
+    ),
+    auto_model: maybeNull(
+      pickRandom(['kilo/auto', 'kilo/auto-free', 'kilo/auto-small'], Math.random()),
+      70
+    ),
+    market_cost: core.cost,
   };
 
   return { core, metadata };

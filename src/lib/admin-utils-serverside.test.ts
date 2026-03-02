@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { payment_methods } from '@/db/schema';
+import { payment_methods } from '@kilocode/db/schema';
 import { hasPaymentMethod } from './admin-utils-serverside';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 

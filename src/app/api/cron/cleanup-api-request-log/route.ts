@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
-import { api_request_log } from '@/db/schema';
+import { api_request_log } from '@kilocode/db/schema';
 import { lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 

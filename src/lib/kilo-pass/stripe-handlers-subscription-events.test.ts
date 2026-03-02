@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, jest } from '@jest/globals';
 
 import { db, cleanupDbForTest } from '@/lib/drizzle';
-import { kilo_pass_audit_log, kilo_pass_subscriptions } from '@/db/schema';
+import { kilo_pass_audit_log, kilo_pass_subscriptions } from '@kilocode/db/schema';
 import { KiloPassAuditLogResult } from './enums';
 import { KiloPassAuditLogAction } from './enums';
 import { KiloPassCadence } from './enums';
@@ -75,9 +75,8 @@ afterEach(() => {
 
 describe('handleKiloPassSubscriptionEvent', () => {
   test('throws KiloPassError when subscription does not look like Kilo Pass (no DB side effects)', async () => {
-    const { handleKiloPassSubscriptionEvent } = await import(
-      '@/lib/kilo-pass/stripe-handlers-subscription-events'
-    );
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
     const subscription = makeStripeSubscription({
       id: `sub_non_kilo_${Math.random()}`,
@@ -102,9 +101,8 @@ describe('handleKiloPassSubscriptionEvent', () => {
   });
 
   test('active subscription: inserts/updates subscription row and writes webhook audit log', async () => {
-    const { handleKiloPassSubscriptionEvent } = await import(
-      '@/lib/kilo-pass/stripe-handlers-subscription-events'
-    );
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
     const user = await insertTestUser();
     const stripeSubId = `sub_${Math.random()}`;
@@ -152,9 +150,8 @@ describe('handleKiloPassSubscriptionEvent', () => {
   });
 
   test('active subscription with cancel_at_period_end=true stores cancel_at_period_end flag', async () => {
-    const { handleKiloPassSubscriptionEvent } = await import(
-      '@/lib/kilo-pass/stripe-handlers-subscription-events'
-    );
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
     const user = await insertTestUser();
     const stripeSubId = `sub_${Math.random()}`;
@@ -186,9 +183,8 @@ describe('handleKiloPassSubscriptionEvent', () => {
   });
 
   test('ended subscription: sets ended_at from ended_at when present and resets streak when transitioning to ended', async () => {
-    const { handleKiloPassSubscriptionEvent } = await import(
-      '@/lib/kilo-pass/stripe-handlers-subscription-events'
-    );
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
     const user = await insertTestUser();
     const stripeSubId = `sub_${Math.random()}`;
@@ -234,9 +230,8 @@ describe('handleKiloPassSubscriptionEvent', () => {
   });
 
   test('ended subscription: falls back to canceled_at and, when missing, uses current time', async () => {
-    const { handleKiloPassSubscriptionEvent } = await import(
-      '@/lib/kilo-pass/stripe-handlers-subscription-events'
-    );
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
     const user = await insertTestUser();
     const stripeSubIdCanceledAt = `sub_canceled_at_${Math.random()}`;
@@ -307,9 +302,8 @@ describe('handleKiloPassSubscriptionEvent', () => {
   });
 
   test('non-ended updates do not reset current_streak_months', async () => {
-    const { handleKiloPassSubscriptionEvent } = await import(
-      '@/lib/kilo-pass/stripe-handlers-subscription-events'
-    );
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
     const user = await insertTestUser();
     const stripeSubId = `sub_${Math.random()}`;

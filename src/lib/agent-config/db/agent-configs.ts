@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { agent_configs } from '@/db/schema';
+import { agent_configs } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import type { Owner } from '@/lib/code-reviews/core';

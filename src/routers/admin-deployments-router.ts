@@ -6,7 +6,7 @@ import {
   deployment_events,
   kilocode_users,
   organizations,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import * as z from 'zod';
 import { eq, and, or, ilike, desc, asc, count, isNotNull, gt, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';

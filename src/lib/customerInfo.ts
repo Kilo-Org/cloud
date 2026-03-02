@@ -1,7 +1,7 @@
 import { summarizeUserPayments, type UserPaymentsSummary } from '@/lib/creditTransactions';
 import { hasPaymentMethodInStripe } from '@/lib/stripe-client';
 import { db } from '@/lib/drizzle';
-import { payment_methods, kilocode_users, type User } from '@/db/schema';
+import { payment_methods, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { generateApiToken } from './tokens';
 import { userHasOrganizations } from '@/lib/organizations/organizations';

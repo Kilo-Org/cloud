@@ -1,4 +1,8 @@
-import { microdollar_usage, organization_seats_purchases, organizations } from '@/db/schema';
+import {
+  microdollar_usage,
+  organization_seats_purchases,
+  organizations,
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { successResult } from '@/lib/maybe-result';
 import { captureMessage } from '@sentry/nextjs';
@@ -36,7 +40,7 @@ import * as z from 'zod';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { processOrganizationExpirations } from '@/lib/creditExpiration';
-import { credit_transactions } from '@/db/schema';
+import { credit_transactions } from '@kilocode/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { organizationSsoRouter } from '@/routers/organizations/organization-sso-router';
 import { organizationAuditLogRouter } from '@/routers/organizations/organization-audit-log-router';

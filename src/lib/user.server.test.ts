@@ -5,7 +5,7 @@ import {
   getUserUUID,
   uuidSchema,
 } from './user.server';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { v5 as uuidv5 } from 'uuid';
 
 // Same namespace UUID used in user.server.ts

@@ -1,6 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
+import { eq, sql } from 'drizzle-orm';
+import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
+import { sessions } from '../db/sqlite-schema';
 import type { Env } from '../env';
+import migrations from '../../drizzle/migrations';
 
 /**
  * Strongly-consistent per-user cache of session ids.
@@ -8,46 +13,32 @@ import type { Env } from '../env';
  * Keyed by kiloUserId (one instance per user).
  */
 export class SessionAccessCacheDO extends DurableObject<Env> {
-  private sql: SqlStorage;
-  private initialized = false;
+  private db: DrizzleSqliteDODatabase;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
-    this.sql = state.storage.sql;
+    this.db = drizzle(state.storage, { logger: false });
 
-    void state.blockConcurrencyWhile(async () => {
-      this.initSchema();
+    void state.blockConcurrencyWhile(() => {
+      return migrate(this.db, migrations);
     });
   }
 
-  private initSchema() {
-    if (this.initialized) return;
-
-    this.sql.exec(/* sql */ `
-      CREATE TABLE IF NOT EXISTS sessions (
-        session_id TEXT PRIMARY KEY
-      );
-    `);
-
-    this.initialized = true;
-  }
-
   async has(sessionId: string): Promise<boolean> {
-    this.initSchema();
-    const rows = this.sql
-      .exec('SELECT 1 AS ok FROM sessions WHERE session_id = ? LIMIT 1', sessionId)
-      .toArray();
-    return rows.length > 0;
+    const row = this.db
+      .select({ ok: sql<number>`1` })
+      .from(sessions)
+      .where(eq(sessions.session_id, sessionId))
+      .get();
+    return row !== undefined;
   }
 
   async add(sessionId: string): Promise<void> {
-    this.initSchema();
-    this.sql.exec('INSERT OR IGNORE INTO sessions (session_id) VALUES (?)', sessionId);
+    this.db.insert(sessions).values({ session_id: sessionId }).onConflictDoNothing().run();
   }
 
   async remove(sessionId: string): Promise<void> {
-    this.initSchema();
-    this.sql.exec('DELETE FROM sessions WHERE session_id = ?', sessionId);
+    this.db.delete(sessions).where(eq(sessions.session_id, sessionId)).run();
   }
 }
 

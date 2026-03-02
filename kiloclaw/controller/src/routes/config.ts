@@ -1,8 +1,18 @@
 import fs from 'node:fs';
 import type { Hono } from 'hono';
 import { timingSafeTokenEqual } from '../auth';
+import type { Supervisor } from '../supervisor';
+import { writeBaseConfig } from '../config-writer';
+import { getBearerToken } from './gateway';
 
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
+
+const VALID_VERSIONS = ['base'] as const;
+type ConfigVersion = (typeof VALID_VERSIONS)[number];
+
+function isValidVersion(v: string): v is ConfigVersion {
+  return (VALID_VERSIONS as readonly string[]).includes(v);
+}
 
 /**
  * Deep-merge `patch` into `target`, creating intermediate objects as needed.
@@ -28,14 +38,45 @@ function deepMerge(target: Record<string, unknown>, patch: Record<string, unknow
   }
 }
 
-export function registerConfigRoutes(app: Hono, expectedToken: string): void {
+export function registerConfigRoutes(
+  app: Hono,
+  supervisor: Supervisor,
+  expectedToken: string
+): void {
   app.use('/_kilo/config/*', async (c, next) => {
-    const authHeader = c.req.header('authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const token = getBearerToken(c.req.header('authorization'));
     if (!timingSafeTokenEqual(token, expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     await next();
+  });
+
+  // Restore config from env vars and restart the gateway.
+  app.post('/_kilo/config/restore/:version', c => {
+    const version = c.req.param('version');
+
+    if (!isValidVersion(version)) {
+      return c.json(
+        { error: `Invalid config version: ${version}. Valid: ${VALID_VERSIONS.join(', ')}` },
+        400
+      );
+    }
+
+    try {
+      writeBaseConfig(process.env);
+      const gatewayState = supervisor.getState();
+      const signaled = gatewayState === 'running' && supervisor.signal('SIGUSR1');
+      if (!signaled) {
+        console.warn(
+          `[controller] Config restored but gateway is ${gatewayState} — SIGUSR1 not sent`
+        );
+      }
+      return c.json({ ok: true, signaled });
+    } catch (error) {
+      console.error('[controller] /_kilo/config/restore failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return c.json({ error: `Failed to restore config: ${message}` }, 500);
+    }
   });
 
   // Deep-merge a JSON patch into openclaw.json.

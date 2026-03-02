@@ -10,7 +10,7 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews, type CloudAgentCodeReview } from '@/db/schema';
+import { cloud_agent_code_reviews, type CloudAgentCodeReview } from '@kilocode/db/schema';
 import { eq, and, or, count } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';

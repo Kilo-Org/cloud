@@ -24,6 +24,14 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import {
   User,
   Calendar,
   Loader2,
@@ -39,6 +47,7 @@ import {
   Square,
   RotateCcw,
   RefreshCw,
+  Pin,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -83,7 +92,7 @@ function DetailPageWrapper({ children, subtitle }: DetailPageWrapperProps) {
   const breadcrumbs = (
     <>
       <BreadcrumbItem>
-        <BreadcrumbLink href="/admin/kiloclaw-instances">KiloClaw Instances</BreadcrumbLink>
+        <BreadcrumbLink href="/admin/kiloclaw">KiloClaw</BreadcrumbLink>
       </BreadcrumbItem>
       <BreadcrumbSeparator />
       <BreadcrumbItem>
@@ -116,6 +125,170 @@ function DetailField({ label, children }: { label: string; children: React.React
       <div className="text-muted-foreground text-xs">{label}</div>
       <div className="text-sm">{children}</div>
     </div>
+  );
+}
+
+function VersionPinCard({ userId }: { userId: string }) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [selectedTag, setSelectedTag] = useState<string>('');
+  const [reason, setReason] = useState('');
+
+  const { data: pinData, isLoading: pinLoading } = useQuery(
+    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ userId })
+  );
+
+  const { data: versionsData } = useQuery(
+    trpc.admin.kiloclawVersions.listVersions.queryOptions({
+      status: 'available',
+      limit: 100,
+    })
+  );
+
+  const { mutateAsync: setPin, isPending: isPinning } = useMutation(
+    trpc.admin.kiloclawVersions.setPin.mutationOptions({
+      onSuccess: () => {
+        toast.success('Version pin set');
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.getUserPin.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.listPins.queryKey(),
+        });
+        setSelectedTag('');
+        setReason('');
+      },
+      onError: err => {
+        toast.error(`Failed to set pin: ${err.message}`);
+      },
+    })
+  );
+
+  const { mutateAsync: removePin, isPending: isUnpinning } = useMutation(
+    trpc.admin.kiloclawVersions.removePin.mutationOptions({
+      onSuccess: () => {
+        toast.success('Version pin removed');
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.getUserPin.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.listPins.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to remove pin: ${err.message}`);
+      },
+    })
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Pin className="h-5 w-5" />
+          <CardTitle>Version Pin</CardTitle>
+        </div>
+        <CardDescription>Pin this user to a specific KiloClaw image version</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {pinLoading ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-muted-foreground text-sm">Loading pin status...</span>
+          </div>
+        ) : pinData ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <DetailField label="Status">
+                <Badge className="bg-blue-600">
+                  Pinned to {pinData.openclaw_version ?? pinData.image_tag}
+                </Badge>
+              </DetailField>
+              <DetailField label="Image Tag">
+                <code className="text-xs">{pinData.image_tag}</code>
+              </DetailField>
+              <DetailField label="Variant">{pinData.variant ?? 'default'}</DetailField>
+              <DetailField label="Pinned By">
+                {pinData.pinned_by_email ?? pinData.pinned_by}
+              </DetailField>
+              {pinData.reason && <DetailField label="Reason">{pinData.reason}</DetailField>}
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <Select value={selectedTag} onValueChange={setSelectedTag}>
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="Change OpenClaw version..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {versionsData?.items.map(v => (
+                    <SelectItem key={v.image_tag} value={v.image_tag}>
+                      {v.openclaw_version} ({v.variant}) - {v.image_tag.slice(0, 16)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Reason (optional)"
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                className="w-[200px]"
+              />
+              {selectedTag && (
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    void setPin({ userId, imageTag: selectedTag, reason: reason || undefined })
+                  }
+                  disabled={isPinning}
+                >
+                  {isPinning ? 'Updating...' : 'Update Pin'}
+                </Button>
+              )}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => void removePin({ userId })}
+                disabled={isUnpinning}
+              >
+                {isUnpinning ? 'Unpinning...' : 'Unpin'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-sm">Following latest available version</p>
+            <div className="flex items-center gap-2">
+              <Select value={selectedTag} onValueChange={setSelectedTag}>
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="Select OpenClaw version to pin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {versionsData?.items.map(v => (
+                    <SelectItem key={v.image_tag} value={v.image_tag}>
+                      {v.openclaw_version} ({v.variant}) - {v.image_tag.slice(0, 16)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Reason (optional)"
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                className="w-[200px]"
+              />
+              <Button
+                size="sm"
+                onClick={() =>
+                  void setPin({ userId, imageTag: selectedTag, reason: reason || undefined })
+                }
+                disabled={!selectedTag || isPinning}
+              >
+                {isPinning ? 'Pinning...' : 'Pin Version'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -692,6 +865,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             </CardContent>
           </Card>
         )}
+        {/* Version Pin Card */}
+        {data.user_id && <VersionPinCard userId={data.user_id} />}
+
         {/* Destroy Confirmation Dialog */}
         <Dialog open={destroyDialogOpen} onOpenChange={setDestroyDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">

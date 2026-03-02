@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { organizations } from '@/db/schema';
+import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { createOrganization } from '@/lib/organizations/organizations';
 

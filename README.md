@@ -2,60 +2,7 @@
 
 ## Getting Started
 
-0. If you're running on a mac and are looking for (a likely incomplete) set of system software prerequisites, here is [how I set up my macos dev env](dev/macos%20dev-environment%20installation.txt).
-
-Install dependencies and pull Git LFS assets:
-
-```bash
-pnpm install
-git lfs pull
-```
-
-1. Pull environment variables from Vercel
-
-```bash
-pnpm i -g vercel
-vercel login
-vercel link --project kilocode-app
-vercel env pull
-```
-
-2. Run the database:
-
-```bash
-cd dev
-docker compose up -d
-```
-
-3. Set up the database
-
-```bash
-pnpm drizzle migrate
-```
-
-You will need to rerun this every time you pull new migrations.
-
-If you wish to make a new migration, make changes to the schema and run:
-
-```bash
-pnpm drizzle generate
-```
-
-4. Run the development server:
-
-```bash
-pnpm dev
-```
-
-5. When testing Stripe, start Stripe forwarding
-
-Installation via brew as described in [macos dev env](dev/macos%20dev-environment%20installation.txt)
-
-```bash
-pnpm stripe
-```
-
-IMPORTANT: copy the webhook signing secret to .env.development.local, and assign to `STRIPE_WEBHOOK_SECRET`
+See [DEVELOPMENT.md](DEVELOPMENT.md) for a complete local development setup guide (prerequisites, project setup, database, environment variables, and more).
 
 ## Environment Variables
 

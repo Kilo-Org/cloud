@@ -1,7 +1,7 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import { describe, it, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import {
   generateApiToken,
   generateOrganizationApiToken,
@@ -36,6 +36,7 @@ const mockUser: User = {
   completed_welcome_form: false,
   linkedin_url: null,
   github_url: null,
+  openrouter_upstream_safety_identifier: null,
 };
 
 describe('Token Functions', () => {

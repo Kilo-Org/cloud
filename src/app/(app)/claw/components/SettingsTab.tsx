@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, AlertTriangle, Hash, Save, Square, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Hash, RotateCcw, Save, Square, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
@@ -8,7 +8,7 @@ import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useKiloClawConfig } from '@/hooks/useKiloClaw';
+import { useControllerVersion, useKiloClawConfig } from '@/hooks/useKiloClaw';
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,41 @@ import { DetailTile } from './DetailTile';
 
 import { ChannelTokenInput } from './ChannelTokenInput';
 import { CHANNELS, CHANNEL_TYPES, type ChannelDefinition } from './channel-config';
+import { ConfirmActionDialog } from './ConfirmActionDialog';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
+
+/**
+ * Models available via the kilocode gateway's baked-in catalog in openclaw.
+ * Only these models are selectable as the default until openclaw supports
+ * dynamic model discovery from the gateway's /models endpoint.
+ */
+const KILOCODE_CATALOG_IDS = new Set([
+  'anthropic/claude-opus-4.6',
+  'z-ai/glm-5:free',
+  'minimax/minimax-m2.5:free',
+  'anthropic/claude-sonnet-4.5',
+  'openai/gpt-5.2',
+  'google/gemini-3-pro-preview',
+  'google/gemini-3-flash-preview',
+  'x-ai/grok-code-fast-1',
+  'moonshotai/kimi-k2.5',
+]);
+
+/** Returns true if calver `version` is >= `minVersion` (e.g. "2026.2.26"). Fails closed on malformed input. */
+function calverAtLeast(version: string | null | undefined, minVersion: string): boolean {
+  if (!version) return false;
+  const parts = version.split('.').map(Number);
+  const minParts = minVersion.split('.').map(Number);
+  for (let i = 0; i < minParts.length; i++) {
+    const a = parts[i] ?? 0;
+    const b = minParts[i] ?? 0;
+    if (Number.isNaN(a) || Number.isNaN(b)) return false;
+    if (a > b) return true;
+    if (a < b) return false;
+  }
+  return true; // equal
+}
 
 function ChannelSection({
   channel,
@@ -182,9 +215,13 @@ export function SettingsTab({
   const { data: config } = useKiloClawConfig();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
   const [confirmDestroy, setConfirmDestroy] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
 
   const modelOptions = useMemo<ModelOption[]>(
-    () => (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
+    () =>
+      (modelsData?.data || [])
+        .filter(model => KILOCODE_CATALOG_IDS.has(model.id))
+        .map(model => ({ id: model.id, name: model.name })),
     [modelsData]
   );
 
@@ -196,6 +233,8 @@ export function SettingsTab({
   const isSaving = mutations.patchConfig.isPending;
   const isDestroying = status.status === 'destroying';
   const isRunning = status.status === 'running';
+  const { data: controllerVersion } = useControllerVersion(isRunning);
+  const supportsConfigRestore = calverAtLeast(controllerVersion?.version, '2026.2.26');
 
   const channelStatus = config?.channels ?? {
     telegram: false,
@@ -237,12 +276,17 @@ export function SettingsTab({
       <Separator />
 
       <div>
-        <h3 className="text-foreground mb-1 text-sm font-medium">KiloCode Configuration</h3>
-        <p className="text-muted-foreground mb-4 text-xs">
-          API key is platform-managed and refreshed during save.
-        </p>
+        <h2 className="text-foreground mb-4 text-lg font-semibold">KiloCode Configuration</h2>
 
         <div className="space-y-4">
+          <div>
+            <h3 className="text-foreground mb-1 text-sm font-medium">Default Model</h3>
+            <p className="text-muted-foreground mb-2 text-xs">
+              The model used for new conversations. Can be changed per-conversation in the OpenClaw
+              Control UI.
+            </p>
+          </div>
+
           <ModelCombobox
             label=""
             models={modelOptions}
@@ -255,7 +299,7 @@ export function SettingsTab({
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={handleSave} disabled={isSaving}>
               <Save className="h-4 w-4" />
-              {isSaving ? 'Saving...' : 'Save & Provision'}
+              {isSaving ? 'Saving...' : 'Save'}
             </Button>
           </div>
 
@@ -304,6 +348,35 @@ export function SettingsTab({
               Stop or destroy this instance. Destroy permanently removes associated data.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        !supportsConfigRestore ||
+                        !isRunning ||
+                        mutations.restoreConfig.isPending ||
+                        isDestroying
+                      }
+                      onClick={() => {
+                        posthog?.capture('claw_restore_config_clicked', {
+                          instance_status: status.status,
+                        });
+                        setConfirmRestore(true);
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Restore Default Config
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!supportsConfigRestore && (
+                  <TooltipContent>Unavailable until redeploy</TooltipContent>
+                )}
+              </Tooltip>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -374,6 +447,37 @@ export function SettingsTab({
           </div>
         </div>
       </div>
+
+      {supportsConfigRestore && (
+        <ConfirmActionDialog
+          open={confirmRestore}
+          onOpenChange={setConfirmRestore}
+          title="Restore Default Config"
+          description="This will rewrite openclaw.json to defaults based on the machine's current environment variables and restart the gateway process. Any manual config changes made via the Control UI will be lost. This does not pull fresh settings from your dashboard — use Redeploy for that."
+          confirmLabel="Restore & Restart"
+          confirmIcon={<RotateCcw className="mr-1 h-4 w-4" />}
+          isPending={mutations.restoreConfig.isPending}
+          pendingLabel="Restoring..."
+          onConfirm={() => {
+            posthog?.capture('claw_restore_config_confirmed', {
+              instance_status: status.status,
+            });
+            mutations.restoreConfig.mutate(undefined, {
+              onSuccess: data => {
+                if (data.signaled) {
+                  toast.success('Config restored and gateway restarting');
+                } else {
+                  toast.success(
+                    'Config restored, but the gateway was not running — restart the instance to apply'
+                  );
+                }
+                setConfirmRestore(false);
+              },
+              onError: err => toast.error(`Failed to restore config: ${err.message}`),
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

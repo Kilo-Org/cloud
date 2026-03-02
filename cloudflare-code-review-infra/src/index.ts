@@ -19,10 +19,13 @@
  */
 
 import { Hono, type Context } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import { bearerAuth } from 'hono/bearer-auth';
 import type { Env, CodeReviewRequest, CodeReviewResponse } from './types';
-import { withDORetry } from './utils/do-retry';
+import {
+  withDORetry,
+  backendAuthMiddleware,
+  createErrorHandler,
+  createNotFoundHandler,
+} from '@kilocode/worker-utils';
 
 // Import base Durable Object
 import { CodeReviewOrchestrator as CodeReviewOrchestratorBase } from './code-review-orchestrator';
@@ -35,26 +38,10 @@ type HonoEnv = { Bindings: Env };
 const app = new Hono<HonoEnv>();
 
 // Authentication middleware
-app.use('*', async (c: Context<HonoEnv>, next): Promise<Response> => {
-  const authToken = c.env.BACKEND_AUTH_TOKEN;
-
-  // Fail if auth token is not configured
-  if (!authToken || authToken.trim() === '') {
-    return c.json({ error: 'Unauthorized' }, 401) as Response;
-  }
-
-  // Use Hono's bearer auth middleware with error handling
-  const authMiddleware = bearerAuth({ token: authToken });
-  try {
-    return (await authMiddleware(c, next)) as Response;
-  } catch (error) {
-    // Handle HTTPException from bearer auth
-    if (error instanceof HTTPException) {
-      return c.json({ error: 'Unauthorized' }, 401) as Response;
-    }
-    throw error;
-  }
-});
+app.use(
+  '*',
+  backendAuthMiddleware<HonoEnv>(c => c.env.BACKEND_AUTH_TOKEN)
+);
 
 // Route: POST /review
 app.post('/review', async (c: Context<HonoEnv>) => {
@@ -197,20 +184,9 @@ app.get('/health', (c: Context<HonoEnv>) => {
 });
 
 // Global error handler
-app.onError((err: Error, c: Context<HonoEnv>) => {
-  console.error('[Worker] Error:', err);
-  return c.json(
-    {
-      error: 'Internal server error',
-      message: err.message || 'Unknown error',
-    },
-    500
-  );
-});
+app.onError(createErrorHandler());
 
 // 404 handler
-app.notFound((c: Context<HonoEnv>) => {
-  return c.json({ error: 'Not found' }, 404);
-});
+app.notFound(createNotFoundHandler());
 
 export default app;

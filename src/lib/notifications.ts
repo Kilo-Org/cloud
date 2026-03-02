@@ -1,4 +1,4 @@
-import { type User } from '@/db/schema';
+import { type User } from '@kilocode/db/schema';
 import { getBalanceForUser } from './user.balance';
 import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@/lib/constants';
 import {
@@ -33,13 +33,14 @@ export type KiloNotification = {
 const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
-  {
-    id: 'feb-25-glm5-free-ended',
-    title: 'GLM-5 Free Period Ended',
-    message:
-      'The free period for GLM-5 has ended. Try another free model like MiniMax M2.5 or Trinity Large Preview!',
-    showIn: ['extension', 'cli'],
-  },
+  // Disabled: GLM-5 free period has long ended; no need to keep notifying users.
+  // {
+  //   id: 'feb-25-glm5-free-ended',
+  //   title: 'GLM-5 Free Period Ended',
+  //   message:
+  //     'The free period for GLM-5 has ended. Try another free model like MiniMax M2.5 or Trinity Large Preview!',
+  //   showIn: ['extension', 'cli'],
+  // },
   {
     id: 'kilo-cli-jan-5',
     title: 'Kilo CLI',
@@ -48,6 +49,7 @@ const normalUnconditionalNotifications: KiloNotification[] = [
       actionText: 'Learn more',
       actionURL: 'https://kilo.ai/docs/cli',
     },
+    showIn: ['extension'],
   },
   {
     id: 'kilo-cloud-agents-jan-15',

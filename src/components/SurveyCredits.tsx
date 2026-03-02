@@ -2,7 +2,7 @@ import type { CustomerInfo } from '@/lib/customerInfo';
 import PostHogClient from '@/lib/posthog';
 import { has_used1usd_andHoldOrPayment } from '@/lib/promoCustomerRequirement';
 import { db } from '@/lib/drizzle';
-import { credit_transactions } from '@/db/schema';
+import { credit_transactions } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 
 const SURVEY_PROMOTIONAL_KEY = 'in-app-5usd';

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import type { PlatformIntegration } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import { logExceptInTest } from '@/lib/utils.server';
 import { WebhookIssuePayloadSchema } from '@/lib/auto-triage/core/schemas';
 import { IssueLabeledPayloadSchema } from '@/lib/auto-fix/core/schemas';

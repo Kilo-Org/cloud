@@ -93,6 +93,21 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
               <h4 className="text-muted-foreground text-sm font-medium">Created At</h4>
               <p>{formatDate(user.created_at)}</p>
             </div>
+            <div>
+              <h4 className="text-muted-foreground text-sm font-medium">
+                OpenRouter Upstream Safety Identifier
+              </h4>
+              {user.openrouter_upstream_safety_identifier ? (
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-sm break-all">
+                    {user.openrouter_upstream_safety_identifier}
+                  </p>
+                  <CopyTextButton text={user.openrouter_upstream_safety_identifier} />
+                </div>
+              ) : (
+                <p className="text-muted-foreground">N/A</p>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>

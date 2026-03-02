@@ -1,4 +1,4 @@
-import { cliSessions, cli_sessions_v2, organization_memberships } from '@/db/schema';
+import { cliSessions, cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
 import type { db } from '@/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
 

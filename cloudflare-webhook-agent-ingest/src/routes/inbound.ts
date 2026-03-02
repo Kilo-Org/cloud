@@ -3,7 +3,7 @@ import type { HonoContext } from '../index';
 import type { TriggerDO } from '../dos/TriggerDO';
 import { MAX_PAYLOAD_SIZE } from '../util/constants';
 import { logger } from '../util/logger';
-import { resError, resSuccess } from '../util/res';
+import { resError, resSuccess } from '@kilocode/worker-utils';
 import { withDORetry } from '../util/do-retry';
 import { compareWebhookSecret, type StoredWebhookAuth } from '../util/webhook-auth';
 import { decodeUserIdFromPath } from '../util/user-id-encoding';

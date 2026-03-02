@@ -9,7 +9,7 @@ import {
   kilo_pass_issuances,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { KiloPassAuditLogAction } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';
 import { KiloPassIssuanceSource } from './enums';
@@ -172,9 +172,8 @@ beforeEach(async () => {
 
 describe('handleKiloPassInvoicePaid', () => {
   test('returns early when invoice does not look like Kilo Pass (no DB side effects)', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const retrieve = jest.fn();
     const stripe = {
@@ -205,9 +204,8 @@ describe('handleKiloPassInvoicePaid', () => {
   });
 
   test('throws when Kilo Pass invoice has no subscription reference', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const priceId = await getKiloPassPriceId({
       tier: KiloPassTier.Tier19,
@@ -241,9 +239,8 @@ describe('handleKiloPassInvoicePaid', () => {
   });
 
   test('monthly: first invoice creates subscription, issuance, base credits; sets streak=1', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({
       total_microdollars_acquired: 0,
@@ -365,9 +362,8 @@ describe('handleKiloPassInvoicePaid', () => {
   });
 
   test('monthly: retry of first invoice is idempotent (does not double-issue base credits)', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const stripeSubId = `sub_${Math.random()}`;
@@ -428,9 +424,8 @@ describe('handleKiloPassInvoicePaid', () => {
   });
 
   test('monthly: streak counts consecutive months (no bonus is issued on invoice.paid)', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const stripeSubId = `sub_${Math.random()}`;
@@ -518,9 +513,8 @@ describe('handleKiloPassInvoicePaid', () => {
   });
 
   test('yearly: first invoice issues base credits (bonus is issued later on usage); retry is idempotent', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({
       total_microdollars_acquired: 0,
@@ -629,9 +623,8 @@ describe('handleKiloPassInvoicePaid', () => {
   });
 
   test('yearly: yearly→yearly tier upgrade issues remaining base credits within the current yearly cycle and releases the schedule', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
 
@@ -746,9 +739,8 @@ describe('handleKiloPassInvoicePaid', () => {
   });
 
   test('monthly: tier_49→tier_199 upgrade issues tier_199 base credits and deletes the scheduled change when the new invoice is paid', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
 
@@ -856,9 +848,8 @@ describe('handleKiloPassInvoicePaid', () => {
   });
 
   test('out-of-order invoice.paid does not resurrect a canceled subscription (regression)', async () => {
-    const { handleKiloPassInvoicePaid } = await import(
-      '@/lib/kilo-pass/stripe-handlers-invoice-paid'
-    );
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const stripeSubId = `sub_${Math.random()}`;

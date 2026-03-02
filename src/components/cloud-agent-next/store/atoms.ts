@@ -9,6 +9,7 @@ import { atom } from 'jotai';
 import type { SessionConfig, StoredMessage, Part } from '../types';
 import { isMessageStreaming, isAssistantMessage } from '../types';
 import type { QuestionInfo } from '@/types/opencode.gen';
+import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
 
 // ============================================================================
 // Primary State - StoredMessage format
@@ -124,24 +125,18 @@ export const messagesListAtom = atom(get => {
 });
 
 /**
- * Static messages - all complete messages that can be memoized.
+ * Split messages into static (complete, contiguous from the start) and dynamic (everything after).
  * A message is complete when its info.time.completed is set (for assistant messages)
  * and all parts have their time.end set.
  */
-export const staticMessagesAtom = atom(get => {
+const splitMessagesAtom = atom(get => {
   const messages = get(messagesListAtom);
-  const { staticMessages } = splitMessages(messages);
-  return staticMessages;
+  return splitByContiguousPrefix(messages, msg => !isMessageStreaming(msg));
 });
 
-/**
- * Dynamic messages - messages that are still streaming.
- */
-export const dynamicMessagesAtom = atom(get => {
-  const messages = get(messagesListAtom);
-  const { dynamicMessages } = splitMessages(messages);
-  return dynamicMessages;
-});
+export const staticMessagesAtom = atom(get => get(splitMessagesAtom).staticItems);
+
+export const dynamicMessagesAtom = atom(get => get(splitMessagesAtom).dynamicItems);
 
 // Matches CLI's getApiMetrics logic
 export const totalCostAtom = atom(get => {
@@ -462,28 +457,3 @@ export const getChildSessionMessagesAtom = atom(get => {
     return childSessionsMap.get(childSessionId) || [];
   };
 });
-
-// Splits messages into static (complete) and dynamic (streaming) groups
-function splitMessages(messages: StoredMessage[]): {
-  staticMessages: StoredMessage[];
-  dynamicMessages: StoredMessage[];
-} {
-  let lastCompleteIndex = -1;
-
-  for (let i = 0; i < messages.length; i++) {
-    if (!isMessageStreaming(messages[i])) {
-      if (i === 0 || i === lastCompleteIndex + 1) {
-        lastCompleteIndex = i;
-      } else {
-        break;
-      }
-    } else {
-      break;
-    }
-  }
-
-  return {
-    staticMessages: messages.slice(0, lastCompleteIndex + 1),
-    dynamicMessages: messages.slice(lastCompleteIndex + 1),
-  };
-}

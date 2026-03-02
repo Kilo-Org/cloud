@@ -5,8 +5,8 @@ import {
   kilo_pass_issuances,
   kilo_pass_subscriptions,
   kilocode_users,
-} from '@/db/schema';
-import type { User } from '@/db/schema';
+} from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { KiloPassAuditLogResult } from './enums';
 import { KiloPassAuditLogAction } from './enums';
 import { KiloPassCadence } from './enums';

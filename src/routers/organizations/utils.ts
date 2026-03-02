@@ -1,5 +1,5 @@
-import type { Organization } from '@/db/schema';
-import { organization_memberships, organizations } from '@/db/schema';
+import type { Organization } from '@kilocode/db/schema';
+import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { baseProcedure } from '@/lib/trpc/init';

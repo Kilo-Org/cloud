@@ -1,7 +1,7 @@
 import 'server-only';
 import type { Owner } from '@/lib/integrations/core/types';
 import { db } from '@/lib/drizzle';
-import { app_builder_projects } from '@/db/schema';
+import { app_builder_projects } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
 import { eq, and } from 'drizzle-orm';
 import type { AppBuilderProject } from '@/lib/app-builder/types';

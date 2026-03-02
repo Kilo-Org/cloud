@@ -4,8 +4,8 @@ import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { CRON_SECRET } from '@/lib/config.server';
-import { organizations, organization_memberships, kilocode_users } from '@/db/schema';
-import type { Organization, User } from '@/db/schema';
+import { organizations, organization_memberships, kilocode_users } from '@kilocode/db/schema';
+import type { Organization, User } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@/lib/organizations/organization-base-types';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
 

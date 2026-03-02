@@ -5,7 +5,7 @@ import {
   redeemSelfServicePromoCode,
 } from '../lib/promotionalCredits';
 import type { PromoCreditCategoryConfig } from '../lib/PromoCreditCategoryConfig';
-import { type User, credit_transactions, kilocode_users } from '../db/schema';
+import { type User, credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { defineTestUser, insertTestUser } from './helpers/user.helper';
 import { db } from '../lib/drizzle';
 import { eq, desc } from 'drizzle-orm';

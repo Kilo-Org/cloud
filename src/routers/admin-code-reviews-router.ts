@@ -6,7 +6,7 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
   organizations,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import * as z from 'zod';
 import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, type SQL } from 'drizzle-orm';
 import {

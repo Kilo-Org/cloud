@@ -1,14 +1,8 @@
 import * as z from 'zod';
-
-/**
- * Zod schema for provider
- */
-export const providerSchema = z.enum(['github', 'git', 'app-builder']);
-
-/**
- * Provider type inferred from schema
- */
-export type Provider = z.infer<typeof providerSchema>;
+import { buildStatusSchema } from '@kilocode/db/schema-types';
+import type { BuildStatus } from '@kilocode/db/schema-types';
+export { providerSchema, buildStatusSchema } from '@kilocode/db/schema-types';
+export type { Provider, BuildStatus } from '@kilocode/db/schema-types';
 
 // Source configuration types for deployments
 export type GitSource = {
@@ -29,23 +23,6 @@ export type GitHubSource = {
 };
 
 export type DeploymentSource = GitSource | AppBuilderSource | GitHubSource;
-
-/**
- * Zod schema for build status
- */
-export const buildStatusSchema = z.enum([
-  'queued',
-  'building',
-  'deploying',
-  'deployed',
-  'failed',
-  'cancelled',
-]);
-
-/**
- * Build status type inferred from schema
- */
-export type BuildStatus = z.infer<typeof buildStatusSchema>;
 
 /**
  * Zod schema for log event payload

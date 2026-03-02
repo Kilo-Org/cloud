@@ -5,7 +5,7 @@ import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import type { AddCreditRequest } from '@/types/admin';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 
 export async function POST(
   request: NextRequest

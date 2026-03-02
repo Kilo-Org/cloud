@@ -46,6 +46,7 @@ export type SendPromptOptions = {
   system?: string;
   /** Enable/disable specific tools */
   tools?: Record<string, boolean>;
+  variant?: string;
 };
 
 /**
@@ -173,6 +174,7 @@ export function createKiloClient(baseUrl: string): KiloClient {
         noReply: opts.noReply,
         system: opts.system,
         tools: opts.tools,
+        variant: opts.variant,
       });
     },
 

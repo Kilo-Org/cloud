@@ -56,7 +56,7 @@ describe('balance-validation', () => {
   describe('validateAuthAndBalance', () => {
     describe('authentication failures', () => {
       it('returns 401 when JWT is invalid', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: false,
           error: 'Invalid token',
         });
@@ -72,7 +72,7 @@ describe('balance-validation', () => {
       });
 
       it('returns 401 when no auth header provided', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: false,
           error: 'No authorization header',
         });
@@ -87,7 +87,7 @@ describe('balance-validation', () => {
       });
 
       it('returns 401 when balance API returns 401', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -109,7 +109,7 @@ describe('balance-validation', () => {
 
     describe('balance validation', () => {
       it('returns 402 when balance is depleted', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -129,7 +129,7 @@ describe('balance-validation', () => {
       });
 
       it('returns 402 when balance is below $1', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -149,7 +149,7 @@ describe('balance-validation', () => {
       });
 
       it('returns 402 when balance is zero', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -169,7 +169,7 @@ describe('balance-validation', () => {
       });
 
       it('returns 402 when balance is negative', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -191,7 +191,7 @@ describe('balance-validation', () => {
 
     describe('error handling', () => {
       it('returns 500 when balance API returns non-401 error', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -211,7 +211,7 @@ describe('balance-validation', () => {
       });
 
       it('returns 500 when fetch throws', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -228,7 +228,7 @@ describe('balance-validation', () => {
       });
 
       it('returns 500 when response JSON is invalid', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -251,7 +251,7 @@ describe('balance-validation', () => {
       });
 
       it('returns 500 when balance is not a number', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -273,7 +273,7 @@ describe('balance-validation', () => {
 
     describe('successful validation', () => {
       it('returns success when balance is sufficient', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -294,7 +294,7 @@ describe('balance-validation', () => {
       });
 
       it('returns success with exactly $1 balance', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -315,7 +315,7 @@ describe('balance-validation', () => {
       });
 
       it('returns success with botId when present', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -337,7 +337,7 @@ describe('balance-validation', () => {
       });
 
       it('uses default API URL when KILOCODE_BACKEND_BASE_URL not configured', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -373,7 +373,7 @@ describe('balance-validation', () => {
 
     describe('organization header', () => {
       it('includes X-KiloCode-OrganizationId header when orgId provided', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -390,18 +390,18 @@ describe('balance-validation', () => {
           `${mockEnv.KILOCODE_BACKEND_BASE_URL}/api/profile/balance`,
           expect.objectContaining({
             method: 'GET',
-            headers: expect.any(Headers),
+            headers: expect.any(Headers) as unknown,
           })
         );
 
-        const [, init] = fetchMock.mock.calls[0];
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
         const headers = init.headers as Headers;
         expect(headers.get('Authorization')).toBe('Bearer valid-token');
         expect(headers.get('X-KiloCode-OrganizationId')).toBe(orgId);
       });
 
       it('does not include X-KiloCode-OrganizationId header when orgId not provided', async () => {
-        vi.mocked(validateKiloToken).mockReturnValue({
+        vi.mocked(validateKiloToken).mockResolvedValue({
           success: true,
           userId: 'user-123',
           token: 'valid-token',
@@ -413,7 +413,7 @@ describe('balance-validation', () => {
 
         await validateAuthAndBalance('Bearer valid-token', undefined, mockEnv);
 
-        const [, init] = fetchMock.mock.calls[0];
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
         const headers = init.headers as Headers;
         expect(headers.get('Authorization')).toBe('Bearer valid-token');
         expect(headers.get('X-KiloCode-OrganizationId')).toBeNull();

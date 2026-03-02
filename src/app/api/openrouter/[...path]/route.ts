@@ -55,55 +55,19 @@ import {
   getToolsUsed,
 } from '@/lib/o11y/api-metrics.server';
 import { handleRequestLogging } from '@/lib/handleRequestLogging';
-import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/providers/anthropic';
 import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
 import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
 import { isActiveCloudAgentPromo } from '@/lib/promotions/cloud-agent-promo';
-import {
-  isKiloAutoModel,
-  KILO_AUTO_FREE_MODEL,
-  KILO_AUTO_SMALL_MODEL,
-} from '@/lib/kilo-auto-model';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
+import { isKiloAutoModel, resolveAutoModel } from '@/lib/kilo-auto-model';
+
+export const maxDuration = 800;
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
-
-// Mode → model mappings for kilo/auto routing.
-// Add/remove/modify entries here to change routing behavior.
-const MODE_TO_MODEL = new Map<string, string>([
-  // Opus modes (planning, reasoning, orchestration, debugging)
-  ['plan', CLAUDE_OPUS_CURRENT_MODEL_ID],
-  ['general', CLAUDE_OPUS_CURRENT_MODEL_ID],
-  ['architect', CLAUDE_OPUS_CURRENT_MODEL_ID],
-  ['orchestrator', CLAUDE_OPUS_CURRENT_MODEL_ID],
-  ['ask', CLAUDE_OPUS_CURRENT_MODEL_ID],
-  ['debug', CLAUDE_OPUS_CURRENT_MODEL_ID],
-  // Sonnet modes (implementation, exploration)
-  ['build', CLAUDE_SONNET_CURRENT_MODEL_ID],
-  ['explore', CLAUDE_SONNET_CURRENT_MODEL_ID],
-  ['code', CLAUDE_SONNET_CURRENT_MODEL_ID],
-]);
-
-const DEFAULT_AUTO_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
-
-function resolveAutoModel(model: string, modeHeader: string | null) {
-  if (model === KILO_AUTO_FREE_MODEL.id) {
-    return minimax_m25_free_model.public_id;
-  }
-  if (model === KILO_AUTO_SMALL_MODEL.id) {
-    return 'openai/gpt-5-nano';
-  }
-  const mode = modeHeader?.trim().toLowerCase() ?? 'code';
-  return MODE_TO_MODEL.get(mode) ?? DEFAULT_AUTO_MODEL;
-}
 
 function validatePath(url: URL) {
   const path =
@@ -153,9 +117,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // "kilo/auto" is a quasi-model id that resolves to a real model based on x-kilocode-mode.
   // After this resolution, the rest of the proxy flow behaves as if the client requested
   // the resolved model directly.
+  const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
+  let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
-    const modeHeader = request.headers.get('x-kilocode-mode');
-    requestBodyParsed.model = resolveAutoModel(requestedModelLowerCased, modeHeader);
+    autoModel = requestedModelLowerCased;
+    Object.assign(requestBodyParsed, resolveAutoModel(requestedModelLowerCased, modeHeader));
   }
 
   const originalModelIdLowerCased = requestBodyParsed.model.toLowerCase();
@@ -325,6 +291,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     tokenSource,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
     session_id: taskId ?? null,
+    mode: modeHeader,
+    auto_model: autoModel,
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);
@@ -426,7 +394,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isAnonymous: isAnonymousContext(user),
       isStreaming: requestBodyParsed.stream === true,
       userByok: !!userByok,
-      mode: request.headers.get('x-kilocode-mode')?.trim() || undefined,
+      mode: modeHeader || undefined,
       provider: provider.id,
       requestedModel: requestedModelLowerCased,
       resolvedModel: normalizeModelId(originalModelIdLowerCased),

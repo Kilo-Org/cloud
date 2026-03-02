@@ -23,7 +23,8 @@ import { SeverityBadge } from './SeverityBadge';
 import { FindingDetailDialog } from './FindingDetailDialog';
 import { DismissFindingDialog, type DismissReason } from './DismissFindingDialog';
 import { cn } from '@/lib/utils';
-import type { SecurityFinding } from '@/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
+import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 
 type AnalysisJobsCardProps = {
   organizationId?: string;
@@ -73,17 +74,6 @@ function formatCompactTimeAgo(date: Date) {
   if (hours >= 1) return `${hours}h ago`;
   const minutes = Math.abs(differenceInMinutes(now, date));
   return `${minutes}m ago`;
-}
-
-function isGitHubIntegrationError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes('GitHub token') ||
-    message.includes('GitHub installation') ||
-    message.includes('installation_id') ||
-    message.includes('Bad credentials') ||
-    message.includes('Not Found')
-  );
 }
 
 // ─── Row sub-components ──────────────────────────────────────────────────────

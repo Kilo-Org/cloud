@@ -82,7 +82,7 @@ describe('stream handler replayEvents', () => {
 
     expect(ws.sentMessages).toHaveLength(3);
     for (let i = 0; i < 3; i++) {
-      const parsed = JSON.parse(ws.sentMessages[i]);
+      const parsed = JSON.parse(ws.sentMessages[i]) as Record<string, unknown>;
       expect(parsed.eventId).toBe(i + 1);
     }
   });
@@ -148,7 +148,7 @@ describe('stream handler replayEvents', () => {
     await handler.replayEvents(ws, filters);
 
     expect(ws.sentMessages).toHaveLength(1);
-    const parsed = JSON.parse(ws.sentMessages[0]);
+    const parsed = JSON.parse(ws.sentMessages[0]) as Record<string, unknown>;
     expect(parsed.eventId).toBe(1);
   });
 
@@ -165,7 +165,7 @@ describe('stream handler replayEvents', () => {
     await handler.replayEvents(ws, filters);
 
     expect(ws.sentMessages).toHaveLength(1);
-    const parsed = JSON.parse(ws.sentMessages[0]);
+    const parsed = JSON.parse(ws.sentMessages[0]) as Record<string, unknown>;
     expect(parsed.type).toBe('error');
     expect(parsed.code).toBe('WS_INTERNAL_ERROR');
   });

@@ -3,9 +3,9 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { insertUsageWithOverrides } from '@/tests/helpers/microdollar-usage.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { db, pool } from '@/lib/drizzle';
-import { microdollar_usage } from '@/db/schema';
+import { microdollar_usage } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 
 // Test users and organization will be created dynamically
 let regularUser: User;

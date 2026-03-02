@@ -8,9 +8,9 @@ import {
   agent_environment_profiles,
   agent_environment_profile_vars,
   agent_environment_profile_commands,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 
 describe('Agent Profiles Router', () => {
   let ownerUser: User;

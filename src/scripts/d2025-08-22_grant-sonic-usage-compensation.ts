@@ -1,4 +1,4 @@
-import { microdollar_usage, kilocode_users } from '@/db/schema';
+import { microdollar_usage, kilocode_users } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, sql } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';

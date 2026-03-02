@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { db } from './drizzle';
-import type { MicrodollarUsage, Organization } from '@/db/schema';
-import { microdollar_usage } from '@/db/schema';
+import type { MicrodollarUsage, Organization } from '@kilocode/db/schema';
+import { microdollar_usage } from '@kilocode/db/schema';
 import type { FeatureValue } from '@/lib/feature-detection';
 import { createTimer } from '@/lib/timer';
 import type { OpenAI } from 'openai';
@@ -139,6 +139,8 @@ type NotYetCostedUsageStats = {
 type JustTheCostsUsageStats = {
   cost_mUsd: number;
   cacheDiscount_mUsd?: number;
+  /** The real cost before any free/BYOK/promo zeroing. Set by processTokenData. */
+  market_cost?: number;
   inputTokens: number;
   outputTokens: number;
   cacheWriteTokens: number;
@@ -184,6 +186,10 @@ export type MicrodollarUsageContext = {
   feature: FeatureValue | null;
   /** Client session/task identifier from X-KiloCode-TaskId header. */
   session_id: string | null;
+  /** Client mode from x-kilocode-mode header (e.g. 'code', 'build', 'architect'). */
+  mode: string | null;
+  /** The kilo/auto model ID when one was requested (e.g. 'kilo/auto', 'kilo/auto-free'). */
+  auto_model: string | null;
 };
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
@@ -205,6 +211,8 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     has_tools: usageContext.has_tools,
     feature: usageContext.feature,
     session_id: usageContext.session_id,
+    mode: usageContext.mode,
+    auto_model: usageContext.auto_model,
   };
 }
 
@@ -256,6 +264,7 @@ export function toInsertableDbUsageRecord(
     is_byok: usageStats.is_byok,
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
+    market_cost: usageStats.market_cost ?? null,
   };
 
   // Legacy heuristic classification removed - abuse_classification is now handled
@@ -439,6 +448,9 @@ export type UsageMetaData = {
   machine_id: string | null;
   feature: string | null;
   session_id: string | null;
+  mode: string | null;
+  auto_model: string | null;
+  market_cost: number | null;
 };
 
 export async function insertUsageRecord(
@@ -525,6 +537,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
           , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
           , ${createUpsertCTE(sql`feature`, metadataFields.feature)}
+          , ${createUpsertCTE(sql`mode`, metadataFields.mode)}
+          , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -548,6 +562,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               has_tools,
               machine_id,
               session_id,
+              market_cost,
 
               http_user_agent_id,
               http_ip_id,
@@ -557,7 +572,9 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               system_prompt_prefix_id,
               finish_reason_id,
               editor_name_id,
-              feature_id
+              feature_id,
+              mode_id,
+              auto_model_id
             )
             SELECT
               ${metadataFields.id},
@@ -581,6 +598,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.has_tools},
               ${metadataFields.machine_id},
               ${metadataFields.session_id},
+              ${metadataFields.market_cost},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),
@@ -590,7 +608,9 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
               (SELECT finish_reason_id FROM finish_reason_cte),
               (SELECT editor_name_id FROM editor_name_cte),
-              (SELECT feature_id FROM feature_cte)
+              (SELECT feature_id FROM feature_cte),
+              (SELECT mode_id FROM mode_cte),
+              (SELECT auto_model_id FROM auto_model_cte)
           )
           UPDATE kilocode_users
           SET microdollars_used = microdollars_used + ${coreUsageFields.cost}
@@ -947,6 +967,9 @@ async function processTokenData(
   reportAbuseCost(usageContext, usageStats).catch(error => {
     console.error('[Abuse] Failed to report cost:', error);
   });
+
+  // Preserve the real cost before zeroing for free/BYOK/promo
+  usageStats.market_cost = usageStats.cost_mUsd;
 
   if (
     isFreeModel(usageContext.requested_model) ||

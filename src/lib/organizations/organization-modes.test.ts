@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { db } from '@/lib/drizzle';
-import { organizations } from '@/db/schema';
+import { organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from './organizations';
 import { createOrganizationMode, getAllOrganizationModes } from './organization-modes';

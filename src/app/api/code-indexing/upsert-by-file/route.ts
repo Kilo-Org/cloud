@@ -8,9 +8,8 @@ import { streamChunks, type ChunkMetadata } from '@/lib/managed-index-chunking';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
 import type { ChunkWithMetadata } from '@/lib/code-indexing/types';
 import { db } from '@/lib/drizzle';
-import { code_indexing_manifest } from '@/db/schema';
+import { code_indexing_manifest } from '@kilocode/db/schema';
 import { getCodeIndexOrganizationId } from '@/routers/code-indexing/code-indexing-router';
-import { MANAGED_INDEXING_ENABLED } from '@/lib/config.server';
 import { trackCodeIndexingUpsert } from '@/lib/code-indexing/posthog-tracking';
 import { createFlexibleAIAttributionTracker } from '@/lib/ai-attribution-service';
 
@@ -62,12 +61,6 @@ export async function PUT(
   request: NextRequest
 ): Promise<NextResponse<ErrorResponse | SuccessResponse>> {
   try {
-    if (!MANAGED_INDEXING_ENABLED) {
-      return NextResponse.json({
-        success: true,
-        chunksProcessed: 0,
-      });
-    }
     // Create tRPC context for authentication
     const ctx = await createTRPCContext();
 

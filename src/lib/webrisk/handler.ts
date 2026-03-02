@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { deployments, deployment_threat_detections } from '@/db/schema';
+import { deployments, deployment_threat_detections } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { APP_URL } from '@/lib/constants';
 import { SLACK_DEPLOY_THREAT_WEBHOOK_URL } from '@/lib/config.server';

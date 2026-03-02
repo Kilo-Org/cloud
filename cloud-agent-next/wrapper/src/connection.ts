@@ -11,8 +11,10 @@
 
 import type { WrapperState } from './state.js';
 import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
+import { trimPayload } from '../../src/shared/trim-payload.js';
 import { createSSEConsumer, isTerminalErrorEvent, type SSEConsumer } from './sse-consumer.js';
 import { logToFile } from './utils.js';
+import type { KiloClient } from './kilo-client.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -38,6 +40,7 @@ export function isSessionIdleEvent(
 
 export type ConnectionConfig = {
   kiloServerPort: number;
+  kiloClient: KiloClient;
 };
 
 export type ConnectionCallbacks = {
@@ -217,16 +220,39 @@ export function createConnectionManager(
         state.recordSseEvent();
       },
       onEvent: (event: IngestEvent) => {
-        // Forward to ingest (heartbeats already filtered out)
-        sendToIngest(event);
+        // Trim large payloads before forwarding to reduce DO storage pressure
+        const trimmed: IngestEvent = {
+          ...event,
+          data: trimPayload(event.streamEventType, event.data),
+        };
+        sendToIngest(trimmed);
 
         // Check for terminal errors
         if (event.streamEventType === 'kilocode') {
           const data = event.data as Record<string, unknown>;
-          const terminal = isTerminalErrorEvent({ event: String(data.event ?? ''), data });
+          const eventName = typeof data.event === 'string' ? data.event : '';
+          const terminal = isTerminalErrorEvent({ event: eventName, data });
           if (terminal.isTerminal) {
             callbacks.onTerminalError(terminal.reason ?? 'terminal error');
             return;
+          }
+
+          // Auto-reject permission requests — Cloud Agent has no UI to answer them,
+          // so unanswered permissions would block the session indefinitely.
+          if (data.event === 'permission.asked') {
+            const props = data.properties;
+            if (isRecord(props) && typeof props.id === 'string') {
+              const permission =
+                typeof props.permission === 'string' ? props.permission : 'unknown';
+              logToFile(`auto-rejecting permission: id=${props.id} permission=${permission}`);
+              config.kiloClient
+                .answerPermission(props.id, 'reject')
+                .catch((err: unknown) =>
+                  logToFile(
+                    `failed to auto-reject permission ${String(props.id)}: ${err instanceof Error ? err.message : String(err)}`
+                  )
+                );
+            }
           }
 
           // session.idle is the primary completion signal - it means the assistant finished

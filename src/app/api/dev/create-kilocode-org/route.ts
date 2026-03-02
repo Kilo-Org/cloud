@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { db } from '@/lib/drizzle';
-import { organizations, organization_memberships } from '@/db/schema';
+import { organizations, organization_memberships } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { DEV_ORG_ID, DEV_ORG_NAME, hosted_domain_specials } from '@/lib/auth/constants';
 import { WORKOS_API_KEY } from '@/lib/config.server';

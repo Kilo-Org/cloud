@@ -5,7 +5,7 @@ import type {
   Organization,
   OrganizationMembership,
   AutoTopUpConfig,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import type { describePaymentMethods } from '@/lib/admin-utils-serverside';
 import { OrganizationSchema } from '@/lib/organizations/organization-types';
 import { type BalanceForUser } from '@/lib/user.balance';

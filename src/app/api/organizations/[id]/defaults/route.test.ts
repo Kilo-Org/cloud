@@ -6,7 +6,7 @@ import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
-import { kilocode_users, organization_memberships, organizations } from '@/db/schema';
+import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 
 jest.mock('@/lib/organizations/organization-auth');

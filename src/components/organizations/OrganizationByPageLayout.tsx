@@ -2,7 +2,7 @@
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { signInUrlWithCallbackPath } from '@/lib/user.server';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
-import type { Organization } from '@/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
 import type { JSX } from 'react';
 import { OrganizationTrialWrapper } from './OrganizationTrialWrapper';

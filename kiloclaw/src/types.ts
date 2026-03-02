@@ -7,7 +7,7 @@ import type { KiloClawApp } from './durable-objects/kiloclaw-app';
 export type KiloClawEnv = {
   KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
-  HYPERDRIVE: Hyperdrive;
+  HYPERDRIVE?: Hyperdrive;
   KV_CLAW_CACHE: KVNamespace;
 
   // Auth secrets
@@ -34,6 +34,7 @@ export type KiloClawEnv = {
   FLY_REGISTRY_APP?: string; // Shared app for Docker image registry
   FLY_REGION?: string;
   FLY_IMAGE_TAG?: string;
+  FLY_IMAGE_DIGEST?: string;
   OPENCLAW_VERSION?: string;
 
   // OpenClaw gateway configuration

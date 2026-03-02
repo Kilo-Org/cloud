@@ -1,34 +1,9 @@
 import * as z from 'zod';
-
-/**
- * Schema for manually added repository (for GitLab where pagination limits results)
- */
-export const ManuallyAddedRepositorySchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  full_name: z.string(),
-  private: z.boolean(),
-});
-
-export type ManuallyAddedRepository = z.infer<typeof ManuallyAddedRepositorySchema>;
-
-/**
- * Zod schema for CodeReviewAgentConfig
- */
-export const CodeReviewAgentConfigSchema = z.object({
-  review_style: z.enum(['strict', 'balanced', 'lenient', 'roast']),
-  focus_areas: z.array(z.string()),
-  auto_approve_minor: z.boolean().optional(),
-  custom_instructions: z.string().nullable().optional(),
-  max_review_time_minutes: z.number().int().positive(),
-  model_slug: z.string(),
-  repository_selection_mode: z.enum(['all', 'selected']).optional(),
-  selected_repository_ids: z.array(z.number()).optional(),
-  // Manually added repositories (for GitLab where pagination limits results)
-  manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
-});
-
-export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
+export {
+  ManuallyAddedRepositorySchema,
+  CodeReviewAgentConfigSchema,
+} from '@kilocode/db/schema-types';
+export type { ManuallyAddedRepository, CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 
 /**
  * Zod schema for remote prompt template from PostHog

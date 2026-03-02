@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import type { PlatformIntegration } from '@/db/schema';
-import { platform_integrations } from '@/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
+import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';

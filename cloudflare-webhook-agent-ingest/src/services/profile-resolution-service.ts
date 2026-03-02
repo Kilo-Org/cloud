@@ -1,5 +1,9 @@
-import { createDatabaseConnection } from '../db/database.js';
-import { ProfileStore, type ResolvedProfileConfig } from '../db/stores/ProfileStore.js';
+import {
+  getWorkerDb,
+  resolveProfile,
+  type WorkerDb,
+  type ResolvedProfileConfig,
+} from '../db/queries.js';
 import { logger } from '../util/logger.js';
 
 /**
@@ -26,16 +30,15 @@ export function getProfileResolutionService(env: ProfileResolutionEnv): ProfileR
  * at webhook processing time.
  */
 export class ProfileResolutionService {
-  private store: ProfileStore | null = null;
+  private db: WorkerDb | null = null;
 
   constructor(private env: ProfileResolutionEnv) {}
 
-  private getStore(): ProfileStore {
-    if (!this.store) {
-      const db = createDatabaseConnection(this.env.HYPERDRIVE.connectionString);
-      this.store = new ProfileStore(db);
+  private getDb(): WorkerDb {
+    if (!this.db) {
+      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     }
-    return this.store;
+    return this.db;
   }
 
   /**
@@ -46,8 +49,8 @@ export class ProfileResolutionService {
    * @param params.orgId - For org triggers, validates profile ownership
    * @returns Resolved profile config or null if not found/not authorized
    */
-  async resolveProfile(params: ResolveProfileParams): Promise<ResolvedProfileConfig | null> {
-    const store = this.getStore();
+  async resolveProfileConfig(params: ResolveProfileParams): Promise<ResolvedProfileConfig | null> {
+    const db = this.getDb();
 
     logger.debug('Resolving profile via Hyperdrive', {
       profileId: params.profileId,
@@ -55,7 +58,7 @@ export class ProfileResolutionService {
       orgId: params.orgId,
     });
 
-    const config = await store.resolveProfile(params.profileId, params.userId, params.orgId);
+    const config = await resolveProfile(db, params.profileId, params.userId, params.orgId);
 
     if (!config) {
       logger.warn('Profile not found or not authorized', {

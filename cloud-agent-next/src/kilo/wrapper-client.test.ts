@@ -271,6 +271,21 @@ describe('WrapperClient', () => {
       expect(execCall).toContain('/job/prompt');
     });
 
+    it('includes variant in request body when provided', async () => {
+      const session = createMockSession(
+        createSuccessResponse({ status: 'sent', messageId: 'msg_variant' })
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.prompt({
+        prompt: 'Test with variant',
+        variant: 'high',
+      });
+
+      const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(execCall).toContain('"variant":"high"');
+    });
+
     it('throws WrapperNoJobError when no job started', async () => {
       const session = createMockSession(createErrorResponse('NO_JOB', 'Call /job/start first'));
       const client = new WrapperClient({ session, port: defaultPort });

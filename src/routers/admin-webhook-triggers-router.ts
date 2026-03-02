@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, isNull, inArray, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/drizzle';
-import { cloud_agent_webhook_triggers, cliSessions } from '@/db/schema';
+import { cloud_agent_webhook_triggers, cliSessions } from '@kilocode/db/schema';
 import { triggerIdSchema } from '@/lib/webhook-trigger-validation';
 import {
   getWorkerTrigger,

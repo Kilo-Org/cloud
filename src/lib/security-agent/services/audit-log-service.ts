@@ -6,8 +6,8 @@
  */
 
 import 'server-only';
-import { security_audit_log } from '@/db/schema';
-import type { SecurityAuditLogEntry } from '@/db/schema';
+import { security_audit_log } from '@kilocode/db/schema';
+import type { SecurityAuditLogEntry } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
 import { SecurityAuditLogAction } from '../core/enums';

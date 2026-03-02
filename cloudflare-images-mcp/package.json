@@ -7,22 +7,25 @@
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
     "test": "vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "aws4fetch": "^1.0.20",
+    "aws4fetch": "catalog:",
     "fast-xml-parser": "^5.3.4",
     "fetch-to-node": "^2.1.0",
-    "jsonwebtoken": "^9.0.3",
-    "zod": "^4.3.6"
+    "jsonwebtoken": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260120.0",
-    "@types/jsonwebtoken": "^9.0.10",
+    "@kilocode/eslint-config": "workspace:*",
+    "@types/jsonwebtoken": "catalog:",
     "@types/node": "^22",
-    "typescript": "^5.9.3",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
     "vitest": "^3.2.4",
-    "wrangler": "^4.61.0"
+    "wrangler": "catalog:"
   }
 }

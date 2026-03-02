@@ -50,14 +50,6 @@ export type ExistingReviewState = {
   headCommitSha: string;
 };
 
-/**
- * @deprecated Use ExistingReviewState instead
- */
-export type ExistingReviewComment = {
-  commentId: number;
-  body: string;
-};
-
 // Zod schema for validating prompt template structure
 const PromptTemplateSchema = z.object({
   version: z.string(),

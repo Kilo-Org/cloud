@@ -4,7 +4,7 @@ import * as z from 'zod';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { eq, and } from 'drizzle-orm';
-import { cliSessions } from '@/db/schema';
+import { cliSessions } from '@kilocode/db/schema';
 import { generateSignedUploadUrl } from '@/lib/r2/cli-sessions';
 import { BLOB_TYPES } from '@/routers/cli-sessions-router';
 

@@ -55,7 +55,7 @@ export class SSEStreamProcessor {
       throw new Error('No response body from stream');
     }
 
-    const reader = response.body.getReader();
+    const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
@@ -100,34 +100,33 @@ export class SSEStreamProcessor {
             }
 
             try {
-              const event = JSON.parse(data);
+              const event: Record<string, unknown> = JSON.parse(data) as Record<string, unknown>;
               metrics.totalEvents++;
 
               // Track event type counts
-              const eventType = event.streamEventType || 'unknown';
+              const eventType =
+                typeof event.streamEventType === 'string' ? event.streamEventType : 'unknown';
               metrics.eventTypeCounts[eventType] = (metrics.eventTypeCounts[eventType] || 0) + 1;
 
               // Extract sessionId from first event
-              if (handlers.onSessionId && event.sessionId) {
+              if (handlers.onSessionId && typeof event.sessionId === 'string') {
                 handlers.onSessionId(event.sessionId);
               }
 
               // Extract text content from kilocode events
-              if (handlers.onTextContent && event.streamEventType === 'kilocode' && event.payload) {
-                if (typeof event.payload.content === 'string') {
-                  handlers.onTextContent(event.payload.content);
-                } else if (
-                  event.payload.type === 'text' &&
-                  typeof event.payload.text === 'string'
-                ) {
-                  handlers.onTextContent(event.payload.text);
+              const payload = event.payload as Record<string, unknown> | undefined;
+              if (handlers.onTextContent && event.streamEventType === 'kilocode' && payload) {
+                if (typeof payload.content === 'string') {
+                  handlers.onTextContent(payload.content);
+                } else if (payload.type === 'text' && typeof payload.text === 'string') {
+                  handlers.onTextContent(payload.text);
                 }
               }
               // Also check for output events
               else if (
                 handlers.onTextContent &&
                 event.streamEventType === 'output' &&
-                event.content
+                typeof event.content === 'string'
               ) {
                 handlers.onTextContent(event.content);
               }
@@ -146,7 +145,9 @@ export class SSEStreamProcessor {
               // Handle error event
               if (event.streamEventType === 'error') {
                 metrics.errorEvents++;
-                const error = new Error(`Stream error: ${event.message || 'Unknown error'}`);
+                const errorMessage =
+                  typeof event.message === 'string' ? event.message : 'Unknown error';
+                const error = new Error(`Stream error: ${errorMessage}`);
 
                 // Log the error event details for debugging
                 console.warn('[SSEStreamProcessor] Error event received', {

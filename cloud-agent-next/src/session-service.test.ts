@@ -52,6 +52,7 @@ describe('SessionService', () => {
   });
 
   const mockedSetupWorkspace = vi.mocked(mockSetupWorkspace);
+  const mockedRestoreWorkspace = vi.mocked(mockRestoreWorkspace);
 
   // Mock environment for tests
   const mockEnv: PersistenceEnv = {
@@ -148,8 +149,8 @@ describe('SessionService', () => {
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -309,8 +310,8 @@ describe('SessionService', () => {
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -826,7 +827,7 @@ describe('SessionService', () => {
       ).rejects.toThrow('workspace is missing and metadata could not be retrieved');
     });
 
-    it('restores session snapshot before reclone when workspace is missing', async () => {
+    it('restores workspace then session snapshot when workspace is missing', async () => {
       const mockDOGetMetadata = vi.fn();
       const payload = JSON.stringify({ info: {}, messages: [] });
       const exportSessionMock = vi.fn().mockResolvedValue(payload);
@@ -901,6 +902,15 @@ describe('SessionService', () => {
       );
       expect(result.context.githubRepo).toBe('facebook/react');
       expect(result.context.githubToken).toBe('test-token');
+
+      // Verify restoreWorkspace (git clone) ran before kilo import
+      const kiloImportCallIndex = fakeSession.exec.mock.calls.findIndex(
+        (args: string[]) => typeof args[0] === 'string' && args[0].includes('kilo import')
+      );
+      expect(kiloImportCallIndex).toBeGreaterThanOrEqual(0);
+      const restoreWorkspaceOrder = mockedRestoreWorkspace.mock.invocationCallOrder[0];
+      const kiloImportOrder = fakeSession.exec.mock.invocationCallOrder[kiloImportCallIndex];
+      expect(restoreWorkspaceOrder).toBeLessThan(kiloImportOrder);
     });
   });
 
@@ -955,8 +965,8 @@ describe('SessionService', () => {
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
           API_KEY: 'test-key-123',
           DATABASE_URL: 'postgres://localhost:5432/test',
           NODE_ENV: 'development',
@@ -1011,7 +1021,7 @@ describe('SessionService', () => {
           PASSWORD: 'p@ssw0rd!#$%',
           JSON_CONFIG: '{"key":"value with spaces"}',
           PATH_WITH_COLON: '/usr/bin:/usr/local/bin',
-        }),
+        }) as unknown,
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
     });
@@ -1060,8 +1070,8 @@ describe('SessionService', () => {
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"/tmp/attachments/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -1087,7 +1097,7 @@ describe('SessionService', () => {
     };
 
     const getConfigContent = (sandboxCreateSession: ReturnType<typeof vi.fn>) => {
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
       return JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
         permission: { question?: string; external_directory?: Record<string, string> };
       };
@@ -1150,6 +1160,47 @@ describe('SessionService', () => {
         expect(config.permission.question).toBe('deny');
       }
     );
+
+    it('should include read-only command guard policy for code-review sessions', async () => {
+      const { sandbox, sandboxCreateSession } = setupForPlatformTest();
+      const sessionId: SessionId = 'agent_code_review_policy_test';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: mockEnv,
+        createdOnPlatform: 'code-review',
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        autoApproval?: {
+          execute?: {
+            denied?: string[];
+          };
+          write?: {
+            enabled?: boolean;
+            protected?: boolean;
+          };
+        };
+      };
+
+      expect(configContent.autoApproval?.execute?.denied).toContain('git commit');
+      expect(configContent.autoApproval?.execute?.denied).toContain('gh pr merge');
+      expect(configContent.autoApproval?.write?.enabled).toBe(false);
+      expect(configContent.autoApproval?.write?.protected).toBe(true);
+    });
   });
 
   describe('GH_TOKEN Auto-Setting', () => {
@@ -1193,7 +1244,7 @@ describe('SessionService', () => {
         expect.objectContaining({
           env: expect.objectContaining({
             GH_TOKEN: 'ghp_test123',
-          }),
+          }) as unknown,
         })
       );
     });
@@ -1243,7 +1294,7 @@ describe('SessionService', () => {
         expect.objectContaining({
           env: expect.objectContaining({
             GH_TOKEN: userProvidedToken,
-          }),
+          }) as unknown,
         })
       );
     });
@@ -1283,7 +1334,7 @@ describe('SessionService', () => {
         env: mockEnv,
       });
 
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
       expect(callArgs.env).not.toHaveProperty('GH_TOKEN');
     });
 
@@ -1322,7 +1373,7 @@ describe('SessionService', () => {
         env: mockEnv,
       });
 
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
       expect(callArgs.env).not.toHaveProperty('GH_TOKEN');
     });
 
@@ -1362,7 +1413,7 @@ describe('SessionService', () => {
       });
 
       // Should NOT set GH_TOKEN because this is not a GitHub repo (no githubRepo)
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
       expect(callArgs.env).not.toHaveProperty('GH_TOKEN');
     });
   });
@@ -1666,8 +1717,10 @@ describe('SessionService', () => {
         mcpServers,
       });
 
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT);
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        mcp: Record<string, unknown>;
+      };
       expect(configContent.mcp).toBeDefined();
       expect(configContent.mcp.puppeteer).toEqual({
         type: 'local',
@@ -1709,8 +1762,10 @@ describe('SessionService', () => {
         mcpServers: {}, // Empty object
       });
 
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT);
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        mcp?: Record<string, unknown>;
+      };
       expect(configContent.mcp).toBeUndefined();
     });
 
@@ -1761,8 +1816,10 @@ describe('SessionService', () => {
         mcpServers,
       });
 
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT);
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        mcp: Record<string, unknown>;
+      };
       // MCP configs are passed through directly — no conversion
       expect(configContent.mcp['server-1']).toEqual({
         type: 'local',
@@ -1819,8 +1876,10 @@ describe('SessionService', () => {
         mcpServers,
       });
 
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT);
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        mcp: Record<string, unknown>;
+      };
       expect(configContent.mcp['disabled-server']).toEqual({
         type: 'local',
         command: ['test'],
@@ -2144,8 +2203,10 @@ describe('SessionService', () => {
       });
 
       // Verify MCP config is passed through directly in KILO_CONFIG_CONTENT
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT);
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        mcp: Record<string, unknown>;
+      };
       expect(configContent.mcp).toBeDefined();
       expect(configContent.mcp.puppeteer).toEqual({
         type: 'local',
@@ -2201,8 +2262,8 @@ describe('SessionService', () => {
         env: expect.objectContaining({
           API_KEY: 'restored-key',
           DATABASE_URL: 'postgres://restored',
-        }),
-        cwd: expect.any(String),
+        }) as unknown,
+        cwd: expect.any(String) as unknown,
       });
     });
 
@@ -2253,16 +2314,18 @@ describe('SessionService', () => {
       // Verify envVars restored
       expect(sandboxCreateSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          env: expect.objectContaining({ API_KEY: 'test' }),
+          env: expect.objectContaining({ API_KEY: 'test' }) as unknown,
         })
       );
 
       // Verify setup commands re-run (because repo didn't exist, triggering reclone)
-      expect(fakeSession.exec).toHaveBeenCalledWith('npm install', expect.any(Object));
+      expect(fakeSession.exec).toHaveBeenCalledWith('npm install', expect.any(Object) as unknown);
 
       // Verify MCP config passed through directly in KILO_CONFIG_CONTENT
-      const callArgs = sandboxCreateSession.mock.calls[0][0];
-      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT);
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        mcp: Record<string, unknown>;
+      };
       expect(configContent.mcp).toBeDefined();
       expect(configContent.mcp.test).toEqual({
         type: 'local',

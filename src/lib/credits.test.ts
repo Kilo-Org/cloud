@@ -1,7 +1,7 @@
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
-import { credit_transactions } from '@/db/schema';
+import { credit_transactions } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { processTopUp } from './credits';
 

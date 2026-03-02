@@ -8,7 +8,7 @@
  */
 
 import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
-import { cloud_agent_code_reviews } from '@/db/schema';
+import { cloud_agent_code_reviews } from '@kilocode/db/schema';
 import { isNull, eq, gt, and, asc } from 'drizzle-orm';
 import { Octokit } from '@octokit/rest';
 

@@ -2,7 +2,7 @@ import { test, expect, describe } from '@jest/globals';
 import { chooseAndStoreDefaultModelForUser } from '@/app/api/defaults/chooseAndStoreDefaultModelForUser';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_MODEL_CHOICES, preferredModels } from '@/lib/models';
 

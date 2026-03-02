@@ -1,6 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_access_codes } from '@/db/schema';
+import { kiloclaw_access_codes } from '@kilocode/db/schema';
 import { eq, and, lt, ne, or } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 

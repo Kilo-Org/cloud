@@ -7,7 +7,7 @@ import {
   kilo_pass_issuances,
   kilo_pass_subscriptions,
   kilocode_users,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {

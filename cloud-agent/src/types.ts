@@ -81,14 +81,6 @@ export type InterruptResult = {
   message: string;
 };
 
-export type TokenPayload = {
-  kiloUserId: string;
-  apiTokenPepper: string;
-  version: number;
-  env: string;
-  botId?: string;
-};
-
 export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */

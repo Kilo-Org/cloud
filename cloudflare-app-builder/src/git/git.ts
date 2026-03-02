@@ -3,17 +3,15 @@
  */
 
 import git from '@ashishkumar472/cf-git';
+import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { SqliteFS } from './fs-adapter';
 import * as Diff from 'diff';
-import type { CommitInfo, FileDiff, GitShowResult, SqlExecutor } from '../types';
+import type { CommitInfo, FileDiff, GitShowResult } from '../types';
 
-/**
- * Represents a file snapshot with path and contents
- */
-interface FileSnapshot {
+type FileSnapshot = {
   filePath: string;
   fileContents: string;
-}
+};
 
 export class GitVersionControl {
   private onFilesChangedCallback?: () => void;
@@ -24,11 +22,10 @@ export class GitVersionControl {
     return { fs: this.fs, dir: '/' } as const;
   }
 
-  constructor(sql: SqlExecutor, author?: { name: string; email: string }) {
-    this.fs = new SqliteFS(sql);
+  constructor(db: DrizzleSqliteDODatabase, author?: { name: string; email: string }) {
+    this.fs = new SqliteFS(db);
     this.author = author || { name: 'Vibesdk', email: 'vibesdk-bot@cloudflare.com' };
 
-    // Initialize SQLite table synchronously
     this.fs.init();
   }
 

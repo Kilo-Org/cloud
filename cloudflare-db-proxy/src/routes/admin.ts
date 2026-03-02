@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { Env, ProvisionResponse } from '../types';
 import type { CredentialsResponse } from '../api-schemas';
 import { requireAdminAuth } from '../utils/auth';
@@ -8,7 +9,7 @@ import { logger } from '../logger';
 const admin = new Hono<{ Bindings: Env }>();
 
 // Apply admin auth to all routes
-admin.use('*', async (c, next) => {
+admin.use('*', async (c: Context<{ Bindings: Env }>, next) => {
   const authError = requireAdminAuth(c);
   if (authError) {
     return authError;

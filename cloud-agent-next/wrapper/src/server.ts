@@ -15,6 +15,8 @@
 
 import type { WrapperState, JobContext } from './state.js';
 import type { KiloClient } from './kilo-client.js';
+import { createLogUploader } from './log-uploader.js';
+import { SESSION_ID_RE } from '../../src/shared/protocol.js';
 import { logToFile } from './utils.js';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +60,7 @@ type PromptBody = {
   messageId?: string;
   system?: string;
   tools?: Record<string, boolean>;
+  variant?: string;
 };
 
 type CommandBody = {
@@ -177,6 +180,22 @@ function createStartJobHandler(deps: ServerDependencies, kiloClient: KiloClient)
       );
     }
 
+    // Validate sessionId format before using in filesystem path (defense-in-depth)
+    if (!SESSION_ID_RE.test(body.sessionId)) {
+      return errorResponse('INVALID_REQUEST', 'Invalid sessionId format', 400);
+    }
+
+    // Parse ingest URL to derive worker base URL for log uploads
+    let workerBaseUrl: string;
+    try {
+      const ingestOrigin = new URL(body.ingestUrl);
+      ingestOrigin.protocol =
+        ingestOrigin.protocol === 'wss:' || ingestOrigin.protocol === 'https:' ? 'https:' : 'http:';
+      workerBaseUrl = ingestOrigin.origin;
+    } catch {
+      return errorResponse('INVALID_REQUEST', 'Invalid ingestUrl', 400);
+    }
+
     // Create or resume kilo session
     let kiloSessionId: string;
     try {
@@ -218,6 +237,22 @@ function createStartJobHandler(deps: ServerDependencies, kiloClient: KiloClient)
       logToFile(`job/start: state.startJob failed: ${msg}`);
       return errorResponse('JOB_CONFLICT', msg, 409);
     }
+
+    // Create and start log uploader for this job
+    const cliLogDir = `/home/${body.sessionId}/.local/share/kilo/log`;
+    const wrapperLogPath = process.env.WRAPPER_LOG_PATH ?? '/tmp/kilocode-wrapper.log';
+    const logUploader = createLogUploader({
+      workerBaseUrl,
+      sessionId: body.sessionId,
+      executionId: body.executionId,
+      userId: body.userId,
+      kilocodeToken: body.kilocodeToken,
+      cliLogDir,
+      wrapperLogPath,
+    });
+    state.setLogUploader(logUploader);
+    logUploader.start();
+    logToFile(`job/start: log uploader started (url=${workerBaseUrl})`);
 
     logToFile(
       `job/start: job started executionId=${body.executionId} kiloSessionId=${kiloSessionId}`
@@ -276,6 +311,7 @@ function createPromptHandler(deps: ServerDependencies) {
         model: body.model,
         system: body.system,
         tools: body.tools,
+        variant: body.variant,
       });
       logToFile(`job/prompt: sent messageId=${messageId}`);
     } catch (error) {

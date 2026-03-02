@@ -3,6 +3,9 @@
  */
 
 import type { AutoFixOrchestrator } from './fix-orchestrator';
+import type { Owner } from '@kilocode/worker-utils';
+
+export type { Owner };
 
 export type FixStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -15,12 +18,6 @@ export interface ClassificationResult {
   relatedFiles?: string[];
   reasoning?: string;
   suggestedAction?: string;
-}
-
-export interface Owner {
-  type: 'user' | 'org';
-  id: string;
-  userId: string;
 }
 
 export interface SessionInput {

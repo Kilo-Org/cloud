@@ -5,7 +5,12 @@
  * and usage history, ensuring the denormalized user record matches the ledger.
  */
 import { db } from '@/lib/drizzle';
-import { kilocode_users, credit_transactions, microdollar_usage, type User } from '@/db/schema';
+import {
+  kilocode_users,
+  credit_transactions,
+  microdollar_usage,
+  type User,
+} from '@kilocode/db/schema';
 import { eq, and, isNull, gt, asc } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@/lib/maybe-result';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';

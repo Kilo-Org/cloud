@@ -1,5 +1,10 @@
-import { createDatabaseConnection } from '../db/database.js';
-import { UserStore } from '../db/stores/UserStore.js';
+import {
+  getWorkerDb,
+  findUserForToken,
+  organizationExists,
+  ensureBotUserForOrg,
+  type WorkerDb,
+} from '../db/queries.js';
 import { signJwt } from '../util/jwt.js';
 import { logger } from '../util/logger.js';
 
@@ -38,17 +43,16 @@ export function getTokenMintingService(env: TokenMintingEnv): TokenMintingServic
  * the kilocode-backend HTTP endpoint.
  */
 export class TokenMintingService {
-  private store: UserStore | null = null;
+  private db: WorkerDb | null = null;
   private jwtSecret: string | null = null;
 
   constructor(private env: TokenMintingEnv) {}
 
-  private getStore(): UserStore {
-    if (!this.store) {
-      const db = createDatabaseConnection(this.env.HYPERDRIVE.connectionString);
-      this.store = new UserStore(db);
+  private getDb(): WorkerDb {
+    if (!this.db) {
+      this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     }
-    return this.store;
+    return this.db;
   }
 
   private async getJwtSecret(): Promise<string> {
@@ -65,12 +69,12 @@ export class TokenMintingService {
    * For org triggers: mints token for the webhook bot user
    */
   async mintToken(params: MintTokenParams): Promise<MintTokenResult> {
-    const store = this.getStore();
+    const db = this.getDb();
 
     if (params.userId) {
       // Personal trigger - mint token for the real user
       logger.info('Token minting: lookup personal user', { userId: params.userId });
-      const user = await store.findUserForToken(params.userId);
+      const user = await findUserForToken(db, params.userId);
 
       if (!user) {
         throw new Error(`User not found: ${params.userId}`);
@@ -100,13 +104,13 @@ export class TokenMintingService {
     } else if (params.orgId) {
       // Org trigger - mint token for the webhook bot user
       logger.info('Token minting: checking org exists', { orgId: params.orgId });
-      const orgExists = await store.organizationExists(params.orgId);
+      const orgExists = await organizationExists(db, params.orgId);
       if (!orgExists) {
         throw new Error(`Organization not found: ${params.orgId}`);
       }
 
       logger.info('Token minting: ensuring bot user', { orgId: params.orgId });
-      const botUser = await store.ensureBotUserForOrg(params.orgId);
+      const botUser = await ensureBotUserForOrg(db, params.orgId);
 
       const token = await this.signToken({
         kiloUserId: botUser.id,

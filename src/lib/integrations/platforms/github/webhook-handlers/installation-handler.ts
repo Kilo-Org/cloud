@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@/db/schema';
+import { platform_integrations } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
   findIntegrationByInstallationId,

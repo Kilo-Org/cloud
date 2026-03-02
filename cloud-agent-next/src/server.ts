@@ -6,6 +6,7 @@ import type { Env } from './types.js';
 import type { HonoContext } from './hono-context.js';
 import { logger, withLogTags } from './logger.js';
 import { validateStreamTicket, validateKiloToken } from './auth.js';
+import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
 import { authMiddleware } from './middleware/auth.js';
@@ -93,7 +94,7 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
 
   const sessionId = c.req.param('sessionId');
   const authHeader = c.req.header('Authorization');
-  const authResult = validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
+  const authResult = await validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
@@ -108,6 +109,70 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
   const doRequest = new Request(doUrl.toString(), c.req.raw);
   return stub.fetch(doRequest);
 });
+
+const ALLOWED_LOG_FILENAMES = new Set(['logs.tar.gz']);
+const MAX_LOG_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
+
+app.put(
+  '/sessions/:userId/:sessionId/logs/:executionId/:filename',
+  async (c: Context<HonoContext>) => {
+    let userId: string;
+    try {
+      userId = decodeURIComponent(c.req.param('userId'));
+    } catch {
+      return c.text('Invalid userId encoding', 400);
+    }
+
+    const filename = c.req.param('filename');
+    if (!ALLOWED_LOG_FILENAMES.has(filename)) {
+      return c.text('Invalid filename', 400);
+    }
+
+    const authHeader = c.req.header('Authorization');
+    const authResult = await validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
+    if (!authResult.success) {
+      return c.text(authResult.error, 401);
+    }
+    if (authResult.userId !== userId) {
+      return c.text('Token does not match session user', 403);
+    }
+
+    const contentLength = parseInt(c.req.header('Content-Length') ?? '', 10);
+    if (contentLength > MAX_LOG_UPLOAD_BYTES) {
+      return c.text('Request body too large', 413);
+    }
+
+    // Buffer the body — R2 requires a known-length value (ArrayBuffer, string, etc.)
+    const body = await c.req.arrayBuffer();
+    if (body.byteLength === 0) {
+      return c.text('Missing request body', 400);
+    }
+    if (body.byteLength > MAX_LOG_UPLOAD_BYTES) {
+      return c.text('Request body too large', 413);
+    }
+
+    const sessionId = c.req.param('sessionId');
+    const executionId = c.req.param('executionId');
+    const safeUserId = encodeURIComponent(userId);
+    const safeSessionId = encodeURIComponent(sessionId);
+    const safeExecutionId = encodeURIComponent(executionId);
+
+    try {
+      await c.env.R2_BUCKET.put(
+        `logs/${safeUserId}/${safeSessionId}/${safeExecutionId}/${filename}`,
+        body,
+        { httpMetadata: { contentType: 'application/gzip' } }
+      );
+    } catch (err) {
+      logger
+        .withFields({ error: err instanceof Error ? err.message : String(err) })
+        .error('R2 put failed for log upload');
+      return c.text('R2 write failed', 500);
+    }
+
+    return c.body(null, 204);
+  }
+);
 
 app.use('/trpc/*', authMiddleware);
 app.use('/trpc/*', balanceMiddleware);
@@ -136,20 +201,8 @@ app.use(
   })
 );
 
-app.notFound((c: Context<HonoContext>) => {
-  return c.json({ error: 'Not found' }, 404);
-});
-
-app.onError((err: Error, c: Context<HonoContext>) => {
-  logger
-    .withFields({
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
-    })
-    .error('Unhandled error');
-
-  return c.json({ error: 'Internal server error' }, 500);
-});
+app.notFound(createNotFoundHandler());
+app.onError(createErrorHandler(logger, { includeMessage: false }));
 
 export default {
   fetch: app.fetch,

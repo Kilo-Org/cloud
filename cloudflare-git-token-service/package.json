@@ -7,16 +7,19 @@
     "dev:test": "wrangler dev --config wrangler.test.jsonc",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
     "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts"
   },
   "dependencies": {
-    "@octokit/auth-app": "^8.1.2",
-    "pg": "^8.16.3",
-    "zod": "^4.3.5"
+    "@kilocode/db": "workspace:*",
+    "@octokit/auth-app": "catalog:",
+    "drizzle-orm": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/pg": "^8.15.6",
-    "typescript": "^5.9.3",
-    "wrangler": "^4.61.0"
+    "@kilocode/eslint-config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
   }
 }

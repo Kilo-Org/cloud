@@ -28,7 +28,7 @@ export async function validateAuthAndBalance(
   env: Env
 ): Promise<BalanceValidationResult> {
   // Validate JWT first
-  const authResult = validateKiloToken(authHeader, env.NEXTAUTH_SECRET);
+  const authResult = await validateKiloToken(authHeader, env.NEXTAUTH_SECRET);
   if (!authResult.success) {
     return { success: false, status: 401, message: authResult.error };
   }
@@ -105,9 +105,9 @@ export function extractOrgIdFromUrl(url: URL): string | undefined {
   if (!inputParam) return undefined;
 
   try {
-    const input = JSON.parse(inputParam);
+    const input: unknown = JSON.parse(inputParam);
     if (input && typeof input === 'object' && 'kilocodeOrganizationId' in input) {
-      const value = input.kilocodeOrganizationId;
+      const value = (input as Record<string, unknown>).kilocodeOrganizationId;
       if (typeof value === 'string') {
         return value;
       }
@@ -130,9 +130,9 @@ export function extractSessionIdFromUrl(url: URL): string | undefined {
   if (!inputParam) return undefined;
 
   try {
-    const input = JSON.parse(inputParam);
+    const input: unknown = JSON.parse(inputParam);
     if (input && typeof input === 'object' && 'sessionId' in input) {
-      const value = input.sessionId;
+      const value = (input as Record<string, unknown>).sessionId;
       if (typeof value === 'string') {
         return value;
       }

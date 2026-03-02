@@ -4,13 +4,9 @@ import type { CallbackJob } from './callbacks/index.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
+import { SESSION_ID_RE } from './shared/protocol.js';
 
-export const sessionIdSchema = z
-  .string()
-  .regex(
-    /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    'Invalid session ID format'
-  );
+export const sessionIdSchema = z.string().regex(SESSION_ID_RE, 'Invalid session ID format');
 
 export const githubRepoSchema = z
   .string()
@@ -81,20 +77,14 @@ export type InterruptResult = {
   message: string;
 };
 
-export type TokenPayload = {
-  kiloUserId: string;
-  apiTokenPepper: string;
-  version: number;
-  env: string;
-  botId?: string;
-};
-
 export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
+  /** R2 bucket for storing session logs */
+  R2_BUCKET: R2Bucket;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** KV namespace for caching GitHub installation tokens */

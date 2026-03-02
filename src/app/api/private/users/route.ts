@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import { kilocode_users, organization_memberships, organizations } from '@/db/schema';
+import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';

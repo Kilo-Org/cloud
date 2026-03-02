@@ -1,7 +1,7 @@
 import { eq, desc, and, isNull, gt, notExists } from 'drizzle-orm';
 import { db, sql } from './drizzle';
-import type { Organization } from '@/db/schema';
-import { credit_transactions, kilo_pass_issuance_items } from '@/db/schema';
+import type { Organization } from '@kilocode/db/schema';
+import { credit_transactions, kilo_pass_issuance_items } from '@kilocode/db/schema';
 
 type CreditSummary = {
   total_promotional_musd: number;

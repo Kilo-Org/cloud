@@ -1,4 +1,4 @@
-import { modelsByProvider } from '@/db/schema';
+import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { normalizeModelId } from '@/lib/model-utils';
 import type { NormalizedOpenRouterResponse } from '@/lib/providers/openrouter/openrouter-types';
@@ -85,7 +85,7 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
   };
 }
 
-async function fetchLatestModelsByProviderSnapshotFromDb(): Promise<
+export async function fetchLatestModelsByProviderSnapshotFromDb(): Promise<
   NormalizedOpenRouterResponse | undefined
 > {
   const result = await db

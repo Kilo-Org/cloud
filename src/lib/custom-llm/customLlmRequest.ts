@@ -28,7 +28,7 @@ import {
   type AiSdkReasoningPart,
 } from './reasoning-provider-metadata';
 import type { ChatCompletionChunk, ChatCompletionChunkChoice } from './schemas';
-import { temp_phase, type CustomLlm } from '@/db/schema';
+import { temp_phase, type CustomLlm } from '@kilocode/db/schema';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';

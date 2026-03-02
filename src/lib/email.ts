@@ -1,4 +1,4 @@
-import type { Organization } from '@/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
 import { CUSTOMERIO_EMAIL_API_KEY, NEXTAUTH_URL } from '@/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';

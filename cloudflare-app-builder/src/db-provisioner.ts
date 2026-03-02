@@ -24,7 +24,10 @@ export function createDBProvisioner(deps: DBProvisionerDeps) {
       return false;
     }
     try {
-      const pkg = JSON.parse(result.content);
+      const pkg = JSON.parse(result.content) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
       const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
       const found = '@kilocode/app-builder-db' in allDeps;
       logger.debug(found ? 'needsDB: dependency found' : 'needsDB: dependency not in package.json');

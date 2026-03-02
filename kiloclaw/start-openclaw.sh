@@ -226,6 +226,9 @@ if (process.env.KILOCODE_API_BASE_URL) {
     config.models.providers = config.models.providers || {};
     config.models.providers.kilocode = config.models.providers.kilocode || {};
     config.models.providers.kilocode.baseUrl = process.env.KILOCODE_API_BASE_URL;
+    // Provider entries require a models array per OpenClaw's strict zod schema.
+    // Empty array is valid — the built-in kilocode provider fills in its catalog.
+    config.models.providers.kilocode.models = config.models.providers.kilocode.models || [];
     console.log('Overriding kilocode base URL: ' + process.env.KILOCODE_API_BASE_URL);
 }
 
@@ -237,6 +240,13 @@ if (process.env.KILOCODE_DEFAULT_MODEL) {
     config.agents.defaults = config.agents.defaults || {};
     config.agents.defaults.model = { primary: process.env.KILOCODE_DEFAULT_MODEL };
     console.log('Overriding default model: ' + process.env.KILOCODE_DEFAULT_MODEL);
+}
+
+// Remove the agents.defaults.models allowlist that `openclaw onboard` creates.
+// When non-empty it restricts visible models to only those listed, hiding the
+// rest of the kilocode catalog. KiloClaw users should see all available models.
+if (config.agents && config.agents.defaults && config.agents.defaults.models) {
+    delete config.agents.defaults.models;
 }
 
 // Exec: KiloClaw machines have no Docker sandbox, so exec must target the

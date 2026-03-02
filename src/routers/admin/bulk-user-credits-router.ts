@@ -1,7 +1,7 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
-import type { User } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { inArray } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';

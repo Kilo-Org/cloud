@@ -72,3 +72,10 @@ export type AutocommitCompletedData = {
   message: string;
   skipped?: boolean;
 };
+
+/**
+ * Regex for validating session IDs (agent_<uuid>).
+ * Shared between worker (zod schema) and wrapper (defense-in-depth validation).
+ */
+export const SESSION_ID_RE =
+  /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

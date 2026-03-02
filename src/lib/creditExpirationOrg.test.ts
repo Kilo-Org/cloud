@@ -1,4 +1,4 @@
-import { credit_transactions as creditTransactionsTable, organizations } from '@/db/schema';
+import { credit_transactions as creditTransactionsTable, organizations } from '@kilocode/db/schema';
 import {
   processOrganizationExpirations,
   fetchExpiringTransactionsForOrganization,

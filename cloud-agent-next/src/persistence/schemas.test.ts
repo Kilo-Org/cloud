@@ -584,6 +584,22 @@ describe('MetadataSchema', () => {
     });
   });
 
+  describe('variant', () => {
+    it('should accept valid variant string', () => {
+      const metadata = {
+        version: 1,
+        sessionId: 'session123',
+        orgId: 'org456',
+        userId: 'user789',
+        timestamp: Date.now(),
+        variant: 'high',
+      };
+
+      const result = MetadataSchema.parse(metadata);
+      expect(result.variant).toBe('high');
+    });
+  });
+
   describe('appendSystemPrompt', () => {
     it('should accept valid appendSystemPrompt', () => {
       const metadata = {

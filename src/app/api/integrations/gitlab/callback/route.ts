@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@/db/schema';
+import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';

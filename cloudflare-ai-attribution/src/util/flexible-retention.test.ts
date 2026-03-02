@@ -168,7 +168,7 @@ describe('calculateFlexibleRetention', () => {
     it('respects lookahead limit', () => {
       const aiHashes = [hashA, hashB];
       // Insert many lines between A and B
-      const manyInsertions = Array(100).fill(hashX);
+      const manyInsertions: string[] = Array(100).fill(hashX) as string[];
       const fileHashes = [hashA, ...manyInsertions, hashB];
 
       // With small lookahead, B won't be found

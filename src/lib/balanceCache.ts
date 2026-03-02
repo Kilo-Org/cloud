@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { createTimer } from '@/lib/timer';
 

@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { free_model_usage } from '@/db/schema';
+import { free_model_usage } from '@kilocode/db/schema';
 import { and, count, gte, sql } from 'drizzle-orm';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,

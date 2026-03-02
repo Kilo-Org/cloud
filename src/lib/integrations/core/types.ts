@@ -1,19 +1,11 @@
 // Core types for the integrations system
+export type { IntegrationPermissions, PlatformRepository } from '@kilocode/db/schema-types';
 
 /**
  * Represents ownership of an integration
  * Can be either a user or an organization
  */
 export type Owner = { type: 'user'; id: string } | { type: 'org'; id: string };
-
-export type IntegrationPermissions = Record<string, string>;
-
-export type PlatformRepository = {
-  id: number;
-  name: string;
-  full_name: string;
-  private: boolean;
-};
 
 export type WebhookEvent = {
   platform: string;

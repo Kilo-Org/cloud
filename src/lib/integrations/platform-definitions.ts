@@ -91,16 +91,3 @@ export function buildPlatforms(
     route: organizationId ? def.orgRoute?.(organizationId) : def.personalRoute,
   }));
 }
-
-/** @deprecated Use buildPlatforms() instead */
-export function buildPlatformsForPersonal(installations: InstallationStatus): Platform[] {
-  return buildPlatforms(installations);
-}
-
-/** @deprecated Use buildPlatforms(installations, organizationId) instead */
-export function buildPlatformsForOrg(
-  organizationId: string,
-  installations: InstallationStatus
-): Platform[] {
-  return buildPlatforms(installations, organizationId);
-}

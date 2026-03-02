@@ -19,7 +19,7 @@
  */
 
 import { localDb, localPool } from '@/scripts/lib/local-database';
-import { kilocode_users, organization_memberships, organizations } from '@/db/schema';
+import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import type { OrganizationPlan } from '@/lib/organizations/organization-base-types';
 import { eq, inArray } from 'drizzle-orm';
 

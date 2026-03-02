@@ -1,6 +1,6 @@
 import type { OrgTrialStatus } from './organization-types';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
-import type { Organization } from '@/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 
 /**
  * Calculate days remaining in trial period from free trial end date

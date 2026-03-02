@@ -38,6 +38,7 @@ import {
   syncAllReposForOwner,
 } from '@/lib/security-agent/services/sync-service';
 import { startSecurityAnalysis } from '@/lib/security-agent/services/analysis-service';
+import { trpcCodeForAnalysisError } from '@/lib/security-agent/core/error-classification';
 import {
   autoDismissEligibleFindings,
   countEligibleForAutoDismiss,
@@ -892,7 +893,7 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
 
         if (!result.started) {
           throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
+            code: trpcCodeForAnalysisError(result.errorCode),
             message: result.error || 'Failed to start analysis',
           });
         }

@@ -1,38 +1,26 @@
 import { DurableObject } from 'cloudflare:workers';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import { eq } from 'drizzle-orm';
+import migrations from '../../drizzle/migrations';
+import { alertConfig, ttfbAlertConfig } from '../db/sqlite-schema';
 import type { AlertingConfig } from './config-store';
 import type { TtfbAlertingConfig } from './ttfb-config-store';
 
-type AlertConfigRow = {
-	model: string;
-	enabled: number;
-	error_rate_slo: number;
-	min_requests_per_window: number;
-	updated_at: string;
-};
-
-function rowToConfig(row: AlertConfigRow): AlertingConfig {
+function rowToConfig(row: typeof alertConfig.$inferSelect): AlertingConfig {
 	return {
 		model: row.model,
-		enabled: row.enabled === 1,
+		enabled: row.enabled,
 		errorRateSlo: row.error_rate_slo,
 		minRequestsPerWindow: row.min_requests_per_window,
 		updatedAt: row.updated_at,
 	};
 }
 
-type TtfbAlertConfigRow = {
-	model: string;
-	enabled: number;
-	ttfb_threshold_ms: number;
-	ttfb_slo: number;
-	min_requests_per_window: number;
-	updated_at: string;
-};
-
-function rowToTtfbConfig(row: TtfbAlertConfigRow): TtfbAlertingConfig {
+function rowToTtfbConfig(row: typeof ttfbAlertConfig.$inferSelect): TtfbAlertingConfig {
 	return {
 		model: row.model,
-		enabled: row.enabled === 1,
+		enabled: row.enabled,
 		ttfbThresholdMs: row.ttfb_threshold_ms,
 		ttfbSlo: row.ttfb_slo,
 		minRequestsPerWindow: row.min_requests_per_window,
@@ -40,95 +28,89 @@ function rowToTtfbConfig(row: TtfbAlertConfigRow): TtfbAlertingConfig {
 	};
 }
 
-/**
- * Durable Object for alert config storage.
- *
- * Replaces KV-backed config to provide strong read-after-write consistency.
- * A single global instance (keyed by "global") holds all alert configs in SQLite.
- */
 export class AlertConfigDO extends DurableObject<Env> {
+	private db;
+
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
-		void ctx.blockConcurrencyWhile(async () => {
-			ctx.storage.sql.exec(`
-				CREATE TABLE IF NOT EXISTS alert_config (
-					model TEXT PRIMARY KEY,
-					enabled INTEGER NOT NULL,
-					error_rate_slo REAL NOT NULL,
-					min_requests_per_window INTEGER NOT NULL,
-					updated_at TEXT NOT NULL
-				)
-			`);
-			ctx.storage.sql.exec(`
-				CREATE TABLE IF NOT EXISTS ttfb_alert_config (
-					model TEXT PRIMARY KEY,
-					enabled INTEGER NOT NULL,
-					ttfb_threshold_ms INTEGER NOT NULL,
-					ttfb_slo REAL NOT NULL,
-					min_requests_per_window INTEGER NOT NULL,
-					updated_at TEXT NOT NULL
-				)
-			`);
+		this.db = drizzle(ctx.storage, { logger: false });
+		void ctx.blockConcurrencyWhile(() => {
+			return migrate(this.db, migrations);
 		});
 	}
 
-	// --- Error rate alert config ---
-
 	list(): AlertingConfig[] {
-		const rows = this.ctx.storage.sql.exec<AlertConfigRow>('SELECT * FROM alert_config ORDER BY model ASC').toArray();
-		return rows.map(rowToConfig);
+		return this.db.select().from(alertConfig).orderBy(alertConfig.model).all().map(rowToConfig);
 	}
 
 	get(model: string): AlertingConfig | null {
-		const rows = this.ctx.storage.sql.exec<AlertConfigRow>('SELECT * FROM alert_config WHERE model = ?', model).toArray();
-		if (rows.length === 0) return null;
-		return rowToConfig(rows[0]);
+		const row = this.db.select().from(alertConfig).where(eq(alertConfig.model, model)).get();
+		if (!row) return null;
+		return rowToConfig(row);
 	}
 
 	upsert(config: AlertingConfig): void {
-		this.ctx.storage.sql.exec(
-			`INSERT OR REPLACE INTO alert_config (model, enabled, error_rate_slo, min_requests_per_window, updated_at)
-			 VALUES (?, ?, ?, ?, ?)`,
-			config.model,
-			config.enabled ? 1 : 0,
-			config.errorRateSlo,
-			config.minRequestsPerWindow,
-			config.updatedAt,
-		);
+		this.db
+			.insert(alertConfig)
+			.values({
+				model: config.model,
+				enabled: config.enabled,
+				error_rate_slo: config.errorRateSlo,
+				min_requests_per_window: config.minRequestsPerWindow,
+				updated_at: config.updatedAt,
+			})
+			.onConflictDoUpdate({
+				target: alertConfig.model,
+				set: {
+					enabled: config.enabled,
+					error_rate_slo: config.errorRateSlo,
+					min_requests_per_window: config.minRequestsPerWindow,
+					updated_at: config.updatedAt,
+				},
+			})
+			.run();
 	}
 
 	remove(model: string): void {
-		this.ctx.storage.sql.exec('DELETE FROM alert_config WHERE model = ?', model);
+		this.db.delete(alertConfig).where(eq(alertConfig.model, model)).run();
 	}
 
-	// --- TTFB alert config ---
-
 	listTtfb(): TtfbAlertingConfig[] {
-		const rows = this.ctx.storage.sql.exec<TtfbAlertConfigRow>('SELECT * FROM ttfb_alert_config ORDER BY model ASC').toArray();
-		return rows.map(rowToTtfbConfig);
+		return this.db.select().from(ttfbAlertConfig).orderBy(ttfbAlertConfig.model).all().map(rowToTtfbConfig);
 	}
 
 	getTtfb(model: string): TtfbAlertingConfig | null {
-		const rows = this.ctx.storage.sql.exec<TtfbAlertConfigRow>('SELECT * FROM ttfb_alert_config WHERE model = ?', model).toArray();
-		if (rows.length === 0) return null;
-		return rowToTtfbConfig(rows[0]);
+		const row = this.db.select().from(ttfbAlertConfig).where(eq(ttfbAlertConfig.model, model)).get();
+		if (!row) return null;
+		return rowToTtfbConfig(row);
 	}
 
 	upsertTtfb(config: TtfbAlertingConfig): void {
-		this.ctx.storage.sql.exec(
-			`INSERT OR REPLACE INTO ttfb_alert_config (model, enabled, ttfb_threshold_ms, ttfb_slo, min_requests_per_window, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
-			config.model,
-			config.enabled ? 1 : 0,
-			config.ttfbThresholdMs,
-			config.ttfbSlo,
-			config.minRequestsPerWindow,
-			config.updatedAt,
-		);
+		this.db
+			.insert(ttfbAlertConfig)
+			.values({
+				model: config.model,
+				enabled: config.enabled,
+				ttfb_threshold_ms: config.ttfbThresholdMs,
+				ttfb_slo: config.ttfbSlo,
+				min_requests_per_window: config.minRequestsPerWindow,
+				updated_at: config.updatedAt,
+			})
+			.onConflictDoUpdate({
+				target: ttfbAlertConfig.model,
+				set: {
+					enabled: config.enabled,
+					ttfb_threshold_ms: config.ttfbThresholdMs,
+					ttfb_slo: config.ttfbSlo,
+					min_requests_per_window: config.minRequestsPerWindow,
+					updated_at: config.updatedAt,
+				},
+			})
+			.run();
 	}
 
 	removeTtfb(model: string): void {
-		this.ctx.storage.sql.exec('DELETE FROM ttfb_alert_config WHERE model = ?', model);
+		this.db.delete(ttfbAlertConfig).where(eq(ttfbAlertConfig.model, model)).run();
 	}
 }
 

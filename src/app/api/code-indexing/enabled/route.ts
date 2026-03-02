@@ -4,7 +4,6 @@ import { createTRPCContext } from '@/lib/trpc/init';
 import { ensureOrganizationAccessAndFetchOrg } from '@/routers/organizations/utils';
 import { getUserFromAuth } from '@/lib/user.server';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
-import { MANAGED_INDEXING_ENABLED } from '@/lib/config.server';
 
 type EnabledResponse = { enabled: boolean };
 type ErrorResponse = { error: string; message?: string };
@@ -23,9 +22,6 @@ type ErrorResponse = { error: string; message?: string };
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<EnabledResponse | ErrorResponse>> {
-  if (!MANAGED_INDEXING_ENABLED) {
-    return NextResponse.json({ enabled: false });
-  }
   const res = await getUserFromAuth({ adminOnly: false });
   if (!res.user) {
     return res.authFailedResponse;

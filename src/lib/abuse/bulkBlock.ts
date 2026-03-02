@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { inArray, or } from 'drizzle-orm';
 import { successResult, type CustomResult } from '@/lib/maybe-result';
 

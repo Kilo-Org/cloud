@@ -4,7 +4,7 @@ import { differenceInDays, differenceInHours, differenceInMinutes, isPast } from
 import { Brain, CheckCircle2, ChevronRight, Clock, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { SecurityFinding } from '@/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 import { cn } from '@/lib/utils';
 import { AnalysisStatusBadge } from './AnalysisStatusBadge';
 import { FindingStatusBadge } from './FindingStatusBadge';

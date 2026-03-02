@@ -1,4 +1,5 @@
 import { parseSSEStream } from '@cloudflare/sandbox';
+import type { ExecEvent } from '@cloudflare/sandbox';
 import { stripVTControlCharacters } from 'node:util';
 import type {
   ExecutionSession,
@@ -16,7 +17,7 @@ import { logger } from './logger.js';
 import { z } from 'zod';
 import { withDORetry } from './utils/do-retry.js';
 import { downloadImagesToSandbox, buildAttachArgs } from './utils/image-download.js';
-import { createR2Client } from './utils/r2-client.js';
+import { createR2Client } from '@kilocode/worker-utils';
 import type { Images } from './router/schemas.js';
 
 const uuidSchema = z.uuid();
@@ -216,7 +217,7 @@ export async function* streamKilocodeExecution(
 
   try {
     // Create async iterator from parseSSEStream
-    const streamIterator = parseSSEStream(stream)[Symbol.asyncIterator]();
+    const streamIterator = parseSSEStream<ExecEvent>(stream)[Symbol.asyncIterator]();
 
     while (true) {
       // Race between getting the next event, interrupt detection, and server-side timeout
@@ -237,14 +238,14 @@ export async function* streamKilocodeExecution(
 
       const rawEvent = result.value;
       if (typeof rawEvent !== 'object' || !rawEvent) continue;
-      const event = rawEvent as Record<string, unknown>;
+      const event = rawEvent as ExecEvent;
       if (typeof event.type !== 'string') continue;
 
       const timestamp = new Date().toISOString();
 
       switch (event.type) {
         case 'stdout': {
-          const data = String(event.data || '');
+          const data = typeof event.data === 'string' ? event.data : '';
           const lines = data.split('\n').filter((line: string) => line.trim());
 
           for (const line of lines) {
@@ -254,10 +255,10 @@ export async function* streamKilocodeExecution(
               // Check if this is a session_created event
               if (
                 parsed.event === 'session_created' &&
-                parsed.sessionId &&
+                typeof parsed.sessionId === 'string' &&
                 !kiloSessionIdCaptured
               ) {
-                const capturedSessionId = String(parsed.sessionId);
+                const capturedSessionId = parsed.sessionId;
                 const uuidResult = uuidSchema.safeParse(capturedSessionId);
                 if (uuidResult.success) {
                   kiloSessionIdCaptured = true;
@@ -324,12 +325,13 @@ export async function* streamKilocodeExecution(
         }
 
         case 'stderr': {
-          yield emitOutputEvent(String(event.data || ''), 'stderr', timestamp, sessionId);
+          const stderrData = typeof event.data === 'string' ? event.data : '';
+          yield emitOutputEvent(stderrData, 'stderr', timestamp, sessionId);
           break;
         }
 
         case 'complete': {
-          const exitCode = Number.parseInt(String(event.exitCode || 0));
+          const exitCode = typeof event.exitCode === 'number' ? event.exitCode : 0;
 
           // Check if this was an interrupt (SIGINT=130, SIGTERM=143, SIGKILL=137)
           if (exitCode === 130 || exitCode === 143 || exitCode === 137) {
@@ -370,7 +372,7 @@ export async function* streamKilocodeExecution(
         case 'error': {
           yield {
             streamEventType: 'error',
-            error: String(event.error || 'Unknown error'),
+            error: typeof event.error === 'string' ? event.error : 'Unknown error',
             timestamp,
             sessionId,
           };

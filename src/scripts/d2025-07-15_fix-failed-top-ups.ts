@@ -1,4 +1,4 @@
-import { kilocode_users, user_admin_notes } from '@/db/schema';
+import { kilocode_users, user_admin_notes } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import { client } from '@/lib/stripe-client';

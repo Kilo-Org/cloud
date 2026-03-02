@@ -10,7 +10,7 @@ import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
 } from '@/lib/organizations/organization-types';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 import { randomUUID } from 'crypto';
 
 jest.mock('@/lib/providers/openrouter', () => {

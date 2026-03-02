@@ -6,7 +6,7 @@
  */
 
 import * as z from 'zod';
-import type { AutoTriageTicket } from '@/db/schema';
+import type { AutoTriageTicket } from '@kilocode/db/schema';
 import { AUTO_TRIAGE_CONSTANTS } from './constants';
 
 // ============================================================================

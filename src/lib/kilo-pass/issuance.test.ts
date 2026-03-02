@@ -8,7 +8,7 @@ import {
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_subscriptions,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { KiloPassAuditLogResult } from './enums';
 import { KiloPassAuditLogAction } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';

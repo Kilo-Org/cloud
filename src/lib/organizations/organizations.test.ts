@@ -5,7 +5,7 @@ import {
   organization_invitations,
   organization_memberships,
   organization_user_limits,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import {

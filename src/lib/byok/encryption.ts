@@ -1,13 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-
-/**
- * Simple encrypted data structure for BYOK API keys
- */
-export type EncryptedData = {
-  iv: string; // Initialization vector (base64)
-  data: string; // Encrypted data (base64)
-  authTag: string; // Authentication tag (base64)
-};
+export type { EncryptedData } from '@kilocode/db/schema-types';
+import type { EncryptedData } from '@kilocode/db/schema-types';
 
 /**
  * Encrypts a string using AES-256-GCM with the provided key

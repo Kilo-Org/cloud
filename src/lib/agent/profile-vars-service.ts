@@ -1,6 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import { agent_environment_profile_vars } from '@/db/schema';
+import { agent_environment_profile_vars } from '@kilocode/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@/lib/encryption';

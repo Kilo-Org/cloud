@@ -1,4 +1,4 @@
-import { api_request_log, type User } from '@/db/schema';
+import { api_request_log, type User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';

@@ -111,6 +111,8 @@ export type CloudAgentSessionState = {
   upstreamBranch?: string;
   /** Kilo CLI session ID for continuation (from session_created event) */
   kiloSessionId?: string;
+  /** Platform that created this session (e.g. slack, code-review, cloud-agent) */
+  createdOnPlatform?: string;
 
   // Execution params (for prepareSession flow)
   /** The prompt/task to execute */

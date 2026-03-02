@@ -10,7 +10,7 @@ import {
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
-import { type User } from '@/db/schema';
+import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import type { Span } from '@sentry/nextjs';

@@ -2,7 +2,7 @@ import { describe, test, expect } from '@jest/globals';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createMockUsageContext } from '@/tests/helpers/microdollar-usage.helper';
 import { db } from '@/lib/drizzle';
-import { kilocode_users, microdollar_usage } from '@/db/schema';
+import { kilocode_users, microdollar_usage } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
   insertUsageRecord,

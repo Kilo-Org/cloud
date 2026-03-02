@@ -1,7 +1,7 @@
 import { describe, expect, it, jest, beforeEach, beforeAll } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import * as cloudAgentModule from '@/lib/cloud-agent/cloud-agent-client';
 

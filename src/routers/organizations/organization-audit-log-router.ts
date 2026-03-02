@@ -4,7 +4,7 @@ import {
   OrganizationIdInputSchema,
   organizationOwnerProcedure,
 } from '@/routers/organizations/utils';
-import { organization_audit_logs } from '@/db/schema';
+import { organization_audit_logs } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { and, eq, lt, gt, desc, asc, count, min, max, ilike, gte, lte, inArray } from 'drizzle-orm';
 import { AuditLogAction } from '@/lib/organizations/organization-audit-logs';

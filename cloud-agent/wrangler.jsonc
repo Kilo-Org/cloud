@@ -8,9 +8,7 @@
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
   "compatibility_date": "2025-09-15",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
   "workers_dev": true,
   "dev": {
@@ -18,6 +16,7 @@
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "observability": {
     "enabled": true,
   },
@@ -137,15 +136,11 @@
   },
   "migrations": [
     {
-      "new_sqlite_classes": [
-        "Sandbox"
-      ],
+      "new_sqlite_classes": ["Sandbox"],
       "tag": "v1",
     },
     {
-      "new_sqlite_classes": [
-        "CloudAgentSession"
-      ],
+      "new_sqlite_classes": ["CloudAgentSession"],
       "tag": "v2",
     },
   ],

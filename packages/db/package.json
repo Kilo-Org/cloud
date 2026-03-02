@@ -1,0 +1,28 @@
+{
+  "name": "@kilocode/db",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./schema-types": "./src/schema-types.ts",
+    "./client": "./src/client.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "catalog:",
+    "pg": "^8.16.3",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@kilocode/eslint-config": "workspace:*",
+    "@types/pg": "^8.11.0",
+    "drizzle-kit": "^0.31.9",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

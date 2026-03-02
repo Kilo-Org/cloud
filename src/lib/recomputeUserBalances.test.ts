@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users, credit_transactions, microdollar_usage } from '@/db/schema';
+import { kilocode_users, credit_transactions, microdollar_usage } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { recomputeUserBalances, computeUserBalanceUpdates } from './recomputeUserBalances';
 import { insertTestUser } from '@/tests/helpers/user.helper';

@@ -151,6 +151,8 @@ export async function POST(request: NextRequest) {
     has_tools: false,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
     session_id: taskId ?? null,
+    mode: null,
+    auto_model: null,
   };
 
   setTag('ui.ai_model', fimModel_withOpenRouterStyleProviderPrefix);

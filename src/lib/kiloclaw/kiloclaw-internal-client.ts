@@ -16,6 +16,8 @@ import type {
   DoctorResponse,
   GatewayProcessStatusResponse,
   GatewayProcessActionResponse,
+  ConfigRestoreResponse,
+  ControllerVersionResponse,
 } from './types';
 
 /**
@@ -178,6 +180,10 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/gateway/status?userId=${encodeURIComponent(userId)}`);
   }
 
+  async getControllerVersion(userId: string): Promise<ControllerVersionResponse> {
+    return this.request(`/api/platform/controller-version?userId=${encodeURIComponent(userId)}`);
+  }
+
   async startGateway(userId: string): Promise<GatewayProcessActionResponse> {
     return this.request('/api/platform/gateway/start', {
       method: 'POST',
@@ -196,6 +202,13 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/gateway/restart', {
       method: 'POST',
       body: JSON.stringify({ userId }),
+    });
+  }
+
+  async restoreConfig(userId: string, version = 'base'): Promise<ConfigRestoreResponse> {
+    return this.request('/api/platform/config/restore', {
+      method: 'POST',
+      body: JSON.stringify({ userId, version }),
     });
   }
 }

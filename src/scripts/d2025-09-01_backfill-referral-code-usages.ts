@@ -6,7 +6,7 @@ import {
   referral_code_usages,
   credit_transactions,
   user_admin_notes,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { eq, and, isNull, gt } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import { referralRedeemingBonus, referralReferringBonus } from '@/lib/promoCreditCategories';

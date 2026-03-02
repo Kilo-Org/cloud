@@ -1,4 +1,4 @@
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 
 const ManuallyEnabledUsers = new Set(['9ff28f58-a37a-4d8a-ad45-bb0c9a4cd229']);
@@ -19,11 +19,3 @@ export function isEnabledForUser(user: User): boolean {
  */
 export const chunkCountToSizeKbSql = (chunkCountExpression: ReturnType<typeof sql.raw>) =>
   sql`ROUND((${chunkCountExpression} * 256.0 * 4.0 * 1.5 / 1024.0)::numeric, 2)`;
-
-/**
- * @deprecated Use chunkCountToSizeKbSql instead and format on the frontend
- * SQL fragment to calculate storage size in MB from chunk count.
- * Formula: chunks * 256 (embedding dimensions) * 4 (bytes per float) * 1.5 (overhead) / (1024*1024) (bytes to MB)
- */
-export const chunkCountToSizeMbSql = (chunkCountExpression: ReturnType<typeof sql.raw>) =>
-  sql`ROUND((${chunkCountExpression} * 256.0 * 4.0 * 1.5 / (1024.0*1024.0))::numeric, 2)`;

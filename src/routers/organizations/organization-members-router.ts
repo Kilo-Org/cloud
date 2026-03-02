@@ -6,7 +6,11 @@ import {
   getAcceptInviteUrl,
 } from '@/lib/organizations/organizations';
 import { updateOrganizationUserLimit } from '@/lib/organizations/organization-usage';
-import { organization_memberships, organization_invitations, kilocode_users } from '@/db/schema';
+import {
+  organization_memberships,
+  organization_invitations,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { db, sql } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {

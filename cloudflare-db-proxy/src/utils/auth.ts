@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { Env, ErrorCode } from '../types';
 
 /**
@@ -46,21 +47,6 @@ export function generateToken(): string {
  */
 export function verifyToken(providedToken: string, storedToken: string): boolean {
   return timingSafeEqual(providedToken, storedToken);
-}
-
-/**
- * Timing-safe string comparison using crypto.subtle.timingSafeEqual
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  const encoder = new TextEncoder();
-  const aBytes = encoder.encode(a);
-  const bBytes = encoder.encode(b);
-
-  if (aBytes.length !== bBytes.length) {
-    crypto.subtle.timingSafeEqual(aBytes, aBytes);
-    return false;
-  }
-  return crypto.subtle.timingSafeEqual(aBytes, bBytes);
 }
 
 /**

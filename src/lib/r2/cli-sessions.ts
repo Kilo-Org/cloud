@@ -8,7 +8,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'node:stream';
 import { r2Client, r2CliSessionsBucketName } from './client';
-import type { CliSession } from '@/db/schema';
+import type { CliSession } from '@kilocode/db/schema';
 
 export type FolderName = 'sessions' | 'shared-sessions';
 export type BlobUrlKeys = Extract<keyof CliSession, `${string}_blob_url`>;

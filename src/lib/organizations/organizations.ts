@@ -1,4 +1,4 @@
-import type { User, Organization, OrganizationInvitation } from '@/db/schema';
+import type { User, Organization, OrganizationInvitation } from '@kilocode/db/schema';
 import {
   type OrganizationRole,
   type UserOrganizationWithSeats,
@@ -14,7 +14,7 @@ import {
   organization_user_limits,
   organization_user_usage,
   organizations,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@/lib/drizzle';
 import { and, eq, isNull, gt } from 'drizzle-orm';

@@ -25,7 +25,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { KiloClawEnv } from '../types';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { deriveGatewayToken } from '../auth/gateway-token';
-import { createDatabaseConnection, InstanceStore } from '../db';
+import { getWorkerDb, getActiveInstance, markInstanceDestroyed } from '../db';
 import { buildEnvVars } from '../gateway/env';
 import {
   PersistedStateSchema,
@@ -102,6 +102,16 @@ const GatewayProcessStatusSchema: ZodType<GatewayProcessStatus> = z.object({
 
 const GatewayCommandResponseSchema = z.object({
   ok: z.boolean(),
+});
+
+const ConfigRestoreResponseSchema = z.object({
+  ok: z.boolean(),
+  signaled: z.boolean(),
+});
+
+const ControllerVersionResponseSchema = z.object({
+  version: z.string(),
+  commit: z.string(),
 });
 
 class GatewayControllerError extends Error {
@@ -714,7 +724,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         Array.isArray(cached.requests)
       ) {
         console.log(`[DO] pairing list served from KV cache (key=${cacheKey})`);
-        return { requests: cached.requests };
+        return { requests: cached.requests as typeof empty.requests };
       }
     }
 
@@ -744,9 +754,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     let pairing = empty;
     try {
-      const data = JSON.parse(result.stdout.trim());
-      if (Array.isArray(data.requests)) {
-        pairing = { requests: data.requests };
+      const data = JSON.parse(result.stdout.trim()) as unknown;
+      if (data && typeof data === 'object' && 'requests' in data && Array.isArray(data.requests)) {
+        pairing = { requests: data.requests as typeof empty.requests };
       }
     } catch {
       console.error('[DO] pairing list parse error:', result.stdout);
@@ -804,9 +814,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    if (!success) {
+      console.error('[DO] pairing approve failed:', result.stderr || result.stdout);
+    }
+
     return {
       success,
-      message: success ? 'Pairing approved' : result.stderr || result.stdout || 'Approval failed',
+      message: success ? 'Pairing approved' : 'Approval failed',
     };
   }
 
@@ -856,7 +870,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         Array.isArray(cached.requests)
       ) {
         console.log(`[DO] device pairing list served from KV cache (key=${cacheKey})`);
-        return { requests: cached.requests };
+        return { requests: cached.requests as typeof empty.requests };
       }
     }
 
@@ -888,9 +902,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     let pairing = empty;
     try {
-      const data = JSON.parse(result.stdout.trim());
-      if (Array.isArray(data.requests)) {
-        pairing = { requests: data.requests };
+      const data = JSON.parse(result.stdout.trim()) as unknown;
+      if (data && typeof data === 'object' && 'requests' in data && Array.isArray(data.requests)) {
+        pairing = { requests: data.requests as typeof empty.requests };
       }
     } catch {
       console.error(`[DO] device pairing list parse error: ${result.stdout} ${logCtx}`);
@@ -943,11 +957,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    if (!success) {
+      console.error('[DO] device pairing approve failed:', result.stderr || result.stdout);
+    }
+
     return {
       success,
-      message: success
-        ? 'Device pairing approved'
-        : result.stderr || result.stdout || 'Approval failed',
+      message: success ? 'Device pairing approved' : 'Approval failed',
     };
   }
 
@@ -1422,6 +1438,38 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       'POST',
       GatewayCommandResponseSchema
     );
+  }
+
+  async restoreConfig(version: string): Promise<{ ok: boolean; signaled: boolean }> {
+    await this.loadState();
+    return this.callGatewayController(
+      `/_kilo/config/restore/${encodeURIComponent(version)}`,
+      'POST',
+      ConfigRestoreResponseSchema
+    );
+  }
+
+  /** Returns null if the controller is too old to have the /_kilo/version endpoint. */
+  async getControllerVersion(): Promise<{ version: string; commit: string } | null> {
+    await this.loadState();
+    try {
+      return await this.callGatewayController(
+        '/_kilo/version',
+        'GET',
+        ControllerVersionResponseSchema
+      );
+    } catch (error) {
+      // Controllers that predate the /_kilo/version route: the request falls
+      // through to the catch-all proxy which returns 401 (REQUIRE_PROXY_TOKEN)
+      // or forwards to the gateway which returns 404 for the unknown path.
+      if (
+        error instanceof GatewayControllerError &&
+        (error.status === 404 || error.status === 401)
+      ) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -2422,9 +2470,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     try {
-      const db = createDatabaseConnection(connectionString);
-      const store = new InstanceStore(db);
-      const instance = await store.getActiveInstance(userId);
+      const db = getWorkerDb(connectionString);
+      const instance = await getActiveInstance(db, userId);
 
       if (!instance) {
         console.warn('[DO] No active instance found in Postgres for', userId);
@@ -2530,9 +2577,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     try {
-      const db = createDatabaseConnection(connectionString);
-      const store = new InstanceStore(db);
-      await store.markDestroyed(userId, sandboxId);
+      const db = getWorkerDb(connectionString);
+      await markInstanceDestroyed(db, userId, sandboxId);
       this.pendingPostgresMarkOnFinalize = false;
       await this.ctx.storage.put(storageUpdate({ pendingPostgresMarkOnFinalize: false }));
       return true;

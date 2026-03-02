@@ -8,6 +8,7 @@
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
     "test": "vitest run",
     "test:git": "tsx src/_integration_tests/test-git-integration.ts",
     "test:git-head": "tsx src/_integration_tests/test-git-head-and-history.ts",
@@ -15,20 +16,25 @@
   },
   "dependencies": {
     "@ashishkumar472/cf-git": "1.0.5",
+    "@kilocode/worker-utils": "workspace:*",
     "diff": "^8.0.3",
-    "jsonwebtoken": "^9.0.3",
-    "workers-tagged-logger": "^1.0.0",
-    "zod": "^4.1.12"
+    "drizzle-orm": "catalog:",
+    "jsonwebtoken": "catalog:",
+    "workers-tagged-logger": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/containers": "^0.0.30",
     "@cloudflare/sandbox": "0.6.7",
     "@cloudflare/workers-types": "^4.20251014.0",
-    "@types/jsonwebtoken": "^9.0.9",
+    "@kilocode/eslint-config": "workspace:*",
+    "@types/jsonwebtoken": "catalog:",
     "@types/node": "^22.10.1",
+    "drizzle-kit": "catalog:",
+    "eslint": "catalog:",
     "tsx": "^4.7.0",
-    "typescript": "^5.9.3",
+    "typescript": "catalog:",
     "vitest": "^4.0.18",
-    "wrangler": "^4.61.0"
+    "wrangler": "catalog:"
   }
 }

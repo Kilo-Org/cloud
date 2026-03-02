@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
-import { kiloclaw_instances } from '@/db/schema';
+import { kiloclaw_instances } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
 

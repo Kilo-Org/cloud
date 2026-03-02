@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { BooleanBadge } from '@/components/ui/boolean-badge';
 import { useQuery } from '@tanstack/react-query';
 import type { UserDetailProps } from '@/types/admin';
-import type { credit_transactions } from '@/db/schema';
+import type { credit_transactions } from '@kilocode/db/schema';
 import { ExternalLinkIcon } from 'lucide-react';
 
 type CreditTransaction = typeof credit_transactions.$inferSelect;

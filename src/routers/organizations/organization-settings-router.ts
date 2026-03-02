@@ -15,7 +15,7 @@ import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
-import { createProviderAwareModelAllowPredicate } from '@/lib/model-allow.server';
+import { createDenyLists, createProviderAwareModelAllowPredicate } from '@/lib/model-allow.server';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { listAvailableCustomLlms } from '@/lib/custom-llm/listAvailableCustomLlms';
 
@@ -221,6 +221,15 @@ export const organizationsSettingsRouter = createTRPCRouter({
       }
       if (provider_allow_list !== undefined) {
         settingsUpdate.provider_allow_list = [...new Set(provider_allow_list)]; // Deduplicate slugs
+      }
+
+      const denyLists = await createDenyLists(
+        settingsUpdate.model_allow_list,
+        settingsUpdate.provider_allow_list
+      );
+      if (denyLists) {
+        settingsUpdate.model_deny_list = denyLists.model_deny_list;
+        settingsUpdate.provider_deny_list = denyLists.provider_deny_list;
       }
 
       // Check if default_model needs to be cleared

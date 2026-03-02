@@ -3,7 +3,7 @@ import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
-import { user_feedback } from '@/db/schema';
+import { user_feedback } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
 

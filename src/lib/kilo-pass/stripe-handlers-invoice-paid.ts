@@ -6,7 +6,7 @@ import {
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
   kilocode_users,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';

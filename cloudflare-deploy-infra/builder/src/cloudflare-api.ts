@@ -150,7 +150,7 @@ export class CloudflareAPI {
 
       if (!response.ok) {
         const errorText = await response.text();
-        const errorObj = JSON.parse(errorText);
+        const errorObj: unknown = JSON.parse(errorText);
 
         throw new Error('Failed to create asset upload session', {
           cause: errorObj,
@@ -344,14 +344,17 @@ export class CloudflareAPI {
         }
 
         // Handle Durable Object class already exists (error code 10074)
-        if (
+        const errors =
           typeof errorObj === 'object' &&
           errorObj !== null &&
           'errors' in errorObj &&
-          Array.isArray(errorObj.errors) &&
-          errorObj.errors[0]?.code === 10074
-        ) {
-          const existingClass = errorObj.errors[0].message.match(/class "([^"]+)"/)?.[1];
+          Array.isArray(errorObj.errors)
+            ? (errorObj.errors as Array<Record<string, unknown>>)
+            : [];
+        const firstError = errors[0];
+        if (firstError?.code === 10074) {
+          const messageStr = typeof firstError.message === 'string' ? firstError.message : '';
+          const existingClass = messageStr.match(/class "([^"]+)"/)?.[1];
 
           if (existingClass && metadata.migrations) {
             // Filter out the existing class from migrations
@@ -373,7 +376,7 @@ export class CloudflareAPI {
             });
           }
 
-          throw new Error(`Durable Object class already exists: ${errorObj.errors[0].message}`);
+          throw new Error(`Durable Object class already exists: ${messageStr}`);
         }
 
         throw new Error('Failed to deploy worker', {

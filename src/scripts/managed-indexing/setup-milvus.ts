@@ -2,7 +2,7 @@ import { deleteCollectionIfExists, ensureCollectionExists } from '@/lib/code-ind
 import { DEFAULT_COLLECTION_NAME } from '@/lib/code-indexing/milvus-storage';
 import { cliConfirm } from '@/scripts/lib/cli-confirm';
 import { db } from '@/lib/drizzle';
-import { code_indexing_manifest } from '@/db/schema';
+import { code_indexing_manifest } from '@kilocode/db/schema';
 import { sql, getTableName } from 'drizzle-orm';
 
 export async function run() {

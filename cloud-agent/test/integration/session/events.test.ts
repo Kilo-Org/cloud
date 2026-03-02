@@ -10,6 +10,7 @@
 
 import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { EventId } from '../../../src/types/ids.js';
 
@@ -28,7 +29,8 @@ describe('Event Storage', () => {
     // The DO auto-runs migrations in constructor via blockConcurrencyWhile
     const result = await runInDurableObject(stub, async (_instance, state) => {
       // Create a fresh queries instance using the same storage
-      const events = createEventQueries(state.storage.sql);
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
       const eventId = events.insert({
         executionId: 'exec_123',
         sessionId: 'sess_1',
@@ -49,7 +51,8 @@ describe('Event Storage', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(id);
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
-      const events = createEventQueries(state.storage.sql);
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
       const now = Date.now();
 
       // Insert multiple events
@@ -135,7 +138,8 @@ describe('Event Storage', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(id);
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
-      const events = createEventQueries(state.storage.sql);
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
       const now = Date.now();
 
       // Insert events at different times
@@ -181,7 +185,8 @@ describe('Event Storage', () => {
     const stub = env.CLOUD_AGENT_SESSION.get(id);
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
-      const events = createEventQueries(state.storage.sql);
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
       const now = Date.now();
 
       // Insert events in sequence

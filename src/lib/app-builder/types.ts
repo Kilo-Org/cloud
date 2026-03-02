@@ -1,6 +1,6 @@
 import type { Owner } from '@/lib/integrations/core/types';
 import type { CloudMessage } from '@/components/cloud-agent/types';
-import type { app_builder_projects } from '@/db/schema';
+import type { app_builder_projects } from '@kilocode/db/schema';
 import type { Images } from '@/lib/images-schema';
 import type { AppBuilderGalleryTemplate } from '@/lib/app-builder/constants';
 

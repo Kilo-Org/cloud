@@ -1,5 +1,5 @@
-import type { AuditLog } from '../../db/schema';
-import { organization_audit_logs } from '../../db/schema';
+import type { AuditLog } from '@kilocode/db/schema';
+import { organization_audit_logs } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
 

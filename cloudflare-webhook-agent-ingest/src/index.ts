@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import { TriggerDO } from './dos/TriggerDO';
 import { logger } from './util/logger';
-import { resError, resSuccess } from './util/res';
+import { resError, resSuccess } from '@kilocode/worker-utils';
 import { inbound } from './routes/inbound';
 import { api } from './routes/api';
 import { callbacks } from './routes/callbacks';
@@ -18,6 +18,7 @@ export type HonoContext = {
 
 const app = new Hono<HonoContext>();
 
+// @ts-expect-error workers-tagged-logger returns Handler typed against an older hono; incompatible with hono 4.12+
 app.use('*', useWorkersLogger('webhook-agent'));
 
 app.get('/health', c => {

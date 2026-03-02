@@ -4,6 +4,7 @@
   "main": "test/test-worker.ts",
   "compatibility_date": "2025-09-15",
   "compatibility_flags": ["nodejs_compat"],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "durable_objects": {
     "bindings": [
       {

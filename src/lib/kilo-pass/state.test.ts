@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 
 import { db } from '@/lib/drizzle';
-import { kilo_pass_subscriptions, kilocode_users } from '@/db/schema';
+import { kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
 import { KiloPassCadence } from './enums';
 import { KiloPassTier } from '@/lib/kilo-pass/enums';
 

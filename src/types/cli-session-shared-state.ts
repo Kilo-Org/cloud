@@ -1,4 +1,1 @@
-export enum CliSessionSharedState {
-  Public = 'public',
-  Organization = 'organization',
-}
+export { CliSessionSharedState } from '@kilocode/db/schema-types';

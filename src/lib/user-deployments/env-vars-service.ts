@@ -1,7 +1,7 @@
 import 'server-only';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import type { Deployment } from '@/db/schema';
-import { deployment_env_vars, deployments } from '@/db/schema';
+import type { Deployment } from '@kilocode/db/schema';
+import { deployment_env_vars, deployments } from '@kilocode/db/schema';
 import { sql, eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@/lib/encryption';

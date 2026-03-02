@@ -114,6 +114,7 @@ type InitiateExecutionRequest = BaseExecutionRequest & {
   prompt: string;
   mode: ExecutionMode;
   model: string;
+  variant?: string;
   githubRepo?: string;
   githubToken?: string;
   gitUrl?: string;
@@ -147,6 +148,7 @@ type FollowupExecutionRequest = BaseExecutionRequest & {
   prompt: string;
   mode?: ExecutionMode;
   model?: string;
+  variant?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   tokenOverrides?: {
@@ -308,6 +310,7 @@ export type WrapperPlan = {
   model?: ModelConfig;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  variant?: string;
 };
 
 // ---------------------------------------------------------------------------

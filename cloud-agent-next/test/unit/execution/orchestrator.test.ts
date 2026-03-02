@@ -400,6 +400,16 @@ describe('WrapperPlan types', () => {
 
     expect(plan.kiloSessionId).toBeUndefined();
   });
+
+  it('includes variant when provided', () => {
+    const plan: WrapperPlan = {
+      kiloSessionId: 'kilo_sess',
+      model: { modelID: 'anthropic/claude-sonnet-4-20250514' },
+      variant: 'high',
+    };
+
+    expect(plan.variant).toBe('high');
+  });
 });
 
 // ---------------------------------------------------------------------------

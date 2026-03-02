@@ -28,22 +28,24 @@ type R2ListResult = {
 const xmlParser = new XMLParser();
 
 function parseListObjectsV2Response(xml: string): R2ListResult {
-  const parsed = xmlParser.parse(xml);
-  const result = parsed.ListBucketResult;
+  const parsed: Record<string, unknown> = xmlParser.parse(xml) as Record<string, unknown>;
+  const result = parsed.ListBucketResult as Record<string, unknown>;
 
   const isTruncated = result.IsTruncated === true || result.IsTruncated === 'true';
-  const nextContinuationToken: string | undefined = result.NextContinuationToken;
+  const nextContinuationToken = result.NextContinuationToken as string | undefined;
 
   // Contents may be absent (empty), a single object, or an array
   const raw = result.Contents;
   const entries: unknown[] = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fast-xml-parser returns untyped data
-  const objects: R2ListEntry[] = entries.map((entry: any) => ({
-    key: String(entry.Key),
-    size: Number(entry.Size),
-    lastModified: String(entry.LastModified),
-  }));
+  const objects: R2ListEntry[] = entries.map(entry => {
+    const e = entry as Record<string, unknown>;
+    return {
+      key: String(e.Key),
+      size: Number(e.Size),
+      lastModified: String(e.LastModified),
+    };
+  });
 
   return { objects, isTruncated, nextContinuationToken };
 }

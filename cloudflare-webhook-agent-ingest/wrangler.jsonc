@@ -8,6 +8,7 @@
   "compatibility_date": "2025-09-27",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "dev": {
     "port": 8793,
     "local_protocol": "http",

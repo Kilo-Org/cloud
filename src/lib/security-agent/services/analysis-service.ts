@@ -25,7 +25,9 @@ import type {
   SecurityFindingTriage,
   SecurityReviewOwner,
 } from '../core/types';
-import type { User, SecurityFinding } from '@/db/schema';
+import type { AnalysisErrorCode } from '../core/error-classification';
+import { classifyAnalysisError, isUserActionableError } from '../core/error-classification';
+import type { User, SecurityFinding } from '@kilocode/db/schema';
 import {
   trackSecurityAgentAnalysisStarted,
   trackSecurityAgentAnalysisCompleted,
@@ -44,6 +46,7 @@ import {
 } from '../core/constants';
 
 const log = sentryLogger('security-agent:analysis', 'info');
+const warn = sentryLogger('security-agent:analysis', 'warning');
 const logError = sentryLogger('security-agent:analysis', 'error');
 
 const ANALYSIS_PROMPT_TEMPLATE = `You are a security analyst reviewing a dependency vulnerability alert for a codebase.
@@ -260,7 +263,12 @@ export async function startSecurityAnalysis(params: {
   forceSandbox?: boolean;
   retrySandboxOnly?: boolean;
   organizationId?: string;
-}): Promise<{ started: boolean; error?: string; triageOnly?: boolean }> {
+}): Promise<{
+  started: boolean;
+  error?: string;
+  errorCode?: AnalysisErrorCode;
+  triageOnly?: boolean;
+}> {
   const {
     findingId,
     user,
@@ -504,27 +512,48 @@ export async function startSecurityAnalysis(params: {
     try {
       await client.initiateFromPreparedSession({ cloudAgentSessionId });
     } catch (initiateError) {
-      logError('initiateFromPreparedSession failed', {
-        correlationId,
-        findingId,
-        cloudAgentSessionId,
-        error: initiateError,
-      });
-      // Clean up the prepared session
-      void client.deleteSession(cloudAgentSessionId).catch(() => {});
-
       // Re-throw InsufficientCreditsError so it propagates to the caller
       if (initiateError instanceof InsufficientCreditsError) {
+        warn('Sandbox initiation blocked by insufficient credits', {
+          correlationId,
+          findingId,
+          cloudAgentSessionId,
+        });
+        // Clean up the prepared session
+        void client.deleteSession(cloudAgentSessionId).catch(() => {});
         throw initiateError;
       }
 
-      await updateAnalysisStatus(findingId, 'failed', {
-        error: initiateError instanceof Error ? initiateError.message : String(initiateError),
+      // Clean up the prepared session
+      void client.deleteSession(cloudAgentSessionId).catch(() => {});
+
+      const classified = classifyAnalysisError(initiateError);
+      // Default to SANDBOX_FAILED for initiation errors unless a more specific code applies
+      const isUnknown = classified.code === 'UNKNOWN';
+      const errorCode: AnalysisErrorCode = isUnknown ? 'SANDBOX_FAILED' : classified.code;
+      const userMessage = isUnknown
+        ? 'Sandbox analysis failed to start. Please try again.'
+        : classified.userMessage;
+
+      const isActionable = isUserActionableError(errorCode);
+      const logFn = isActionable ? warn : logError;
+      logFn('initiateFromPreparedSession failed', {
+        correlationId,
+        findingId,
+        cloudAgentSessionId,
+        errorCode,
+        error: initiateError,
       });
-      return {
-        started: false,
-        error: initiateError instanceof Error ? initiateError.message : String(initiateError),
-      };
+
+      if (!isActionable) {
+        captureException(initiateError, {
+          tags: { operation: 'initiateFromPreparedSession', errorCode },
+          extra: { findingId, cloudAgentSessionId, correlationId },
+        });
+      }
+
+      await updateAnalysisStatus(findingId, 'failed', { error: userMessage });
+      return { started: false, error: userMessage, errorCode };
     }
 
     return { started: true, triageOnly: false };
@@ -535,13 +564,25 @@ export async function startSecurityAnalysis(params: {
       throw error;
     }
 
+    const classified = classifyAnalysisError(error);
+
     await updateAnalysisStatus(findingId, 'failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: classified.userMessage,
     });
-    captureException(error, {
-      tags: { operation: 'startSecurityAnalysis' },
-      extra: { findingId, githubRepo, correlationId },
-    });
-    return { started: false, error: error instanceof Error ? error.message : String(error) };
+    if (isUserActionableError(classified.code)) {
+      warn('Analysis failed (user-actionable)', {
+        correlationId,
+        findingId,
+        githubRepo,
+        errorCode: classified.code,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } else {
+      captureException(error, {
+        tags: { operation: 'startSecurityAnalysis', errorCode: classified.code },
+        extra: { findingId, githubRepo, correlationId },
+      });
+    }
+    return { started: false, error: classified.userMessage, errorCode: classified.code };
   }
 }

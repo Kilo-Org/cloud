@@ -7,20 +7,25 @@
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
     "test": "jest"
   },
   "dependencies": {
-    "hono": "^4.11.4",
-    "workers-tagged-logger": "^1.0.0",
-    "zod": "^4.1.12"
+    "@kilocode/encryption": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "hono": "catalog:",
+    "workers-tagged-logger": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.8",
+    "@kilocode/eslint-config": "workspace:*",
     "@types/jest": "^30.0.0",
     "@types/node": "^22",
+    "eslint": "catalog:",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
-    "typescript": "^5.8.3",
-    "wrangler": "^4.61.0"
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
   }
 }

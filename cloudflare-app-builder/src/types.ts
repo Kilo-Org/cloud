@@ -83,13 +83,9 @@ export interface RepositoryStats {
 // ============================================
 // Git Service Types
 // ============================================
-export interface SqlExecutor {
-  <T = unknown>(query: TemplateStringsArray, ...values: (string | number | boolean | null)[]): T[];
-}
-
-export interface RepositoryBuildOptions {
+export type RepositoryBuildOptions = {
   gitObjects: Array<{ path: string; data: Uint8Array }>;
-}
+};
 
 export interface RefUpdate {
   oldOid: string;

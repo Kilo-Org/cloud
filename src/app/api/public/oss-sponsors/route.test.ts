@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { GET, OPTIONS } from './route';
 import { db } from '@/lib/drizzle';
-import { organizations, organization_memberships, kilocode_users } from '@/db/schema';
+import { organizations, organization_memberships, kilocode_users } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import type { OrganizationSettings } from '@/lib/organizations/organization-base-types';

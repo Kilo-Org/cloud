@@ -1,6 +1,6 @@
 'use client';
 
-import type { CreditTransaction } from '@/db/schema';
+import type { CreditTransaction } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { fetchCreditTransactionIdForStripeSession, getPaymentReturnUrl } from './actions';

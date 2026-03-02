@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLinkIcon, CreditCard } from 'lucide-react';
 import type { UserDetailProps } from '@/types/admin';
-import type { PaymentMethod } from '@/db/schema';
+import type { PaymentMethod } from '@kilocode/db/schema';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 
 type AdminPaymentMethod = PaymentMethod;

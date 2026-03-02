@@ -10,7 +10,9 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "resolveJsonModule": true,
+    "allowJs": true
   },
-  "include": ["worker-configuration.d.ts", "src/**/*.ts", "vitest.config.ts"]
+  "include": ["worker-configuration.d.ts", "src/**/*.ts", "vitest.config.ts", "drizzle/**/*"]
 }

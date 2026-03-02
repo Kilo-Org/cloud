@@ -125,8 +125,9 @@ describe('createApp', () => {
 
     const fetchCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(fetchCall[0]).toBe('https://api.machines.dev/v1/apps');
-    expect(fetchCall[1].method).toBe('POST');
-    const sentBody = JSON.parse(fetchCall[1].body);
+    const fetchInit = fetchCall[1] as RequestInit;
+    expect(fetchInit.method).toBe('POST');
+    const sentBody = JSON.parse(fetchInit.body as string) as unknown;
     expect(sentBody).toEqual({ app_name: 'acct-test', org_slug: 'test-org', network: 'acct-test' });
   });
 
@@ -135,8 +136,9 @@ describe('createApp', () => {
 
     await createApp(CONFIG, 'acct-abc123', 'org', USER_ID, METADATA_KEY);
 
-    const sentBody = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
-    expect(sentBody.network).toBe('acct-abc123');
+    const fetchInit = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    const sentBody = JSON.parse(fetchInit.body as string) as unknown;
+    expect(sentBody).toEqual(expect.objectContaining({ network: 'acct-abc123' }));
   });
 
   it('treats 409 as success when app has no machines (empty app)', async () => {
@@ -344,8 +346,9 @@ describe('allocateIP', () => {
 
     const fetchCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(fetchCall[0]).toBe('https://api.machines.dev/v1/apps/acct-test/ip_assignments');
-    expect(fetchCall[1].method).toBe('POST');
-    const sentBody = JSON.parse(fetchCall[1].body);
+    const fetchInit = fetchCall[1] as RequestInit;
+    expect(fetchInit.method).toBe('POST');
+    const sentBody = JSON.parse(fetchInit.body as string) as unknown;
     expect(sentBody).toEqual({ type: 'v6' });
   });
 
@@ -359,8 +362,9 @@ describe('allocateIP', () => {
 
     await allocateIP(TOKEN, 'acct-test', 'shared_v4');
 
-    const sentBody = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
-    expect(sentBody.type).toBe('shared_v4');
+    const fetchInit = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    const sentBody = JSON.parse(fetchInit.body as string) as unknown;
+    expect(sentBody).toEqual(expect.objectContaining({ type: 'shared_v4' }));
   });
 
   it('treats 409 as success (IP already allocated)', async () => {

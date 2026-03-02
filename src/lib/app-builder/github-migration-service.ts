@@ -2,7 +2,7 @@ import 'server-only';
 import type { Owner } from '@/lib/integrations/core/types';
 import * as appBuilderClient from '@/lib/app-builder/app-builder-client';
 import { db } from '@/lib/drizzle';
-import { app_builder_projects, deployments } from '@/db/schema';
+import { app_builder_projects, deployments } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import {
   fetchGitHubInstallationDetails,

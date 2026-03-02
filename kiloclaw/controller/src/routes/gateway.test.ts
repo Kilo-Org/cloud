@@ -10,6 +10,7 @@ function createMockSupervisor(): Supervisor {
     stop: vi.fn(async () => true),
     restart: vi.fn(async () => true),
     shutdown: vi.fn(async () => undefined),
+    signal: vi.fn(() => true),
     getState: vi.fn(() => state),
     getStats: vi.fn(() => ({
       state,

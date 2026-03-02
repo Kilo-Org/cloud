@@ -17,7 +17,7 @@ import { useState, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { UserAdminNote } from '@/db/schema';
+import type { UserAdminNote } from '@kilocode/db/schema';
 import { formatDate } from '@/lib/admin-utils';
 import type { NoteWithAdminUser, UserDetailProps } from '@/types/admin';
 

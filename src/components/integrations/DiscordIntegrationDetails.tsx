@@ -6,10 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, XCircle, MessageSquare, Settings, ExternalLink, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@/lib/constants';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 
 type DiscordIntegrationDetailsProps = {
   organizationId?: string;
@@ -36,6 +38,24 @@ export function DiscordIntegrationDetails({
   // Get OAuth URL for installation
   const { data: oauthUrlData } = useQuery(trpc.discord.getOAuthUrl.queryOptions(input));
 
+  // Fetch models for the model selector
+  const { data: openRouterModels, isLoading: isLoadingModels } =
+    useModelSelectorList(organizationId);
+
+  const modelOptions = useMemo<ModelOption[]>(() => {
+    return openRouterModels?.data.map(model => ({ id: model.id, name: model.name })) ?? [];
+  }, [openRouterModels]);
+
+  // Track selected model
+  const [selectedModel, setSelectedModel] = useState<string>('');
+
+  // Initialize selected model from installation data
+  useEffect(() => {
+    if (installationData?.installation?.modelSlug) {
+      setSelectedModel(installationData.installation.modelSlug);
+    }
+  }, [installationData?.installation?.modelSlug]);
+
   const uninstallApp = useMutation(
     trpc.discord.uninstallApp.mutationOptions({
       onSuccess: () => {
@@ -47,6 +67,16 @@ export function DiscordIntegrationDetails({
   );
 
   const testConnection = useMutation(trpc.discord.testConnection.mutationOptions());
+
+  const updateModel = useMutation(
+    trpc.discord.updateModel.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.discord.getInstallation.queryKey(input),
+        });
+      },
+    })
+  );
 
   const devRemoveDbRowOnly = useMutation(
     trpc.discord.devRemoveDbRowOnly.mutationOptions({
@@ -72,6 +102,32 @@ export function DiscordIntegrationDetails({
     if (oauthUrlData?.url) {
       window.location.href = oauthUrlData.url;
     }
+  };
+
+  const handleModelChange = (modelSlug: string) => {
+    const previousModel = selectedModel;
+    setSelectedModel(modelSlug);
+    updateModel.mutate(
+      { modelSlug, organizationId },
+      {
+        onSuccess: result => {
+          if (result.success) {
+            toast.success('Model updated successfully');
+          } else {
+            setSelectedModel(previousModel);
+            toast.error('Failed to update model', {
+              description: result.error,
+            });
+          }
+        },
+        onError: err => {
+          setSelectedModel(previousModel);
+          toast.error('Failed to update model', {
+            description: err.message,
+          });
+        },
+      }
+    );
   };
 
   const handleUninstall = () => {
@@ -202,6 +258,19 @@ export function DiscordIntegrationDetails({
                       : 'Unknown'}
                   </span>
                 </div>
+              </div>
+
+              {/* Model Selection */}
+              <div className="space-y-3 rounded-lg border p-4">
+                <ModelCombobox
+                  label="AI Model"
+                  helperText="Select the AI model to use when responding to Discord messages"
+                  models={modelOptions}
+                  value={selectedModel}
+                  onValueChange={handleModelChange}
+                  isLoading={isLoadingModels}
+                  placeholder="Select a model"
+                />
               </div>
 
               {/* Actions */}

@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { credit_transactions } from '@/db/schema';
+import { credit_transactions } from '@kilocode/db/schema';
 import { and, inArray } from 'drizzle-orm';
 
 export async function hasReceivedAnyFreeWelcomeCredits(userId: string) {

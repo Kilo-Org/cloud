@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
-import { deployment_events, deployment_builds, deployments } from '@/db/schema';
+import { deployment_events, deployment_builds, deployments } from '@kilocode/db/schema';
 import { USER_DEPLOYMENTS_API_AUTH_KEY } from '@/lib/config.server';
 import { and, eq, ne } from 'drizzle-orm';
 import * as z from 'zod';

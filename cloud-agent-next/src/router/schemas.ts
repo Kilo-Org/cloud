@@ -43,6 +43,7 @@ export const PromptPayload = z.object({
   prompt: z.string().min(1, 'Prompt is required').describe('The task prompt for Kilo Code'),
   mode: AgentModeSchema.describe('Kilo Code execution mode (required)'),
   model: modelIdSchema.describe('AI model to use (required)'),
+  variant: z.string().max(50).optional(),
 });
 
 /**
@@ -127,6 +128,7 @@ export const PrepareSessionInput = z
       .describe('The task prompt for Kilo Code'),
     mode: AgentModeSchema.describe('Kilo Code execution mode'),
     model: modelIdSchema.describe('AI model to use'),
+    variant: z.string().max(50).optional(),
 
     // Repository - one of these pairs required
     githubRepo: githubRepoSchema
@@ -200,6 +202,13 @@ export const PrepareSessionInput = z
       .max(100)
       .optional()
       .describe('Platform that created this session (e.g. slack, app-builder)'),
+    shallow: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        'Perform a shallow clone (depth: 1) for faster checkout and reduced disk usage. Useful when full git history is not needed.'
+      ),
   })
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
@@ -231,6 +240,7 @@ export const UpdateSessionInput = z
     // Scalar fields - null to clear, value to set, undefined to skip
     mode: AgentModeSchema.nullable().optional().describe('Mode to set (null to clear)'),
     model: modelIdSchema.nullable().optional().describe('Model to set (null to clear)'),
+    variant: z.string().max(50).nullable().optional(),
     githubToken: z.string().nullable().optional().describe('GitHub token to set (null to clear)'),
     gitToken: z.string().nullable().optional().describe('Git token to set (null to clear)'),
     upstreamBranch: branchNameSchema

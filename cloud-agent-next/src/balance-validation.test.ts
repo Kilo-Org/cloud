@@ -231,11 +231,11 @@ describe('balance-validation', () => {
           `${mockEnv.KILOCODE_BACKEND_BASE_URL}/api/profile/balance`,
           expect.objectContaining({
             method: 'GET',
-            headers: expect.any(Headers),
+            headers: expect.any(Headers) as unknown,
           })
         );
 
-        const [, init] = fetchMock.mock.calls[0];
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
         const headers = init.headers as Headers;
         expect(headers.get('Authorization')).toBe('Bearer valid-token');
         expect(headers.get('X-KiloCode-OrganizationId')).toBe(orgId);
@@ -249,7 +249,7 @@ describe('balance-validation', () => {
 
         await validateBalanceOnly('valid-token', undefined, mockEnv);
 
-        const [, init] = fetchMock.mock.calls[0];
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
         const headers = init.headers as Headers;
         expect(headers.get('Authorization')).toBe('Bearer valid-token');
         expect(headers.get('X-KiloCode-OrganizationId')).toBeNull();

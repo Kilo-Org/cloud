@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { modelStats } from '@/db/schema';
+import { modelStats } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { posthogQuery } from '@/lib/posthog-query';
 

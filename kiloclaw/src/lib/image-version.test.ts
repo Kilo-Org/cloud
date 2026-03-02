@@ -81,7 +81,7 @@ describe('registerVersionIfNeeded', () => {
     expect(versioned).toBeDefined();
     expect(latest).toBeDefined();
 
-    const parsedVersioned = JSON.parse(versioned!);
+    const parsedVersioned = JSON.parse(versioned!) as Record<string, unknown>;
     expect(parsedVersioned.openclawVersion).toBe('2026.2.9');
     expect(parsedVersioned.variant).toBe('default');
     expect(parsedVersioned.imageTag).toBe('dev-123');
@@ -109,7 +109,10 @@ describe('registerVersionIfNeeded', () => {
     const result = await registerVersionIfNeeded(kv, '2026.2.10', 'default', 'dev-456');
     expect(result).toBe(true);
 
-    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!);
+    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!) as Record<
+      string,
+      unknown
+    >;
     expect(latest.openclawVersion).toBe('2026.2.10');
     expect(latest.imageTag).toBe('dev-456');
   });
@@ -121,7 +124,10 @@ describe('registerVersionIfNeeded', () => {
     const result = await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-456');
     expect(result).toBe(true);
 
-    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!);
+    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!) as Record<
+      string,
+      unknown
+    >;
     expect(latest.imageTag).toBe('dev-456');
   });
 
@@ -130,7 +136,10 @@ describe('registerVersionIfNeeded', () => {
 
     await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-123', 'sha256:abc');
 
-    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!);
+    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!) as Record<
+      string,
+      unknown
+    >;
     expect(latest.imageDigest).toBe('sha256:abc');
   });
 });

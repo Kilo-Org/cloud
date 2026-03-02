@@ -8,7 +8,7 @@ import {
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
   microdollar_usage,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import {
   KiloPassCadence,
   KiloPassIssuanceItemKind,

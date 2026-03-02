@@ -4,9 +4,9 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
-import { byok_api_keys, organization_audit_logs } from '@/db/schema';
+import { byok_api_keys, organization_audit_logs } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 
 describe('BYOK Router', () => {
   let ownerUser: User;

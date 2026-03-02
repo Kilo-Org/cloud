@@ -1,10 +1,10 @@
-import { app_reported_messages } from '@/db/schema';
+import { app_reported_messages } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { generateMessageSignature } from '@/lib/app-reported-messages/messageSignature';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 
 let user: User;
 

@@ -8,7 +8,7 @@ import type {
   writebackDependabotDismissal as writebackDependabotDismissalType,
   maybeAutoDismissAnalysis as maybeAutoDismissAnalysisType,
 } from './auto-dismiss-service';
-import type { SecurityFinding } from '@/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingAnalysis } from '../core/types';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -69,9 +69,8 @@ let writebackDependabotDismissal: typeof writebackDependabotDismissalType;
 let maybeAutoDismissAnalysis: typeof maybeAutoDismissAnalysisType;
 
 beforeAll(async () => {
-  ({ writebackDependabotDismissal, maybeAutoDismissAnalysis } = await import(
-    './auto-dismiss-service'
-  ));
+  ({ writebackDependabotDismissal, maybeAutoDismissAnalysis } =
+    await import('./auto-dismiss-service'));
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────

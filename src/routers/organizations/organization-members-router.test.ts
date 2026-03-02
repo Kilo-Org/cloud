@@ -1,7 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import type { User, Organization } from '@/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 
 // Mock the email service to prevent actual API calls during tests
 jest.mock('@/lib/email', () => ({
@@ -391,7 +391,7 @@ describe('organizations members trpc router', () => {
 
       // Get the invitation ID from the database
       const { db } = await import('@/lib/drizzle');
-      const { organization_invitations } = await import('@/db/schema');
+      const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
 
       const invitation = await db
@@ -433,7 +433,7 @@ describe('organizations members trpc router', () => {
 
       // Get the invitation ID from the database
       const { db } = await import('@/lib/drizzle');
-      const { organization_invitations } = await import('@/db/schema');
+      const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
 
       const invitation = await db
@@ -481,7 +481,7 @@ describe('organizations members trpc router', () => {
 
       // Get the invitation ID from the database
       const { db } = await import('@/lib/drizzle');
-      const { organization_invitations } = await import('@/db/schema');
+      const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
 
       const invitation = await db

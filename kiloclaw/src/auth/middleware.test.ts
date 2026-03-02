@@ -5,26 +5,13 @@ import type { AppEnv } from '../types';
 import { authMiddleware, internalApiMiddleware } from './middleware';
 import { KILO_TOKEN_VERSION, KILOCLAW_AUTH_COOKIE } from '../config';
 
-vi.mock('../db', async importOriginal => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await importOriginal<typeof import('../db')>();
-  return {
-    ...actual,
-    // Return a fake Database whose UserStore.findPepperByUserId will resolve
-    // by delegating to the real query method with a fake result.
-    createDatabaseConnection: () => ({
-      __kind: 'Database' as const,
-      query: async (_text: string, values: Record<string, unknown> = {}) => {
-        // Return a matching pepper row for any userId.
-        // The pepper value matches what the test tokens contain.
-        const userId = Object.values(values)[0];
-        return [{ id: userId, api_token_pepper: `pepper_for_${userId}` }];
-      },
-      begin: async <T>(fn: (tx: unknown) => Promise<T>) => fn({} as never),
-      end: async () => {},
-    }),
-  };
-});
+vi.mock('../db', () => ({
+  getWorkerDb: vi.fn(() => ({})),
+  findPepperByUserId: vi.fn(async (_db: unknown, userId: string) => ({
+    id: userId,
+    api_token_pepper: `pepper_for_${userId}`,
+  })),
+}));
 
 const TEST_SECRET = 'test-nextauth-secret';
 

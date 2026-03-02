@@ -7,7 +7,7 @@ import {
   kilo_pass_issuances,
   kilo_pass_subscriptions,
   kilocode_users,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { KiloPassIssuanceItemKind, KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { and, eq, inArray } from 'drizzle-orm';
 

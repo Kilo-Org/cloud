@@ -18,5 +18,13 @@ describe('normalizeKilocodeModel', () => {
 
   it('preserves existing kilo prefix', () => {
     expect(normalizeKilocodeModel('kilo/code')).toBe('kilo/code');
+    expect(normalizeKilocodeModel('kilo/anthropic/claude-sonnet-4')).toBe(
+      'kilo/anthropic/claude-sonnet-4'
+    );
+  });
+
+  it('re-prefixes kilo/auto so it becomes a valid provider model', () => {
+    expect(normalizeKilocodeModel('kilo/auto')).toBe('kilo/kilo/auto');
+    expect(normalizeKilocodeModel('kilo/auto-medium')).toBe('kilo/kilo/auto-medium');
   });
 });

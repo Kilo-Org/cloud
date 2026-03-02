@@ -1,6 +1,11 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { app_builder_projects, kilocode_users, organizations, cliSessions } from '@/db/schema';
+import {
+  app_builder_projects,
+  kilocode_users,
+  organizations,
+  cliSessions,
+} from '@kilocode/db/schema';
 import * as z from 'zod';
 import { eq, and, or, ilike, desc, asc, count, isNotNull, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';

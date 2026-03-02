@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { kilo_pass_scheduled_changes } from '@/db/schema';
+import { kilo_pass_scheduled_changes } from '@kilocode/db/schema';
 import { auto_deleted_at } from '@/lib/drizzle';
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';

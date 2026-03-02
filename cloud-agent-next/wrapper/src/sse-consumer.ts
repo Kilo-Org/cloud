@@ -291,7 +291,8 @@ export function isTerminalErrorEvent(event: KiloSSEEvent): {
 
   // Check for API errors in event data
   if (isRecord(event.data) && event.data.error) {
-    const errorStr = String(event.data.error);
+    const rawError = event.data.error;
+    const errorStr = typeof rawError === 'string' ? rawError : JSON.stringify(rawError);
     if (
       errorStr.includes('payment') ||
       errorStr.includes('credit') ||

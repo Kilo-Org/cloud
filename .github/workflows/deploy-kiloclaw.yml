@@ -48,6 +48,8 @@ jobs:
           tags: |
             registry.fly.io/kiloclaw-machines:${{ github.sha }}
             registry.fly.io/kiloclaw-machines:latest
+          build-args: |
+            CONTROLLER_COMMIT=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

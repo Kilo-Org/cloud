@@ -1,4 +1,9 @@
-import type { MicrodollarUsage, Organization, OrganizationUserLimitType, User } from '@/db/schema';
+import type {
+  MicrodollarUsage,
+  Organization,
+  OrganizationUserLimitType,
+  User,
+} from '@kilocode/db/schema';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 import {
   organization_user_limits,
@@ -8,7 +13,7 @@ import {
   microdollar_usage,
   sharedCliSessions,
   cloud_agent_code_reviews,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
 import { and, eq, sql, gte, lte, not, inArray, count } from 'drizzle-orm';

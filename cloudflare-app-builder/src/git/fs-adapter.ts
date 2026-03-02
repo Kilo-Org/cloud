@@ -1,6 +1,6 @@
 /**
  * SQLite filesystem adapter for isomorphic-git
- * One DO = one Git repo, stored directly in SQLite
+ * One DO = one Git repo, stored directly in SQLite via Drizzle ORM
  *
  * Limits:
  * - Cloudflare DO SQLite: 10GB total storage
@@ -8,32 +8,59 @@
  * - Git objects are base64-encoded to safely store binary data
  */
 
-import type { SqlExecutor, ErrnoException } from '../types';
+import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
+import { eq, and, like } from 'drizzle-orm';
+
+import { gitObjects } from '../db/sqlite-schema';
+import type { ErrnoException } from '../types';
 import { MAX_OBJECT_SIZE } from './constants';
 
 export class SqliteFS {
-  private sql!: SqlExecutor; // Assigned in constructor
-  public promises!: this; // Set in init(), required by isomorphic-git
+  private db: DrizzleSqliteDODatabase;
+  public promises!: this;
 
-  constructor(sql: SqlExecutor) {
-    this.sql = sql;
+  constructor(db: DrizzleSqliteDODatabase) {
+    this.db = db;
   }
 
-  /**
-   * Get storage statistics for observability
-   */
+  init() {
+    // Ensure root directory exists
+    this.db
+      .insert(gitObjects)
+      .values({
+        path: '',
+        parent_path: '',
+        data: '',
+        is_dir: 1,
+        mtime: Date.now(),
+      })
+      .onConflictDoNothing()
+      .run();
+
+    // promises property required by isomorphic-git
+    Object.defineProperty(this, 'promises', {
+      value: this,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
+  }
+
   getStorageStats(): {
     totalObjects: number;
     totalBytes: number;
     largestObject: { path: string; size: number } | null;
   } {
-    const objects = this.sql<{
-      path: string;
-      data: string;
-      is_dir: number;
-    }>`SELECT path, data, is_dir FROM git_objects WHERE is_dir = 0`;
+    const objects = this.db
+      .select({
+        path: gitObjects.path,
+        data: gitObjects.data,
+      })
+      .from(gitObjects)
+      .where(eq(gitObjects.is_dir, 0))
+      .all();
 
-    if (!objects || objects.length === 0) {
+    if (objects.length === 0) {
       return { totalObjects: 0, totalBytes: 0, largestObject: null };
     }
 
@@ -56,42 +83,17 @@ export class SqliteFS {
     };
   }
 
-  init() {
-    // Create table
-    void this.sql`
-            CREATE TABLE IF NOT EXISTS git_objects (
-                path TEXT PRIMARY KEY,
-                parent_path TEXT NOT NULL DEFAULT '',
-                data TEXT NOT NULL,
-                is_dir INTEGER NOT NULL DEFAULT 0,
-                mtime INTEGER NOT NULL
-            )
-        `;
-
-    // Create indexes for efficient lookups
-    void this
-      .sql`CREATE INDEX IF NOT EXISTS idx_git_objects_parent ON git_objects(parent_path, path)`;
-    void this.sql`CREATE INDEX IF NOT EXISTS idx_git_objects_is_dir ON git_objects(is_dir, path)`;
-
-    // Ensure root directory exists
-    void this
-      .sql`INSERT OR IGNORE INTO git_objects (path, parent_path, data, is_dir, mtime) VALUES ('', '', '', 1, ${Date.now()})`;
-
-    // promises property required for isomorphic-git
-    Object.defineProperty(this, 'promises', {
-      value: this,
-      enumerable: true,
-      writable: false,
-      configurable: false,
-    });
-  }
-
   async readFile(path: string, options?: { encoding?: 'utf8' }): Promise<Uint8Array | string> {
     const normalized = path.replace(/^\/+/, '');
-    const result = this.sql<{
-      data: string;
-      is_dir: number;
-    }>`SELECT data, is_dir FROM git_objects WHERE path = ${normalized}`;
+    const result = this.db
+      .select({
+        data: gitObjects.data,
+        is_dir: gitObjects.is_dir,
+      })
+      .from(gitObjects)
+      .where(eq(gitObjects.path, normalized))
+      .all();
+
     if (!result[0]) {
       const error: ErrnoException = new Error(`ENOENT: no such file or directory, open '${path}'`);
       error.code = 'ENOENT';
@@ -140,7 +142,6 @@ export class SqliteFS {
       const sizeKB = (bytes.length / 1024).toFixed(2);
       const maxKB = (MAX_OBJECT_SIZE / 1024).toFixed(2);
 
-      // Provide helpful error message for git packfiles
       if (normalized.includes('.git/objects/pack/')) {
         throw new Error(
           `Git packfile too large: ${sizeKB}KB exceeds ${maxKB}KB limit. ` +
@@ -152,9 +153,12 @@ export class SqliteFS {
     }
 
     // Check if path exists as directory
-    const existing = this.sql<{
-      is_dir: number;
-    }>`SELECT is_dir FROM git_objects WHERE path = ${normalized}`;
+    const existing = this.db
+      .select({ is_dir: gitObjects.is_dir })
+      .from(gitObjects)
+      .where(eq(gitObjects.path, normalized))
+      .all();
+
     if (existing[0]?.is_dir === 1) {
       const error: ErrnoException = new Error(
         `EISDIR: illegal operation on a directory, open '${path}'`
@@ -174,8 +178,17 @@ export class SqliteFS {
       for (let i = 0; i < parts.length - 1; i++) {
         const dirPath = parts.slice(0, i + 1).join('/');
         const dirParent = i === 0 ? '' : parts.slice(0, i).join('/');
-        void this
-          .sql`INSERT OR IGNORE INTO git_objects (path, parent_path, data, is_dir, mtime) VALUES (${dirPath}, ${dirParent}, '', 1, ${now})`;
+        this.db
+          .insert(gitObjects)
+          .values({
+            path: dirPath,
+            parent_path: dirParent,
+            data: '',
+            is_dir: 1,
+            mtime: now,
+          })
+          .onConflictDoNothing()
+          .run();
       }
     }
 
@@ -189,16 +202,37 @@ export class SqliteFS {
       base64Content = btoa(binaryString);
     }
 
-    void this
-      .sql`INSERT OR REPLACE INTO git_objects (path, parent_path, data, is_dir, mtime) VALUES (${normalized}, ${parentPath}, ${base64Content}, 0, ${Date.now()})`;
+    const now = Date.now();
+    this.db
+      .insert(gitObjects)
+      .values({
+        path: normalized,
+        parent_path: parentPath,
+        data: base64Content,
+        is_dir: 0,
+        mtime: now,
+      })
+      .onConflictDoUpdate({
+        target: gitObjects.path,
+        set: {
+          parent_path: parentPath,
+          data: base64Content,
+          is_dir: 0,
+          mtime: now,
+        },
+      })
+      .run();
   }
 
   async unlink(path: string): Promise<void> {
     const normalized = path.replace(/^\/+/, '');
 
-    const existing = this.sql<{
-      is_dir: number;
-    }>`SELECT is_dir FROM git_objects WHERE path = ${normalized}`;
+    const existing = this.db
+      .select({ is_dir: gitObjects.is_dir })
+      .from(gitObjects)
+      .where(eq(gitObjects.path, normalized))
+      .all();
+
     if (!existing[0]) {
       const error: ErrnoException = new Error(
         `ENOENT: no such file or directory, unlink '${path}'`
@@ -216,15 +250,21 @@ export class SqliteFS {
       throw error;
     }
 
-    void this.sql`DELETE FROM git_objects WHERE path = ${normalized} AND is_dir = 0`;
+    this.db
+      .delete(gitObjects)
+      .where(and(eq(gitObjects.path, normalized), eq(gitObjects.is_dir, 0)))
+      .run();
   }
 
   async readdir(path: string): Promise<string[]> {
     const normalized = path.replace(/^\/+|\/+$/g, '');
 
-    const dirCheck = this.sql<{
-      is_dir: number;
-    }>`SELECT is_dir FROM git_objects WHERE path = ${normalized}`;
+    const dirCheck = this.db
+      .select({ is_dir: gitObjects.is_dir })
+      .from(gitObjects)
+      .where(eq(gitObjects.path, normalized))
+      .all();
+
     if (!dirCheck[0] || !dirCheck[0].is_dir) {
       const error: ErrnoException = new Error(
         `ENOENT: no such file or directory, scandir '${path}'`
@@ -235,19 +275,19 @@ export class SqliteFS {
       throw error;
     }
 
-    const rows = this.sql<{
-      path: string;
-    }>`SELECT path FROM git_objects WHERE parent_path = ${normalized}`;
+    const rows = this.db
+      .select({ path: gitObjects.path })
+      .from(gitObjects)
+      .where(eq(gitObjects.parent_path, normalized))
+      .all();
 
-    if (!rows || rows.length === 0) return [];
+    if (rows.length === 0) return [];
 
     // Extract just the basename from each path
-    const children = rows.map(row => {
+    return rows.map(row => {
       const parts = row.path.split('/');
       return parts[parts.length - 1];
     });
-
-    return children;
   }
 
   async mkdir(path: string, _options?: unknown): Promise<void> {
@@ -259,14 +299,14 @@ export class SqliteFS {
     const isDirectChildOfRoot = parts.length === 1;
 
     if (!isDirectChildOfRoot) {
-      // Check parent exists first (avoid unnecessary queries)
       const parentPath = parts.slice(0, -1).join('/');
-      const parent = this.sql<{
-        is_dir: number;
-      }>`SELECT is_dir FROM git_objects WHERE path = ${parentPath}`;
+      const parent = this.db
+        .select({ is_dir: gitObjects.is_dir })
+        .from(gitObjects)
+        .where(eq(gitObjects.path, parentPath))
+        .all();
+
       if (!parent[0] || parent[0].is_dir !== 1) {
-        // Parent doesn't exist - throw ENOENT
-        // Isomorphic-git's FileSystem wrapper will catch this and recursively create parent
         const error: ErrnoException = new Error(
           `ENOENT: no such file or directory, mkdir '${path}'`
         );
@@ -278,9 +318,12 @@ export class SqliteFS {
     }
 
     // Check if already exists (after parent check to fail fast on missing parent)
-    const existing = this.sql<{
-      is_dir: number;
-    }>`SELECT is_dir FROM git_objects WHERE path = ${normalized}`;
+    const existing = this.db
+      .select({ is_dir: gitObjects.is_dir })
+      .from(gitObjects)
+      .where(eq(gitObjects.path, normalized))
+      .all();
+
     if (existing[0]) {
       if (existing[0].is_dir === 1) {
         return;
@@ -294,8 +337,17 @@ export class SqliteFS {
     }
 
     const parentPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-    void this
-      .sql`INSERT OR IGNORE INTO git_objects (path, parent_path, data, is_dir, mtime) VALUES (${normalized}, ${parentPath}, '', 1, ${Date.now()})`;
+    this.db
+      .insert(gitObjects)
+      .values({
+        path: normalized,
+        parent_path: parentPath,
+        data: '',
+        is_dir: 1,
+        mtime: Date.now(),
+      })
+      .onConflictDoNothing()
+      .run();
   }
 
   async rmdir(path: string): Promise<void> {
@@ -305,10 +357,12 @@ export class SqliteFS {
       throw new Error('Cannot remove root directory');
     }
 
-    // Check if exists and is a directory
-    const existing = this.sql<{
-      is_dir: number;
-    }>`SELECT is_dir FROM git_objects WHERE path = ${normalized}`;
+    const existing = this.db
+      .select({ is_dir: gitObjects.is_dir })
+      .from(gitObjects)
+      .where(eq(gitObjects.path, normalized))
+      .all();
+
     if (!existing[0]) {
       const error: ErrnoException = new Error(`ENOENT: no such file or directory, rmdir '${path}'`);
       error.code = 'ENOENT';
@@ -324,10 +378,14 @@ export class SqliteFS {
       throw error;
     }
 
-    // Check if directory is empty (has no children)
-    const children = this.sql<{
-      path: string;
-    }>`SELECT path FROM git_objects WHERE path LIKE ${normalized + '/%'} LIMIT 1`;
+    // Check if directory is empty (has no direct children)
+    const children = this.db
+      .select({ path: gitObjects.path })
+      .from(gitObjects)
+      .where(eq(gitObjects.parent_path, normalized))
+      .limit(1)
+      .all();
+
     if (children.length > 0) {
       const error: ErrnoException = new Error(`ENOTEMPTY: directory not empty, rmdir '${path}'`);
       error.code = 'ENOTEMPTY';
@@ -336,18 +394,23 @@ export class SqliteFS {
       throw error;
     }
 
-    void this.sql`DELETE FROM git_objects WHERE path = ${normalized}`;
+    this.db.delete(gitObjects).where(eq(gitObjects.path, normalized)).run();
   }
 
   async stat(
     path: string
   ): Promise<{ type: 'file' | 'dir'; mode: number; size: number; mtimeMs: number }> {
     const normalized = path.replace(/^\/+/, '');
-    const result = this.sql<{
-      data: string;
-      mtime: number;
-      is_dir: number;
-    }>`SELECT data, mtime, is_dir FROM git_objects WHERE path = ${normalized}`;
+    const result = this.db
+      .select({
+        data: gitObjects.data,
+        mtime: gitObjects.mtime,
+        is_dir: gitObjects.is_dir,
+      })
+      .from(gitObjects)
+      .where(eq(gitObjects.path, normalized))
+      .all();
+
     if (!result[0]) {
       const error: ErrnoException = new Error(`ENOENT: no such file or directory, stat '${path}'`);
       error.code = 'ENOENT';
@@ -372,7 +435,7 @@ export class SqliteFS {
       mode: isDir ? 0o040755 : 0o100644,
       size,
       mtimeMs: row.mtime,
-      // Add full Node.js stat properties for isomorphic-git
+      // Node.js stat properties for isomorphic-git
       dev: 0,
       ino: 0,
       uid: 0,
@@ -380,7 +443,6 @@ export class SqliteFS {
       ctime: new Date(row.mtime),
       mtime: new Date(row.mtime),
       ctimeMs: row.mtime,
-      // Add methods that isomorphic-git expects
       isFile: () => !isDir,
       isDirectory: () => isDir,
       isSymbolicLink: () => false,
@@ -400,10 +462,6 @@ export class SqliteFS {
     return (await this.readFile(path, { encoding: 'utf8' })) as string;
   }
 
-  /**
-   * Check if a file or directory exists
-   * Required by isomorphic-git's init check
-   */
   async exists(path: string): Promise<boolean> {
     try {
       await this.stat(path);
@@ -416,27 +474,23 @@ export class SqliteFS {
     }
   }
 
-  /**
-   * Alias for writeFile (isomorphic-git sometimes uses 'write')
-   */
   async write(path: string, data: Uint8Array | string): Promise<void> {
     return await this.writeFile(path, data);
   }
 
-  /**
-   * Export all git objects for cloning
-   * Returns array of {path, data}
-   */
   exportGitObjects(): Array<{ path: string; data: Uint8Array }> {
-    const objects = this.sql<{ path: string; data: string; is_dir: number }>`
-            SELECT path, data, is_dir FROM git_objects WHERE path LIKE '.git/%'
-        `;
+    const objects = this.db
+      .select({
+        path: gitObjects.path,
+        data: gitObjects.data,
+      })
+      .from(gitObjects)
+      .where(and(like(gitObjects.path, '.git/%'), eq(gitObjects.is_dir, 0)))
+      .all();
 
     const exported: Array<{ path: string; data: Uint8Array }> = [];
 
     for (const obj of objects) {
-      if (obj.is_dir === 1) continue; // Skip directories, only export files
-
       // Decode base64 to binary
       const binaryString = atob(obj.data);
       const bytes = new Uint8Array(binaryString.length);

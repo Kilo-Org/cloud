@@ -1,6 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import { device_auth_requests, kilocode_users } from '@/db/schema';
+import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, lt, sql } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
 import { randomBytes } from 'node:crypto';

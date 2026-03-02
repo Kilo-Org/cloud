@@ -5,8 +5,8 @@ import {
   type NewSlackBotRequest,
   type SlackBotEventType,
   type SlackBotRequestStatus,
-} from '@/db/schema';
-import type { PlatformIntegration } from '@/db/schema';
+} from '@kilocode/db/schema';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 
 type LogSlackBotRequestParams = {
   // Slack identifiers

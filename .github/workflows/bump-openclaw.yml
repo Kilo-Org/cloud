@@ -1,0 +1,137 @@
+name: Check for new OpenClaw release
+
+on:
+  schedule:
+    - cron: '0 */12 * * *' # Every 12 hours (midnight and noon UTC)
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: kiloclaw/Dockerfile
+          sparse-checkout-cone-mode: false
+
+      - name: Get current pinned version
+        id: current
+        run: |
+          version=$(grep -oP 'openclaw@\K[0-9]+\.[0-9]+\.[0-9]+' kiloclaw/Dockerfile || true)
+          if [ -z "$version" ]; then
+            echo "::error::Failed to extract openclaw version from kiloclaw/Dockerfile"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Current pinned version: $version"
+
+      - name: Get latest stable release tag
+        id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(
+            gh api repos/openclaw/openclaw/git/refs/tags \
+              --paginate --jq '.[].ref' \
+            | sed 's|refs/tags/v||' \
+            | grep -vE '-' \
+            | sort -V \
+            | tail -1
+          )
+          if [ -z "$version" ]; then
+            echo "::error::Failed to find any stable openclaw release tags"
+            exit 1
+          fi
+          # Validate the version looks like a version number (no shell metacharacters)
+          if ! echo "$version" | grep -qP '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Latest tag does not look like a valid version: $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Latest stable release: $version"
+
+      - name: Check if release is less than 24 hours old
+        id: age
+        if: steps.latest.outputs.version != steps.current.outputs.version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          tag_date=$(
+            gh api "repos/openclaw/openclaw/git/refs/tags/v${LATEST_VERSION}" \
+              --jq '.object.url' \
+            | xargs gh api --jq '.tagger.date // .author.date'
+          )
+          if [ -z "$tag_date" ]; then
+            echo "::error::Failed to retrieve tag date for v${LATEST_VERSION}"
+            exit 1
+          fi
+          tag_epoch=$(date -d "$tag_date" +%s)
+          now_epoch=$(date +%s)
+          age_hours=$(( (now_epoch - tag_epoch) / 3600 ))
+          echo "Tag created $age_hours hours ago ($tag_date)"
+          if [ "$age_hours" -lt 24 ]; then
+            echo "recent=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "recent=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping — release is older than 24 hours"
+          fi
+
+      - name: Notify webhook of new release
+        if: steps.age.outputs.recent == 'true'
+        continue-on-error: true
+        env:
+          WEBHOOK_SECRET: ${{ secrets.KILOCLAW_GITHUB_WEBHOOK_TRIGGER_TOKEN }}
+          WEBHOOK_URL: ${{ secrets.OPENCLAW_BUMP_WEBHOOK_URL }}
+          NEW_VERSION: ${{ steps.latest.outputs.version }}
+          CURRENT_VERSION: ${{ steps.current.outputs.version }}
+        run: |
+          echo "New openclaw version available: $NEW_VERSION (current: $CURRENT_VERSION)"
+          curl -sf -o /dev/null -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-webhook-secret: $WEBHOOK_SECRET" \
+            -d "{\"new_openclaw_version\": \"$NEW_VERSION\"}" \
+            "$WEBHOOK_URL"
+
+      - name: Notify Slack
+        if: steps.age.outputs.recent == 'true'
+        continue-on-error: true
+        uses: slackapi/slack-github-action@v2
+        env:
+          CURRENT_VERSION: ${{ steps.current.outputs.version }}
+          NEW_VERSION: ${{ steps.latest.outputs.version }}
+        with:
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "New OpenClaw Release Available"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Current Version:*\n${{ env.CURRENT_VERSION }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*New Version:*\n${{ env.NEW_VERSION }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<https://github.com/openclaw/openclaw/releases/tag/v${{ env.NEW_VERSION }}|View release notes>"
+                  }
+                }
+              ]
+            }

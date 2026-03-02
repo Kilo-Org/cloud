@@ -11,12 +11,13 @@ import {
   cliSessions,
   cli_sessions_v2,
   credit_transactions,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
+import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
@@ -33,7 +34,11 @@ import { TRPCError } from '@trpc/server';
 import { assertNoError, successResult } from '@/lib/maybe-result';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { kilo_pass_issuances, kilo_pass_issuance_items, microdollar_usage } from '@/db/schema';
+import {
+  kilo_pass_issuances,
+  kilo_pass_issuance_items,
+  microdollar_usage,
+} from '@kilocode/db/schema';
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 import { fromMicrodollars } from '@/lib/utils';
 import { sum } from 'drizzle-orm';
@@ -44,7 +49,7 @@ import { recomputeUserBalances } from '@/lib/recomputeUserBalances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@/lib/stripe-client';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
-import { kilo_pass_scheduled_changes } from '@/db/schema';
+import { kilo_pass_scheduled_changes } from '@kilocode/db/schema';
 import {
   getKilocodeRepoOpenPullRequestCounts,
   getKilocodeRepoOpenPullRequestsSummary,
@@ -1081,6 +1086,7 @@ export const adminRouter = createTRPCRouter({
   }),
   appBuilder: adminAppBuilderRouter,
   kiloclawInstances: adminKiloclawInstancesRouter,
+  kiloclawVersions: adminKiloclawVersionsRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   bulkUserCredits: bulkUserCreditsRouter,

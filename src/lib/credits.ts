@@ -1,7 +1,7 @@
-import { credit_transactions } from '@/db/schema';
+import { credit_transactions } from '@kilocode/db/schema';
 
-import type { User } from '@/db/schema';
-import { kilocode_users } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { sql, eq } from 'drizzle-orm';
 import { after } from 'next/server';

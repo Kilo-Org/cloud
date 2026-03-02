@@ -1,4 +1,4 @@
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import type { PaymentMethodInfo } from './stripePaymentMethodInfo';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';

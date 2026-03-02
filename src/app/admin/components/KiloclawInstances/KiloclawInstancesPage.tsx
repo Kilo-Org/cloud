@@ -265,7 +265,7 @@ export function KiloclawInstancesPage() {
         ...queryStringState,
         ...overrides,
       });
-      router.push(`/admin/kiloclaw-instances?${queryString.toString()}`);
+      router.push(`/admin/kiloclaw?${queryString.toString()}`);
     },
     [router, queryStringState]
   );
@@ -428,11 +428,11 @@ export function KiloclawInstancesPage() {
                   className="hover:bg-muted/50 cursor-pointer"
                   tabIndex={0}
                   role="link"
-                  onClick={() => router.push(`/admin/kiloclaw-instances/${instance.id}`)}
+                  onClick={() => router.push(`/admin/kiloclaw/${instance.id}`)}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      router.push(`/admin/kiloclaw-instances/${instance.id}`);
+                      router.push(`/admin/kiloclaw/${instance.id}`);
                     }
                   }}
                 >

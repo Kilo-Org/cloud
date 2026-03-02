@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getOrganizationById } from '@/lib/organizations/organizations';
-import { organizations } from '@/db/schema';
+import { organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, sql } from 'drizzle-orm';
 import { toMicrodollars } from '@/lib/utils';

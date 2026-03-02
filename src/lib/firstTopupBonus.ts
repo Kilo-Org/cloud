@@ -1,4 +1,4 @@
-import type { User } from '@/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { grantCreditForCategory } from './promotionalCredits';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';

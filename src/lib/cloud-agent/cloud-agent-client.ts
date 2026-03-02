@@ -12,6 +12,8 @@ import { EventSourcePolyfill } from 'event-source-polyfill';
 import type { StreamEvent } from '@/components/cloud-agent/types';
 import type { EncryptedEnvelope } from '@/lib/encryption';
 import type { Images } from '@/lib/images-schema';
+import type { z } from 'zod';
+import type { executionStateSchema } from '@/routers/cloud-agent-schemas';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { createNoRetryEventSource } from '@/lib/trpc/noRetryEventSource';
@@ -205,16 +207,8 @@ export type GetSessionInput = {
   cloudAgentSessionId: string;
 };
 
-/** Execution state from cloud-agent DO */
-export type ExecutionState = {
-  id: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
-  startedAt?: number;
-  lastHeartbeat?: number;
-  processId?: string | null;
-  error?: string | null;
-  health?: 'healthy' | 'stale' | 'unknown';
-};
+/** Execution state from cloud-agent DO — derived from the Zod schema */
+export type ExecutionState = z.infer<typeof executionStateSchema>;
 
 /** Output from getSession procedure (sanitized, no secrets) */
 export type GetSessionOutput = {

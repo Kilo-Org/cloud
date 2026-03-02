@@ -176,7 +176,7 @@ describe('deliverCallbackJob', () => {
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
             Authorization: 'Bearer token123',
-          }),
+          }) as unknown,
         })
       );
     });

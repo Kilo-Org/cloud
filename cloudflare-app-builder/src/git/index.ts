@@ -10,7 +10,6 @@ export { GitVersionControl } from './git';
 export type {
   RefUpdate,
   ReceivePackResult,
-  SqlExecutor,
   RepositoryBuildOptions,
   CommitInfo,
   FileDiff,

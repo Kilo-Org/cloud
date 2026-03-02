@@ -11,7 +11,7 @@
 
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import { security_findings } from '@/db/schema';
+import { security_findings } from '@kilocode/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { trackSecurityAgentAutoDismiss } from '../posthog-tracking';

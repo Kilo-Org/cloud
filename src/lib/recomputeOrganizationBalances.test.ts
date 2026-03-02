@@ -2,7 +2,7 @@ import {
   credit_transactions as creditTransactionsTable,
   organizations,
   microdollar_usage,
-} from '@/db/schema';
+} from '@kilocode/db/schema';
 import { recomputeOrganizationBalances } from './recomputeOrganizationBalances';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';

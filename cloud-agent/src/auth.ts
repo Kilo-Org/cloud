@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import jwt from 'jsonwebtoken';
-import type { Env, TokenPayload } from './types.js';
+import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
+import type { Env } from './types.js';
 
 type StreamTicketPayload = {
   type: 'stream_ticket';
@@ -12,52 +13,24 @@ type StreamTicketPayload = {
   nonce?: string;
 };
 
-export function validateKiloToken(
+export async function validateKiloToken(
   authHeader: string | null,
   secret: string
-):
+): Promise<
   | { success: true; userId: string; token: string; botId?: string }
-  | { success: false; error: string } {
-  // Check header exists and has Bearer format
-  if (!authHeader) {
-    return { success: false, error: 'Missing Authorization header' };
+  | { success: false; error: string }
+> {
+  const token = extractBearerToken(authHeader);
+  if (!token) {
+    return { success: false, error: 'Missing or malformed Authorization header' };
   }
-
-  if (!authHeader.toLowerCase().startsWith('bearer ')) {
-    return { success: false, error: 'Invalid Authorization header format' };
-  }
-
-  const token = authHeader.substring(7).trim();
 
   try {
-    // Verify JWT signature and decode
-    const payload = jwt.verify(token, secret, {
-      algorithms: ['HS256'],
-    }) as TokenPayload;
-
-    // Validate token version
-    if (payload.version !== 3) {
-      return {
-        success: false,
-        error: `Invalid token version: ${payload.version}, expected 3`,
-      };
-    }
-
-    // Token is valid
-    return {
-      success: true,
-      userId: payload.kiloUserId,
-      token,
-      botId: payload.botId,
-    };
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return { success: false, error: 'Token expired' };
-    }
-    if (error instanceof jwt.JsonWebTokenError) {
-      return { success: false, error: 'Invalid token signature' };
-    }
-    return { success: false, error: 'Token validation failed' };
+    const payload = await verifyKiloToken(token, secret);
+    return { success: true, userId: payload.kiloUserId, token, botId: payload.botId };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'JWT verification failed';
+    return { success: false, error: message };
   }
 }
 
@@ -94,13 +67,13 @@ export function validateStreamTicket(
  * Validates JWT token and extracts user ID for tRPC context
  * @throws {TRPCError} If authentication fails
  */
-export function authenticate(
+export async function authenticate(
   request: Request,
   env: Env
-): { userId: string; token: string; botId?: string } {
+): Promise<{ userId: string; token: string; botId?: string }> {
   const authHeader = request.headers.get('authorization');
 
-  const result = validateKiloToken(authHeader, env.NEXTAUTH_SECRET);
+  const result = await validateKiloToken(authHeader, env.NEXTAUTH_SECRET);
 
   if (!result.success) {
     throw new TRPCError({

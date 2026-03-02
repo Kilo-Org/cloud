@@ -10,7 +10,7 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { auto_fix_tickets, type AutoFixTicket } from '@/db/schema';
+import { auto_fix_tickets, type AutoFixTicket } from '@kilocode/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 import type { Owner } from '../core/schemas';
 import { prepareFixPayload } from '../triggers/prepare-fix-payload';

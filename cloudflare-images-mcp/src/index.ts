@@ -21,7 +21,7 @@ function createMCPServer(env: Env, claims: ImageMCPTokenClaims): McpServer {
 
   let bucketPublicUrls: Record<string, string>;
   try {
-    bucketPublicUrls = JSON.parse(env.BUCKET_PUBLIC_URLS);
+    bucketPublicUrls = JSON.parse(env.BUCKET_PUBLIC_URLS) as Record<string, string>;
   } catch {
     throw new Error('BUCKET_PUBLIC_URLS env var is not valid JSON');
   }

@@ -4,6 +4,7 @@ export type BotType =
   | 'auto-triage'
   | 'auto-fix'
   | 'slack-bot'
+  | 'discord-bot'
   | 'webhook-bot';
 
 /**
@@ -34,6 +35,11 @@ const BOT_USER_PATTERNS = {
     idPrefix: 'bot-slack',
     emailSuffix: 'slack-bot',
     displayName: 'Slack Bot',
+  },
+  'discord-bot': {
+    idPrefix: 'bot-discord',
+    emailSuffix: 'discord-bot',
+    displayName: 'Discord Bot',
   },
   'webhook-bot': {
     idPrefix: 'bot-webhook',

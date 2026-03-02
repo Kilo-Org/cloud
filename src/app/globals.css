@@ -4,7 +4,38 @@
 */
 
 @import 'tw-animate-css';
+@import '@xterm/xterm/css/xterm.css';
 @plugin '@tailwindcss/typography';
+
+/* xterm overrides — Tailwind v4's preflight resets letter-spacing, line-height,
+   and font-family on all elements via *, which breaks xterm's precise character
+   grid layout. Re-assert the critical properties with enough specificity. */
+.xterm {
+  font-feature-settings: normal !important;
+  font-variation-settings: normal !important;
+  letter-spacing: normal !important;
+  line-height: normal !important;
+}
+
+.xterm-helpers {
+  position: absolute;
+  opacity: 0;
+}
+/* xterm's helper textarea is used for IME/clipboard but Tailwind v4's reset
+   overrides its off-screen positioning, making it visible as a garbled box.
+   Re-assert the off-screen placement with enough specificity to survive the reset. */
+
+.xterm .xterm-helper-textarea {
+  position: absolute !important;
+  opacity: 0 !important;
+  left: -9999em !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
 
 @theme inline {
   --color-background: var(--background);

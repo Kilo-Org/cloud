@@ -1,6 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
-import { agent_environment_profiles } from '@/db/schema';
+import { agent_environment_profiles } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { ProfileOwner } from './types';

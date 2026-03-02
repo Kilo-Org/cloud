@@ -30,7 +30,7 @@ import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
-import type { Organization, User } from '@/db/schema';
+import type { Organization, User } from '@kilocode/db/schema';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {

@@ -10,6 +10,7 @@
   "compatibility_date": "2025-09-15",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "workers_dev": true,
   "dev": {
     "port": 8794,
@@ -118,7 +119,7 @@
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.0.29",
+        "KILOCODE_CLI_VERSION": "7.0.33",
       },
       "max_instances": 150,
       "rollout_active_grace_period": 120,
@@ -244,7 +245,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.0.29",
+            "KILOCODE_CLI_VERSION": "7.0.33",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,

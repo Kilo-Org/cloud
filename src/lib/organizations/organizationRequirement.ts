@@ -1,7 +1,11 @@
 import type { OptionalError } from '@/lib/maybe-result';
 import type { Awaitable } from 'next-auth';
 import { db } from '@/lib/drizzle';
-import { credit_transactions, organization_memberships, type Organization } from '@/db/schema';
+import {
+  credit_transactions,
+  organization_memberships,
+  type Organization,
+} from '@kilocode/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 
 export type OrganizationRequirement = (orgInfo: Organization) => Awaitable<OptionalError<string>>;

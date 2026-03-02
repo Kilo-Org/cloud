@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { kilo_pass_subscriptions } from '@/db/schema';
+import { kilo_pass_subscriptions } from '@kilocode/db/schema';
 
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';

@@ -124,8 +124,8 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <Blocks />,
   },
   {
-    title: () => 'KiloClaw Instances',
-    url: '/admin/kiloclaw-instances',
+    title: () => 'KiloClaw',
+    url: '/admin/kiloclaw',
     icon: () => <Server />,
   },
   {

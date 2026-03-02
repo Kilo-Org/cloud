@@ -45,6 +45,7 @@
     "@aws-sdk/s3-request-presigner": "^3.980.0",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/llm-shared": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@lottiefiles/dotlottie-react": "^0.17.6",
     "@mdx-js/loader": "^3.1.1",

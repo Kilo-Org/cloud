@@ -1,0 +1,38 @@
+{
+  "name": "llm-gateway",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy --outdir dist --upload-source-maps --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE --org=kilo-code --project=llm-gateway && sentry-cli sourcemaps upload --org=kilo-code --project=llm-gateway --release=$_SENTRY_RELEASE --strip-prefix 'dist/..' dist",
+    "postdeploy": "pnpm sentry:sourcemaps"
+  },
+  "dependencies": {
+    "hono": "catalog:",
+    "zod": "catalog:",
+    "drizzle-orm": "catalog:",
+    "pg": "^8.16.3",
+    "@kilocode/worker-utils": "workspace:*",
+    "@kilocode/db": "workspace:*",
+    "@kilocode/llm-shared": "workspace:*",
+    "@sentry/cloudflare": "^10.25.0",
+    "workers-tagged-logger": "catalog:",
+    "jsonwebtoken": "catalog:",
+    "ai": "^6.0.78",
+    "@ai-sdk/anthropic": "^3.0.41",
+    "@ai-sdk/openai": "^3.0.27"
+  },
+  "devDependencies": {
+    "wrangler": "catalog:",
+    "typescript": "catalog:",
+    "@cloudflare/workers-types": "^4.20260120.0",
+    "@sentry/cli": "^2.58.2",
+    "@types/jsonwebtoken": "catalog:",
+    "@types/pg": "^8.11.0"
+  }
+}

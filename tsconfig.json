@@ -12,7 +12,8 @@
       "@/*": ["./src/*"],
       "@kilocode/db": ["./packages/db/src/index.ts"],
       "@kilocode/db/*": ["./packages/db/src/*"],
-      "@kilocode/encryption": ["./packages/encryption/src/index.ts"]
+      "@kilocode/encryption": ["./packages/encryption/src/index.ts"],
+      "@kilocode/llm-shared": ["./packages/llm-shared/src/index.ts"]
     },
     "allowJs": true,
     "noEmit": true,

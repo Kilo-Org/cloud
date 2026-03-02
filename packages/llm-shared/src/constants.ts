@@ -1,0 +1,2 @@
+export const PROMOTION_MAX_REQUESTS = 10000;
+export const PROMOTION_WINDOW_HOURS = 24;

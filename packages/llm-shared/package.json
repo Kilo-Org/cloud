@@ -1,0 +1,21 @@
+{
+  "name": "@kilocode/llm-shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "catalog:",
+    "openai": "^6.22.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@ai-sdk/gateway": "^3.0.16",
+    "@ai-sdk/anthropic": "^3.0.41"
+  }
+}

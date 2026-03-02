@@ -1,0 +1,43 @@
+{
+  "name": "llm-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "placement": { "mode": "smart" },
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "BYOK_CACHE",
+      "id": "<to-be-created>",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "secret_name": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "OPENROUTER_API_KEY",
+      "secret_name": "OPENROUTER_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "SENTRY_DSN",
+      "secret_name": "LLM_GATEWAY_SENTRY_DSN",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+  },
+}

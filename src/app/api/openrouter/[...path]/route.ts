@@ -1,28 +1,48 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
+
+import {
+  createAnonymousContext,
+  isAnonymousContext,
+  type AnonymousUserContext,
+  ENABLE_TOOL_REPAIR,
+  repairTools,
+  estimateChatTokens,
+  extractPromptInfo,
+  type MicrodollarUsageContext,
+  FEATURE_HEADER,
+  validateFeatureHeader,
+  generateProviderSpecificHash,
+  getToolsAvailable,
+  getToolsUsed,
+  isActiveCloudAgentPromo,
+  isActiveReviewPromo,
+  isDataCollectionRequiredOnKiloCodeOnly,
+  isDeadFreeModel,
+  isFreeModel,
+  isFreePromptTrainingAllowed,
+  isKiloAutoModel,
+  resolveAutoModel,
+  isKiloFreeModel,
+  isRateLimitedToDeath,
+  normalizeModelId,
+  type OpenRouterChatCompletionRequest,
+  PROMOTION_MAX_REQUESTS,
+  PROMOTION_WINDOW_HOURS,
+} from '@kilocode/llm-shared';
+
 import { stripRequiredPrefix } from '@/lib/utils';
-import { generateProviderSpecificHash } from '@/lib/providerHash';
-import { extractPromptInfo, type MicrodollarUsageContext } from '@/lib/processUsage';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import { applyProviderSpecificLogic, getProvider, openRouterRequest } from '@/lib/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
-  isFreeModel,
-  isDataCollectionRequiredOnKiloCodeOnly,
-  isDeadFreeModel,
-  isKiloFreeModel,
-} from '@/lib/models';
-import {
   accountForMicrodollarUsage,
   alphaPeriodEndedResponse,
   captureProxyError,
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
-  estimateChatTokens,
   extractFraudAndProjectHeaders,
   invalidPathResponse,
   invalidRequestResponse,
@@ -34,33 +54,16 @@ import {
   wrapInSafeNextResponse,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
-import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
 import { rewriteFreeModelResponse } from '@/lib/rewriteModelResponse';
-import {
-  createAnonymousContext,
-  isAnonymousContext,
-  type AnonymousUserContext,
-} from '@/lib/anonymous';
 import {
   checkFreeModelRateLimit,
   logFreeModelRequest,
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
-import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import { classifyAbuse } from '@/lib/abuse-service';
-import {
-  emitApiMetricsForResponse,
-  getToolsAvailable,
-  getToolsUsed,
-} from '@/lib/o11y/api-metrics.server';
+import { emitApiMetricsForResponse } from '@/lib/o11y/api-metrics.server';
 import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
-import { normalizeModelId } from '@/lib/model-utils';
-import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
-import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
-import { isActiveCloudAgentPromo } from '@/lib/promotions/cloud-agent-promo';
-import { isKiloAutoModel, resolveAutoModel } from '@/lib/kilo-auto-model';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 

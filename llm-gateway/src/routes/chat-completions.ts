@@ -48,7 +48,7 @@ import {
 import { getWorkerDb } from '../lib/db.js';
 import { authenticateRequest } from '../services/auth.js';
 import { getProvider, createProviders } from '../services/provider.js';
-import { getBalanceAndOrgSettings } from '../services/balance.js';
+import { getBalanceAndOrgSettings, usageLimitExceededResponse } from '../services/balance.js';
 import {
   checkFreeModelRateLimit,
   logFreeModelRequest,
@@ -57,8 +57,11 @@ import {
 import { upstreamRequest } from '../services/upstream.js';
 import { classifyAbuse } from '../services/abuse.js';
 import { customLlmRequest } from '../services/custom-llm.js';
+import { rewriteFreeModelResponse, makeErrorReadable } from '../services/response-transforms.js';
 import { countAndStoreUsage } from '../background/usage-accounting.js';
 import { captureProxyError } from '../background/error-capture.js';
+import { handleRequestLogging } from '../background/request-log.js';
+import { emitApiMetrics } from '../background/metrics.js';
 import { logger } from '../logger.js';
 
 const MAX_TOKENS_LIMIT = 99999999999;
@@ -170,7 +173,10 @@ export async function handleChatCompletions(c: Context<HonoEnv>): Promise<Respon
     }
 
     // 8. Provider selection
-    const providers = createProviders({ openrouterApiKey: env.OPENROUTER_API_KEY });
+    const providers = createProviders({
+      openrouterApiKey: env.OPENROUTER_API_KEY,
+      vercelApiKey: env.VERCEL_AI_GATEWAY_API_KEY,
+    });
     const taskId = c.req.header('x-kilocode-taskid')?.slice(0, 500)?.trim() || undefined;
     const {
       provider,
@@ -183,19 +189,41 @@ export async function handleChatCompletions(c: Context<HonoEnv>): Promise<Respon
       organizationId,
       taskId,
       db,
-      providers
+      providers,
+      env.BYOK_CACHE,
+      env.BYOK_ENCRYPTION_KEY
     );
 
     logger.debug(`Routing request to ${provider.id}`, { provider: provider.id });
 
     // 9. Abuse classification (non-blocking, 2s timeout)
-    const classifyPromise = classifyAbuse(c.req.raw, requestBodyParsed, {
-      kiloUserId: user.id,
-      organizationId,
-      projectId: c.req.header('x-kilocode-projectid')?.slice(0, 500)?.trim() || null,
-      provider: provider.id,
-      isByok: !!userByok,
-    });
+    // Fraud headers & editor name are extracted later; read them early for classify
+    const classifyFraudHeaders = {
+      http_x_forwarded_for: c.req.header('x-forwarded-for') || null,
+      http_x_vercel_ip_city: c.req.header('x-vercel-ip-city') || null,
+      http_x_vercel_ip_country: c.req.header('x-vercel-ip-country') || null,
+      http_x_vercel_ip_latitude: c.req.header('x-vercel-ip-latitude')
+        ? Number(c.req.header('x-vercel-ip-latitude'))
+        : null,
+      http_x_vercel_ip_longitude: c.req.header('x-vercel-ip-longitude')
+        ? Number(c.req.header('x-vercel-ip-longitude'))
+        : null,
+      http_x_vercel_ja4_digest: c.req.header('x-vercel-ja4-digest') || null,
+      http_user_agent: c.req.header('user-agent') || null,
+    };
+    const classifyPromise = classifyAbuse(
+      requestBodyParsed,
+      classifyFraudHeaders,
+      c.req.header('x-kilocode-editorname')?.slice(0, 500)?.trim() || null,
+      {
+        kiloUserId: user.id,
+        organizationId,
+        projectId: c.req.header('x-kilocode-projectid')?.slice(0, 500)?.trim() || null,
+        provider: provider.id,
+        isByok: !!userByok,
+      },
+      env
+    );
 
     // 10. Max tokens check
     if (requestBodyParsed.max_tokens && requestBodyParsed.max_tokens > MAX_TOKENS_LIMIT) {
@@ -215,20 +243,8 @@ export async function handleChatCompletions(c: Context<HonoEnv>): Promise<Respon
     const tokenEstimates = estimateChatTokens(requestBodyParsed);
     const promptInfo = extractPromptInfo(requestBodyParsed);
 
-    // Extract fraud detection headers
-    const fraudHeaders = {
-      http_x_forwarded_for: c.req.header('x-forwarded-for') || null,
-      http_x_vercel_ip_city: c.req.header('x-vercel-ip-city') || null,
-      http_x_vercel_ip_country: c.req.header('x-vercel-ip-country') || null,
-      http_x_vercel_ip_latitude: c.req.header('x-vercel-ip-latitude')
-        ? Number(c.req.header('x-vercel-ip-latitude'))
-        : null,
-      http_x_vercel_ip_longitude: c.req.header('x-vercel-ip-longitude')
-        ? Number(c.req.header('x-vercel-ip-longitude'))
-        : null,
-      http_x_vercel_ja4_digest: c.req.header('x-vercel-ja4-digest') || null,
-      http_user_agent: c.req.header('user-agent') || null,
-    };
+    // Reuse fraud detection headers extracted earlier for abuse classification
+    const fraudHeaders = classifyFraudHeaders;
 
     const projectId = c.req.header('x-kilocode-projectid')?.slice(0, 500)?.trim() || null;
 
@@ -273,18 +289,7 @@ export async function handleChatCompletions(c: Context<HonoEnv>): Promise<Respon
         !isActiveReviewPromo(botId, originalModelIdLowerCased) &&
         !isActiveCloudAgentPromo(tokenSource, originalModelIdLowerCased)
       ) {
-        // TODO: Port full usageLimitExceededResponse with payment history
-        return Response.json(
-          {
-            error: {
-              title: 'Low Credit Warning!',
-              message: 'Add credits to continue, or switch to a free model',
-              balance,
-              buyCreditsUrl: 'https://app.kilo.ai/profile',
-            },
-          },
-          { status: 402 }
-        );
+        return usageLimitExceededResponse(user.id, balance, db);
       }
 
       const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
@@ -340,7 +345,8 @@ export async function handleChatCompletions(c: Context<HonoEnv>): Promise<Respon
           requestBodyParsed,
           user.id,
           taskId,
-          !!fraudHeaders.http_user_agent?.startsWith('Kilo-Code/')
+          !!fraudHeaders.http_user_agent?.startsWith('Kilo-Code/'),
+          db
         )
       : await upstreamRequest({
           path: '/chat/completions',
@@ -370,9 +376,59 @@ export async function handleChatCompletions(c: Context<HonoEnv>): Promise<Respon
 
     // Background: usage accounting
     const clonedResponse = response.clone();
-    c.executionCtx.waitUntil(countAndStoreUsage(clonedResponse, usageContext));
+    c.executionCtx.waitUntil(countAndStoreUsage(clonedResponse, usageContext, env));
 
-    // Background: error capture
+    // Background: request logging (needs its own DB connection since main handler closes in finally)
+    c.executionCtx.waitUntil(
+      (async () => {
+        const {
+          db: logDb,
+          connect: logConnect,
+          end: logEnd,
+        } = getWorkerDb(env.HYPERDRIVE.connectionString);
+        await logConnect();
+        try {
+          await handleRequestLogging({
+            clonedResponse: response.clone(),
+            userId: isAnonymousContext(user) ? undefined : user.id,
+            userEmail: isAnonymousContext(user) ? undefined : user.google_user_email,
+            organizationId: organizationId ?? null,
+            provider: provider.id,
+            model: requestBodyParsed.model,
+            request: requestBodyParsed,
+            db: logDb,
+          });
+        } finally {
+          await logEnd().catch(() => {});
+        }
+      })()
+    );
+
+    // Background: metrics emission
+    c.executionCtx.waitUntil(
+      emitApiMetrics(
+        {
+          clientSecret: env.O11Y_CLIENT_SECRET,
+          kiloUserId: user.id,
+          organizationId,
+          isAnonymous: isAnonymousContext(user),
+          isStreaming: requestBodyParsed.stream === true,
+          userByok: !!userByok,
+          provider: provider.id,
+          requestedModel: originalModelIdLowerCased,
+          resolvedModel: requestBodyParsed.model,
+          toolsAvailable,
+          toolsUsed,
+          ttfbMs,
+          completeRequestMs: Math.max(0, Math.round(performance.now() - requestStartedAt)),
+          statusCode: response.status,
+        },
+        env.O11Y_SERVICE_URL,
+        env.O11Y_CLIENT_SECRET
+      )
+    );
+
+    // Background: error capture for 402
     if (response.status === 402 && !userByok) {
       c.executionCtx.waitUntil(
         captureProxyError({
@@ -387,6 +443,20 @@ export async function handleChatCompletions(c: Context<HonoEnv>): Promise<Respon
       return temporarilyUnavailableResponse();
     }
 
+    // Error readability transform for 400+
+    if (response.status >= 400) {
+      const readableError = await makeErrorReadable({
+        requestedModel: originalModelIdLowerCased,
+        request: requestBodyParsed,
+        response: response.clone(),
+        isUserByok: !!userByok,
+      });
+      if (readableError) {
+        return readableError;
+      }
+    }
+
+    // Background: error capture for other 400+
     if (response.status >= 400) {
       c.executionCtx.waitUntil(
         captureProxyError({
@@ -398,6 +468,17 @@ export async function handleChatCompletions(c: Context<HonoEnv>): Promise<Respon
           trackInSentry: response.status >= 500,
         })
       );
+    }
+
+    // Free model response rewrite
+    const shouldRewrite =
+      !customLlmRecord &&
+      (isFreeModel(originalModelIdLowerCased) ||
+        isActiveReviewPromo(botId, originalModelIdLowerCased) ||
+        isActiveCloudAgentPromo(tokenSource, originalModelIdLowerCased));
+
+    if (shouldRewrite) {
+      return rewriteFreeModelResponse(response, originalModelIdLowerCased);
     }
 
     // Return response to client

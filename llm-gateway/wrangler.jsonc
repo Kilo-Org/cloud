@@ -36,6 +36,46 @@
       "secret_name": "LLM_GATEWAY_SENTRY_DSN",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
     },
+    {
+      "binding": "BYOK_ENCRYPTION_KEY",
+      "secret_name": "BYOK_ENCRYPTION_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "ABUSE_SERVICE_URL",
+      "secret_name": "ABUSE_SERVICE_URL",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "ABUSE_SERVICE_CF_ACCESS_CLIENT_ID",
+      "secret_name": "ABUSE_SERVICE_CF_ACCESS_CLIENT_ID",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET",
+      "secret_name": "ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "POSTHOG_API_KEY",
+      "secret_name": "POSTHOG_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "O11Y_SERVICE_URL",
+      "secret_name": "O11Y_SERVICE_URL",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "O11Y_CLIENT_SECRET",
+      "secret_name": "O11Y_CLIENT_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
+    {
+      "binding": "VERCEL_AI_GATEWAY_API_KEY",
+      "secret_name": "VERCEL_AI_GATEWAY_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+    },
   ],
   "vars": {
     "ENVIRONMENT": "production",

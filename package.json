@@ -30,7 +30,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts"
+    "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts",
+    "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts"
   },
   "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
   "dependencies": {

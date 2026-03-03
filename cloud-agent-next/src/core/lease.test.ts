@@ -18,8 +18,8 @@ describe('Lease Logic', () => {
       expect(HEARTBEAT_INTERVAL_MS).toBe(30_000);
     });
 
-    it('should have STALE_THRESHOLD_MS set to 10 minutes', () => {
-      expect(STALE_THRESHOLD_MS).toBe(10 * 60 * 1000);
+    it('should have STALE_THRESHOLD_MS set to 90 seconds', () => {
+      expect(STALE_THRESHOLD_MS).toBe(90_000);
     });
   });
 

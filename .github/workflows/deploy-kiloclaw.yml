@@ -39,6 +39,7 @@ jobs:
           password: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Build and push Docker image
+        id: docker-build
         uses: docker/build-push-action@v6
         with:
           context: kiloclaw
@@ -74,7 +75,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: kiloclaw
-          command: deploy --var FLY_IMAGE_TAG:${{ github.sha }} --var OPENCLAW_VERSION:${{ steps.openclaw-version.outputs.version }}
+          command: deploy --var FLY_IMAGE_TAG:${{ github.sha }} --var OPENCLAW_VERSION:${{ steps.openclaw-version.outputs.version }} --var FLY_IMAGE_DIGEST:${{ steps.docker-build.outputs.digest }}
 
       - name: Notify Slack
         continue-on-error: true

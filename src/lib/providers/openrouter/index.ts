@@ -13,7 +13,7 @@ import {
   getModelSettings,
   getOpenCodeSettings,
   getVersionedModelSettings,
-} from '@/lib/providers/recommended-models';
+} from '@/lib/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/kilo-auto-model';
 
 // Re-export from shared module for backwards compatibility

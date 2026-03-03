@@ -25,6 +25,17 @@ export type ProcessedMessage = {
 };
 
 /**
+ * Autocommit status for a single turn, keyed by assistant message ID.
+ */
+export type AutocommitStatus = {
+  status: 'in_progress' | 'completed' | 'failed';
+  message: string;
+  timestamp: string;
+  commitHash?: string;
+  commitMessage?: string;
+};
+
+/**
  * Callbacks for state change notifications.
  * All callbacks are optional - only subscribe to what you need.
  *
@@ -93,6 +104,9 @@ export type EventProcessorCallbacks = {
 
   /** Called when a question is answered or rejected (question.replied / question.rejected) */
   onQuestionResolved?: (requestId: string) => void;
+
+  /** Called when an autocommit event (started/completed) is received with a messageId */
+  onAutocommitUpdated?: (messageId: string, status: AutocommitStatus) => void;
 };
 
 /**

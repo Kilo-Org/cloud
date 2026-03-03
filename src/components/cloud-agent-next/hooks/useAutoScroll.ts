@@ -12,7 +12,7 @@
  * - Provides manual scroll-to-bottom function
  */
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAtom } from 'jotai';
 import { chatUIAtom } from '../store/atoms';
 
@@ -33,13 +33,29 @@ type UseAutoScrollReturn = {
  * Hook for managing auto-scroll behavior in the chat message container.
  *
  * @param dynamicMessages - The dynamic messages array (triggers auto-scroll effect)
+ * @param extraScrollTriggers - Additional values that should trigger auto-scroll when changed
+ *   (e.g. autocommit status map, session status indicator, standalone question)
  * @returns Refs, state, and handlers for auto-scroll behavior
  */
-export function useAutoScroll(dynamicMessages: unknown[]): UseAutoScrollReturn {
+export function useAutoScroll(
+  dynamicMessages: unknown[],
+  extraScrollTriggers: unknown[] = []
+): UseAutoScrollReturn {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [chatUI, setChatUI] = useAtom(chatUIAtom);
   const [showScrollButton, setShowScrollButton] = useState(false);
+
+  // Serialize extra triggers into a single stable dependency so the useEffect
+  // dependency count stays constant regardless of array length.
+  // Custom replacer handles Map (JSON.stringify produces "{}" for Map by default).
+  const extraTriggersKey = useMemo(
+    () =>
+      JSON.stringify(extraScrollTriggers, (_key, value: unknown) =>
+        value instanceof Map ? [...value] : value
+      ),
+    [extraScrollTriggers]
+  );
 
   // Auto-scroll effect - only scroll when dynamic messages change AND user is near bottom
   // Note: staticMessages intentionally excluded - they never change once rendered
@@ -54,7 +70,7 @@ export function useAutoScroll(dynamicMessages: unknown[]): UseAutoScrollReturn {
         });
       }
     }
-  }, [dynamicMessages, chatUI.shouldAutoScroll]);
+  }, [dynamicMessages, extraTriggersKey, chatUI.shouldAutoScroll]);
 
   // Handle scroll events to detect if user scrolled up
   const handleScroll = useCallback(() => {

@@ -169,7 +169,7 @@ async function main() {
           // Send interrupted event before aborting
           state.sendToIngest({
             streamEventType: 'interrupted',
-            data: { reason: 'User killed execution' },
+            data: { reason: 'Session stopped' },
             timestamp: new Date().toISOString(),
           });
           // Abort the kilo session
@@ -240,6 +240,7 @@ async function main() {
       openConnection: () => connectionManager.open(),
       getMaxRuntimeMs: () => getLifecycleManager().getMaxRuntimeMs(),
       setAborted: () => getLifecycleManager().setAborted(),
+      resetLifecycle: () => getLifecycleManager().reset(),
     },
     () => getLifecycleManager().triggerDrainAndClose()
   );

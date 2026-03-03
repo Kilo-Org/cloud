@@ -161,7 +161,8 @@ export function createSessionMessagingHandlers() {
                 session,
                 sessionContext.workspacePath,
                 sessionService.metadata.gitUrl,
-                input.gitToken
+                input.gitToken,
+                sessionService.metadata.platform
               );
             }
           }

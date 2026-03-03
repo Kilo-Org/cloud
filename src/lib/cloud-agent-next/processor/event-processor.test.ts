@@ -445,7 +445,7 @@ describe('createEventProcessor', () => {
       expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
     });
 
-    it('should update session status to idle and set streaming false', () => {
+    it('should update session status to idle without stopping streaming (complete event does that)', () => {
       const callbacks: EventProcessorCallbacks = {
         onSessionStatusChanged: jest.fn(),
         onStreamingChanged: jest.fn(),
@@ -460,7 +460,7 @@ describe('createEventProcessor', () => {
         })
       );
 
-      // Then set to idle
+      // Then set to idle — streaming should NOT stop yet
       processor.processEvent(
         createKilocodeEvent('session.status', {
           sessionID: 'session-123',
@@ -469,7 +469,9 @@ describe('createEventProcessor', () => {
       );
 
       expect(callbacks.onSessionStatusChanged).toHaveBeenLastCalledWith({ type: 'idle' });
-      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
+      // onStreamingChanged should only have been called once (busy=true)
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
     });
 
     it('should handle retry status without changing streaming state', () => {
@@ -676,6 +678,7 @@ describe('createEventProcessor', () => {
       expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
 
       // Child session emits idle — should NOT set streaming false
+      // (neither root nor child idle stops streaming; only `complete` does)
       processor.processEvent(createKilocodeEvent('session.idle', { sessionID: 'child-1' }));
 
       // onStreamingChanged should only have been called once (the busy=true)
@@ -786,11 +789,8 @@ describe('createEventProcessor', () => {
 
       // Message should be force-completed
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
-      // onError should fire
-      expect(callbacks.onError).toHaveBeenCalledWith(
-        'The model failed to generate a response',
-        'child-1'
-      );
+      // No ErrorBanner — the session is still alive
+      expect(callbacks.onError).not.toHaveBeenCalled();
       // streaming should still be true (only 1 call: the busy=true)
       expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
     });
@@ -990,12 +990,8 @@ describe('createEventProcessor', () => {
         null
       );
 
-      // Should stop streaming and fire error
-      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
-      expect(callbacks.onError).toHaveBeenCalledWith(
-        'The model failed to generate a response',
-        'session-123'
-      );
+      // No ErrorBanner — the session is still alive, user can retry
+      expect(callbacks.onError).not.toHaveBeenCalled();
     });
 
     it('should not force-complete messages when reason is not error', () => {
@@ -1278,6 +1274,526 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onQuestionAsked).not.toHaveBeenCalled();
       expect(callbacks.onStandaloneQuestionAsked).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('termination events (interrupted, wrapper_disconnected, error)', () => {
+    it('interrupted should stop streaming and force-complete messages without calling onError', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onMessageUpdated: jest.fn(),
+        onMessageCompleted: jest.fn(),
+        onStreamingChanged: jest.fn(),
+        onError: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Start streaming
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // Create an in-flight assistant message
+      processor.processEvent(
+        createKilocodeEvent('message.updated', {
+          info: createAssistantInfo('msg-1'),
+        })
+      );
+
+      // Interrupted event (top-level streamEventType, not kilocode-wrapped)
+      processor.processEvent(createEvent('interrupted', { reason: 'Session stopped' }));
+
+      expect(callbacks.onError).not.toHaveBeenCalled();
+      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
+      expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
+    });
+
+    it('wrapper_disconnected should stop streaming and force-complete messages without calling onError', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onMessageUpdated: jest.fn(),
+        onMessageCompleted: jest.fn(),
+        onStreamingChanged: jest.fn(),
+        onError: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Start streaming
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // Create an in-flight assistant message
+      processor.processEvent(
+        createKilocodeEvent('message.updated', {
+          info: createAssistantInfo('msg-1'),
+        })
+      );
+
+      // Wrapper disconnected event
+      processor.processEvent(createEvent('wrapper_disconnected', { reason: 'container died' }));
+
+      expect(callbacks.onError).not.toHaveBeenCalled();
+      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
+      expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
+    });
+
+    it('bare error (fatal) should stop streaming and force-complete messages without calling onError', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onMessageUpdated: jest.fn(),
+        onMessageCompleted: jest.fn(),
+        onStreamingChanged: jest.fn(),
+        onError: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Start streaming
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // Create an in-flight assistant message
+      processor.processEvent(
+        createKilocodeEvent('message.updated', {
+          info: createAssistantInfo('msg-1'),
+        })
+      );
+
+      // Fatal error event
+      processor.processEvent(createEvent('error', { error: 'Process killed', fatal: true }));
+
+      expect(callbacks.onError).not.toHaveBeenCalled();
+      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
+      expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
+    });
+
+    it('session.error after interrupted should be silently dropped', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+        onError: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Start streaming
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // Interrupted event
+      processor.processEvent(createEvent('interrupted', { reason: 'Session stopped' }));
+
+      // session.error arrives as an aftershock (CLI dying)
+      processor.processEvent(
+        createKilocodeEvent('session.error', {
+          sessionID: 'session-123',
+          error: 'MessageAbortedError',
+        })
+      );
+
+      // onError should NOT have been called — the session.error is an aftershock
+      expect(callbacks.onError).not.toHaveBeenCalled();
+    });
+
+    it('session.error without prior termination should still call onError', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+        onError: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Start streaming
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // session.error without any prior termination event
+      processor.processEvent(
+        createKilocodeEvent('session.error', {
+          sessionID: 'session-123',
+          error: 'Something went wrong',
+        })
+      );
+
+      expect(callbacks.onError).toHaveBeenCalledWith('Something went wrong', 'session-123');
+    });
+
+    it('clear() should reset terminated state', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+        onError: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Start streaming, then interrupt
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+      processor.processEvent(createEvent('interrupted', { reason: 'Session stopped' }));
+
+      // Clear and start fresh
+      processor.clear();
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // session.error should now trigger onError again (terminated was reset)
+      processor.processEvent(
+        createKilocodeEvent('session.error', {
+          sessionID: 'session-123',
+          error: 'Real error',
+        })
+      );
+
+      expect(callbacks.onError).toHaveBeenCalledWith('Real error', 'session-123');
+    });
+
+    it('session.error after interrupted + new busy status should call onError', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+        onError: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // First execution: start streaming, then interrupt
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+      processor.processEvent(createEvent('interrupted', { reason: 'Session stopped' }));
+
+      // Second execution: new busy status (user sent another message)
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // session.error from the NEW execution should NOT be suppressed
+      processor.processEvent(
+        createKilocodeEvent('session.error', {
+          sessionID: 'session-123',
+          error: 'Real error from new execution',
+        })
+      );
+
+      expect(callbacks.onError).toHaveBeenCalledWith(
+        'Real error from new execution',
+        'session-123'
+      );
+    });
+  });
+
+  describe('complete event (execution fully done)', () => {
+    it('should stop streaming when complete event arrives', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Start streaming
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
+
+      // Complete event arrives (wrapper finished including autocommit)
+      processor.processEvent(createEvent('complete', {}));
+
+      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
+    });
+
+    it('should stop streaming only on complete, not on session.idle', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+        onSessionStatusChanged: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Start streaming
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+
+      // Session goes idle (CLI finished, autocommit about to start)
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'idle' },
+        })
+      );
+
+      // Streaming should still be true (only busy=true call so far)
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledWith(true);
+
+      // Complete event arrives after autocommit
+      processor.processEvent(createEvent('complete', {}));
+
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(2);
+      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
+    });
+
+    it('should be a no-op when not streaming', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Complete without ever starting streaming
+      processor.processEvent(createEvent('complete', {}));
+
+      expect(callbacks.onStreamingChanged).not.toHaveBeenCalled();
+    });
+
+    it('full lifecycle: busy → idle → autocommit → complete', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onStreamingChanged: jest.fn(),
+        onSessionStatusChanged: jest.fn(),
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // 1. Session starts
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'busy' },
+        })
+      );
+      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(true);
+
+      // 2. CLI finishes, session goes idle
+      processor.processEvent(
+        createKilocodeEvent('session.status', {
+          sessionID: 'session-123',
+          status: { type: 'idle' },
+        })
+      );
+      // Still streaming
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
+
+      // 3. Autocommit starts
+      processor.processEvent(
+        createEvent('autocommit_started', { message: 'Committing...', messageId: 'msg-1' })
+      );
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledTimes(1);
+      // Still streaming
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
+
+      // 4. Autocommit completes
+      processor.processEvent(
+        createEvent('autocommit_completed', {
+          success: true,
+          message: 'Done',
+          messageId: 'msg-1',
+          commitHash: 'abc123',
+        })
+      );
+      // Still streaming (complete hasn't fired yet)
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(1);
+
+      // 5. Wrapper sends complete
+      processor.processEvent(createEvent('complete', {}));
+      expect(callbacks.onStreamingChanged).toHaveBeenCalledTimes(2);
+      expect(callbacks.onStreamingChanged).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  describe('autocommit events', () => {
+    it('autocommit_started with messageId should fire onAutocommitUpdated with in_progress', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      processor.processEvent(
+        createEvent('autocommit_started', {
+          message: 'Generating commit message...',
+          messageId: 'msg-42',
+        })
+      );
+
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledTimes(1);
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledWith(
+        'msg-42',
+        expect.objectContaining({
+          status: 'in_progress',
+          message: 'Generating commit message...',
+          timestamp: expect.any(String),
+        })
+      );
+    });
+
+    it('autocommit_started without messageId should not fire callback', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      processor.processEvent(
+        createEvent('autocommit_started', { message: 'Generating commit message...' })
+      );
+
+      expect(callbacks.onAutocommitUpdated).not.toHaveBeenCalled();
+    });
+
+    it('autocommit_started should use default message when none provided', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      processor.processEvent(createEvent('autocommit_started', { messageId: 'msg-42' }));
+
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledWith(
+        'msg-42',
+        expect.objectContaining({
+          status: 'in_progress',
+          message: 'Committing changes...',
+        })
+      );
+    });
+
+    it('autocommit_completed with success should fire onAutocommitUpdated with completed', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      processor.processEvent(
+        createEvent('autocommit_completed', {
+          success: true,
+          message: 'Committed abc123',
+          commitHash: 'abc123',
+          commitMessage: 'fix: resolve race condition',
+          messageId: 'msg-42',
+        })
+      );
+
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledTimes(1);
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledWith(
+        'msg-42',
+        expect.objectContaining({
+          status: 'completed',
+          message: 'Committed abc123',
+          commitHash: 'abc123',
+          commitMessage: 'fix: resolve race condition',
+          timestamp: expect.any(String),
+        })
+      );
+    });
+
+    it('autocommit_completed with success: false should fire onAutocommitUpdated with failed', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      processor.processEvent(
+        createEvent('autocommit_completed', {
+          success: false,
+          message: 'git push rejected',
+          messageId: 'msg-42',
+        })
+      );
+
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledTimes(1);
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledWith(
+        'msg-42',
+        expect.objectContaining({
+          status: 'failed',
+          message: 'git push rejected',
+        })
+      );
+    });
+
+    it('autocommit_completed with skipped: true should not fire callback', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      processor.processEvent(
+        createEvent('autocommit_completed', {
+          success: true,
+          skipped: true,
+          messageId: 'msg-42',
+        })
+      );
+
+      expect(callbacks.onAutocommitUpdated).not.toHaveBeenCalled();
+    });
+
+    it('autocommit_completed without messageId should not fire callback', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      processor.processEvent(
+        createEvent('autocommit_completed', {
+          success: true,
+          message: 'Committed',
+        })
+      );
+
+      expect(callbacks.onAutocommitUpdated).not.toHaveBeenCalled();
+    });
+
+    it('autocommit_completed should use default messages when none provided', () => {
+      const callbacks: EventProcessorCallbacks = {
+        onAutocommitUpdated: jest.fn(),
+      };
+      const processor = createEventProcessor({ callbacks });
+
+      // Success without message
+      processor.processEvent(
+        createEvent('autocommit_completed', { success: true, messageId: 'msg-1' })
+      );
+
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledWith(
+        'msg-1',
+        expect.objectContaining({ status: 'completed', message: 'Changes committed' })
+      );
+
+      // Failure without message
+      processor.processEvent(
+        createEvent('autocommit_completed', { success: false, messageId: 'msg-2' })
+      );
+
+      expect(callbacks.onAutocommitUpdated).toHaveBeenCalledWith(
+        'msg-2',
+        expect.objectContaining({ status: 'failed', message: 'Commit failed' })
+      );
     });
   });
 

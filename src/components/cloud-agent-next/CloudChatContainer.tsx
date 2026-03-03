@@ -24,7 +24,8 @@ import {
   getChildSessionMessagesAtom,
   questionRequestIdsAtom,
   sessionOrganizationIdAtom,
-  autocommitStatusAtom,
+  autocommitStatusMapAtom,
+  sessionStatusIndicatorAtom,
   standaloneQuestionAtom,
 } from './store/atoms';
 import { buildSessionConfig, needsResumeConfiguration } from './session-config';
@@ -85,7 +86,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   const currentSessionId = useAtomValue(currentSessionIdAtom);
   const sessionConfig = useAtomValue(sessionConfigAtom);
   const totalCost = useAtomValue(totalCostAtom);
-  const autocommitStatus = useAtomValue(autocommitStatusAtom);
+  const autocommitStatusMap = useAtomValue(autocommitStatusMapAtom);
+  const sessionStatusIndicator = useAtomValue(sessionStatusIndicatorAtom);
   const questionRequestIds = useAtomValue(questionRequestIdsAtom);
   const questionOrganizationId = useAtomValue(sessionOrganizationIdAtom);
   const standaloneQuestion = useAtomValue(standaloneQuestionAtom);
@@ -218,9 +220,13 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   const [inputMode, setInputMode] = useState<AgentMode>('code');
   const [inputModel, setInputModel] = useState<string>('');
 
-  // Auto-scroll behavior
+  // Auto-scroll behavior — also scroll when autocommit/status/question content changes
   const { messagesEndRef, scrollContainerRef, showScrollButton, handleScroll, scrollToBottom } =
-    useAutoScroll(dynamicMessages);
+    useAutoScroll(dynamicMessages, [
+      autocommitStatusMap,
+      sessionStatusIndicator,
+      standaloneQuestion,
+    ]);
 
   // Slash commands
   const { availableCommands } = useSlashCommandSets();
@@ -273,6 +279,13 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     refetchSessions();
   }, [playCelebrationSound, refetchSessions]);
 
+  // Track failed message text to restore into ChatInput on send failure
+  const [failedMessageText, setFailedMessageText] = useState<string | null>(null);
+
+  const handleSendFailed = useCallback((messageText: string) => {
+    setFailedMessageText(messageText);
+  }, []);
+
   // Stream hook (V2 WebSocket-based)
   const {
     sendMessage: sendMessageV2,
@@ -288,6 +301,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
     onKiloSessionCreated: handleKiloSessionCreated,
     onSessionInitiated: handleSessionInitiated,
     onQuestionAsked: playNotification,
+    onSendFailed: handleSendFailed,
   });
 
   // Wrapper for sendMessage that doesn't use sessionIdOverride
@@ -750,6 +764,8 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   // Handle send message
   const handleSendMessage = useCallback(
     async (prompt: string) => {
+      // Clear any previously failed message text so a repeated failure can re-trigger initialValue
+      setFailedMessageText(null);
       // Use cloudAgentSessionId (from IndexedDB for resumed sessions) or
       // currentSessionId (from stream for new sessions)
       let effectiveSessionId = cloudAgentSessionId || currentSessionId || null;
@@ -805,6 +821,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
             console.error('Failed to prepare existing session:', err);
             setError('Failed to prepare session. Please try again.');
             toast.error('Failed to prepare session. Please try again.');
+            setFailedMessageText(prompt);
             return;
           }
         }
@@ -839,6 +856,7 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
             console.error('Failed to prepare session for resume:', err);
             setError('Failed to prepare session. Please try again.');
             toast.error('Failed to prepare session. Please try again.');
+            setFailedMessageText(prompt);
             return;
           }
         }
@@ -976,9 +994,10 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
         onInputModeChange={handleInputModeChange}
         onInputModelChange={handleInputModelChange}
         isOldSession={isOldSession}
-        autocommitStatus={autocommitStatus}
+        sessionStatusIndicator={sessionStatusIndicator}
         getChildMessages={getChildSessionMessages}
         standaloneQuestion={standaloneQuestion}
+        chatInputInitialValue={failedMessageText ?? undefined}
       />
     </QuestionContextProvider>
   );

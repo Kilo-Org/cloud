@@ -33,7 +33,7 @@ export default function EarlybirdPage() {
               <span className="text-3xl" role="img" aria-label="lobster">
                 🦞
               </span>
-              <CardTitle className="text-2xl">Presale: 50% Off for the First 100</CardTitle>
+              <CardTitle className="text-2xl">Presale: 50% Off for the First 1,000</CardTitle>
             </div>
             <span className="bg-brand-primary/15 text-brand-primary mt-2 w-fit rounded-full px-3 py-1 text-xs font-bold tracking-wide uppercase">
               Early Bird &mdash; 50% Off
@@ -42,14 +42,17 @@ export default function EarlybirdPage() {
 
           <CardContent className="relative flex flex-col gap-4">
             <p className="text-muted-foreground leading-relaxed">
-              To thank those of you who have been early adopters, we&apos;re offering the first 100
-              users 6 months of KiloClaw compute at 50% off. That&apos;s{' '}
+              To thank those of you who have been early adopters, we&apos;re offering the first
+              1,000 users 6 months of KiloClaw compute at 50% off. That&apos;s{' '}
               <span className="text-brand-primary font-semibold">$150 total</span> &mdash; works out
               to <span className="text-brand-primary font-semibold">$25/month</span> instead of $49.
             </p>
             <p className="text-muted-foreground leading-relaxed">
               The discount applies to compute only, not inference. At $25/month for a hosted AI
               agent, that&apos;s hard to beat. 🦀
+            </p>
+            <p className="rounded-md bg-amber-500/10 px-3 py-2 text-center text-sm font-medium text-amber-600 dark:text-amber-400">
+              ⚠ All early bird purchases are final. No refunds will be issued.
             </p>
           </CardContent>
 

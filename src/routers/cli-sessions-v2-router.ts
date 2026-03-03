@@ -88,6 +88,10 @@ const GetByCloudAgentSessionIdInputSchema = z.object({
   cloud_agent_session_id: cloudAgentSessionIdField,
 });
 
+const DeleteSessionInputSchema = z.object({
+  session_id: sessionIdField,
+});
+
 /**
  * Router for cli_sessions_v2 table operations.
  * Used by cloud-agent-next for session storage and retrieval.
@@ -322,4 +326,35 @@ export const cliSessionsV2Router = createTRPCRouter({
         runtimeState,
       };
     }),
+
+  /**
+   * Delete a V2 session.
+   * Cleans up the cloud-agent-next DO/sandbox if applicable, then deletes the DB row.
+   */
+  delete: baseProcedure.input(DeleteSessionInputSchema).mutation(async ({ ctx, input }) => {
+    const { session_id } = input;
+    const session = await getSessionWithOwnerCheck(session_id, ctx.user.id);
+
+    if (session.cloud_agent_session_id) {
+      const authToken = generateApiToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      await client.deleteSession(session.cloud_agent_session_id);
+    }
+
+    const [deletedSession] = await db
+      .delete(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, session_id),
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+        )
+      )
+      .returning({ session_id: cli_sessions_v2.session_id });
+
+    if (!deletedSession) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+    }
+
+    return { success: true, session_id };
+  }),
 });

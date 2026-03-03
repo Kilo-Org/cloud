@@ -37,6 +37,8 @@ export type ServerDependencies = {
   getMaxRuntimeMs: () => number;
   /** Set the aborted flag to skip post-completion tasks */
   setAborted: () => void;
+  /** Reset lifecycle state for a new execution */
+  resetLifecycle: () => void;
 };
 
 // Request body types
@@ -228,6 +230,9 @@ function createStartJobHandler(deps: ServerDependencies, kiloClient: KiloClient)
       ingestToken: body.ingestToken,
       kilocodeToken: body.kilocodeToken,
     };
+
+    // Reset lifecycle state from previous execution (clears stale isAborted, isDraining, etc.)
+    deps.resetLifecycle();
 
     // Start the job (this stores context but doesn't connect yet)
     try {

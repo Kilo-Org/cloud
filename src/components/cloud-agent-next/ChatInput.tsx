@@ -35,6 +35,8 @@ type ChatInputProps = {
   onModelChange?: (model: string) => void;
   /** Whether to show the toolbar (hide when no active session) */
   showToolbar?: boolean;
+  /** Pre-populate the textarea (e.g. to restore text after a failed send) */
+  initialValue?: string;
 };
 
 export function ChatInput({
@@ -51,11 +53,21 @@ export function ChatInput({
   onModeChange,
   onModelChange,
   showToolbar = false,
+  initialValue,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Restore text into the textarea when initialValue changes (e.g. after a failed send).
+  // Treats undefined as "no opinion" (skip), but empty string actively clears the field.
+  useEffect(() => {
+    if (initialValue !== undefined) {
+      setValue(initialValue);
+      textareaRef.current?.focus();
+    }
+  }, [initialValue]);
 
   // Filter commands based on current input
   const filteredCommands = useMemo(() => {

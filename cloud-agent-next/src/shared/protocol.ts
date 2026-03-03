@@ -62,6 +62,7 @@ export type KilocodeEventData = {
  */
 export type AutocommitStartedData = {
   message: string;
+  messageId?: string;
 };
 
 /**
@@ -70,7 +71,10 @@ export type AutocommitStartedData = {
 export type AutocommitCompletedData = {
   success: boolean;
   message: string;
+  messageId?: string;
   skipped?: boolean;
+  commitHash?: string;
+  commitMessage?: string;
 };
 
 /**

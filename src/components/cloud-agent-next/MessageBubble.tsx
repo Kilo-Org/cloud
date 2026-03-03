@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { User, Bot, Scissors, Image, FileText, AlertCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage, Part, CompactionPart } from './types';
 import {
@@ -23,10 +23,10 @@ import { stripImageContext } from '@/lib/app-builder/message-utils';
  */
 function CompactionSeparator({
   compactionPart,
-  timeAgo,
+  timestamp,
 }: {
   compactionPart: CompactionPart;
-  timeAgo: string;
+  timestamp: number | string;
 }) {
   const isAuto = compactionPart.auto;
 
@@ -37,7 +37,7 @@ function CompactionSeparator({
         <Scissors className="h-3 w-3" />
         <span>Context compacted{isAuto ? ' (auto)' : ''}</span>
         <span className="text-muted-foreground/60">·</span>
-        <span className="text-muted-foreground/60">{timeAgo}</span>
+        <TimeAgo timestamp={timestamp} className="text-muted-foreground/60" />
       </div>
       <div className="bg-border h-px flex-1" />
     </div>
@@ -161,7 +161,6 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
-  const timeAgo = formatDistanceToNow(new Date(timestamp), { addSuffix: true });
 
   const getTextForCopy = useCallback(() => getAssistantTextContent(message.parts), [message.parts]);
 
@@ -174,7 +173,7 @@ export function MessageBubble({
 
     // Render compaction separator for compaction-only messages
     if (hasOnlyCompactionParts && compactionPart) {
-      return <CompactionSeparator compactionPart={compactionPart} timeAgo={timeAgo} />;
+      return <CompactionSeparator compactionPart={compactionPart} timestamp={timestamp} />;
     }
 
     const displayName = userName ?? 'You';
@@ -186,7 +185,7 @@ export function MessageBubble({
       <div className="flex items-start justify-end gap-2 py-4 md:gap-3">
         <div className="flex flex-1 flex-col items-end space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs">{timeAgo}</span>
+            <TimeAgo timestamp={timestamp} className="text-muted-foreground text-xs" />
             <span className="text-sm font-medium">{displayName}</span>
           </div>
           <div className="bg-primary text-primary-foreground max-w-[95%] rounded-lg p-3 sm:max-w-[85%] md:max-w-[80%] md:p-4">
@@ -235,7 +234,7 @@ export function MessageBubble({
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">Kilo Code</span>
-            <span className="text-muted-foreground text-xs">{timeAgo}</span>
+            <TimeAgo timestamp={timestamp} className="text-muted-foreground text-xs" />
             {isStreaming && (
               <span className="text-muted-foreground flex items-center gap-1 text-xs">
                 <span className="relative flex h-2 w-2">

@@ -16,8 +16,9 @@ export const LEASE_TTL_MS = 90_000;
 /** Interval for heartbeat messages in milliseconds (30 seconds) */
 export const HEARTBEAT_INTERVAL_MS = 30_000;
 
-/** Threshold for considering an execution stale (10 minutes) - used by reaper */
-export const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+/** Threshold for considering an execution stale (90 seconds) - used by reaper.
+ * Wrapper heartbeats every 20s (debounced to 30s), so 90s ≈ 3 missed heartbeats. */
+export const STALE_THRESHOLD_MS = 90_000;
 
 // ---------------------------------------------------------------------------
 // Lease Helpers

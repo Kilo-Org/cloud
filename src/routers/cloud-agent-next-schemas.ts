@@ -114,7 +114,7 @@ export const baseSendMessageNextSchema = z.object({
   mode: agentModeSendMessageSchema,
   model: z.string().min(1),
   variant: z.string().max(50).optional(),
-  autoCommit: z.boolean().optional().default(false),
+  autoCommit: z.boolean().optional(),
 });
 
 // Schema for interrupting a session

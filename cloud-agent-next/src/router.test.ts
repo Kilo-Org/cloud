@@ -247,9 +247,8 @@ describe('router sessionId validation', () => {
           vi.clearAllMocks();
           interruptMock.mockResolvedValue({
             success: true,
-            killedProcessIds: ['p1'],
-            failedProcessIds: [],
             message: 'stopped',
+            processesFound: true,
           });
           buildContextMock.mockImplementation(
             ({

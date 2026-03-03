@@ -85,12 +85,10 @@ export const SendMessageV2Input = z
     autoCommit: z
       .boolean()
       .optional()
-      .default(false)
       .describe('Automatically commit and push changes after execution'),
     condenseOnComplete: z
       .boolean()
       .optional()
-      .default(false)
       .describe('Automatically condense context after execution completes'),
     githubToken: z
       .string()

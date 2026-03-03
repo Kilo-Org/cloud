@@ -170,9 +170,8 @@ export function createSessionManagementHandlers() {
               logger.info('Session not found');
               return {
                 success: false,
-                killedProcessIds: [],
-                failedProcessIds: [],
                 message: 'Session not found',
+                processesFound: false,
               };
             }
 
@@ -245,12 +244,55 @@ export function createSessionManagementHandlers() {
               activeExecutionId ?? undefined
             );
 
-            logger
-              .withFields({
-                killedCount: result.killedProcessIds.length,
-                failedCount: result.failedProcessIds.length,
-              })
-              .info('Session interruption completed');
+            logger.info('Session interruption completed');
+
+            // If no processes were found but there's still an active execution,
+            // the wrapper is already dead — clear the stale execution immediately.
+            // Note: pkill always returns killedProcessIds: [], so we check
+            // processesFound instead to distinguish "killed" from "nothing to kill".
+            if (!result.processesFound && activeExecutionId) {
+              logger
+                .withFields({ executionId: activeExecutionId })
+                .info('No processes found during interrupt - clearing stale active execution');
+
+              const statusResult = await withDORetry(
+                getStub,
+                async stub => {
+                  const r = await stub.updateExecutionStatus({
+                    executionId: activeExecutionId,
+                    status: 'failed',
+                    error: 'Interrupted - no running processes found',
+                    completedAt: Date.now(),
+                  });
+                  return { ok: r.ok } as { ok: boolean };
+                },
+                'updateExecutionStatus'
+              );
+
+              // If another codepath already moved the execution to a terminal
+              // state, skip cleanup to avoid spurious events.
+              if (!statusResult.ok) {
+                logger
+                  .withFields({ executionId: activeExecutionId })
+                  .info('Skipping interrupt cleanup - status transition failed');
+              } else {
+                await withDORetry(
+                  getStub,
+                  stub => stub.clearActiveExecution(),
+                  'clearActiveExecution'
+                );
+
+                await withDORetry(
+                  getStub,
+                  stub =>
+                    stub.emitExecutionError(
+                      activeExecutionId,
+                      'Interrupted - no running processes found'
+                    ),
+                  'emitExecutionError'
+                );
+              }
+            }
 
             return result;
           } catch (error) {

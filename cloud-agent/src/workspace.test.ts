@@ -6,6 +6,7 @@ import {
   configureKilocode,
   checkDiskSpace,
   createSandboxUsageEvent,
+  updateGitRemoteToken,
   LOW_DISK_THRESHOLD_MB,
 } from './workspace';
 import type { ExecutionSession } from './types';
@@ -480,6 +481,121 @@ describe('disk space checking', () => {
         expect.stringContaining('x-access-token:test-token'),
         expect.any(Object)
       );
+    });
+
+    it('should use oauth2 username for gitlab platform', async () => {
+      mockExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
+
+      mockGitCheckout.mockResolvedValue({
+        success: true,
+        exitCode: 0,
+      });
+
+      await cloneGitRepo(
+        fakeSession,
+        '/workspace',
+        'https://gitlab.com/repo.git',
+        'test-token',
+        undefined,
+        {
+          platform: 'gitlab',
+        }
+      );
+
+      expect(mockGitCheckout).toHaveBeenCalledWith(
+        expect.stringContaining('oauth2:test-token'),
+        expect.any(Object)
+      );
+    });
+
+    it('should use x-access-token username for github platform', async () => {
+      mockExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
+
+      mockGitCheckout.mockResolvedValue({
+        success: true,
+        exitCode: 0,
+      });
+
+      await cloneGitRepo(
+        fakeSession,
+        '/workspace',
+        'https://example.com/repo.git',
+        'test-token',
+        undefined,
+        {
+          platform: 'github',
+        }
+      );
+
+      expect(mockGitCheckout).toHaveBeenCalledWith(
+        expect.stringContaining('x-access-token:test-token'),
+        expect.any(Object)
+      );
+    });
+
+    it('should use x-access-token username when platform is undefined', async () => {
+      mockExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
+
+      mockGitCheckout.mockResolvedValue({
+        success: true,
+        exitCode: 0,
+      });
+
+      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git', 'test-token');
+
+      expect(mockGitCheckout).toHaveBeenCalledWith(
+        expect.stringContaining('x-access-token:test-token'),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('updateGitRemoteToken', () => {
+    it('should use oauth2 username for gitlab platform', async () => {
+      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+      await updateGitRemoteToken(
+        fakeSession,
+        '/workspace',
+        'https://gitlab.com/repo.git',
+        'new-token',
+        'gitlab'
+      );
+
+      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('oauth2:new-token'));
+    });
+
+    it('should use x-access-token username for github platform', async () => {
+      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+      await updateGitRemoteToken(
+        fakeSession,
+        '/workspace',
+        'https://example.com/repo.git',
+        'new-token',
+        'github'
+      );
+
+      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('x-access-token:new-token'));
+    });
+
+    it('should use x-access-token username when platform is undefined', async () => {
+      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+      await updateGitRemoteToken(
+        fakeSession,
+        '/workspace',
+        'https://example.com/repo.git',
+        'new-token'
+      );
+
+      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('x-access-token:new-token'));
     });
   });
 

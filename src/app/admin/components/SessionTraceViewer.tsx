@@ -28,6 +28,34 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const SES_PREFIX = 'ses_';
 const AGENT_PREFIX = 'agent_';
 
+function formatModelLabel(providerId: unknown, modelId: unknown): string | null {
+  if (typeof providerId !== 'string' || typeof modelId !== 'string') {
+    return null;
+  }
+
+  const provider = providerId.trim();
+  const model = modelId.trim();
+
+  if (!provider || !model) {
+    return null;
+  }
+
+  return `${provider}/${model}`;
+}
+
+function getV2MessageModelLabel(message: StoredMessage): string | null {
+  if (message.info.role === 'user') {
+    const model = message.info.model;
+    if (!model) {
+      return null;
+    }
+
+    return formatModelLabel(model.providerID, model.modelID);
+  }
+
+  return formatModelLabel(message.info.providerID, message.info.modelID);
+}
+
 function convertToMessage(cloudMessage: CloudMessage): Message & {
   say?: string;
   ask?: string;
@@ -173,6 +201,17 @@ export function SessionTraceViewer() {
 
   const messageCount = isV2 ? v2Messages.length : v1Messages.length;
 
+  const v2SummaryModel = useMemo(() => {
+    for (let index = v2Messages.length - 1; index >= 0; index -= 1) {
+      const modelLabel = getV2MessageModelLabel(v2Messages[index]);
+      if (modelLabel) {
+        return modelLabel;
+      }
+    }
+
+    return null;
+  }, [v2Messages]);
+
   const breadcrumbs = (
     <BreadcrumbItem>
       <BreadcrumbPage>Session Traces</BreadcrumbPage>
@@ -303,10 +342,12 @@ export function SessionTraceViewer() {
                   <span className="text-sm">{sessionQuery.data.last_mode}</span>
                 </div>
               )}
-              {sessionQuery.data.last_model && (
+              {((isV2 && v2SummaryModel) || (!isV2 && sessionQuery.data.last_model)) && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">Model:</span>
-                  <span className="font-mono text-sm">{sessionQuery.data.last_model}</span>
+                  <span className="font-mono text-sm">
+                    {isV2 ? v2SummaryModel : sessionQuery.data.last_model}
+                  </span>
                 </div>
               )}
             </CardContent>
@@ -336,11 +377,26 @@ export function SessionTraceViewer() {
                 <p className="text-muted-foreground">No messages in this session</p>
               ) : isV2 ? (
                 <div className="space-y-2">
-                  {v2Messages.map((msg, index) => (
-                    <V2MessageErrorBoundary key={`${msg.info.id}-${index}`}>
-                      <V2MessageBubble message={msg} isStreaming={false} />
-                    </V2MessageErrorBoundary>
-                  ))}
+                  {v2Messages.map((msg, index) => {
+                    const userMessageModel =
+                      msg.info.role === 'user' ? getV2MessageModelLabel(msg) : null;
+
+                    return (
+                      <V2MessageErrorBoundary key={`${msg.info.id}-${index}`}>
+                        <div className="space-y-1">
+                          {userMessageModel && (
+                            <div className="text-muted-foreground flex items-center gap-2 px-3 text-xs">
+                              <span className="font-medium">Model:</span>
+                              <code className="bg-muted rounded px-1 py-0.5 font-mono">
+                                {userMessageModel}
+                              </code>
+                            </div>
+                          )}
+                          <V2MessageBubble message={msg} isStreaming={false} />
+                        </div>
+                      </V2MessageErrorBoundary>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="space-y-2">

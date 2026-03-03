@@ -145,6 +145,18 @@ describe('WrapperState', () => {
 
         expect(state.currentJob?.executionId).toBe('exc_second');
       });
+
+      it('resets SSE activity tracking', () => {
+        state.startJob(createJobContext({ executionId: 'exc_first' }));
+        state.recordSseEvent();
+        expect(state.hasSseActivity()).toBe(true);
+
+        state.clearJob();
+        state.startJob(createJobContext({ executionId: 'exc_second' }));
+
+        expect(state.hasSseActivity()).toBe(false);
+        expect(state.getSseInactivityMs(Date.now())).toBeNull();
+      });
     });
 
     describe('clearJob', () => {

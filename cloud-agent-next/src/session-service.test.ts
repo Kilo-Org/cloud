@@ -2473,8 +2473,7 @@ describe('SessionService', () => {
       const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
 
       expect(result.success).toBe(true);
-      expect(result.killedProcessIds).toEqual(['proc1', 'proc2']);
-      expect(result.failedProcessIds).toEqual([]);
+      expect(result.processesFound).toBe(true);
       expect(mockKillProcess).toHaveBeenCalledTimes(2);
       expect(mockKillProcess).toHaveBeenCalledWith('proc1', 'SIGTERM');
       expect(mockKillProcess).toHaveBeenCalledWith('proc2', 'SIGTERM');
@@ -2526,8 +2525,7 @@ describe('SessionService', () => {
 
       // Should only kill proc1 (the one matching our workspace)
       expect(result.success).toBe(true);
-      expect(result.killedProcessIds).toEqual(['proc1']);
-      expect(result.failedProcessIds).toEqual([]);
+      expect(result.processesFound).toBe(true);
       expect(mockKillProcess).toHaveBeenCalledTimes(1);
       expect(mockKillProcess).toHaveBeenCalledWith('proc1', 'SIGTERM');
     });
@@ -2577,8 +2575,7 @@ describe('SessionService', () => {
 
       // Should only kill proc1 (status='running')
       expect(result.success).toBe(true);
-      expect(result.killedProcessIds).toEqual(['proc1']);
-      expect(result.failedProcessIds).toEqual([]);
+      expect(result.processesFound).toBe(true);
       expect(mockKillProcess).toHaveBeenCalledTimes(1);
       expect(mockKillProcess).toHaveBeenCalledWith('proc1', 'SIGTERM');
     });
@@ -2633,8 +2630,7 @@ describe('SessionService', () => {
 
       // Should only kill proc1 (contains 'kilocode')
       expect(result.success).toBe(true);
-      expect(result.killedProcessIds).toEqual(['proc1']);
-      expect(result.failedProcessIds).toEqual([]);
+      expect(result.processesFound).toBe(true);
       expect(mockKillProcess).toHaveBeenCalledTimes(1);
       expect(mockKillProcess).toHaveBeenCalledWith('proc1', 'SIGTERM');
     });
@@ -2667,8 +2663,7 @@ describe('SessionService', () => {
       const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
 
       expect(result.success).toBe(true);
-      expect(result.killedProcessIds).toEqual([]);
-      expect(result.failedProcessIds).toEqual([]);
+      expect(result.processesFound).toBe(false);
       expect(result.message).toContain('No running kilocode processes found');
       expect(mockKillProcess).not.toHaveBeenCalled();
     });
@@ -2723,8 +2718,7 @@ describe('SessionService', () => {
       const result = await SessionService.interrupt(mockSandbox, mockSession, sessionContext);
 
       expect(result.success).toBe(true); // success because at least one was killed
-      expect(result.killedProcessIds).toEqual(['proc1', 'proc3']);
-      expect(result.failedProcessIds).toEqual(['proc2']);
+      expect(result.processesFound).toBe(true);
       expect(result.message).toContain('killed 2 process(es)');
       expect(result.message).toContain('1 failed');
       expect(mockKillProcess).toHaveBeenCalledTimes(3);

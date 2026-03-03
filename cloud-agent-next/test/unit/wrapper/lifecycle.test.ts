@@ -471,6 +471,86 @@ describe('createLifecycleManager', () => {
   });
 
   // -------------------------------------------------------------------------
+  // reset
+  // -------------------------------------------------------------------------
+
+  describe('reset', () => {
+    it('reset clears aborted flag - allows complete event after reset', async () => {
+      const mgr = createManager();
+      state.startJob(createJobContext());
+      state.addInflight('msg_1', Date.now() + 60000);
+
+      mgr.setAborted();
+      mgr.reset();
+
+      (connectionManager.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      const sendToIngestSpy = vi.fn();
+      state.setSendToIngestFn(sendToIngestSpy);
+
+      // Completing the last inflight triggers drain
+      mgr.onMessageComplete('msg_1');
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // complete event should be sent because isAborted was reset
+      expect(sendToIngestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          streamEventType: 'complete',
+        })
+      );
+    });
+
+    it('reset clears draining flag - allows new drain after reset', async () => {
+      const mgr = createManager();
+      state.startJob(createJobContext());
+      (connectionManager.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      // First drain
+      mgr.triggerDrainAndClose();
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(connectionManager.close).toHaveBeenCalledTimes(1);
+
+      // Reset clears isDraining so a second drain can happen
+      mgr.reset();
+
+      // Start a fresh job
+      state.clearJob();
+      state.startJob(createJobContext({ executionId: 'exc_second' }));
+      state.addInflight('msg_2', Date.now() + 60000);
+
+      // Completing last inflight triggers a new drain
+      mgr.onMessageComplete('msg_2');
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(connectionManager.close).toHaveBeenCalledTimes(2);
+    });
+
+    it('reset enables post-completion flow after previous abort', async () => {
+      const mgr = createManager({ autoCommit: false });
+      state.startJob(createJobContext());
+      state.addInflight('msg_1', Date.now() + 60000);
+
+      mgr.setAborted();
+      mgr.reset();
+
+      (connectionManager.isConnected as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      const sendToIngestSpy = vi.fn();
+      state.setSendToIngestFn(sendToIngestSpy);
+
+      mgr.onMessageComplete('msg_1');
+      mgr.signalCompletion();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // complete event should be sent (not skipped due to stale aborted flag)
+      expect(sendToIngestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          streamEventType: 'complete',
+        })
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // signalCompletion
   // -------------------------------------------------------------------------
 

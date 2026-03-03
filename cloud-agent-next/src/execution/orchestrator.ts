@@ -406,7 +406,8 @@ export class ExecutionOrchestrator {
           prepared.session,
           prepared.context.workspacePath,
           existingMetadata.gitUrl,
-          resumeContext.gitToken
+          resumeContext.gitToken,
+          prepared.context.platform
         );
       }
     } catch (error) {

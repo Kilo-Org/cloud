@@ -512,14 +512,14 @@ export async function cloneGitRepo(
   gitUrl: string,
   gitToken?: string,
   gitAuthor?: GitAuthorConfig,
-  options?: { shallow?: boolean }
+  options?: { shallow?: boolean; platform?: 'github' | 'gitlab' }
 ): Promise<void> {
   // Build URL with token if available (for private repos)
-  // Use x-access-token format which works across most git providers
+  // GitLab OAuth tokens require username 'oauth2'; all other providers use 'x-access-token'
   let repoUrl = gitUrl;
   if (gitToken) {
     const url = new URL(gitUrl);
-    url.username = 'x-access-token';
+    url.username = options?.platform === 'gitlab' ? 'oauth2' : 'x-access-token';
     url.password = gitToken;
     repoUrl = url.toString();
   }
@@ -567,22 +567,23 @@ export async function cloneGitRepo(
 /**
  * Update the git remote origin URL to include a new token.
  * This is needed when the git token changes and we need to push/pull.
- * Uses the same x-access-token format as cloneGitRepo() for consistency.
  *
  * @param session - Execution session
  * @param workspacePath - Path to the git repository
  * @param gitUrl - Full git URL (e.g., https://github.com/org/repo.git)
  * @param gitToken - New git token for authentication
+ * @param platform - Git platform; GitLab requires 'oauth2' as the username
  */
 export async function updateGitRemoteToken(
   session: ExecutionSession,
   workspacePath: string,
   gitUrl: string,
-  gitToken: string
+  gitToken: string,
+  platform?: 'github' | 'gitlab'
 ): Promise<void> {
-  // Build new URL with token embedded (same format as cloneGitRepo)
+  // Build new URL with token embedded (GitLab uses 'oauth2', others use 'x-access-token')
   const newUrl = new URL(gitUrl);
-  newUrl.username = 'x-access-token';
+  newUrl.username = platform === 'gitlab' ? 'oauth2' : 'x-access-token';
   newUrl.password = gitToken;
 
   const sanitizedGitUrl = sanitizeGitUrlForLogging(gitUrl);

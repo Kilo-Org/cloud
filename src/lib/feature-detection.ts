@@ -27,7 +27,8 @@ export const FEATURE_VALUES = [
   'slack',
   'discord',
   'webhook',
-  'kilo-claw',
+  'kiloclaw',
+  'openclaw',
   'direct-gateway',
 ] as const;
 

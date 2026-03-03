@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import { FreeModelUsageStats } from '../components/FreeModelUsageStats';
+import { PromotedModelUsageStats } from '../components/PromotedModelUsageStats';
 import AdminPage from '../components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
@@ -44,6 +45,20 @@ export default function FreeModelUsagePage() {
 
         <Suspense fallback={<div>Loading free model usage statistics...</div>}>
           <FreeModelUsageStats />
+        </Suspense>
+
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Promoted Models Usage</h2>
+        </div>
+
+        <p className="text-muted-foreground">
+          Monitor IP-based rate limiting for promoted model usage by anonymous/unauthenticated
+          users. This tracks requests from users who have not signed in, with rate limiting based on
+          request count per IP address within a rolling window.
+        </p>
+
+        <Suspense fallback={<div>Loading promoted model usage statistics...</div>}>
+          <PromotedModelUsageStats />
         </Suspense>
       </div>
     </AdminPage>

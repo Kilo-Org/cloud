@@ -37,7 +37,7 @@ import type OpenAI from 'openai';
 import crypto from 'crypto';
 import { db } from '@/lib/drizzle';
 import { inArray } from 'drizzle-orm';
-import { ReasoningEffortSchema, VerbositySchema } from '@/lib/organizations/model-settings';
+import { ReasoningEffortSchema, VerbositySchema } from '@kilocode/db/schema-types';
 
 function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage[] {
   const toolNameByCallId = new Map<string, string>();

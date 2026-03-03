@@ -1,6 +1,6 @@
 import { custom_llm, type CustomLlm } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
-import { OpenCodeSettingsSchema, ToolArraySchema } from '@/lib/organizations/model-settings';
+import { OpenCodeSettingsSchema, ToolArraySchema } from '@kilocode/db/schema-types';
 
 export function convert(model: CustomLlm) {
   return {

@@ -231,6 +231,23 @@ export function createConnectionManager(
         if (event.streamEventType === 'kilocode') {
           const data = event.data as Record<string, unknown>;
           const eventName = typeof data.event === 'string' ? data.event : '';
+
+          // Track the last root-session assistant message ID for autocommit association.
+          // message.updated events carry { event, properties: { info: { id, role, sessionID } } }
+          if (eventName === 'message.updated') {
+            const props = data.properties;
+            if (isRecord(props)) {
+              const info = props.info;
+              if (isRecord(info) && info.role === 'assistant' && typeof info.id === 'string') {
+                const msgSessionId = info.sessionID;
+                const currentSessionId = state.currentJob?.kiloSessionId;
+                if (!currentSessionId || msgSessionId === currentSessionId) {
+                  state.setLastAssistantMessageId(info.id);
+                }
+              }
+            }
+          }
+
           const terminal = isTerminalErrorEvent({ event: eventName, data });
           if (terminal.isTerminal) {
             callbacks.onTerminalError(terminal.reason ?? 'terminal error');

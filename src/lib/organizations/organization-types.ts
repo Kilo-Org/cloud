@@ -23,7 +23,7 @@ import {
   ModelSettingsSchema,
   OpenCodeSettingsSchema,
   VersionedSettingsSchema,
-} from '@/lib/organizations/model-settings';
+} from '@kilocode/db/schema-types';
 
 export const OrganizationNameSchema = z
   .string()

@@ -267,6 +267,13 @@
       "when": 1772472147057,
       "tag": "0037_magical_captain_britain",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1772540011976,
+      "tag": "0038_late_shaman",
+      "breakpoints": true
     }
   ]
 }

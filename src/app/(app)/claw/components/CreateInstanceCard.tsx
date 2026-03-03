@@ -71,8 +71,13 @@ export function CreateInstanceCard({ mutations }: { mutations: ClawMutations }) 
       return;
     }
 
+    if (!selectedModel) {
+      toast.error('Please select a default model before creating an instance.');
+      return;
+    }
+
     posthog?.capture('claw_create_instance_clicked', {
-      selected_model: selectedModel || null,
+      selected_model: selectedModel,
       channels: [...addedChannels],
     });
 
@@ -88,7 +93,7 @@ export function CreateInstanceCard({ mutations }: { mutations: ClawMutations }) 
 
     mutations.provision.mutate(
       {
-        kilocodeDefaultModel: selectedModel ? `kilocode/${selectedModel}` : null,
+        kilocodeDefaultModel: `kilocode/${selectedModel}`,
         channels: buildChannelsPayload(),
       },
       {
@@ -110,12 +115,13 @@ export function CreateInstanceCard({ mutations }: { mutations: ClawMutations }) 
       </CardHeader>
       <CardContent className="space-y-4">
         <ModelCombobox
-          label=""
+          label="Default Model"
           models={modelOptions}
           value={selectedModel}
           onValueChange={setSelectedModel}
           isLoading={isLoadingModels}
           disabled={mutations.provision.isPending || isLoadingModels}
+          required
         />
 
         <div className="space-y-3">
@@ -183,7 +189,7 @@ export function CreateInstanceCard({ mutations }: { mutations: ClawMutations }) 
         </div>
 
         <div className="flex justify-end">
-          <Button onClick={handleCreate} disabled={mutations.provision.isPending}>
+          <Button onClick={handleCreate} disabled={mutations.provision.isPending || !selectedModel}>
             <Plus className="mr-2 h-4 w-4" />
             {mutations.provision.isPending ? 'Creating...' : 'Create & Provision'}
           </Button>

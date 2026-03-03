@@ -327,7 +327,8 @@ async function processMessage(msg: ExecutionMessage, env: Env, deps: ConsumerDep
               prepared.session,
               prepared.context.workspacePath,
               planMetadata.gitUrl,
-              resumeTokenOverrides.gitToken
+              resumeTokenOverrides.gitToken,
+              prepared.context.platform
             );
           } else {
             logger.warn('gitToken override provided but session is not gitUrl-based');

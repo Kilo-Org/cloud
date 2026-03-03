@@ -70,7 +70,7 @@ export async function buildEnvVars(
   const plainEnv: Record<string, string> = {};
 
   if (env.KILOCODE_API_BASE_URL) plainEnv.KILOCODE_API_BASE_URL = env.KILOCODE_API_BASE_URL;
-  plainEnv.KILOCODE_FEATURE = 'kilo-claw';
+  plainEnv.KILOCODE_FEATURE = 'kiloclaw';
 
   // Collect all sensitive values
   const sensitive: Record<string, string> = {};

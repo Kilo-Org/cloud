@@ -173,9 +173,8 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .output(
       z.object({
         success: z.boolean(),
-        killedProcessIds: z.array(z.string()),
-        failedProcessIds: z.array(z.string()),
         message: z.string(),
+        processesFound: z.boolean(),
       })
     )
     .mutation(async ({ ctx, input }) => {

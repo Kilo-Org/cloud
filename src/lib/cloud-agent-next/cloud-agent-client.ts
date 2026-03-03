@@ -236,9 +236,8 @@ export type UpdateSessionOutput = {
 /** Result of interrupting a session */
 export type InterruptResult = {
   success: boolean;
-  killedProcessIds: string[];
-  failedProcessIds: string[];
   message: string;
+  processesFound: boolean;
 };
 
 export type AnswerQuestionInput = {

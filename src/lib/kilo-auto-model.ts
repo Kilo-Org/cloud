@@ -1,14 +1,10 @@
-import type {
-  ModelSettings,
-  OpenCodeSettings,
-  Verbosity,
-} from '@/lib/organizations/model-settings';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
 import { minimax_m25_free_model } from '@/lib/providers/minimax';
 import type { OpenRouterReasoningConfig } from '@/lib/providers/openrouter/types';
+import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 
 type AutoModel = {
   id: string;

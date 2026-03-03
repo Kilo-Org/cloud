@@ -72,9 +72,9 @@ export type SessionContext = {
 /** Result of interrupting a session's running processes */
 export type InterruptResult = {
   success: boolean;
-  killedProcessIds: string[];
-  failedProcessIds: string[];
   message: string;
+  /** Whether matching processes were found by pkill/sandbox API */
+  processesFound: boolean;
 };
 
 export type Env = {

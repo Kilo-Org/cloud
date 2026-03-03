@@ -21,7 +21,8 @@ import React, {
   useSyncExternalStore,
 } from 'react';
 import { User, ArrowDown, ChevronRight, ChevronDown } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { format } from 'date-fns';
+import { TimeAgo } from '@/components/shared/TimeAgo';
 import AssistantLogo from '@/components/AssistantLogo';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -62,14 +63,12 @@ const isDev = process.env.NODE_ENV === 'development';
  * Timestamp display with optional tooltip showing full time in dev mode
  */
 function TimestampDisplay({ ts }: { ts: number }) {
-  const timeAgo = formatDistanceToNow(new Date(ts), { addSuffix: true });
-
   if (isDev) {
     const fullTime = format(new Date(ts), 'yyyy-MM-dd HH:mm:ss.SSS');
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="text-muted-foreground text-xs">{timeAgo}</span>
+          <TimeAgo timestamp={ts} className="text-muted-foreground text-xs" />
         </TooltipTrigger>
         <TooltipContent>
           <span className="font-mono">{fullTime}</span>
@@ -78,7 +77,7 @@ function TimestampDisplay({ ts }: { ts: number }) {
     );
   }
 
-  return <span className="text-muted-foreground text-xs">{timeAgo}</span>;
+  return <TimeAgo timestamp={ts} className="text-muted-foreground text-xs" />;
 }
 
 /**
@@ -239,7 +238,7 @@ function ExpandableSessionBlock({
           {endedDate && (
             <div className="text-muted-foreground mt-0.5 text-xs">
               Chat session ended {format(endedDate, 'MMM d, yyyy')} (
-              {formatDistanceToNow(endedDate, { addSuffix: true })})
+              <TimeAgo timestamp={endedDate.getTime()} />)
             </div>
           )}
         </div>

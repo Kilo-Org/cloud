@@ -22,7 +22,7 @@ public/
 *.generated.*
 *.min.*
 _journal.json
-src/db/migrations/meta/*.json
+**/meta/*_snapshot.json
 **/worker-configuration.d.ts
 
 # Package files

@@ -10,6 +10,8 @@ import type { SessionConfig, StoredMessage, Part } from '../types';
 import { isMessageStreaming, isAssistantMessage } from '../types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
+import type { AutocommitStatus } from '@/lib/cloud-agent-next/processor/types';
+export type { AutocommitStatus };
 
 // ============================================================================
 // Primary State - StoredMessage format
@@ -84,16 +86,24 @@ export const sessionStatusAtom = atom<
 >({ type: 'idle' });
 
 /**
- * Autocommit status — one per execution, transitions in-place.
- * Reset to null when a new execution starts.
+ * Per-message autocommit status map.
+ * Key is the assistant message ID; value is the status for that turn's autocommit.
+ * Replaces the old single-value `autocommitStatusAtom` to survive multi-turn replays.
  */
-export type AutocommitStatus = {
-  status: 'in_progress' | 'completed' | 'failed';
+export const autocommitStatusMapAtom = atom<Map<string, AutocommitStatus>>(new Map());
+
+/**
+ * Inline session status indicator — shown in the chat feed for recoverable
+ * session errors, reconnection states, and interrupts.
+ * Non-recoverable errors still go through `errorAtom` → `ErrorBanner`.
+ */
+export type SessionStatusIndicator = {
+  type: 'error' | 'warning' | 'info';
   message: string;
-  timestamp: string;
+  timestamp: number;
 };
 
-export const autocommitStatusAtom = atom<AutocommitStatus | null>(null);
+export const sessionStatusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
 
 // ============================================================================
 // Common State
@@ -161,7 +171,8 @@ export const clearMessagesAtom = atom(null, (_get, set) => {
   set(messagesMapAtom, new Map());
   set(partsMapAtom, new Map());
   set(questionRequestIdsAtom, new Map());
-  set(autocommitStatusAtom, null);
+  set(autocommitStatusMapAtom, new Map());
+  set(sessionStatusIndicatorAtom, null);
   set(standaloneQuestionAtom, null);
 });
 
@@ -285,10 +296,10 @@ export const addUserMessageAtom = atom(
       agent?: string;
       model?: { providerID: string; modelID: string };
     }
-  ) => {
+  ): string => {
     const { sessionId, content, agent = 'code', model = { providerID: '', modelID: '' } } = payload;
-    const messageId = `user_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    const partId = `part_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const messageId = `optimistic-${crypto.randomUUID()}`;
+    const partId = `part_${crypto.randomUUID()}`;
     const now = Date.now();
 
     const userMessage: StoredMessage = {
@@ -326,8 +337,44 @@ export const addUserMessageAtom = atom(
     const partsMap = new Map(get(partsMapAtom));
     partsMap.set(partId, { messageId, part: userMessage.parts[0] });
     set(partsMapAtom, partsMap);
+
+    return messageId;
   }
 );
+
+/**
+ * Remove the optimistic user message (if any) from the store.
+ * No-op when no optimistic message exists (avoids unnecessary Map copies / subscriber notifications).
+ * Returns true if an optimistic message was found and removed.
+ */
+export const removeOptimisticMessageAtom = atom(null, (get, set): boolean => {
+  const messagesMap = get(messagesMapAtom);
+
+  // Find the optimistic message without copying first
+  let optimisticId: string | null = null;
+  for (const id of messagesMap.keys()) {
+    if (id.startsWith('optimistic-')) {
+      optimisticId = id;
+      break;
+    }
+  }
+  if (!optimisticId) return false;
+
+  const message = messagesMap.get(optimisticId);
+  const newMessagesMap = new Map(messagesMap);
+  const newPartsMap = new Map(get(partsMapAtom));
+
+  if (message) {
+    for (const part of message.parts) {
+      newPartsMap.delete(part.id);
+    }
+  }
+  newMessagesMap.delete(optimisticId);
+
+  set(messagesMapAtom, newMessagesMap);
+  set(partsMapAtom, newPartsMap);
+  return true;
+});
 
 /**
  * Update a message in a child session.

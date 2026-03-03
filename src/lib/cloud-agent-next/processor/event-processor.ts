@@ -18,7 +18,7 @@
 import type { CloudAgentEvent } from '../event-types';
 import { isValidCloudAgentEvent } from '../event-types';
 import type { Part, QuestionInfo } from '@/types/opencode.gen';
-import type { ProcessedMessage, EventProcessorConfig } from './types';
+import type { ProcessedMessage, EventProcessorConfig, AutocommitStatus } from './types';
 import {
   stripPartContentIfFile,
   isUserMessage,
@@ -48,6 +48,12 @@ const HANDLED_EVENT_TYPES = new Set([
   'question.asked',
   'question.replied',
   'question.rejected',
+  'wrapper_disconnected',
+  'error',
+  'interrupted',
+  'autocommit_started',
+  'autocommit_completed',
+  'complete',
 ]);
 
 function isHandledEventType(type: string): boolean {
@@ -131,6 +137,9 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   const completedMessages = new Set<string>();
 
   let streaming = false;
+  // Set when an interrupted/wrapper_disconnected/error event arrives.
+  // Suppresses subsequent session.error events (aftershocks from the CLI dying).
+  let terminated = false;
 
   /**
    * Get parent session ID for a session.
@@ -332,14 +341,13 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
     // Update streaming state based on status
     if (status.type === 'idle') {
-      // Complete user messages when session becomes idle (for both root and child)
+      // Complete user messages when session becomes idle (for both root and child).
+      // Streaming is NOT stopped here — the wrapper's `complete` event is the
+      // definitive signal (fires after autocommit finishes).
       completeUserMessages();
-
-      if (!fromChild && streaming) {
-        streaming = false;
-        callbacks.onStreamingChanged?.(false);
-      }
     } else if (status.type === 'busy') {
+      // New execution started — prior termination state is stale
+      terminated = false;
       if (!fromChild && !streaming) {
         streaming = true;
         callbacks.onStreamingChanged?.(true);
@@ -372,8 +380,13 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
    * Handle session.error events.
    * onError fires for all sessions (root and child).
    * Streaming toggle only fires for root sessions.
+   *
+   * When `terminated` is true, the session was already interrupted/disconnected
+   * and this is just an aftershock from the CLI dying — skip the error banner.
    */
   function handleSessionError(data: { sessionID?: string; error?: unknown }): void {
+    if (terminated) return;
+
     const errorMessage = typeof data.error === 'string' ? data.error : 'Session error occurred';
     const fromChild = isChildSession(data.sessionID);
 
@@ -410,16 +423,10 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
    * Child session idle events still trigger user message completion
    * but do NOT toggle the streaming flag or fire onStreamingChanged.
    */
-  function handleSessionIdle(data: { sessionID: string }): void {
-    const fromChild = isChildSession(data.sessionID);
-
-    // Complete user messages for both root and child sessions
+  function handleSessionIdle(_data: { sessionID: string }): void {
+    // Complete user messages for both root and child sessions.
+    // Streaming is NOT stopped here — the wrapper's `complete` event handles that.
     completeUserMessages();
-
-    if (!fromChild && streaming) {
-      streaming = false;
-      callbacks.onStreamingChanged?.(false);
-    }
   }
 
   /**
@@ -457,8 +464,7 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
    * Handle session.turn.close events.
    * When reason is "error", force-complete all in-flight assistant messages
    * that never received time.completed from the server.
-   * Child session turn close events still complete messages and fire onError,
-   * but skip the streaming toggle.
+   * No ErrorBanner — the session is still alive; the user can retry.
    */
   function handleSessionTurnClose(data: { sessionID?: string; reason?: string }): void {
     if (data.reason !== 'error') {
@@ -467,8 +473,90 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
     const fromChild = isChildSession(data.sessionID);
     forceCompleteAllMessages(fromChild);
+  }
 
-    callbacks.onError?.('The model failed to generate a response', data.sessionID);
+  /**
+   * Handle wrapper_disconnected events — the container WebSocket died.
+   * Sets inline indicator via handleEvent in the consumer; no ErrorBanner.
+   */
+  function handleWrapperDisconnected(): void {
+    terminated = true;
+    forceCompleteAllMessages();
+  }
+
+  /**
+   * Handle bare "error" events from the reaper or interrupt flow.
+   * These are NOT session.error — they come with { error, fatal } payloads.
+   * Sets inline indicator via handleEvent in the consumer; no ErrorBanner.
+   */
+  function handleBareError(data: { fatal?: boolean }): void {
+    terminated = true;
+    if (data.fatal) {
+      forceCompleteAllMessages();
+    }
+    if (streaming) {
+      streaming = false;
+      callbacks.onStreamingChanged?.(false);
+    }
+  }
+
+  /**
+   * Handle "interrupted" events — the execution was interrupted.
+   * Sets inline indicator via handleEvent in the consumer; no ErrorBanner.
+   */
+  function handleInterrupted(): void {
+    terminated = true;
+    forceCompleteAllMessages();
+  }
+
+  /**
+   * Handle the wrapper's "complete" event — the execution is fully done
+   * (including autocommit). This is the definitive "safe to send another message" signal.
+   */
+  function handleExecutionComplete(): void {
+    if (streaming) {
+      streaming = false;
+      callbacks.onStreamingChanged?.(false);
+    }
+  }
+
+  /**
+   * Handle autocommit_started events.
+   * Only fires callback if the event includes a messageId.
+   */
+  function handleAutocommitStarted(data: { message?: string; messageId?: string }): void {
+    if (!data.messageId) return;
+    const status: AutocommitStatus = {
+      status: 'in_progress',
+      message: data.message ?? 'Committing changes...',
+      timestamp: new Date().toISOString(),
+    };
+    callbacks.onAutocommitUpdated?.(data.messageId, status);
+  }
+
+  /**
+   * Handle autocommit_completed events.
+   * Only fires callback if the event includes a messageId.
+   * Skipped autocommits are silently dropped (no map entry).
+   */
+  function handleAutocommitCompleted(data: {
+    success?: boolean;
+    message?: string;
+    skipped?: boolean;
+    commitHash?: string;
+    commitMessage?: string;
+    messageId?: string;
+  }): void {
+    if (!data.messageId) return;
+    if (data.skipped) return;
+    const status: AutocommitStatus = {
+      status: data.success ? 'completed' : 'failed',
+      message: data.message ?? (data.success ? 'Changes committed' : 'Commit failed'),
+      timestamp: new Date().toISOString(),
+      commitHash: data.commitHash,
+      commitMessage: data.commitMessage,
+    };
+    callbacks.onAutocommitUpdated?.(data.messageId, status);
   }
 
   /**
@@ -547,6 +635,39 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
         }
         break;
       }
+
+      case 'wrapper_disconnected':
+        handleWrapperDisconnected();
+        break;
+
+      case 'error':
+        handleBareError(data as { fatal?: boolean });
+        break;
+
+      case 'interrupted':
+        handleInterrupted();
+        break;
+
+      case 'complete':
+        handleExecutionComplete();
+        break;
+
+      case 'autocommit_started':
+        handleAutocommitStarted(data as { message?: string; messageId?: string });
+        break;
+
+      case 'autocommit_completed':
+        handleAutocommitCompleted(
+          data as {
+            success?: boolean;
+            message?: string;
+            skipped?: boolean;
+            commitHash?: string;
+            commitMessage?: string;
+            messageId?: string;
+          }
+        );
+        break;
     }
   }
 
@@ -559,6 +680,7 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     sessionParents.clear();
     completedMessages.clear();
     streaming = false;
+    terminated = false;
   }
 
   return {

@@ -65,7 +65,11 @@ export async function createDenyLists(
   const model_deny_list = new Set<string>();
   const provider_deny_list = new Set<string>();
   for (const provider of data.providers) {
-    if (provider_allow_list && !provider_allow_list.includes(provider.slug)) {
+    if (
+      provider_allow_list &&
+      provider_allow_list.length > 0 &&
+      !provider_allow_list.includes(provider.slug)
+    ) {
       provider_deny_list.add(provider.slug);
     }
     for (const model of provider.models) {

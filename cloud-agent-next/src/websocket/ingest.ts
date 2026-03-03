@@ -432,15 +432,17 @@ export function createIngestHandler(
      *
      * @param ws - The WebSocket that closed
      */
-    handleIngestClose(ws: WebSocket): void {
+    handleIngestClose(ws: WebSocket): ExecutionId | null {
       const attachment = ws.deserializeAttachment() as IngestAttachment | null;
       if (attachment) {
         const { executionId } = attachment;
         // Only remove from tracking if this is the current connection for this execution
         if (activeConnections.get(executionId) === ws) {
           activeConnections.delete(executionId);
+          return executionId;
         }
       }
+      return null;
     },
 
     /**

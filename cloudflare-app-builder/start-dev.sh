@@ -130,7 +130,7 @@ tmux send-keys -t "$SESSION_NAME:services.6" "echo '🌐 Starting ngrok (forward
 
 # Pane 7 (bottom-right): cloud-agent-next
 tmux select-pane -t "$SESSION_NAME:services.7" -T "cloud-agent-next (8794)"
-tmux send-keys -t "$SESSION_NAME:services.7" "cd $PROJECT_ROOT/cloud-agent-next && echo '☁️  Starting cloud-agent-next (port 8794)...' && pnpm exec wrangler dev --env dev --inspector-port 9234" C-m
+tmux send-keys -t "$SESSION_NAME:services.7" "cd $PROJECT_ROOT/cloud-agent-next && echo '☁️  Starting cloud-agent-next (port 8794)...' && pnpm run dev" C-m
 
 # Select the ngrok pane by default
 tmux select-pane -t "$SESSION_NAME:services.6"

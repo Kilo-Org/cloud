@@ -14,6 +14,7 @@ import { useSetAtom } from 'jotai';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
+import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { clearMessagesAtom, currentSessionIdAtom } from '../store/atoms';
 import { deleteSessionFromStoreAtom } from '../store/db-session-atoms';
 
@@ -26,9 +27,6 @@ type UseSessionDeletionOptions = {
 };
 
 type UseSessionDeletionReturn = {
-  /**
-   * Delete a session by its database session ID (UUID).
-   */
   handleDeleteSession: (sessionId: string) => Promise<void>;
 };
 
@@ -49,6 +47,9 @@ export function useSessionDeletion({
 
   // Set up tRPC mutation for unified session deletion
   const { mutateAsync: deleteCliSession } = useMutation(trpc.cliSessions.delete.mutationOptions());
+  const { mutateAsync: deleteCliSessionV2 } = useMutation(
+    trpc.cliSessionsV2.delete.mutationOptions()
+  );
 
   const handleDeleteSession = useCallback(
     async (sessionId: string) => {
@@ -72,7 +73,11 @@ export function useSessionDeletion({
       // Delete from server (source of truth)
       let serverDeleteFailed = false;
       try {
-        await deleteCliSession({ session_id: sessionId });
+        if (isNewSession(sessionId)) {
+          await deleteCliSessionV2({ session_id: sessionId });
+        } else {
+          await deleteCliSession({ session_id: sessionId });
+        }
       } catch (error) {
         console.error('Error calling session deletion API:', error);
         serverDeleteFailed = true;
@@ -101,6 +106,7 @@ export function useSessionDeletion({
       router,
       deleteSessionFromStore,
       deleteCliSession,
+      deleteCliSessionV2,
       refetchSessions,
       queryClient,
       trpc,

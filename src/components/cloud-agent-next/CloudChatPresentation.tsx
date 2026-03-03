@@ -16,8 +16,9 @@ import { ChatInput } from './ChatInput';
 import { ErrorBanner } from './ErrorBanner';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { MessageBubble } from './MessageBubble';
-import { AutocommitStatus } from './AutocommitStatus';
-import type { AutocommitStatus as AutocommitStatusType } from './store/atoms';
+import { MaybeAutocommitStatus } from './AutocommitStatus';
+import { SessionStatusIndicator } from './SessionStatusIndicator';
+import type { SessionStatusIndicator as SessionStatusIndicatorType } from './store/atoms';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ArrowDown, RefreshCw } from 'lucide-react';
@@ -48,6 +49,7 @@ const StaticMessages = memo(
         {messages.map(msg => (
           <MessageErrorBoundary key={msg.info.id}>
             <MessageBubble message={msg} getChildMessages={getChildMessages} />
+            <MaybeAutocommitStatus msg={msg} />
           </MessageErrorBoundary>
         ))}
       </>
@@ -79,6 +81,7 @@ function DynamicMessages({
               isStreaming={streaming}
               getChildMessages={getChildMessages}
             />
+            <MaybeAutocommitStatus msg={msg} />
           </MessageErrorBoundary>
         );
       })}
@@ -164,8 +167,8 @@ export type CloudChatPresentationProps = {
   onMenuClick: () => void;
   onMobileSheetOpenChange: (open: boolean) => void;
 
-  /** Autocommit status to display after messages */
-  autocommitStatus?: AutocommitStatusType | null;
+  /** Session status indicator for recoverable errors, reconnections, interrupts */
+  sessionStatusIndicator?: SessionStatusIndicatorType | null;
 
   // Old session handling
   isOldSession?: boolean;
@@ -178,6 +181,9 @@ export type CloudChatPresentationProps = {
   inputModel?: string;
   onInputModeChange?: (mode: AgentMode) => void;
   onInputModelChange?: (model: string) => void;
+
+  /** Pre-populate the ChatInput textarea (e.g. to restore text after a failed send) */
+  chatInputInitialValue?: string;
 };
 
 /**
@@ -235,7 +241,7 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
   onToggleSound,
   onMenuClick,
   onMobileSheetOpenChange,
-  autocommitStatus,
+  sessionStatusIndicator,
   isOldSession = false,
   getChildMessages,
   standaloneQuestion,
@@ -243,6 +249,7 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
   inputModel,
   onInputModeChange,
   onInputModelChange,
+  chatInputInitialValue,
 }: CloudChatPresentationProps) {
   // Show chat interface when we have:
   // 1. An active streaming session (currentSessionId + sessionConfig)
@@ -400,9 +407,6 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
                 {/* Dynamic messages - re-render during streaming */}
                 <DynamicMessages messages={dynamicMessages} getChildMessages={getChildMessages} />
 
-                {/* Auto-commit status indicator */}
-                {autocommitStatus && <AutocommitStatus status={autocommitStatus} />}
-
                 {/* Standalone question (not attached to a tool call) */}
                 {standaloneQuestion && (
                   <div className="my-4 ml-12">
@@ -413,6 +417,11 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
                       status="running"
                     />
                   </div>
+                )}
+
+                {/* Session status indicator (recoverable errors, reconnection, interrupts) */}
+                {sessionStatusIndicator && (
+                  <SessionStatusIndicator indicator={sessionStatusIndicator} />
                 )}
 
                 {/* Invisible anchor for auto-scroll */}
@@ -463,7 +472,9 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
                         ? 'Configure session to continue...'
                         : isStreaming
                           ? 'Streaming...'
-                          : 'Type your message... (/ for commands)'
+                          : sessionStatusIndicator?.type === 'error'
+                            ? 'Send a message to continue...'
+                            : 'Type your message... (/ for commands)'
               }
               slashCommands={availableCommands}
               mode={inputMode}
@@ -473,6 +484,7 @@ export const CloudChatPresentation = memo(function CloudChatPresentation({
               onModeChange={onInputModeChange}
               onModelChange={onInputModelChange}
               showToolbar={Boolean(currentDbSessionId) && !needsResumeConfig}
+              initialValue={chatInputInitialValue}
             />
 
             {/* Banner for sessions needing configuration */}

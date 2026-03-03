@@ -14,7 +14,7 @@ export function EarlybirdBanner() {
             Early Bird: 50% Off KiloClaw Compute
           </span>
           <span className="text-muted-foreground ml-2 text-sm">
-            First 100 users &mdash; $25/mo instead of $49
+            First 1,000 users &mdash; $25/mo instead of $49
           </span>
         </div>
       </div>

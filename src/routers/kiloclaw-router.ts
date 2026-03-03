@@ -16,36 +16,38 @@ import {
   restoreDestroyedInstance,
 } from '@/lib/kiloclaw/instance-registry';
 
+const kilocodeDefaultModelSchema = z
+  .string()
+  .regex(
+    /^kilocode\/[^/]+\/.+$/,
+    'kilocodeDefaultModel must start with kilocode/ and include a provider'
+  );
+
+const channelsSchema = z
+  .object({
+    telegramBotToken: z.string().optional(),
+    discordBotToken: z.string().optional(),
+    slackBotToken: z.string().optional(),
+    slackAppToken: z.string().optional(),
+  })
+  .optional();
+
 const updateConfigSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
   secrets: z.record(z.string(), z.string()).optional(),
-  channels: z
-    .object({
-      telegramBotToken: z.string().optional(),
-      discordBotToken: z.string().optional(),
-      slackBotToken: z.string().optional(),
-      slackAppToken: z.string().optional(),
-    })
-    .optional(),
-  kilocodeDefaultModel: z
-    .string()
-    .regex(
-      /^kilocode\/[^/]+\/.+$/,
-      'kilocodeDefaultModel must start with kilocode/ and include a provider'
-    )
-    .nullable()
-    .optional(),
+  channels: channelsSchema,
+  kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
+});
+
+const provisionSchema = z.object({
+  envVars: z.record(z.string(), z.string()).optional(),
+  secrets: z.record(z.string(), z.string()).optional(),
+  channels: channelsSchema,
+  kilocodeDefaultModel: kilocodeDefaultModelSchema,
 });
 
 const updateKiloCodeConfigSchema = z.object({
-  kilocodeDefaultModel: z
-    .string()
-    .regex(
-      /^kilocode\/[^/]+\/.+$/,
-      'kilocodeDefaultModel must start with kilocode/ and include a provider'
-    )
-    .nullable()
-    .optional(),
+  kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
 });
 
 const patchChannelsSchema = z.object({
@@ -235,7 +237,7 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   // Explicit lifecycle APIs
-  provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
+  provision: baseProcedure.input(provisionSchema).mutation(async ({ ctx, input }) => {
     return provisionInstance(ctx.user, input);
   }),
 

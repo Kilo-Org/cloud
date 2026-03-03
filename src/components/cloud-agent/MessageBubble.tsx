@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { User, Bot, Info } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { Message } from './types';
 import { MessageContent } from './MessageContent';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
@@ -25,7 +25,6 @@ export function MessageBubble({
   userName,
   userAvatarUrl,
 }: MessageBubbleProps) {
-  const timeAgo = formatDistanceToNow(new Date(message.timestamp), { addSuffix: true });
   const getTextForCopy = useCallback(() => message.content, [message.content]);
 
   // User message
@@ -35,7 +34,7 @@ export function MessageBubble({
       <div className="flex items-start justify-end gap-2 py-4 md:gap-3">
         <div className="flex flex-1 flex-col items-end space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs">{timeAgo}</span>
+            <TimeAgo timestamp={message.timestamp} className="text-muted-foreground text-xs" />
             <span className="text-sm font-medium">{displayName}</span>
           </div>
           <div className="bg-primary text-primary-foreground max-w-[95%] rounded-lg p-3 sm:max-w-[85%] md:max-w-[80%] md:p-4">
@@ -75,7 +74,7 @@ export function MessageBubble({
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Kilo Code</span>
-              <span className="text-muted-foreground text-xs">{timeAgo}</span>
+              <TimeAgo timestamp={message.timestamp} className="text-muted-foreground text-xs" />
               {isStreaming && (
                 <span className="text-muted-foreground flex items-center gap-1 text-xs">
                   <span className="relative flex h-2 w-2">
@@ -108,7 +107,7 @@ export function MessageBubble({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-sm font-medium">System</span>
-            <span className="text-muted-foreground text-xs">{timeAgo}</span>
+            <TimeAgo timestamp={message.timestamp} className="text-muted-foreground text-xs" />
           </div>
           <div className="text-muted-foreground text-sm">
             <p className="overflow-wrap-anywhere wrap-break-word whitespace-pre-wrap">
@@ -129,7 +128,7 @@ export function MessageBubble({
       <div className="min-w-0 flex-1 space-y-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Kilo Code</span>
-          <span className="text-muted-foreground text-xs">{timeAgo}</span>
+          <TimeAgo timestamp={message.timestamp} className="text-muted-foreground text-xs" />
           {isStreaming && (
             <span className="text-muted-foreground flex items-center gap-1 text-xs">
               <span className="relative flex h-2 w-2">

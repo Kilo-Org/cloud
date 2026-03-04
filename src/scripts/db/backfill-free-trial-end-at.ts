@@ -2,7 +2,7 @@
  * Backfill script for free_trial_end_at column
  *
  * This script populates free_trial_end_at for existing organizations that have null values.
- * It sets free_trial_end_at to created_at + 30 days for all organizations where it's currently null.
+ * It sets free_trial_end_at to created_at + 14 days for all organizations where it's currently null.
  *
  * Usage:
  *   pnpm script src/scripts/db/backfill-free-trial-end-at.ts
@@ -31,7 +31,8 @@ export async function run() {
     const updateResult = await db
       .update(organizations)
       .set({
-        free_trial_end_at: sql`${organizations.created_at} + INTERVAL '30 days'`,
+        // Changed from 30 days; no orgs on trial have null end at this time
+        free_trial_end_at: sql`${organizations.created_at} + INTERVAL '14 days'`,
       })
       .where(isNull(organizations.free_trial_end_at));
 

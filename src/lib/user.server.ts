@@ -3,6 +3,7 @@ import 'server-only';
 import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from './tokens';
 import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
+
 import type { CreateOrUpdateUserArgs } from './user';
 import { findUserById, createOrUpdateUser, findAndSyncExistingUser } from './user';
 import { db, readDb } from '@/lib/drizzle';
@@ -57,6 +58,7 @@ import {
   NEXTAUTH_SECRET,
   GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET,
+  BLACKLIST_TLDS,
 } from '@/lib/config.server';
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
@@ -436,6 +438,12 @@ const authOptions: NextAuthOptions = {
 
         // Check if this is an existing user with a different primary email
         const existingUser = await findAndSyncExistingUser(accountInfo);
+
+        // Block new signups from blocked TLDs (existing users can still sign in)
+        if (!existingUser && isBlockedTLD(accountInfo.google_user_email)) {
+          return redirectUrlForCode(`BLOCKED`, accountInfo.google_user_email);
+        }
+
         if (existingUser) {
           const primaryEmailDomain = getLowerDomainFromEmail(existingUser.google_user_email);
           if (primaryEmailDomain) {
@@ -462,8 +470,10 @@ const authOptions: NextAuthOptions = {
           }
         }
 
+        const requestHeaders = await headers();
+
         if (accountInfo.provider === 'workos') {
-          return processSSOUserLogin(accountInfo);
+          return processSSOUserLogin(accountInfo, requestHeaders);
         }
 
         // Validate Turnstile JWT for real OAuth logins (not fake logins or email auth)
@@ -491,7 +501,7 @@ const authOptions: NextAuthOptions = {
             return redirectUrlForCode('INVALID_VERIFICATION');
           }
 
-          const currentIP = (await headers()).get('x-forwarded-for');
+          const currentIP = requestHeaders.get('x-forwarded-for');
           if (verifiedToken.ip !== currentIP) {
             sentryLogger('turnstile-auth')(
               `SECURITY: IP mismatch - JWT: ${verifiedToken.ip}, Current: ${currentIP}`,
@@ -513,7 +523,12 @@ const authOptions: NextAuthOptions = {
                 await linkAccountToExistingUser(linkingSession.existingUserId, accountInfo),
                 v => ({ ...v, isNew: false })
               )
-            : await createOrUpdateUser(accountInfo, verifiedToken?.guid, autoLinkToExistingUser);
+            : await createOrUpdateUser(
+                accountInfo,
+                verifiedToken?.guid,
+                autoLinkToExistingUser,
+                requestHeaders
+              );
 
         if (result.success === false) {
           // Expected user errors that shouldn't be logged to Sentry
@@ -806,6 +821,9 @@ export const isEmailBlacklistedByDomain = (
       email.toLowerCase().endsWith('@' + domain.toLowerCase()) ||
       email.toLowerCase().endsWith('.' + domain.toLowerCase())
   );
+
+export const isBlockedTLD = (email: string, blacklisted_tlds = BLACKLIST_TLDS) =>
+  blacklisted_tlds.some(tld => email.toLowerCase().endsWith(tld));
 
 export function report_blocked_user(kiloUserId: string) {
   return authError(403, 'Access denied (R1)', kiloUserId);

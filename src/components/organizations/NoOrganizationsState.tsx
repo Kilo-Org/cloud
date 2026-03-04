@@ -80,7 +80,7 @@ export function NoOrganizationsState() {
             {canMakeOrgs ? (
               <div>
                 <p className="mb-4 text-center">
-                  Take Kilo on a free 30-day test drive for your team
+                  Take Kilo on a free 14-day test drive for your team
                 </p>
                 <div className="flex justify-center">
                   <NewOrganizationButton />

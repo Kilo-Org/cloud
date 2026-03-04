@@ -1,21 +1,13 @@
-/**
- * Internal API Endpoint: Security Analysis Callback
- *
- * Called by:
- * - cloud-agent-next (when sandbox analysis completes, fails, or is interrupted)
- *
- * The findingId is passed in the URL path.
- *
- * URL: POST /api/internal/security-analysis-callback/{findingId}
- * Protected by internal API secret
- */
-
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { captureException } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import { getSecurityFindingById } from '@/lib/security-agent/db/security-findings';
-import { updateAnalysisStatus } from '@/lib/security-agent/db/security-analysis';
+import {
+  updateAnalysisStatus,
+  transitionAutoAnalysisQueueFromCallback,
+  type AutoAnalysisFailureCode,
+} from '@/lib/security-agent/db/security-analysis';
 import {
   finalizeAnalysis,
   extractLastAssistantMessage,
@@ -51,6 +43,34 @@ type ExecutionCallbackPayload = {
   lastSeenBranch?: string;
 };
 
+function mapCallbackFailure(params: { status: 'failed' | 'interrupted'; errorMessage?: string }): {
+  errorMessage: string;
+  failureCode: AutoAnalysisFailureCode;
+} {
+  if (params.status === 'interrupted') {
+    return {
+      errorMessage: `Analysis interrupted: ${params.errorMessage ?? 'unknown reason'}`,
+      failureCode: 'STATE_GUARD_REJECTED',
+    };
+  }
+
+  const errorMessage = params.errorMessage ?? 'Analysis failed';
+  const normalized = errorMessage.toLowerCase();
+  if (normalized.includes('timeout') || normalized.includes('timed out')) {
+    return { errorMessage, failureCode: 'NETWORK_TIMEOUT' };
+  }
+  if (
+    normalized.includes('502') ||
+    normalized.includes('503') ||
+    normalized.includes('504') ||
+    normalized.includes('upstream') ||
+    normalized.includes('5xx')
+  ) {
+    return { errorMessage, failureCode: 'UPSTREAM_5XX' };
+  }
+  return { errorMessage, failureCode: 'START_CALL_AMBIGUOUS' };
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ findingId: string }> }
@@ -83,6 +103,36 @@ export async function POST(
       return NextResponse.json({ error: 'Finding not found' }, { status: 404 });
     }
 
+    const sessionMismatch =
+      (payload.cloudAgentSessionId &&
+        finding.session_id &&
+        payload.cloudAgentSessionId !== finding.session_id) ||
+      (payload.kiloSessionId &&
+        finding.cli_session_id &&
+        payload.kiloSessionId !== finding.cli_session_id);
+
+    if (sessionMismatch) {
+      warn('Ignoring stale auto-analysis callback due to session mismatch', {
+        findingId,
+        findingSessionId: finding.session_id,
+        findingCliSessionId: finding.cli_session_id,
+        callbackCloudAgentSessionId: payload.cloudAgentSessionId,
+        callbackKiloSessionId: payload.kiloSessionId,
+      });
+      captureMessage('Auto-analysis callback session mismatch', {
+        level: 'warning',
+        tags: { source: 'security-analysis-callback-api' },
+        extra: {
+          findingId,
+          findingSessionId: finding.session_id,
+          findingCliSessionId: finding.cli_session_id,
+          callbackCloudAgentSessionId: payload.cloudAgentSessionId,
+          callbackKiloSessionId: payload.kiloSessionId,
+        },
+      });
+      return NextResponse.json({ success: true, message: 'Stale callback ignored' });
+    }
+
     // Skip if already in a terminal state
     if (finding.analysis_status === 'completed' || finding.analysis_status === 'failed') {
       log('Finding already in terminal state, skipping callback', {
@@ -101,8 +151,23 @@ export async function POST(
       try {
         if (payload.status === 'completed') {
           await handleAnalysisCompleted(findingId, payload, finding);
-        } else {
+        } else if (payload.status === 'failed' || payload.status === 'interrupted') {
           await handleAnalysisFailed(findingId, payload, finding);
+        } else {
+          const unknownStatus = payload.status as string;
+          logError('Unknown callback status received, marking as failed', {
+            findingId,
+            status: unknownStatus,
+          });
+          await updateAnalysisStatus(findingId, 'failed', {
+            error: `Unknown callback status: ${unknownStatus}`,
+          });
+          await transitionAutoAnalysisQueueFromCallback({
+            findingId,
+            toStatus: 'failed',
+            failureCode: 'STATE_GUARD_REJECTED',
+            errorMessage: `Unknown callback status: ${unknownStatus}`,
+          });
         }
       } catch (error) {
         logError('Error processing security analysis callback', { error });
@@ -129,7 +194,7 @@ export async function POST(
   }
 }
 
-/** Safely read the stored analysis metadata from the JSONB column */
+/** Read stored analysis metadata, filling in defaults for missing fields. */
 function readAnalysisContext(analysis: SecurityFindingAnalysis | null | undefined): {
   correlationId: string;
   modelUsed: string;
@@ -172,6 +237,12 @@ async function handleAnalysisCompleted(
     await updateAnalysisStatus(findingId, 'failed', {
       error: 'Cannot process callback — triggeredByUserId missing from analysis context',
     });
+    await transitionAutoAnalysisQueueFromCallback({
+      findingId,
+      toStatus: 'failed',
+      failureCode: 'STATE_GUARD_REJECTED',
+      errorMessage: 'Cannot process callback — triggeredByUserId missing from analysis context',
+    });
     return;
   }
 
@@ -180,6 +251,12 @@ async function handleAnalysisCompleted(
     logError('Callback missing kiloSessionId', { findingId, correlationId });
     await updateAnalysisStatus(findingId, 'failed', {
       error: 'Callback missing kiloSessionId — cannot retrieve analysis result',
+    });
+    await transitionAutoAnalysisQueueFromCallback({
+      findingId,
+      toStatus: 'failed',
+      failureCode: 'STATE_GUARD_REJECTED',
+      errorMessage: 'Callback missing kiloSessionId — cannot retrieve analysis result',
     });
     return;
   }
@@ -236,6 +313,12 @@ async function handleAnalysisCompleted(
     await updateAnalysisStatus(findingId, 'failed', {
       error: 'Analysis completed but result could not be retrieved from ingest service',
     });
+    await transitionAutoAnalysisQueueFromCallback({
+      findingId,
+      toStatus: 'failed',
+      failureCode: 'START_CALL_AMBIGUOUS',
+      errorMessage: 'Analysis completed but result could not be retrieved from ingest service',
+    });
     return;
   }
 
@@ -265,6 +348,12 @@ async function handleAnalysisCompleted(
     await updateAnalysisStatus(findingId, 'failed', {
       error: `User ${triggeredByUserId} not found — cannot run Tier 3 extraction`,
     });
+    await transitionAutoAnalysisQueueFromCallback({
+      findingId,
+      toStatus: 'failed',
+      failureCode: 'STATE_GUARD_REJECTED',
+      errorMessage: `User ${triggeredByUserId} not found — cannot run Tier 3 extraction`,
+    });
     return;
   }
 
@@ -288,16 +377,49 @@ async function handleAnalysisCompleted(
     },
   });
 
-  await finalizeAnalysis(
-    findingId,
-    rawMarkdown,
-    analysisModel,
-    owner,
-    triggeredByUserId,
-    authToken,
-    correlationId,
-    organizationId
-  );
+  try {
+    await finalizeAnalysis(
+      findingId,
+      rawMarkdown,
+      analysisModel,
+      owner,
+      triggeredByUserId,
+      authToken,
+      correlationId,
+      organizationId
+    );
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'security-analysis-callback-api', operation: 'finalizeAnalysis' },
+      extra: { findingId, correlationId },
+    });
+    await transitionAutoAnalysisQueueFromCallback({
+      findingId,
+      toStatus: 'failed',
+      failureCode: 'START_CALL_AMBIGUOUS',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  const updatedFinding = await getSecurityFindingById(findingId);
+  if (updatedFinding?.analysis_status === 'completed') {
+    await transitionAutoAnalysisQueueFromCallback({ findingId, toStatus: 'completed' });
+  } else if (updatedFinding?.analysis_status === 'failed') {
+    await transitionAutoAnalysisQueueFromCallback({
+      findingId,
+      toStatus: 'failed',
+      failureCode: 'START_CALL_AMBIGUOUS',
+      errorMessage: updatedFinding.analysis_error ?? undefined,
+    });
+  } else {
+    await transitionAutoAnalysisQueueFromCallback({
+      findingId,
+      toStatus: 'failed',
+      failureCode: 'STATE_GUARD_REJECTED',
+      errorMessage: `Unexpected post-finalize state: ${updatedFinding?.analysis_status ?? 'finding_not_found'}`,
+    });
+  }
 }
 
 async function handleAnalysisFailed(
@@ -314,10 +436,15 @@ async function handleAnalysisFailed(
   } = readAnalysisContext(finding.analysis);
   const organizationId = finding.owned_by_organization_id ?? undefined;
 
-  const errorMessage =
-    payload.status === 'interrupted'
-      ? `Analysis interrupted: ${payload.errorMessage ?? 'unknown reason'}`
-      : (payload.errorMessage ?? 'Analysis failed');
+  if (payload.status !== 'failed' && payload.status !== 'interrupted') {
+    return;
+  }
+
+  const callbackFailure = mapCallbackFailure({
+    status: payload.status,
+    errorMessage: payload.errorMessage,
+  });
+  const errorMessage = callbackFailure.errorMessage;
 
   if (payload.status === 'interrupted') {
     logExceptInTest('Analysis interrupted by user', {
@@ -336,6 +463,12 @@ async function handleAnalysisFailed(
   }
 
   await updateAnalysisStatus(findingId, 'failed', { error: errorMessage });
+  await transitionAutoAnalysisQueueFromCallback({
+    findingId,
+    toStatus: 'failed',
+    failureCode: callbackFailure.failureCode,
+    errorMessage,
+  });
 
   if (!triggeredByUserId) {
     logError('Missing triggeredByUserId in analysis context, skipping PostHog tracking', {

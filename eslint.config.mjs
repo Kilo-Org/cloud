@@ -1,6 +1,5 @@
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { FlatCompat } from '@eslint/eslintrc';
 import tailwindcssPlugin from 'eslint-plugin-tailwindcss';
 import drizzlePlugin from 'eslint-plugin-drizzle';
 import nodePlugin from 'eslint-plugin-n';
@@ -12,10 +11,6 @@ import eslintPluginReactHooks from 'eslint-plugin-react-hooks';
 import tanstackQueryPlugin from '@tanstack/eslint-plugin-query';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
 
 export default defineConfig([
   eslintPluginNext.configs.recommended,

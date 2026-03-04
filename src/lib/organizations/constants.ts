@@ -6,7 +6,7 @@ export const STRIPE_SUB_QUERY_STRING_KEY = 'subscription_session_id';
 // maybe take this from stripe at some point?
 export const TEAM_SEAT_PRICE_MONTHLY_USD = 15;
 export const TEAM_SEAT_PRICE_YEARLY_USD = TEAM_SEAT_PRICE_MONTHLY_USD * 12;
-export const ENTERPRISE_SEAT_PRICE_MONTHLY_USD = 150;
+export const ENTERPRISE_SEAT_PRICE_MONTHLY_USD = 60;
 export const ENTERPRISE_SEAT_PRICE_YEARLY_USD = ENTERPRISE_SEAT_PRICE_MONTHLY_USD * 12;
 
 export const ENABLE_ORG_CREATION_FREE_CREDITS = false;

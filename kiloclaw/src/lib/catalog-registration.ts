@@ -5,6 +5,7 @@
 
 import { getWorkerDb } from '@kilocode/db/client';
 import { kiloclaw_image_catalog, sql, ne } from '@kilocode/db';
+import { eq } from 'drizzle-orm';
 import { isValidImageTag } from './image-tag-validation';
 
 const OPENCLAW_VERSION_RE = /^\d{4}\.\d{1,2}\.\d{1,2}$/;
@@ -44,6 +45,41 @@ function validateEntry(entry: CatalogVersionEntry): string | null {
     return `publishedAt is older than 1 year: ${entry.publishedAt}`;
   }
   return null;
+}
+
+/**
+ * Look up a catalog entry by image tag from Postgres via Hyperdrive.
+ * Used during provision to resolve metadata for pinned image tags.
+ * Returns regardless of status — pinning is an admin override that
+ * should work even for disabled versions.
+ * Returns null if the tag is not found.
+ */
+export async function lookupCatalogVersion(
+  connectionString: string,
+  imageTag: string
+): Promise<CatalogVersionEntry | null> {
+  const db = getWorkerDb(connectionString);
+  const [row] = await db
+    .select({
+      openclaw_version: kiloclaw_image_catalog.openclaw_version,
+      variant: kiloclaw_image_catalog.variant,
+      image_tag: kiloclaw_image_catalog.image_tag,
+      image_digest: kiloclaw_image_catalog.image_digest,
+      published_at: kiloclaw_image_catalog.published_at,
+    })
+    .from(kiloclaw_image_catalog)
+    .where(eq(kiloclaw_image_catalog.image_tag, imageTag))
+    .limit(1);
+
+  if (!row) return null;
+
+  return {
+    openclawVersion: row.openclaw_version,
+    variant: row.variant,
+    imageTag: row.image_tag,
+    imageDigest: row.image_digest,
+    publishedAt: row.published_at,
+  };
 }
 
 /**

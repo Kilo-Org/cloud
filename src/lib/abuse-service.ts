@@ -10,6 +10,7 @@ import {
 } from '@/lib/config.server';
 import { getFraudDetectionHeaders } from '@/lib/utils';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
+import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import 'server-only';
 
 /**
@@ -188,6 +189,48 @@ export type UsagePayload = {
 };
 
 /**
+ * Shared fetch helper for all abuse service endpoints.
+ * Handles URL check, CF Access auth headers, and fail-open error handling.
+ * Returns the parsed JSON response, or null if the service is unavailable or errored.
+ */
+async function fetchAbuseService<T>(
+  path: string,
+  payload: unknown,
+  label: string
+): Promise<T | null> {
+  if (!ABUSE_SERVICE_URL) {
+    return null;
+  }
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (ABUSE_SERVICE_CF_ACCESS_CLIENT_ID && ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET) {
+      headers['CF-Access-Client-Id'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_ID;
+      headers['CF-Access-Client-Secret'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET;
+    }
+
+    const response = await fetch(`${ABUSE_SERVICE_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error(`[Abuse] ${label} failed (${response.status}): ${await response.text()}`);
+      return null;
+    }
+
+    return (await response.json()) as T;
+  } catch (error) {
+    console.error(`[Abuse] ${label} error:`, error);
+    return null;
+  }
+}
+
+/**
  * Classify a request for potential abuse.
  * This is called before proxying requests to detect fraudulent activity.
  *
@@ -199,38 +242,7 @@ export type UsagePayload = {
 export async function classifyRequest(
   payload: UsagePayload
 ): Promise<AbuseClassificationResponse | null> {
-  if (!ABUSE_SERVICE_URL) {
-    return null;
-  }
-
-  try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    // Add Cloudflare Access headers for authentication
-    if (ABUSE_SERVICE_CF_ACCESS_CLIENT_ID && ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET) {
-      headers['CF-Access-Client-Id'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_ID;
-      headers['CF-Access-Client-Secret'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET;
-    }
-
-    const response = await fetch(`${ABUSE_SERVICE_URL}/api/classify`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      console.error(`Abuse service error (${response.status}): ${await response.text()}`);
-      return null;
-    }
-
-    return (await response.json()) as AbuseClassificationResponse;
-  } catch (error) {
-    // Fail-open: don't block requests if abuse service is down
-    console.error('Abuse classification failed:', error);
-    return null;
-  }
+  return fetchAbuseService<AbuseClassificationResponse>('/api/classify', payload, 'classify');
 }
 
 /**
@@ -280,38 +292,34 @@ export type CostUpdateResponse = {
  * @returns Response or null if service unavailable/failed
  */
 export async function reportCost(payload: CostUpdatePayload): Promise<CostUpdateResponse | null> {
-  if (!ABUSE_SERVICE_URL) {
-    return null;
-  }
+  return fetchAbuseService<CostUpdateResponse>('/api/usage/cost', payload, 'cost update');
+}
 
-  try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+/**
+ * Payload for the auth event tracking endpoint.
+ * Tracks signup/signin patterns for abuse detection.
+ */
+export type AuthEventPayload = {
+  kilo_user_id: string;
+  event_type: 'signup' | 'signin';
+  email: string;
+  account_created_at: string; // ISO 8601
+  ip_address?: string | null;
+  geo_city?: string | null;
+  geo_country?: string | null;
+  ja4_digest?: string | null;
+  user_agent?: string | null;
+  auth_method: AuthProviderId;
+  /** Reserved for future Stytch integration — not populated yet */
+  stytch_session_id?: string | null;
+};
 
-    // Add Cloudflare Access headers in production
-    if (ABUSE_SERVICE_CF_ACCESS_CLIENT_ID && ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET) {
-      headers['CF-Access-Client-Id'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_ID;
-      headers['CF-Access-Client-Secret'] = ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET;
-    }
-
-    const response = await fetch(`${ABUSE_SERVICE_URL}/api/usage/cost`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      console.error(`[Abuse] Cost update failed (${response.status}): ${await response.text()}`);
-      return null;
-    }
-
-    return (await response.json()) as CostUpdateResponse;
-  } catch (error) {
-    // Log but don't throw - this shouldn't affect user experience
-    console.error('[Abuse] Failed to report cost:', error);
-    return null;
-  }
+/**
+ * Report an auth event (signup or signin) to the abuse service.
+ * Fire-and-forget: catches all errors, never throws, never blocks auth.
+ */
+export async function reportAuthEvent(payload: AuthEventPayload): Promise<void> {
+  await fetchAbuseService('/api/auth-event', payload, 'auth event');
 }
 
 /**

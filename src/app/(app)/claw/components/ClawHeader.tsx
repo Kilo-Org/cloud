@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
-import { AccessCodeActions } from './AccessCodeActions';
+import { OpenClawButton } from './OpenClawButton';
 import { CLAW_STATUS_BADGE, type ClawState } from './claw.types';
 
 export function ClawHeader({
@@ -43,10 +43,7 @@ export function ClawHeader({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <AccessCodeActions
-          canShow={status === 'running' && !!gatewayReady}
-          gatewayUrl={gatewayUrl}
-        />
+        <OpenClawButton canShow={status === 'running' && !!gatewayReady} gatewayUrl={gatewayUrl} />
       </div>
     </header>
   );

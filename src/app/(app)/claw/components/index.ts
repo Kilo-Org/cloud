@@ -1,4 +1,4 @@
-export { AccessCodeActions } from './AccessCodeActions';
+export { OpenClawButton } from './OpenClawButton';
 export { ClawDashboard } from './ClawDashboard';
 export { ClawHeader } from './ClawHeader';
 export { CreateInstanceCard } from './CreateInstanceCard';

@@ -96,3 +96,40 @@ export async function fetchSessionMessages(
   const snapshot = await fetchSessionSnapshot(sessionId, user.id);
   return snapshot?.messages ?? null;
 }
+
+/**
+ * Delete a session via the session-ingest worker.
+ *
+ * The ingest worker owns all DB deletion (recursive child sessions) and
+ * ingest DO / cache cleanup. Returns void on success.
+ */
+export async function deleteSession(sessionId: string, userId: string): Promise<void> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new Error('SESSION_INGEST_WORKER_URL is not configured');
+  }
+
+  const token = generateInternalServiceToken(userId);
+  const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}`;
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (response.status === 404) {
+    // Session already deleted or was never ingested — treat as success (idempotent delete).
+    return;
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    const error = new Error(
+      `Session ingest delete failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'delete' },
+      extra: { sessionId, status: response.status },
+    });
+    throw error;
+  }
+}

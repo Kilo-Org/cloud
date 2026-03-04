@@ -70,6 +70,8 @@ export function VersionsTab() {
     })
   );
 
+  const { data: latestTag } = useQuery(trpc.admin.kiloclawVersions.getLatestTag.queryOptions());
+
   const { mutateAsync: updateStatus } = useMutation(
     trpc.admin.kiloclawVersions.updateVersionStatus.mutationOptions({
       onSuccess: () => {
@@ -80,6 +82,22 @@ export function VersionsTab() {
       },
       onError: err => {
         toast.error(`Failed to update status: ${err.message}`);
+      },
+    })
+  );
+
+  const { mutateAsync: syncCatalog, isPending: isSyncing } = useMutation(
+    trpc.admin.kiloclawVersions.syncCatalog.mutationOptions({
+      onSuccess: result => {
+        const parts = [`${result.synced} added`, `${result.alreadyExisted} already existed`];
+        if (result.invalid > 0) parts.push(`${result.invalid} invalid`);
+        toast.success(`Sync complete: ${parts.join(', ')}`);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Sync failed: ${err.message}`);
       },
     })
   );
@@ -105,6 +123,9 @@ export function VersionsTab() {
             <SelectItem value="disabled">Disabled</SelectItem>
           </SelectContent>
         </Select>
+        <Button variant="outline" size="sm" disabled={isSyncing} onClick={() => void syncCatalog()}>
+          {isSyncing ? 'Syncing...' : 'Sync from KV'}
+        </Button>
       </div>
 
       <div className="rounded-lg border">
@@ -139,11 +160,18 @@ export function VersionsTab() {
                   <TableCell className="font-medium">{version.openclaw_version}</TableCell>
                   <TableCell>{version.variant}</TableCell>
                   <TableCell>
-                    <code className="text-xs">
-                      {version.image_tag.length > 20
-                        ? `${version.image_tag.slice(0, 20)}…`
-                        : version.image_tag}
-                    </code>
+                    <div className="flex items-center gap-1.5">
+                      <code className="text-xs">
+                        {version.image_tag.length > 20
+                          ? `${version.image_tag.slice(0, 20)}…`
+                          : version.image_tag}
+                      </code>
+                      {latestTag === version.image_tag && (
+                        <Badge className="bg-blue-600 px-1.5 py-0 text-[10px] text-white">
+                          latest
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <code className="text-xs" title={version.image_digest ?? undefined}>
@@ -365,16 +393,16 @@ export function PinsTab() {
                 </Popover>
               )}
             </div>
-            <div className="w-[250px]">
-              <label className="text-muted-foreground mb-1 block text-xs">OpenClaw Version</label>
+            <div className="w-[300px]">
+              <label className="text-muted-foreground mb-1 block text-xs">Image Tag</label>
               <Select value={pinImageTag} onValueChange={setPinImageTag}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select OpenClaw version..." />
+                  <SelectValue placeholder="Select image tag..." />
                 </SelectTrigger>
                 <SelectContent>
                   {availableVersions?.items.map(v => (
                     <SelectItem key={v.image_tag} value={v.image_tag}>
-                      {v.openclaw_version} ({v.variant})
+                      {v.image_tag} (OpenClaw {v.openclaw_version})
                     </SelectItem>
                   ))}
                 </SelectContent>

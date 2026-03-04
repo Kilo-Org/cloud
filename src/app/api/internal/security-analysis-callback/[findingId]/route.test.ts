@@ -17,6 +17,9 @@ const mockGetSecurityFindingById = jest.fn() as jest.MockedFunction<
 const mockUpdateAnalysisStatus = jest.fn() as jest.MockedFunction<
   typeof securityAnalysisModule.updateAnalysisStatus
 >;
+const mockTransitionAutoAnalysisQueueFromCallback = jest.fn() as jest.MockedFunction<
+  typeof securityAnalysisModule.transitionAutoAnalysisQueueFromCallback
+>;
 const mockFinalizeAnalysis = jest.fn() as jest.MockedFunction<
   typeof analysisServiceModule.finalizeAnalysis
 >;
@@ -32,6 +35,7 @@ const mockTrackAnalysisCompleted = jest.fn() as jest.MockedFunction<
 const mockGenerateApiToken = jest.fn() as jest.MockedFunction<typeof tokensModule.generateApiToken>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockDbSelect = jest.fn<any>();
+const mockCaptureMessage = jest.fn();
 
 // --- Module mocks ---
 
@@ -64,6 +68,7 @@ jest.mock('@/lib/security-agent/db/security-findings', () => ({
 
 jest.mock('@/lib/security-agent/db/security-analysis', () => ({
   updateAnalysisStatus: mockUpdateAnalysisStatus,
+  transitionAutoAnalysisQueueFromCallback: mockTransitionAutoAnalysisQueueFromCallback,
 }));
 
 jest.mock('@/lib/security-agent/services/analysis-service', () => ({
@@ -85,6 +90,7 @@ jest.mock('@/lib/tokens', () => ({
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
+  captureMessage: mockCaptureMessage,
 }));
 
 jest.mock('@/lib/utils.server', () => ({
@@ -180,7 +186,7 @@ function createMockFinding(overrides: Partial<SecurityFinding> = {}): SecurityFi
     cwe_ids: null,
     cvss_score: null,
     dependency_scope: 'runtime',
-    session_id: 'ses-agent-1',
+    session_id: 'agent-session-1',
     cli_session_id: null,
     analysis_status: 'running',
     analysis_started_at: '2025-01-01T00:00:00.000Z',
@@ -231,6 +237,7 @@ beforeEach(async () => {
   jest.useFakeTimers();
   afterPromises = [];
   mockUpdateAnalysisStatus.mockResolvedValue(undefined);
+  mockTransitionAutoAnalysisQueueFromCallback.mockResolvedValue(undefined);
   mockFinalizeAnalysis.mockResolvedValue(undefined);
   ({ POST } = await import('./route'));
 });
@@ -283,6 +290,27 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
   });
 
   describe('idempotency', () => {
+    it('no-ops callback when session IDs do not match the current finding session', async () => {
+      mockGetSecurityFindingById.mockResolvedValue(
+        createMockFinding({ session_id: 'agent-current', cli_session_id: 'kilo-current' })
+      );
+
+      const req = makeRequest(FINDING_ID, {
+        ...completedPayload,
+        cloudAgentSessionId: 'agent-stale',
+        kiloSessionId: 'kilo-stale',
+      });
+      const response = await POST(req, makeParams(FINDING_ID));
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateAnalysisStatus).not.toHaveBeenCalled();
+      expect(mockTransitionAutoAnalysisQueueFromCallback).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        'Auto-analysis callback session mismatch',
+        expect.objectContaining({ level: 'warning' })
+      );
+    });
+
     it('skips processing when finding is already completed', async () => {
       mockGetSecurityFindingById.mockResolvedValue(
         createMockFinding({ analysis_status: 'completed' })
@@ -722,6 +750,9 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(FINDING_ID, 'failed', {
         error: 'Sandbox timed out',
       });
+      expect(mockTransitionAutoAnalysisQueueFromCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ failureCode: 'NETWORK_TIMEOUT' })
+      );
     });
 
     it('marks finding as failed with prefixed message for interrupted status', async () => {
@@ -734,6 +765,9 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(FINDING_ID, 'failed', {
         error: 'Analysis interrupted: User cancelled',
       });
+      expect(mockTransitionAutoAnalysisQueueFromCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ failureCode: 'STATE_GUARD_REJECTED' })
+      );
     });
 
     it('uses default message when errorMessage is absent for failed status', async () => {
@@ -767,6 +801,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
 
       const req = makeRequest(FINDING_ID, failedPayload);
       await POST(req, makeParams(FINDING_ID));
+      await flushAfterCallbacks();
 
       expect(mockTrackAnalysisCompleted).toHaveBeenCalledWith({
         distinctId: 'user-trigger-1',
@@ -806,6 +841,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
 
       const req = makeRequest(FINDING_ID, failedPayload);
       await POST(req, makeParams(FINDING_ID));
+      await flushAfterCallbacks();
 
       expect(mockTrackAnalysisCompleted).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: orgId })
@@ -818,6 +854,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
 
       const req = makeRequest(FINDING_ID, failedPayload);
       await POST(req, makeParams(FINDING_ID));
+      await flushAfterCallbacks();
 
       expect(mockTrackAnalysisCompleted).toHaveBeenCalledWith(
         expect.objectContaining({ durationMs: 0 })

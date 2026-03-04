@@ -28,7 +28,7 @@ type ClawMutations = ReturnType<typeof useKiloClawMutations>;
  * Only these models are selectable as the default until openclaw supports
  * dynamic model discovery from the gateway's /models endpoint.
  */
-const KILOCODE_CATALOG_IDS = new Set([
+export const KILOCODE_CATALOG_IDS = new Set([
   'anthropic/claude-opus-4.6',
   'z-ai/glm-5:free',
   'minimax/minimax-m2.5:free',

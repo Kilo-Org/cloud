@@ -28,7 +28,7 @@ export const APP_URL =
     ? 'https://app.kilo.ai'
     : (process.env.APP_URL_OVERRIDE ?? 'http://localhost:3000');
 
-export const TRIAL_DURATION_DAYS = 30;
+export const TRIAL_DURATION_DAYS = 14;
 
 export const AUTOCOMPLETE_MODEL = 'codestral-2508';
 

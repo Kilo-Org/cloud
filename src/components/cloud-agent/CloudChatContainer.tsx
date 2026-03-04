@@ -40,7 +40,6 @@ import {
 import { useCloudAgentStreamV2 } from './useCloudAgentStreamV2';
 import { useAutoScroll } from './hooks/useAutoScroll';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
-import { useSidebarSessions } from './hooks/useSidebarSessions';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
 import { useSessionDeletion } from './hooks/useSessionDeletion';
 import { useResumeConfigModal } from './hooks/useResumeConfigModal';
@@ -51,10 +50,12 @@ import { buildPrepareSessionRepoParams } from './utils/git-utils';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { CloudChatPresentation } from './CloudChatPresentation';
 import type { ResumeConfig } from './ResumeConfigModal';
-import type { AgentMode, SessionStartConfig } from './types';
+import type { AgentMode, SessionStartConfig, StoredSession } from './types';
 
 type CloudChatContainerProps = {
   organizationId?: string;
+  sessions: StoredSession[];
+  refetchSessions: () => void;
 };
 
 /**
@@ -85,7 +86,11 @@ type ResumeConfigState =
   | { status: 'persisted'; config: ResumeConfig }
   | { status: 'failed'; config: ResumeConfig; error: Error };
 
-export function CloudChatContainer({ organizationId }: CloudChatContainerProps) {
+export function CloudChatContainer({
+  organizationId,
+  sessions,
+  refetchSessions,
+}: CloudChatContainerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const trpc = useTRPC();
@@ -233,12 +238,6 @@ export function CloudChatContainer({ organizationId }: CloudChatContainerProps) 
   const handleSessionInitiated = useCallback(() => {
     setIsSessionInitiated(true);
   }, []);
-
-  // Sidebar sessions (scoped to organization when in org context, personal-only when undefined)
-  // Pass null for personal chat to filter out org sessions, or the org ID for org chat
-  const { sessions, refetchSessions } = useSidebarSessions({
-    organizationId: organizationId ?? null,
-  });
 
   // Callback for stream completion
   const handleStreamComplete = useCallback(() => {

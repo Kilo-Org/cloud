@@ -62,7 +62,9 @@ import * as fly from '../fly/client';
 import { appNameFromUserId } from '../fly/apps';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../utils/env-encryption';
 import { z, type ZodType } from 'zod';
-import { resolveLatestVersion } from '../lib/image-version';
+import { resolveLatestVersion, resolveVersionByTag } from '../lib/image-version';
+import { lookupCatalogVersion } from '../lib/catalog-registration';
+import { ImageVariantSchema } from '../schemas/image-version';
 
 type InstanceStatus = PersistedState['status'];
 
@@ -381,6 +383,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private openclawVersion: string | null = null;
   private imageVariant: string | null = null;
   private trackedImageTag: string | null = null;
+  private trackedImageDigest: string | null = null;
 
   // In-memory only (not persisted to SQLite) — throttles live Fly checks in getStatus()
   private lastLiveCheckAt: number | null = null;
@@ -421,6 +424,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.openclawVersion = s.openclawVersion;
       this.imageVariant = s.imageVariant;
       this.trackedImageTag = s.trackedImageTag;
+      this.trackedImageDigest = s.trackedImageDigest;
     } else {
       const hasAnyData = entries.size > 0;
       if (hasAnyData) {
@@ -487,18 +491,97 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       console.log('[DO] Created Fly Volume:', volume.id, 'region:', volume.region);
     }
 
-    // Resolve the latest registered version on every provision (including re-provision).
-    // If the registry isn't populated yet, fields stay null → fallback to FLY_IMAGE_TAG.
-    const variant = 'default'; // hardcoded day 1; future: from config or provision request
-    const latest = await resolveLatestVersion(this.env.KV_CLAW_CACHE, variant);
-    if (latest) {
-      this.openclawVersion = latest.openclawVersion;
-      this.imageVariant = latest.variant;
-      this.trackedImageTag = latest.imageTag;
-    } else if (isNew) {
-      this.openclawVersion = null;
-      this.imageVariant = null;
-      this.trackedImageTag = null;
+    // Resolve the image version for this provision.
+    // If the user has a pinned image tag, look it up in KV first (fast), then Postgres (authoritative).
+    // If not pinned, resolve latest from KV.
+    console.debug('[DO] provision: pinnedImageTag from config:', config.pinnedImageTag ?? 'none');
+    if (config.pinnedImageTag) {
+      // Try KV first (fast, but only has versions registered by the current worker)
+      let pinned = await resolveVersionByTag(this.env.KV_CLAW_CACHE, config.pinnedImageTag);
+
+      // Fall back to Postgres catalog (authoritative, has all synced versions)
+      if (!pinned && !this.env.HYPERDRIVE?.connectionString) {
+        console.error(
+          '[DO] HYPERDRIVE not configured — cannot look up pinned tag in Postgres:',
+          config.pinnedImageTag
+        );
+      }
+      if (!pinned && this.env.HYPERDRIVE?.connectionString) {
+        try {
+          const catalogEntry = await lookupCatalogVersion(
+            this.env.HYPERDRIVE.connectionString,
+            config.pinnedImageTag
+          );
+          if (catalogEntry) {
+            // Validate variant from Postgres catalog against known variants
+            const variantParse = ImageVariantSchema.safeParse(catalogEntry.variant);
+            if (!variantParse.success) {
+              // Log error but treat as cache miss rather than failing provision
+              console.error(
+                '[DO] Invalid variant from Postgres catalog, skipping:',
+                catalogEntry.variant,
+                'for tag:',
+                config.pinnedImageTag,
+                'error:',
+                variantParse.error.flatten()
+              );
+              // Continue without setting pinned - will fall through to error handling below
+            } else {
+              pinned = {
+                openclawVersion: catalogEntry.openclawVersion,
+                variant: variantParse.data,
+                imageTag: catalogEntry.imageTag,
+                imageDigest: catalogEntry.imageDigest,
+                publishedAt: catalogEntry.publishedAt,
+              };
+              console.debug(
+                '[DO] Resolved pinned tag from Postgres catalog:',
+                config.pinnedImageTag
+              );
+            }
+          }
+        } catch (err) {
+          console.warn(
+            '[DO] Failed to look up pinned tag in Postgres:',
+            err instanceof Error ? err.message : err
+          );
+        }
+      }
+
+      if (pinned) {
+        this.openclawVersion = pinned.openclawVersion;
+        this.imageVariant = pinned.variant;
+        this.trackedImageTag = pinned.imageTag;
+        this.trackedImageDigest = pinned.imageDigest;
+        console.debug('[DO] Using pinned version:', pinned.openclawVersion, '→', pinned.imageTag);
+      } else {
+        // Pinned tag not found in KV or Postgres — use the tag directly but metadata is unknown.
+        // Clear version metadata to avoid stale values from a previous provision.
+        console.warn(
+          '[DO] Pinned tag not found in KV or Postgres, using tag directly:',
+          config.pinnedImageTag
+        );
+        this.openclawVersion = null;
+        this.imageVariant = null;
+        this.trackedImageTag = config.pinnedImageTag;
+        this.trackedImageDigest = null;
+      }
+    } else {
+      // No pin — resolve latest registered version.
+      // If the registry isn't populated yet, fields stay null → fallback to FLY_IMAGE_TAG.
+      const variant = 'default'; // hardcoded day 1; future: from config or provision request
+      const latest = await resolveLatestVersion(this.env.KV_CLAW_CACHE, variant);
+      if (latest) {
+        this.openclawVersion = latest.openclawVersion;
+        this.imageVariant = latest.variant;
+        this.trackedImageTag = latest.imageTag;
+        this.trackedImageDigest = latest.imageDigest;
+      } else if (isNew) {
+        this.openclawVersion = null;
+        this.imageVariant = null;
+        this.trackedImageTag = null;
+        this.trackedImageDigest = null;
+      }
     }
 
     const configFields = {
@@ -518,6 +601,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       openclawVersion: this.openclawVersion,
       imageVariant: this.imageVariant,
       trackedImageTag: this.trackedImageTag,
+      trackedImageDigest: this.trackedImageDigest,
     };
 
     const update = isNew
@@ -1070,6 +1154,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const { envVars, minSecretsVersion } = await this.buildUserEnvVars();
     const guest = guestFromSize(this.machineSize);
     const imageTag = this.resolveImageTag();
+    console.log(
+      '[DO] startGateway: deploying with imageTag:',
+      imageTag,
+      'trackedImageTag:',
+      this.trackedImageTag,
+      'openclawVersion:',
+      this.openclawVersion
+    );
     const identity = {
       userId: this.userId,
       sandboxId: this.sandboxId,
@@ -1253,6 +1345,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     openclawVersion: string | null;
     imageVariant: string | null;
     trackedImageTag: string | null;
+    trackedImageDigest: string | null;
   }> {
     await this.loadState();
 
@@ -1287,6 +1380,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       openclawVersion: this.openclawVersion,
       imageVariant: this.imageVariant,
       trackedImageTag: this.trackedImageTag,
+      trackedImageDigest: this.trackedImageDigest,
     };
   }
 
@@ -1527,6 +1621,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             this.openclawVersion = latest.openclawVersion;
             this.imageVariant = latest.variant;
             this.trackedImageTag = latest.imageTag;
+            this.trackedImageDigest = latest.imageDigest;
           }
           // If KV empty, fall through to existing resolveImageTag() fallback
         } else {
@@ -1534,12 +1629,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           this.trackedImageTag = options.imageTag;
           this.openclawVersion = null;
           this.imageVariant = null;
+          this.trackedImageDigest = null;
         }
         await this.ctx.storage.put(
           storageUpdate({
             openclawVersion: this.openclawVersion,
             imageVariant: this.imageVariant,
             trackedImageTag: this.trackedImageTag,
+            trackedImageDigest: this.trackedImageDigest,
           })
         );
       }
@@ -2112,6 +2209,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.openclawVersion = null;
     this.imageVariant = null;
     this.trackedImageTag = null;
+    this.trackedImageDigest = null;
     this.loaded = false;
   }
 
@@ -2544,6 +2642,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.openclawVersion = null;
       this.imageVariant = null;
       this.trackedImageTag = null;
+      this.trackedImageDigest = null;
       this.loaded = true;
 
       console.log('[DO] Restored from Postgres: sandboxId =', instance.sandboxId);

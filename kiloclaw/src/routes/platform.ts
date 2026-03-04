@@ -19,7 +19,7 @@ import {
   imageVersionKey,
   imageVersionLatestKey,
 } from '../schemas/image-version';
-import { listAllVersions, updateTagIndex } from '../lib/image-version';
+import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
@@ -135,6 +135,7 @@ platform.post('/provision', async c => {
     kilocodeDefaultModel,
     machineSize,
     region,
+    pinnedImageTag,
   } = result.data;
 
   try {
@@ -150,6 +151,7 @@ platform.post('/provision', async c => {
           kilocodeDefaultModel,
           machineSize,
           region,
+          pinnedImageTag,
         }),
       'provision'
     );
@@ -576,6 +578,19 @@ platform.get('/versions', async c => {
   } catch (err) {
     console.error('[platform] Failed to list versions:', err);
     return c.json({ error: 'Failed to list versions' }, 500);
+  }
+});
+
+// GET /api/platform/versions/latest
+// Returns the current :latest image version from KV.
+platform.get('/versions/latest', async c => {
+  try {
+    const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
+    if (!latest) return c.json({ error: 'No latest version registered' }, 404);
+    return c.json(latest);
+  } catch (err) {
+    console.error('[platform] Failed to get latest version:', err);
+    return c.json({ error: 'Failed to get latest version' }, 500);
   }
 });
 

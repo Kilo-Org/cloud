@@ -193,7 +193,7 @@ export async function createVolume(
     method: 'POST',
     body: JSON.stringify(request),
   });
-  await assertOk(resp, 'createVolume');
+  await assertOk(resp, `createVolume [${request.region}]`);
   return resp.json();
 }
 
@@ -257,17 +257,19 @@ export function isFlyNotFound(err: unknown): boolean {
 
 /**
  * Status codes that Fly uses for capacity/resource exhaustion errors.
+ * - 400: "no capacity" on createVolume (observed in production)
  * - 412: "insufficient resources" when creating a machine with an existing volume
  * - 409: "insufficient memory" when updating/starting a machine on a full host
  * - 403: org memory quota exceeded in a region ("over the allowed quota")
  */
-const CAPACITY_STATUS_CODES = [403, 409, 412];
+const CAPACITY_STATUS_CODES = [400, 403, 409, 412];
 
 /**
  * Capacity-related markers in Fly error bodies. Matched case-insensitively
  * against the JSON body fields (error, status) and raw body text.
  *
  * Confirmed from production:
+ * - 400: '{"error":"no capacity"}'
  * - 412: "insufficient resources to create new machine with existing volume 'vol_xxx'"
  * - 409: "could not reserve resource for machine: insufficient memory available to fulfill request"
  * - 403: 'organization "Kilo" is using N MB of memory in {region} which is over the allowed quota'
@@ -276,6 +278,7 @@ const CAPACITY_STATUS_CODES = [403, 409, 412];
  * capacity error formats from Fly.
  */
 const CAPACITY_MARKERS = [
+  'no capacity',
   'insufficient resources',
   'insufficient memory',
   'over the allowed quota',
@@ -285,13 +288,14 @@ const CAPACITY_MARKERS = [
  * Check if a Fly API error is a capacity/resource exhaustion issue
  * (host where a volume/machine lives has no room, or org quota exceeded).
  *
- * Fly uses 412 for volume-pinned capacity issues, 409 for memory
- * exhaustion on updateMachine, and 403 for org memory quota exceeded
- * in a region. These codes are also used for unrelated errors
- * (precondition/version mismatches, conflicts, auth), so we only
+ * Fly uses 400 for "no capacity" on volume creation,
+ * 412 for volume-pinned capacity issues, 409 for memory exhaustion
+ * on updateMachine, and 403 for org memory quota exceeded in a region.
+ * These codes are also used for unrelated errors (bad request,
+ * precondition/version mismatches, conflicts, auth), so we only
  * trigger recovery when the body contains explicit capacity markers.
  *
- * Logs a warning for unclassified 403/409/412s so we can tune matching.
+ * Logs a warning for unclassified 400/403/409/412s so we can tune matching.
  */
 export function isFlyInsufficientResources(err: unknown): boolean {
   if (!(err instanceof FlyApiError) || !CAPACITY_STATUS_CODES.includes(err.status)) return false;
@@ -317,7 +321,7 @@ export function isFlyInsufficientResources(err: unknown): boolean {
   // Fall back to raw text matching across message + body
   if (CAPACITY_MARKERS.some(m => searchText.includes(m))) return true;
 
-  // 409/412 but no capacity signal — likely a version/precondition/conflict issue.
+  // Status matched but no capacity signal — likely a bad-request/auth/conflict/precondition issue.
   // Log so we can tune matching if Fly introduces new capacity error formats.
   console.warn(`[fly] Unclassified ${err.status} error (not treated as capacity):`, err.body);
   return false;

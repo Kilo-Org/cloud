@@ -62,6 +62,7 @@ import {
 import {
   DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
+  SECURITY_ANALYSIS_OWNER_CAP,
 } from '@/lib/security-agent/core/constants';
 import {
   trackSecurityAgentEnabled,
@@ -141,11 +142,11 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
         modelSlug: DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
         triageModelSlug: DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
         analysisModelSlug: DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
-        // Analysis mode default
         analysisMode: 'auto' as const,
-        // Auto-dismiss defaults (off by default)
         autoDismissEnabled: false,
         autoDismissConfidenceThreshold: 'high' as const,
+        autoAnalysisEnabled: false,
+        autoAnalysisMinSeverity: 'high' as const,
       };
     }
 
@@ -172,11 +173,11 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
       modelSlug: result.config.model_slug || analysisModelSlug,
       triageModelSlug,
       analysisModelSlug,
-      // Analysis mode configuration
       analysisMode: result.config.analysis_mode ?? 'auto',
-      // Auto-dismiss configuration
       autoDismissEnabled: result.config.auto_dismiss_enabled ?? false,
       autoDismissConfidenceThreshold: result.config.auto_dismiss_confidence_threshold ?? 'high',
+      autoAnalysisEnabled: result.config.auto_analysis_enabled ?? false,
+      autoAnalysisMinSeverity: result.config.auto_analysis_min_severity ?? 'high',
     };
   }),
 
@@ -205,6 +206,8 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
             analysisMode: existingConfig.config.analysis_mode,
             autoDismissEnabled: existingConfig.config.auto_dismiss_enabled,
             autoDismissConfidenceThreshold: existingConfig.config.auto_dismiss_confidence_threshold,
+            autoAnalysisEnabled: existingConfig.config.auto_analysis_enabled,
+            autoAnalysisMinSeverity: existingConfig.config.auto_analysis_min_severity,
             modelSlug: existingConfig.config.model_slug,
             triageModelSlug: existingTriageModelSlug,
             analysisModelSlug: existingAnalysisModelSlug,
@@ -244,11 +247,11 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
           model_slug: modelSlug,
           triage_model_slug: triageModelSlug,
           analysis_model_slug: analysisModelSlug,
-          // Analysis mode configuration
           analysis_mode: input.analysisMode,
-          // Auto-dismiss configuration
           auto_dismiss_enabled: input.autoDismissEnabled,
           auto_dismiss_confidence_threshold: input.autoDismissConfidenceThreshold,
+          auto_analysis_enabled: input.autoAnalysisEnabled,
+          auto_analysis_min_severity: input.autoAnalysisMinSeverity,
         },
         ctx.user.id
       );
@@ -282,6 +285,8 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
           analysisMode: input.analysisMode,
           autoDismissEnabled: input.autoDismissEnabled,
           autoDismissConfidenceThreshold: input.autoDismissConfidenceThreshold,
+          autoAnalysisEnabled: input.autoAnalysisEnabled,
+          autoAnalysisMinSeverity: input.autoAnalysisMinSeverity,
           modelSlug,
           triageModelSlug,
           analysisModelSlug,
@@ -841,7 +846,7 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
 
       // Check concurrency limit
       const securityOwner: SecurityReviewOwner = { organizationId: input.organizationId };
-      const concurrencyCheck = await canStartAnalysis(securityOwner);
+      const concurrencyCheck = await canStartAnalysis(securityOwner, SECURITY_ANALYSIS_OWNER_CAP);
 
       if (!concurrencyCheck.allowed) {
         throw new TRPCError({
@@ -974,7 +979,7 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
       const total = await countSecurityFindingsWithAnalysis(securityOwner);
 
       // Get concurrency info
-      const concurrencyCheck = await canStartAnalysis(securityOwner);
+      const concurrencyCheck = await canStartAnalysis(securityOwner, SECURITY_ANALYSIS_OWNER_CAP);
 
       return {
         jobs,

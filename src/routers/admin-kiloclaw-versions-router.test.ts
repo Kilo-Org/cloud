@@ -6,6 +6,22 @@ import { db } from '@/lib/drizzle';
 import { kiloclaw_image_catalog, kiloclaw_version_pins } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
+// Mock KiloClawInternalClient so tests don't require KILOCLAW_API_URL.
+// getLatestVersion returns null (no latest set) so disable-latest guard passes.
+jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
+  KiloClawInternalClient: jest.fn().mockImplementation(() => ({
+    getLatestVersion: jest.fn().mockResolvedValue(null),
+    listVersions: jest.fn().mockResolvedValue([]),
+  })),
+  KiloClawApiError: class extends Error {
+    readonly statusCode: number;
+    constructor(statusCode: number) {
+      super(`KiloClaw API error (${statusCode})`);
+      this.statusCode = statusCode;
+    }
+  },
+}));
+
 let regularUser: User;
 let adminUser: User;
 let targetUser: User;

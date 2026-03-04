@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import type { AppEnv } from '../types';
 import { KILOCLAW_AUTH_COOKIE, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
@@ -159,63 +159,40 @@ async function hasValidCookie(
   return result.success && result.userId === userId;
 }
 
-accessGatewayRoutes.get('/kilo-access-gateway', async c => {
-  const userId = c.req.query('userId');
-  if (!userId) {
-    return c.text('Missing userId parameter', 400);
-  }
-
-  // If the user already has a valid cookie, derive the gateway token and redirect
-  const secret = c.env.NEXTAUTH_SECRET;
-  if (secret) {
-    const cookie = getCookie(c, KILOCLAW_AUTH_COOKIE);
-    if (await hasValidCookie(cookie, userId, secret, c.env.WORKER_ENV)) {
-      const redirectUrl = await buildRedirectUrl(userId, c.env.GATEWAY_TOKEN_SECRET);
-      return c.redirect(redirectUrl);
-    }
-  }
-
-  return c.html(renderPage({ userId }));
-});
-
-accessGatewayRoutes.post('/kilo-access-gateway', async c => {
-  const body = await c.req.parseBody();
-  const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
-  const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
-
-  if (!code || !userId) {
-    return c.html(renderPage({ userId, error: 'Access code and user ID are required.' }), 400);
-  }
-
+/**
+ * Validate an access code, set the auth cookie, and return the redirect URL.
+ * Returns an error object if validation fails (caller should show an error).
+ */
+async function redeemCodeAndSetCookie(
+  c: Context<AppEnv>,
+  code: string,
+  userId: string
+): Promise<{ redirectUrl: string } | { error: string; status: 401 | 500 }> {
   const connectionString = c.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
     console.error('[access-gateway] HYPERDRIVE not configured');
-    return c.html(renderPage({ userId, error: 'Server configuration error.' }), 500);
+    return { error: 'Server configuration error.', status: 500 };
   }
 
   const secret = c.env.NEXTAUTH_SECRET;
   if (!secret) {
     console.error('[access-gateway] NEXTAUTH_SECRET not configured');
-    return c.html(renderPage({ userId, error: 'Server configuration error.' }), 500);
+    return { error: 'Server configuration error.', status: 500 };
   }
 
   const db = getWorkerDb(connectionString);
 
   const redeemedUserId = await validateAndRedeemAccessCode(db, code, userId);
   if (!redeemedUserId) {
-    return c.html(
-      renderPage({
-        userId,
-        error: 'Invalid or expired access code. Please generate a new one from your dashboard.',
-      }),
-      401
-    );
+    return {
+      error: 'Invalid or expired access code. Please generate a new one from your dashboard.',
+      status: 401,
+    };
   }
 
-  // Look up the user's pepper so the JWT matches what authMiddleware expects
   const user = await findPepperByUserId(db, redeemedUserId);
   if (!user) {
-    return c.html(renderPage({ userId, error: 'User not found.' }), 401);
+    return { error: 'User not found.', status: 401 };
   }
 
   const token = await signKiloToken({
@@ -234,7 +211,54 @@ accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   });
 
   const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env.GATEWAY_TOKEN_SECRET);
-  return c.html(renderLoadingPage(redirectUrl));
+  return { redirectUrl };
+}
+
+accessGatewayRoutes.get('/kilo-access-gateway', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) {
+    return c.text('Missing userId parameter', 400);
+  }
+
+  // If the user already has a valid cookie, derive the gateway token and redirect
+  const secret = c.env.NEXTAUTH_SECRET;
+  if (secret) {
+    const cookie = getCookie(c, KILOCLAW_AUTH_COOKIE);
+    if (await hasValidCookie(cookie, userId, secret, c.env.WORKER_ENV)) {
+      const redirectUrl = await buildRedirectUrl(userId, c.env.GATEWAY_TOKEN_SECRET);
+      return c.redirect(redirectUrl);
+    }
+  }
+
+  // If an auth_code is provided in the URL, validate it directly (auto-auth flow).
+  // This lets the dashboard embed the code in the Open link so users skip manual entry.
+  const authCode = c.req.query('auth_code')?.trim().toUpperCase();
+  if (authCode) {
+    const result = await redeemCodeAndSetCookie(c, authCode, userId);
+    if ('redirectUrl' in result) {
+      return c.html(renderLoadingPage(result.redirectUrl));
+    }
+    // Code was invalid/expired — fall through to the manual form with the error
+    return c.html(renderPage({ userId, error: result.error }), result.status);
+  }
+
+  return c.html(renderPage({ userId }));
+});
+
+accessGatewayRoutes.post('/kilo-access-gateway', async c => {
+  const body = await c.req.parseBody();
+  const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
+  const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
+
+  if (!code || !userId) {
+    return c.html(renderPage({ userId, error: 'Access code and user ID are required.' }), 400);
+  }
+
+  const result = await redeemCodeAndSetCookie(c, code, userId);
+  if ('redirectUrl' in result) {
+    return c.html(renderLoadingPage(result.redirectUrl));
+  }
+  return c.html(renderPage({ userId, error: result.error }), result.status);
 });
 
 export { accessGatewayRoutes };

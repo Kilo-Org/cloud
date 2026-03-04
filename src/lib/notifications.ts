@@ -143,7 +143,7 @@ async function generateTeamsTrialNotification(user: User): Promise<KiloNotificat
   return [
     {
       id: 'teams-free-trial-oct-17',
-      title: 'Try Kilo with Your Team — Free for 30 Days',
+      title: 'Try Kilo with Your Team — Free for 14 Days',
       message:
         'Get usage analytics, centralized billing, shared context, and other features you need to scale AI coding across your org.',
       action: {

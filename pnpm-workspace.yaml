@@ -41,6 +41,7 @@ packages:
   - 'cloudflare-o11y'
   - 'cloudflare-git-token-service'
   - 'cloudflare-security-sync'
+  - 'cloudflare-security-auto-analysis'
   - 'kiloclaw'
   - 'cloudflare-gastown'
   - 'cloudflare-gastown/container'
@@ -54,26 +55,25 @@ ignoredBuiltDependencies:
 
 minimumReleaseAge: 5760
 
-# Storybook 9.1.17 excluded for security update - https://storybook.js.org/blog/security-advisory/
+# Storybook 9.1.19 excluded for security update (GHSA-mjf5-7g4m-gx5w)
 minimumReleaseAgeExclude:
-  - '@storybook/addon-docs@9.1.17'
-  - '@storybook/addon-links@9.1.17'
-  - '@storybook/addon-themes@9.1.17'
-  - '@storybook/builder-webpack5@9.1.17'
-  - '@storybook/core-webpack@9.1.17'
-  - '@storybook/csf-plugin@9.1.17'
-  - '@storybook/global@9.1.17'
-  - '@storybook/icons@9.1.17'
-  - '@storybook/nextjs@9.1.17'
-  - '@storybook/preset-react-webpack@9.1.17'
-  - '@storybook/react@9.1.17'
-  - '@storybook/react-docgen-typescript-plugin@9.1.17'
-  - '@storybook/react-dom-shim@9.1.17'
-  - storybook@9.1.17
-  # glob@13.0.1 + minimatch@10.1.2 + @isaacs/brace-expansion@5.0.1 fix GHSA-7h2j-956f-4vf2
+  - '@storybook/addon-docs@9.1.19'
+  - '@storybook/addon-links@9.1.19'
+  - '@storybook/addon-themes@9.1.19'
+  - '@storybook/builder-webpack5@9.1.19'
+  - '@storybook/core-webpack@9.1.19'
+  - '@storybook/csf-plugin@9.1.19'
+  - '@storybook/nextjs@9.1.19'
+  - '@storybook/preset-react-webpack@9.1.19'
+  - '@storybook/react@9.1.19'
+  - '@storybook/react-dom-shim@9.1.19'
+  - storybook@9.1.19
+  # glob@13.0.1 + minimatch@10.2.3 + brace-expansion@5.0.2 fix minimatch ReDoS vulns
   - glob@13.0.1
-  - minimatch@10.1.2
-  - '@isaacs/brace-expansion@5.0.1'
+  - minimatch@10.2.3
+  - brace-expansion@5.0.2
+  # Security overrides for transitive dependencies
+  - serialize-javascript@7.0.3
 
 onlyBuiltDependencies:
   - '@swc/core'

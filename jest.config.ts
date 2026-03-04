@@ -41,6 +41,7 @@ const config: Config = {
     '<rootDir>/cloudflare-webhook-agent-ingest/',
     '<rootDir>/cloudflare-session-ingest/',
     '<rootDir>/cloudflare-gastown/',
+    '<rootDir>/cloudflare-security-auto-analysis/',
     '<rootDir>/kiloclaw/',
     '<rootDir>/packages/encryption/',
     '<rootDir>/packages/worker-utils/',

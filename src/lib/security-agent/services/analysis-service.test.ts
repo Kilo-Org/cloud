@@ -14,6 +14,9 @@ const mockGetSecurityFindingById = jest.fn() as jest.MockedFunction<
 const mockUpdateAnalysisStatus = jest.fn() as jest.MockedFunction<
   typeof securityAnalysisModule.updateAnalysisStatus
 >;
+const mockTryAcquireAnalysisStartLease = jest.fn() as jest.MockedFunction<
+  typeof securityAnalysisModule.tryAcquireAnalysisStartLease
+>;
 const mockTriageSecurityFinding = jest.fn() as jest.MockedFunction<
   typeof triageModule.triageSecurityFinding
 >;
@@ -24,13 +27,28 @@ const mockPrepareSession = jest.fn<any>();
 const mockInitiateFromPreparedSession = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockDeleteSession = jest.fn<any>();
+const mockInfoLogger = jest.fn();
+const mockErrorLogger = jest.fn();
 
 jest.mock('@/lib/security-agent/db/security-findings', () => ({
   getSecurityFindingById: mockGetSecurityFindingById,
 }));
 
-jest.mock('@/lib/security-agent/db/security-analysis', () => ({
-  updateAnalysisStatus: mockUpdateAnalysisStatus,
+jest.mock('@/lib/security-agent/db/security-analysis', () => {
+  const actual: { isFindingEligibleForAutoAnalysis: unknown } = jest.requireActual(
+    '@/lib/security-agent/db/security-analysis'
+  );
+  return {
+    updateAnalysisStatus: mockUpdateAnalysisStatus,
+    tryAcquireAnalysisStartLease: mockTryAcquireAnalysisStartLease,
+    isFindingEligibleForAutoAnalysis: actual.isFindingEligibleForAutoAnalysis,
+    AUTO_ANALYSIS_MAX_ATTEMPTS: 5,
+    AUTO_ANALYSIS_OWNER_CAP: 2,
+  };
+});
+
+jest.mock('@/lib/config.server', () => ({
+  INTERNAL_API_SECRET: 'test-internal-secret',
 }));
 
 jest.mock('./triage-service', () => ({
@@ -65,6 +83,11 @@ jest.mock('./extraction-service', () => ({
   extractSandboxAnalysis: jest.fn(() => Promise.resolve()),
 }));
 
+jest.mock('@/lib/utils.server', () => ({
+  sentryLogger: (_scope: string, level: string) =>
+    level === 'error' ? mockErrorLogger : mockInfoLogger,
+}));
+
 let startSecurityAnalysis: typeof startSecurityAnalysisType;
 let extractLastAssistantMessage: typeof extractLastAssistantMessageType;
 
@@ -75,6 +98,32 @@ beforeAll(async () => {
 describe('analysis-service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTryAcquireAnalysisStartLease.mockResolvedValue(true);
+  });
+
+  it('does not start when start lease cannot be acquired', async () => {
+    const findingId = 'finding-lease-miss';
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      status: 'fixed',
+      analysis_status: 'running',
+    } as Awaited<ReturnType<typeof mockGetSecurityFindingById>>);
+    mockTryAcquireAnalysisStartLease.mockResolvedValue(false);
+
+    const result = await startSecurityAnalysis({
+      findingId,
+      user,
+      githubRepo: 'acme/repo',
+      githubToken: 'gh-token',
+    });
+
+    expect(result).toEqual({
+      started: false,
+      error: "Finding status is 'fixed', analysis requires 'open' status",
+    });
+    expect(mockUpdateAnalysisStatus).not.toHaveBeenCalledWith(findingId, 'pending');
   });
 
   it('passes organization id to cloud-agent-next prepareSession', async () => {

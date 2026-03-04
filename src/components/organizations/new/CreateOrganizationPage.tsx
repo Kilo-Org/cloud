@@ -144,7 +144,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
         <h1 className="mb-2 text-3xl font-bold lg:text-4xl">
           Create an organization and start your
           <br />
-          30-day free trial for Kilo Enterprise
+          14-day free trial for Kilo Enterprise
         </h1>
         <Link
           href="/get-started/personal"
@@ -249,7 +249,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
                   'Processing...'
                 ) : (
                   <span className="flex items-center gap-2">
-                    Start 30-day free trial for Kilo Enterprise
+                    Start 14-day free trial for Kilo Enterprise
                     <ArrowRight className="h-5 w-5" />
                   </span>
                 )}

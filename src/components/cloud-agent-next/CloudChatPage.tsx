@@ -1,24 +1,31 @@
 /**
  * Cloud Chat Page
  *
- * Simple wrapper that exports the CloudChatContainer component.
- * All business logic, hooks, and state management are in CloudChatContainer.
- * All rendering logic is in CloudChatPresentation.
+ * Owns the sidebar session query so it runs outside CloudChatContainer,
+ * whose frequent internal state changes would otherwise cause redundant
+ * unifiedSessions.list invocations batched by tRPC.
  */
 
 'use client';
 
 import { CloudChatContainer } from './CloudChatContainer';
+import { useSidebarSessions } from './hooks/useSidebarSessions';
 
 type CloudChatPageProps = {
   organizationId?: string;
 };
 
-/**
- * Main export - renders the cloud chat container
- */
-export default function CloudChatPage(props: CloudChatPageProps) {
-  return <CloudChatContainer {...props} />;
+export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
+  const { sessions, refetchSessions } = useSidebarSessions({
+    organizationId: organizationId ?? null,
+  });
+  return (
+    <CloudChatContainer
+      organizationId={organizationId}
+      sessions={sessions}
+      refetchSessions={refetchSessions}
+    />
+  );
 }
 
 // Named export for compatibility

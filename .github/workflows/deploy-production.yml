@@ -358,6 +358,32 @@ jobs:
     with:
       environment: prod
 
+  check-security-auto-analysis-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs['security-auto-analysis'] }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for security-auto-analysis changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            security-auto-analysis:
+              - 'cloudflare-security-auto-analysis/**'
+
+  deploy-security-auto-analysis:
+    needs: [check-security-auto-analysis-changes]
+    if: needs.check-security-auto-analysis-changes.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-security-auto-analysis.yml
+    secrets: inherit
+    with:
+      environment: prod
+
   check-deployment-dispatcher-changes:
     runs-on: ubuntu-latest
     outputs:

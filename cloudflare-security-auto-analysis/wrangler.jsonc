@@ -1,0 +1,130 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "security-auto-analysis",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "dev": {
+    "port": 8797,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
+  },
+  "triggers": {
+    "crons": ["* * * * *"],
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "OWNER_QUEUE",
+        "queue": "security-auto-analysis-owner-queue",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "security-auto-analysis-owner-queue",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "security-auto-analysis-owner-dlq",
+        "max_concurrency": 50,
+        "type": "unbound",
+      },
+    ],
+  },
+  "services": [
+    {
+      "binding": "CLOUD_AGENT_NEXT",
+      "service": "cloud-agent-next",
+    },
+    {
+      "binding": "GIT_TOKEN_SERVICE",
+      "service": "git-token-service",
+      "entrypoint": "GitTokenRPCEntrypoint",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET_PROD",
+    },
+  ],
+  "env": {
+    "dev": {
+      "name": "security-auto-analysis-dev",
+      "workers_dev": false,
+      "vars": {
+        "ENVIRONMENT": "development",
+        "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
+      },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "OWNER_QUEUE",
+            "queue": "security-auto-analysis-owner-queue-dev",
+          },
+        ],
+        "consumers": [
+          {
+            "queue": "security-auto-analysis-owner-queue-dev",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "security-auto-analysis-owner-dlq-dev",
+            "max_concurrency": 50,
+            "type": "unbound",
+          },
+        ],
+      },
+      "services": [
+        {
+          "binding": "CLOUD_AGENT_NEXT",
+          "service": "cloud-agent-next-dev",
+        },
+        {
+          "binding": "GIT_TOKEN_SERVICE",
+          "service": "git-token-service-dev",
+          "entrypoint": "GitTokenRPCEntrypoint",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "INTERNAL_API_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "INTERNAL_API_SECRET_DEV",
+        },
+        {
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "NEXTAUTH_SECRET_DEV",
+        },
+      ],
+    },
+  },
+}

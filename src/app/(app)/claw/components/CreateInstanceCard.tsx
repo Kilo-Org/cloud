@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { ChannelTokenInput } from './ChannelTokenInput';
 import { CHANNELS, CHANNEL_TYPES, type ChannelType } from './channel-config';
+import { KILOCODE_CATALOG_IDS } from './SettingsTab';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
@@ -23,7 +24,10 @@ export function CreateInstanceCard({ mutations }: { mutations: ClawMutations }) 
   const [tokens, setTokens] = useState<Record<string, string>>({});
 
   const modelOptions = useMemo<ModelOption[]>(
-    () => (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
+    () =>
+      (modelsData?.data || [])
+        .filter(model => KILOCODE_CATALOG_IDS.has(model.id))
+        .map(model => ({ id: model.id, name: model.name })),
     [modelsData]
   );
 

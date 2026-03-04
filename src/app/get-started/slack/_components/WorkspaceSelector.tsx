@@ -175,7 +175,7 @@ export function WorkspaceSelector({ onSelect }: WorkspaceSelectorProps) {
                       Create New Organization
                     </CardTitle>
                     <CardDescription className="text-sm">
-                      Share Kilo for Slack with your team. Starts with a 30-day free trial
+                      Share Kilo for Slack with your team. Starts with a 14-day free trial
                     </CardDescription>
                   </div>
                 </CardContent>

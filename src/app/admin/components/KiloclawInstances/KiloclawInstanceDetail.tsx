@@ -188,7 +188,7 @@ function VersionPinCard({ userId }: { userId: string }) {
           <Pin className="h-5 w-5" />
           <CardTitle>Version Pin</CardTitle>
         </div>
-        <CardDescription>Pin this user to a specific KiloClaw image version</CardDescription>
+        <CardDescription>Pin this user to a specific KiloClaw image tag</CardDescription>
       </CardHeader>
       <CardContent>
         {pinLoading ? (
@@ -199,14 +199,10 @@ function VersionPinCard({ userId }: { userId: string }) {
         ) : pinData ? (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-4">
-              <DetailField label="Status">
-                <Badge className="bg-blue-600">
-                  Pinned to {pinData.openclaw_version ?? pinData.image_tag}
-                </Badge>
+              <DetailField label="Pinned Image Tag">
+                <Badge className="bg-blue-600 font-mono text-xs">{pinData.image_tag}</Badge>
               </DetailField>
-              <DetailField label="Image Tag">
-                <code className="text-xs">{pinData.image_tag}</code>
-              </DetailField>
+              <DetailField label="OpenClaw Version">{pinData.openclaw_version ?? '—'}</DetailField>
               <DetailField label="Variant">{pinData.variant ?? 'default'}</DetailField>
               <DetailField label="Pinned By">
                 {pinData.pinned_by_email ?? pinData.pinned_by}
@@ -216,12 +212,12 @@ function VersionPinCard({ userId }: { userId: string }) {
             <div className="flex items-center gap-2 pt-2">
               <Select value={selectedTag} onValueChange={setSelectedTag}>
                 <SelectTrigger className="w-[250px]">
-                  <SelectValue placeholder="Change OpenClaw version..." />
+                  <SelectValue placeholder="Change image tag..." />
                 </SelectTrigger>
                 <SelectContent>
                   {versionsData?.items.map(v => (
                     <SelectItem key={v.image_tag} value={v.image_tag}>
-                      {v.openclaw_version} ({v.variant}) - {v.image_tag.slice(0, 16)}
+                      {v.image_tag} (OpenClaw {v.openclaw_version})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -259,12 +255,12 @@ function VersionPinCard({ userId }: { userId: string }) {
             <div className="flex items-center gap-2">
               <Select value={selectedTag} onValueChange={setSelectedTag}>
                 <SelectTrigger className="w-[250px]">
-                  <SelectValue placeholder="Select OpenClaw version to pin..." />
+                  <SelectValue placeholder="Select image tag to pin..." />
                 </SelectTrigger>
                 <SelectContent>
                   {versionsData?.items.map(v => (
                     <SelectItem key={v.image_tag} value={v.image_tag}>
-                      {v.openclaw_version} ({v.variant}) - {v.image_tag.slice(0, 16)}
+                      {v.image_tag} (OpenClaw {v.openclaw_version})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -628,6 +624,30 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   <DetailField label="Secrets">{data.workerStatus.secretCount}</DetailField>
 
                   <DetailField label="Channels">{data.workerStatus.channelCount}</DetailField>
+
+                  <DetailField label="OpenClaw Version">
+                    {data.workerStatus.openclawVersion ?? '—'}
+                  </DetailField>
+
+                  <DetailField label="Image Variant">
+                    {data.workerStatus.imageVariant ?? '—'}
+                  </DetailField>
+
+                  <DetailField label="Image Tag">
+                    {data.workerStatus.trackedImageTag ? (
+                      <code className="text-xs">{data.workerStatus.trackedImageTag}</code>
+                    ) : (
+                      '—'
+                    )}
+                  </DetailField>
+
+                  <DetailField label="Image Digest">
+                    {data.workerStatus.trackedImageDigest ? (
+                      <code className="text-xs">{data.workerStatus.trackedImageDigest}</code>
+                    ) : (
+                      '—'
+                    )}
+                  </DetailField>
                 </div>
               ) : !data.workerStatusError ? (
                 <p className="text-muted-foreground text-sm">No worker status available</p>

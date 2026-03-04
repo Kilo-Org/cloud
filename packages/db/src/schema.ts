@@ -2477,6 +2477,12 @@ export const security_findings = pgTable(
     index('idx_security_findings_session_id').on(table.session_id),
     index('idx_security_findings_cli_session_id').on(table.cli_session_id),
     index('idx_security_findings_analysis_status').on(table.analysis_status),
+    index('idx_security_findings_org_analysis_in_flight')
+      .on(table.owned_by_organization_id, table.analysis_status)
+      .where(sql`${table.analysis_status} IN ('pending', 'running')`),
+    index('idx_security_findings_user_analysis_in_flight')
+      .on(table.owned_by_user_id, table.analysis_status)
+      .where(sql`${table.analysis_status} IN ('pending', 'running')`),
     // Owner check constraint
     check(
       'security_findings_owner_check',
@@ -2490,6 +2496,165 @@ export const security_findings = pgTable(
 
 export type SecurityFinding = typeof security_findings.$inferSelect;
 export type NewSecurityFinding = typeof security_findings.$inferInsert;
+
+export const security_analysis_queue = pgTable(
+  'security_analysis_queue',
+  {
+    id: idPrimaryKeyColumn,
+    finding_id: uuid()
+      .notNull()
+      .references(() => security_findings.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    queue_status: text().notNull(),
+    severity_rank: smallint().notNull(),
+    queued_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_by_job_id: text(),
+    claim_token: text(),
+    attempt_count: integer().notNull().default(0),
+    reopen_requeue_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failure_code: text(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_security_analysis_queue_finding_id').on(table.finding_id),
+    check(
+      'security_analysis_queue_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'security_analysis_queue_status_check',
+      sql`${table.queue_status} IN ('queued', 'pending', 'running', 'failed', 'completed')`
+    ),
+    check(
+      'security_analysis_queue_claim_token_required_check',
+      sql`${table.queue_status} NOT IN ('pending', 'running') OR ${table.claim_token} IS NOT NULL`
+    ),
+    check(
+      'security_analysis_queue_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'security_analysis_queue_reopen_requeue_count_non_negative_check',
+      sql`${table.reopen_requeue_count} >= 0`
+    ),
+    check(
+      'security_analysis_queue_severity_rank_check',
+      sql`${table.severity_rank} IN (0, 1, 2, 3)`
+    ),
+    check(
+      'security_analysis_queue_failure_code_check',
+      sql`${table.failure_code} IS NULL OR ${table.failure_code} IN (
+        'NETWORK_TIMEOUT',
+        'UPSTREAM_5XX',
+        'TEMP_TOKEN_FAILURE',
+        'START_CALL_AMBIGUOUS',
+        'REQUEUE_TEMPORARY_PRECONDITION',
+        'ACTOR_RESOLUTION_FAILED',
+        'GITHUB_TOKEN_UNAVAILABLE',
+        'INVALID_CONFIG',
+        'MISSING_OWNERSHIP',
+        'PERMISSION_DENIED_PERMANENT',
+        'UNSUPPORTED_SEVERITY',
+        'INSUFFICIENT_CREDITS',
+        'STATE_GUARD_REJECTED',
+        'SKIPPED_ALREADY_IN_PROGRESS',
+        'SKIPPED_NO_LONGER_ELIGIBLE',
+        'REOPEN_LOOP_GUARD',
+        'RUN_LOST'
+      )`
+    ),
+    index('idx_security_analysis_queue_claim_path_org')
+      .on(
+        table.owned_by_organization_id,
+        sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+        table.severity_rank,
+        table.queued_at,
+        table.id
+      )
+      .where(sql`${table.queue_status} = 'queued'`),
+    index('idx_security_analysis_queue_claim_path_user')
+      .on(
+        table.owned_by_user_id,
+        sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+        table.severity_rank,
+        table.queued_at,
+        table.id
+      )
+      .where(sql`${table.queue_status} = 'queued'`),
+    index('idx_security_analysis_queue_in_flight_org')
+      .on(table.owned_by_organization_id, table.queue_status, table.claimed_at, table.id)
+      .where(sql`${table.queue_status} IN ('pending', 'running')`),
+    index('idx_security_analysis_queue_in_flight_user')
+      .on(table.owned_by_user_id, table.queue_status, table.claimed_at, table.id)
+      .where(sql`${table.queue_status} IN ('pending', 'running')`),
+    index('idx_security_analysis_queue_lag_dashboards')
+      .on(table.queued_at)
+      .where(sql`${table.queue_status} = 'queued'`),
+    index('idx_security_analysis_queue_pending_reconciliation')
+      .on(table.claimed_at, table.id)
+      .where(sql`${table.queue_status} = 'pending'`),
+    index('idx_security_analysis_queue_running_reconciliation')
+      .on(table.updated_at, table.id)
+      .where(sql`${table.queue_status} = 'running'`),
+    index('idx_security_analysis_queue_failure_trend')
+      .on(table.failure_code, table.updated_at)
+      .where(sql`${table.failure_code} IS NOT NULL`),
+  ]
+);
+
+export type SecurityAnalysisQueue = typeof security_analysis_queue.$inferSelect;
+export type NewSecurityAnalysisQueue = typeof security_analysis_queue.$inferInsert;
+
+export const security_analysis_owner_state = pgTable(
+  'security_analysis_owner_state',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    auto_analysis_enabled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    blocked_until: timestamp({ withTimezone: true, mode: 'string' }),
+    block_reason: text(),
+    consecutive_actor_resolution_failures: integer().notNull().default(0),
+    last_actor_resolution_failure_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_analysis_owner_state_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'security_analysis_owner_state_block_reason_check',
+      sql`${table.block_reason} IS NULL OR ${table.block_reason} IN ('INSUFFICIENT_CREDITS', 'ACTOR_RESOLUTION_FAILED', 'OPERATOR_PAUSE')`
+    ),
+    uniqueIndex('UQ_security_analysis_owner_state_org_owner')
+      .on(table.owned_by_organization_id)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_security_analysis_owner_state_user_owner')
+      .on(table.owned_by_user_id)
+      .where(isNotNull(table.owned_by_user_id)),
+  ]
+);
+
+export type SecurityAnalysisOwnerState = typeof security_analysis_owner_state.$inferSelect;
 
 // Security Audit Log — SOC2-compliant audit trail for security agent actions
 export const security_audit_log = pgTable(
@@ -3202,3 +3367,23 @@ export const kiloclaw_version_pins = pgTable('kiloclaw_version_pins', {
 });
 
 export type KiloClawVersionPin = typeof kiloclaw_version_pins.$inferSelect;
+
+// KiloClaw Early Bird Purchases — records one-time earlybird payments.
+// Unique on user_id enforces at most one purchase per user.
+// Unique on stripe_charge_id provides webhook idempotency.
+export const kiloclaw_earlybird_purchases = pgTable('kiloclaw_earlybird_purchases', {
+  id: uuid()
+    .default(sql`gen_random_uuid()`)
+    .primaryKey()
+    .notNull(),
+  user_id: text()
+    .notNull()
+    .references(() => kilocode_users.id, { onDelete: 'cascade' })
+    .unique(),
+  stripe_charge_id: text().unique(),
+  manual_payment_id: text().unique(),
+  amount_cents: integer().notNull(),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export type KiloClawEarlybirdPurchase = typeof kiloclaw_earlybird_purchases.$inferSelect;

@@ -1,9 +1,3 @@
-/**
- * Security Reviews - Sync Service
- *
- * Orchestrates syncing Dependabot alerts from GitHub to our database.
- */
-
 import { captureException } from '@sentry/nextjs';
 import { trackSecurityAgentFullSync } from '../posthog-tracking';
 import { db } from '@/lib/drizzle';
@@ -14,6 +8,11 @@ import { hasSecurityReviewPermissions } from '../github/permissions';
 import { parseDependabotAlerts } from '../parsers/dependabot-parser';
 import { upsertSecurityFinding } from '../db/security-findings';
 import { getSecurityAgentConfig, getSecurityAgentConfigWithStatus } from '../db/security-config';
+import {
+  getOwnerAutoAnalysisEnabledAt,
+  syncAutoAnalysisQueueForFinding,
+  type AutoAnalysisQueueSyncResult,
+} from '../db/security-analysis';
 import { upsertAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
   getSlaForSeverity,
@@ -29,10 +28,6 @@ const log = sentryLogger('security-agent:sync', 'info');
 const warn = sentryLogger('security-agent:sync', 'warning');
 const logError = sentryLogger('security-agent:sync', 'error');
 
-/**
- * Convert SecurityReviewOwner to Owner type used by agent_configs
- * The userId field is used for audit purposes; for system operations we use 'system'
- */
 function toAgentConfigOwner(owner: SecurityReviewOwner): Owner {
   if (owner.organizationId) {
     return { type: 'org', id: owner.organizationId, userId: 'system' };
@@ -43,9 +38,6 @@ function toAgentConfigOwner(owner: SecurityReviewOwner): Owner {
   throw new Error('Invalid owner: must have either organizationId or userId');
 }
 
-/**
- * Sync Dependabot alerts for a single repository
- */
 export async function syncDependabotAlertsForRepo(params: {
   owner: SecurityReviewOwner;
   platformIntegrationId: string;
@@ -64,15 +56,19 @@ export async function syncDependabotAlertsForRepo(params: {
     errors: 0,
     staleRepos: [],
   };
+  const queueSyncTotals: AutoAnalysisQueueSyncResult = {
+    enqueueCount: 0,
+    eligibleCount: 0,
+    boundarySkipCount: 0,
+    unknownSeverityCount: 0,
+  };
 
   try {
-    // Parse repo owner and name
     const [repoOwner, repoName] = repoFullName.split('/');
     if (!repoOwner || !repoName) {
       throw new Error(`Invalid repo full name: ${repoFullName}`);
     }
 
-    // Fetch all alerts from Dependabot
     const fetchResult = await fetchAllDependabotAlerts(installationId, repoOwner, repoName);
 
     if (fetchResult.status === 'repo_not_found') {
@@ -89,20 +85,21 @@ export async function syncDependabotAlertsForRepo(params: {
     const alerts = fetchResult.alerts;
     log(`Fetched ${alerts.length} alerts from GitHub for ${repoFullName}`);
 
-    // Parse alerts to our internal format
     const findings = parseDependabotAlerts(alerts, repoFullName);
     log(`Parsed ${findings.length} findings for ${repoFullName}`);
 
-    // Get SLA config for this owner
-    const config = await getSecurityAgentConfig(toAgentConfigOwner(owner));
+    const configOwner = toAgentConfigOwner(owner);
+    const configWithStatus = await getSecurityAgentConfigWithStatus(configOwner);
+    const config = configWithStatus?.config ?? (await getSecurityAgentConfig(configOwner));
+    const isAgentEnabled = configWithStatus?.isEnabled ?? false;
+    const ownerAutoAnalysisEnabledAt = await getOwnerAutoAnalysisEnabledAt(owner);
 
-    // Upsert each finding
     for (const finding of findings) {
       try {
         const slaDays = getSlaForSeverity(config, finding.severity);
         const slaDueAt = calculateSlaDueAt(finding.first_detected_at, slaDays);
 
-        await upsertSecurityFinding({
+        const upsertResult = await upsertSecurityFinding({
           ...finding,
           owner,
           platformIntegrationId,
@@ -111,6 +108,39 @@ export async function syncDependabotAlertsForRepo(params: {
         });
 
         result.synced++;
+
+        try {
+          const queueSyncResult = await syncAutoAnalysisQueueForFinding({
+            owner,
+            findingId: upsertResult.findingId,
+            findingCreatedAt: upsertResult.findingCreatedAt,
+            previousStatus: upsertResult.previousStatus,
+            currentStatus: finding.status,
+            severity: finding.severity,
+            isAgentEnabled,
+            autoAnalysisEnabled: config.auto_analysis_enabled,
+            autoAnalysisMinSeverity: config.auto_analysis_min_severity,
+            ownerAutoAnalysisEnabledAt,
+          });
+          queueSyncTotals.enqueueCount += queueSyncResult.enqueueCount;
+          queueSyncTotals.eligibleCount += queueSyncResult.eligibleCount;
+          queueSyncTotals.boundarySkipCount += queueSyncResult.boundarySkipCount;
+          queueSyncTotals.unknownSeverityCount += queueSyncResult.unknownSeverityCount;
+        } catch (error) {
+          logError(`Error syncing auto-analysis queue for ${repoFullName}`, {
+            error,
+            alertNumber: finding.source_id,
+            findingId: upsertResult.findingId,
+          });
+          captureException(error, {
+            tags: { operation: 'syncDependabotAlertsForRepo', step: 'syncAutoAnalysisQueue' },
+            extra: {
+              repoFullName,
+              alertNumber: finding.source_id,
+              findingId: upsertResult.findingId,
+            },
+          });
+        }
       } catch (error) {
         result.errors++;
         logError(`Error upserting finding for ${repoFullName}`, {
@@ -130,6 +160,10 @@ export async function syncDependabotAlertsForRepo(params: {
       durationMs: repoDurationMs,
       alertsSynced: result.synced,
       errors: result.errors,
+      enqueue_count_per_sync: queueSyncTotals.enqueueCount,
+      eligible_count_per_sync: queueSyncTotals.eligibleCount,
+      boundary_skip_count: queueSyncTotals.boundarySkipCount,
+      unknown_severity_count: queueSyncTotals.unknownSeverityCount,
     });
 
     return result;
@@ -145,9 +179,8 @@ export async function syncDependabotAlertsForRepo(params: {
 }
 
 /**
- * Sync Dependabot alerts for all repositories of an owner.
- * If all repositories fail to sync, throws the first error encountered.
- * Stale repos (404 from GitHub) are collected and returned for pruning.
+ * Sync all repos for an owner. Throws the first error if every repo fails.
+ * Stale repos (GitHub 404) are returned for pruning.
  */
 export async function syncAllReposForOwner(params: {
   owner: SecurityReviewOwner;
@@ -165,7 +198,6 @@ export async function syncAllReposForOwner(params: {
     staleRepos: [],
   };
 
-  // Track the first error encountered to throw if all repos fail
   let firstError: Error | null = null;
   let successfulRepos = 0;
 
@@ -193,8 +225,6 @@ export async function syncAllReposForOwner(params: {
     }
   }
 
-  // If all repositories failed to sync, throw the first error
-  // This ensures the frontend gets an error response instead of success
   if (successfulRepos === 0 && firstError) {
     throw firstError;
   }
@@ -211,11 +241,7 @@ type EnabledSecurityReviewConfig = {
   repoNameToId: Map<string, number>;
 };
 
-/**
- * Get all enabled security review configurations with their integrations
- */
 export async function getEnabledSecurityReviewConfigs(): Promise<EnabledSecurityReviewConfig[]> {
-  // Get all enabled security_review configs
   const configs = await db
     .select()
     .from(agent_configs)
@@ -224,7 +250,6 @@ export async function getEnabledSecurityReviewConfigs(): Promise<EnabledSecurity
   const results: EnabledSecurityReviewConfig[] = [];
 
   for (const config of configs) {
-    // Validate owner - database constraint ensures one is set, but TypeScript doesn't know
     const orgId = config.owned_by_organization_id;
     const userId = config.owned_by_user_id;
 
@@ -233,7 +258,6 @@ export async function getEnabledSecurityReviewConfigs(): Promise<EnabledSecurity
       continue;
     }
 
-    // Get the platform integration for this owner
     const ownerCondition = orgId
       ? eq(platform_integrations.owned_by_organization_id, orgId)
       : eq(platform_integrations.owned_by_user_id, userId as string);
@@ -255,13 +279,11 @@ export async function getEnabledSecurityReviewConfigs(): Promise<EnabledSecurity
       continue;
     }
 
-    // Check if integration has required permissions
     if (!hasSecurityReviewPermissions(integration)) {
       log(`Integration ${integration.id} missing vulnerability_alerts permission, skipping`);
       continue;
     }
 
-    // Get all repositories from integration with valid id and full_name
     const allRepositories = (integration.repositories || []).filter(
       (r): r is { id: number; full_name: string; name: string; private: boolean } =>
         typeof r.id === 'number' && typeof r.full_name === 'string' && r.full_name.length > 0
@@ -272,27 +294,22 @@ export async function getEnabledSecurityReviewConfigs(): Promise<EnabledSecurity
       continue;
     }
 
-    // Build name-to-id mapping for stale repo pruning
     const repoNameToId = new Map(allRepositories.map(r => [r.full_name, r.id]));
 
-    // Parse the security agent config to get repository selection settings
     const securityConfig = config.config as {
       repository_selection_mode?: 'all' | 'selected';
       selected_repository_ids?: number[];
     };
 
-    // Filter repositories based on selection mode
     let selectedRepos: string[];
     if (
       securityConfig.repository_selection_mode === 'selected' &&
       securityConfig.selected_repository_ids &&
       securityConfig.selected_repository_ids.length > 0
     ) {
-      // Only sync selected repositories
       const selectedIds = new Set(securityConfig.selected_repository_ids);
       selectedRepos = allRepositories.filter(r => selectedIds.has(r.id)).map(r => r.full_name);
     } else {
-      // Sync all repositories
       selectedRepos = allRepositories.map(r => r.full_name);
     }
 
@@ -320,10 +337,7 @@ export async function getEnabledSecurityReviewConfigs(): Promise<EnabledSecurity
 const SECURITY_SCAN_AGENT_TYPE = 'security_scan';
 const SECURITY_SCAN_PLATFORM = 'github';
 
-/**
- * Remove stale repos (deleted/transferred on GitHub) from the agent config's
- * selected_repository_ids. Only applies when repository_selection_mode is 'selected'.
- */
+/** Remove stale repos from selected_repository_ids when using 'selected' mode. */
 async function pruneStaleReposFromConfig(
   owner: SecurityReviewOwner,
   staleRepoNames: string[],
@@ -342,7 +356,6 @@ async function pruneStaleReposFromConfig(
 
   const { config, isEnabled } = configWithStatus;
 
-  // Only prune when using 'selected' mode with explicit repo IDs
   if (
     config.repository_selection_mode !== 'selected' ||
     !config.selected_repository_ids ||
@@ -371,10 +384,6 @@ async function pruneStaleReposFromConfig(
   });
 }
 
-/**
- * Run a full sync for all enabled security review configurations
- * This is called by the cron job
- */
 export async function runFullSync(): Promise<{
   totalSynced: number;
   totalErrors: number;
@@ -395,7 +404,6 @@ export async function runFullSync(): Promise<{
       totalSynced += result.synced;
       totalErrors += result.errors;
 
-      // Prune stale repos from config so they won't be retried on future syncs
       if (result.staleRepos.length > 0) {
         try {
           await pruneStaleReposFromConfig(config.owner, result.staleRepos, config.repoNameToId);

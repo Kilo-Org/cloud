@@ -256,6 +256,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (isDeadFreeModel(originalModelIdLowerCased)) {
+    console.warn(`User requested discontinued free model ${originalModelIdLowerCased}; rejecting.`);
     return alphaPeriodEndedResponse();
   }
 

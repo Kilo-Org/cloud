@@ -15,7 +15,10 @@ import { SSO_SIGNIN_PATH } from '@/lib/auth/constants';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
-async function processSSOInternal(args: CreateOrUpdateUserArgs): Promise<boolean> {
+async function processSSOInternal(
+  args: CreateOrUpdateUserArgs,
+  requestHeaders?: Headers
+): Promise<boolean> {
   if (args.provider !== 'workos') {
     throw new Error('Only SSO logins supported');
   }
@@ -48,7 +51,7 @@ async function processSSOInternal(args: CreateOrUpdateUserArgs): Promise<boolean
     );
   }
 
-  const res = await createOrUpdateUser(args, undefined, true);
+  const res = await createOrUpdateUser(args, undefined, true, requestHeaders);
   if (!res.success) {
     throw new Error(res.error);
   }
@@ -96,9 +99,9 @@ async function processSSOInternal(args: CreateOrUpdateUserArgs): Promise<boolean
   return true;
 }
 
-export async function processSSOUserLogin(args: CreateOrUpdateUserArgs) {
+export async function processSSOUserLogin(args: CreateOrUpdateUserArgs, requestHeaders?: Headers) {
   try {
-    return await processSSOInternal(args);
+    return await processSSOInternal(args, requestHeaders);
   } catch (error) {
     console.error('Error processing SSO login:', error);
     captureException(error, {

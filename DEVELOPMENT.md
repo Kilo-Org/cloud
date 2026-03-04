@@ -219,7 +219,7 @@ http://localhost:3000/users/sign_in?fakeUser=someone@example.com&callbackPath=/p
 
 ### Admin access
 
-Some features (e.g., Security Agent, admin panels) are only visible to users with `is_admin = true`. The admin flag is set at user-creation time based on the email address:
+Some features (e.g., admin panels) are only visible to users with `is_admin = true`. The admin flag is set at user-creation time based on the email address:
 
 - **Real OAuth:** emails ending in `@kilocode.ai` with the `kilocode.ai` hosted domain are admins.
 - **Fake login:** emails must end in `@admin.example.com` to get admin access.

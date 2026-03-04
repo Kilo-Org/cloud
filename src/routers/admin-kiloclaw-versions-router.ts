@@ -1,9 +1,10 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { kiloclaw_image_catalog, kiloclaw_version_pins, kilocode_users } from '@kilocode/db/schema';
-import { eq, desc, sql, or, ilike } from 'drizzle-orm';
+import { eq, desc, sql, or, ilike, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { TRPCError } from '@trpc/server';
+import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import * as z from 'zod';
 
 const ListVersionsSchema = z.object({
@@ -72,6 +73,33 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   updateVersionStatus: adminProcedure
     .input(UpdateVersionStatusSchema)
     .mutation(async ({ input, ctx }) => {
+      // Prevent disabling the :latest version — it would break all unpinned users.
+      // Note: TOCTOU race exists between fetching latest from KV and the DB update below.
+      // Acceptable because this is an admin-only operation with low concurrent usage.
+      if (input.status === 'disabled') {
+        const client = new KiloClawInternalClient();
+        try {
+          const latestTag = (await client.getLatestVersion())?.imageTag;
+          if (latestTag === input.imageTag) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'Cannot disable the current :latest version. Push a new image first.',
+            });
+          }
+        } catch (err) {
+          // If it's already a TRPCError, re-throw it
+          if (err instanceof TRPCError) {
+            throw err;
+          }
+          // Only catch unexpected errors (network, service unavailable, etc.)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to verify latest version status',
+            cause: err,
+          });
+        }
+      }
+
       const [updated] = await db
         .update(kiloclaw_image_catalog)
         .set({
@@ -163,24 +191,36 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   }),
 
   setPin: adminProcedure.input(SetPinSchema).mutation(async ({ input, ctx }) => {
-    const [result] = await db
-      .insert(kiloclaw_version_pins)
-      .values({
-        user_id: input.userId,
-        image_tag: input.imageTag,
-        pinned_by: ctx.user.id,
-        reason: input.reason ?? null,
-      })
-      .onConflictDoUpdate({
-        target: kiloclaw_version_pins.user_id,
-        set: {
+    let result;
+    try {
+      [result] = await db
+        .insert(kiloclaw_version_pins)
+        .values({
+          user_id: input.userId,
           image_tag: input.imageTag,
           pinned_by: ctx.user.id,
           reason: input.reason ?? null,
-          updated_at: new Date().toISOString(),
-        },
-      })
-      .returning();
+        })
+        .onConflictDoUpdate({
+          target: kiloclaw_version_pins.user_id,
+          set: {
+            image_tag: input.imageTag,
+            pinned_by: ctx.user.id,
+            reason: input.reason ?? null,
+            updated_at: new Date().toISOString(),
+          },
+        })
+        .returning();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('foreign key')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Image tag '${input.imageTag}' not found in catalog`,
+        });
+      }
+      throw err;
+    }
 
     if (!result) {
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
@@ -200,6 +240,93 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
     }
 
     return { success: true };
+  }),
+
+  getLatestTag: adminProcedure.query(async () => {
+    const client = new KiloClawInternalClient();
+    try {
+      const latest = await client.getLatestVersion();
+      return latest?.imageTag ?? null;
+    } catch (err) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch latest version',
+        cause: err,
+      });
+    }
+  }),
+
+  syncCatalog: adminProcedure.mutation(async () => {
+    const client = new KiloClawInternalClient();
+    let kvVersions;
+    try {
+      kvVersions = await client.listVersions();
+    } catch (err) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch versions from KiloClaw service',
+        cause: err,
+      });
+    }
+
+    // Early return if KV has no versions
+    if (kvVersions.length === 0) {
+      return { synced: 0, alreadyExisted: 0, invalid: 0, total: 0 };
+    }
+
+    // Fetch only existing tags that match KV versions (more memory-efficient)
+    const kvTags = kvVersions.map(v => v.imageTag);
+    const existingTags = new Set(
+      (
+        await db
+          .select({ image_tag: kiloclaw_image_catalog.image_tag })
+          .from(kiloclaw_image_catalog)
+          .where(inArray(kiloclaw_image_catalog.image_tag, kvTags))
+      ).map(row => row.image_tag)
+    );
+
+    // Filter out entries that already exist in Postgres
+    const newEntries = kvVersions.filter(entry => !existingTags.has(entry.imageTag));
+
+    // Validate entries before inserting — KV data may be malformed.
+    // Uses the same rules as validateEntry() in catalog-registration.ts.
+    const IMAGE_TAG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+    const VERSION_RE = /^\d{4}\.\d{1,2}\.\d{1,2}$/;
+    const VARIANT_RE = /^[a-z0-9-]{1,64}$/;
+    const validEntries = newEntries.filter(entry => {
+      if (!IMAGE_TAG_RE.test(entry.imageTag) || entry.imageTag.length > 128) return false;
+      if (!VERSION_RE.test(entry.openclawVersion)) return false;
+      if (!VARIANT_RE.test(entry.variant)) return false;
+      const ts = new Date(entry.publishedAt).getTime();
+      if (isNaN(ts)) return false;
+      return true;
+    });
+    const invalidCount = newEntries.length - validEntries.length;
+
+    // Bulk insert validated new entries. onConflictDoNothing guards against
+    // concurrent syncs inserting the same tag between our check and insert.
+    if (validEntries.length > 0) {
+      await db
+        .insert(kiloclaw_image_catalog)
+        .values(
+          validEntries.map(entry => ({
+            openclaw_version: entry.openclawVersion,
+            variant: entry.variant,
+            image_tag: entry.imageTag,
+            image_digest: entry.imageDigest,
+            status: 'available' as const,
+            published_at: entry.publishedAt,
+          }))
+        )
+        .onConflictDoNothing();
+    }
+
+    return {
+      synced: validEntries.length,
+      alreadyExisted: existingTags.size,
+      invalid: invalidCount,
+      total: kvVersions.length,
+    };
   }),
 
   searchUsers: adminProcedure

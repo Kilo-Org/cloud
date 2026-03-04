@@ -11,6 +11,7 @@ import {
   kilocode_users,
   auto_top_up_configs,
   organizations,
+  kiloclaw_earlybird_purchases,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -428,6 +429,9 @@ export async function handleSuccessfulChargeWithPayment(
     // Auto-topup-setup is the initial $15 charge when user enables auto-top-up
     const isAutoTopUpSetup = paymentIntent?.metadata?.type === 'auto-topup-setup';
 
+    // KiloClaw earlybird purchases are handled separately - not a credit top-up
+    const isKiloclawEarlybird = paymentIntent?.metadata?.type === 'kiloclaw-earlybird';
+
     // Invoice-based auto-top-ups are handled by `invoice.payment_succeeded` webhook,
     // which has direct access to invoice metadata. Skip them here to avoid duplicate processing.
     const invoiceId =
@@ -442,6 +446,8 @@ export async function handleSuccessfulChargeWithPayment(
       );
     } else if (isAutoTopUpSetup) {
       await handleAutoTopUpSetup(user, paymentIntent, creditAmountInCents, config);
+    } else if (isKiloclawEarlybird) {
+      await recordKiloclawEarlybirdPurchase(user, charge);
     } else {
       // Unknown charge type - log warning but don't process
       warnExceptInTest(
@@ -460,6 +466,28 @@ export async function handleSuccessfulChargeWithPayment(
       kilo_user_id: user.id,
       ...config,
     });
+  }
+}
+
+async function recordKiloclawEarlybirdPurchase(user: User, charge: Stripe.Charge) {
+  const result = await db
+    .insert(kiloclaw_earlybird_purchases)
+    .values({
+      user_id: user.id,
+      stripe_charge_id: charge.id,
+      amount_cents: charge.amount,
+    })
+    .onConflictDoNothing()
+    .returning({ id: kiloclaw_earlybird_purchases.id });
+
+  if (result.length > 0) {
+    logExceptInTest(
+      `Recorded kiloclaw-earlybird purchase for user ${user.id}, charge ${charge.id}`
+    );
+  } else {
+    logExceptInTest(
+      `Duplicate kiloclaw-earlybird charge skipped for user ${user.id}, charge ${charge.id}`
+    );
   }
 }
 

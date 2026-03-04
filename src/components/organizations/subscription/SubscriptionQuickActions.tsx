@@ -14,7 +14,7 @@ import { SeatChangeModal } from './SeatChangeModal';
 import Link from 'next/link';
 import {
   TEAM_SEAT_PRICE_MONTHLY_USD,
-  TEAM_SEAT_PRICE_YEARLY_USD,
+  ENTERPRISE_SEAT_PRICE_MONTHLY_USD,
 } from '@/lib/organizations/constants';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 
@@ -137,7 +137,9 @@ export function SubscriptionQuickActions({
           currentSeatCount={currentSeatCount}
           organizationId={organizationId}
           price={
-            org.data.plan === 'teams' ? TEAM_SEAT_PRICE_MONTHLY_USD : TEAM_SEAT_PRICE_YEARLY_USD
+            org.data.plan === 'teams'
+              ? TEAM_SEAT_PRICE_MONTHLY_USD
+              : ENTERPRISE_SEAT_PRICE_MONTHLY_USD
           }
         />
       )}

@@ -1,5 +1,14 @@
 import type { EncryptedEnvelope } from '@/lib/encryption';
 
+/** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
+export type ImageVersionEntry = {
+  openclawVersion: string;
+  variant: string;
+  imageTag: string;
+  imageDigest: string | null;
+  publishedAt: string;
+};
+
 /** Input to POST /api/platform/provision */
 export type ProvisionInput = {
   envVars?: Record<string, string>;
@@ -13,6 +22,7 @@ export type ProvisionInput = {
   kilocodeApiKey?: string;
   kilocodeApiKeyExpiresAt?: string;
   kilocodeDefaultModel?: string;
+  pinnedImageTag?: string;
 };
 
 export type KiloCodeConfigPatchInput = {
@@ -109,6 +119,10 @@ export type PlatformStatusResponse = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  openclawVersion: string | null;
+  imageVariant: string | null;
+  trackedImageTag: string | null;
+  trackedImageDigest: string | null;
 };
 
 /** A Fly volume snapshot. */

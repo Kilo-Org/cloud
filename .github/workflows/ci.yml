@@ -17,6 +17,7 @@ jobs:
       cloud_agent: ${{ steps.filter.outputs.cloud_agent }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
       webhook_agent: ${{ steps.filter.outputs.webhook_agent }}
+      security_auto_analysis: ${{ steps.filter.outputs.security_auto_analysis }}
       kiloclaw: ${{ steps.filter.outputs.kiloclaw }}
       app_builder: ${{ steps.filter.outputs.app_builder }}
     steps:
@@ -35,6 +36,8 @@ jobs:
               - 'cloud-agent-next/**'
             webhook_agent:
               - 'cloudflare-webhook-agent-ingest/**'
+            security_auto_analysis:
+              - 'cloudflare-security-auto-analysis/**'
             kiloclaw:
               - 'kiloclaw/**'
             app_builder:
@@ -264,6 +267,36 @@ jobs:
 
       - name: Run webhook-agent-ingest tests
         run: pnpm --filter cloudflare-webhook-agent-ingest test
+
+  security-auto-analysis:
+    needs: changes
+    if: needs.changes.outputs.security_auto_analysis == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (security-auto-analysis)
+        run: pnpm --filter cloudflare-security-auto-analysis typecheck
+
+      - name: Run security-auto-analysis tests
+        run: pnpm --filter cloudflare-security-auto-analysis test
 
   kiloclaw:
     needs: changes

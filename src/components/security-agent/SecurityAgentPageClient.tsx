@@ -1,10 +1,18 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { SecurityFindingsCard } from './SecurityFindingsCard';
 import { FindingDetailDialog } from './FindingDetailDialog';
 import { DismissFindingDialog, type DismissReason } from './DismissFindingDialog';
@@ -62,6 +70,8 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
   const [dismissDialogOpen, setDismissDialogOpen] = useState(false);
   const [startingAnalysisId, setStartingAnalysisId] = useState<string | null>(null);
   const [gitHubError, setGitHubError] = useState<string | null>(null);
+  const configHasChanges = useRef(false);
+  const [pendingTabChange, setPendingTabChange] = useState<string | null>(null);
 
   // Determine which router to use based on organizationId
   const isOrg = !!organizationId;
@@ -461,6 +471,8 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
         analysisMode: 'auto' | 'shallow' | 'deep';
         autoDismissEnabled: boolean;
         autoDismissConfidenceThreshold: 'high' | 'medium' | 'low';
+        autoAnalysisEnabled: boolean;
+        autoAnalysisMinSeverity: 'critical' | 'high' | 'medium' | 'all';
       }
     ) => {
       const modelConfigPayload = {
@@ -481,6 +493,8 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
           analysisMode: config.analysisMode,
           autoDismissEnabled: config.autoDismissEnabled,
           autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
+          autoAnalysisEnabled: config.autoAnalysisEnabled,
+          autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
           ...modelConfigPayload,
         });
       } else if (!isOrg) {
@@ -494,6 +508,8 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
           analysisMode: config.analysisMode,
           autoDismissEnabled: config.autoDismissEnabled,
           autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
+          autoAnalysisEnabled: config.autoAnalysisEnabled,
+          autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
           ...modelConfigPayload,
         });
       }
@@ -752,8 +768,48 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
         </Alert>
       )}
 
+      {/* Unsaved Changes Confirmation Dialog */}
+      <Dialog
+        open={pendingTabChange !== null}
+        onOpenChange={open => !open && setPendingTabChange(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsaved Changes</DialogTitle>
+            <DialogDescription>
+              You have unsaved configuration changes. Do you want to discard them?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingTabChange(null)}>
+              Go Back
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const tab = pendingTabChange;
+                setPendingTabChange(null);
+                if (tab) setActiveTab(tab);
+              }}
+            >
+              Discard Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Tabs - only show config and jobs tabs when GitHub integration is available */}
-      <Tabs value={effectiveTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs
+        value={effectiveTab}
+        onValueChange={tab => {
+          if (effectiveTab === 'config' && tab !== 'config' && configHasChanges.current) {
+            setPendingTabChange(tab);
+          } else {
+            setActiveTab(tab);
+          }
+        }}
+        className="w-full"
+      >
         <TabsList
           className={`grid w-full max-w-lg ${hasIntegration ? 'grid-cols-3' : 'grid-cols-1'}`}
         >
@@ -822,9 +878,14 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
               analysisMode={configData?.analysisMode ?? 'auto'}
               autoDismissEnabled={configData?.autoDismissEnabled ?? false}
               autoDismissConfidenceThreshold={configData?.autoDismissConfidenceThreshold ?? 'high'}
+              autoAnalysisEnabled={configData?.autoAnalysisEnabled ?? false}
+              autoAnalysisMinSeverity={configData?.autoAnalysisMinSeverity ?? 'high'}
               repositories={allRepositories}
               onSave={handleSaveConfig}
               onToggleEnabled={handleToggleEnabled}
+              onHasChangesChange={v => {
+                configHasChanges.current = v;
+              }}
               isSaving={isSavingConfig}
               isToggling={isTogglingEnabled}
             />

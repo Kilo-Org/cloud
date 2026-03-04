@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { generateInternalServiceToken } from '@/lib/tokens';
 import type { SessionSnapshot } from './session-ingest-client';
-import { fetchSessionSnapshot, fetchSessionMessages } from './session-ingest-client';
+import { fetchSessionSnapshot, fetchSessionMessages, deleteSession } from './session-ingest-client';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -165,6 +165,98 @@ describe('fetchSessionSnapshot', () => {
       expect.objectContaining({
         headers: { Authorization: 'Bearer custom-test-token' },
       })
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteSession
+// ---------------------------------------------------------------------------
+
+describe('deleteSession', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+  });
+
+  it('resolves successfully on 200', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await expect(deleteSession('ses_abc123', 'user_123')).resolves.toBeUndefined();
+  });
+
+  it('calls DELETE on the correct URL', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await deleteSession('ses_abc123', 'user_123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/api/session/ses_abc123',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+  });
+
+  it('sends correct Authorization header', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await deleteSession('ses_abc123', 'user_123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ headers: { Authorization: 'Bearer mock-jwt-token' } })
+    );
+  });
+
+  it('generates token for the given userId', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await deleteSession('ses_abc123', 'user_test_456');
+
+    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+  });
+
+  it('throws and calls captureException on 500', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('something broke'),
+    });
+
+    await expect(deleteSession('ses_abc123', 'user_123')).rejects.toThrow(
+      'Session ingest delete failed: 500 Internal Server Error - something broke'
+    );
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'delete' },
+        extra: { sessionId: 'ses_abc123', status: 500 },
+      })
+    );
+  });
+
+  it('resolves successfully on 404 (idempotent delete)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      text: () => Promise.resolve(''),
+    });
+
+    await expect(deleteSession('ses_nonexistent', 'user_123')).resolves.toBeUndefined();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('encodes session ID in URL', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await deleteSession('ses_with spaces&special', 'user_123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/api/session/ses_with%20spaces%26special',
+      expect.any(Object)
     );
   });
 });

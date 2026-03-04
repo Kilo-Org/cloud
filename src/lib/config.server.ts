@@ -166,6 +166,14 @@ if (process.env.NODE_ENV === 'production') {
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
 export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
 
+// KiloClaw Early Bird Checkout
+export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
+  'STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID'
+);
+export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
+  'STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID'
+);
+
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';
@@ -186,3 +194,12 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 export const SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL = getEnvVariable(
   'SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL'
 );
+
+// Pipe-delimited list of TLDs to block from new signups, each with a leading dot (e.g. ".shop|.top|.co.uk")
+const blacklistTldsEnv = getEnvVariable('BLACKLIST_TLDS');
+export const BLACKLIST_TLDS = blacklistTldsEnv
+  ? blacklistTldsEnv
+      .split('|')
+      .map((tld: string) => tld.trim().toLowerCase())
+      .filter(Boolean)
+  : [];

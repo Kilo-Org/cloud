@@ -15,7 +15,7 @@ export function getDaysRemainingInTrial(freeTrialEndAt: string | null, createdAt
   if (freeTrialEndAt) {
     endDate = new Date(freeTrialEndAt);
   } else {
-    // Fallback to created_at + 30 days for backward compatibility
+    // Fallback to created_at + TRIAL_DURATION_DAYS for backward compatibility
     const created = new Date(createdAt);
     endDate = new Date(created.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
   }

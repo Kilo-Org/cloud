@@ -290,7 +290,7 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
             </div>
             <ActivityFeedView
               townId={townId}
-              events={events.slice(-80)}
+              events={events.slice(0, 80)}
               isLoading={townEventsQuery.isLoading}
               onEventClick={event => openDrawer({ type: 'event', event })}
             />

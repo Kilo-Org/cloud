@@ -1057,11 +1057,11 @@ importers:
   cloudflare-gastown/container:
     dependencies:
       '@kilocode/plugin':
-        specifier: 1.0.23
-        version: 1.0.23
+        specifier: 7.0.37
+        version: 7.0.37
       '@kilocode/sdk':
-        specifier: 1.0.23
-        version: 1.0.23
+        specifier: 7.0.37
+        version: 7.0.37
       hono:
         specifier: 'catalog:'
         version: 4.12.2
@@ -3456,11 +3456,11 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
-  '@kilocode/plugin@1.0.23':
-    resolution: {integrity: sha512-iP273WjkN1veQF0ygpVEVGZviIl/bynxH7RXwmkyODKtlgHbs3QzxeUoLbd5r4ZDYDIcA5+4NITCTjcE3YlPEQ==}
+  '@kilocode/plugin@7.0.37':
+    resolution: {integrity: sha512-bDeLo2FLqFdQZmjezfiJ+Oyk5rb3Tzh9+nKAVp+2kHOhKDkwgOD71OFN+Ii0t3RvyChkLYnghw179FqHByNILQ==}
 
-  '@kilocode/sdk@1.0.23':
-    resolution: {integrity: sha512-4z7xdfHyoRm+iUwQtu0k+BMy1ovNhA3yCy+94Hwz0jH5329ZVmaTjoPq4QleWihMthzsxaJCVFx7bonphsr1PA==}
+  '@kilocode/sdk@7.0.37':
+    resolution: {integrity: sha512-t7HEjYpAuW3IdbEp+2VYQPFLhidYFSmWK3nl6vWri0QBNh+spQcotdMYENNmv/HQOAXr84pXgOFtc8YCEOz5wQ==}
 
   '@lottiefiles/dotlottie-react@0.17.7':
     resolution: {integrity: sha512-A6wO3zqkDx/t0ULfctcr1Bmb1f1hc4zUV3NcbKQOsBGAOIx1vABV/fRabFYElvbJl9lmOR24yMh//Z0fvvJV+Q==}
@@ -14332,12 +14332,12 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@kilocode/plugin@1.0.23':
+  '@kilocode/plugin@7.0.37':
     dependencies:
-      '@kilocode/sdk': 1.0.23
+      '@kilocode/sdk': 7.0.37
       zod: 4.1.8
 
-  '@kilocode/sdk@1.0.23': {}
+  '@kilocode/sdk@7.0.37': {}
 
   '@lottiefiles/dotlottie-react@0.17.7(react@19.2.0)':
     dependencies:

@@ -1,12 +1,12 @@
 /**
- * Agent manager — tracks agents as SDK-managed opencode sessions.
+ * Agent manager — tracks agents as SDK-managed kilo sessions.
  *
- * Uses @kilocode/sdk's createOpencode() to start server instances in-process
+ * Uses @kilocode/sdk's createKilo() to start server instances in-process
  * and client.event.subscribe() for typed event streams. No subprocesses,
  * no SSE text parsing, no ring buffers.
  */
 
-import { createOpencode, type OpencodeClient } from '@kilocode/sdk';
+import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted } from './completion-reporter';
@@ -18,7 +18,7 @@ const MANAGER_LOG = '[process-manager]';
 const SessionResponse = z.object({ id: z.string().min(1) }).passthrough();
 
 type SDKInstance = {
-  client: OpencodeClient;
+  client: KiloClient;
   server: { url: string; close(): void };
   sessionCount: number;
 };
@@ -119,7 +119,7 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
 async function ensureSDKServer(
   workdir: string,
   env: Record<string, string>
-): Promise<{ client: OpencodeClient; port: number }> {
+): Promise<{ client: KiloClient; port: number }> {
   const existing = sdkInstances.get(workdir);
   if (existing) {
     return {
@@ -131,7 +131,7 @@ async function ensureSDKServer(
   const port = nextPort++;
   console.log(`${MANAGER_LOG} Starting SDK server on port ${port} for ${workdir}`);
 
-  // Save env vars that we'll mutate, set them for createOpencode, then restore.
+  // Save env vars that we'll mutate, set them for createKilo, then restore.
   // This avoids permanent global mutation when multiple agents start with
   // different env — each server gets the env it was started with.
   const envSnapshot: Record<string, string | undefined> = {};
@@ -144,7 +144,7 @@ async function ensureSDKServer(
   const prevCwd = process.cwd();
   try {
     process.chdir(workdir);
-    const { client, server } = await createOpencode({
+    const { client, server } = await createKilo({
       hostname: '127.0.0.1',
       port,
       timeout: 30_000,
@@ -172,7 +172,7 @@ async function ensureSDKServer(
  * Subscribe to SDK events for an agent's session and forward them.
  */
 async function subscribeToEvents(
-  client: OpencodeClient,
+  client: KiloClient,
   agent: ManagedAgent,
   request: StartAgentRequest
 ): Promise<void> {

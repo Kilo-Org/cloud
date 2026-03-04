@@ -74,6 +74,8 @@ minimumReleaseAgeExclude:
   - brace-expansion@5.0.2
   # Security overrides for transitive dependencies
   - serialize-javascript@7.0.3
+  - '@kilocode/plugin'
+  - '@kilocode/sdk'
 
 onlyBuiltDependencies:
   - '@swc/core'

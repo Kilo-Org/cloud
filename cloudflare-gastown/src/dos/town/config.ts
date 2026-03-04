@@ -2,7 +2,12 @@
  * Town configuration management.
  */
 
-import { TownConfigSchema, type TownConfig, type TownConfigUpdate } from '../../types';
+import {
+  TownConfigSchema,
+  type TownConfig,
+  type TownConfigUpdate,
+  type MergeStrategy,
+} from '../../types';
 
 const CONFIG_KEY = 'town:config';
 
@@ -57,11 +62,19 @@ export async function updateTownConfig(
     git_auth: resolvedGitAuth,
     refinery:
       update.refinery !== undefined
-        ? { ...current.refinery, ...update.refinery }
+        ? {
+            gates: update.refinery.gates ?? current.refinery?.gates ?? [],
+            auto_merge: update.refinery.auto_merge ?? current.refinery?.auto_merge ?? true,
+            require_clean_merge:
+              update.refinery.require_clean_merge ?? current.refinery?.require_clean_merge ?? true,
+          }
         : current.refinery,
     container:
       update.container !== undefined
-        ? { ...current.container, ...update.container }
+        ? {
+            sleep_after_minutes:
+              update.container.sleep_after_minutes ?? current.container?.sleep_after_minutes,
+          }
         : current.container,
   };
 
@@ -74,13 +87,30 @@ export async function updateTownConfig(
 }
 
 /**
- * Resolve the model for an agent role from town config.
+ * Resolve the primary model from town config.
  * Priority: rig override → role-specific → town default → hardcoded default.
  */
 export function resolveModel(townConfig: TownConfig, _rigId: string, _role: string): string {
-  // OPEN QUESTION: Should we add rig_overrides to TownConfig?
-  // For now, just use the town default.
   return townConfig.default_model ?? 'anthropic/claude-sonnet-4.6';
+}
+
+/**
+ * Resolve the small (lightweight) model from town config.
+ * Used for title generation, explore subagent, etc.
+ */
+export function resolveSmallModel(townConfig: TownConfig): string {
+  return townConfig.small_model ?? 'anthropic/claude-haiku-4.5';
+}
+
+/**
+ * Resolve the effective merge strategy for a rig.
+ * Priority: rig-level override → town-level default → 'direct'.
+ */
+export function resolveMergeStrategy(
+  townConfig: TownConfig,
+  rigMergeStrategy: MergeStrategy | undefined
+): MergeStrategy {
+  return rigMergeStrategy ?? townConfig.merge_strategy;
 }
 
 /**
@@ -94,7 +124,8 @@ export async function buildContainerConfig(
   const config = await getTownConfig(storage);
   return {
     env_vars: config.env_vars,
-    default_model: config.default_model ?? 'anthropic/claude-sonnet-4.6',
+    default_model: resolveModel(config, '', ''),
+    small_model: resolveSmallModel(config),
     git_auth: config.git_auth,
     kilocode_token: config.kilocode_token,
     kilo_api_url: env.KILO_API_URL ?? '',

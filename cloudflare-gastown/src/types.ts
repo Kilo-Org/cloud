@@ -176,6 +176,11 @@ export type PatrolResult = {
   orphaned_beads: string[];
 };
 
+// -- Merge Strategy --
+
+export const MergeStrategy = z.enum(['direct', 'pr']);
+export type MergeStrategy = z.infer<typeof MergeStrategy>;
+
 // -- Town Configuration --
 
 export const TownConfigSchema = z.object({
@@ -202,8 +207,18 @@ export const TownConfigSchema = z.object({
   /** Default LLM model for new agent sessions */
   default_model: z.string().optional(),
 
+  /** Lightweight model for title generation, explore subagent, etc. */
+  small_model: z.string().optional(),
+
   /** Maximum concurrent polecats per rig */
   max_polecats_per_rig: z.number().int().min(1).max(20).optional(),
+
+  /**
+   * Town-level merge strategy. Rigs inherit this when they don't set their own.
+   * - 'direct': Refinery pushes directly to main (no PR)
+   * - 'pr': Refinery creates a GitHub PR / GitLab MR for human review
+   */
+  merge_strategy: MergeStrategy.default('direct'),
 
   /** Refinery configuration */
   refinery: z
@@ -230,8 +245,43 @@ export const TownConfigSchema = z.object({
 
 export type TownConfig = z.infer<typeof TownConfigSchema>;
 
-/** Partial update schema — all fields optional for merge updates */
-export const TownConfigUpdateSchema = TownConfigSchema.partial();
+/**
+ * Partial update schema — all fields optional, NO defaults.
+ * TownConfigSchema.partial() can't be used here because Zod still fires
+ * .default() during parsing, injecting phantom values (e.g. merge_strategy:
+ * 'direct') that overwrite existing config on partial updates.
+ */
+export const TownConfigUpdateSchema = z.object({
+  env_vars: z.record(z.string(), z.string()).optional(),
+  git_auth: z
+    .object({
+      github_token: z.string().optional(),
+      gitlab_token: z.string().optional(),
+      gitlab_instance_url: z.string().optional(),
+      platform_integration_id: z.string().optional(),
+    })
+    .optional(),
+  owner_user_id: z.string().optional(),
+  kilocode_token: z.string().optional(),
+  default_model: z.string().optional(),
+  small_model: z.string().optional(),
+  max_polecats_per_rig: z.number().int().min(1).max(20).optional(),
+  merge_strategy: MergeStrategy.optional(),
+  refinery: z
+    .object({
+      gates: z.array(z.string()).optional(),
+      auto_merge: z.boolean().optional(),
+      require_clean_merge: z.boolean().optional(),
+    })
+    .optional(),
+  alarm_interval_active: z.number().int().min(5).max(600).optional(),
+  alarm_interval_idle: z.number().int().min(30).max(3600).optional(),
+  container: z
+    .object({
+      sleep_after_minutes: z.number().int().min(5).max(120).optional(),
+    })
+    .optional(),
+});
 export type TownConfigUpdate = z.infer<typeof TownConfigUpdateSchema>;
 
 /** Agent-level config overrides (merged on top of town config) */

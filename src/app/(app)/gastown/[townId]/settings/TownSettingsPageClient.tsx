@@ -17,6 +17,7 @@ import {
   Save,
   Settings,
   GitBranch,
+  GitPullRequest,
   Bot,
   Shield,
   Variable,
@@ -32,6 +33,7 @@ const SECTIONS = [
   { id: 'git-auth', label: 'Git Authentication', icon: GitBranch },
   { id: 'env-vars', label: 'Environment Variables', icon: Variable },
   { id: 'agent-defaults', label: 'Agent Defaults', icon: Bot },
+  { id: 'merge-strategy', label: 'Merge Strategy', icon: GitPullRequest },
   { id: 'refinery', label: 'Refinery', icon: Shield },
 ] as const;
 
@@ -98,6 +100,7 @@ export function TownSettingsPageClient({ townId }: Props) {
   const [maxPolecats, setMaxPolecats] = useState<number | undefined>(undefined);
   const [refineryGates, setRefineryGates] = useState<string[]>([]);
   const [autoMerge, setAutoMerge] = useState(true);
+  const [mergeStrategy, setMergeStrategy] = useState<'direct' | 'pr'>('direct');
   const [initialized, setInitialized] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
 
@@ -112,6 +115,7 @@ export function TownSettingsPageClient({ townId }: Props) {
     setMaxPolecats(cfg.max_polecats_per_rig);
     setRefineryGates(cfg.refinery?.gates ?? []);
     setAutoMerge(cfg.refinery?.auto_merge ?? true);
+    setMergeStrategy(cfg.merge_strategy === 'pr' ? 'pr' : 'direct');
     setInitialized(true);
   }
 
@@ -136,6 +140,7 @@ export function TownSettingsPageClient({ townId }: Props) {
         },
         ...(defaultModel ? { default_model: defaultModel } : {}),
         ...(maxPolecats ? { max_polecats_per_rig: maxPolecats } : {}),
+        merge_strategy: mergeStrategy,
         refinery: {
           gates: refineryGates.filter(g => g.trim()),
           auto_merge: autoMerge,
@@ -355,13 +360,37 @@ export function TownSettingsPageClient({ townId }: Props) {
                 </div>
               </SettingsSection>
 
+              {/* ── Merge Strategy ──────────────────────────────────── */}
+              <SettingsSection
+                id="merge-strategy"
+                title="Merge Strategy"
+                description="How agent work lands in the default branch. Per-rig overrides coming soon."
+                icon={GitPullRequest}
+                index={3}
+              >
+                <div className="space-y-3">
+                  <MergeStrategyOption
+                    selected={mergeStrategy === 'direct'}
+                    onSelect={() => setMergeStrategy('direct')}
+                    label="Direct push"
+                    description="Refinery pushes merged code directly to the default branch. No PR, no human review step. Quality gates are the only check."
+                  />
+                  <MergeStrategyOption
+                    selected={mergeStrategy === 'pr'}
+                    onSelect={() => setMergeStrategy('pr')}
+                    label="Pull request"
+                    description="Refinery creates a GitHub PR or GitLab MR for human review. Code lands only after a human approves."
+                  />
+                </div>
+              </SettingsSection>
+
               {/* ── Refinery (Quality Gates) ─────────────────────────── */}
               <SettingsSection
                 id="refinery"
                 title="Refinery"
                 description="Quality gates run before merging polecat branches into the default branch."
                 icon={Shield}
-                index={3}
+                index={4}
                 action={
                   <button
                     onClick={addRefineryGate}
@@ -529,5 +558,43 @@ function FieldGroup({
       {children}
       {hint && <p className="text-[11px] text-white/25">{hint}</p>}
     </div>
+  );
+}
+
+function MergeStrategyOption({
+  selected,
+  onSelect,
+  label,
+  description,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  label: string;
+  description: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+        selected
+          ? 'border-[color:oklch(95%_0.15_108_/_0.3)] bg-[color:oklch(95%_0.15_108_/_0.06)]'
+          : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'
+      }`}
+    >
+      <div
+        className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
+          selected ? 'border-[color:oklch(95%_0.15_108_/_0.6)]' : 'border-white/20'
+        }`}
+      >
+        {selected && <div className="size-2 rounded-full bg-[color:oklch(95%_0.15_108)]" />}
+      </div>
+      <div>
+        <div className={`text-sm font-medium ${selected ? 'text-white/90' : 'text-white/60'}`}>
+          {label}
+        </div>
+        <p className="mt-0.5 text-[11px] text-white/35">{description}</p>
+      </div>
+    </button>
   );
 }

@@ -3,12 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Badge } from '@/components/ui/badge';
-import { BeadEventTimeline } from '@/components/gastown/ActivityFeed';
+import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
 
 import { format } from 'date-fns';
 import {
   Clock,
+  ExternalLink,
   Flag,
   Hash,
   Tags,
@@ -69,6 +70,10 @@ export function BeadPanel({
     : null;
 
   const townId = rigQuery.data?.town_id;
+
+  // Extract PR URL from bead metadata (set by setReviewPrUrl for merge_request beads).
+  // Only allow https:// URLs to prevent XSS via javascript: protocol injection.
+  const prUrl = extractPrUrl(bead.metadata);
 
   // Build related beads from the flat list (no extra API needed)
   const allBeads = beadsQuery.data ?? [];
@@ -163,6 +168,21 @@ export function BeadPanel({
           </button>
         )}
       </div>
+
+      {/* PR link for merge_request beads */}
+      {bead.type === 'merge_request' && prUrl && (
+        <div className="border-b border-white/[0.06] px-5 py-3">
+          <a
+            href={prUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-[color:oklch(95%_0.15_108)] transition-colors hover:bg-white/[0.06]"
+          >
+            <ExternalLink className="size-3" />
+            {prUrl.includes('github.com') ? 'View Pull Request' : 'View Merge Request'}
+          </a>
+        </div>
+      )}
 
       {/* Related Beads DAG */}
       {relatedBeads.length > 0 && (

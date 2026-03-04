@@ -8,7 +8,7 @@ import { signAgentJWT } from '../../util/jwt.util';
 import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
 import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
 import type { TownConfig } from '../../types';
-import { buildContainerConfig } from './config';
+import { buildContainerConfig, resolveModel, resolveSmallModel } from './config';
 
 const TOWN_LOG = '[Town.do]';
 
@@ -17,12 +17,23 @@ const TOWN_LOG = '[Town.do]';
  */
 export async function resolveJWTSecret(env: Env): Promise<string | null> {
   const binding = env.GASTOWN_JWT_SECRET;
-  if (!binding) return null;
+  if (!binding) {
+    console.error(`${TOWN_LOG} resolveJWTSecret: GASTOWN_JWT_SECRET binding is falsy`);
+    return null;
+  }
   if (typeof binding === 'string') return binding;
   try {
-    return await binding.get();
-  } catch {
-    console.error('Failed to resolve GASTOWN_JWT_SECRET');
+    const secret = await binding.get();
+    if (!secret) {
+      console.error(`${TOWN_LOG} resolveJWTSecret: binding.get() returned falsy value`);
+      return null;
+    }
+    return secret ?? null;
+  } catch (err) {
+    console.error(
+      `${TOWN_LOG} resolveJWTSecret: binding.get() threw:`,
+      err instanceof Error ? err.message : err
+    );
     return null;
   }
 }
@@ -145,6 +156,14 @@ export async function startAgentInContainer(
       userId: params.userId,
     });
 
+    if (!token) {
+      console.error(
+        `${TOWN_LOG} startAgentInContainer: ABORTING — failed to mint JWT for agent ${params.agentId}. ` +
+          'The agent would start without GASTOWN_SESSION_TOKEN and be unable to call back to the worker.'
+      );
+      return false;
+    }
+
     // Build env vars from town config
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
 
@@ -189,7 +208,8 @@ export async function startAgentInContainer(
           beadBody: params.beadBody,
           checkpoint: params.checkpoint,
         }),
-        model: params.townConfig.default_model ?? 'anthropic/claude-sonnet-4.6',
+        model: resolveModel(params.townConfig, params.rigId, params.role),
+        smallModel: resolveSmallModel(params.townConfig),
         systemPrompt:
           params.systemPromptOverride ??
           systemPromptForRole({

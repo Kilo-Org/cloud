@@ -190,6 +190,10 @@ function applyToolChoiceSetting(
 
 function getPreferredProviderOrder(requestedModel: string): OpenRouterInferenceProviderId[] {
   if (isAnthropicModel(requestedModel)) {
+    // Use `order` (set below in applyPreferredProvider) to preferentially
+    // route Anthropic models to Bedrock and Anthropic. Google Vertex doesn't
+    // support assistant message prefill, which causes 400 errors on tool
+    // calls when OpenRouter falls back to it.
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,

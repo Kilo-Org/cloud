@@ -59,6 +59,10 @@ If you are stuck for more than a few attempts at the same problem:
 
 ## Important
 
+- Do NOT create pull requests or merge requests. Your job is to write code on your branch. The Refinery handles merging and PR creation.
+- Do NOT merge your branch into the default branch yourself.
+- Do NOT use \`gh pr create\`, \`git merge\`, or any equivalent. Just push your branch and call gt_done.
+- Do NOT pass a \`pr_url\` to \`gt_done\`. The URL that \`git push\` prints (e.g. \`https://github.com/.../pull/new/...\`) is NOT a pull request — it is a convenience link for humans. Ignore it.
 - Do NOT modify files outside your worktree.
 - Do NOT run destructive git operations (force push, hard reset to remote).
 - Do NOT install global packages or modify the container environment.

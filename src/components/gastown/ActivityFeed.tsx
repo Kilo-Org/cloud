@@ -148,7 +148,7 @@ export function ActivityFeedView({
     );
   }
 
-  // Newest first — events from the API come oldest-first, so reverse.
+  // Ensure newest-first ordering (API returns DESC but defensive sort).
   const sorted = [...effectiveEvents].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -215,6 +215,18 @@ export function ActivityFeedView({
 }
 
 export type { TownEvent };
+
+/**
+ * Extract a safe PR URL from bead metadata.
+ * Only allows https:// URLs to prevent XSS via javascript: protocol injection.
+ */
+export function extractPrUrl(metadata: unknown): string | null {
+  if (metadata && typeof metadata === 'object' && 'pr_url' in metadata) {
+    const url = metadata.pr_url;
+    if (typeof url === 'string' && url.startsWith('https://')) return url;
+  }
+  return null;
+}
 
 export function ActivityFeed({ townId }: { townId: string }) {
   return <ActivityFeedView townId={townId} />;

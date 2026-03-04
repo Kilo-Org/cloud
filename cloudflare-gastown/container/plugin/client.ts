@@ -27,7 +27,6 @@ export class GastownClient {
   private agentId: string;
   private rigId: string;
   private townId: string;
-
   constructor(env: GastownEnv) {
     this.baseUrl = env.apiUrl.replace(/\/+$/, '');
     this.token = env.sessionToken;

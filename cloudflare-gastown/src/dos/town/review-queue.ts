@@ -76,6 +76,16 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
   const id = generateId();
   const timestamp = now();
 
+  // Build metadata — include pr_url if the agent already created a PR so
+  // the link is visible via the standard bead list endpoint.
+  const metadata: Record<string, unknown> = {
+    source_bead_id: input.bead_id,
+    source_agent_id: input.agent_id,
+  };
+  if (input.pr_url) {
+    metadata.pr_url = input.pr_url;
+  }
+
   // Create the merge_request bead
   query(
     sql,
@@ -100,7 +110,7 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
       null, // assignee left null — refinery claims it via hookBead
       'medium',
       JSON.stringify(['gt:merge-request']),
-      JSON.stringify({ source_bead_id: input.bead_id, source_agent_id: input.agent_id }),
+      JSON.stringify(metadata),
       input.agent_id, // created_by records who submitted
       timestamp,
       timestamp,
@@ -250,6 +260,84 @@ export function completeReviewWithResult(
   }
 }
 
+/**
+ * Set the platform PR/MR URL on an MR bead's review_metadata and bead metadata.
+ * Called after a PR is created in the 'pr' merge strategy path.
+ * Writes to both review_metadata.pr_url (for query) and beads.metadata.pr_url
+ * (so the URL is available via the standard bead list endpoint).
+ */
+export function setReviewPrUrl(sql: SqlStorage, entryId: string, prUrl: string): boolean {
+  // Reject non-HTTPS URLs to prevent storing garbage from LLM output.
+  // Invalid URLs would cause pollPendingPRs to poll indefinitely.
+  if (!prUrl.startsWith('https://')) {
+    console.warn(`[review-queue] setReviewPrUrl: rejecting non-HTTPS pr_url: ${prUrl}`);
+    return false;
+  }
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${review_metadata}
+      SET ${review_metadata.columns.pr_url} = ?
+      WHERE ${review_metadata.bead_id} = ?
+    `,
+    [prUrl, entryId]
+  );
+
+  // Also write to bead metadata so the PR URL is visible in the standard bead list
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${beads}
+      SET ${beads.columns.metadata} = json_set(COALESCE(${beads.metadata}, '{}'), '$.pr_url', ?)
+      WHERE ${beads.bead_id} = ?
+    `,
+    [prUrl, entryId]
+  );
+  return true;
+}
+
+/**
+ * Set an MR bead status to 'in_review' (maps to bead status 'in_progress').
+ * Used when the PR strategy creates a PR and waits for human review.
+ */
+export function markReviewInReview(sql: SqlStorage, entryId: string): void {
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${beads}
+      SET ${beads.columns.status} = 'in_progress',
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.bead_id} = ?
+    `,
+    [new Date().toISOString(), entryId]
+  );
+}
+
+/**
+ * List MR beads that are in_progress and have a pr_url (PR-strategy merges
+ * waiting for external review). Used by the alarm to poll PR status.
+ */
+export function listPendingPRReviews(sql: SqlStorage): MergeRequestBeadRecord[] {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        ${REVIEW_JOIN}
+        WHERE ${beads.status} = 'in_progress'
+          AND ${review_metadata.pr_url} IS NOT NULL
+      `,
+      []
+    ),
+  ];
+  return MergeRequestBeadRecord.array().parse(rows);
+}
+
+/**
+ * Reset MR beads stuck in 'in_progress' back to 'open' so they can be
+ * re-processed. Excludes beads that have a pr_url set — those are
+ * legitimately waiting for external human review (PR strategy) and may
+ * take hours or days.
+ */
 export function recoverStuckReviews(sql: SqlStorage): void {
   const timeout = new Date(Date.now() - REVIEW_RUNNING_TIMEOUT_MS).toISOString();
   query(
@@ -261,6 +349,11 @@ export function recoverStuckReviews(sql: SqlStorage): void {
       WHERE ${beads.type} = 'merge_request'
         AND ${beads.status} = 'in_progress'
         AND ${beads.updated_at} < ?
+        AND ${beads.bead_id} NOT IN (
+          SELECT ${review_metadata.bead_id}
+          FROM ${review_metadata}
+          WHERE ${review_metadata.pr_url} IS NOT NULL
+        )
     `,
     [now(), timeout]
   );
@@ -274,10 +367,42 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
   if (!agent.current_hook_bead_id) throw new Error(`Agent ${agentId} has no hooked bead`);
 
   if (agent.role === 'refinery') {
-    // The refinery is hooked to the MR bead. Mark it as merged and log
-    // the review_completed event on the source bead.
+    // The refinery handles merging (direct strategy) or PR creation (pr strategy)
+    // itself. When it calls gt_done:
+    //  - With pr_url: refinery created a PR → store URL, mark as in_review, poll it
+    //  - Without pr_url: refinery merged directly → mark as merged
     const mrBeadId = agent.current_hook_bead_id;
-    completeReviewFromMRBead(sql, mrBeadId, agentId);
+
+    if (input.pr_url) {
+      // PR strategy: refinery created a PR via gh/glab CLI.
+      // Validate the URL — LLM output may contain garbage URLs.
+      const stored = setReviewPrUrl(sql, mrBeadId, input.pr_url);
+      if (stored) {
+        markReviewInReview(sql, mrBeadId);
+        logBeadEvent(sql, {
+          beadId: mrBeadId,
+          agentId,
+          eventType: 'pr_created',
+          newValue: input.pr_url,
+          metadata: { pr_url: input.pr_url, created_by: 'refinery' },
+        });
+      } else {
+        // Invalid URL — fail the review so it doesn't poll forever
+        completeReviewWithResult(sql, {
+          entry_id: mrBeadId,
+          status: 'failed',
+          message: `Refinery provided invalid pr_url: ${input.pr_url}`,
+        });
+      }
+    } else {
+      // Direct strategy: refinery already merged and pushed
+      completeReviewWithResult(sql, {
+        entry_id: mrBeadId,
+        status: 'merged',
+        message: input.summary ?? 'Merged by refinery agent',
+      });
+    }
+
     unhookBead(sql, agentId);
     return;
   }
@@ -304,35 +429,6 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
   // bead retains its assignee so we know which agent worked on it.
   unhookBead(sql, agentId);
   closeBead(sql, sourceBead, agentId);
-}
-
-/**
- * Complete a review given the MR bead id directly (the refinery is hooked
- * to the MR bead). Marks the MR as merged and logs a review_completed
- * event on the source bead. The source bead itself is already closed by
- * the polecat's agentDone path.
- */
-function completeReviewFromMRBead(sql: SqlStorage, mrBeadId: string, agentId: string): void {
-  const mrBead = getBead(sql, mrBeadId);
-  if (!mrBead) {
-    console.error(
-      `[review-queue] completeReviewFromMRBead: MR bead ${mrBeadId} not found — data integrity issue`
-    );
-    return;
-  }
-  const sourceBeadId: unknown = mrBead.metadata?.source_bead_id;
-
-  completeReview(sql, mrBeadId, 'merged');
-
-  if (typeof sourceBeadId === 'string') {
-    logBeadEvent(sql, {
-      beadId: sourceBeadId,
-      agentId,
-      eventType: 'review_completed',
-      newValue: 'merged',
-      metadata: { completedBy: 'refinery', mr_bead_id: mrBeadId },
-    });
-  }
 }
 
 /**

@@ -428,6 +428,7 @@ export const TownConfigSchema = z.object({
   owner_user_id: z.string().optional(),
   default_model: z.string().optional(),
   max_polecats_per_rig: z.number().optional(),
+  merge_strategy: z.enum(['direct', 'pr']).default('direct'),
   refinery: z
     .object({
       gates: z.array(z.string()),

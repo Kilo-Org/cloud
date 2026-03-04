@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
@@ -21,16 +22,18 @@ type CreateTownDialogProps = {
 
 export function CreateTownDialog({ isOpen, onClose }: CreateTownDialogProps) {
   const [name, setName] = useState('');
+  const router = useRouter();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const createTown = useMutation(
     trpc.gastown.createTown.mutationOptions({
-      onSuccess: () => {
+      onSuccess: data => {
         void queryClient.invalidateQueries({ queryKey: trpc.gastown.listTowns.queryKey() });
         toast.success('Town created');
         setName('');
         onClose();
+        router.push(`/gastown/${data.id}`);
       },
       onError: err => {
         toast.error(err.message);

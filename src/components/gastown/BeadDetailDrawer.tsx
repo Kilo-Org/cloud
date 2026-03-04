@@ -3,11 +3,22 @@
 import { Drawer } from 'vaul';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/Button';
-import { BeadEventTimeline } from '@/components/gastown/ActivityFeed';
+import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
 import { format } from 'date-fns';
-import { Clock, Flag, Hash, Tags, User, X, Hexagon, FileText, GitBranch } from 'lucide-react';
+import {
+  Clock,
+  Flag,
+  Hash,
+  Tags,
+  User,
+  X,
+  Hexagon,
+  FileText,
+  GitBranch,
+  ExternalLink,
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -48,6 +59,10 @@ export function BeadDetailDrawer({
   const assigneeName = bead?.assignee_agent_bead_id
     ? agentNameById?.[bead.assignee_agent_bead_id]
     : null;
+
+  // Extract PR URL from metadata (set by the 'pr' merge strategy on merge_request beads).
+  // Only allow https:// URLs to prevent XSS via javascript: protocol injection.
+  const prUrl = extractPrUrl(bead?.metadata);
 
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction="right">
@@ -149,6 +164,21 @@ export function BeadDetailDrawer({
                       />
                     )}
                   </div>
+
+                  {/* PR link for merge_request beads */}
+                  {bead.type === 'merge_request' && prUrl && (
+                    <div className="border-b border-white/[0.06] px-5 py-3">
+                      <a
+                        href={prUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-[color:oklch(95%_0.15_108)] transition-colors hover:bg-white/[0.08]"
+                      >
+                        <ExternalLink className="size-3" />
+                        {prUrl.includes('github.com') ? 'View Pull Request' : 'View Merge Request'}
+                      </a>
+                    </div>
+                  )}
 
                   {/* Body */}
                   {bead.body && bead.body.trim().length > 0 && (

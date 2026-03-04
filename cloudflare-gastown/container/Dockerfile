@@ -44,15 +44,23 @@ RUN cd /opt/gastown-plugin && npm install --omit=dev && \
 
 WORKDIR /app
 
-# Copy package files and install deps deterministically
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+# ── Install production deps via pnpm ────────────────────────────────
+# package.json uses pnpm catalog: references for shared versions.
+# pnpm-workspace.yaml (catalog only) and pnpm-lock.yaml are copied
+# from the monorepo root by `pnpm container:prepare`.
+# package.prod.json is package.json with workspace: devDeps removed.
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.prod.json package.json
+RUN pnpm install --prod
 
 # Copy source (bun runs TypeScript directly — no build step needed)
 COPY src/ ./src/
 
 RUN chown -R agent:agent /app
 
+# Explicitly set HOME so kilo resolves XDG paths correctly.
+# Some container runtimes don't set HOME when switching USER.
+ENV HOME=/home/agent
 USER agent
 
 EXPOSE 8080

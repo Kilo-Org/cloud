@@ -24,6 +24,7 @@ import * as reviewQueue from './town/review-queue';
 import * as config from './town/config';
 import * as rigs from './town/rigs';
 import * as dispatch from './town/container-dispatch';
+import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../util/platform-pr.util';
 
 // Table imports for beads-centric operations
 import {
@@ -60,13 +61,14 @@ import type {
   PrimeContext,
   Molecule,
   BeadEventRecord,
+  MergeStrategy,
 } from '../types';
 
 const TOWN_LOG = '[Town.do]';
 
 // Alarm intervals
-const ACTIVE_ALARM_INTERVAL_MS = 15_000; // 15s when agents are active
-const IDLE_ALARM_INTERVAL_MS = 5 * 60_000; // 5m when idle
+const ACTIVE_ALARM_INTERVAL_MS = 5_000; // 5s when agents are active
+const IDLE_ALARM_INTERVAL_MS = 1 * 60_000; // 1m when idle
 const DISPATCH_COOLDOWN_MS = 2 * 60_000; // 2 min — skip agents with recent dispatch activity
 const GUPP_THRESHOLD_MS = 30 * 60_000; // 30 min
 const MAX_DISPATCH_ATTEMPTS = 5;
@@ -93,6 +95,8 @@ type RigConfig = {
   userId: string;
   kilocodeToken?: string;
   platformIntegrationId?: string;
+  /** Per-rig merge strategy override. When unset, inherits from town config. */
+  merge_strategy?: MergeStrategy;
 };
 
 // ── Escalation API type (derived from EscalationBeadRecord) ─────────
@@ -1442,6 +1446,9 @@ export class TownDO extends DurableObject<Env> {
   private async processReviewQueue(): Promise<void> {
     reviewQueue.recoverStuckReviews(this.sql);
 
+    // Poll open PRs created by the 'pr' strategy
+    await this.pollPendingPRs();
+
     const entry = reviewQueue.popReviewQueue(this.sql);
     if (!entry) return;
 
@@ -1460,76 +1467,183 @@ export class TownDO extends DurableObject<Env> {
     }
 
     const townConfig = await this.getTownConfig();
+    const mergeStrategy = config.resolveMergeStrategy(townConfig, rigConfig.merge_strategy);
     const gates = townConfig.refinery?.gates ?? [];
 
-    if (gates.length > 0) {
-      const refineryAgent = agents.getOrCreateAgent(this.sql, 'refinery', rigId, this.townId);
+    console.log(
+      `${TOWN_LOG} processReviewQueue: entry=${entry.id} branch=${entry.branch} ` +
+        `mergeStrategy=${mergeStrategy} gates=${gates.length}`
+    );
 
-      const { buildRefinerySystemPrompt } = await import('../prompts/refinery-system.prompt');
-      const systemPrompt = buildRefinerySystemPrompt({
-        identity: refineryAgent.identity,
-        rigId,
-        townId: this.townId,
-        gates,
-        branch: entry.branch,
-        targetBranch: rigConfig.defaultBranch,
-        polecatAgentId: entry.agent_id,
-      });
+    // Always spawn a refinery agent — it handles quality gates (if any),
+    // code review, and the merge/PR creation step via CLI tools.
+    const refineryAgent = agents.getOrCreateAgent(this.sql, 'refinery', rigId, this.townId);
 
-      // Hook the refinery to the MR bead (entry.id), not the source bead
-      // (entry.bead_id). The source bead stays closed with its original
-      // polecat assignee preserved.
-      agents.hookBead(this.sql, refineryAgent.id, entry.id);
+    const { buildRefinerySystemPrompt } = await import('../prompts/refinery-system.prompt');
+    const systemPrompt = buildRefinerySystemPrompt({
+      identity: refineryAgent.identity,
+      rigId,
+      townId: this.townId,
+      gates,
+      branch: entry.branch,
+      targetBranch: rigConfig.defaultBranch,
+      polecatAgentId: entry.agent_id,
+      mergeStrategy,
+    });
 
-      const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-        townId: this.townId,
-        rigId,
-        userId: rigConfig.userId,
-        agentId: refineryAgent.id,
-        agentName: refineryAgent.name,
-        role: 'refinery',
-        identity: refineryAgent.identity,
-        beadId: entry.id,
-        beadTitle: `Review merge: ${entry.branch} → ${rigConfig.defaultBranch}`,
-        beadBody: entry.summary ?? '',
-        checkpoint: null,
-        gitUrl: rigConfig.gitUrl,
-        defaultBranch: rigConfig.defaultBranch,
-        kilocodeToken: rigConfig.kilocodeToken,
-        townConfig,
-        systemPromptOverride: systemPrompt,
-        platformIntegrationId: rigConfig.platformIntegrationId,
-      });
+    // Hook the refinery to the MR bead (entry.id), not the source bead
+    // (entry.bead_id). The source bead stays closed with its original
+    // polecat assignee preserved.
+    agents.hookBead(this.sql, refineryAgent.id, entry.id);
 
-      if (!started) {
-        agents.unhookBead(this.sql, refineryAgent.id);
-        await this.triggerDeterministicMerge(rigConfig, entry, townConfig);
-      }
-    } else {
-      await this.triggerDeterministicMerge(rigConfig, entry, townConfig);
+    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
+      townId: this.townId,
+      rigId,
+      userId: rigConfig.userId,
+      agentId: refineryAgent.id,
+      agentName: refineryAgent.name,
+      role: 'refinery',
+      identity: refineryAgent.identity,
+      beadId: entry.id,
+      beadTitle: `Review merge: ${entry.branch} → ${rigConfig.defaultBranch}`,
+      beadBody: entry.summary ?? '',
+      checkpoint: null,
+      gitUrl: rigConfig.gitUrl,
+      defaultBranch: rigConfig.defaultBranch,
+      kilocodeToken: rigConfig.kilocodeToken,
+      townConfig,
+      systemPromptOverride: systemPrompt,
+      platformIntegrationId: rigConfig.platformIntegrationId,
+    });
+
+    if (!started) {
+      agents.unhookBead(this.sql, refineryAgent.id);
+      console.error(
+        `${TOWN_LOG} processReviewQueue: refinery agent failed to start for entry=${entry.id}`
+      );
+      reviewQueue.completeReview(this.sql, entry.id, 'failed');
     }
   }
 
-  private async triggerDeterministicMerge(
-    rigConfig: RigConfig,
-    entry: ReviewQueueEntry,
-    townConfig: TownConfig
-  ): Promise<void> {
-    const ok = await dispatch.startMergeInContainer(this.env, this.ctx.storage, {
-      townId: this.townId,
-      rigId: rigConfig.rigId,
-      agentId: entry.agent_id,
-      entryId: entry.id,
-      beadId: entry.bead_id,
-      branch: entry.branch,
-      targetBranch: rigConfig.defaultBranch,
-      gitUrl: rigConfig.gitUrl,
-      kilocodeToken: rigConfig.kilocodeToken,
-      townConfig,
-    });
-    if (!ok) {
-      reviewQueue.completeReview(this.sql, entry.id, 'failed');
+  /**
+   * Poll external PRs created by the 'pr' merge strategy.
+   * Checks if PRs have been merged or closed and updates the MR bead status.
+   */
+  private async pollPendingPRs(): Promise<void> {
+    const pendingReviews = reviewQueue.listPendingPRReviews(this.sql);
+    if (pendingReviews.length === 0) return;
+
+    console.log(`${TOWN_LOG} pollPendingPRs: checking ${pendingReviews.length} pending PR(s)`);
+
+    const townConfig = await this.getTownConfig();
+
+    // Cap the number of PRs polled per alarm tick to avoid exhausting
+    // GitHub/GitLab API rate limits when many PRs are pending.
+    const MAX_POLLS_PER_TICK = 10;
+    for (const review of pendingReviews.slice(0, MAX_POLLS_PER_TICK)) {
+      const prUrl = review.pr_url;
+      if (!prUrl) continue;
+      // review.bead_id is the MR bead's own ID (not the source bead).
+      // MergeRequestBeadRecord.bead_id == the merge_request bead PK.
+
+      try {
+        const status = await this.checkPRStatus(prUrl, townConfig);
+        console.log(
+          `${TOWN_LOG} pollPendingPRs: entry=${review.bead_id} url=${prUrl} status=${status ?? 'null (could not determine)'}`
+        );
+        if (!status) continue;
+
+        if (status === 'merged') {
+          reviewQueue.completeReviewWithResult(this.sql, {
+            entry_id: review.bead_id,
+            status: 'merged',
+            message: 'PR merged externally',
+          });
+          console.log(`${TOWN_LOG} pollPendingPRs: PR merged for entry=${review.bead_id}`);
+        } else if (status === 'closed') {
+          reviewQueue.completeReviewWithResult(this.sql, {
+            entry_id: review.bead_id,
+            status: 'failed',
+            message: 'PR closed without merge',
+          });
+          console.log(
+            `${TOWN_LOG} pollPendingPRs: PR closed without merge for entry=${review.bead_id}`
+          );
+        }
+        // 'open' — still waiting, do nothing
+      } catch (err) {
+        console.warn(`${TOWN_LOG} pollPendingPRs: failed to check PR status for ${prUrl}:`, err);
+      }
     }
+  }
+
+  /**
+   * Check the status of a PR/MR via its URL.
+   * Returns 'open', 'merged', or 'closed' (null if cannot determine).
+   */
+  private async checkPRStatus(
+    prUrl: string,
+    townConfig: TownConfig
+  ): Promise<'open' | 'merged' | 'closed' | null> {
+    // GitHub PR URL format: https://github.com/{owner}/{repo}/pull/{number}
+    const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (ghMatch) {
+      const [, owner, repo, numberStr] = ghMatch;
+      const token = townConfig.git_auth.github_token;
+      if (!token) {
+        console.warn(`${TOWN_LOG} checkPRStatus: no github_token configured, cannot poll ${prUrl}`);
+        return null;
+      }
+
+      const response = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}`,
+        {
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'Gastown-Refinery/1.0',
+          },
+        }
+      );
+      if (!response.ok) return null;
+
+      const json = await response.json().catch(() => null);
+      if (!json) return null;
+      const data = GitHubPRStatusSchema.safeParse(json);
+      if (!data.success) return null;
+
+      if (data.data.merged) return 'merged';
+      if (data.data.state === 'closed') return 'closed';
+      return 'open';
+    }
+
+    // GitLab MR URL format: https://{host}/{path}/-/merge_requests/{iid}
+    const glMatch = prUrl.match(/^(https:\/\/[^/]+)\/(.+)\/-\/merge_requests\/(\d+)/);
+    if (glMatch) {
+      const [, instanceUrl, projectPath, iidStr] = glMatch;
+      const token = townConfig.git_auth.gitlab_token;
+      if (!token) return null;
+
+      const encodedPath = encodeURIComponent(projectPath);
+      const response = await fetch(
+        `${instanceUrl}/api/v4/projects/${encodedPath}/merge_requests/${iidStr}`,
+        {
+          headers: { 'PRIVATE-TOKEN': token },
+        }
+      );
+      if (!response.ok) return null;
+
+      const glJson = await response.json().catch(() => null);
+      if (!glJson) return null;
+      const data = GitLabMRStatusSchema.safeParse(glJson);
+      if (!data.success) return null;
+
+      if (data.data.state === 'merged') return 'merged';
+      if (data.data.state === 'closed') return 'closed';
+      return 'open';
+    }
+
+    return null;
   }
 
   /**

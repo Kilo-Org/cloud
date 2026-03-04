@@ -12,8 +12,8 @@
     "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
   },
   "dependencies": {
-    "@kilocode/plugin": "1.0.23",
-    "@kilocode/sdk": "1.0.23",
+    "@kilocode/plugin": "7.0.37",
+    "@kilocode/sdk": "7.0.37",
     "hono": "catalog:",
     "zod": "catalog:"
   },

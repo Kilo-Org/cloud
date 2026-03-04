@@ -49,7 +49,7 @@
   "vars": {
     "ENVIRONMENT": "production",
     "CF_ACCESS_TEAM": "engineering-e11",
-    "CF_ACCESS_AUD": "f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809",
+    "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
     "KILO_API_URL": "https://api.kilo.ai",
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
   },
@@ -68,9 +68,13 @@
       "vars": {
         "ENVIRONMENT": "development",
         "CF_ACCESS_TEAM": "engineering-e11",
-        "CF_ACCESS_AUD": "f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809",
-        "KILO_API_URL": "http://host.docker.internal:3000",
-        "GASTOWN_API_URL": "http://host.docker.internal:8787",
+        "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
+        // Wrangler's workerd-network doesn't get Docker Desktop's
+        // host.docker.internal → host proxy mapping. Use the Docker
+        // Desktop VM host gateway IP directly so containers can reach
+        // the host's dev servers.
+        "KILO_API_URL": "http://192.168.65.254:3000",
+        "GASTOWN_API_URL": "http://192.168.65.254:8787",
       },
       "containers": [
         {

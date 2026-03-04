@@ -15,13 +15,28 @@ function resolveEnv(request: StartAgentRequest, key: string): string | undefined
   return request.envVars?.[key] ?? process.env[key];
 }
 
+/** Prepend the kilo provider prefix to an OpenRouter-style model ID. */
+function kiloModel(openrouterModel: string): string {
+  return openrouterModel.startsWith('kilo/') ? openrouterModel : `kilo/${openrouterModel}`;
+}
+
+const HEADLESS_PERMISSIONS = {
+  edit: 'allow' as const,
+  bash: 'allow' as const,
+  webfetch: 'allow' as const,
+  doom_loop: 'allow' as const,
+  external_directory: 'allow' as const,
+};
+
 /**
  * Build KILO_CONFIG_CONTENT JSON so kilo serve can authenticate with
- * the Kilo LLM gateway. Mirrors the pattern in cloud-agent-next's
- * session-service.ts getSaferEnvVars().
+ * the Kilo LLM gateway. Both `model` and `smallModel` are OpenRouter-style
+ * IDs (e.g. "anthropic/claude-sonnet-4.6") resolved from the town config.
  */
-function buildKiloConfigContent(kilocodeToken: string, model?: string): string {
-  const resolvedModel = model ?? 'kilo/anthropic/claude-sonnet-4.6';
+function buildKiloConfigContent(kilocodeToken: string, model: string, smallModel: string): string {
+  const primaryModel = kiloModel(model);
+  const smModel = kiloModel(smallModel);
+
   return JSON.stringify({
     provider: {
       kilo: {
@@ -29,86 +44,31 @@ function buildKiloConfigContent(kilocodeToken: string, model?: string): string {
           apiKey: kilocodeToken,
           kilocodeToken,
         },
-        // Explicitly register models so the kilo server doesn't reject them
-        // before routing to the gateway. The gateway handles actual validation.
+        // Register models so the kilo server doesn't reject them before
+        // routing to the gateway.
         models: {
-          [resolvedModel]: {},
-          'kilo/anthropic/claude-haiku-4.5': {},
+          [primaryModel]: {},
+          [smModel]: {},
         },
       },
     },
-    // Override the small model (used for title generation) to a valid
-    // kilo-provider model. Without this, kilo serve defaults to
-    // openai/gpt-5-nano which doesn't exist in the kilo provider,
-    // causing ProviderModelNotFoundError that kills the entire prompt loop.
-    small_model: 'kilo/anthropic/claude-haiku-4.5',
-    model: resolvedModel,
-    // Override the title agent to use a valid model (same as small_model).
-    // kilo serve v1.0.23 resolves title model independently and the
-    // small_model fallback doesn't prevent ProviderModelNotFoundError.
+    // Override small_model (used for title generation). Without this, kilo
+    // serve defaults to a model that doesn't exist in the kilo provider,
+    // causing ProviderModelNotFoundError.
+    small_model: smModel,
+    model: primaryModel,
     agent: {
-      code: {
-        model: 'kilo/anthropic/claude-sonnet-4.6',
-        // Auto-approve everything — agents run headless in a container,
-        // there's no human to answer permission prompts.
-        permission: {
-          edit: 'allow',
-          bash: 'allow',
-          webfetch: 'allow',
-          doom_loop: 'allow',
-          external_directory: 'allow',
-        },
-      },
-      general: {
-        model: 'kilo/anthropic/claude-sonnet-4.6',
-        // Auto-approve everything — agents run headless in a container,
-        // there's no human to answer permission prompts.
-        permission: {
-          edit: 'allow',
-          bash: 'allow',
-          webfetch: 'allow',
-          doom_loop: 'allow',
-          external_directory: 'allow',
-        },
-      },
-      plan: {
-        model: 'kilo/anthropic/claude-sonnet-4.6',
-        // Auto-approve everything — agents run headless in a container,
-        // there's no human to answer permission prompts.
-        permission: {
-          edit: 'allow',
-          bash: 'allow',
-          webfetch: 'allow',
-          doom_loop: 'allow',
-          external_directory: 'allow',
-        },
-      },
-      title: {
-        model: 'kilo/anthropic/claude-haiku-4.5',
-      },
+      code: { model: primaryModel, permission: HEADLESS_PERMISSIONS },
+      general: { model: primaryModel, permission: HEADLESS_PERMISSIONS },
+      plan: { model: primaryModel, permission: HEADLESS_PERMISSIONS },
+      title: { model: smModel },
       explore: {
-        small_model: 'kilo/anthropic/claude-haiku-4.5',
-        model: 'kilo/anthropic/claude-sonnet-4.6',
-        // Auto-approve everything — agents run headless in a container,
-        // there's no human to answer permission prompts.
-        permission: {
-          edit: 'allow',
-          bash: 'allow',
-          webfetch: 'allow',
-          doom_loop: 'allow',
-          external_directory: 'allow',
-        },
+        small_model: smModel,
+        model: primaryModel,
+        permission: HEADLESS_PERMISSIONS,
       },
     },
-    // Auto-approve everything — agents run headless in a container,
-    // there's no human to answer permission prompts.
-    permission: {
-      edit: 'allow',
-      bash: 'allow',
-      webfetch: 'allow',
-      doom_loop: 'allow',
-      external_directory: 'allow',
-    },
+    permission: HEADLESS_PERMISSIONS,
   } satisfies Config);
 }
 
@@ -137,6 +97,12 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     }
   }
 
+  console.log(`GASTOWN_API_URL="${env.GASTOWN_API_URL}"
+GASTOWN_SESSION_TOKEN=${env.GASTOWN_SESSION_TOKEN ? '(set)' : '(not set)'}
+GASTOWN_AGENT_ID="${env.GASTOWN_AGENT_ID}"
+GASTOWN_RIG_ID="${env.GASTOWN_RIG_ID}"
+GASTOWN_TOWN_ID="${env.GASTOWN_TOWN_ID}"`);
+
   // Fall back to X-Town-Config for KILOCODE_TOKEN if not in request or process.env
   if (!env.KILOCODE_TOKEN) {
     const townConfig = getCurrentTownConfig();
@@ -156,15 +122,32 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   // Must also set OPENCODE_CONFIG_CONTENT — kilo serve checks both names.
   const kilocodeToken = env.KILOCODE_TOKEN;
   if (kilocodeToken) {
-    const configJson = buildKiloConfigContent(kilocodeToken, request.model);
+    const configJson = buildKiloConfigContent(
+      kilocodeToken,
+      request.model,
+      request.smallModel ?? 'anthropic/claude-haiku-4.5'
+    );
     env.KILO_CONFIG_CONTENT = configJson;
     env.OPENCODE_CONFIG_CONTENT = configJson;
-    const resolvedModel = request.model ?? 'kilo/anthropic/claude-sonnet-4.6';
-    console.log(`[buildAgentEnv] KILO_CONFIG_CONTENT set (model=${resolvedModel})`);
+    console.log(
+      `[buildAgentEnv] KILO_CONFIG_CONTENT set (model=${request.model}, smallModel=${request.smallModel ?? '(default)'})`
+    );
   } else {
     console.warn('[buildAgentEnv] No KILOCODE_TOKEN available — KILO_CONFIG_CONTENT not set');
   }
 
+  // Authenticate the gh CLI via GH_TOKEN so agents can use `gh` commands.
+  // GIT_TOKEN is a GitHub access token set by the town config's git_auth.
+  // Set before the envVars loop so user-provided GH_TOKEN in town env vars
+  // cannot override the platform credential (intentional — prevents agents
+  // from being pointed at a different GitHub identity).
+  const ghToken = resolveEnv(request, 'GIT_TOKEN') ?? resolveEnv(request, 'GITHUB_TOKEN');
+  if (ghToken) {
+    env.GH_TOKEN = ghToken;
+  }
+
+  // Town-level env vars. The `!(key in env)` guard means infra-set vars
+  // (GASTOWN_*, KILO_*, GH_TOKEN, etc.) take precedence over user config.
   if (request.envVars) {
     for (const [key, value] of Object.entries(request.envVars)) {
       if (!(key in env)) {

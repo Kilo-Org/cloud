@@ -16,6 +16,8 @@ export const StartAgentRequest = z.object({
   identity: z.string(),
   prompt: z.string(),
   model: z.string(),
+  /** Lightweight model for title generation, explore subagent, etc. */
+  smallModel: z.string().optional(),
   systemPrompt: z.string(),
   gitUrl: z.string(),
   branch: z.string(),

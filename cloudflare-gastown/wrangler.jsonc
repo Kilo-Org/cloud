@@ -61,6 +61,11 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "GASTOWN_JWT_SECRET_PROD",
     },
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET",
+    },
   ],
 
   "env": {

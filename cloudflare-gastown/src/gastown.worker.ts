@@ -3,13 +3,13 @@ import type { Context } from 'hono';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { resError } from './util/res.util';
 import { dashboardHtml } from './ui/dashboard.ui';
-import { withCloudflareAccess, validateCfAccessRequest } from './middleware/cf-access.middleware';
 import {
   authMiddleware,
   agentOnlyMiddleware,
   townIdMiddleware,
   type AuthVariables,
 } from './middleware/auth.middleware';
+import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
 import {
   handleCreateBead,
   handleListBeads,
@@ -115,18 +115,6 @@ app.use('*', async (c, next) => {
   const elapsed = Date.now() - startTime;
   console.log(`${WORKER_LOG} <-- ${method} ${path} ${c.res.status} (${elapsed}ms)`);
 });
-
-// ── Cloudflare Access ───────────────────────────────────────────────────
-// Validate Cloudflare Access JWT for all requests; skip in development.
-
-app.use('*', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development'
-    ? next()
-    : withCloudflareAccess({
-        team: c.env.CF_ACCESS_TEAM,
-        audience: c.env.CF_ACCESS_AUD,
-      })(c, next)
-);
 
 // ── Dashboard UI ────────────────────────────────────────────────────────
 
@@ -245,6 +233,30 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/molecule/advance', c =>
 
 app.post('/api/towns/:townId/rigs/:rigId/escalations', c =>
   handleCreateEscalation(c, c.req.param())
+);
+
+// ── Kilo User Auth ──────────────────────────────────────────────────────
+// Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
+// routes. Skip in development. Container→worker routes use the agent JWT
+// middleware instead (authMiddleware above).
+
+app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+);
+app.use('/api/towns/:townId/convoys/*', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+);
+app.use('/api/towns/:townId/escalations/*', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+);
+app.use('/api/towns/:townId/config', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+);
+app.use('/api/towns/:townId/container/*', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+);
+app.use('/api/towns/:townId/mayor/*', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
 );
 
 // ── Towns & Rigs ────────────────────────────────────────────────────────
@@ -377,20 +389,20 @@ export default {
     // Must bypass Hono — the DO returns a 101 + WebSocketPair that the
     // runtime handles directly.
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
-      // Validate CF Access JWT before forwarding — WebSocket upgrades
+      // Validate Kilo user JWT before forwarding — WebSocket upgrades
       // bypass Hono middleware so we must check auth inline.
-      if (env.ENVIRONMENT !== 'development') {
-        try {
-          await validateCfAccessRequest(request, {
-            team: env.CF_ACCESS_TEAM,
-            audience: env.CF_ACCESS_AUD,
-          });
-        } catch (e) {
-          console.warn(
-            `[gastown-worker] WS CF Access auth failed: ${e instanceof Error ? e.message : 'unknown'}`
-          );
-          return new Response('Unauthorized', { status: 401 });
-        }
+      try {
+        const { verifyKiloToken, extractBearerToken } = await import('@kilocode/worker-utils');
+        const { resolveSecret } = await import('./util/secret.util');
+        const token = extractBearerToken(request.headers.get('Authorization'));
+        if (!token) throw new Error('Missing Authorization header');
+        const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+        await verifyKiloToken(token, secret);
+      } catch (e) {
+        console.warn(
+          `[gastown-worker] WS auth failed: ${e instanceof Error ? e.message : 'unknown'}`
+        );
+        return new Response('Unauthorized', { status: 401 });
       }
 
       const url = new URL(request.url);

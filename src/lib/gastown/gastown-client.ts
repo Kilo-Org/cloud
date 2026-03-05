@@ -1,9 +1,6 @@
 import 'server-only';
-import {
-  GASTOWN_SERVICE_URL,
-  GASTOWN_CF_ACCESS_CLIENT_ID,
-  GASTOWN_CF_ACCESS_CLIENT_SECRET,
-} from '@/lib/config.server';
+import { GASTOWN_SERVICE_URL } from '@/lib/config.server';
+import { generateInternalServiceToken } from '@/lib/tokens';
 import { z } from 'zod';
 
 // ── Response schemas ──────────────────────────────────────────────────────
@@ -118,9 +115,13 @@ function getHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
   };
 
-  if (GASTOWN_CF_ACCESS_CLIENT_ID && GASTOWN_CF_ACCESS_CLIENT_SECRET) {
-    headers['CF-Access-Client-Id'] = GASTOWN_CF_ACCESS_CLIENT_ID;
-    headers['CF-Access-Client-Secret'] = GASTOWN_CF_ACCESS_CLIENT_SECRET;
+  // Authenticate to the Gastown worker with a short-lived internal service
+  // token signed with NEXTAUTH_SECRET. This replaces the old CF Access
+  // service token approach. Uses a fixed service identity since the actual
+  // user ID is passed in the URL path for user-scoped operations.
+  const token = generateInternalServiceToken('gastown-service');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   return headers;

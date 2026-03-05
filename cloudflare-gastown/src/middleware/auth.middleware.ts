@@ -8,6 +8,7 @@ import type { GastownEnv } from '../gastown.worker';
 export type AuthVariables = {
   agentJWT: AgentJWTPayload;
   townId: string;
+  kiloUserId: string;
 };
 
 import { resolveSecret } from '../util/secret.util';

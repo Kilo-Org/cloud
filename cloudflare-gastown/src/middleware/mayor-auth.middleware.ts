@@ -22,7 +22,7 @@ export const mayorAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) 
 
   const secret = await resolveSecret(c.env.GASTOWN_JWT_SECRET);
   if (!secret) {
-    console.error('[mayor-auth] GASTOWN_JWT_SECRET not configured');
+    console.error('[mayor-auth] failed to resolve GASTOWN_JWT_SECRET from Secrets Store');
     return c.json(resError('Internal server error'), 500);
   }
 

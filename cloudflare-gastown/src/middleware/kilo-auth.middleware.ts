@@ -23,6 +23,10 @@ export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     return c.json(resError('Internal server error'), 500);
   }
   const secret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  if (!secret) {
+    console.error('[kilo-auth] failed to resolve NEXTAUTH_SECRET from Secrets Store');
+    return c.json(resError('Internal server error'), 500);
+  }
 
   try {
     const payload = await verifyKiloToken(token, secret);

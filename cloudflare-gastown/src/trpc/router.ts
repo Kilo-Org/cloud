@@ -105,6 +105,12 @@ async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper:
     });
   }
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  if (!secret) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to resolve NEXTAUTH_SECRET from Secrets Store',
+    });
+  }
   return generateKiloApiToken(user, secret);
 }
 

@@ -884,6 +884,10 @@ export class CloudAgentSession extends DurableObject {
   async alarm(): Promise<void> {
     const now = Date.now();
 
+    logger
+      .withFields({ doId: this.ctx.id.toString(), sessionId: this.sessionId })
+      .info('Alarm fired');
+
     try {
       // Check if session should be deleted due to inactivity (90 days)
       const lastActivity = await this.ctx.storage.get<number>(LAST_ACTIVITY_KEY);
@@ -897,18 +901,41 @@ export class CloudAgentSession extends DurableObject {
         return;
       }
 
+      logger
+        .withFields({ sessionId: this.sessionId, lastActivity, elapsedMs: Date.now() - now })
+        .debug('TTL check passed');
+
       // Run cleanup tasks
+      logger
+        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+        .debug('Starting cleanupStaleExecutions');
       await this.cleanupStaleExecutions(now);
+
+      logger
+        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+        .debug('Starting cleanupOldEvents');
       this.cleanupOldEvents(now);
+
+      logger
+        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+        .debug('Starting cleanupExpiredLeases');
       this.cleanupExpiredLeases(now);
 
       // Check if kilo server should be stopped due to inactivity
+      logger
+        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+        .debug('Starting cleanupIdleKiloServer');
       await this.cleanupIdleKiloServer(now);
+
+      logger
+        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+        .debug('All cleanup steps completed');
     } catch (error) {
       logger
         .withFields({
           doId: this.ctx.id.toString(),
           sessionId: this.sessionId,
+          elapsedMs: Date.now() - now,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
         })
@@ -926,6 +953,9 @@ export class CloudAgentSession extends DurableObject {
     } catch {
       // Fall through with default interval
     }
+    logger
+      .withFields({ sessionId: this.sessionId, nextInterval, elapsedMs: Date.now() - now })
+      .info('Rescheduling alarm');
     await this.ctx.storage.setAlarm(now + nextInterval);
   }
 
@@ -1168,7 +1198,16 @@ export class CloudAgentSession extends DurableObject {
       const sandboxId = await generateSandboxId(metadata.orgId, metadata.userId, metadata.botId);
       const sandbox = getSandbox((this.env as unknown as WorkerEnv).Sandbox, sandboxId);
 
+      const rpcStart = Date.now();
+      logger
+        .withFields({ sessionId: this.sessionId, sandboxId })
+        .debug('Starting stopKiloServer RPC');
+
       await stopKiloServer(sandbox, metadata.sessionId);
+
+      logger
+        .withFields({ sessionId: this.sessionId, sandboxId, rpcElapsedMs: Date.now() - rpcStart })
+        .debug('stopKiloServer RPC completed');
 
       // Clear the activity timestamp since server is stopped
       // Must merge with existing metadata since updateMetadata validates the full schema

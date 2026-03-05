@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { cors } from 'hono/cors';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { resError } from './util/res.util';
 import { dashboardHtml } from './ui/dashboard.ui';
@@ -10,6 +11,8 @@ import {
   type AuthVariables,
 } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
+import { trpcServer } from '@hono/trpc-server';
+import { wrappedGastownRouter } from './trpc/router';
 import {
   handleCreateBead,
   handleListBeads,
@@ -115,6 +118,30 @@ app.use('*', async (c, next) => {
   const elapsed = Date.now() - startTime;
   console.log(`${WORKER_LOG} <-- ${method} ${path} ${c.res.status} (${elapsed}ms)`);
 });
+
+// ── CORS ────────────────────────────────────────────────────────────────
+// Allow browser requests from the main Kilo app. In development, allow
+// localhost origins for the Next.js dev server.
+
+const corsMiddleware = cors({
+  origin: (origin, c: Context<GastownEnv>) => {
+    if (c.env.ENVIRONMENT === 'development') {
+      // Allow any localhost origin in dev
+      if (origin.startsWith('http://localhost:')) return origin;
+    }
+    // Production origins
+    const allowed = ['https://app.kilo.ai', 'https://kilo.ai'];
+    return allowed.includes(origin) ? origin : '';
+  },
+  allowHeaders: ['Content-Type', 'Authorization'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  exposeHeaders: ['Content-Length'],
+  maxAge: 3600,
+  credentials: true,
+});
+
+app.use('/api/*', corsMiddleware);
+app.use('/trpc/*', corsMiddleware);
 
 // ── Dashboard UI ────────────────────────────────────────────────────────
 
@@ -365,6 +392,28 @@ app.get('/api/mayor/:townId/tools/rigs/:rigId/agents', c =>
 );
 app.post('/api/mayor/:townId/tools/mail', c => handleMayorSendMail(c, c.req.param()));
 
+// ── tRPC ────────────────────────────────────────────────────────────────
+// Serve the gastown tRPC router directly. The frontend tRPC client
+// connects here instead of going through the Next.js proxy layer.
+
+app.use('/trpc/*', kiloAuthMiddleware);
+app.use(
+  '/trpc/*',
+  trpcServer({
+    router: wrappedGastownRouter,
+    endpoint: '/trpc',
+    createContext: (_opts: unknown, c: Context<GastownEnv>) => ({
+      env: c.env,
+      userId: c.get('kiloUserId') ?? '',
+      isAdmin: c.get('kiloIsAdmin') ?? false,
+      apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
+    }),
+    onError: ({ error, path }: { error: Error; path?: string }) => {
+      console.error(`[gastown-trpc] error on ${path ?? 'unknown'}:`, error.message);
+    },
+  })
+);
+
 // ── Error handling ──────────────────────────────────────────────────────
 
 app.notFound(c => c.json(resError('Not found'), 404));
@@ -389,22 +438,10 @@ export default {
     // Must bypass Hono — the DO returns a 101 + WebSocketPair that the
     // runtime handles directly.
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
-      // Validate Kilo user JWT before forwarding — WebSocket upgrades
-      // bypass Hono middleware so we must check auth inline.
-      try {
-        const { verifyKiloToken, extractBearerToken } = await import('@kilocode/worker-utils');
-        const { resolveSecret } = await import('./util/secret.util');
-        const token = extractBearerToken(request.headers.get('Authorization'));
-        if (!token) throw new Error('Missing Authorization header');
-        const secret = await resolveSecret(env.NEXTAUTH_SECRET);
-        await verifyKiloToken(token, secret);
-      } catch (e) {
-        console.warn(
-          `[gastown-worker] WS auth failed: ${e instanceof Error ? e.message : 'unknown'}`
-        );
-        return new Response('Unauthorized', { status: 401 });
-      }
-
+      // WebSocket upgrades use capability-token auth, not JWT headers.
+      // Browsers cannot send custom headers on WebSocket connections.
+      // The stream endpoint uses a ticket obtained via authenticated POST,
+      // and PTY uses a session ID obtained via authenticated POST.
       const url = new URL(request.url);
 
       // Agent event stream

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { BeadEventTimeline } from '@/components/gastown/ActivityFeed';
 import { useTerminalBar } from '@/components/gastown/TerminalBarContext';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
@@ -61,7 +61,7 @@ export function AgentPanel({
   push: (ref: ResourceRef) => void;
   close: () => void;
 }) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const { openAgentTab } = useTerminalBar();
 
   const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Badge } from '@/components/ui/badge';
 import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
@@ -50,7 +50,7 @@ export function BeadPanel({
   rigId: string;
   push: (ref: ResourceRef) => void;
 }) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const beadsQuery = useQuery(trpc.gastown.listBeads.queryOptions({ rigId }));
   const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));
   const rigQuery = useQuery(trpc.gastown.getRig.queryOptions({ rigId }));

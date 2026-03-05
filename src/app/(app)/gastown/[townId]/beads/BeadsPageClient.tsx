@@ -2,16 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import { Hexagon, Search } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { RootRouter } from '@/routers/root-router';
 import { motion, AnimatePresence } from 'motion/react';
+import type { GastownOutputs } from '@/lib/gastown/trpc';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type Bead = RouterOutputs['gastown']['listBeads'][number];
+type Bead = GastownOutputs['gastown']['listBeads'][number];
 
 type BeadsPageClientProps = {
   townId: string;
@@ -25,7 +23,7 @@ const STATUS_DOT: Record<string, string> = {
 };
 
 export function BeadsPageClient({ townId }: BeadsPageClientProps) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const { open: openDrawer } = useDrawerStack();
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');

@@ -1,15 +1,13 @@
 'use client';
 
 import { useMemo, useRef, useEffect, useState } from 'react';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { RootRouter } from '@/routers/root-router';
+import type { GastownOutputs } from '@/lib/gastown/trpc';
 
 import { motion } from 'motion/react';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type Rig = RouterOutputs['gastown']['listRigs'][number];
-type Agent = RouterOutputs['gastown']['listAgents'][number];
-type TownEvent = RouterOutputs['gastown']['getTownEvents'][number];
+type Rig = GastownOutputs['gastown']['listRigs'][number];
+type Agent = GastownOutputs['gastown']['listAgents'][number];
+type TownEvent = GastownOutputs['gastown']['getTownEvents'][number];
 
 type SystemTopologyProps = {
   townName: string;

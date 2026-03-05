@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { RootRouter } from '@/routers/root-router';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
+import type { GastownOutputs } from '@/lib/gastown/trpc';
 import { formatDistanceToNow } from 'date-fns';
 import {
   Activity,
@@ -42,9 +41,8 @@ const EVENT_COLORS: Record<string, string> = {
   mail_sent: 'text-sky-500',
 };
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type TownEvent = RouterOutputs['gastown']['getTownEvents'][number];
-type BeadEvent = RouterOutputs['gastown']['getBeadEvents'][number];
+type TownEvent = GastownOutputs['gastown']['getTownEvents'][number];
+type BeadEvent = GastownOutputs['gastown']['getBeadEvents'][number];
 
 function eventDescription(event: {
   event_type: string;
@@ -103,7 +101,7 @@ export function ActivityFeedView({
   isLoading,
   onEventClick,
 }: ActivityFeedViewProps) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const query = useQuery({
     ...trpc.gastown.getTownEvents.queryOptions({ townId, limit: 50 }),
     refetchInterval: 5000,
@@ -233,7 +231,7 @@ export function ActivityFeed({ townId }: { townId: string }) {
 }
 
 export function BeadEventTimeline({ rigId, beadId }: { rigId: string; beadId: string }) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const { data: events, isLoading } = useQuery({
     ...trpc.gastown.getBeadEvents.queryOptions({ rigId, beadId }),
     refetchInterval: 5000,

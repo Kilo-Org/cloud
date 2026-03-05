@@ -1,13 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { RootRouter } from '@/routers/root-router';
+import type { GastownOutputs } from '@/lib/gastown/trpc';
 import { Hexagon, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type Bead = RouterOutputs['gastown']['listBeads'][number];
+type Bead = GastownOutputs['gastown']['listBeads'][number];
 
 type ConvoyTimelineProps = {
   /** All beads from a rig (or across rigs) */

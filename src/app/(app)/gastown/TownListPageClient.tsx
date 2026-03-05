@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 export function TownListPageClient() {
   const router = useRouter();
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const queryClient = useQueryClient();

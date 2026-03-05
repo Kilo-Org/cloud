@@ -1,12 +1,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Mail } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export function MailPageClient({ townId }: { townId: string }) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
 
   const eventsQuery = useQuery({
     ...trpc.gastown.getTownEvents.queryOptions({ townId, limit: 200 }),

@@ -17,11 +17,18 @@
     "test:integration": "vitest run --config vitest.workers.config.ts",
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
     "typecheck": "tsgo --noEmit --incremental false",
+    "build:types": "tsgo -p tsconfig.types.json || true",
     "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
   },
   "dependencies": {
     "@cloudflare/containers": "^0.1.0",
+    "@hono/trpc-server": "^0.4.2",
+    "@kilocode/db": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "jose": "catalog:",
+    "pg": "^8.16.3",
     "@kilocode/worker-utils": "workspace:*",
+    "@trpc/server": "^11.0.0",
     "hono": "catalog:",
     "itty-time": "^1.0.6",
     "jsonwebtoken": "catalog:",

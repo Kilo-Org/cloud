@@ -14,6 +14,7 @@ export const kiloTokenPayload = z.object({
   apiTokenPepper: z.string().nullable().optional(),
   env: z.string().optional(),
   // Optional extras from JWTTokenExtraPayload
+  isAdmin: z.boolean().optional(),
   botId: z.string().optional(),
   organizationId: z.string().optional(),
   organizationRole: z.enum(['owner', 'member', 'billing_manager']).optional(),

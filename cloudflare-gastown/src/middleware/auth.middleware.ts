@@ -9,6 +9,8 @@ export type AuthVariables = {
   agentJWT: AgentJWTPayload;
   townId: string;
   kiloUserId: string;
+  kiloIsAdmin: boolean;
+  kiloApiTokenPepper: string | null;
 };
 
 import { resolveSecret } from '../util/secret.util';

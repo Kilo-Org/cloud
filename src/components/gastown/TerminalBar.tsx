@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useTerminalBar } from './TerminalBarContext';
 import { ChevronDown, ChevronUp, Crown, Terminal as TerminalIcon, X } from 'lucide-react';
@@ -139,7 +139,7 @@ export function TerminalBar({ townId }: TerminalBarProps) {
 // ── Mayor Terminal Pane ──────────────────────────────────────────────────
 
 function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: boolean }) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState('Initializing...');
@@ -271,7 +271,7 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
       ptyRef.current = result.pty;
       setStatus('Connecting...');
 
-      const ws = new WebSocket(result.wsUrl);
+      const ws = new WebSocket(gastownWsUrl(result.wsUrl));
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
 
@@ -361,7 +361,7 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
 // ── Agent Terminal Pane ──────────────────────────────────────────────────
 
 function AgentTerminalPane({ townId, agentId }: { townId: string; agentId: string }) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const terminalRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -446,7 +446,7 @@ function AgentTerminalPane({ townId, agentId }: { townId: string; agentId: strin
       ptyRef.current = result.pty;
       setStatus('Connecting...');
 
-      const ws = new WebSocket(result.wsUrl);
+      const ws = new WebSocket(gastownWsUrl(result.wsUrl));
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
 

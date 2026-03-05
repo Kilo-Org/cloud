@@ -2,16 +2,14 @@
 
 import { useMemo } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import { Bot, Crown, Shield, Eye, Clock, Hexagon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { RootRouter } from '@/routers/root-router';
+import type { GastownOutputs } from '@/lib/gastown/trpc';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type Agent = RouterOutputs['gastown']['listAgents'][number];
+type Agent = GastownOutputs['gastown']['listAgents'][number];
 
 const ROLE_ICONS: Record<string, typeof Bot> = {
   polecat: Bot,
@@ -28,7 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function AgentsPageClient({ townId }: { townId: string }) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const { open: openDrawer } = useDrawerStack();
 
   const rigsQuery = useQuery(trpc.gastown.listRigs.queryOptions({ townId }));

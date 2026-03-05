@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/Button';
 import { X, Radio } from 'lucide-react';
@@ -136,7 +136,7 @@ function toStreamEntry(
 }
 
 export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const [entries, setEntries] = useState<StreamEntry[]>([]);
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState<string>('Fetching ticket...');
@@ -185,7 +185,7 @@ export function AgentStream({ townId, agentId, onClose }: AgentStreamProps) {
 
     setStatus('Connecting...');
 
-    const wsUrl = new URL(url);
+    const wsUrl = new URL(gastownWsUrl(url));
     wsUrl.searchParams.set('ticket', ticket);
 
     const ws = new WebSocket(wsUrl.toString());

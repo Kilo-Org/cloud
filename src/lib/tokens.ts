@@ -13,6 +13,7 @@ export type JWTTokenExtraPayload = {
   organizationId?: string;
   organizationRole?: OrganizationRole;
   internalApiUse?: boolean;
+  isAdmin?: boolean;
   createdOnPlatform?: string;
   tokenSource?: string;
 };

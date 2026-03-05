@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -73,7 +73,7 @@ function scrollToSection(id: string) {
 }
 
 export function TownSettingsPageClient({ townId }: Props) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
 
   const townQuery = useQuery(trpc.gastown.getTown.queryOptions({ townId }));

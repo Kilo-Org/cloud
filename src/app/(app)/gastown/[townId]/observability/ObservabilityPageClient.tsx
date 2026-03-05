@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Activity, Clock, Hexagon, Bot, GitMerge, AlertTriangle, Mail } from 'lucide-react';
 import { formatDistanceToNow, format, subHours, differenceInMinutes } from 'date-fns';
 import {
@@ -20,7 +20,7 @@ import {
 type EventTypeCounts = Record<string, number>;
 
 export function ObservabilityPageClient({ townId }: { townId: string }) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
 
   const eventsQuery = useQuery({
     ...trpc.gastown.getTownEvents.queryOptions({ townId, limit: 500 }),

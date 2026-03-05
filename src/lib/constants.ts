@@ -43,6 +43,10 @@ export const CLOUD_AGENT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_WS_URL ?? 
 // Separate URL for the new cloud-agent-next implementation
 export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL ?? '';
 
+// Gastown worker URL (client-side, inlined at build time)
+// The browser talks directly to the gastown Cloudflare Worker for tRPC + WS.
+export const GASTOWN_URL = process.env.NEXT_PUBLIC_GASTOWN_URL ?? '';
+
 // Free model rate limits (applies to both anonymous and authenticated users)
 export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;
 export const FREE_MODEL_MAX_REQUESTS_PER_WINDOW = 200;

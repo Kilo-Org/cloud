@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,7 @@ export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [model, setModel] = useState('kilo/auto');
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
 
   const sling = useMutation(

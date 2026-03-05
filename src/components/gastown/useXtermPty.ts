@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 
@@ -35,7 +35,7 @@ export function useXtermPty({
   retryDelay = 3_000,
   onStatusChange,
 }: XtermPtyOptions): XtermPtyResult {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState('Initializing...');
 
@@ -153,7 +153,7 @@ export function useXtermPty({
       ptyRef.current = result.pty;
       updateStatus('Connecting...');
 
-      const ws = new WebSocket(result.wsUrl);
+      const ws = new WebSocket(gastownWsUrl(result.wsUrl));
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
 

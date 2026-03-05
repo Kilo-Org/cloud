@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useSidebar } from '@/components/ui/sidebar';
 import { ChevronDown, ChevronUp, Terminal as TerminalIcon } from 'lucide-react';
 import { useXtermPty } from './useXtermPty';
@@ -15,7 +15,7 @@ const COLLAPSED_HEIGHT = 40; // px — title bar only
 const EXPANDED_HEIGHT = 320; // px — terminal area
 
 export function MayorChat({ townId }: MayorChatProps) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
 

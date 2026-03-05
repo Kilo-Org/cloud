@@ -4,8 +4,7 @@ import { Drawer } from 'vaul';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/Button';
 import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { RootRouter } from '@/routers/root-router';
+import type { GastownOutputs } from '@/lib/gastown/trpc';
 import { format } from 'date-fns';
 import {
   Clock,
@@ -22,8 +21,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type Bead = RouterOutputs['gastown']['listBeads'][number];
+type Bead = GastownOutputs['gastown']['listBeads'][number];
 
 type BeadDetailDrawerProps = {
   open: boolean;

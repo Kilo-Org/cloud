@@ -13,20 +13,25 @@ import { resolveSecret } from '../util/secret.util';
  */
 export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
   const token = extractBearerToken(c.req.header('Authorization'));
+
   if (!token) {
     return c.json(resError('Authentication required'), 401);
   }
 
-  const secret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  if (!secret) {
+  if (!c.env.NEXTAUTH_SECRET) {
     console.error('[kilo-auth] NEXTAUTH_SECRET not configured');
     return c.json(resError('Internal server error'), 500);
   }
+  const secret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  console.log(secret);
 
   try {
     const payload = await verifyKiloToken(token, secret);
     c.set('kiloUserId', payload.kiloUserId);
+    c.set('kiloIsAdmin', payload.isAdmin === true);
+    c.set('kiloApiTokenPepper', payload.apiTokenPepper ?? null);
   } catch (err) {
+    console.log('error', err);
     const message = err instanceof Error ? err.message : 'Invalid token';
     return c.json(resError(message), 401);
   }

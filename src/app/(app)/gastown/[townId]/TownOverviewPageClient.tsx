@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Button } from '@/components/Button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateRigDialog } from '@/components/gastown/CreateRigDialog';
@@ -29,11 +29,9 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { RootRouter } from '@/routers/root-router';
+import type { GastownOutputs } from '@/lib/gastown/trpc';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type Agent = RouterOutputs['gastown']['listAgents'][number];
+type Agent = GastownOutputs['gastown']['listAgents'][number];
 
 type TownOverviewPageClientProps = {
   townId: string;
@@ -80,7 +78,7 @@ function bucketEventsOverTime(events: Array<{ created_at: string }>, windowMinut
 
 export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) {
   const router = useRouter();
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
   const [isCreateRigOpen, setIsCreateRigOpen] = useState(false);
   const { open: openDrawer } = useDrawerStack();
 

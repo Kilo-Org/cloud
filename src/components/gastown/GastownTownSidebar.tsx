@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import {
   Sidebar,
   SidebarContent,
@@ -35,7 +35,7 @@ type GastownTownSidebarProps = {
 
 export function GastownTownSidebar({ townId, ...sidebarProps }: GastownTownSidebarProps) {
   const pathname = usePathname();
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
 
   const townQuery = useQuery(trpc.gastown.getTown.queryOptions({ townId }));
   const rigsQuery = useQuery(trpc.gastown.listRigs.queryOptions({ townId }));

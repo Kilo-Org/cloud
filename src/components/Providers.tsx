@@ -2,6 +2,7 @@
 
 import { Toaster } from '@/components/ui/sonner';
 import { TRPCContext } from '@/lib/trpc/client';
+import { GastownTRPCProvider, createGastownTRPCClient } from '@/lib/gastown/trpc';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider } from 'next-auth/react';
 import type { PropsWithChildren } from 'react';
@@ -20,15 +21,18 @@ export function Providers({ children }: PropsWithChildren) {
         },
       })
   );
+  const [gastownClient] = useState(() => createGastownTRPCClient());
 
   return (
     <>
       <QueryClientProvider client={queryClient}>
         <TRPCContext>
-          <SessionProvider>
-            <SignInHintEmailSyncer />
-            {children}
-          </SessionProvider>
+          <GastownTRPCProvider trpcClient={gastownClient} queryClient={queryClient}>
+            <SessionProvider>
+              <SignInHintEmailSyncer />
+              {children}
+            </SessionProvider>
+          </GastownTRPCProvider>
         </TRPCContext>
       </QueryClientProvider>
 

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   Dialog,
@@ -30,17 +31,18 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
   const [mode, setMode] = useState<RepoMode>('integration');
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<'github' | 'gitlab' | null>(null);
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
+  const mainTrpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Fetch repos from integrations
+  // Fetch repos from integrations (via main tRPC — cloudAgent is not on the gastown router)
   const githubReposQuery = useQuery({
-    ...trpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false }),
+    ...mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false }),
     enabled: isOpen && mode === 'integration',
   });
 
   const gitlabReposQuery = useQuery({
-    ...trpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false }),
+    ...mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false }),
     enabled: isOpen && mode === 'integration',
   });
 

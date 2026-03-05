@@ -2,11 +2,10 @@
 
 import { Drawer } from 'vaul';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
+import type { GastownOutputs } from '@/lib/gastown/trpc';
 import { Badge } from '@/components/ui/badge';
 import { BeadEventTimeline } from '@/components/gastown/ActivityFeed';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { RootRouter } from '@/routers/root-router';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
   X,
@@ -22,9 +21,8 @@ import {
   Activity,
 } from 'lucide-react';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type Agent = RouterOutputs['gastown']['listAgents'][number];
-type Bead = RouterOutputs['gastown']['listBeads'][number];
+type Agent = GastownOutputs['gastown']['listAgents'][number];
+type Bead = GastownOutputs['gastown']['listBeads'][number];
 
 type AgentDetailDrawerProps = {
   open: boolean;
@@ -64,7 +62,7 @@ export function AgentDetailDrawer({
   onConnect,
   onDelete,
 }: AgentDetailDrawerProps) {
-  const trpc = useTRPC();
+  const trpc = useGastownTRPC();
 
   // Fetch related beads for this agent
   const beadsQuery = useQuery({

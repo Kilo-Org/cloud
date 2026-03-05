@@ -54,6 +54,23 @@
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
   },
 
+  // Hyperdrive binding for Postgres (user lookups, token generation)
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+
+  "services": [
+    {
+      "binding": "GIT_TOKEN_SERVICE",
+      "service": "git-token-service",
+      "entrypoint": "GitTokenRPCEntrypoint",
+    },
+  ],
+
   // PRODUCTION Secrets Store (shared Kilo secrets store)
   "secrets_store_secrets": [
     {
@@ -99,11 +116,23 @@
           { "name": "AGENT", "class_name": "AgentDO" },
         ],
       },
+      "services": [
+        {
+          "binding": "GIT_TOKEN_SERVICE",
+          "service": "git-token-service",
+          "entrypoint": "GitTokenRPCEntrypoint",
+        },
+      ],
       "secrets_store_secrets": [
         {
           "binding": "GASTOWN_JWT_SECRET",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           "secret_name": "GASTOWN_JWT_SECRET_PROD",
+        },
+        {
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "NEXTAUTH_SECRET",
         },
       ],
     },

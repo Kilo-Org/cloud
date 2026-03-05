@@ -588,6 +588,7 @@ export class SessionService {
 
     const permission: Record<string, unknown> = {
       external_directory: {
+        '*': 'deny',
         [`/tmp/${sessionId}/**`]: 'allow',
         [`${workspacePath}/**`]: 'allow',
       },

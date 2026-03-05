@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kilo for Teams Subscription Renewal</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+      background-color: #1a1a1a;
+      color: #d1d5db;
+    "
+  >
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a">
+      <tr>
+        <td align="center" style="padding: 40px 20px">
+          <table
+            width="600"
+            cellpadding="0"
+            cellspacing="0"
+            style="background-color: #2a2a2a; border-radius: 8px; border: 1px solid #3a3a3a"
+          >
+            <!-- Header -->
+            <tr>
+              <td style="padding: 40px 40px 20px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: #f4e452;
+                    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+                  "
+                >
+                  Kilo for Teams Subscription Renewal
+                </h1>
+              </td>
+            </tr>
+            <!-- Body -->
+            <tr>
+              <td style="padding: 0 40px 30px">
+                <p
+                  style="
+                    margin: 0 0 16px;
+                    font-size: 14px;
+                    line-height: 20px;
+                    color: #9ca3af;
+                    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+                  "
+                >
+                  Your subscription for
+                  <strong style="color: #d1d5db">{{ seats }}</strong> has been renewed for another
+                  month.
+                </p>
+                <p
+                  style="
+                    margin: 0 0 16px;
+                    font-size: 14px;
+                    line-height: 20px;
+                    color: #9ca3af;
+                    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+                  "
+                >
+                  You can view your organization's invoices
+                  <a href="{{ invoices_url }}" style="color: #f4e452; text-decoration: underline"
+                    >here</a
+                  >.
+                </p>
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 14px;
+                    line-height: 20px;
+                    color: #9ca3af;
+                    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+                  "
+                >
+                  If you have any questions, please don't hesitate to reply to this email. We are
+                  here to help!
+                </p>
+              </td>
+            </tr>
+            <!-- Sign-off -->
+            <tr>
+              <td style="padding: 0 40px 40px; border-top: 1px solid #3a3a3a">
+                <p
+                  style="
+                    margin: 20px 0 0;
+                    font-size: 14px;
+                    line-height: 20px;
+                    color: #9ca3af;
+                    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+                  "
+                >
+                  — The Kilo Team
+                </p>
+              </td>
+            </tr>
+          </table>
+          <!-- Branding Footer -->
+          <table width="600" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" style="padding: 30px 20px">
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 12px;
+                    color: #6b7280;
+                    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+                  "
+                >
+                  © {{ year }} Kilo Code, LLC<br />455 Market St, Ste 1940 PMB 993504<br />San
+                  Francisco, CA 94105, USA
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

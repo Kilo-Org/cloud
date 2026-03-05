@@ -23,7 +23,6 @@ export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     return c.json(resError('Internal server error'), 500);
   }
   const secret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  console.log(secret);
 
   try {
     const payload = await verifyKiloToken(token, secret);
@@ -31,9 +30,11 @@ export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     c.set('kiloIsAdmin', payload.isAdmin === true);
     c.set('kiloApiTokenPepper', payload.apiTokenPepper ?? null);
   } catch (err) {
-    console.log('error', err);
-    const message = err instanceof Error ? err.message : 'Invalid token';
-    return c.json(resError(message), 401);
+    console.warn(
+      '[kilo-auth] token verification failed:',
+      err instanceof Error ? err.message : 'unknown error'
+    );
+    return c.json(resError('Invalid token'), 401);
   }
 
   return next();

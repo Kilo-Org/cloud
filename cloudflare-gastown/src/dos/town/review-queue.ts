@@ -393,6 +393,12 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
           status: 'failed',
           message: `Refinery provided invalid pr_url: ${input.pr_url}`,
         });
+        logBeadEvent(sql, {
+          beadId: mrBeadId,
+          agentId,
+          eventType: 'pr_creation_failed',
+          metadata: { pr_url: input.pr_url, reason: 'invalid_url' },
+        });
       }
     } else {
       // Direct strategy: refinery already merged and pushed

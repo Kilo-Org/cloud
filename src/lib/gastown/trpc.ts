@@ -9,6 +9,7 @@
  */
 
 import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
+import { z } from 'zod';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { WrappedGastownRouter } from '@/lib/gastown/types/router';
@@ -35,10 +36,10 @@ async function fetchToken(): Promise<string> {
     throw new Error(`Failed to fetch gastown token: ${res.status} ${body}`);
   }
   const data: unknown = await res.json();
-  const { token, expiresAt } = data as { token: string; expiresAt: string };
-  cachedToken = token;
-  tokenExpiresAt = new Date(expiresAt).getTime();
-  return token;
+  const parsed = z.object({ token: z.string(), expiresAt: z.string() }).parse(data);
+  cachedToken = parsed.token;
+  tokenExpiresAt = new Date(parsed.expiresAt).getTime();
+  return parsed.token;
 }
 
 async function getToken(): Promise<string> {

@@ -1,7 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateApiToken } from '@/lib/tokens';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 

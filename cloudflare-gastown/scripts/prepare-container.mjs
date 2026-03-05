@@ -44,10 +44,12 @@ writeFileSync(resolve(containerDir, 'pnpm-workspace.yaml'), catalogLines.join('\
 // Create a production-only package.json that strips workspace: references
 // (they can't be resolved outside the monorepo).
 const pkg = JSON.parse(readFileSync(resolve(containerDir, 'package.json'), 'utf8'));
-if (pkg.devDependencies) {
-  for (const [name, version] of Object.entries(pkg.devDependencies)) {
-    if (typeof version === 'string' && version.startsWith('workspace:')) {
-      delete pkg.devDependencies[name];
+for (const depKey of ['dependencies', 'devDependencies']) {
+  if (pkg[depKey]) {
+    for (const [name, version] of Object.entries(pkg[depKey])) {
+      if (typeof version === 'string' && version.startsWith('workspace:')) {
+        delete pkg[depKey][name];
+      }
     }
   }
 }

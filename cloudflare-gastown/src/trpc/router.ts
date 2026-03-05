@@ -14,7 +14,7 @@ import { getTownContainerStub } from '../dos/TownContainer.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
-import { TownConfigSchema } from '../types';
+import { TownConfigSchema, TownConfigUpdateSchema } from '../types';
 import {
   RpcTownOutput,
   RpcRigOutput,
@@ -258,6 +258,7 @@ export const gastownRouter = router({
     .input(z.object({ rigId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       requireAdmin(ctx);
+      await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const userStub = getGastownUserStub(ctx.env, ctx.userId);
       await userStub.deleteRig(input.rigId);
     }),
@@ -510,7 +511,7 @@ export const gastownRouter = router({
     .input(
       z.object({
         townId: z.string().uuid(),
-        config: z.record(z.string(), z.unknown()),
+        config: TownConfigUpdateSchema,
       })
     )
     .output(RpcTownConfigSchema)

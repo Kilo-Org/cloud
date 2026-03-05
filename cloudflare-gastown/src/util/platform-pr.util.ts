@@ -189,6 +189,42 @@ const GitHubPRResponse = z.object({
   state: z.string(),
 });
 
+/** Fetch an existing open PR for the same head→base pair (used on 422 duplicate). */
+async function fetchExistingGitHubPR(params: {
+  owner: string;
+  repo: string;
+  token: string;
+  head: string;
+  base: string;
+}): Promise<{ pr_url: string; pr_number: number } | null> {
+  try {
+    const qs = new URLSearchParams({
+      head: `${params.owner}:${params.head}`,
+      base: params.base,
+      state: 'open',
+    });
+    const response = await fetch(
+      `https://api.github.com/repos/${params.owner}/${params.repo}/pulls?${qs}`,
+      {
+        headers: {
+          Authorization: `token ${params.token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'Gastown-Refinery/1.0',
+        },
+      }
+    );
+    if (!response.ok) return null;
+    const data: unknown = await response.json();
+    const prs = z.array(GitHubPRResponse).parse(data);
+    if (prs.length > 0) {
+      return { pr_url: prs[0].html_url, pr_number: prs[0].number };
+    }
+  } catch {
+    // Best-effort — caller will throw the original 422 error
+  }
+  return null;
+}
+
 export async function createGitHubPR(params: {
   owner: string;
   repo: string;
@@ -219,6 +255,17 @@ export async function createGitHubPR(params: {
   );
 
   if (!response.ok) {
+    // HTTP 422 with "A pull request already exists" means a PR for this
+    // head→base combination already exists. Fetch the existing PR URL
+    // instead of failing the entire merge request flow.
+    if (response.status === 422) {
+      const errorBody = await response.text().catch(() => '');
+      if (errorBody.includes('A pull request already exists')) {
+        const existingPR = await fetchExistingGitHubPR(params);
+        if (existingPR) return existingPR;
+      }
+      throw new Error(`GitHub PR creation failed (422): ${errorBody.slice(0, 500)}`);
+    }
     const text = await response.text().catch(() => '(unreadable)');
     throw new Error(`GitHub PR creation failed (${response.status}): ${text.slice(0, 500)}`);
   }
@@ -240,8 +287,8 @@ export async function createGitHubPR(params: {
         },
         body: JSON.stringify({ labels: params.labels }),
       }
-    ).catch(() => {
-      // Best-effort label application
+    ).catch(err => {
+      console.warn(`[platform-pr] Failed to apply labels to PR #${parsed.number}:`, err);
     });
   }
 

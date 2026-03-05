@@ -1,3 +1,5 @@
+import type { MergeStrategy } from '../types';
+
 /**
  * Build the system prompt for a refinery agent.
  *
@@ -12,7 +14,7 @@ export function buildRefinerySystemPrompt(params: {
   branch: string;
   targetBranch: string;
   polecatAgentId: string;
-  mergeStrategy: 'direct' | 'pr';
+  mergeStrategy: MergeStrategy;
 }): string {
   const gateList =
     params.gates.length > 0
@@ -75,6 +77,7 @@ ${mergeInstructions}
 - \`gt_checkpoint\` — Save progress for crash recovery
 
 ## Important
+- Before any git operation, run \`git status\` first to understand the current state of the working tree. This significantly reduces errors from unexpected dirty state or wrong branch.
 - Be specific in rework requests. "Fix the tests" is not actionable. "Test \`calculateTotal\` in \`tests/cart.test.ts\` fails because the discount logic in \`src/cart.ts:47\` doesn't handle the zero-quantity case" is actionable.
 - Do not modify the code yourself. Your job is to review, merge/create PRs, and decide — not to fix code.
 - If you cannot determine whether the code is correct (e.g., you don't understand the domain), escalate with severity "medium" instead of guessing.

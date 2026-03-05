@@ -17,7 +17,9 @@ function resolveEnv(request: StartAgentRequest, key: string): string | undefined
 
 /** Prepend the kilo provider prefix to an OpenRouter-style model ID. */
 function kiloModel(openrouterModel: string): string {
-  return openrouterModel.startsWith('kilo/') ? openrouterModel : `kilo/${openrouterModel}`;
+  const trimmed = openrouterModel.trim();
+  if (!trimmed) return 'kilo/auto';
+  return trimmed.startsWith('kilo/') ? trimmed : `kilo/${trimmed}`;
 }
 
 const HEADLESS_PERMISSIONS = {

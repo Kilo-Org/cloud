@@ -1622,7 +1622,23 @@ export class TownDO extends DurableObject<Env> {
     if (glMatch) {
       const [, instanceUrl, projectPath, iidStr] = glMatch;
       const token = townConfig.git_auth.gitlab_token;
-      if (!token) return null;
+      if (!token) {
+        console.warn(`${TOWN_LOG} checkPRStatus: no gitlab_token configured, cannot poll ${prUrl}`);
+        return null;
+      }
+
+      // Validate the host against known GitLab hosts to prevent SSRF/token leak.
+      // Only send the PRIVATE-TOKEN to gitlab.com or the configured instance URL.
+      const prHost = new URL(instanceUrl).hostname;
+      const configuredHost = townConfig.git_auth.gitlab_instance_url
+        ? new URL(townConfig.git_auth.gitlab_instance_url).hostname
+        : null;
+      if (prHost !== 'gitlab.com' && prHost !== configuredHost) {
+        console.warn(
+          `${TOWN_LOG} checkPRStatus: refusing to send gitlab_token to unknown host: ${prHost}`
+        );
+        return null;
+      }
 
       const encodedPath = encodeURIComponent(projectPath);
       const response = await fetch(
@@ -1643,6 +1659,7 @@ export class TownDO extends DurableObject<Env> {
       return 'open';
     }
 
+    console.warn(`${TOWN_LOG} checkPRStatus: unrecognized PR URL format: ${prUrl}`);
     return null;
   }
 

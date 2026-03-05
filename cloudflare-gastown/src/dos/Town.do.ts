@@ -1605,7 +1605,12 @@ export class TownDO extends DurableObject<Env> {
           },
         }
       );
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.warn(
+          `${TOWN_LOG} checkPRStatus: GitHub API returned ${response.status} for ${prUrl}`
+        );
+        return null;
+      }
 
       const json = await response.json().catch(() => null);
       if (!json) return null;
@@ -1647,7 +1652,12 @@ export class TownDO extends DurableObject<Env> {
           headers: { 'PRIVATE-TOKEN': token },
         }
       );
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.warn(
+          `${TOWN_LOG} checkPRStatus: GitLab API returned ${response.status} for ${prUrl}`
+        );
+        return null;
+      }
 
       const glJson = await response.json().catch(() => null);
       if (!glJson) return null;

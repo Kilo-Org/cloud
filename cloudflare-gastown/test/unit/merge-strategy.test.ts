@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TownConfigSchema, MergeStrategy } from '../../src/types';
+import { TownConfigSchema, TownConfigUpdateSchema, MergeStrategy } from '../../src/types';
 import { resolveMergeStrategy } from '../../src/dos/town/config';
 import { parseGitUrl, buildPRBody, type QualityGateResult } from '../../src/util/platform-pr.util';
 
@@ -27,6 +27,24 @@ describe('merge strategy', () => {
     it('preserves merge_strategy through TownConfigSchema.partial()', () => {
       const partial = TownConfigSchema.partial().parse({ merge_strategy: 'pr' });
       expect(partial.merge_strategy).toBe('pr');
+    });
+  });
+
+  describe('TownConfigUpdateSchema', () => {
+    it('does not inject merge_strategy default on empty input', () => {
+      const update = TownConfigUpdateSchema.parse({});
+      expect(update.merge_strategy).toBeUndefined();
+    });
+
+    it('preserves merge_strategy when explicitly provided', () => {
+      const update = TownConfigUpdateSchema.parse({ merge_strategy: 'pr' });
+      expect(update.merge_strategy).toBe('pr');
+    });
+
+    it('does not inject any defaults on empty input', () => {
+      const update = TownConfigUpdateSchema.parse({});
+      // All fields should be undefined — no phantom defaults
+      expect(Object.values(update).every(v => v === undefined)).toBe(true);
     });
   });
 

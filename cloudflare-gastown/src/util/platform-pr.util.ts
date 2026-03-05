@@ -312,7 +312,23 @@ export async function createGitLabMR(params: {
   source_branch: string;
   target_branch: string;
   labels?: string[];
+  /** Optional: configured GitLab instance URL for host validation. */
+  configuredInstanceUrl?: string;
 }): Promise<{ mr_url: string; mr_iid: number }> {
+  // Validate the instance URL host to prevent SSRF/token exfiltration.
+  // Only send PRIVATE-TOKEN to gitlab.com or the configured instance URL.
+  const targetHost = hostnameOf(params.instanceUrl);
+  if (targetHost && targetHost !== 'gitlab.com') {
+    const configuredHost = params.configuredInstanceUrl
+      ? hostnameOf(params.configuredInstanceUrl)
+      : null;
+    if (targetHost !== configuredHost) {
+      throw new Error(
+        `GitLab MR creation refused: instance URL host "${targetHost}" does not match configured host "${configuredHost ?? '(none)'}"`
+      );
+    }
+  }
+
   const encodedPath = encodeURIComponent(params.projectPath);
   const baseUrl = params.instanceUrl.replace(/\/$/, '');
 

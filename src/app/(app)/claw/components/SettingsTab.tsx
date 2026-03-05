@@ -44,7 +44,7 @@ export const KILOCODE_CATALOG_IDS = new Set([
   'z-ai/glm-5:free',
   'minimax/minimax-m2.5:free',
   'anthropic/claude-sonnet-4.5',
-  'openai/gpt-5.2',
+  'openai/gpt-5.4',
   'google/gemini-3-pro-preview',
   'google/gemini-3-flash-preview',
   'x-ai/grok-code-fast-1',

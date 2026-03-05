@@ -135,7 +135,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
         organization: {
           ...organization,
           settings: {
-            model_allow_list: ['openai/gpt-5.2', 'openai/*'],
+            model_allow_list: ['openai/gpt-5.4', 'openai/*'],
           },
         },
       },
@@ -147,7 +147,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.defaultModel).toBe('openai/gpt-5.2');
+    expect(body.defaultModel).toBe('openai/gpt-5.4');
     expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
   });
 

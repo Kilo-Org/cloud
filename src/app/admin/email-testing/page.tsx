@@ -211,37 +211,37 @@ export default function EmailTestingPage() {
               {previewQuery.isPending && (
                 <p className="text-muted-foreground text-sm">Loading preview...</p>
               )}
-              {previewQuery.data && selectedProvider === 'customerio' && (
-                <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs">
-                    Template ID:{' '}
-                    <span className="font-mono">{previewQuery.data.transactional_message_id}</span>
-                  </p>
-                  <div className="rounded-lg border">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-muted-foreground px-4 py-2 text-left font-medium">
-                            Variable
-                          </th>
-                          <th className="text-muted-foreground px-4 py-2 text-left font-medium">
-                            Value
-                          </th>
+              {previewQuery.data?.type === 'customerio' && (
+                <div className="rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-muted-foreground px-4 py-2 text-left font-medium">
+                          Variable
+                        </th>
+                        <th className="text-muted-foreground px-4 py-2 text-left font-medium">
+                          Value
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(previewQuery.data.message_data).map(([key, value]) => (
+                        <tr key={key} className="border-b last:border-0">
+                          <td className="px-4 py-2 font-mono text-xs">{key}</td>
+                          <td className="px-4 py-2 font-mono text-xs break-all">{String(value)}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(previewQuery.data.message_data).map(([key, value]) => (
-                          <tr key={key} className="border-b last:border-0">
-                            <td className="px-4 py-2 font-mono text-xs">{key}</td>
-                            <td className="px-4 py-2 font-mono text-xs break-all">
-                              {String(value)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
+              )}
+              {previewQuery.data?.type === 'mailgun' && (
+                <iframe
+                  srcDoc={previewQuery.data.html}
+                  title="Email preview"
+                  className="h-[600px] w-full rounded-lg border bg-white"
+                  sandbox="allow-same-origin"
+                />
               )}
             </CardContent>
           </Card>

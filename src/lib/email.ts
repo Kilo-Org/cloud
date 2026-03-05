@@ -2,8 +2,34 @@ import type { Organization } from '@kilocode/db/schema';
 import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
 import { EMAIL_PROVIDER, NEXTAUTH_URL } from '@/lib/config.server';
 import { sendViaCustomerIo } from '@/lib/email-customerio';
-import type { SendEmailRequestOptions } from '@/lib/email-customerio';
-import { sendViaMailgun } from '@/lib/email-mailgun';
+import { sendViaMailgun, type EmailParams } from '@/lib/email-mailgun';
+import * as fs from 'fs';
+import * as path from 'path';
+
+function renderTemplate(name: string, vars: Record<string, string>): string {
+  const templatePath = path.join(process.cwd(), 'src', 'emails', `${name}.html`);
+  const html = fs.readFileSync(templatePath, 'utf-8');
+  return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
+    if (!(key in vars)) {
+      throw new Error(`Missing template variable '${key}' in email template '${name}'`);
+    }
+    return vars[key];
+  });
+}
+
+function buildCreditsSection(monthlyCreditsUsd: number): string {
+  if (monthlyCreditsUsd <= 0) return '';
+  return `<br />• <strong style="color: #d1d5db">$${monthlyCreditsUsd} USD in Kilo credits</strong>, which reset every 30 days`;
+}
+
+function send(params: EmailParams) {
+  if (EMAIL_PROVIDER === 'mailgun') {
+    return sendViaMailgun(params);
+  }
+  return sendViaCustomerIo(params);
+}
+
+const year = String(new Date().getFullYear());
 
 type OrganizationInviteEmailData = {
   to: string;
@@ -18,127 +44,63 @@ type Props = {
   organizationId: string;
 };
 
-function send(mailRequest: SendEmailRequestOptions) {
-  if (EMAIL_PROVIDER === 'mailgun') {
-    return sendViaMailgun(mailRequest);
-  }
-  return sendViaCustomerIo(mailRequest);
-}
-
-const templates = {
-  orgSubscription: '10',
-  orgRenewed: '11',
-  orgCancelled: '12',
-  orgSSOUserJoined: '13',
-  orgInvitation: '6',
-  magicLink: '14',
-  balanceAlert: '16',
-  autoTopUpFailed: '17',
-  ossInviteNewUser: '18',
-  ossInviteExistingUser: '19',
-  ossExistingOrgProvisioned: '20',
-  deployFailed: '21',
-} as const;
-
-type Template = (typeof templates)[keyof typeof templates];
-
-type SendOrgEmailProps = {
-  organizationId: Organization['id'];
-  seats?: number;
-};
-
-function sendOrgEmail(transactionalMessageId: Template, to: string, props: SendOrgEmailProps) {
-  const seats = props.seats ? `${props.seats} seat${props.seats === 1 ? '' : 's'}` : undefined;
+export async function sendOrgSubscriptionEmail(to: string, props: Props) {
+  const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
   const organization_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}`;
   const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
+  const html = renderTemplate('orgSubscription', { seats, organization_url, invoices_url, year });
+  return send({ to, subject: 'Welcome to Kilo for Teams!', html });
+}
 
-  const mailRequest: SendEmailRequestOptions = {
-    // this is the id of the email in customerio - do not change this
-    transactional_message_id: transactionalMessageId,
-    to,
-    message_data: {
-      ...props,
-      seats,
-      organization_url,
-      invoices_url,
-    },
-    identifiers: {
-      email: to,
-    },
-    reply_to: 'hi@kilocode.ai',
-  };
-  return send(mailRequest);
+export async function sendOrgRenewedEmail(to: string, props: Props) {
+  const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
+  const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
+  const html = renderTemplate('orgRenewed', { seats, invoices_url, year });
+  return send({ to, subject: 'Kilo: Your Teams Subscription Renewal', html });
+}
+
+export async function sendOrgCancelledEmail(to: string, props: Omit<Props, 'seatCount'>) {
+  const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
+  const html = renderTemplate('orgCancelled', { invoices_url, year });
+  return send({ to, subject: 'Kilo: Your Teams Subscription is Cancelled', html });
 }
 
 export async function sendOrgSSOUserJoinedEmail(
   to: string,
   props: Omit<Props, 'seatCount'> & { new_user_email: string }
 ) {
-  return sendOrgEmail(templates.orgSSOUserJoined, to, props);
-}
-
-export async function sendOrgCancelledEmail(to: string, props: Omit<Props, 'seatCount'>) {
-  return sendOrgEmail(templates.orgCancelled, to, props);
-}
-
-export async function sendOrgRenewedEmail(to: string, props: Props) {
-  return sendOrgEmail(templates.orgRenewed, to, props);
-}
-
-export async function sendOrgSubscriptionEmail(to: string, props: Props) {
-  return sendOrgEmail(templates.orgSubscription, to, props);
+  const organization_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}`;
+  const html = renderTemplate('orgSSOUserJoined', {
+    new_user_email: props.new_user_email,
+    organization_url,
+    year,
+  });
+  return send({ to, subject: 'Kilo: New SSO User Joined Your Organization', html });
 }
 
 export async function sendOrganizationInviteEmail(data: OrganizationInviteEmailData) {
-  const mailRequest: SendEmailRequestOptions = {
-    // this is the id of the email in customerio - do not change this
-    transactional_message_id: templates.orgInvitation,
-    message_data: {
-      organization_name: data.organizationName,
-      inviter_name: data.inviterName,
-      accept_invite_url: data.acceptInviteUrl,
-    },
-    identifiers: {
-      id: data.inviteCode,
-    },
-    reply_to: 'hi@kilocode.ai',
-    to: data.to,
-  };
-
-  return await send(mailRequest);
+  const html = renderTemplate('orgInvitation', {
+    organization_name: data.organizationName,
+    inviter_name: data.inviterName,
+    accept_invite_url: data.acceptInviteUrl,
+    year,
+  });
+  return send({ to: data.to, subject: 'Kilo: Teams Invitation', html });
 }
 
-/**
- * Send a magic link email to the user.
- *
- * @param magicLink - The magic link token with plaintext
- * @param callbackUrl - Optional callback URL to preserve redirect path
- * @returns Promise that resolves when email is sent
- */
 export async function sendMagicLinkEmail(
   magicLink: MagicLinkTokenWithPlaintext,
   callbackUrl?: string
 ) {
-  const expiresIn = '24 hours';
-
-  const mailRequest: SendEmailRequestOptions = {
-    transactional_message_id: templates.magicLink,
-    to: magicLink.email,
-    message_data: {
-      magic_link_url: getMagicLinkUrl(magicLink, callbackUrl),
-      email: magicLink.email,
-      expires_in: expiresIn,
-      expires_at: new Date(magicLink.expires_at).toISOString(),
-      app_url: NEXTAUTH_URL,
-    },
-    identifiers: {
-      email: magicLink.email,
-    },
-    reply_to: 'hi@kilocode.ai',
-  };
-
-  return send(mailRequest);
+  const html = renderTemplate('magicLink', {
+    magic_link_url: getMagicLinkUrl(magicLink, callbackUrl),
+    email: magicLink.email,
+    expires_in: '24 hours',
+    year,
+  });
+  return send({ to: magicLink.email, subject: 'Sign in to Kilo Code', html });
 }
+
 export async function sendAutoTopUpFailedEmail(
   to: string,
   props: { reason: string; organizationId?: string }
@@ -146,18 +108,8 @@ export async function sendAutoTopUpFailedEmail(
   const credits_url = props.organizationId
     ? `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`
     : `${NEXTAUTH_URL}/credits?show-auto-top-up`;
-  return send({
-    transactional_message_id: templates.autoTopUpFailed,
-    to,
-    message_data: {
-      reason: props.reason,
-      credits_url,
-    },
-    identifiers: {
-      email: to,
-    },
-    reply_to: 'hi@kilocode.ai',
-  });
+  const html = renderTemplate('autoTopUpFailed', { reason: props.reason, credits_url, year });
+  return send({ to, subject: 'Kilo: Auto Top-Up Failed', html });
 }
 
 type SendDeploymentFailedEmailProps = {
@@ -168,19 +120,13 @@ type SendDeploymentFailedEmailProps = {
 };
 
 export async function sendDeploymentFailedEmail(props: SendDeploymentFailedEmailProps) {
-  return send({
-    transactional_message_id: templates.deployFailed,
-    to: props.to,
-    message_data: {
-      deployment_name: props.deployment_name,
-      deployment_url: props.deployment_url,
-      repository: props.repository,
-    },
-    identifiers: {
-      email: props.to,
-    },
-    reply_to: 'hi@kilocode.ai',
+  const html = renderTemplate('deployFailed', {
+    deployment_name: props.deployment_name,
+    deployment_url: props.deployment_url,
+    repository: props.repository,
+    year,
   });
+  return send({ to: props.to, subject: 'Kilo: Your Deployment Failed', html });
 }
 
 type SendBalanceAlertEmailProps = {
@@ -189,13 +135,6 @@ type SendBalanceAlertEmailProps = {
   to: string[];
 };
 
-/**
- * Send a balance alert email to the configured recipients.
- * Batches emails in groups of 10 using Promise.all.
- *
- * @param props - The email properties including organizationId, minimum_balance, and recipient list
- * @returns Promise that resolves when all emails are sent
- */
 export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps) {
   const { organizationId, minimum_balance, to } = props;
 
@@ -207,25 +146,14 @@ export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps) {
   }
 
   const organization_url = `${NEXTAUTH_URL}/organizations/${organizationId}`;
-  const invoices_url = `${NEXTAUTH_URL}/organizations/${organizationId}/payment-details`;
+  const html = renderTemplate('balanceAlert', {
+    minimum_balance: String(minimum_balance),
+    organization_url,
+    year,
+  });
 
-  const sendToRecipient = async (email: string) => {
-    const mailRequest: SendEmailRequestOptions = {
-      transactional_message_id: templates.balanceAlert,
-      to: email,
-      message_data: {
-        organizationId,
-        minimum_balance,
-        organization_url,
-        invoices_url,
-      },
-      identifiers: {
-        email,
-      },
-      reply_to: 'hi@kilocode.ai',
-    };
-    return send(mailRequest);
-  };
+  const sendToRecipient = (email: string) =>
+    send({ to: email, subject: 'Kilo: Low Balance Alert', html });
 
   // Batch emails in groups of 10
   const BATCH_SIZE = 10;
@@ -253,64 +181,23 @@ type OssInviteEmailData = {
   monthlyCreditsUsd: number;
 };
 
-/**
- * Send an OSS invite email to a new user (doesn't have a Kilo account yet).
- * They need to click the accept button to sign up and join the org.
- *
- * Template 18 variables:
- * - organization_name: Name of the organization
- * - accept_invite_url: Link to accept the invitation
- * - integrations_url: Link to integrations page
- * - code_reviews_url: Link to code reviews page
- * - tier_name: "Premier", "Growth", or "Seed"
- * - seats: Number of enterprise seats (5, 15, or 25)
- * - seat_value: Dollar value of the seats ($9,000, $27,000, or $48,000)
- * - has_credits: Boolean - true if monthly credits > 0
- * - monthly_credits_usd: Dollar amount for monthly credit top-up (only relevant if has_credits)
- */
 export async function sendOssInviteNewUserEmail(data: OssInviteEmailData) {
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
   const tierConfig = ossTierConfig[data.tier];
-
-  const mailRequest: SendEmailRequestOptions = {
-    transactional_message_id: templates.ossInviteNewUser,
-    to: data.to,
-    message_data: {
-      organization_name: data.organizationName,
-      accept_invite_url: data.acceptInviteUrl,
-      integrations_url,
-      code_reviews_url,
-      tier_name: tierConfig.name,
-      seats: tierConfig.seats,
-      seat_value: tierConfig.seatValue.toLocaleString(),
-      has_credits: data.monthlyCreditsUsd > 0,
-      monthly_credits_usd: data.monthlyCreditsUsd,
-    },
-    identifiers: {
-      id: data.inviteCode,
-    },
-    reply_to: 'hi@kilocode.ai',
-  };
-
-  return send(mailRequest);
+  const html = renderTemplate('ossInviteNewUser', {
+    tier_name: tierConfig.name,
+    seats: String(tierConfig.seats),
+    seat_value: tierConfig.seatValue.toLocaleString(),
+    credits_section: buildCreditsSection(data.monthlyCreditsUsd),
+    accept_invite_url: data.acceptInviteUrl,
+    integrations_url,
+    code_reviews_url,
+    year,
+  });
+  return send({ to: data.to, subject: 'Kilo: OSS Sponsorship Offer', html });
 }
 
-/**
- * Send an OSS invite email to an existing Kilo user.
- * They've been directly added to the org, they just need to sign in.
- *
- * Template 19 variables:
- * - organization_name: Name of the organization
- * - organization_url: Link to the organization dashboard
- * - integrations_url: Link to integrations page
- * - code_reviews_url: Link to code reviews page
- * - tier_name: "Premier", "Growth", or "Seed"
- * - seats: Number of enterprise seats (5, 15, or 25)
- * - seat_value: Dollar value of the seats ($9,000, $27,000, or $48,000)
- * - has_credits: Boolean - true if monthly credits > 0
- * - monthly_credits_usd: Dollar amount for monthly credit top-up (only relevant if has_credits)
- */
 export async function sendOssInviteExistingUserEmail(
   data: Omit<OssInviteEmailData, 'acceptInviteUrl' | 'inviteCode'>
 ) {
@@ -318,28 +205,17 @@ export async function sendOssInviteExistingUserEmail(
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
   const tierConfig = ossTierConfig[data.tier];
-
-  const mailRequest: SendEmailRequestOptions = {
-    transactional_message_id: templates.ossInviteExistingUser,
-    to: data.to,
-    message_data: {
-      organization_name: data.organizationName,
-      organization_url,
-      integrations_url,
-      code_reviews_url,
-      tier_name: tierConfig.name,
-      seats: tierConfig.seats,
-      seat_value: tierConfig.seatValue.toLocaleString(),
-      has_credits: data.monthlyCreditsUsd > 0,
-      monthly_credits_usd: data.monthlyCreditsUsd,
-    },
-    identifiers: {
-      email: data.to,
-    },
-    reply_to: 'hi@kilocode.ai',
-  };
-
-  return send(mailRequest);
+  const html = renderTemplate('ossInviteExistingUser', {
+    tier_name: tierConfig.name,
+    seats: String(tierConfig.seats),
+    seat_value: tierConfig.seatValue.toLocaleString(),
+    credits_section: buildCreditsSection(data.monthlyCreditsUsd),
+    organization_url,
+    integrations_url,
+    code_reviews_url,
+    year,
+  });
+  return send({ to: data.to, subject: 'Kilo: OSS Sponsorship Offer', html });
 }
 
 type OssProvisionEmailData = {
@@ -350,50 +226,26 @@ type OssProvisionEmailData = {
   monthlyCreditsUsd: number;
 };
 
-/**
- * Send an OSS provisioning notification email to owners of an existing organization.
- * Used when an admin enables OSS sponsorship on an existing org from the admin panel.
- *
- * Template 20 variables (same as template 19):
- * - organization_name: Name of the organization
- * - organization_url: Link to the organization dashboard
- * - integrations_url: Link to integrations page
- * - code_reviews_url: Link to code reviews page
- * - tier_name: "Premier", "Growth", or "Seed"
- * - seats: Number of enterprise seats (5, 15, or 25)
- * - seat_value: Dollar value of the seats ($9,000, $27,000, or $48,000)
- * - has_credits: Boolean - true if monthly credits > 0
- * - monthly_credits_usd: Dollar amount for monthly credit top-up (only relevant if has_credits)
- */
 export async function sendOssExistingOrgProvisionedEmail(data: OssProvisionEmailData) {
   const organization_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}`;
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
   const tierConfig = ossTierConfig[data.tier];
+  const html = renderTemplate('ossExistingOrgProvisioned', {
+    tier_name: tierConfig.name,
+    seats: String(tierConfig.seats),
+    seat_value: tierConfig.seatValue.toLocaleString(),
+    credits_section: buildCreditsSection(data.monthlyCreditsUsd),
+    organization_url,
+    integrations_url,
+    code_reviews_url,
+    year,
+  });
 
-  const sendToRecipient = async (email: string) => {
-    const mailRequest: SendEmailRequestOptions = {
-      transactional_message_id: templates.ossExistingOrgProvisioned,
-      to: email,
-      message_data: {
-        organization_name: data.organizationName,
-        organization_url,
-        integrations_url,
-        code_reviews_url,
-        tier_name: tierConfig.name,
-        seats: tierConfig.seats,
-        seat_value: tierConfig.seatValue.toLocaleString(),
-        has_credits: data.monthlyCreditsUsd > 0,
-        monthly_credits_usd: data.monthlyCreditsUsd,
-      },
-      identifiers: {
-        email,
-      },
-      reply_to: 'hi@kilocode.ai',
-    };
-    return send(mailRequest);
-  };
-
-  // Send to all recipients
-  await Promise.all(data.to.map(sendToRecipient));
+  await Promise.all(
+    data.to.map(email => send({ to: email, subject: 'Kilo: OSS Sponsorship Offer', html }))
+  );
 }
+
+// Exported for use in the admin email testing page
+export { renderTemplate, buildCreditsSection };

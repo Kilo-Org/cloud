@@ -300,6 +300,9 @@ importers:
       eventsource-parser:
         specifier: ^3.0.6
         version: 3.0.6
+      form-data:
+        specifier: ^4.0.5
+        version: 4.0.5
       jotai:
         specifier: ^2.15.1
         version: 2.15.1(@babel/core@7.28.5)(@babel/template@7.27.2)(@types/react@19.2.2)(react@19.2.0)
@@ -318,6 +321,9 @@ importers:
       lucide-react:
         specifier: ^0.552.0
         version: 0.552.0(react@19.2.0)
+      mailgun.js:
+        specifier: ^12.7.0
+        version: 12.7.0
       monaco-editor:
         specifier: ^0.55.1
         version: 0.55.1
@@ -6635,6 +6641,9 @@ packages:
       bare-abort-controller:
         optional: true
 
+  base-64@1.0.0:
+    resolution: {integrity: sha512-kwDPIFCGx0NZHog36dj+tHiwP4QMzsZ3AgMViUBKI0+V5n4U0ufTCUMhnQ04diaRI8EX/QcPfql7zlhZ7j4zgg==}
+
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
@@ -9255,6 +9264,10 @@ packages:
   magicast@0.5.2:
     resolution: {integrity: sha512-E3ZJh4J3S9KfwdjZhe2afj6R9lGIN5Pher1pF39UGrXRqq/VDaGVIGN13BjHd2u8B61hArAGOnso7nBOouW3TQ==}
 
+  mailgun.js@12.7.0:
+    resolution: {integrity: sha512-TKuGxSGMdGKQDR+Ciocs0zzKNsy+ip+BwLEVatVLlJls30OigFcK61LiBBWoPrVg5D5nmKN/nDR9yKLJCERCsA==}
+    engines: {node: '>=18.0.0'}
+
   make-dir@3.1.0:
     resolution: {integrity: sha512-g3FeP20LNwhALb/6Cz6Dd4F2ngze0jz7tbzrD2wAV+o9FeNHe4rL+yK2md0J/fiSf1sa1ADhXqi5+oVwOM/eGw==}
     engines: {node: '>=8'}
@@ -11405,6 +11418,9 @@ packages:
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
+
+  url-join@4.0.1:
+    resolution: {integrity: sha512-jk1+QP6ZJqyOiuEI9AEWQfju/nB2Pw466kbA0LEZljHwKeMgd9WrAEgEGxjPDD2+TNbbb37rTyhEfrCXfuKXnA==}
 
   url@0.11.4:
     resolution: {integrity: sha512-oCwdVC7mTuWiPyjLUz/COz5TLk6wgp0RCsN+wHZ2Ekneac9w8uuV0njcbbie2ME+Vs+d6duwmYuR3HgQXs1fOg==}
@@ -18182,6 +18198,8 @@ snapshots:
 
   bare-events@2.8.2: {}
 
+  base-64@1.0.0: {}
+
   base64-js@1.5.1: {}
 
   baseline-browser-mapping@2.10.0: {}
@@ -21372,6 +21390,14 @@ snapshots:
       '@babel/types': 7.29.0
       source-map-js: 1.2.1
 
+  mailgun.js@12.7.0:
+    dependencies:
+      axios: 1.13.5
+      base-64: 1.0.0
+      url-join: 4.0.1
+    transitivePeerDependencies:
+      - debug
+
   make-dir@3.1.0:
     dependencies:
       semver: 6.3.1
@@ -23973,6 +23999,8 @@ snapshots:
   uri-js@4.4.1:
     dependencies:
       punycode: 2.3.1
+
+  url-join@4.0.1: {}
 
   url@0.11.4:
     dependencies:

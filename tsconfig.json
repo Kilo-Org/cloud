@@ -2,24 +2,34 @@
   "compilerOptions": {
     "target": "es2017",
     "module": "commonjs",
-    "lib": ["dom", "dom.iterable", "esnext", "esnext.asynciterable"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext",
+      "esnext.asynciterable"
+    ],
     "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "@kilocode/db": ["./packages/db/src/index.ts"],
-      "@kilocode/db/*": ["./packages/db/src/*"],
-      "@kilocode/encryption": ["./packages/encryption/src/index.ts"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@kilocode/db": [
+        "./packages/db/src/index.ts"
+      ],
+      "@kilocode/db/*": [
+        "./packages/db/src/*"
+      ]
     },
     "allowJs": true,
     "noEmit": true,
     "incremental": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx",
+    "jsx": "preserve",
     "plugins": [
       {
         "name": "next"
@@ -43,8 +53,11 @@
     "instrumentation-client.ts",
     "sentry.edge.config.ts",
     "sentry.server.config.ts",
-    ".next/dev/types/**/*.ts",
-    "dev/discord-gateway-cron.ts"
+    ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", ".next", "cloud-agent"]
+  "exclude": [
+    "node_modules",
+    ".next",
+    "cloud-agent"
+  ]
 }

@@ -1,8 +1,9 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendViaCustomerIo } from '@/lib/email-customerio';
+import { sendViaMailgun } from '@/lib/email-mailgun';
+import { renderTemplate, buildCreditsSection } from '@/lib/email';
 import * as z from 'zod';
-import { TRPCError } from '@trpc/server';
 
 const templateNames = [
   'orgSubscription',
@@ -23,27 +24,11 @@ type TemplateName = (typeof templateNames)[number];
 
 const TemplateNameSchema = z.enum(templateNames);
 
-const providerNames = ['customerio'] as const;
+const providerNames = ['customerio', 'mailgun'] as const;
 
 type ProviderName = (typeof providerNames)[number];
 
 const ProviderNameSchema = z.enum(providerNames);
-
-// Customer.io template IDs (same as in email.ts)
-const templates: Record<TemplateName, string> = {
-  orgSubscription: '10',
-  orgRenewed: '11',
-  orgCancelled: '12',
-  orgSSOUserJoined: '13',
-  orgInvitation: '6',
-  magicLink: '14',
-  balanceAlert: '16',
-  autoTopUpFailed: '17',
-  ossInviteNewUser: '18',
-  ossInviteExistingUser: '19',
-  ossExistingOrgProvisioned: '20',
-  deployFailed: '21',
-};
 
 const subjects: Record<TemplateName, string> = {
   orgSubscription: 'Welcome to Kilo for Teams!',
@@ -60,7 +45,9 @@ const subjects: Record<TemplateName, string> = {
   deployFailed: 'Kilo: Your Deployment Failed',
 };
 
-function fixtureMessageData(template: TemplateName): Record<string, unknown> {
+const year = String(new Date().getFullYear());
+
+function fixtureTemplateVars(template: TemplateName): Record<string, string> {
   const orgId = 'fixture-org-id';
   const organization_url = `${NEXTAUTH_URL}/organizations/${orgId}`;
   const invoices_url = `${NEXTAUTH_URL}/organizations/${orgId}/payment-details`;
@@ -69,81 +56,74 @@ function fixtureMessageData(template: TemplateName): Record<string, unknown> {
 
   switch (template) {
     case 'orgSubscription':
-      return {
-        seats: '5 seats',
-        organization_url,
-        invoices_url,
-        seatCount: 5,
-        organizationId: orgId,
-      };
+      return { seats: '5 seats', organization_url, invoices_url, year };
     case 'orgRenewed':
-      return { seats: '5 seats', invoices_url, seatCount: 5, organizationId: orgId };
+      return { seats: '5 seats', invoices_url, year };
     case 'orgCancelled':
-      return { invoices_url, organizationId: orgId };
+      return { invoices_url, year };
     case 'orgSSOUserJoined':
-      return { new_user_email: 'newuser@example.com', organization_url, organizationId: orgId };
+      return { new_user_email: 'newuser@example.com', organization_url, year };
     case 'orgInvitation':
       return {
         organization_name: 'Acme Corp',
         inviter_name: 'Alice Smith',
         accept_invite_url: `${NEXTAUTH_URL}/invite/fixture-code`,
+        year,
       };
     case 'magicLink':
       return {
         magic_link_url: `${NEXTAUTH_URL}/auth/magic?token=fixture-token`,
         email: 'user@example.com',
         expires_in: '24 hours',
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        app_url: NEXTAUTH_URL,
+        year,
       };
     case 'balanceAlert':
-      return { organizationId: orgId, minimum_balance: 10, organization_url, invoices_url };
+      return { minimum_balance: '10', organization_url, year };
     case 'autoTopUpFailed':
       return {
         reason: 'Card declined',
         credits_url: `${NEXTAUTH_URL}/credits?show-auto-top-up`,
+        year,
       };
     case 'ossInviteNewUser':
       return {
-        organization_name: 'Acme OSS',
+        tier_name: 'Premier',
+        seats: '25',
+        seat_value: '48,000',
+        credits_section: buildCreditsSection(500),
         accept_invite_url: `${NEXTAUTH_URL}/invite/fixture-oss-code`,
         integrations_url,
         code_reviews_url,
-        tier_name: 'Premier',
-        seats: 25,
-        seat_value: '48,000',
-        has_credits: true,
-        monthly_credits_usd: 500,
+        year,
       };
     case 'ossInviteExistingUser':
       return {
-        organization_name: 'Acme OSS',
+        tier_name: 'Premier',
+        seats: '25',
+        seat_value: '48,000',
+        credits_section: buildCreditsSection(500),
         organization_url,
         integrations_url,
         code_reviews_url,
-        tier_name: 'Premier',
-        seats: 25,
-        seat_value: '48,000',
-        has_credits: true,
-        monthly_credits_usd: 500,
+        year,
       };
     case 'ossExistingOrgProvisioned':
       return {
-        organization_name: 'Acme OSS',
+        tier_name: 'Premier',
+        seats: '25',
+        seat_value: '48,000',
+        credits_section: buildCreditsSection(500),
         organization_url,
         integrations_url,
         code_reviews_url,
-        tier_name: 'Premier',
-        seats: 25,
-        seat_value: '48,000',
-        has_credits: true,
-        monthly_credits_usd: 500,
+        year,
       };
     case 'deployFailed':
       return {
         deployment_name: 'my-app',
         deployment_url: `${NEXTAUTH_URL}/deployments/fixture-id`,
         repository: 'acme/my-app',
+        year,
       };
   }
 }
@@ -160,13 +140,16 @@ export const emailTestingRouter = createTRPCRouter({
   getPreview: adminProcedure
     .input(z.object({ template: TemplateNameSchema, provider: ProviderNameSchema }))
     .query(({ input }) => {
-      const messageData = fixtureMessageData(input.template);
-      return {
-        type: 'customerio' as const,
-        transactional_message_id: templates[input.template],
-        subject: subjects[input.template],
-        message_data: messageData,
-      };
+      const vars = fixtureTemplateVars(input.template);
+      const subject = subjects[input.template];
+
+      if (input.provider === 'mailgun') {
+        const html = renderTemplate(input.template, vars);
+        return { type: 'mailgun' as const, subject, html };
+      }
+
+      // customerio: show the template variables as key/value pairs
+      return { type: 'customerio' as const, subject, message_data: vars };
     }),
 
   sendTest: adminProcedure
@@ -178,23 +161,16 @@ export const emailTestingRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const messageData = fixtureMessageData(input.template);
-      const templateId = templates[input.template];
+      const vars = fixtureTemplateVars(input.template);
+      const subject = subjects[input.template];
+      const html = renderTemplate(input.template, vars);
 
-      if (input.provider === 'customerio') {
-        await sendViaCustomerIo({
-          transactional_message_id: templateId,
-          to: input.recipient,
-          message_data: messageData,
-          identifiers: { email: input.recipient },
-          reply_to: 'hi@kilocode.ai',
-        });
-        return { success: true, provider: input.provider, recipient: input.recipient };
+      if (input.provider === 'mailgun') {
+        await sendViaMailgun({ to: input.recipient, subject, html });
+      } else {
+        await sendViaCustomerIo({ to: input.recipient, subject, html });
       }
 
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: `Provider '${input.provider}' is not yet implemented`,
-      });
+      return { success: true, provider: input.provider, recipient: input.recipient };
     }),
 });

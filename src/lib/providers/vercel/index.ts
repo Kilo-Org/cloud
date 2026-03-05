@@ -81,7 +81,7 @@ export async function shouldRouteToVercel(
   }
 
   if (isOpenAiModel(requestedModel)) {
-    // 2026-03-03 Vercel returns this error: The model `gpt-5.3-codex-api-preview` does not exist or you do not have access to it.
+    // 2026-03-03 Vercel returns this error: The model `gpt-5.4` does not exist or you do not have access to it.
     console.debug(`[shouldRouteToVercel] OpenAI models are not routed to Vercel`);
     return false;
   }

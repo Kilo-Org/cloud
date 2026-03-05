@@ -192,7 +192,7 @@ export function createKiloClient(baseUrl: string): KiloClient {
 
     answerPermission: async (permissionId: string, response: PermissionResponse) => {
       // Permission replies go to POST /permission/:permissionId/reply
-      await requestNoContent('POST', `/permission/${permissionId}/reply`, { response });
+      await requestNoContent('POST', `/permission/${permissionId}/reply`, { reply: response });
       return true;
     },
 

@@ -350,6 +350,36 @@ export async function writeAuthFile(
   logger.info('Wrote kilo auth file for session ingest');
 }
 
+// Write global rules file so the CLI injects cloud-agent-specific instructions.
+// The CLI's RulesMigrator discovers ~/.kilocode/rules/*.md and appends them
+// to the system prompt automatically.
+export async function writeGlobalRules(
+  sandbox: SandboxInstance,
+  sessionHome: string,
+  sessionId: string
+): Promise<void> {
+  const rulesDir = `${sessionHome}/.kilocode/rules`;
+  const rulesPath = `${rulesDir}/cloud-agent.md`;
+
+  await sandbox.exec(`mkdir -p ${rulesDir}`);
+
+  const content = [
+    '# Cloud Agent Environment',
+    '',
+    "You are running inside a sandboxed cloud container, not on the user's local machine.",
+    'The filesystem is ephemeral and will not persist after the session ends.',
+    "Do not assume access to the user's local files, browsers, or desktop environment.",
+    '',
+    '## Temporary Files',
+    '',
+    `When you need to create temporary or scratch files, use \`/tmp/${sessionId}/\` as your scratch directory.`,
+    'This path is pre-approved for file access and will not trigger permission prompts.',
+    '',
+  ].join('\n');
+
+  await sandbox.writeFile(rulesPath, content);
+}
+
 /**
  * Fetch session metadata from Durable Object using RPC with retry logic.
  * Creates a fresh stub for each retry attempt as recommended by Cloudflare.
@@ -558,7 +588,7 @@ export class SessionService {
 
     const permission: Record<string, unknown> = {
       external_directory: {
-        [`/tmp/attachments/${sessionId}/**`]: 'allow',
+        [`/tmp/${sessionId}/**`]: 'allow',
         [`${workspacePath}/**`]: 'allow',
       },
       ...(!isInteractive && { question: 'deny' }),
@@ -876,6 +906,7 @@ export class SessionService {
 
     // Write auth file for session ingest
     await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
+    await writeGlobalRules(sandbox, context.sessionHome, context.sessionId);
 
     // Save metadata to Durable Object
     const existingMetadata = await this.loadSessionMetadata(env, context);
@@ -1126,6 +1157,7 @@ export class SessionService {
 
     // Write auth file for session ingest
     await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
+    await writeGlobalRules(sandbox, context.sessionHome, sessionId);
 
     // Fetch metadata from DO if not provided, to ensure we preserve existing fields
     const metadataToPreserve =
@@ -1331,6 +1363,7 @@ export class SessionService {
 
     // Write auth file BEFORE kilo import so KiloSessions.bootstrap() can authenticate
     await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
+    await writeGlobalRules(sandbox, context.sessionHome, sessionId);
 
     await this.restoreSessionSnapshot(session, sessionId, metadata.kiloSessionId, env, userId);
 

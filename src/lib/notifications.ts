@@ -1,4 +1,4 @@
-import { type User } from '@kilocode/db/schema';
+import { type User, free_model_usage } from '@kilocode/db/schema';
 import { getBalanceForUser } from './user.balance';
 import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@/lib/constants';
 import {
@@ -10,11 +10,13 @@ import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactio
 import { cachedPosthogQuery } from '@/lib/posthog-query';
 import * as z from 'zod';
 import { subDays } from 'date-fns';
+import { and, eq } from 'drizzle-orm';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { db } from '@/lib/drizzle';
+import { db, readDb } from '@/lib/drizzle';
 import { fromMicrodollars } from '@/lib/utils';
+import { kimi_k25_free_model } from '@/lib/providers/moonshotai';
 
 export type KiloNotification = {
   id: string;
@@ -71,6 +73,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateByokProvidersNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
+    generateKimiK25FreeEndingNotification,
   ];
 
   const resolvedConditionalNotifications = (
@@ -279,6 +282,36 @@ async function generateKiloPassNotification(user: User): Promise<KiloNotificatio
         actionURL: 'https://blog.kilo.ai/p/introducing-kilo-pass',
       },
       showIn: ['cli', 'extension'],
+    },
+  ];
+}
+
+async function generateKimiK25FreeEndingNotification(user: User): Promise<KiloNotification[]> {
+  // Check if user has ever used the free Kimi K2.5 model
+  const usage = await readDb
+    .select({ id: free_model_usage.id })
+    .from(free_model_usage)
+    .where(
+      and(
+        eq(free_model_usage.kilo_user_id, user.id),
+        eq(free_model_usage.model, kimi_k25_free_model.public_id)
+      )
+    )
+    .limit(1);
+
+  if (usage.length === 0) return [];
+
+  return [
+    {
+      id: 'kimi-k25-free-ending-mar-26',
+      title: 'Kimi K2.5 Free Promotion Ending Soon',
+      message:
+        'We hope you enjoyed free use of Kimi K2.5! The promotion will be ending soon. You can switch to another free model or keep using Kimi with credits.',
+      action: {
+        actionText: 'Get Credits',
+        actionURL: `${APP_URL}/credits`,
+      },
+      showIn: ['extension', 'cli'],
     },
   ];
 }

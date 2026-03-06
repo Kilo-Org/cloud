@@ -134,6 +134,8 @@ export type ReviewQueueInput = {
   branch: string;
   pr_url?: string;
   summary?: string;
+  /** The rig's default branch. Used as target when not overridden by convoy feature branch. */
+  default_branch?: string;
 };
 
 // -- Molecules (now beads with type='molecule' + child step beads) --

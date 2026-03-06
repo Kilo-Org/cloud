@@ -245,16 +245,42 @@ function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp: string
   for (const row of convoyRows) {
     const convoyId = z.object({ depends_on_bead_id: z.string() }).parse(row).depends_on_bead_id;
 
-    // Count closed tracked beads (both 'closed' and 'failed' count as done)
+    // Skip if this isn't actually a convoy (e.g. MR bead 'tracks' its source bead,
+    // which may not be a convoy). No convoy_metadata row → not a convoy.
+    const metaCheck = [
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT 1 FROM ${convoy_metadata}
+          WHERE ${convoy_metadata.bead_id} = ?
+        `,
+        [convoyId]
+      ),
+    ];
+    if (metaCheck.length === 0) continue;
+
+    // Count tracked beads that are fully done: closed/failed AND have no
+    // pending merge_request child beads. This prevents marking a convoy as
+    // ready_to_land while reviews are still in flight.
     const countRows = [
       ...query(
         sql,
         /* sql */ `
-          SELECT COUNT(1) AS count FROM ${bead_dependencies}
-          INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
-          WHERE ${bead_dependencies.depends_on_bead_id} = ?
-            AND ${bead_dependencies.dependency_type} = 'tracks'
-            AND ${beads.status} IN ('closed', 'failed')
+          SELECT COUNT(1) AS count FROM ${bead_dependencies} AS tracked
+          INNER JOIN ${beads} AS tracked_bead
+            ON tracked.${bead_dependencies.columns.bead_id} = tracked_bead.${beads.columns.bead_id}
+          WHERE tracked.${bead_dependencies.columns.depends_on_bead_id} = ?
+            AND tracked.${bead_dependencies.columns.dependency_type} = 'tracks'
+            AND tracked_bead.${beads.columns.status} IN ('closed', 'failed')
+            AND NOT EXISTS (
+              SELECT 1 FROM ${bead_dependencies} AS mr_dep
+              INNER JOIN ${beads} AS mr_bead
+                ON mr_dep.${bead_dependencies.columns.bead_id} = mr_bead.${beads.columns.bead_id}
+              WHERE mr_dep.${bead_dependencies.columns.depends_on_bead_id} = tracked_bead.${beads.columns.bead_id}
+                AND mr_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+                AND mr_bead.${beads.columns.type} = 'merge_request'
+                AND mr_bead.${beads.columns.status} IN ('open', 'in_progress')
+            )
         `,
         [convoyId]
       ),
@@ -286,12 +312,14 @@ function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp: string
     const totalBeads = z.object({ total_beads: z.number() }).parse(metaRows[0]).total_beads;
 
     if (closedCount >= totalBeads && totalBeads > 0) {
-      // Check if this convoy has a feature branch. If so, don't auto-close
-      // the convoy bead yet — it needs a final merge of the feature branch
-      // into main. The alarm's processReviewQueue will handle this.
+      // For review-then-land convoys with a feature branch, don't auto-close
+      // the convoy yet — it needs a final merge of the feature branch into
+      // main. For review-and-merge convoys (where each bead already landed
+      // independently), auto-close immediately.
       const featureBranch = getConvoyFeatureBranch(sql, convoyId);
+      const mergeMode = getConvoyMergeMode(sql, convoyId);
 
-      if (featureBranch) {
+      if (featureBranch && mergeMode === 'review-then-land') {
         // Mark the convoy as ready to land by storing a flag in metadata.
         // The alarm loop's processReviewQueue will detect this and create
         // the final landing MR (feature branch → main).

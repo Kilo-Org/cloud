@@ -1076,7 +1076,44 @@ export class TownDO extends DurableObject<Env> {
       .slice(0, 40);
     const featureBranch = `convoy/${convoySlug}/${convoyId.slice(0, 8)}/head`;
 
-    // 1. Create convoy bead + convoy_metadata
+    // 1. Validate the dependency graph has no cycles BEFORE persisting anything.
+    // Kahn's algorithm: if we can't visit all nodes, there's a cycle.
+    {
+      const adj = new Map<number, number[]>();
+      const inDegree = new Map<number, number>();
+      for (let i = 0; i < input.tasks.length; i++) {
+        adj.set(i, []);
+        inDegree.set(i, 0);
+      }
+      for (let i = 0; i < input.tasks.length; i++) {
+        for (const depIdx of input.tasks[i].depends_on ?? []) {
+          if (depIdx < 0 || depIdx >= input.tasks.length || depIdx === i) continue;
+          adj.get(depIdx)!.push(i);
+          inDegree.set(i, (inDegree.get(i) ?? 0) + 1);
+        }
+      }
+      const queue: number[] = [];
+      for (const [node, deg] of inDegree) {
+        if (deg === 0) queue.push(node);
+      }
+      let visited = 0;
+      while (queue.length > 0) {
+        const node = queue.shift()!;
+        visited++;
+        for (const neighbor of adj.get(node) ?? []) {
+          const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
+          inDegree.set(neighbor, newDeg);
+          if (newDeg === 0) queue.push(neighbor);
+        }
+      }
+      if (visited < input.tasks.length) {
+        throw new Error(
+          `Convoy dependency graph contains a cycle — ${input.tasks.length - visited} tasks are involved in circular dependencies`
+        );
+      }
+    }
+
+    // 2. Create convoy bead + convoy_metadata
     query(
       this.sql,
       /* sql */ `
@@ -1149,42 +1186,6 @@ export class TownDO extends DurableObject<Env> {
         `,
         [createdBead.bead_id, convoyId, 'tracks']
       );
-    }
-
-    // 3. Validate the dependency graph has no cycles (Kahn's algorithm)
-    {
-      const adj = new Map<number, number[]>();
-      const inDegree = new Map<number, number>();
-      for (let i = 0; i < input.tasks.length; i++) {
-        adj.set(i, []);
-        inDegree.set(i, 0);
-      }
-      for (let i = 0; i < input.tasks.length; i++) {
-        for (const depIdx of input.tasks[i].depends_on ?? []) {
-          if (depIdx < 0 || depIdx >= input.tasks.length || depIdx === i) continue;
-          adj.get(depIdx)!.push(i);
-          inDegree.set(i, (inDegree.get(i) ?? 0) + 1);
-        }
-      }
-      const queue: number[] = [];
-      for (const [node, deg] of inDegree) {
-        if (deg === 0) queue.push(node);
-      }
-      let visited = 0;
-      while (queue.length > 0) {
-        const node = queue.shift()!;
-        visited++;
-        for (const neighbor of adj.get(node) ?? []) {
-          const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
-          inDegree.set(neighbor, newDeg);
-          if (newDeg === 0) queue.push(neighbor);
-        }
-      }
-      if (visited < input.tasks.length) {
-        throw new Error(
-          `Convoy dependency graph contains a cycle — ${input.tasks.length - visited} tasks are involved in circular dependencies`
-        );
-      }
     }
 
     // 4. Create 'blocks' dependencies from depends_on indices

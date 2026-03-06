@@ -21,8 +21,10 @@ import {
   createBead,
   getConvoyForBead,
   getConvoyFeatureBranch,
+  getConvoyMergeMode,
 } from './beads';
 import { getAgent, unhookBead } from './agents';
+import { getRig } from './rigs';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
 
 // Review entries stuck in 'running' past this timeout are reset to 'pending'
@@ -95,11 +97,18 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
     metadata.pr_url = input.pr_url;
   }
 
-  // For convoy beads, the MR targets the convoy's feature branch, not main.
-  // This keeps all convoy work on the feature branch until the convoy lands.
+  // Resolve the target branch for this MR:
+  // - For review-then-land convoy beads → convoy's feature branch
+  // - For review-and-merge convoy beads → rig's default branch (land independently)
+  // - For standalone beads → rig's default branch
+  // We pass defaultBranch from the caller so we don't hardcode 'main'.
   const convoyId = getConvoyForBead(sql, input.bead_id);
   const convoyFeatureBranch = convoyId ? getConvoyFeatureBranch(sql, convoyId) : null;
-  const targetBranch = convoyFeatureBranch ?? 'main';
+  const convoyMergeMode = convoyId ? getConvoyMergeMode(sql, convoyId) : null;
+  const targetBranch =
+    convoyMergeMode === 'review-then-land' && convoyFeatureBranch
+      ? convoyFeatureBranch
+      : (input.default_branch ?? 'main');
 
   if (convoyId) {
     metadata.convoy_id = convoyId;
@@ -516,13 +525,19 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     );
   }
 
+  // Resolve the rig's default branch so submitToReviewQueue can use it
+  // instead of hardcoding 'main' for standalone/review-and-merge beads.
+  const rigId = agent.rig_id ?? '';
+  const rig = rigId ? getRig(sql, rigId) : null;
+
   submitToReviewQueue(sql, {
     agent_id: agentId,
     bead_id: sourceBead,
-    rig_id: agent.rig_id ?? '',
+    rig_id: rigId,
     branch: input.branch,
     pr_url: input.pr_url,
     summary: input.summary,
+    default_branch: rig?.default_branch,
   });
 
   // Close the source bead (matches upstream gt done behavior). The polecat's

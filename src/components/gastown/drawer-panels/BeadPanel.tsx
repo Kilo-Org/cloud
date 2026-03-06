@@ -321,6 +321,7 @@ type BeadLike = {
   status: string;
   title: string;
   parent_bead_id: string | null;
+  rig_id?: string | null;
   metadata: Record<string, unknown>;
 };
 
@@ -335,7 +336,7 @@ type ConvoyLike = {
   id: string;
   title: string;
   feature_branch?: string | null;
-  beads: Array<{ bead_id: string; title: string; status: string }>;
+  beads: Array<{ bead_id: string; title: string; status: string; rig_id: string | null }>;
   dependency_edges?: Array<{ bead_id: string; depends_on_bead_id: string }>;
 };
 
@@ -385,6 +386,7 @@ function buildRelatedBeads(
             status: convoyBead.status,
             title: convoyBead.title,
             parent_bead_id: null,
+            rig_id: convoyBead.rig_id,
             metadata: {},
           },
         });
@@ -416,6 +418,7 @@ function buildRelatedBeads(
             status: convoyBead.status,
             title: convoyBead.title,
             parent_bead_id: null,
+            rig_id: convoyBead.rig_id,
             metadata: {},
           },
         });

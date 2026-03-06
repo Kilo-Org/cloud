@@ -99,16 +99,18 @@ async function verifyRigOwnership(env: Env, userId: string, rigId: string) {
 
 async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper: string | null }) {
   if (!env.NEXTAUTH_SECRET) {
+    console.error('[mintKilocodeToken] NEXTAUTH_SECRET not configured');
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'NEXTAUTH_SECRET not configured',
+      message: 'Internal server error',
     });
   }
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
   if (!secret) {
+    console.error('[mintKilocodeToken] failed to resolve NEXTAUTH_SECRET from Secrets Store');
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to resolve NEXTAUTH_SECRET from Secrets Store',
+      message: 'Internal server error',
     });
   }
   return generateKiloApiToken(user, secret);

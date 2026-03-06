@@ -527,7 +527,21 @@ export class TownDO extends DurableObject<Env> {
     commit_sha?: string;
   }): Promise<void> {
     await this.ensureInitialized();
+
+    // Resolve the source bead ID before completing the review, so we can
+    // trigger dispatchUnblockedBeads for it after the MR closes.
+    const mrBead = beadOps.getBead(this.sql, input.entry_id);
+    const sourceBeadId =
+      typeof mrBead?.metadata?.source_bead_id === 'string' ? mrBead.metadata.source_bead_id : null;
+
     reviewQueue.completeReviewWithResult(this.sql, input);
+
+    // When a review is merged, the source bead's pending MR is now resolved.
+    // Downstream beads that were blocked (because hasUnresolvedBlockers saw
+    // the open MR) should now be dispatched.
+    if (input.status === 'merged' && sourceBeadId) {
+      this.dispatchUnblockedBeads(sourceBeadId);
+    }
   }
 
   async agentDone(agentId: string, input: AgentDoneInput): Promise<void> {
@@ -1515,6 +1529,19 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
+    // Process reviews FIRST so the refinery gets assigned before the
+    // scheduler dispatches new polecats. This prevents downstream beads
+    // from starting before upstream reviews are merged.
+    try {
+      await this.processReviewQueue();
+    } catch (err) {
+      console.error(`${TOWN_LOG} alarm: processReviewQueue failed`, err);
+    }
+    try {
+      await this.processConvoyLandings();
+    } catch (err) {
+      console.error(`${TOWN_LOG} alarm: processConvoyLandings failed`, err);
+    }
     try {
       await this.schedulePendingWork();
     } catch (err) {
@@ -1529,16 +1556,6 @@ export class TownDO extends DurableObject<Env> {
       await this.deliverPendingMail();
     } catch (err) {
       console.warn(`${TOWN_LOG} alarm: deliverPendingMail failed`, err);
-    }
-    try {
-      await this.processReviewQueue();
-    } catch (err) {
-      console.error(`${TOWN_LOG} alarm: processReviewQueue failed`, err);
-    }
-    try {
-      await this.processConvoyLandings();
-    } catch (err) {
-      console.error(`${TOWN_LOG} alarm: processConvoyLandings failed`, err);
     }
     try {
       await this.reEscalateStaleEscalations();

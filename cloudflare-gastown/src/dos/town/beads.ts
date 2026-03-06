@@ -369,8 +369,15 @@ function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp: string
 }
 
 /**
- * Check if a bead has unresolved 'blocks' dependencies — i.e. beads
- * that must close before this bead can be dispatched.
+ * Check if a bead has unresolved 'blocks' dependencies.
+ *
+ * A blocker is resolved only when:
+ * 1. The blocker bead itself is closed or failed, AND
+ * 2. The blocker has no pending merge_request child beads (open/in_progress).
+ *
+ * Condition (2) prevents dispatching downstream beads before the refinery
+ * has reviewed and merged the upstream bead's work. Without this, the
+ * downstream polecat would start on a codebase missing the upstream changes.
  */
 export function hasUnresolvedBlockers(sql: SqlStorage, beadId: string): boolean {
   const rows = [
@@ -378,11 +385,23 @@ export function hasUnresolvedBlockers(sql: SqlStorage, beadId: string): boolean 
       sql,
       /* sql */ `
         SELECT COUNT(1) AS count
-        FROM ${bead_dependencies}
-        INNER JOIN ${beads} ON ${bead_dependencies.depends_on_bead_id} = ${beads.bead_id}
-        WHERE ${bead_dependencies.bead_id} = ?
-          AND ${bead_dependencies.dependency_type} = 'blocks'
-          AND ${beads.status} NOT IN ('closed', 'failed')
+        FROM ${bead_dependencies} AS dep
+        INNER JOIN ${beads} AS blocker
+          ON dep.${bead_dependencies.columns.depends_on_bead_id} = blocker.${beads.columns.bead_id}
+        WHERE dep.${bead_dependencies.columns.bead_id} = ?
+          AND dep.${bead_dependencies.columns.dependency_type} = 'blocks'
+          AND (
+            blocker.${beads.columns.status} NOT IN ('closed', 'failed')
+            OR EXISTS (
+              SELECT 1 FROM ${bead_dependencies} AS mr_dep
+              INNER JOIN ${beads} AS mr_bead
+                ON mr_dep.${bead_dependencies.columns.bead_id} = mr_bead.${beads.columns.bead_id}
+              WHERE mr_dep.${bead_dependencies.columns.depends_on_bead_id} = blocker.${beads.columns.bead_id}
+                AND mr_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+                AND mr_bead.${beads.columns.type} = 'merge_request'
+                AND mr_bead.${beads.columns.status} IN ('open', 'in_progress')
+            )
+          )
       `,
       [beadId]
     ),

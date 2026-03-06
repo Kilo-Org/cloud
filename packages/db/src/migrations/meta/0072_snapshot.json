@@ -4519,6 +4519,443 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.contributor_champion_contributors": {
+      "name": "contributor_champion_contributors",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "github_login": {
+          "name": "github_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "github_profile_url": {
+          "name": "github_profile_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "github_user_id": {
+          "name": "github_user_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_contribution_at": {
+          "name": "first_contribution_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_contribution_at": {
+          "name": "last_contribution_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "all_time_contributions": {
+          "name": "all_time_contributions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "manual_email": {
+          "name": "manual_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_contributor_champion_contributors_last_contribution_at": {
+          "name": "IDX_contributor_champion_contributors_last_contribution_at",
+          "columns": [
+            {
+              "expression": "last_contribution_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_contributor_champion_contributors_manual_email": {
+          "name": "IDX_contributor_champion_contributors_manual_email",
+          "columns": [
+            {
+              "expression": "manual_email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_contributor_champion_contributors_github_login": {
+          "name": "UQ_contributor_champion_contributors_github_login",
+          "nullsNotDistinct": false,
+          "columns": [
+            "github_login"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.contributor_champion_events": {
+      "name": "contributor_champion_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "contributor_id": {
+          "name": "contributor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo_full_name": {
+          "name": "repo_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "github_pr_number": {
+          "name": "github_pr_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "github_pr_url": {
+          "name": "github_pr_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "github_pr_title": {
+          "name": "github_pr_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "github_author_login": {
+          "name": "github_author_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "github_author_email": {
+          "name": "github_author_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "merged_at": {
+          "name": "merged_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_contributor_champion_events_contributor_id": {
+          "name": "IDX_contributor_champion_events_contributor_id",
+          "columns": [
+            {
+              "expression": "contributor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_contributor_champion_events_merged_at": {
+          "name": "IDX_contributor_champion_events_merged_at",
+          "columns": [
+            {
+              "expression": "merged_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_contributor_champion_events_author_email": {
+          "name": "IDX_contributor_champion_events_author_email",
+          "columns": [
+            {
+              "expression": "github_author_email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "contributor_champion_events_contributor_id_contributor_champion_contributors_id_fk": {
+          "name": "contributor_champion_events_contributor_id_contributor_champion_contributors_id_fk",
+          "tableFrom": "contributor_champion_events",
+          "tableTo": "contributor_champion_contributors",
+          "columnsFrom": [
+            "contributor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_contributor_champion_events_repo_pr": {
+          "name": "UQ_contributor_champion_events_repo_pr",
+          "nullsNotDistinct": false,
+          "columns": [
+            "repo_full_name",
+            "github_pr_number"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.contributor_champion_memberships": {
+      "name": "contributor_champion_memberships",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "contributor_id": {
+          "name": "contributor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "selected_tier": {
+          "name": "selected_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enrolled_tier": {
+          "name": "enrolled_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enrolled_at": {
+          "name": "enrolled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "credit_amount_microdollars": {
+          "name": "credit_amount_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "credits_last_granted_at": {
+          "name": "credits_last_granted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linked_kilo_user_id": {
+          "name": "linked_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_contributor_champion_memberships_credits_due": {
+          "name": "IDX_contributor_champion_memberships_credits_due",
+          "columns": [
+            {
+              "expression": "credits_last_granted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"contributor_champion_memberships\".\"enrolled_tier\" IS NOT NULL AND \"contributor_champion_memberships\".\"credit_amount_microdollars\" > 0",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "contributor_champion_memberships_contributor_id_contributor_champion_contributors_id_fk": {
+          "name": "contributor_champion_memberships_contributor_id_contributor_champion_contributors_id_fk",
+          "tableFrom": "contributor_champion_memberships",
+          "tableTo": "contributor_champion_contributors",
+          "columnsFrom": [
+            "contributor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "contributor_champion_memberships_linked_kilo_user_id_kilocode_users_id_fk": {
+          "name": "contributor_champion_memberships_linked_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "contributor_champion_memberships",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "linked_kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_contributor_champion_memberships_contributor_id": {
+          "name": "UQ_contributor_champion_memberships_contributor_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "contributor_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "contributor_champion_memberships_selected_tier_check": {
+          "name": "contributor_champion_memberships_selected_tier_check",
+          "value": "\"contributor_champion_memberships\".\"selected_tier\" IS NULL OR \"contributor_champion_memberships\".\"selected_tier\" IN ('contributor', 'ambassador', 'champion')"
+        },
+        "contributor_champion_memberships_enrolled_tier_check": {
+          "name": "contributor_champion_memberships_enrolled_tier_check",
+          "value": "\"contributor_champion_memberships\".\"enrolled_tier\" IS NULL OR \"contributor_champion_memberships\".\"enrolled_tier\" IN ('contributor', 'ambassador', 'champion')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.contributor_champion_sync_state": {
+      "name": "contributor_champion_sync_state",
+      "schema": "",
+      "columns": {
+        "repo_full_name": {
+          "name": "repo_full_name",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "last_merged_at": {
+          "name": "last_merged_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.credit_transactions": {
       "name": "credit_transactions",
       "schema": "",

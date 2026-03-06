@@ -28,6 +28,7 @@ import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-rou
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
+import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
@@ -1553,6 +1554,7 @@ export const adminRouter = createTRPCRouter({
   kiloclawRegions: adminKiloclawRegionsRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
+  contributorChampions: contributorChampionsRouter,
   bulkUserCredits: bulkUserCreditsRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,

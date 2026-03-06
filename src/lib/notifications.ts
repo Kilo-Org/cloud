@@ -29,6 +29,8 @@ export type KiloNotification = {
   // When showIn is specified this can be used to target specific apps. When not specified all apps with notification support will show it:
   // CAUTION: use extension-native sparingly since it shows up as a native VSCode notification and is spammy
   showIn?: ('extension' | 'extension-native' | 'cli')[];
+  // ISO 8601 timestamp after which the notification should no longer be shown
+  expiresAt?: string;
 };
 
 const normalUnconditionalNotifications: KiloNotification[] = [
@@ -62,6 +64,18 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     },
     showIn: ['extension', 'cli'],
   },
+  {
+    id: 'app-builder-mar-6',
+    title: 'New: App Builder',
+    message:
+      'Build and deploy web apps with AI — describe what you want and watch it come to life. No local setup needed.',
+    action: {
+      actionText: 'Try App Builder',
+      actionURL: 'https://app.kilo.ai/app-builder',
+    },
+    showIn: ['extension'],
+    expiresAt: '2026-04-06T00:00:00Z',
+  },
 ];
 
 export async function generateUserNotifications(user: User): Promise<KiloNotification[]> {
@@ -79,7 +93,10 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     await Promise.all(conditionalNotifications.map(f => f(user)))
   ).flat();
 
-  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications];
+  const now = new Date();
+  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(
+    n => !n.expiresAt || new Date(n.expiresAt) > now
+  );
 }
 
 async function generateLowCreditNotification(user: User): Promise<KiloNotification[]> {

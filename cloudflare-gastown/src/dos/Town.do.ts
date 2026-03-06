@@ -1069,11 +1069,12 @@ export class TownDO extends DurableObject<Env> {
     // at path X prevents branches under X/. Agent branches live under
     // <featureBranch>/gt/<agent>/<bead>, so the feature branch itself must
     // end with a path component (/head) to act as a directory prefix.
-    const convoySlug = input.convoyTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 40);
+    const convoySlug =
+      input.convoyTitle
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 40) || 'convoy';
     const featureBranch = `convoy/${convoySlug}/${convoyId.slice(0, 8)}/head`;
 
     // 1. Validate the dependency graph has no cycles BEFORE persisting anything.
@@ -1088,7 +1089,7 @@ export class TownDO extends DurableObject<Env> {
       for (let i = 0; i < input.tasks.length; i++) {
         for (const depIdx of input.tasks[i].depends_on ?? []) {
           if (depIdx < 0 || depIdx >= input.tasks.length || depIdx === i) continue;
-          adj.get(depIdx)!.push(i);
+          (adj.get(depIdx) ?? []).push(i);
           inDegree.set(i, (inDegree.get(i) ?? 0) + 1);
         }
       }
@@ -1098,7 +1099,8 @@ export class TownDO extends DurableObject<Env> {
       }
       let visited = 0;
       while (queue.length > 0) {
-        const node = queue.shift()!;
+        const node = queue.shift();
+        if (node === undefined) break;
         visited++;
         for (const neighbor of adj.get(node) ?? []) {
           const newDeg = (inDegree.get(neighbor) ?? 1) - 1;

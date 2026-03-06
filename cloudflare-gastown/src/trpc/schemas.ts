@@ -5,7 +5,6 @@ import { z } from 'zod';
  * (avoiding "excessively deep" instantiation with Rpc.Promisified DO stubs)
  * while still performing full runtime validation via the piped schema.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rpcSafe<T extends z.ZodTypeAny>(schema: T): z.ZodPipe<z.ZodAny, T> {
   return z.any().pipe(schema);
 }

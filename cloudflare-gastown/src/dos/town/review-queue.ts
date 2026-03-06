@@ -427,18 +427,12 @@ export function closeOrphanedReviewBeads(sql: SqlStorage): void {
         INNER JOIN ${review_metadata} ON ${beads.bead_id} = ${review_metadata.bead_id}
         LEFT JOIN ${agent_metadata} ON ${beads.assignee_agent_bead_id} = ${agent_metadata.bead_id}
         WHERE ${beads.type} = 'merge_request'
-          AND ${beads.status} IN ('open', 'in_progress')
+          AND ${beads.status} = 'open'
           AND ${review_metadata.pr_url} IS NOT NULL
           AND ${beads.updated_at} < ?
           AND (
             ${agent_metadata.bead_id} IS NULL
-            OR (
-              ${agent_metadata.status} IN ('idle', 'dead')
-              AND (
-                ${agent_metadata.current_hook_bead_id} IS NULL
-                OR ${agent_metadata.current_hook_bead_id} != ${beads.bead_id}
-              )
-            )
+            OR ${agent_metadata.status} IN ('idle', 'dead')
           )
       `,
       [cutoff]

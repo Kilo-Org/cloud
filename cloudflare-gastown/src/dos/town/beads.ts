@@ -30,7 +30,6 @@ import {
 import { query } from '../../util/query.util';
 import type { CreateBeadInput, BeadFilter, Bead } from '../../types';
 import type { BeadEventType } from '../../db/tables/bead-events.table';
-import type { BeadDependencyRecord } from '../../db/tables/bead-dependencies.table';
 
 function generateId(): string {
   return crypto.randomUUID();

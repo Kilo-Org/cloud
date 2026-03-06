@@ -11,6 +11,7 @@ import {
 import { getFraudDetectionHeaders } from '@/lib/utils';
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { FeatureValue } from '@/lib/feature-detection';
 import 'server-only';
 
 /**
@@ -183,6 +184,7 @@ export type UsagePayload = {
   is_byok?: boolean | null;
   is_user_byok?: boolean | null;
   editor_name?: string | null;
+  feature?: string | null;
 
   // Existing classification (if any)
   abuse_classification?: number | null;
@@ -332,6 +334,7 @@ export type AbuseClassificationContext = {
   projectId?: string | null;
   provider?: string | null;
   isByok?: boolean | null;
+  feature?: FeatureValue | null;
 };
 
 /**
@@ -372,6 +375,7 @@ export async function classifyAbuse(
     streamed: body.stream === true,
     is_user_byok: context?.isByok ?? null,
     editor_name: request.headers.get('x-kilocode-editorname') ?? null,
+    feature: context?.feature ?? null,
   };
 
   return classifyRequest(payload);

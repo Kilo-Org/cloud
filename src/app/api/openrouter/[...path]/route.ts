@@ -234,6 +234,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   console.debug(`Routing request to ${provider.id}`);
 
+  const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');
+  const feature = validateFeatureHeader(
+    request.headers.get(FEATURE_HEADER) || (isLegacyOpenRouterPath ? '' : 'direct-gateway')
+  );
+
   // Start abuse classification early (non-blocking) - we'll await it before creating usage context
   const classifyPromise = classifyAbuse(request, requestBodyParsed, {
     kiloUserId: user.id,
@@ -241,6 +246,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     projectId,
     provider: provider.id,
     isByok: !!userByok,
+    feature,
   });
 
   // large responses may run longer than the 800s serverless function timeout, usually this value is set to 8192 tokens
@@ -264,7 +270,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Extract properties for usage context
   const tokenEstimates = estimateChatTokens_ignoringToolDefinitions(requestBodyParsed);
   const promptInfo = extractPromptInfo(requestBodyParsed);
-  const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');
 
   const usageContext: MicrodollarUsageContext = {
     kiloUserId: user.id,
@@ -288,9 +293,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     has_tools: (requestBodyParsed.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
-    feature: validateFeatureHeader(
-      request.headers.get(FEATURE_HEADER) || (isLegacyOpenRouterPath ? '' : 'direct-gateway')
-    ),
+    feature,
     session_id: taskId ?? null,
     mode: modeHeader,
     auto_model: autoModel,

@@ -18,21 +18,43 @@ const MayorSlingBody = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-const MayorSlingBatchBody = z.object({
-  rig_id: z.string().min(1),
-  convoy_title: z.string().min(1),
-  tasks: z
-    .array(
-      z.object({
-        title: z.string().min(1),
-        body: z.string().optional(),
-        depends_on: z.array(z.number().int().min(0)).optional(),
-      })
-    )
-    .min(1)
-    .max(50),
-  merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
-});
+const MayorSlingBatchBody = z
+  .object({
+    rig_id: z.string().min(1),
+    convoy_title: z.string().min(1),
+    tasks: z
+      .array(
+        z.object({
+          title: z.string().min(1),
+          body: z.string().optional(),
+          depends_on: z.array(z.number().int().min(0)).optional(),
+        })
+      )
+      .min(1)
+      .max(50),
+    merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
+    /** Set to true only when ALL tasks are genuinely independent (no shared files, no shared state). */
+    parallel: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Require dependency graph unless explicitly opted out with parallel: true.
+    // Without depends_on, all polecats start simultaneously on the same codebase
+    // and produce merge conflicts.
+    if (data.parallel) return;
+    if (data.tasks.length <= 1) return;
+    const hasDeps = data.tasks.some(t => t.depends_on && t.depends_on.length > 0);
+    if (!hasDeps) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Convoy has multiple tasks but none declare depends_on. ' +
+          'Without dependencies, all polecats start at the same time on the same codebase and will produce merge conflicts. ' +
+          'Add depends_on to express task ordering, or set parallel: true if ALL tasks are genuinely independent ' +
+          '(they touch completely different files with no shared state).',
+        path: ['tasks'],
+      });
+    }
+  });
 
 const MayorMailBody = z.object({
   rig_id: z.string().min(1),

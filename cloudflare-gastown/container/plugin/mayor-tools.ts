@@ -160,6 +160,15 @@ export function createMayorTools(client: MayorGastownClient) {
               'Best for loosely coupled tasks where each bead stands on its own and you want incremental merges.'
           )
           .optional(),
+        parallel: tool.schema
+          .boolean()
+          .describe(
+            'Set to true ONLY when ALL tasks are genuinely independent — they touch completely ' +
+              'different files with no shared state. Without this flag, the system REQUIRES at least ' +
+              'one task to declare depends_on. This prevents accidental parallel execution of tasks ' +
+              'that need ordering, which causes merge conflicts and failures.'
+          )
+          .optional(),
       },
       async execute(args) {
         const result = await client.slingBatch({
@@ -167,6 +176,7 @@ export function createMayorTools(client: MayorGastownClient) {
           convoy_title: args.convoy_title,
           tasks: args.tasks,
           merge_mode: args.merge_mode,
+          parallel: args.parallel,
         });
 
         const beadLines = result.beads.map(

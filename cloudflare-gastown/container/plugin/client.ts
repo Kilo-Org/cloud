@@ -290,6 +290,7 @@ export class MayorGastownClient {
     convoy_title: string;
     tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
     merge_mode?: 'review-then-land' | 'review-and-merge';
+    parallel?: boolean;
   }): Promise<SlingBatchResult> {
     return this.request<SlingBatchResult>(this.mayorPath('/sling-batch'), {
       method: 'POST',

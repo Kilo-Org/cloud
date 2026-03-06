@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { GastownClient, GastownApiError, createClientFromEnv } from './client';
-import type { GastownEnv } from './types';
+import { GastownClient, MayorGastownClient, GastownApiError, createClientFromEnv } from './client';
+import type { GastownEnv, MayorGastownEnv } from './types';
 
 const TEST_ENV: GastownEnv = {
   apiUrl: 'https://gastown.example.com',
@@ -283,5 +283,78 @@ describe('createClientFromEnv', () => {
     process.env.GASTOWN_RIG_ID = 'rig-1';
 
     expect(() => createClientFromEnv()).toThrow('GASTOWN_API_URL, GASTOWN_AGENT_ID');
+  });
+});
+
+// ── MayorGastownClient tests ─────────────────────────────────────────────
+
+const MAYOR_ENV: MayorGastownEnv = {
+  apiUrl: 'https://gastown.example.com',
+  sessionToken: 'mayor-jwt-token',
+  agentId: 'mayor-agent-1',
+  townId: 'town-1',
+};
+
+describe('MayorGastownClient', () => {
+  let client: MayorGastownClient;
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    client = new MayorGastownClient(MAYOR_ENV);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('slingBatch() posts to sling-batch endpoint', async () => {
+    const responseData = {
+      convoy: { id: 'convoy-1', title: 'Test Convoy', status: 'active', total_beads: 2 },
+      beads: [],
+    };
+    const fetchMock = mockFetch(responseData);
+    globalThis.fetch = fetchMock;
+
+    const result = await client.slingBatch({
+      rig_id: 'rig-1',
+      convoy_title: 'Test Convoy',
+      tasks: [{ title: 'Task 1' }, { title: 'Task 2', body: 'Details' }],
+    });
+
+    expect(result).toEqual(responseData);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://gastown.example.com/api/mayor/town-1/tools/sling-batch');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      rig_id: 'rig-1',
+      convoy_title: 'Test Convoy',
+      tasks: [{ title: 'Task 1' }, { title: 'Task 2', body: 'Details' }],
+    });
+  });
+
+  it('listConvoys() fetches convoy list', async () => {
+    const convoys = [{ id: 'convoy-1', title: 'Test', status: 'active' }];
+    globalThis.fetch = mockFetch(convoys);
+
+    const result = await client.listConvoys();
+    expect(result).toEqual(convoys);
+
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe('https://gastown.example.com/api/mayor/town-1/tools/convoys');
+  });
+
+  it('getConvoyStatus() fetches detailed convoy', async () => {
+    const detail = {
+      id: 'convoy-1',
+      title: 'Test',
+      beads: [{ bead_id: 'b1', title: 'T1', status: 'open', assignee_agent_name: null }],
+    };
+    globalThis.fetch = mockFetch(detail);
+
+    const result = await client.getConvoyStatus('convoy-1');
+    expect(result).toEqual(detail);
+
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe('https://gastown.example.com/api/mayor/town-1/tools/convoys/convoy-1');
   });
 });

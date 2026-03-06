@@ -34,6 +34,12 @@ const eventSinks = new Set<(agentId: string, event: string, data: unknown) => vo
 let nextPort = 4096;
 const startTime = Date.now();
 
+// Mutex for ensureSDKServer — createKilo() reads process.cwd() and
+// process.env during startup, so concurrent calls with different workdirs
+// would corrupt each other's globals. This serializes server creation only;
+// once created, the SDK instance is reused without locking.
+let sdkServerLock: Promise<void> = Promise.resolve();
+
 export function getUptime(): number {
   return Date.now() - startTime;
 }
@@ -115,11 +121,17 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
 
 /**
  * Get or create an SDK server instance for a workdir.
+ *
+ * createKilo() reads process.cwd() and process.env during startup, so
+ * we must serialize server creation to prevent concurrent calls from
+ * corrupting each other's globals. Once created, the SDK instance is
+ * cached and returned without locking.
  */
 async function ensureSDKServer(
   workdir: string,
   env: Record<string, string>
 ): Promise<{ client: KiloClient; port: number }> {
+  // Fast path: reuse existing instance without locking.
   const existing = sdkInstances.get(workdir);
   if (existing) {
     return {
@@ -128,43 +140,64 @@ async function ensureSDKServer(
     };
   }
 
-  const port = nextPort++;
-  console.log(`${MANAGER_LOG} Starting SDK server on port ${port} for ${workdir}`);
+  // Slow path: serialize server creation. createKilo() reads process.cwd()
+  // and process.env, so concurrent calls with different workdirs must not
+  // overlap. We capture the previous lock and install our own as the new
+  // tail in the same synchronous microtask — no await between read and
+  // write — so no concurrent caller can observe a stale sdkServerLock.
+  const previousLock = sdkServerLock;
+  let releaseLock!: () => void;
+  sdkServerLock = new Promise<void>(resolve => {
+    releaseLock = resolve;
+  });
 
-  // Save env vars that we'll mutate, set them for createKilo, then restore.
-  // This avoids permanent global mutation when multiple agents start with
-  // different env — each server gets the env it was started with.
-  const envSnapshot: Record<string, string | undefined> = {};
-  for (const key of Object.keys(env)) {
-    envSnapshot[key] = process.env[key];
-    process.env[key] = env[key];
-  }
+  await previousLock;
 
-  // Save and set CWD for the server
-  const prevCwd = process.cwd();
   try {
-    process.chdir(workdir);
-    const { client, server } = await createKilo({
-      hostname: '127.0.0.1',
-      port,
-      timeout: 30_000,
-    });
+    // Re-check after acquiring lock — another caller may have created it.
+    const cached = sdkInstances.get(workdir);
+    if (cached) {
+      return {
+        client: cached.client,
+        port: parseInt(new URL(cached.server.url).port),
+      };
+    }
 
-    const instance: SDKInstance = { client, server, sessionCount: 0 };
-    sdkInstances.set(workdir, instance);
+    const port = nextPort++;
+    console.log(`${MANAGER_LOG} Starting SDK server on port ${port} for ${workdir}`);
 
-    console.log(`${MANAGER_LOG} SDK server started: ${server.url}`);
-    return { client, port };
-  } finally {
-    process.chdir(prevCwd);
-    // Restore previous env values
-    for (const [key, prev] of Object.entries(envSnapshot)) {
-      if (prev === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = prev;
+    const envSnapshot: Record<string, string | undefined> = {};
+    for (const key of Object.keys(env)) {
+      envSnapshot[key] = process.env[key];
+      process.env[key] = env[key];
+    }
+
+    const prevCwd = process.cwd();
+    try {
+      process.chdir(workdir);
+      const { client, server } = await createKilo({
+        hostname: '127.0.0.1',
+        port,
+        timeout: 30_000,
+      });
+
+      const instance: SDKInstance = { client, server, sessionCount: 0 };
+      sdkInstances.set(workdir, instance);
+
+      console.log(`${MANAGER_LOG} SDK server started: ${server.url}`);
+      return { client, port };
+    } finally {
+      process.chdir(prevCwd);
+      for (const [key, prev] of Object.entries(envSnapshot)) {
+        if (prev === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = prev;
+        }
       }
     }
+  } finally {
+    releaseLock();
   }
 }
 

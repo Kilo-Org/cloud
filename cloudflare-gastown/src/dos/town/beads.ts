@@ -3,6 +3,7 @@
  * After the beads-centric refactor (#441), all object types are beads.
  */
 
+import { z } from 'zod';
 import { beads, BeadRecord, createTableBeads, getIndexesBeads } from '../../db/tables/beads.table';
 import {
   bead_events,
@@ -21,10 +22,15 @@ import {
   escalation_metadata,
   createTableEscalationMetadata,
 } from '../../db/tables/escalation-metadata.table';
-import { convoy_metadata, createTableConvoyMetadata } from '../../db/tables/convoy-metadata.table';
+import {
+  convoy_metadata,
+  createTableConvoyMetadata,
+  migrateConvoyMetadata,
+} from '../../db/tables/convoy-metadata.table';
 import { query } from '../../util/query.util';
 import type { CreateBeadInput, BeadFilter, Bead } from '../../types';
 import type { BeadEventType } from '../../db/tables/bead-events.table';
+import type { BeadDependencyRecord } from '../../db/tables/bead-dependencies.table';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -52,6 +58,15 @@ export function initBeadTables(sql: SqlStorage): void {
   query(sql, createTableReviewMetadata(), []);
   query(sql, createTableEscalationMetadata(), []);
   query(sql, createTableConvoyMetadata(), []);
+
+  // Migrations: add columns to existing tables (idempotent)
+  for (const stmt of migrateConvoyMetadata()) {
+    try {
+      query(sql, stmt, []);
+    } catch {
+      // Column already exists — expected after first run
+    }
+  }
 }
 
 export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {
@@ -196,9 +211,185 @@ export function updateBeadStatus(
     newValue: status,
   });
 
+  // If the bead reached a terminal status and is tracked by a convoy,
+  // update the convoy's closed_beads counter and auto-land if complete.
+  if (status === 'closed' || status === 'failed') {
+    updateConvoyProgress(sql, beadId, timestamp);
+  }
+
   const updated = getBead(sql, beadId);
   if (!updated) throw new Error(`Bead ${beadId} not found after update`);
   return updated;
+}
+
+/**
+ * If beadId is tracked by a convoy (via bead_dependencies 'tracks'),
+ * recount closed beads and update convoy_metadata. Auto-lands the
+ * convoy when all tracked beads are closed.
+ */
+function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp: string): void {
+  const convoyRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${bead_dependencies.depends_on_bead_id}
+        FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+      `,
+      [beadId]
+    ),
+  ];
+  if (convoyRows.length === 0) return;
+
+  for (const row of convoyRows) {
+    const convoyId = z.object({ depends_on_bead_id: z.string() }).parse(row).depends_on_bead_id;
+
+    // Count closed tracked beads (both 'closed' and 'failed' count as done)
+    const countRows = [
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT COUNT(1) AS count FROM ${bead_dependencies}
+          INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
+          WHERE ${bead_dependencies.depends_on_bead_id} = ?
+            AND ${bead_dependencies.dependency_type} = 'tracks'
+            AND ${beads.status} IN ('closed', 'failed')
+        `,
+        [convoyId]
+      ),
+    ];
+    const closedCount = z.object({ count: z.number() }).parse(countRows[0]).count;
+
+    query(
+      sql,
+      /* sql */ `
+        UPDATE ${convoy_metadata}
+        SET ${convoy_metadata.columns.closed_beads} = ?
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
+      [closedCount, convoyId]
+    );
+
+    // Check if convoy should auto-land
+    const metaRows = [
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT ${convoy_metadata.total_beads}
+          FROM ${convoy_metadata}
+          WHERE ${convoy_metadata.bead_id} = ?
+        `,
+        [convoyId]
+      ),
+    ];
+    const totalBeads = z.object({ total_beads: z.number() }).parse(metaRows[0]).total_beads;
+
+    if (closedCount >= totalBeads && totalBeads > 0) {
+      // Check if this convoy has a feature branch. If so, don't auto-close
+      // the convoy bead yet — it needs a final merge of the feature branch
+      // into main. The alarm's processReviewQueue will handle this.
+      const featureBranch = getConvoyFeatureBranch(sql, convoyId);
+
+      if (featureBranch) {
+        // Mark the convoy as ready to land by storing a flag in metadata.
+        // The alarm loop's processReviewQueue will detect this and create
+        // the final landing MR (feature branch → main).
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.metadata} = json_set(COALESCE(${beads.metadata}, '{}'), '$.ready_to_land', 1),
+                ${beads.columns.updated_at} = ?
+            WHERE ${beads.bead_id} = ?
+          `,
+          [timestamp, convoyId]
+        );
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${convoy_metadata}
+            SET ${convoy_metadata.columns.closed_beads} = ?
+            WHERE ${convoy_metadata.bead_id} = ?
+          `,
+          [closedCount, convoyId]
+        );
+      } else {
+        // No feature branch — auto-land immediately (backwards compatible)
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.status} = 'closed',
+                ${beads.columns.closed_at} = ?,
+                ${beads.columns.updated_at} = ?
+            WHERE ${beads.bead_id} = ?
+          `,
+          [timestamp, timestamp, convoyId]
+        );
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${convoy_metadata}
+            SET ${convoy_metadata.columns.landed_at} = ?
+            WHERE ${convoy_metadata.bead_id} = ?
+          `,
+          [timestamp, convoyId]
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Check if a bead has unresolved 'blocks' dependencies — i.e. beads
+ * that must close before this bead can be dispatched.
+ */
+export function hasUnresolvedBlockers(sql: SqlStorage, beadId: string): boolean {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT COUNT(1) AS count
+        FROM ${bead_dependencies}
+        INNER JOIN ${beads} ON ${bead_dependencies.depends_on_bead_id} = ${beads.bead_id}
+        WHERE ${bead_dependencies.bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'blocks'
+          AND ${beads.status} NOT IN ('closed', 'failed')
+      `,
+      [beadId]
+    ),
+  ];
+  return z.object({ count: z.number() }).parse(rows[0]).count > 0;
+}
+
+/**
+ * Find beads that were blocked by `closedBeadId` and are now fully unblocked
+ * (all their 'blocks' dependencies are resolved).
+ */
+export function getNewlyUnblockedBeads(sql: SqlStorage, closedBeadId: string): string[] {
+  // Find beads that depend on the closed bead via 'blocks'
+  const dependentRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${bead_dependencies.bead_id}
+        FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'blocks'
+      `,
+      [closedBeadId]
+    ),
+  ];
+
+  const dependentIds = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse(dependentRows)
+    .map(r => r.bead_id);
+
+  // For each dependent, check if ALL blockers are now resolved
+  return dependentIds.filter(id => !hasUnresolvedBlockers(sql, id));
 }
 
 export function closeBead(sql: SqlStorage, beadId: string, agentId: string): Bead {
@@ -329,4 +520,167 @@ export function listBeadEvents(
     ),
   ];
   return BeadEventRecord.array().parse(rows);
+}
+
+// ── Bead Dependencies (DAG queries) ─────────────────────────────────
+
+/**
+ * Return all dependency edges for a given bead (both directions).
+ * - blockers: beads that block this bead (this bead depends_on them)
+ * - blocked_by_this: beads that this bead blocks (they depend_on this bead)
+ * - tracks: convoys this bead is tracked by
+ */
+export function getBeadDependencies(
+  sql: SqlStorage,
+  beadId: string
+): {
+  blockers: Array<{ bead_id: string; depends_on_bead_id: string; dependency_type: string }>;
+  dependents: Array<{ bead_id: string; depends_on_bead_id: string; dependency_type: string }>;
+} {
+  const DependencyRow = z.object({
+    bead_id: z.string(),
+    depends_on_bead_id: z.string(),
+    dependency_type: z.string(),
+  });
+
+  // Forward: beads this bead depends on (its blockers / the convoys it tracks)
+  const blockerRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${bead_dependencies.bead_id}, ${bead_dependencies.depends_on_bead_id},
+               ${bead_dependencies.dependency_type}
+        FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.bead_id} = ?
+      `,
+      [beadId]
+    ),
+  ];
+
+  // Reverse: beads that depend on this bead
+  const dependentRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${bead_dependencies.bead_id}, ${bead_dependencies.depends_on_bead_id},
+               ${bead_dependencies.dependency_type}
+        FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.depends_on_bead_id} = ?
+      `,
+      [beadId]
+    ),
+  ];
+
+  return {
+    blockers: DependencyRow.array().parse(blockerRows),
+    dependents: DependencyRow.array().parse(dependentRows),
+  };
+}
+
+/**
+ * Return all 'blocks' dependency edges for beads tracked by a convoy.
+ * Used to render the DAG in the convoy UI.
+ */
+export function getConvoyDependencyEdges(
+  sql: SqlStorage,
+  convoyId: string
+): Array<{ bead_id: string; depends_on_bead_id: string }> {
+  const EdgeRow = z.object({
+    bead_id: z.string(),
+    depends_on_bead_id: z.string(),
+  });
+
+  // First get all bead IDs tracked by this convoy
+  // Then get all 'blocks' edges between those beads
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT dep.${bead_dependencies.columns.bead_id},
+               dep.${bead_dependencies.columns.depends_on_bead_id}
+        FROM ${bead_dependencies} AS dep
+        WHERE dep.${bead_dependencies.columns.dependency_type} = 'blocks'
+          AND dep.${bead_dependencies.columns.bead_id} IN (
+            SELECT tracked.${bead_dependencies.columns.bead_id}
+            FROM ${bead_dependencies} AS tracked
+            WHERE tracked.${bead_dependencies.columns.depends_on_bead_id} = ?
+              AND tracked.${bead_dependencies.columns.dependency_type} = 'tracks'
+          )
+          AND dep.${bead_dependencies.columns.depends_on_bead_id} IN (
+            SELECT tracked2.${bead_dependencies.columns.bead_id}
+            FROM ${bead_dependencies} AS tracked2
+            WHERE tracked2.${bead_dependencies.columns.depends_on_bead_id} = ?
+              AND tracked2.${bead_dependencies.columns.dependency_type} = 'tracks'
+          )
+      `,
+      [convoyId, convoyId]
+    ),
+  ];
+
+  return EdgeRow.array().parse(rows);
+}
+
+/**
+ * Find the convoy a bead belongs to (if any) via 'tracks' dependencies.
+ * Returns the convoy bead_id or null.
+ */
+export function getConvoyForBead(sql: SqlStorage, beadId: string): string | null {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${bead_dependencies.depends_on_bead_id}
+        FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+      `,
+      [beadId]
+    ),
+  ];
+  if (rows.length === 0) return null;
+  return z.object({ depends_on_bead_id: z.string() }).parse(rows[0]).depends_on_bead_id;
+}
+
+/**
+ * Get the merge_mode for a convoy from convoy_metadata.
+ * Defaults to 'review-then-land' if not set.
+ */
+export function getConvoyMergeMode(
+  sql: SqlStorage,
+  convoyId: string
+): 'review-then-land' | 'review-and-merge' {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${convoy_metadata.merge_mode}
+        FROM ${convoy_metadata}
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
+      [convoyId]
+    ),
+  ];
+  if (rows.length === 0) return 'review-then-land';
+  const mode = z.object({ merge_mode: z.string().nullable() }).parse(rows[0]).merge_mode;
+  if (mode === 'review-and-merge') return 'review-and-merge';
+  return 'review-then-land';
+}
+
+/**
+ * Get the feature_branch for a convoy from convoy_metadata.
+ */
+export function getConvoyFeatureBranch(sql: SqlStorage, convoyId: string): string | null {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${convoy_metadata.feature_branch}
+        FROM ${convoy_metadata}
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
+      [convoyId]
+    ),
+  ];
+  if (rows.length === 0) return null;
+  return z.object({ feature_branch: z.string().nullable() }).parse(rows[0]).feature_branch;
 }

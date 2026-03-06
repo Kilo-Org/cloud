@@ -5,11 +5,14 @@ import type {
   BeadPriority,
   BeadStatus,
   BeadType,
+  Convoy,
+  ConvoyDetail,
   GastownEnv,
   Mail,
   MayorGastownEnv,
   PrimeContext,
   Rig,
+  SlingBatchResult,
   SlingResult,
 } from './types';
 
@@ -280,6 +283,26 @@ export class MayorGastownClient {
         from_agent_id: this.agentId,
       }),
     });
+  }
+
+  async slingBatch(input: {
+    rig_id: string;
+    convoy_title: string;
+    tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
+    merge_mode?: 'review-then-land' | 'review-and-merge';
+  }): Promise<SlingBatchResult> {
+    return this.request<SlingBatchResult>(this.mayorPath('/sling-batch'), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async listConvoys(): Promise<Convoy[]> {
+    return this.request<Convoy[]>(this.mayorPath('/convoys'));
+  }
+
+  async getConvoyStatus(convoyId: string): Promise<ConvoyDetail> {
+    return this.request<ConvoyDetail>(this.mayorPath(`/convoys/${convoyId}`));
   }
 }
 

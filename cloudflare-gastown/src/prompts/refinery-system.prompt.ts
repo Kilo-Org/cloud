@@ -15,6 +15,12 @@ export function buildRefinerySystemPrompt(params: {
   targetBranch: string;
   polecatAgentId: string;
   mergeStrategy: MergeStrategy;
+  /** Present when this review is for a bead inside a convoy. */
+  convoyContext?: {
+    mergeMode: 'review-then-land' | 'review-and-merge';
+    /** True when this is an intermediate step (not the final landing merge). */
+    isIntermediateStep: boolean;
+  };
 }): string {
   const gateList =
     params.gates.length > 0
@@ -25,6 +31,8 @@ export function buildRefinerySystemPrompt(params: {
     params.mergeStrategy === 'direct'
       ? buildDirectMergeInstructions(params)
       : buildPRMergeInstructions(params);
+
+  const convoySection = params.convoyContext ? buildConvoySection(params.convoyContext) : '';
 
   return `You are the Refinery agent for rig "${params.rigId}" (town "${params.townId}").
 Your identity: ${params.identity}
@@ -37,6 +45,7 @@ You review code changes from polecat agents and, if they pass review, either mer
 - **Target branch:** \`${params.targetBranch}\`
 - **Merge strategy:** ${params.mergeStrategy === 'direct' ? 'Direct merge (you merge and push)' : 'Pull request (you create a PR)'}
 - **Polecat agent ID:** ${params.polecatAgentId}
+${convoySection}
 
 ## Review Process
 
@@ -83,6 +92,28 @@ ${mergeInstructions}
 - If you cannot determine whether the code is correct (e.g., you don't understand the domain), escalate with severity "medium" instead of guessing.
 - The URL that \`git push\` prints (e.g. \`https://github.com/.../pull/new/...\`) is NOT a pull request — it is a convenience link for humans. Never use that as a pr_url.
 `;
+}
+
+function buildConvoySection(ctx: {
+  mergeMode: 'review-then-land' | 'review-and-merge';
+  isIntermediateStep: boolean;
+}): string {
+  if (ctx.mergeMode === 'review-then-land' && ctx.isIntermediateStep) {
+    return `
+## Convoy Context
+This bead is part of a **review-then-land** convoy. Your job for this intermediate step is:
+1. **Review the code** — run quality gates and code review as normal.
+2. **If approved, merge into the convoy's feature branch** — this is an intermediate merge, NOT the final landing to main. Merge directly into the target branch shown above.
+3. **If changes needed, send rework request** — the polecat will fix and resubmit.
+
+The final merge/PR to main happens automatically once ALL beads in the convoy are done. Do NOT create a PR for this intermediate step.`;
+  }
+  if (ctx.mergeMode === 'review-and-merge') {
+    return `
+## Convoy Context
+This bead is part of a **review-and-merge** convoy. Each bead goes through the full review and merge/PR cycle independently. Proceed with your normal review and merge/PR process.`;
+  }
+  return '';
 }
 
 function buildDirectMergeInstructions(params: { branch: string; targetBranch: string }): string {

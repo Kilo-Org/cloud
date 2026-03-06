@@ -11,8 +11,17 @@ import { beads, BeadRecord, MergeRequestBeadRecord } from '../../db/tables/beads
 import { review_metadata } from '../../db/tables/review-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
+import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
 import { query } from '../../util/query.util';
-import { logBeadEvent, getBead, closeBead, updateBeadStatus, createBead } from './beads';
+import {
+  logBeadEvent,
+  getBead,
+  closeBead,
+  updateBeadStatus,
+  createBead,
+  getConvoyForBead,
+  getConvoyFeatureBranch,
+} from './beads';
 import { getAgent, unhookBead } from './agents';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
 
@@ -86,6 +95,19 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
     metadata.pr_url = input.pr_url;
   }
 
+  // For convoy beads, the MR targets the convoy's feature branch, not main.
+  // This keeps all convoy work on the feature branch until the convoy lands.
+  const convoyId = getConvoyForBead(sql, input.bead_id);
+  const convoyFeatureBranch = convoyId ? getConvoyFeatureBranch(sql, convoyId) : null;
+  const targetBranch = convoyFeatureBranch ?? 'main';
+
+  if (convoyId) {
+    metadata.convoy_id = convoyId;
+    if (convoyFeatureBranch) {
+      metadata.convoy_feature_branch = convoyFeatureBranch;
+    }
+  }
+
   // Create the merge_request bead
   query(
     sql,
@@ -141,7 +163,7 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
         ${review_metadata.columns.pr_url}, ${review_metadata.columns.retry_count}
       ) VALUES (?, ?, ?, ?, ?, ?)
     `,
-    [id, input.branch, 'main', null, input.pr_url ?? null, 0]
+    [id, input.branch, targetBranch, null, input.pr_url ?? null, 0]
   );
 
   logBeadEvent(sql, {
@@ -149,7 +171,7 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
     agentId: input.agent_id,
     eventType: 'review_submitted',
     newValue: input.branch,
-    metadata: { branch: input.branch },
+    metadata: { branch: input.branch, target_branch: targetBranch },
   });
 }
 
@@ -243,6 +265,20 @@ export function completeReviewWithResult(
 
   if (input.status === 'merged') {
     closeBead(sql, entry.bead_id, entry.agent_id);
+
+    // If this was a convoy landing MR, also set landed_at on the convoy metadata
+    const sourceBead = getBead(sql, entry.bead_id);
+    if (sourceBead?.type === 'convoy') {
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${convoy_metadata}
+          SET ${convoy_metadata.columns.landed_at} = ?
+          WHERE ${convoy_metadata.bead_id} = ?
+        `,
+        [now(), entry.bead_id]
+      );
+    }
   } else if (input.status === 'conflict') {
     // Create an escalation bead so the conflict is visible and actionable
     createBead(sql, {
@@ -357,6 +393,65 @@ export function recoverStuckReviews(sql: SqlStorage): void {
     `,
     [now(), timeout]
   );
+}
+
+/**
+ * Close MR beads that are stuck waiting for a PR review but whose assigned
+ * agent is no longer active. After a container restart, agents lose their
+ * in-memory state — the PR review will never complete. Close these beads
+ * so they don't block convoy progress indefinitely.
+ *
+ * Only affects beads with a pr_url (excluded by recoverStuckReviews) that
+ * are stale (>30 min) and whose agent is idle/dead/missing.
+ */
+const ORPHAN_REVIEW_TIMEOUT_MS = 30 * 60 * 1000;
+
+export function closeOrphanedReviewBeads(sql: SqlStorage): void {
+  const cutoff = new Date(Date.now() - ORPHAN_REVIEW_TIMEOUT_MS).toISOString();
+
+  const orphanRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${beads.bead_id}, ${beads.assignee_agent_bead_id}
+        FROM ${beads}
+        INNER JOIN ${review_metadata} ON ${beads.bead_id} = ${review_metadata.bead_id}
+        LEFT JOIN ${agent_metadata} ON ${beads.assignee_agent_bead_id} = ${agent_metadata.bead_id}
+        WHERE ${beads.type} = 'merge_request'
+          AND ${beads.status} IN ('open', 'in_progress')
+          AND ${review_metadata.pr_url} IS NOT NULL
+          AND ${beads.updated_at} < ?
+          AND (
+            ${agent_metadata.bead_id} IS NULL
+            OR (
+              ${agent_metadata.status} IN ('idle', 'dead')
+              AND (
+                ${agent_metadata.current_hook_bead_id} IS NULL
+                OR ${agent_metadata.current_hook_bead_id} != ${beads.bead_id}
+              )
+            )
+          )
+      `,
+      [cutoff]
+    ),
+  ];
+
+  for (const row of orphanRows) {
+    const parsed = z
+      .object({ bead_id: z.string(), assignee_agent_bead_id: z.string().nullable() })
+      .parse(row);
+    try {
+      closeBead(sql, parsed.bead_id, parsed.assignee_agent_bead_id ?? 'system');
+      console.log(
+        `[review-queue] closeOrphanedReviewBeads: closed orphaned MR bead=${parsed.bead_id}`
+      );
+    } catch (err) {
+      console.warn(
+        `[review-queue] closeOrphanedReviewBeads: failed to close bead=${parsed.bead_id}`,
+        err
+      );
+    }
+  }
 }
 
 // ── Agent Done ──────────────────────────────────────────────────────

@@ -1,17 +1,19 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
-import { Hexagon, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { CheckCircle, GitBranch, Loader2, X, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
-type Bead = GastownOutputs['gastown']['listBeads'][number];
+type ConvoyDetail = GastownOutputs['gastown']['listConvoys'][number];
+type ConvoyBead = ConvoyDetail['beads'][number];
+type DependencyEdge = ConvoyDetail['dependency_edges'][number];
 
-type ConvoyTimelineProps = {
-  /** All beads from a rig (or across rigs) */
-  beads: Bead[];
-  agentNameById: Record<string, string>;
-  onSelectBead?: (beadId: string) => void;
+export type ConvoyTimelineProps = {
+  convoys: ConvoyDetail[];
+  collapsed?: boolean;
+  onSelectBead?: (beadId: string, rigId: string | null) => void;
+  onCloseConvoy?: (convoyId: string) => void;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -29,170 +31,264 @@ const STATUS_DOT_COLORS: Record<string, string> = {
 };
 
 /**
- * Horizontal timeline showing bead completion events over time.
- * Groups beads by parent_bead_id to form "convoys".
+ * Compute topological waves from beads and dependency edges using Kahn's algorithm.
+ * Wave 0 = beads with no incoming 'blocks' edges (can run immediately).
+ * Wave N = beads whose all blockers are in waves < N.
+ * Returns beads grouped by wave index, preserving creation order within each wave.
  */
-export function ConvoyTimeline({ beads, agentNameById, onSelectBead }: ConvoyTimelineProps) {
-  // Group into convoys by parent_bead_id
-  const convoys = useMemo(() => {
-    const groups: Record<string, Bead[]> = {};
-    const standalone: Bead[] = [];
+function computeWaves(beadList: ConvoyBead[], edges: DependencyEdge[]): ConvoyBead[][] {
+  const beadIds = new Set(beadList.map(b => b.bead_id));
 
-    for (const bead of beads) {
-      if (bead.parent_bead_id) {
-        const key = bead.parent_bead_id;
-        groups[key] ??= [];
-        groups[key].push(bead);
-      } else {
-        standalone.push(bead);
+  // Build in-degree map and adjacency list (only for beads in this convoy)
+  const inDegree = new Map<string, number>();
+  const blockedBy = new Map<string, string[]>(); // bead_id → list of blockers
+  for (const b of beadList) {
+    inDegree.set(b.bead_id, 0);
+    blockedBy.set(b.bead_id, []);
+  }
+  for (const edge of edges) {
+    if (!beadIds.has(edge.bead_id) || !beadIds.has(edge.depends_on_bead_id)) continue;
+    inDegree.set(edge.bead_id, (inDegree.get(edge.bead_id) ?? 0) + 1);
+    blockedBy.get(edge.bead_id)?.push(edge.depends_on_bead_id);
+  }
+
+  const beadById = new Map(beadList.map(b => [b.bead_id, b]));
+  const waves: ConvoyBead[][] = [];
+  const remaining = new Set(beadIds);
+
+  while (remaining.size > 0) {
+    // Collect all beads with in-degree 0
+    const wave: ConvoyBead[] = [];
+    for (const id of remaining) {
+      if ((inDegree.get(id) ?? 0) === 0) {
+        const bead = beadById.get(id);
+        if (bead) wave.push(bead);
       }
     }
 
-    const result: Array<{ id: string; label: string; beads: Bead[]; isConvoy: boolean }> = [];
-
-    // Add actual convoys
-    for (const [parentId, children] of Object.entries(groups)) {
-      const parent = beads.find(b => b.bead_id === parentId);
-      result.push({
-        id: parentId,
-        label: parent?.title ?? `Convoy ${parentId.slice(0, 8)}`,
-        beads: children.sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        ),
-        isConvoy: true,
-      });
-    }
-
-    // Add standalone beads as single-bead "convoys"
-    for (const bead of standalone) {
-      if (!groups[bead.bead_id]) {
-        result.push({
-          id: bead.bead_id,
-          label: bead.title,
-          beads: [bead],
-          isConvoy: false,
-        });
+    // If no zero-degree nodes remain, there's a cycle — dump remaining as final wave
+    if (wave.length === 0) {
+      const rest: ConvoyBead[] = [];
+      for (const id of remaining) {
+        const bead = beadById.get(id);
+        if (bead) rest.push(bead);
       }
+      waves.push(rest);
+      break;
     }
 
-    return result;
-  }, [beads]);
+    waves.push(wave);
 
-  if (beads.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <Hexagon className="mb-2 size-6 text-white/10" />
-        <p className="text-xs text-white/25">No beads to visualize.</p>
-      </div>
-    );
+    // Remove wave nodes and decrement in-degrees
+    for (const bead of wave) {
+      remaining.delete(bead.bead_id);
+    }
+    for (const id of remaining) {
+      const blockers = blockedBy.get(id) ?? [];
+      let newDegree = 0;
+      for (const dep of blockers) {
+        if (remaining.has(dep)) newDegree++;
+      }
+      inDegree.set(id, newDegree);
+    }
+  }
+
+  return waves;
+}
+
+/**
+ * Renders convoy progress as horizontal timeline tracks with DAG visualization.
+ * Beads are grouped into waves based on dependency edges.
+ * Collapse state is managed by the parent via the `collapsed` prop.
+ */
+export function ConvoyTimeline({
+  convoys,
+  collapsed = false,
+  onSelectBead,
+  onCloseConvoy,
+}: ConvoyTimelineProps) {
+  if (convoys.length === 0) {
+    return null;
   }
 
   return (
-    <div className="space-y-4">
-      {convoys.map(convoy => {
-        const completedCount = convoy.beads.filter(b => b.status === 'closed').length;
-        const total = convoy.beads.length;
-        const hasStalled = convoy.beads.some(b => b.status === 'open' && !b.assignee_agent_bead_id);
+    <AnimatePresence initial={false}>
+      {!collapsed && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="min-w-0 space-y-3 overflow-hidden"
+        >
+          {convoys.map(convoy => (
+            <ConvoyCard
+              key={convoy.id}
+              convoy={convoy}
+              onSelectBead={onSelectBead}
+              onClose={onCloseConvoy ? () => onCloseConvoy(convoy.id) : undefined}
+            />
+          ))}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
-        return (
-          <div
-            key={convoy.id}
-            className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3"
-          >
-            {/* Convoy header */}
-            <div className="mb-2.5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {convoy.isConvoy && (
-                  <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-medium text-white/40">
-                    CONVOY
-                  </span>
-                )}
-                <span className="max-w-[300px] truncate text-xs font-medium text-white/70">
-                  {convoy.label}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {hasStalled && (
-                  <span className="flex items-center gap-1 text-[9px] text-orange-400">
-                    <AlertTriangle className="size-2.5" />
-                    Stranded
-                  </span>
-                )}
-                <span className="font-mono text-[10px] text-white/30">
-                  {completedCount}/{total}
-                </span>
-              </div>
-            </div>
+function ConvoyCard({
+  convoy,
+  onSelectBead,
+  onClose,
+}: {
+  convoy: ConvoyDetail;
+  onSelectBead?: (beadId: string, rigId: string | null) => void;
+  onClose?: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const progress = convoy.total_beads > 0 ? convoy.closed_beads / convoy.total_beads : 0;
 
-            {/* Timeline track */}
-            <div className="relative flex items-center gap-1 overflow-x-auto py-1">
-              {/* Track line */}
-              <div className="absolute top-1/2 right-0 left-0 h-px -translate-y-1/2 bg-white/[0.06]" />
+  const waves = useMemo(
+    () => computeWaves(convoy.beads, convoy.dependency_edges ?? []),
+    [convoy.beads, convoy.dependency_edges]
+  );
 
-              {convoy.beads.map((bead, i) => {
-                const assigneeName = bead.assignee_agent_bead_id
-                  ? agentNameById[bead.assignee_agent_bead_id]
-                  : null;
+  const hasDag = (convoy.dependency_edges ?? []).length > 0;
 
-                return (
-                  <motion.button
-                    key={bead.bead_id}
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: i * 0.06, duration: 0.25 }}
-                    onClick={() => onSelectBead?.(bead.bead_id)}
-                    className={`relative z-10 flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] transition-all hover:scale-105 ${STATUS_COLORS[bead.status] ?? 'border-white/10 bg-white/[0.03]'}`}
-                    title={`${bead.title} (${bead.status})`}
+  return (
+    <div className="min-w-0 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+      {/* Convoy header */}
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-medium text-violet-400">
+            CONVOY
+          </span>
+          <span className="max-w-[300px] truncate text-xs font-medium text-white/70">
+            {convoy.title}
+          </span>
+          {convoy.feature_branch && (
+            <span
+              className="flex items-center gap-1 text-[9px] text-white/25"
+              title={convoy.feature_branch}
+            >
+              <GitBranch className="size-2.5" />
+              <span className="max-w-[140px] truncate font-mono">{convoy.feature_branch}</span>
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] text-white/30">
+            {convoy.closed_beads}/{convoy.total_beads}
+          </span>
+          {onClose && (
+            <>
+              {confirming ? (
+                <span className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setConfirming(false);
+                    }}
+                    className="rounded bg-red-500/20 px-1.5 py-0.5 text-[9px] font-medium text-red-400 transition-colors hover:bg-red-500/30"
                   >
-                    {bead.status === 'closed' ? (
-                      <CheckCircle className="size-3 text-emerald-400" />
-                    ) : bead.status === 'in_progress' ? (
-                      <Loader2 className="size-3 animate-spin text-amber-400" />
-                    ) : (
-                      <span
-                        className={`size-2 rounded-full ${STATUS_DOT_COLORS[bead.status] ?? 'bg-white/20'}`}
-                      />
-                    )}
-                    <span className="max-w-[80px] truncate text-white/70">
-                      {bead.title.slice(0, 20)}
-                    </span>
-                    {assigneeName && <span className="ml-0.5 text-white/30">{assigneeName}</span>}
-                  </motion.button>
-                );
-              })}
+                    Close all
+                  </button>
+                  <button
+                    onClick={() => setConfirming(false)}
+                    className="text-[9px] text-white/30 transition-colors hover:text-white/50"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirming(true)}
+                  className="rounded p-0.5 text-white/20 transition-colors hover:bg-white/[0.06] hover:text-white/40"
+                  title="Close convoy and all beads"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-2.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+        <motion.div
+          className="h-full rounded-full bg-emerald-500/60"
+          initial={{ width: 0 }}
+          animate={{ width: `${progress * 100}%` }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        />
+      </div>
+
+      {/* DAG wave layout or flat list */}
+      {hasDag ? (
+        <div className="relative isolate flex items-center gap-0.5 overflow-x-auto py-0.5">
+          {waves.map((wave, waveIdx) => (
+            <div key={waveIdx} className="flex items-center gap-0.5">
+              {waveIdx > 0 && <ArrowRight className="mx-1 size-3 shrink-0 text-white/15" />}
+              <div className="flex flex-col gap-1">
+                {wave.length > 1 && (
+                  <span className="text-center text-[8px] text-white/20">wave {waveIdx + 1}</span>
+                )}
+                <div className="flex gap-1">
+                  {wave.map((bead, i) => (
+                    <BeadChip
+                      key={bead.bead_id}
+                      bead={bead}
+                      delay={waveIdx * 0.1 + i * 0.05}
+                      onSelect={onSelectBead}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      ) : (
+        <div className="relative isolate flex items-center gap-1 overflow-x-auto py-0.5">
+          <div className="absolute top-1/2 right-0 left-0 h-px -translate-y-1/2 bg-white/[0.06]" />
+          {convoy.beads.map((bead, i) => (
+            <BeadChip key={bead.bead_id} bead={bead} delay={i * 0.05} onSelect={onSelectBead} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-/**
- * Detects convoys where beads are open but no agents are assigned.
- */
-export function StrandedConvoyAlert({ beads, onSling }: { beads: Bead[]; onSling?: () => void }) {
-  const strandedBeads = beads.filter(b => b.status === 'open' && !b.assignee_agent_bead_id);
-
-  if (strandedBeads.length === 0) return null;
-
+function BeadChip({
+  bead,
+  delay,
+  onSelect,
+}: {
+  bead: ConvoyBead;
+  delay: number;
+  onSelect?: (beadId: string, rigId: string | null) => void;
+}) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-orange-500/20 bg-orange-500/5 px-4 py-2.5">
-      <AlertTriangle className="size-4 shrink-0 text-orange-400" />
-      <div className="flex-1">
-        <span className="text-xs font-medium text-orange-300">
-          {strandedBeads.length} stranded bead{strandedBeads.length > 1 ? 's' : ''}
-        </span>
-        <span className="ml-1 text-[10px] text-orange-400/60">— open but no agent assigned</span>
-      </div>
-      {onSling && (
-        <button
-          onClick={onSling}
-          className="rounded-md bg-orange-500/15 px-3 py-1 text-[10px] font-medium text-orange-300 transition-colors hover:bg-orange-500/25"
-        >
-          Sling
-        </button>
+    <motion.button
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay, duration: 0.2 }}
+      onClick={() => onSelect?.(bead.bead_id, bead.rig_id)}
+      className={`relative z-10 flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] transition-all hover:scale-105 ${STATUS_COLORS[bead.status] ?? 'border-white/10 bg-white/[0.03]'}`}
+      title={`${bead.title} (${bead.status})${bead.assignee_agent_name ? ` — ${bead.assignee_agent_name}` : ''}`}
+    >
+      {bead.status === 'closed' ? (
+        <CheckCircle className="size-3 text-emerald-400" />
+      ) : bead.status === 'in_progress' ? (
+        <Loader2 className="size-3 animate-spin text-amber-400" />
+      ) : (
+        <span
+          className={`size-2 rounded-full ${STATUS_DOT_COLORS[bead.status] ?? 'bg-white/20'}`}
+        />
       )}
-    </div>
+      <span className="max-w-[100px] truncate text-white/70">{bead.title}</span>
+      {bead.assignee_agent_name && (
+        <span className="ml-0.5 text-white/25">{bead.assignee_agent_name}</span>
+      )}
+    </motion.button>
   );
 }

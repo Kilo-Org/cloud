@@ -17,7 +17,6 @@ const CreateBeadBody = z.object({
   labels: z.array(z.string()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   assignee_agent_id: z.string().optional(),
-  convoy_id: z.string().optional(),
 });
 
 const UpdateBeadStatusBody = z.object({

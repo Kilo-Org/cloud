@@ -112,6 +112,40 @@ export const PtySessionOutput = z.object({
   wsUrl: z.string(),
 });
 
+// Convoy summary
+export const ConvoyOutput = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.enum(['active', 'landed']),
+  total_beads: z.number(),
+  closed_beads: z.number(),
+  created_by: z.string().nullable(),
+  created_at: z.string(),
+  landed_at: z.string().nullable(),
+  feature_branch: z.string().nullable(),
+  merge_mode: z.string().nullable(),
+});
+
+// Detailed convoy status with per-bead breakdown and DAG edges
+export const ConvoyDetailOutput = ConvoyOutput.extend({
+  beads: z.array(
+    z.object({
+      bead_id: z.string(),
+      title: z.string(),
+      status: z.string(),
+      rig_id: z.string().nullable(),
+      assignee_agent_name: z.string().nullable(),
+    })
+  ),
+  /** 'blocks' dependency edges between tracked beads — the execution DAG. */
+  dependency_edges: z.array(
+    z.object({
+      bead_id: z.string(),
+      depends_on_bead_id: z.string(),
+    })
+  ),
+});
+
 // SlingResult
 export const SlingResultOutput = z.object({
   bead: BeadOutput,
@@ -148,5 +182,7 @@ export const RpcMayorSendResultOutput = rpcSafe(MayorSendResultOutput);
 export const RpcMayorStatusOutput = rpcSafe(MayorStatusOutput);
 export const RpcStreamTicketOutput = rpcSafe(StreamTicketOutput);
 export const RpcPtySessionOutput = rpcSafe(PtySessionOutput);
+export const RpcConvoyOutput = rpcSafe(ConvoyOutput);
+export const RpcConvoyDetailOutput = rpcSafe(ConvoyDetailOutput);
 export const RpcSlingResultOutput = rpcSafe(SlingResultOutput);
 export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { toast } from 'sonner';
@@ -8,9 +8,10 @@ import { Button } from '@/components/Button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BeadBoard } from '@/components/gastown/BeadBoard';
 import { AgentCard } from '@/components/gastown/AgentCard';
+import { ConvoyTimeline } from '@/components/gastown/ConvoyTimeline';
 import { SlingDialog } from '@/components/gastown/SlingDialog';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
-import { Plus, GitBranch, Hexagon, Bot } from 'lucide-react';
+import { Plus, GitBranch, Hexagon, Bot, Layers, ChevronRight, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type RigDetailPageClientProps = {
@@ -21,6 +22,7 @@ type RigDetailPageClientProps = {
 export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps) {
   const trpc = useGastownTRPC();
   const [isSlingOpen, setIsSlingOpen] = useState(false);
+  const [convoysCollapsed, setConvoysCollapsed] = useState(false);
   const { open: openDrawer } = useDrawerStack();
 
   const queryClient = useQueryClient();
@@ -61,8 +63,31 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
     })
   );
 
+  const convoysQuery = useQuery({
+    ...trpc.gastown.listConvoys.queryOptions({ townId }),
+    refetchInterval: 8_000,
+  });
+  const closeConvoyMutation = useMutation(
+    trpc.gastown.closeConvoy.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.listConvoys.queryKey({ townId }),
+        });
+      },
+      onError: err => toast.error(err.message),
+    })
+  );
+
   const beads = beadsQuery.data ?? [];
   const agents = agentsQuery.data ?? [];
+
+  // Filter convoys to those with at least one bead in this rig
+  const rigBeadIds = useMemo(() => new Set(beads.map(b => b.bead_id)), [beads]);
+  const rigConvoys = useMemo(
+    () =>
+      (convoysQuery.data ?? []).filter(convoy => convoy.beads.some(b => rigBeadIds.has(b.bead_id))),
+    [convoysQuery.data, rigBeadIds]
+  );
 
   const openBeads = beads.filter(b => b.status === 'open' && b.type !== 'agent').length;
   const inProgressBeads = beads.filter(
@@ -106,6 +131,38 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
         <RigStatCell label="In Progress" value={inProgressBeads} color="text-amber-400" />
         <RigStatCell label="Closed" value={closedBeads} color="text-emerald-400" />
       </div>
+
+      {/* Convoy progress (if any) */}
+      {rigConvoys.length > 0 && (
+        <div className="flex max-h-[40vh] flex-col border-b border-white/[0.06] px-4 py-3">
+          <button
+            onClick={() => setConvoysCollapsed(v => !v)}
+            className="mb-2 flex w-full shrink-0 items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="size-3 text-violet-400/70" />
+              <span className="text-[10px] font-medium tracking-wide text-white/35 uppercase">
+                Convoys ({rigConvoys.length})
+              </span>
+            </div>
+            {convoysCollapsed ? (
+              <ChevronRight className="size-3.5 text-white/25" />
+            ) : (
+              <ChevronDown className="size-3.5 text-white/25" />
+            )}
+          </button>
+          <div className="min-h-0 min-w-0 overflow-y-auto">
+            <ConvoyTimeline
+              convoys={rigConvoys}
+              collapsed={convoysCollapsed}
+              onSelectBead={(beadId, beadRigId) =>
+                openDrawer({ type: 'bead', beadId, rigId: beadRigId ?? rigId })
+              }
+              onCloseConvoy={convoyId => closeConvoyMutation.mutate({ townId, convoyId })}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Main content: columns layout */}
       <div className="flex flex-1 overflow-hidden">

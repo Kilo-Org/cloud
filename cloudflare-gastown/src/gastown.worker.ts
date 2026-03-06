@@ -75,10 +75,13 @@ import {
 } from './handlers/mayor.handler';
 import {
   handleMayorSling,
+  handleMayorSlingBatch,
   handleMayorListRigs,
   handleMayorListBeads,
   handleMayorListAgents,
   handleMayorSendMail,
+  handleMayorListConvoys,
+  handleMayorConvoyStatus,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
@@ -385,12 +388,17 @@ app.post('/api/towns/:townId/mayor/destroy', c => handleDestroyMayor(c, c.req.pa
 app.use('/api/mayor/:townId/tools/*', mayorAuthMiddleware);
 
 app.post('/api/mayor/:townId/tools/sling', c => handleMayorSling(c, c.req.param()));
+app.post('/api/mayor/:townId/tools/sling-batch', c => handleMayorSlingBatch(c, c.req.param()));
 app.get('/api/mayor/:townId/tools/rigs', c => handleMayorListRigs(c, c.req.param()));
 app.get('/api/mayor/:townId/tools/rigs/:rigId/beads', c => handleMayorListBeads(c, c.req.param()));
 app.get('/api/mayor/:townId/tools/rigs/:rigId/agents', c =>
   handleMayorListAgents(c, c.req.param())
 );
 app.post('/api/mayor/:townId/tools/mail', c => handleMayorSendMail(c, c.req.param()));
+app.get('/api/mayor/:townId/tools/convoys', c => handleMayorListConvoys(c, c.req.param()));
+app.get('/api/mayor/:townId/tools/convoys/:convoyId', c =>
+  handleMayorConvoyStatus(c, c.req.param())
+);
 
 // ── tRPC ────────────────────────────────────────────────────────────────
 // Serve the gastown tRPC router directly. The frontend tRPC client

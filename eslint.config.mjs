@@ -23,6 +23,7 @@ export default defineConfig([
       'build/**',
       'supabase/functions/**',
       'src/types/opencode.gen.ts',
+      'src/lib/gastown/types/**',
     ],
   },
   {

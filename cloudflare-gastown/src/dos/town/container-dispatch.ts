@@ -119,6 +119,33 @@ export function branchForAgent(name: string, beadId?: string): string {
 }
 
 /**
+ * Generate a branch name for a convoy bead's agent.
+ *
+ * Agent branches are siblings of the convoy feature branch's /head ref,
+ * not children of it. Git refs are file-based: a ref at path X blocks
+ * refs under X/. The convoy feature branch ends with /head (a leaf),
+ * and agent branches sit alongside it under the same convoy prefix:
+ *
+ *   convoy/<slug>/<id>/head             ← feature branch
+ *   convoy/<slug>/<id>/gt/<agent>/<bead> ← agent branch (sibling)
+ *
+ * Both are entries within the <id>/ directory, so no ref conflict.
+ */
+export function branchForConvoyAgent(
+  convoyFeatureBranch: string,
+  name: string,
+  beadId: string
+): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-');
+  // Strip /head suffix to get the convoy prefix, then place the agent branch as a sibling
+  const convoyPrefix = convoyFeatureBranch.replace(/\/head$/, '');
+  return `${convoyPrefix}/gt/${slug}/${beadId.slice(0, 8)}`;
+}
+
+/**
  * Signal the container to start an agent process.
  * Attaches current town config via X-Town-Config header.
  */
@@ -143,6 +170,8 @@ export async function startAgentInContainer(
     townConfig: TownConfig;
     systemPromptOverride?: string;
     platformIntegrationId?: string;
+    /** For convoy beads: the convoy's feature branch to branch from instead of defaultBranch. */
+    convoyFeatureBranch?: string;
   }
 ): Promise<boolean> {
   console.log(
@@ -220,7 +249,13 @@ export async function startAgentInContainer(
             townId: params.townId,
           }),
         gitUrl: params.gitUrl,
-        branch: branchForAgent(params.agentName, params.beadId),
+        branch: params.convoyFeatureBranch
+          ? branchForConvoyAgent(params.convoyFeatureBranch, params.agentName, params.beadId)
+          : branchForAgent(params.agentName, params.beadId),
+        // Always use the rig's real default branch for the initial git clone.
+        // The convoy feature branch may not exist on the remote yet (the first
+        // agent's work creates it via the refinery merge). The agent's working
+        // branch is created as a worktree from HEAD after clone.
         defaultBranch: params.defaultBranch,
         envVars,
         platformIntegrationId: params.platformIntegrationId,

@@ -27,6 +27,7 @@ import {
   RpcPtySessionOutput,
   RpcSlingResultOutput,
   RpcRigDetailOutput,
+  RpcConvoyDetailOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 
@@ -570,6 +571,38 @@ export const gastownRouter = router({
         since: input.since,
         limit: input.limit,
       });
+    }),
+
+  listConvoys: procedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+      })
+    )
+    .output(z.array(RpcConvoyDetailOutput))
+    .query(async ({ ctx, input }) => {
+      requireAdmin(ctx);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.listConvoysDetailed();
+    }),
+
+  closeConvoy: procedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        convoyId: z.string().uuid(),
+      })
+    )
+    .output(RpcConvoyDetailOutput.nullable())
+    .mutation(async ({ ctx, input }) => {
+      requireAdmin(ctx);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      const convoy = await townStub.closeConvoy(input.convoyId);
+      if (!convoy) return null;
+      const status = await townStub.getConvoyStatus(input.convoyId);
+      return status ?? { ...convoy, beads: [] };
     }),
 });
 

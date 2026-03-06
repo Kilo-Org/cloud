@@ -18,6 +18,22 @@ const MayorSlingBody = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+const MayorSlingBatchBody = z.object({
+  rig_id: z.string().min(1),
+  convoy_title: z.string().min(1),
+  tasks: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        body: z.string().optional(),
+        depends_on: z.array(z.number().int().min(0)).optional(),
+      })
+    )
+    .min(1)
+    .max(50),
+  merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
+});
+
 const MayorMailBody = z.object({
   rig_id: z.string().min(1),
   to_agent_id: z.string().min(1),
@@ -219,4 +235,74 @@ export async function handleMayorSendMail(c: Context<GastownEnv>, params: { town
   });
 
   return c.json(resSuccess({ sent: true }));
+}
+
+/**
+ * POST /api/mayor/:townId/tools/sling-batch
+ * Sling multiple beads as a tracked convoy. Creates N beads + 1 convoy,
+ * assigns polecats, and dispatches all in one call.
+ */
+export async function handleMayorSlingBatch(c: Context<GastownEnv>, params: { townId: string }) {
+  const parsed = MayorSlingBatchBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, parsed.data.rig_id);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorSlingBatch: townId=${params.townId} rigId=${parsed.data.rig_id} convoy="${parsed.data.convoy_title.slice(0, 80)}" tasks=${parsed.data.tasks.length}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const result = await town.slingConvoy({
+    rigId: parsed.data.rig_id,
+    convoyTitle: parsed.data.convoy_title,
+    tasks: parsed.data.tasks,
+    merge_mode: parsed.data.merge_mode,
+  });
+
+  console.log(
+    `${HANDLER_LOG} handleMayorSlingBatch: completed, convoy=${result.convoy.id} beads=${result.beads.length}`
+  );
+
+  return c.json(resSuccess(result), 201);
+}
+
+/**
+ * GET /api/mayor/:townId/tools/convoys
+ * List active convoys with progress counts.
+ */
+export async function handleMayorListConvoys(c: Context<GastownEnv>, params: { townId: string }) {
+  console.log(`${HANDLER_LOG} handleMayorListConvoys: townId=${params.townId}`);
+
+  const town = getTownDOStub(c.env, params.townId);
+  const convoys = await town.listConvoys();
+
+  return c.json(resSuccess(convoys));
+}
+
+/**
+ * GET /api/mayor/:townId/tools/convoys/:convoyId
+ * Detailed convoy status with per-bead breakdown.
+ */
+export async function handleMayorConvoyStatus(
+  c: Context<GastownEnv>,
+  params: { townId: string; convoyId: string }
+) {
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyStatus: townId=${params.townId} convoyId=${params.convoyId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const status = await town.getConvoyStatus(params.convoyId);
+
+  if (!status) return c.json(resError('Convoy not found'), 404);
+  return c.json(resSuccess(status));
 }

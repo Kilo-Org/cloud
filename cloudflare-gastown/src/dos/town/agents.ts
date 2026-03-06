@@ -247,12 +247,14 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
     [beadId, now(), agentId]
   );
 
+  // Assign the agent to the bead but keep the bead as 'open'.
+  // The bead transitions to 'in_progress' only when the agent's
+  // container process actually starts (in dispatchAgent).
   query(
     sql,
     /* sql */ `
       UPDATE ${beads}
-      SET ${beads.columns.status} = 'in_progress',
-          ${beads.columns.assignee_agent_bead_id} = ?,
+      SET ${beads.columns.assignee_agent_bead_id} = ?,
           ${beads.columns.updated_at} = ?
       WHERE ${beads.bead_id} = ?
     `,

@@ -8,6 +8,7 @@ import { Button } from '@/components/Button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateRigDialog } from '@/components/gastown/CreateRigDialog';
 import { ActivityFeedView } from '@/components/gastown/ActivityFeed';
+import { ConvoyTimeline } from '@/components/gastown/ConvoyTimeline';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import { SystemTopology } from '@/components/gastown/SystemTopology';
 import {
@@ -24,6 +25,8 @@ import {
   Shield,
   Eye,
   ChevronRight,
+  ChevronDown,
+  Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -80,6 +83,7 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
   const router = useRouter();
   const trpc = useGastownTRPC();
   const [isCreateRigOpen, setIsCreateRigOpen] = useState(false);
+  const [convoysCollapsed, setConvoysCollapsed] = useState(false);
   const { open: openDrawer } = useDrawerStack();
 
   const queryClient = useQueryClient();
@@ -89,9 +93,24 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
     ...trpc.gastown.getTownEvents.queryOptions({ townId, limit: 200 }),
     refetchInterval: 5_000,
   });
+  const convoysQuery = useQuery({
+    ...trpc.gastown.listConvoys.queryOptions({ townId }),
+    refetchInterval: 8_000,
+  });
+  const closeConvoyMutation = useMutation(
+    trpc.gastown.closeConvoy.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.listConvoys.queryKey({ townId }),
+        });
+      },
+      onError: err => toast.error(err.message),
+    })
+  );
 
   const rigs = rigsQuery.data ?? [];
   const events = townEventsQuery.data ?? [];
+  const convoys = convoysQuery.data ?? [];
 
   const activityData = useMemo(() => bucketEventsOverTime(events), [events]);
 
@@ -199,7 +218,7 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
       {/* Main content area — no scroll container; viewport scrolls */}
       <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_380px]">
         {/* Left column: activity feed */}
-        <div className="border-r border-white/[0.06]">
+        <div className="min-w-0 border-r border-white/[0.06]">
           {/* Stats strip */}
           <div className="grid grid-cols-4 border-b border-white/[0.06]">
             <StatCell
@@ -278,6 +297,38 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
               )}
             </div>
           </div>
+
+          {/* Active Convoys */}
+          {convoys.length > 0 && (
+            <div className="flex max-h-[40vh] flex-col border-b border-white/[0.06] px-5 pt-4 pb-3">
+              <button
+                onClick={() => setConvoysCollapsed(v => !v)}
+                className="mb-2.5 flex w-full shrink-0 items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <Layers className="size-3.5 text-violet-400/70" />
+                  <span className="text-[11px] font-medium tracking-wide text-white/40 uppercase">
+                    Active Convoys ({convoys.length})
+                  </span>
+                </div>
+                {convoysCollapsed ? (
+                  <ChevronRight className="size-3.5 text-white/25" />
+                ) : (
+                  <ChevronDown className="size-3.5 text-white/25" />
+                )}
+              </button>
+              <div className="min-h-0 min-w-0 overflow-y-auto">
+                <ConvoyTimeline
+                  convoys={convoys}
+                  collapsed={convoysCollapsed}
+                  onSelectBead={(beadId, rigId) => {
+                    if (rigId) openDrawer({ type: 'bead', beadId, rigId });
+                  }}
+                  onCloseConvoy={convoyId => closeConvoyMutation.mutate({ townId, convoyId })}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Activity feed — clickable items */}
           <div className="px-2">

@@ -35,9 +35,10 @@ import {
   ConvoyBeadRecord,
 } from '../db/tables/beads.table';
 import { agent_metadata, AgentMetadataRecord } from '../db/tables/agent-metadata.table';
+import { review_metadata } from '../db/tables/review-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
-import { bead_dependencies, BeadDependencyRecord } from '../db/tables/bead-dependencies.table';
+import { bead_dependencies } from '../db/tables/bead-dependencies.table';
 import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
@@ -138,6 +139,8 @@ type ConvoyEntry = {
   created_by: string | null;
   created_at: string;
   landed_at: string | null;
+  feature_branch: string | null;
+  merge_mode: string | null;
 };
 
 function toConvoy(row: ConvoyBeadRecord): ConvoyEntry {
@@ -150,13 +153,16 @@ function toConvoy(row: ConvoyBeadRecord): ConvoyEntry {
     created_by: row.created_by,
     created_at: row.created_at,
     landed_at: row.landed_at,
+    feature_branch: row.feature_branch,
+    merge_mode: row.merge_mode,
   };
 }
 
 const CONVOY_JOIN = /* sql */ `
   SELECT ${beads}.*,
          ${convoy_metadata.total_beads}, ${convoy_metadata.closed_beads},
-         ${convoy_metadata.landed_at}
+         ${convoy_metadata.landed_at}, ${convoy_metadata.feature_branch},
+         ${convoy_metadata.merge_mode}
   FROM ${beads}
   INNER JOIN ${convoy_metadata} ON ${beads.bead_id} = ${convoy_metadata.bead_id}
 `;
@@ -207,6 +213,13 @@ export class TownDO extends DurableObject<Env> {
 
     // Rig registry
     rigs.initRigTables(this.sql);
+
+    // Ensure the alarm loop is running. After a deploy/restart, the
+    // Cloudflare runtime normally delivers missed alarms, but if the alarm
+    // was never set or was deleted by destroy(), the loop is dead. Re-arm
+    // unconditionally so pending work (idle agents with hooks, open MR beads,
+    // stale reviews) gets processed.
+    await this.armAlarmIfNeeded();
   }
 
   private _townId: string | null = null;
@@ -345,28 +358,13 @@ export class TownDO extends DurableObject<Env> {
 
   async updateBeadStatus(beadId: string, status: string, agentId: string): Promise<Bead> {
     await this.ensureInitialized();
+    // Convoy progress is updated automatically inside beadOps.updateBeadStatus
+    // when the bead reaches a terminal status (closed/failed).
     const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId);
 
-    // If closed and part of a convoy (via bead_dependencies), notify
-    if (status === 'closed') {
-      const convoyRows = [
-        ...query(
-          this.sql,
-          /* sql */ `
-            SELECT ${bead_dependencies.depends_on_bead_id}
-            FROM ${bead_dependencies}
-            WHERE ${bead_dependencies.bead_id} = ?
-              AND ${bead_dependencies.dependency_type} = 'tracks'
-          `,
-          [beadId]
-        ),
-      ];
-      const parsed = BeadDependencyRecord.pick({ depends_on_bead_id: true })
-        .array()
-        .parse(convoyRows);
-      for (const { depends_on_bead_id } of parsed) {
-        this.onBeadClosed({ convoyId: depends_on_bead_id, beadId }).catch(() => {});
-      }
+    // When a bead closes, check if any blocked beads are now unblocked and dispatch them.
+    if (status === 'closed' || status === 'failed') {
+      this.dispatchUnblockedBeads(beadId);
     }
 
     return bead;
@@ -967,6 +965,391 @@ export class TownDO extends DurableObject<Env> {
     return convoy;
   }
 
+  /**
+   * Force-close a convoy and all its tracked beads. Unhooks any agents
+   * still assigned to those beads so they return to the idle pool.
+   */
+  async closeConvoy(convoyId: string): Promise<ConvoyEntry | null> {
+    await this.ensureInitialized();
+
+    const convoy = this.getConvoy(convoyId);
+    if (!convoy) return null;
+
+    const timestamp = now();
+
+    // Find all tracked beads
+    const trackedRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${beads.bead_id}, ${beads.status}, ${beads.assignee_agent_bead_id}
+          FROM ${bead_dependencies}
+          INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
+          WHERE ${bead_dependencies.depends_on_bead_id} = ?
+            AND ${bead_dependencies.dependency_type} = 'tracks'
+        `,
+        [convoyId]
+      ),
+    ];
+
+    const TrackedRow = z.object({
+      bead_id: z.string(),
+      status: z.string(),
+      assignee_agent_bead_id: z.string().nullable(),
+    });
+
+    for (const raw of trackedRows) {
+      const row = TrackedRow.parse(raw);
+      if (row.status === 'closed' || row.status === 'failed') continue;
+
+      // Unhook agent if still assigned
+      if (row.assignee_agent_bead_id) {
+        try {
+          agents.unhookBead(this.sql, row.assignee_agent_bead_id);
+        } catch (err) {
+          console.warn(
+            `${TOWN_LOG} closeConvoy: unhookBead failed for agent=${row.assignee_agent_bead_id}`,
+            err
+          );
+        }
+      }
+
+      beadOps.updateBeadStatus(this.sql, row.bead_id, 'closed', 'system');
+    }
+
+    // Close the convoy bead itself if not already auto-landed by
+    // updateConvoyProgress (which fires when the last tracked bead closes).
+    const current = this.getConvoy(convoyId);
+    if (current && current.status !== 'landed') {
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.status} = 'closed',
+              ${beads.columns.closed_at} = ?,
+              ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [timestamp, timestamp, convoyId]
+      );
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${convoy_metadata}
+          SET ${convoy_metadata.columns.closed_beads} = ${convoy_metadata.columns.total_beads},
+              ${convoy_metadata.columns.landed_at} = ?
+          WHERE ${convoy_metadata.bead_id} = ?
+        `,
+        [timestamp, convoyId]
+      );
+    }
+
+    console.log(`${TOWN_LOG} closeConvoy: force-closed convoy=${convoyId}`);
+    return this.getConvoy(convoyId);
+  }
+
+  /**
+   * Atomic batch sling: create N beads + 1 convoy, assign polecats, dispatch.
+   * Used by the Mayor's gt_sling_batch tool.
+   */
+  async slingConvoy(input: {
+    rigId: string;
+    convoyTitle: string;
+    tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
+    merge_mode?: 'review-then-land' | 'review-and-merge';
+  }): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent }> }> {
+    await this.ensureInitialized();
+
+    const convoyId = generateId();
+    const timestamp = now();
+
+    // Generate a feature branch name for this convoy.
+    // Convention: convoy/<slug>/<id-prefix>/head
+    // The /head suffix is required because git refs are file-based: a branch
+    // at path X prevents branches under X/. Agent branches live under
+    // <featureBranch>/gt/<agent>/<bead>, so the feature branch itself must
+    // end with a path component (/head) to act as a directory prefix.
+    const convoySlug = input.convoyTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40);
+    const featureBranch = `convoy/${convoySlug}/${convoyId.slice(0, 8)}/head`;
+
+    // 1. Create convoy bead + convoy_metadata
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${beads} (
+          ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
+          ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
+          ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
+          ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
+          ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
+          ${beads.columns.closed_at}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        convoyId,
+        'convoy',
+        'open',
+        input.convoyTitle,
+        null, // body
+        null, // rig_id — intentionally null; a convoy is a town-level grouping that can span multiple rigs
+        null, // parent_bead_id
+        null, // assignee_agent_bead_id
+        'medium',
+        JSON.stringify(['gt:convoy']),
+        JSON.stringify({ feature_branch: featureBranch }),
+        null,
+        timestamp,
+        timestamp,
+        null,
+      ]
+    );
+
+    const mergeMode = input.merge_mode ?? 'review-then-land';
+
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${convoy_metadata} (
+          ${convoy_metadata.columns.bead_id}, ${convoy_metadata.columns.total_beads},
+          ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at},
+          ${convoy_metadata.columns.feature_branch}, ${convoy_metadata.columns.merge_mode}
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [convoyId, input.tasks.length, 0, null, featureBranch, mergeMode]
+    );
+
+    // 2. Create all beads and track their IDs (needed for depends_on resolution)
+    const beadIds: string[] = [];
+    const results: Array<{ bead: Bead; agent: Agent }> = [];
+
+    for (const task of input.tasks) {
+      const createdBead = beadOps.createBead(this.sql, {
+        type: 'issue',
+        title: task.title,
+        body: task.body,
+        priority: 'medium',
+        rig_id: input.rigId,
+        metadata: { convoy_id: convoyId, feature_branch: featureBranch },
+      });
+      beadIds.push(createdBead.bead_id);
+
+      // Link bead → convoy via 'tracks'
+      query(
+        this.sql,
+        /* sql */ `
+          INSERT INTO ${bead_dependencies} (
+            ${bead_dependencies.columns.bead_id},
+            ${bead_dependencies.columns.depends_on_bead_id},
+            ${bead_dependencies.columns.dependency_type}
+          ) VALUES (?, ?, ?)
+        `,
+        [createdBead.bead_id, convoyId, 'tracks']
+      );
+    }
+
+    // 3. Validate the dependency graph has no cycles (Kahn's algorithm)
+    {
+      const adj = new Map<number, number[]>();
+      const inDegree = new Map<number, number>();
+      for (let i = 0; i < input.tasks.length; i++) {
+        adj.set(i, []);
+        inDegree.set(i, 0);
+      }
+      for (let i = 0; i < input.tasks.length; i++) {
+        for (const depIdx of input.tasks[i].depends_on ?? []) {
+          if (depIdx < 0 || depIdx >= input.tasks.length || depIdx === i) continue;
+          adj.get(depIdx)!.push(i);
+          inDegree.set(i, (inDegree.get(i) ?? 0) + 1);
+        }
+      }
+      const queue: number[] = [];
+      for (const [node, deg] of inDegree) {
+        if (deg === 0) queue.push(node);
+      }
+      let visited = 0;
+      while (queue.length > 0) {
+        const node = queue.shift()!;
+        visited++;
+        for (const neighbor of adj.get(node) ?? []) {
+          const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
+          inDegree.set(neighbor, newDeg);
+          if (newDeg === 0) queue.push(neighbor);
+        }
+      }
+      if (visited < input.tasks.length) {
+        throw new Error(
+          `Convoy dependency graph contains a cycle — ${input.tasks.length - visited} tasks are involved in circular dependencies`
+        );
+      }
+    }
+
+    // 4. Create 'blocks' dependencies from depends_on indices
+    for (let i = 0; i < input.tasks.length; i++) {
+      const deps = input.tasks[i].depends_on;
+      if (!deps || deps.length === 0) continue;
+      for (const depIdx of deps) {
+        if (depIdx < 0 || depIdx >= beadIds.length || depIdx === i) continue;
+        query(
+          this.sql,
+          /* sql */ `
+            INSERT OR IGNORE INTO ${bead_dependencies} (
+              ${bead_dependencies.columns.bead_id},
+              ${bead_dependencies.columns.depends_on_bead_id},
+              ${bead_dependencies.columns.dependency_type}
+            ) VALUES (?, ?, ?)
+          `,
+          [beadIds[i], beadIds[depIdx], 'blocks']
+        );
+      }
+    }
+
+    // 4. For each bead: assign a polecat, but only dispatch if unblocked
+    for (let i = 0; i < beadIds.length; i++) {
+      const beadId = beadIds[i];
+      const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
+      agents.hookBead(this.sql, agent.id, beadId);
+
+      const bead = beadOps.getBead(this.sql, beadId);
+      const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
+      if (!bead) continue;
+
+      // Only dispatch beads with no unresolved blockers
+      if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
+        this.dispatchAgent(hookedAgent, bead).catch(err =>
+          console.error(`${TOWN_LOG} slingConvoy: fire-and-forget dispatchAgent failed:`, err)
+        );
+      } else {
+        console.log(
+          `${TOWN_LOG} slingConvoy: bead=${beadId} blocked, deferring dispatch until deps close`
+        );
+      }
+
+      results.push({ bead, agent: hookedAgent });
+    }
+
+    await this.armAlarmIfNeeded();
+
+    const convoy = this.getConvoy(convoyId);
+    if (!convoy) throw new Error('Failed to create convoy');
+    return { convoy, beads: results };
+  }
+
+  /**
+   * List active convoys with progress counts.
+   */
+  async listConvoys(): Promise<ConvoyEntry[]> {
+    await this.ensureInitialized();
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `${CONVOY_JOIN}
+          WHERE ${beads.status} != 'closed'
+          ORDER BY ${beads.created_at} DESC`,
+        []
+      ),
+    ];
+    return rows.map(row => toConvoy(ConvoyBeadRecord.parse(row)));
+  }
+
+  /**
+   * List active convoys with full per-bead breakdown in a single DO call.
+   * Avoids N+1 RPC fan-out from calling getConvoyStatus for each convoy.
+   */
+  async listConvoysDetailed(): Promise<
+    Array<
+      ConvoyEntry & {
+        beads: Array<{
+          bead_id: string;
+          title: string;
+          status: string;
+          rig_id: string | null;
+          assignee_agent_name: string | null;
+        }>;
+        dependency_edges: Array<{
+          bead_id: string;
+          depends_on_bead_id: string;
+        }>;
+      }
+    >
+  > {
+    await this.ensureInitialized();
+    const convoys = await this.listConvoys();
+    const detailed = [];
+    for (const convoy of convoys) {
+      const status = await this.getConvoyStatus(convoy.id);
+      detailed.push(status ?? { ...convoy, beads: [], dependency_edges: [] });
+    }
+    return detailed;
+  }
+
+  /**
+   * Detailed convoy status with per-bead breakdown and DAG edges.
+   */
+  async getConvoyStatus(convoyId: string): Promise<
+    | (ConvoyEntry & {
+        beads: Array<{
+          bead_id: string;
+          title: string;
+          status: string;
+          rig_id: string | null;
+          assignee_agent_name: string | null;
+        }>;
+        dependency_edges: Array<{
+          bead_id: string;
+          depends_on_bead_id: string;
+        }>;
+      })
+    | null
+  > {
+    await this.ensureInitialized();
+    const convoy = this.getConvoy(convoyId);
+    if (!convoy) return null;
+
+    // Fetch tracked beads with optional agent name.
+    // Both sides of the LEFT JOIN are the beads table, so all column refs
+    // must be qualified to avoid ambiguity.
+    const trackedRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${beads.bead_id}, ${beads.title}, ${beads.status},
+                 ${beads.rig_id},
+                 ${beads.assignee_agent_bead_id},
+                 agent_beads.${beads.columns.title} AS assignee_agent_name
+          FROM ${bead_dependencies}
+          INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
+          LEFT JOIN ${beads} AS agent_beads
+            ON ${beads.assignee_agent_bead_id} = agent_beads.${beads.columns.bead_id}
+          WHERE ${bead_dependencies.depends_on_bead_id} = ?
+            AND ${bead_dependencies.dependency_type} = 'tracks'
+          ORDER BY ${beads.created_at} ASC
+        `,
+        [convoyId]
+      ),
+    ];
+
+    const TrackedBeadRow = z.object({
+      bead_id: z.string(),
+      title: z.string(),
+      status: z.string(),
+      rig_id: z.string().nullable(),
+      assignee_agent_name: z.string().nullable(),
+    });
+
+    // Get DAG edges (blocks dependencies) between tracked beads
+    const dependencyEdges = beadOps.getConvoyDependencyEdges(this.sql, convoyId);
+
+    return {
+      ...convoy,
+      beads: trackedRows.map(row => TrackedBeadRow.parse(row)),
+      dependency_edges: dependencyEdges,
+    };
+  }
+
   private getConvoy(convoyId: string): ConvoyEntry | null {
     const rows = [
       ...query(this.sql, /* sql */ `${CONVOY_JOIN} WHERE ${beads.bead_id} = ?`, [convoyId]),
@@ -1150,6 +1533,11 @@ export class TownDO extends DurableObject<Env> {
       console.error(`${TOWN_LOG} alarm: processReviewQueue failed`, err);
     }
     try {
+      await this.processConvoyLandings();
+    } catch (err) {
+      console.error(`${TOWN_LOG} alarm: processConvoyLandings failed`, err);
+    }
+    try {
       await this.reEscalateStaleEscalations();
     } catch (err) {
       console.warn(`${TOWN_LOG} alarm: reEscalation failed`, err);
@@ -1207,6 +1595,28 @@ export class TownDO extends DurableObject<Env> {
       const townConfig = await this.getTownConfig();
       const kilocodeToken = await this.resolveKilocodeToken();
 
+      // Check if this bead belongs to a convoy and resolve its feature branch.
+      // Convoy beads branch from the feature branch, not from defaultBranch.
+      const convoyId = beadOps.getConvoyForBead(this.sql, bead.bead_id);
+      const convoyFeatureBranch = convoyId
+        ? beadOps.getConvoyFeatureBranch(this.sql, convoyId)
+        : null;
+
+      // Transition the bead to in_progress BEFORE starting the container.
+      // This must happen synchronously within the DO's I/O gate — the
+      // fire-and-forget pattern used by slingBead/slingConvoy means the
+      // calling RPC may return before startAgentInContainer completes,
+      // closing the I/O gate and preventing further SQL writes.
+      const currentBead = beadOps.getBead(this.sql, bead.bead_id);
+      if (
+        currentBead &&
+        currentBead.status !== 'in_progress' &&
+        currentBead.status !== 'closed' &&
+        currentBead.status !== 'failed'
+      ) {
+        beadOps.updateBeadStatus(this.sql, bead.bead_id, 'in_progress', agent.id);
+      }
+
       // Mark dispatch in progress: set last_activity_at so schedulePendingWork
       // skips this agent while the container start is in flight, and bump
       // dispatch_attempts for the retry budget.
@@ -1238,9 +1648,11 @@ export class TownDO extends DurableObject<Env> {
         kilocodeToken,
         townConfig,
         platformIntegrationId: rigConfig.platformIntegrationId,
+        convoyFeatureBranch: convoyFeatureBranch ?? undefined,
       });
 
       if (started) {
+        const timestamp = now();
         query(
           this.sql,
           /* sql */ `
@@ -1250,7 +1662,7 @@ export class TownDO extends DurableObject<Env> {
                 ${agent_metadata.columns.last_activity_at} = ?
             WHERE ${agent_metadata.bead_id} = ?
           `,
-          [now(), agent.id]
+          [timestamp, agent.id]
         );
         console.log(`${TOWN_LOG} dispatchAgent: started agent=${agent.name}(${agent.id})`);
       }
@@ -1258,6 +1670,37 @@ export class TownDO extends DurableObject<Env> {
     } catch (err) {
       console.error(`${TOWN_LOG} dispatchAgent: failed for agent=${agent.id}:`, err);
       return false;
+    }
+  }
+
+  /**
+   * When a bead closes, find beads that were blocked by it and are now
+   * fully unblocked (all 'blocks' dependencies resolved). Dispatch their
+   * assigned agents.
+   */
+  private dispatchUnblockedBeads(closedBeadId: string): void {
+    const unblockedIds = beadOps.getNewlyUnblockedBeads(this.sql, closedBeadId);
+    if (unblockedIds.length === 0) return;
+
+    console.log(
+      `${TOWN_LOG} dispatchUnblockedBeads: ${unblockedIds.length} beads unblocked by ${closedBeadId}`
+    );
+
+    for (const beadId of unblockedIds) {
+      const bead = beadOps.getBead(this.sql, beadId);
+      if (!bead || bead.status === 'closed' || bead.status === 'failed') continue;
+
+      // Find the agent hooked to this bead
+      if (!bead.assignee_agent_bead_id) continue;
+      const agent = agents.getAgent(this.sql, bead.assignee_agent_bead_id);
+      if (!agent || agent.status !== 'idle') continue;
+
+      this.dispatchAgent(agent, bead).catch(err =>
+        console.error(
+          `${TOWN_LOG} dispatchUnblockedBeads: fire-and-forget dispatch failed for bead=${beadId}`,
+          err
+        )
+      );
     }
   }
 
@@ -1318,6 +1761,13 @@ export class TownDO extends DurableObject<Env> {
       if (agent.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
         beadOps.updateBeadStatus(this.sql, beadId, 'failed', agent.id);
         agents.unhookBead(this.sql, agent.id);
+        continue;
+      }
+
+      // Skip beads that still have unresolved 'blocks' dependencies —
+      // they'll be dispatched by dispatchUnblockedBeads when their
+      // blockers close.
+      if (beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
         continue;
       }
 
@@ -1445,6 +1895,7 @@ export class TownDO extends DurableObject<Env> {
    */
   private async processReviewQueue(): Promise<void> {
     reviewQueue.recoverStuckReviews(this.sql);
+    reviewQueue.closeOrphanedReviewBeads(this.sql);
 
     // Poll open PRs created by the 'pr' strategy
     await this.pollPendingPRs();
@@ -1470,9 +1921,45 @@ export class TownDO extends DurableObject<Env> {
     const mergeStrategy = config.resolveMergeStrategy(townConfig, rigConfig.merge_strategy);
     const gates = townConfig.refinery?.gates ?? [];
 
+    // Resolve the target branch from review_metadata. For convoy beads
+    // this will be the convoy's feature branch; for standalone beads it's
+    // the rig's default branch. For convoy landing MRs it's back to default.
+    const targetBranchRows = z
+      .object({ target_branch: z.string() })
+      .array()
+      .parse([
+        ...query(
+          this.sql,
+          /* sql */ `
+            SELECT ${review_metadata.target_branch}
+            FROM ${review_metadata}
+            WHERE ${review_metadata.bead_id} = ?
+          `,
+          [entry.id]
+        ),
+      ]);
+    const targetBranch = targetBranchRows[0]?.target_branch ?? rigConfig.defaultBranch;
+
+    // Check if this MR belongs to a convoy and what the merge mode is.
+    // For 'review-then-land' convoys, the refinery only reviews and merges
+    // into the feature branch (using direct strategy regardless of town config),
+    // because the final land to main happens once ALL beads are done.
+    // For 'review-and-merge' convoys (and standalone beads), use the normal strategy.
+    const sourceBeadId = typeof entry.bead_id === 'string' ? entry.bead_id : null;
+    const convoyId = sourceBeadId ? beadOps.getConvoyForBead(this.sql, sourceBeadId) : null;
+    const convoyMergeMode = convoyId ? beadOps.getConvoyMergeMode(this.sql, convoyId) : null;
+
+    // For review-then-land convoys targeting the feature branch, always use
+    // direct merge strategy (the refinery merges the polecat's work into the
+    // feature branch directly, no PR needed for intermediate steps).
+    const isConvoyIntermediateMerge =
+      convoyMergeMode === 'review-then-land' && targetBranch !== rigConfig.defaultBranch;
+    const effectiveMergeStrategy = isConvoyIntermediateMerge ? 'direct' : mergeStrategy;
+
     console.log(
       `${TOWN_LOG} processReviewQueue: entry=${entry.id} branch=${entry.branch} ` +
-        `mergeStrategy=${mergeStrategy} gates=${gates.length}`
+        `targetBranch=${targetBranch} mergeStrategy=${effectiveMergeStrategy} ` +
+        `convoyMode=${convoyMergeMode ?? 'standalone'} gates=${gates.length}`
     );
 
     // Always spawn a refinery agent — it handles quality gates (if any),
@@ -1486,9 +1973,15 @@ export class TownDO extends DurableObject<Env> {
       townId: this.townId,
       gates,
       branch: entry.branch,
-      targetBranch: rigConfig.defaultBranch,
+      targetBranch,
       polecatAgentId: entry.agent_id,
-      mergeStrategy,
+      mergeStrategy: effectiveMergeStrategy,
+      convoyContext: convoyMergeMode
+        ? {
+            mergeMode: convoyMergeMode,
+            isIntermediateStep: isConvoyIntermediateMerge,
+          }
+        : undefined,
     });
 
     // Hook the refinery to the MR bead (entry.id), not the source bead
@@ -1505,10 +1998,13 @@ export class TownDO extends DurableObject<Env> {
       role: 'refinery',
       identity: refineryAgent.identity,
       beadId: entry.id,
-      beadTitle: `Review merge: ${entry.branch} → ${rigConfig.defaultBranch}`,
+      beadTitle: `Review merge: ${entry.branch} → ${targetBranch}`,
       beadBody: entry.summary ?? '',
       checkpoint: null,
       gitUrl: rigConfig.gitUrl,
+      // Always clone from the rig's real default branch. The targetBranch
+      // may be a convoy feature branch that doesn't exist on the remote yet.
+      // The refinery's system prompt tells it which branch to merge into.
       defaultBranch: rigConfig.defaultBranch,
       kilocodeToken: rigConfig.kilocodeToken,
       townConfig,
@@ -1522,6 +2018,162 @@ export class TownDO extends DurableObject<Env> {
         `${TOWN_LOG} processReviewQueue: refinery agent failed to start for entry=${entry.id}`
       );
       reviewQueue.completeReview(this.sql, entry.id, 'failed');
+    }
+  }
+
+  /**
+   * Process convoys whose tracked beads are all closed and that have a
+   * feature branch waiting to be landed. Creates a final merge_request bead
+   * to merge the convoy's feature branch into the default branch.
+   */
+  private async processConvoyLandings(): Promise<void> {
+    // Find convoys with ready_to_land flag in metadata that are still open
+    const ReadyConvoyRow = z.object({
+      bead_id: z.string(),
+      metadata: z
+        .string()
+        .transform(v => {
+          try {
+            return JSON.parse(v) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })
+        .pipe(z.record(z.string(), z.any())),
+    });
+    const readyRows = ReadyConvoyRow.array().parse([
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${beads.bead_id}, ${beads.metadata}
+          FROM ${beads}
+          WHERE ${beads.type} = 'convoy'
+            AND ${beads.status} = 'open'
+            AND json_extract(${beads.metadata}, '$.ready_to_land') = 1
+        `,
+        []
+      ),
+    ]);
+
+    for (const row of readyRows) {
+      const convoyId = row.bead_id;
+      const featureBranch = beadOps.getConvoyFeatureBranch(this.sql, convoyId);
+      if (!featureBranch) continue;
+
+      // Check if there's already a pending landing MR for this convoy
+      const existingLanding = [
+        ...query(
+          this.sql,
+          /* sql */ `
+            SELECT ${beads.bead_id}
+            FROM ${beads}
+            WHERE ${beads.type} = 'merge_request'
+              AND ${beads.status} IN ('open', 'in_progress')
+              AND json_extract(${beads.metadata}, '$.convoy_landing') = 1
+              AND json_extract(${beads.metadata}, '$.convoy_id') = ?
+            LIMIT 1
+          `,
+          [convoyId]
+        ),
+      ];
+      if (existingLanding.length > 0) continue;
+
+      // Find which rig this convoy's beads belong to
+      const rigRow = z
+        .object({ rig_id: z.string().nullable() })
+        .array()
+        .parse([
+          ...query(
+            this.sql,
+            /* sql */ `
+              SELECT ${beads.rig_id}
+              FROM ${bead_dependencies}
+              INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
+              WHERE ${bead_dependencies.depends_on_bead_id} = ?
+                AND ${bead_dependencies.dependency_type} = 'tracks'
+                AND ${beads.rig_id} IS NOT NULL
+              LIMIT 1
+            `,
+            [convoyId]
+          ),
+        ]);
+      const rigId = rigRow[0]?.rig_id;
+      if (!rigId) continue;
+
+      const rigConfig = await this.getRigConfig(rigId);
+      if (!rigConfig) continue;
+
+      console.log(
+        `${TOWN_LOG} processConvoyLandings: creating landing MR for convoy=${convoyId} branch=${featureBranch} → ${rigConfig.defaultBranch}`
+      );
+
+      // Submit a landing MR: feature branch → defaultBranch
+      reviewQueue.submitToReviewQueue(this.sql, {
+        agent_id: 'system',
+        bead_id: convoyId,
+        rig_id: rigId,
+        branch: featureBranch,
+        summary: `Landing convoy: merge ${featureBranch} → ${rigConfig.defaultBranch}`,
+      });
+
+      // Patch the just-created MR bead's metadata to mark it as a convoy landing
+      // and set the target_branch to the default branch (not the convoy feature branch).
+      const mrRows = z
+        .object({ bead_id: z.string() })
+        .array()
+        .parse([
+          ...query(
+            this.sql,
+            /* sql */ `
+              SELECT ${beads.bead_id}
+              FROM ${beads}
+              WHERE ${beads.type} = 'merge_request'
+                AND ${beads.created_by} = 'system'
+                AND json_extract(${beads.metadata}, '$.source_bead_id') = ?
+              ORDER BY ${beads.created_at} DESC
+              LIMIT 1
+            `,
+            [convoyId]
+          ),
+        ]);
+      if (mrRows.length > 0) {
+        const mrBeadId = mrRows[0].bead_id;
+        query(
+          this.sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.metadata} = json_set(
+              COALESCE(${beads.metadata}, '{}'),
+              '$.convoy_landing', 1,
+              '$.convoy_id', ?
+            )
+            WHERE ${beads.bead_id} = ?
+          `,
+          [convoyId, mrBeadId]
+        );
+        // Override the target_branch to the default branch for the landing MR
+        query(
+          this.sql,
+          /* sql */ `
+            UPDATE ${review_metadata}
+            SET ${review_metadata.columns.target_branch} = ?
+            WHERE ${review_metadata.bead_id} = ?
+          `,
+          [rigConfig.defaultBranch, mrBeadId]
+        );
+      }
+
+      // Clear the ready_to_land flag
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.ready_to_land'),
+              ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [now(), convoyId]
+      );
     }
   }
 

@@ -120,7 +120,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
-    ...(isGastownEnabled || isDevelopment
+    ...(isGastownEnabled
       ? [
           {
             title: 'Gastown',

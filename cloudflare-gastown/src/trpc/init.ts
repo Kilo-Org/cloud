@@ -24,3 +24,15 @@ export const procedure = t.procedure.use(async ({ ctx, next }) => {
   }
   return next({ ctx });
 });
+
+/**
+ * Gastown access procedure — requires a valid JWT with `gastownAccess`
+ * (set by the token endpoint after PostHog flag evaluation). Falls back
+ * to `isAdmin` for backward compatibility with pre-migration tokens.
+ */
+export const gastownProcedure = procedure.use(async ({ ctx, next }) => {
+  if (!ctx.gastownAccess && !ctx.isAdmin) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Gastown access required' });
+  }
+  return next({ ctx });
+});

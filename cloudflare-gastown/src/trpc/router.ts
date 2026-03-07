@@ -8,7 +8,7 @@
 /* eslint-disable @typescript-eslint/await-thenable -- DO RPC stubs return Rpc.Promisified which is thenable at runtime */
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { router, procedure } from './init';
+import { router, gastownProcedure } from './init';
 import { getTownDOStub } from '../dos/Town.do';
 import { getTownContainerStub } from '../dos/TownContainer.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
@@ -70,16 +70,8 @@ async function refreshGitCredentials(
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-/**
- * Require Gastown access. The token endpoint evaluates the PostHog
- * feature flag and embeds `gastownAccess` in the JWT, so the worker
- * doesn't need its own PostHog call. Falls back to `isAdmin` for
- * backward compatibility with tokens minted before the flag migration.
- */
-function requireGastownAccess(ctx: TRPCContext): { id: string; api_token_pepper: string | null } {
-  if (!ctx.gastownAccess && !ctx.isAdmin) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Gastown access required' });
-  }
+/** Extract user identity fields from the tRPC context. */
+function userFromCtx(ctx: TRPCContext): { id: string; api_token_pepper: string | null } {
   return { id: ctx.userId, api_token_pepper: ctx.apiTokenPepper };
 }
 
@@ -128,11 +120,11 @@ async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper:
 export const gastownRouter = router({
   // ── Towns ───────────────────────────────────────────────────────────
 
-  createTown: procedure
+  createTown: gastownProcedure
     .input(z.object({ name: z.string().min(1).max(64) }))
     .output(RpcTownOutput)
     .mutation(async ({ ctx, input }) => {
-      const user = requireGastownAccess(ctx);
+      const user = userFromCtx(ctx);
       const userStub = getGastownUserStub(ctx.env, user.id);
       const town = await userStub.createTown({ name: input.name, owner_user_id: user.id });
 
@@ -148,24 +140,21 @@ export const gastownRouter = router({
       return town;
     }),
 
-  listTowns: procedure.output(z.array(RpcTownOutput)).query(async ({ ctx }) => {
-    requireGastownAccess(ctx);
+  listTowns: gastownProcedure.output(z.array(RpcTownOutput)).query(async ({ ctx }) => {
     const userStub = getGastownUserStub(ctx.env, ctx.userId);
     return userStub.listTowns();
   }),
 
-  getTown: procedure
+  getTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcTownOutput)
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       return verifyTownOwnership(ctx.env, ctx.userId, input.townId);
     }),
 
-  deleteTown: procedure
+  deleteTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
       const userStub = getGastownUserStub(ctx.env, ctx.userId);
       await userStub.deleteTown(input.townId);
@@ -173,7 +162,7 @@ export const gastownRouter = router({
 
   // ── Rigs ────────────────────────────────────────────────────────────
 
-  createRig: procedure
+  createRig: gastownProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -185,7 +174,7 @@ export const gastownRouter = router({
     )
     .output(RpcRigOutput)
     .mutation(async ({ ctx, input }) => {
-      const user = requireGastownAccess(ctx);
+      const user = userFromCtx(ctx);
       await verifyTownOwnership(ctx.env, user.id, input.townId);
 
       // Generate kilocode token for agent LLM gateway auth
@@ -246,21 +235,19 @@ export const gastownRouter = router({
       return rig;
     }),
 
-  listRigs: procedure
+  listRigs: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .output(z.array(RpcRigOutput))
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
       const userStub = getGastownUserStub(ctx.env, ctx.userId);
       return userStub.listRigs(input.townId);
     }),
 
-  getRig: procedure
+  getRig: gastownProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .output(RpcRigDetailOutput)
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       // Sequential to avoid "excessively deep" type inference with Rpc.Promisified DO stubs.
@@ -269,10 +256,9 @@ export const gastownRouter = router({
       return { ...rig, agents: agentList, beads: beadList };
     }),
 
-  deleteRig: procedure
+  deleteRig: gastownProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const userStub = getGastownUserStub(ctx.env, ctx.userId);
       await userStub.deleteRig(input.rigId);
@@ -280,7 +266,7 @@ export const gastownRouter = router({
 
   // ── Beads ───────────────────────────────────────────────────────────
 
-  listBeads: procedure
+  listBeads: gastownProcedure
     .input(
       z.object({
         rigId: z.string().uuid(),
@@ -289,16 +275,14 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadOutput))
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listBeads({ rig_id: rig.id, status: input.status });
     }),
 
-  deleteBead: procedure
+  deleteBead: gastownProcedure
     .input(z.object({ rigId: z.string().uuid(), beadId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteBead(input.beadId);
@@ -306,20 +290,18 @@ export const gastownRouter = router({
 
   // ── Agents ──────────────────────────────────────────────────────────
 
-  listAgents: procedure
+  listAgents: gastownProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .output(z.array(RpcAgentOutput))
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listAgents({ rig_id: rig.id });
     }),
 
-  deleteAgent: procedure
+  deleteAgent: gastownProcedure
     .input(z.object({ rigId: z.string().uuid(), agentId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteAgent(input.agentId);
@@ -327,7 +309,7 @@ export const gastownRouter = router({
 
   // ── Work Assignment ─────────────────────────────────────────────────
 
-  sling: procedure
+  sling: gastownProcedure
     .input(
       z.object({
         rigId: z.string().uuid(),
@@ -338,7 +320,7 @@ export const gastownRouter = router({
     )
     .output(RpcSlingResultOutput)
     .mutation(async ({ ctx, input }) => {
-      const user = requireGastownAccess(ctx);
+      const user = userFromCtx(ctx);
       const rig = await verifyRigOwnership(ctx.env, user.id, input.rigId);
 
       // Best-effort: refresh git credentials before dispatching
@@ -360,7 +342,7 @@ export const gastownRouter = router({
 
   // ── Mayor ───────────────────────────────────────────────────────────
 
-  sendMessage: procedure
+  sendMessage: gastownProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -371,7 +353,6 @@ export const gastownRouter = router({
     )
     .output(RpcMayorSendResultOutput)
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
 
       const townStub = getTownDOStub(ctx.env, input.townId);
@@ -379,22 +360,20 @@ export const gastownRouter = router({
       return townStub.sendMayorMessage(input.message, input.model);
     }),
 
-  getMayorStatus: procedure
+  getMayorStatus: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcMayorStatusOutput)
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
       return townStub.getMayorStatus();
     }),
 
-  ensureMayor: procedure
+  ensureMayor: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcMayorSendResultOutput)
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
 
       // Best-effort: refresh git credentials from the first rig with a GitHub URL
@@ -418,11 +397,10 @@ export const gastownRouter = router({
 
   // ── Agent Streams ───────────────────────────────────────────────────
 
-  getAgentStreamUrl: procedure
+  getAgentStreamUrl: gastownProcedure
     .input(z.object({ agentId: z.string().uuid(), townId: z.string().uuid() }))
     .output(RpcStreamTicketOutput)
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
 
       // Proxy to container control server to get a stream ticket
@@ -449,11 +427,10 @@ export const gastownRouter = router({
 
   // ── PTY ─────────────────────────────────────────────────────────────
 
-  createPtySession: procedure
+  createPtySession: gastownProcedure
     .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
     .output(RpcPtySessionOutput)
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
 
       // Proxy to container control server to create a PTY session
@@ -479,7 +456,7 @@ export const gastownRouter = router({
       return { pty: ptyData, wsUrl };
     }),
 
-  resizePtySession: procedure
+  resizePtySession: gastownProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -490,7 +467,6 @@ export const gastownRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
 
       const containerStub = getTownContainerStub(ctx.env, input.townId);
@@ -512,17 +488,16 @@ export const gastownRouter = router({
 
   // ── Town Configuration ──────────────────────────────────────────────
 
-  getTownConfig: procedure
+  getTownConfig: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcTownConfigSchema)
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getTownConfig();
     }),
 
-  updateTownConfig: procedure
+  updateTownConfig: gastownProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -531,7 +506,6 @@ export const gastownRouter = router({
     )
     .output(RpcTownConfigSchema)
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.updateTownConfig(input.config);
@@ -539,7 +513,7 @@ export const gastownRouter = router({
 
   // ── Events ──────────────────────────────────────────────────────────
 
-  getBeadEvents: procedure
+  getBeadEvents: gastownProcedure
     .input(
       z.object({
         rigId: z.string().uuid(),
@@ -550,7 +524,6 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadEventOutput))
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listBeadEvents({
@@ -560,7 +533,7 @@ export const gastownRouter = router({
       });
     }),
 
-  getTownEvents: procedure
+  getTownEvents: gastownProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -570,7 +543,6 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadEventOutput))
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.listBeadEvents({
@@ -579,7 +551,7 @@ export const gastownRouter = router({
       });
     }),
 
-  listConvoys: procedure
+  listConvoys: gastownProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -587,13 +559,12 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcConvoyDetailOutput))
     .query(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.listConvoysDetailed();
     }),
 
-  closeConvoy: procedure
+  closeConvoy: gastownProcedure
     .input(
       z.object({
         townId: z.string().uuid(),
@@ -602,7 +573,6 @@ export const gastownRouter = router({
     )
     .output(RpcConvoyDetailOutput.nullable())
     .mutation(async ({ ctx, input }) => {
-      requireGastownAccess(ctx);
       await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       const convoy = await townStub.closeConvoy(input.convoyId);

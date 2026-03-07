@@ -8,6 +8,12 @@ import { captureException, startSpan } from '@sentry/nextjs';
 const posthogClient = PostHogClient();
 
 /**
+ * Flags that should return true in development where PostHog is stubbed out.
+ * Add a flag name here so local dev works without PostHog configuration.
+ */
+const DEV_ENABLED_FLAGS = new Set(['gastown-access']);
+
+/**
  * Generic server action to fetch any PostHog feature flag value
  * @param flagName - The name of the PostHog feature flag to fetch
  * @param distinctId - Optional distinct ID for the feature flag request (defaults to 'server-config-fetch')
@@ -58,6 +64,10 @@ export async function isFeatureFlagEnabled(
   flagName: string,
   distinctId: string = 'server-config-fetch'
 ): Promise<boolean> {
+  if (process.env.NODE_ENV !== 'production' && DEV_ENABLED_FLAGS.has(flagName)) {
+    return true;
+  }
+
   try {
     // For boolean flags, we can use getFeatureFlag instead of getFeatureFlagPayload
     const isEnabled = await startSpan({ name: flagName, op: 'posthog-feature-flag' }, async () => {

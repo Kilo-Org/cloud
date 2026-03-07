@@ -2,7 +2,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { generateApiToken } from '@/lib/tokens';
-import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { GASTOWN_ACCESS_FLAG } from '@/lib/gastown/feature-flags';
 
 const ONE_HOUR_SECONDS = 60 * 60;
@@ -27,7 +27,7 @@ export async function POST() {
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const hasAccess = await isReleaseToggleEnabled(GASTOWN_ACCESS_FLAG, user.id);
+  const hasAccess = await isFeatureFlagEnabled(GASTOWN_ACCESS_FLAG, user.id);
 
   if (!hasAccess) {
     return NextResponse.json({ error: 'Gastown access denied' }, { status: 403 });

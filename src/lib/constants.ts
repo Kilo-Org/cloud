@@ -33,7 +33,6 @@ export const TRIAL_DURATION_DAYS = 14;
 export const AUTOCOMPLETE_MODEL = 'codestral-2508';
 
 export const ENABLE_DEPLOY_FEATURE = true;
-export const ENABLE_GASTOWN_FEATURE = true;
 
 export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 

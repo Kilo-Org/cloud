@@ -31,7 +31,7 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { useFeatureFlagEnabled, useFeatureFlagVariantKey } from 'posthog-js/react';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
@@ -39,7 +39,10 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
-  const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
+  // Strict boolean check — matches isReleaseToggleEnabled on the server side.
+  // useFeatureFlagVariantKey returns the raw flag value (true | string | undefined),
+  // so === true rejects multivariate string variants.
+  const isGastownEnabled = useFeatureFlagVariantKey('gastown-access') === true;
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Dashboard group

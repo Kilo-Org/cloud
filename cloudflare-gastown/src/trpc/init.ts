@@ -5,6 +5,7 @@ export type TRPCContext = {
   userId: string;
   isAdmin: boolean;
   apiTokenPepper: string | null;
+  gastownAccess: boolean;
 };
 
 const t = initTRPC.context<TRPCContext>().create();

@@ -1,7 +1,6 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 import { notFound } from 'next/navigation';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import { GASTOWN_ACCESS_FLAG } from '@/lib/gastown/feature-flags';
+import { isGastownEnabled } from '@/lib/gastown/feature-flags';
 import { RigDetailPageClient } from './RigDetailPageClient';
 
 export default async function RigDetailPage({
@@ -14,7 +13,7 @@ export default async function RigDetailPage({
     `/users/sign_in?callbackPath=/gastown/${townId}/rigs/${rigId}`
   );
 
-  if (!(await isFeatureFlagEnabled(GASTOWN_ACCESS_FLAG, user.id))) {
+  if (!(await isGastownEnabled(user.id))) {
     return notFound();
   }
 

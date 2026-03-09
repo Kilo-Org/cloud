@@ -2570,9 +2570,17 @@ export class TownDO extends DurableObject<Env> {
         `convoyMode=${convoyMergeMode ?? 'standalone'} gates=${gates.length}`
     );
 
-    // Always spawn a refinery agent — it handles quality gates (if any),
-    // code review, and the merge/PR creation step via CLI tools.
+    // Get or create the per-rig refinery. If it already exists and is busy
+    // (processing another review), put the entry back to 'open' so it gets
+    // retried on the next alarm cycle.
     const refineryAgent = agents.getOrCreateAgent(this.sql, 'refinery', rigId, this.townId);
+    if (refineryAgent.status !== 'idle') {
+      console.log(
+        `${TOWN_LOG} processReviewQueue: refinery for rig=${rigId} is ${refineryAgent.status}, re-queuing entry=${entry.id}`
+      );
+      beadOps.updateBeadStatus(this.sql, entry.id, 'open', 'system');
+      return;
+    }
 
     const { buildRefinerySystemPrompt } = await import('../prompts/refinery-system.prompt');
     const systemPrompt = buildRefinerySystemPrompt({

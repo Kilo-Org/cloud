@@ -365,6 +365,11 @@ export async function checkAgentContainerStatus(
     const container = getTownContainerStub(env, townId);
     // TODO: Generally you should use containerFetch which waits for ports to be available
     const response = await container.fetch(`http://container/agents/${agentId}/status`);
+    // 404 means the container is running but has no record of this agent
+    // (e.g. after container eviction). Report as 'not_found' so
+    // witnessPatrol can immediately reset and redispatch the agent
+    // instead of waiting for the 2-hour GUPP timeout.
+    if (response.status === 404) return { status: 'not_found' };
     if (!response.ok) return { status: 'unknown' };
     const data: unknown = await response.json();
     if (typeof data === 'object' && data !== null && 'status' in data) {

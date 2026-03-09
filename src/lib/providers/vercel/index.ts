@@ -1,6 +1,7 @@
 import type { BYOKResult } from '@/lib/byok';
 import { kiloFreeModels, preferredModels } from '@/lib/models';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
+import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { isOpenAiModel } from '@/lib/providers/openai';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
@@ -77,6 +78,12 @@ export async function shouldRouteToVercel(
   if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
     console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
     return true;
+  }
+
+  if (isAnthropicModel(requestedModel)) {
+    // there seem to be rate limiting problems: https://kilo-code.slack.com/archives/C0AAUV9G4S3/p1773093621883919
+    console.debug('[shouldRouteToVercel] Anthropic models are not routed to Vercel');
+    return false;
   }
 
   if (isOpenAiModel(requestedModel)) {

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { cors } from 'hono/cors';
 import { getTownContainerStub } from './dos/TownContainer.do';
+import { getTownDOStub } from './dos/Town.do';
 import { resError } from './util/res.util';
 import { dashboardHtml } from './ui/dashboard.ui';
 import {
@@ -44,6 +45,7 @@ import {
   handleCompleteReview,
 } from './handlers/rig-review-queue.handler';
 import { handleCreateEscalation } from './handlers/rig-escalations.handler';
+import { handleResolveTriage } from './handlers/rig-triage.handler';
 import { handleListBeadEvents } from './handlers/rig-bead-events.handler';
 import { handleListTownEvents } from './handlers/town-events.handler';
 import {
@@ -265,6 +267,12 @@ app.post('/api/towns/:townId/rigs/:rigId/escalations', c =>
   handleCreateEscalation(c, c.req.param())
 );
 
+// ── Triage ──────────────────────────────────────────────────────────────
+
+app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
+  handleResolveTriage(c, c.req.param())
+);
+
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
 // routes. Skip in development. Container→worker routes use the agent JWT
@@ -440,6 +448,7 @@ app.onError((err, c) => {
 
 const WS_STREAM_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/stream$/;
 const WS_PTY_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/pty\/([^/]+)\/connect$/;
+const WS_STATUS_PATTERN = /^\/api\/towns\/([^/]+)\/status\/ws$/;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -473,6 +482,15 @@ export default {
           `[gastown-worker] WS upgrade (pty): townId=${townId} agentId=${agentId} ptyId=${ptyId}`
         );
         const stub = getTownContainerStub(env, townId);
+        return stub.fetch(request);
+      }
+
+      // Town alarm status (real-time push)
+      const statusMatch = url.pathname.match(WS_STATUS_PATTERN);
+      if (statusMatch) {
+        const townId = statusMatch[1];
+        console.log(`[gastown-worker] WS upgrade (status): townId=${townId}`);
+        const stub = getTownDOStub(env, townId);
         return stub.fetch(request);
       }
     }

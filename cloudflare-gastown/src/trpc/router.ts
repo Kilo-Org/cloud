@@ -28,6 +28,7 @@ import {
   RpcSlingResultOutput,
   RpcRigDetailOutput,
   RpcConvoyDetailOutput,
+  RpcAlarmStatusOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 
@@ -185,6 +186,15 @@ export const gastownRouter = router({
       await townStub.setTownId(input.townId);
       await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
 
+      // Resolve git credentials BEFORE configureRig so that
+      // townConfig.git_auth.github_token is populated when
+      // setupRigRepoInContainer reads it for the proactive clone.
+      try {
+        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, user.id);
+      } catch (err) {
+        console.warn('[gastown-trpc] createRig: git credential refresh failed', err);
+      }
+
       const userStub = getGastownUserStub(ctx.env, user.id);
       const rig = await userStub.createRig({
         town_id: input.townId,
@@ -225,13 +235,6 @@ export const gastownRouter = router({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to configure rig' });
       }
 
-      // Best-effort: resolve git credentials from the git-token-service
-      try {
-        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, user.id);
-      } catch (err) {
-        console.warn('[gastown-trpc] createRig: git credential refresh failed', err);
-      }
-
       return rig;
     }),
 
@@ -259,7 +262,12 @@ export const gastownRouter = router({
   deleteRig: gastownProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      // Remove from Town DO first so the name is freed before the user
+      // record is deleted. If this fails the user record is still intact
+      // and the user can retry.
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      await townStub.removeRig(input.rigId);
       const userStub = getGastownUserStub(ctx.env, ctx.userId);
       await userStub.deleteRig(input.rigId);
     }),
@@ -368,6 +376,16 @@ export const gastownRouter = router({
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
       return townStub.getMayorStatus();
+    }),
+
+  getAlarmStatus: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(RpcAlarmStatusOutput)
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.setTownId(input.townId);
+      return townStub.getAlarmStatus();
     }),
 
   ensureMayor: gastownProcedure

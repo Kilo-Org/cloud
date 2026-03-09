@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
+
 import { useSidebar } from '@/components/ui/sidebar';
 import { useTerminalBar } from './TerminalBarContext';
-import { ChevronDown, ChevronUp, Crown, Terminal as TerminalIcon, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Crown, Activity, Terminal as TerminalIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
@@ -35,6 +36,7 @@ export function TerminalBar({ townId }: TerminalBarProps) {
   const sidebarLeft = isMobile ? '0px' : sidebarState === 'expanded' ? '16rem' : '3rem';
 
   const allTabs = [
+    { id: 'status', label: 'Status', kind: 'status' as const, agentId: '' },
     { id: 'mayor', label: 'Mayor', kind: 'mayor' as const, agentId: '' },
     ...agentTabs,
   ];
@@ -93,8 +95,11 @@ export function TerminalBar({ townId }: TerminalBarProps) {
                   {isMayor && (
                     <Crown className="size-3 shrink-0 text-[color:oklch(95%_0.15_108_/_0.6)]" />
                   )}
+                  {tab.kind === 'status' && (
+                    <Activity className="size-3 shrink-0 text-[color:oklch(85%_0.12_200_/_0.6)]" />
+                  )}
                   <span className="max-w-[120px] truncate">{tab.label}</span>
-                  {!isMayor && (
+                  {!isMayor && tab.kind !== 'status' && (
                     <button
                       onClick={e => {
                         e.stopPropagation();
@@ -126,6 +131,8 @@ export function TerminalBar({ townId }: TerminalBarProps) {
           >
             {activeTab.kind === 'mayor' ? (
               <MayorTerminalPane townId={townId} collapsed={collapsed} />
+            ) : activeTab.kind === 'status' ? (
+              <AlarmStatusPane townId={townId} />
             ) : (
               <AgentTerminalPane townId={townId} agentId={activeTab.agentId} />
             )}
@@ -134,6 +141,308 @@ export function TerminalBar({ townId }: TerminalBarProps) {
       </AnimatePresence>
     </div>
   );
+}
+
+// ── Alarm Status Pane ────────────────────────────────────────────────────
+
+type AlarmStatus = {
+  alarm: { nextFireAt: string | null; intervalMs: number; intervalLabel: string };
+  agents: { working: number; idle: number; stalled: number; dead: number; total: number };
+  beads: { open: number; inProgress: number; failed: number; triageRequests: number };
+  patrol: {
+    guppWarnings: number;
+    guppEscalations: number;
+    stalledAgents: number;
+    orphanedHooks: number;
+  };
+  recentEvents: Array<{ time: string; type: string; message: string }>;
+};
+
+/**
+ * Hook that connects to the TownDO status WebSocket and returns the
+ * latest alarm status snapshot. Falls back to tRPC polling if the
+ * WebSocket fails or disconnects.
+ */
+function useAlarmStatusWs(townId: string): {
+  data: AlarmStatus | null;
+  connected: boolean;
+  error: string | null;
+} {
+  const [data, setData] = useState<AlarmStatus | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  const connect = useCallback(() => {
+    if (!mountedRef.current) return;
+    const wsUrl = gastownWsUrl(`/api/towns/${townId}/status/ws`);
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      if (!mountedRef.current) return;
+      setConnected(true);
+      setError(null);
+    };
+
+    ws.onmessage = (e: MessageEvent) => {
+      if (!mountedRef.current || typeof e.data !== 'string') return;
+      try {
+        setData(JSON.parse(e.data) as AlarmStatus);
+      } catch {
+        // Ignore malformed messages
+      }
+    };
+
+    ws.onclose = () => {
+      if (!mountedRef.current) return;
+      setConnected(false);
+      // Reconnect after 3s
+      reconnectTimerRef.current = setTimeout(connect, 3_000);
+    };
+
+    ws.onerror = () => {
+      if (!mountedRef.current) return;
+      setError('WebSocket connection failed');
+    };
+  }, [townId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    connect();
+    return () => {
+      mountedRef.current = false;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      wsRef.current?.close(1000, 'Component unmount');
+      wsRef.current = null;
+    };
+  }, [connect]);
+
+  return { data, connected, error };
+}
+
+function AlarmStatusPane({ townId }: { townId: string }) {
+  const { data, connected, error } = useAlarmStatusWs(townId);
+
+  if (!data && !error) {
+    return (
+      <div className="flex h-full items-center justify-center text-xs text-white/30">
+        Connecting to alarm status...
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="flex h-full items-center justify-center text-xs text-red-400/60">{error}</div>
+    );
+  }
+
+  if (!data) return null;
+
+  const hasIssues =
+    data.patrol.guppWarnings > 0 ||
+    data.patrol.guppEscalations > 0 ||
+    data.patrol.stalledAgents > 0 ||
+    data.patrol.orphanedHooks > 0;
+
+  return (
+    <div className="relative flex h-full gap-3 overflow-hidden p-3 text-[11px] text-white/70">
+      {/* Connection indicator */}
+      <div className="absolute top-1.5 right-3 z-10 flex items-center gap-1.5">
+        <span
+          className={`size-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'animate-pulse bg-yellow-400'}`}
+        />
+        <span className="text-[10px] text-white/35">{connected ? 'Live' : 'Reconnecting...'}</span>
+      </div>
+
+      {/* Left column: status cards */}
+      <div className="flex w-[340px] shrink-0 flex-col gap-2 overflow-y-auto">
+        {/* Alarm */}
+        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+            <Activity className="size-3" />
+            Alarm Loop
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <StatusRow label="Interval" value={data.alarm.intervalLabel} />
+            <StatusRow
+              label="Next fire"
+              value={data.alarm.nextFireAt ? formatRelativeTime(data.alarm.nextFireAt) : 'not set'}
+              warn={!data.alarm.nextFireAt}
+            />
+          </div>
+        </div>
+
+        {/* Agents */}
+        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
+          <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+            Agents ({data.agents.total})
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <StatusRow
+              label="Working"
+              value={data.agents.working}
+              highlight={data.agents.working > 0}
+            />
+            <StatusRow label="Idle" value={data.agents.idle} />
+            <StatusRow label="Stalled" value={data.agents.stalled} warn={data.agents.stalled > 0} />
+            <StatusRow label="Dead" value={data.agents.dead} warn={data.agents.dead > 0} />
+          </div>
+        </div>
+
+        {/* Beads */}
+        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
+          <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+            Beads
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <StatusRow label="Open" value={data.beads.open} />
+            <StatusRow
+              label="In Progress"
+              value={data.beads.inProgress}
+              highlight={data.beads.inProgress > 0}
+            />
+            <StatusRow label="Failed" value={data.beads.failed} warn={data.beads.failed > 0} />
+            <StatusRow
+              label="Triage"
+              value={data.beads.triageRequests}
+              warn={data.beads.triageRequests > 0}
+            />
+          </div>
+        </div>
+
+        {/* Patrol */}
+        <div
+          className={`rounded-md border p-2 ${
+            hasIssues
+              ? 'border-yellow-500/20 bg-yellow-500/[0.03]'
+              : 'border-white/[0.06] bg-white/[0.02]'
+          }`}
+        >
+          <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+            Patrol {hasIssues ? '(issues detected)' : ''}
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <StatusRow
+              label="GUPP Warns"
+              value={data.patrol.guppWarnings}
+              warn={data.patrol.guppWarnings > 0}
+            />
+            <StatusRow
+              label="GUPP Escalations"
+              value={data.patrol.guppEscalations}
+              warn={data.patrol.guppEscalations > 0}
+            />
+            <StatusRow
+              label="Stalled"
+              value={data.patrol.stalledAgents}
+              warn={data.patrol.stalledAgents > 0}
+            />
+            <StatusRow
+              label="Orphaned Hooks"
+              value={data.patrol.orphanedHooks}
+              warn={data.patrol.orphanedHooks > 0}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Right column: event feed */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-white/[0.06] bg-white/[0.02]">
+        <div className="border-b border-white/[0.06] px-2.5 py-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+          Recent Events
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {data.recentEvents.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-white/20">
+              No recent events
+            </div>
+          ) : (
+            <div className="divide-y divide-white/[0.04]">
+              {data.recentEvents.map((event, i) => (
+                <div key={i} className="flex items-baseline gap-2 px-2.5 py-1.5">
+                  <span className="shrink-0 text-[10px] text-white/25 tabular-nums">
+                    {formatTime(event.time)}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-medium ${eventTypeColor(event.type)}`}
+                  >
+                    {event.type}
+                  </span>
+                  <span className="min-w-0 truncate">{event.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusRow({
+  label,
+  value,
+  warn,
+  highlight,
+}: {
+  label: string;
+  value: string | number;
+  warn?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-white/35">{label}</span>
+      <span
+        className={`tabular-nums ${
+          warn ? 'text-yellow-400/80' : highlight ? 'text-emerald-400/80' : 'text-white/60'
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function formatRelativeTime(iso: string): string {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff < 0) return 'overdue';
+  if (diff < 1000) return 'now';
+  if (diff < 60_000) return `${Math.round(diff / 1000)}s`;
+  return `${Math.round(diff / 60_000)}m`;
+}
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function eventTypeColor(type: string): string {
+  switch (type) {
+    case 'status_changed':
+      return 'bg-blue-500/15 text-blue-400/70';
+    case 'assigned':
+      return 'bg-emerald-500/15 text-emerald-400/70';
+    case 'pr_created':
+    case 'pr_merged':
+      return 'bg-purple-500/15 text-purple-400/70';
+    case 'pr_creation_failed':
+    case 'escalation_created':
+      return 'bg-yellow-500/15 text-yellow-400/70';
+    default:
+      return 'bg-white/5 text-white/40';
+  }
 }
 
 // ── Mayor Terminal Pane ──────────────────────────────────────────────────
@@ -226,6 +535,10 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
           selectionBackground: '#3a3a5a',
         },
         allowProposedApi: true,
+        // Disable xterm's scrollback so kilo's TUI handles all scrolling.
+        // Without this, xterm's viewport captures mouse wheel events and
+        // prevents the TUI's own scroll from working.
+        scrollback: 0,
       });
 
       term.loadAddon(fitAddon);
@@ -410,6 +723,7 @@ function AgentTerminalPane({ townId, agentId }: { townId: string; agentId: strin
           selectionBackground: '#3a3a5a',
         },
         allowProposedApi: true,
+        scrollback: 0,
       });
 
       term.loadAddon(fitAddon);

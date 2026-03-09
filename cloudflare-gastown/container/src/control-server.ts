@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { runAgent } from './agent-runner';
+import { runAgent, resolveGitCredentials } from './agent-runner';
 import {
   stopAgent,
   sendMessage,
@@ -13,8 +13,8 @@ import {
   registerEventSink,
 } from './process-manager';
 import { startHeartbeat, stopHeartbeat } from './heartbeat';
-import { mergeBranch } from './git-manager';
-import { StartAgentRequest, SendMessageRequest, MergeRequest } from './types';
+import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
+import { StartAgentRequest, SendMessageRequest, MergeRequest, SetupRepoRequest } from './types';
 import type {
   AgentStatusResponse,
   HealthResponse,
@@ -105,7 +105,7 @@ app.post('/agents/start', async c => {
   console.log(
     `[control-server] /agents/start: role=${parsed.data.role} name=${parsed.data.name} rigId=${parsed.data.rigId} agentId=${parsed.data.agentId}`
   );
-  console.log(`[control-server] system prompt length: ${parsed.data.systemPrompt.length}`);
+  console.log(`[control-server] system prompt length: ${parsed.data.systemPrompt?.length ?? 0}`);
 
   try {
     const agent = await runAgent(parsed.data);
@@ -227,6 +227,53 @@ export function consumeStreamTicket(ticket: string): string | null {
   if (entry.expiresAt < Date.now()) return null;
   return entry.agentId;
 }
+
+// POST /repos/setup
+// Proactively clone a rig's repo and create a browse worktree so the
+// mayor (and future agents) have immediate access to the codebase.
+// Called by the TownDO when a new rig is added.
+app.post('/repos/setup', async c => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = SetupRepoRequest.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
+  }
+
+  const req = parsed.data;
+  console.log(`[control-server] /repos/setup: rigId=${req.rigId} gitUrl=${req.gitUrl}`);
+
+  // Run in background so we return 202 immediately.
+  // Errors are caught and logged — never propagated as unhandled rejections.
+  const doSetup = async () => {
+    try {
+      // Resolve git credentials from platformIntegrationId if no token
+      // is present in envVars (e.g. rigs using GitHub App installations).
+      const envVars = await resolveGitCredentials({
+        envVars: req.envVars,
+        platformIntegrationId: req.platformIntegrationId,
+      });
+
+      const browseDir = await setupRigBrowseWorktree({
+        rigId: req.rigId,
+        gitUrl: req.gitUrl,
+        defaultBranch: req.defaultBranch,
+        envVars,
+      });
+      console.log(`[control-server] /repos/setup: done rigId=${req.rigId} browse=${browseDir}`);
+    } catch (err) {
+      // Log as a warning, not an error — this is a best-effort background
+      // operation. The mayor and agents can still function without the
+      // browse worktree; it will be retried on the next agent dispatch.
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[control-server] /repos/setup: FAILED for rigId=${req.rigId}: ${message.split('\n')[0]}`
+      );
+    }
+  };
+  doSetup().catch(() => {});
+
+  return c.json({ status: 'accepted', message: 'Repo setup started' }, 202);
+});
 
 // POST /git/merge
 // Deterministic merge of a polecat branch into the target branch.

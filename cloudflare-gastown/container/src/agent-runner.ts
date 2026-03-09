@@ -1,7 +1,7 @@
 import type { Config } from '@kilocode/sdk';
 import { z } from 'zod';
 import { writeFile } from 'node:fs/promises';
-import { cloneRepo, createWorktree } from './git-manager';
+import { cloneRepo, createWorktree, setupRigBrowseWorktree } from './git-manager';
 import { startAgent } from './process-manager';
 import { getCurrentTownConfig } from './control-server';
 import type { ManagedAgent, StartAgentRequest } from './types';
@@ -210,15 +210,16 @@ async function configureGitCredentials(
  * is available, call the Next.js server to resolve fresh credentials.
  * Returns the (potentially enriched) envVars.
  */
-async function resolveGitCredentialsIfMissing(
-  request: StartAgentRequest
-): Promise<Record<string, string>> {
-  const envVars = { ...(request.envVars ?? {}) };
+export async function resolveGitCredentials(params: {
+  envVars?: Record<string, string>;
+  platformIntegrationId?: string;
+}): Promise<Record<string, string>> {
+  const envVars = { ...(params.envVars ?? {}) };
   const hasToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
 
   if (hasToken) return envVars;
 
-  const integrationId = request.platformIntegrationId;
+  const integrationId = params.platformIntegrationId;
   const kiloToken = envVars.KILOCODE_TOKEN;
   // The Next.js server URL — in dev it's localhost:3000, in prod it's the main app URL.
   // We derive it from KILO_API_URL (the gateway URL) or fall back to localhost.
@@ -361,6 +362,58 @@ async function createMayorWorkspace(rigId: string): Promise<string> {
 }
 
 /**
+ * Write the mayor's system prompt to AGENTS.md in the workspace.
+ *
+ * kilo/opencode reads AGENTS.md from the project root for ALL sessions,
+ * including built-in sub-agents (explore, general). By writing the full
+ * system prompt here instead of passing it via the session.prompt API,
+ * the mayor and all its sub-agents share the exact same instructions.
+ *
+ * The system prompt comes from the TownDO (buildMayorSystemPrompt) and
+ * is the single source of truth. When it changes (gastown updates,
+ * user customization), the TownDO sends the updated prompt and we
+ * rewrite this file.
+ */
+async function writeMayorSystemPromptToAgentsMd(
+  workspaceDir: string,
+  systemPrompt: string
+): Promise<void> {
+  const { writeFile, readdir, stat } = await import('node:fs/promises');
+  const path = await import('node:path');
+
+  // Append a dynamic section listing discovered browse worktrees so
+  // sub-agents know where to find rig codebases.
+  const rigsRoot = '/workspace/rigs';
+  let rigDirs: string[] = [];
+  try {
+    rigDirs = await readdir(rigsRoot);
+  } catch {
+    // No rigs directory yet
+  }
+
+  const browseEntries: string[] = [];
+  for (const entry of rigDirs) {
+    if (entry.startsWith('mayor-')) continue;
+    const browseDir = path.join(rigsRoot, entry, 'browse');
+    try {
+      const s = await stat(browseDir);
+      if (s.isDirectory()) {
+        browseEntries.push(`- **${entry}**: \`${browseDir}\``);
+      }
+    } catch {
+      // No browse worktree yet
+    }
+  }
+
+  const browseSuffix =
+    browseEntries.length > 0
+      ? `\n\n## Discovered Browse Worktrees\n\n${browseEntries.join('\n')}`
+      : '';
+
+  await writeFile(path.join(workspaceDir, 'AGENTS.md'), systemPrompt + browseSuffix);
+}
+
+/**
  * Run the full agent startup sequence:
  * 1. Clone/fetch the rig's git repo (or create minimal workspace for mayor)
  * 2. Create an isolated worktree for the agent's branch
@@ -368,17 +421,54 @@ async function createMayorWorkspace(rigId: string): Promise<string> {
  * 4. Start a kilo serve instance for the worktree (or reuse existing)
  * 5. Create a session and send the initial prompt via HTTP API
  */
-export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent> {
+export async function runAgent(originalRequest: StartAgentRequest): Promise<ManagedAgent> {
+  let request = originalRequest;
   let workdir: string;
 
   if (request.role === 'mayor') {
     // Mayor doesn't need a repo clone — just a git-initialized directory
     workdir = await createMayorWorkspace(request.rigId);
+
+    // On fresh containers the browse worktrees won't exist yet. Set them
+    // up for all known rigs before writing AGENTS.md so the mayor (and its
+    // sub-agents) can immediately browse codebases.
+    if (request.rigs?.length) {
+      const envVars = await resolveGitCredentials(request);
+      await Promise.allSettled(
+        request.rigs.map(async rig => {
+          try {
+            await setupRigBrowseWorktree({
+              rigId: rig.rigId,
+              gitUrl: rig.gitUrl,
+              defaultBranch: rig.defaultBranch,
+              envVars,
+            });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+            console.warn(`[runAgent] browse worktree setup failed for rig=${rig.rigId}: ${msg}`);
+          }
+        })
+      );
+    }
+
+    // Write the system prompt to AGENTS.md so the mayor AND its built-in
+    // sub-agents (explore, general) all share the same instructions.
+    // The system prompt is NOT passed via the session.prompt API — AGENTS.md
+    // is the sole source of truth for the mayor's instructions.
+    if (request.systemPrompt) {
+      await writeMayorSystemPromptToAgentsMd(workdir, request.systemPrompt);
+    }
   } else {
     // Resolve git credentials if missing. When the town config doesn't have
     // a token (common on first dispatch after rig creation), fetch one from
     // the Next.js server using the platform_integration_id.
-    const envVars = await resolveGitCredentialsIfMissing(request);
+    const envVars = await resolveGitCredentials(request);
+
+    // Merge resolved credentials back into the request so buildAgentEnv
+    // can propagate GIT_TOKEN/GH_TOKEN to the spawned kilo serve process.
+    // Without this, rigs using platformIntegrationId would clone successfully
+    // but the agent session itself would lack git push / gh credentials.
+    request = { ...request, envVars };
 
     await cloneRepo({
       rigId: request.rigId,
@@ -390,6 +480,8 @@ export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent
     workdir = await createWorktree({
       rigId: request.rigId,
       branch: request.branch,
+      startPoint: request.startPoint,
+      defaultBranch: request.defaultBranch,
     });
 
     // Set up git credentials so the agent can push
@@ -401,5 +493,13 @@ export async function runAgent(request: StartAgentRequest): Promise<ManagedAgent
 
   const env = buildAgentEnv(request);
 
-  return startAgent(request, workdir, env);
+  // For the mayor, the system prompt lives in AGENTS.md (written above)
+  // so all sessions — including sub-agents — share it. Don't also pass
+  // it via the session.prompt API to avoid duplication. Setting to
+  // undefined (not '') so the SDK omits it entirely and kilo serve
+  // uses its default system prompt + AGENTS.md, rather than treating
+  // an empty string as an explicit override.
+  const startRequest = request.role === 'mayor' ? { ...request, systemPrompt: undefined } : request;
+
+  return startAgent(startRequest, workdir, env);
 }

@@ -464,6 +464,17 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
   if (!agent) throw new Error(`Agent ${agentId} not found`);
   if (!agent.current_hook_bead_id) throw new Error(`Agent ${agentId} has no hooked bead`);
 
+  // Triage batch beads don't produce code — close and unhook without
+  // submitting to the review queue. Only applies to system-created triage
+  // beads (created_by = 'patrol'). User-created beads that happen to carry
+  // the gt:triage label go through normal review flow.
+  const hookedBead = getBead(sql, agent.current_hook_bead_id);
+  if (hookedBead?.labels.includes('gt:triage') && hookedBead.created_by === 'patrol') {
+    closeBead(sql, agent.current_hook_bead_id, agentId);
+    unhookBead(sql, agentId);
+    return;
+  }
+
   if (agent.role === 'refinery') {
     // The refinery handles merging (direct strategy) or PR creation (pr strategy)
     // itself. When it calls gt_done:

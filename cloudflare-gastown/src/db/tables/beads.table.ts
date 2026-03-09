@@ -110,17 +110,20 @@ export type BeadRecordWithMetadata = z.output<typeof BeadRecordWithMetadata>;
 
 export const beads = getTableFromZodSchema('beads', BeadRecord);
 
+// CHECK constraints are intentionally omitted — Cloudflare DO SQLite
+// provides no way to alter CHECK constraints on existing tables, and
+// Zod validates all values at the application layer. See #442.
 export function createTableBeads(): string {
   return getCreateTableQueryFromTable(beads, {
     bead_id: `text primary key`,
-    type: `text not null check(type in ('issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'))`,
-    status: `text not null default 'open' check(status in ('open', 'in_progress', 'closed', 'failed'))`,
+    type: `text not null`,
+    status: `text not null default 'open'`,
     title: `text not null`,
     body: `text`,
     rig_id: `text`,
     parent_bead_id: `text references beads(bead_id)`,
     assignee_agent_bead_id: `text`,
-    priority: `text default 'medium' check(priority in ('low', 'medium', 'high', 'critical'))`,
+    priority: `text default 'medium'`,
     labels: `text default '[]'`,
     metadata: `text default '{}'`,
     created_by: `text`,

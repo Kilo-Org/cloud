@@ -108,6 +108,18 @@ This bead is part of a **review-then-land** convoy. Your job for this intermedia
 
 The final merge/PR to main happens automatically once ALL beads in the convoy are done. Do NOT create a PR for this intermediate step.`;
   }
+  if (ctx.mergeMode === 'review-then-land' && !ctx.isIntermediateStep) {
+    return `
+## Convoy Context — Final Landing
+This is the **final landing merge** for a review-then-land convoy. All individual beads have been reviewed and merged into the convoy's feature branch. Your job is to:
+
+1. **Review the combined diff** — the feature branch contains the accumulated work of all convoy beads. Review the full diff against the target branch to ensure everything integrates correctly.
+2. **Run quality gates** — this is the last check before the work lands on the target branch. All gates must pass against the combined changes.
+3. **If approved, perform the merge or create a PR** — use the merge strategy shown above. This IS the final landing, so follow the merge/PR instructions below to land the convoy on the target branch.
+4. **If changes needed, escalate** — since there's no single polecat to send rework to, call \`gt_escalate\` with severity "medium" describing the issue. Do NOT attempt to fix the code yourself.
+
+This merge represents all the work in the convoy landing together. Treat it with the same rigor as a large feature branch merge.`;
+  }
   if (ctx.mergeMode === 'review-and-merge') {
     return `
 ## Convoy Context

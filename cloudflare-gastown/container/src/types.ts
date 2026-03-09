@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // ── Agent roles (mirrors worker types) ──────────────────────────────────
 
-export const AgentRole = z.enum(['mayor', 'polecat', 'refinery', 'witness']);
+export const AgentRole = z.enum(['mayor', 'polecat', 'refinery']);
 export type AgentRole = z.infer<typeof AgentRole>;
 
 // ── Control server request/response schemas ─────────────────────────────
@@ -18,13 +18,25 @@ export const StartAgentRequest = z.object({
   model: z.string(),
   /** Lightweight model for title generation, explore subagent, etc. */
   smallModel: z.string().optional(),
-  systemPrompt: z.string(),
+  systemPrompt: z.string().optional(),
   gitUrl: z.string(),
   branch: z.string(),
   defaultBranch: z.string(),
   envVars: z.record(z.string(), z.string()).optional(),
   /** Platform integration ID for resolving fresh git credentials at startup */
   platformIntegrationId: z.string().optional(),
+  /** Git ref to branch from (e.g. convoy feature branch). Falls back to HEAD if absent. */
+  startPoint: z.string().optional(),
+  /** Rig list for mayor agents — used to set up browse worktrees on fresh containers. */
+  rigs: z
+    .array(
+      z.object({
+        rigId: z.string(),
+        gitUrl: z.string(),
+        defaultBranch: z.string(),
+      })
+    )
+    .optional(),
 });
 export type StartAgentRequest = z.infer<typeof StartAgentRequest>;
 
@@ -254,7 +266,23 @@ export type CloneOptions = {
 export type WorktreeOptions = {
   rigId: string;
   branch: string;
+  /** Optional start point for the new branch (e.g. 'origin/main' or a feature branch ref). */
+  startPoint?: string;
+  /** Default branch name, used as fallback start point (e.g. 'main'). */
+  defaultBranch?: string;
 };
+
+// ── Repo setup (proactive clone + browse worktree) ──────────────────────
+
+export const SetupRepoRequest = z.object({
+  rigId: z.string().min(1),
+  gitUrl: z.string().min(1),
+  defaultBranch: z.string().min(1),
+  envVars: z.record(z.string(), z.string()).optional(),
+  /** Platform integration ID for resolving git credentials when no token is in envVars */
+  platformIntegrationId: z.string().optional(),
+});
+export type SetupRepoRequest = z.infer<typeof SetupRepoRequest>;
 
 // ── Heartbeat ───────────────────────────────────────────────────────────
 

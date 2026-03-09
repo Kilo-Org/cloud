@@ -54,18 +54,61 @@ export function addRig(
   }
 ): RigRecord {
   const timestamp = new Date().toISOString();
-  query(
-    sql,
-    /* sql */ `
-      INSERT INTO rigs (id, name, git_url, default_branch, config, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        name = excluded.name,
-        git_url = excluded.git_url,
-        default_branch = excluded.default_branch
-    `,
-    [input.rigId, input.name, input.gitUrl, input.defaultBranch, '{}', timestamp]
-  );
+  try {
+    query(
+      sql,
+      /* sql */ `
+        INSERT INTO rigs (id, name, git_url, default_branch, config, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          git_url = excluded.git_url,
+          default_branch = excluded.default_branch
+      `,
+      [input.rigId, input.name, input.gitUrl, input.defaultBranch, '{}', timestamp]
+    );
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('UNIQUE constraint failed: rigs.name')) {
+      // A rig with this name already exists under a different ID.
+      // Clean up the stale entry only if it's truly orphaned (has no
+      // open or in-progress beads). Otherwise surface the conflict.
+      const staleRig = query(sql, /* sql */ `SELECT id FROM rigs WHERE name = ? AND id != ?`, [
+        input.name,
+        input.rigId,
+      ]);
+      const staleId = [...staleRig][0]?.id as string | undefined;
+      if (staleId) {
+        const activeBeads = query(
+          sql,
+          /* sql */ `SELECT COUNT(*) AS cnt FROM beads WHERE rig_id = ? AND status IN ('open', 'in_progress')`,
+          [staleId]
+        );
+        const count = Number([...activeBeads][0]?.cnt ?? 0);
+        if (count > 0) {
+          throw new Error(
+            `A rig named "${input.name}" already exists (id=${staleId}) with ${count} active bead(s). ` +
+              `Delete it first before creating a new rig with the same name.`
+          );
+        }
+        // Truly orphaned — safe to remove
+        query(sql, /* sql */ `DELETE FROM rigs WHERE id = ?`, [staleId]);
+      }
+      query(
+        sql,
+        /* sql */ `
+          INSERT INTO rigs (id, name, git_url, default_branch, config, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            git_url = excluded.git_url,
+            default_branch = excluded.default_branch
+        `,
+        [input.rigId, input.name, input.gitUrl, input.defaultBranch, '{}', timestamp]
+      );
+    } else {
+      throw err;
+    }
+  }
 
   const rig = getRig(sql, input.rigId);
   if (!rig) throw new Error('Failed to create rig');

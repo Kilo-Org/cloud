@@ -224,9 +224,22 @@ function useAlarmStatusWs(townId: string): {
 }
 
 function AlarmStatusPane({ townId }: { townId: string }) {
-  const { data, connected, error } = useAlarmStatusWs(townId);
+  const { data: wsData, connected: wsConnected, error: wsError } = useAlarmStatusWs(townId);
+  const trpc = useGastownTRPC();
 
-  if (!data && !error) {
+  // Fall back to polling when WebSocket is unavailable (blocked, errored,
+  // or never connected). The tRPC query is disabled while the WS is
+  // providing data to avoid redundant requests.
+  const wsFailed = !!wsError && !wsData;
+  const pollingQuery = useQuery({
+    ...trpc.gastown.getAlarmStatus.queryOptions({ townId }),
+    enabled: wsFailed,
+    refetchInterval: wsFailed ? 5_000 : false,
+  });
+
+  const data = wsData ?? (pollingQuery.data as AlarmStatus | undefined) ?? null;
+
+  if (!data && !wsError && !pollingQuery.error) {
     return (
       <div className="flex h-full items-center justify-center text-xs text-white/30">
         Connecting to alarm status...
@@ -234,13 +247,13 @@ function AlarmStatusPane({ townId }: { townId: string }) {
     );
   }
 
-  if (error && !data) {
+  if (!data) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-red-400/60">{error}</div>
+      <div className="flex h-full items-center justify-center text-xs text-red-400/60">
+        {wsError ?? 'Failed to load status'}
+      </div>
     );
   }
-
-  if (!data) return null;
 
   const hasIssues =
     data.patrol.guppWarnings > 0 ||
@@ -253,9 +266,11 @@ function AlarmStatusPane({ townId }: { townId: string }) {
       {/* Connection indicator */}
       <div className="absolute top-1.5 right-3 z-10 flex items-center gap-1.5">
         <span
-          className={`size-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'animate-pulse bg-yellow-400'}`}
+          className={`size-1.5 rounded-full ${wsConnected ? 'bg-emerald-400' : wsFailed ? 'bg-blue-400' : 'animate-pulse bg-yellow-400'}`}
         />
-        <span className="text-[10px] text-white/35">{connected ? 'Live' : 'Reconnecting...'}</span>
+        <span className="text-[10px] text-white/35">
+          {wsConnected ? 'Live' : wsFailed ? 'Polling' : 'Reconnecting...'}
+        </span>
       </div>
 
       {/* Left column: status cards */}

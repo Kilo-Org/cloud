@@ -64,19 +64,29 @@ export declare const AgentOutput: z.ZodObject<
   {
     id: z.ZodString;
     rig_id: z.ZodNullable<z.ZodString>;
-    role: z.ZodEnum<{
-      mayor: 'mayor';
-      polecat: 'polecat';
-      refinery: 'refinery';
-    }>;
+    role: z.ZodUnion<
+      [
+        z.ZodEnum<{
+          mayor: 'mayor';
+          polecat: 'polecat';
+          refinery: 'refinery';
+        }>,
+        z.ZodString,
+      ]
+    >;
     name: z.ZodString;
     identity: z.ZodString;
-    status: z.ZodEnum<{
-      dead: 'dead';
-      idle: 'idle';
-      stalled: 'stalled';
-      working: 'working';
-    }>;
+    status: z.ZodUnion<
+      [
+        z.ZodEnum<{
+          dead: 'dead';
+          idle: 'idle';
+          stalled: 'stalled';
+          working: 'working';
+        }>,
+        z.ZodString,
+      ]
+    >;
     current_hook_bead_id: z.ZodNullable<z.ZodString>;
     dispatch_attempts: z.ZodDefault<z.ZodNumber>;
     last_activity_at: z.ZodNullable<z.ZodString>;
@@ -253,19 +263,29 @@ export declare const SlingResultOutput: z.ZodObject<
       {
         id: z.ZodString;
         rig_id: z.ZodNullable<z.ZodString>;
-        role: z.ZodEnum<{
-          mayor: 'mayor';
-          polecat: 'polecat';
-          refinery: 'refinery';
-        }>;
+        role: z.ZodUnion<
+          [
+            z.ZodEnum<{
+              mayor: 'mayor';
+              polecat: 'polecat';
+              refinery: 'refinery';
+            }>,
+            z.ZodString,
+          ]
+        >;
         name: z.ZodString;
         identity: z.ZodString;
-        status: z.ZodEnum<{
-          dead: 'dead';
-          idle: 'idle';
-          stalled: 'stalled';
-          working: 'working';
-        }>;
+        status: z.ZodUnion<
+          [
+            z.ZodEnum<{
+              dead: 'dead';
+              idle: 'idle';
+              stalled: 'stalled';
+              working: 'working';
+            }>,
+            z.ZodString,
+          ]
+        >;
         current_hook_bead_id: z.ZodNullable<z.ZodString>;
         dispatch_attempts: z.ZodDefault<z.ZodNumber>;
         last_activity_at: z.ZodNullable<z.ZodString>;
@@ -292,19 +312,29 @@ export declare const RigDetailOutput: z.ZodObject<
         {
           id: z.ZodString;
           rig_id: z.ZodNullable<z.ZodString>;
-          role: z.ZodEnum<{
-            mayor: 'mayor';
-            polecat: 'polecat';
-            refinery: 'refinery';
-          }>;
+          role: z.ZodUnion<
+            [
+              z.ZodEnum<{
+                mayor: 'mayor';
+                polecat: 'polecat';
+                refinery: 'refinery';
+              }>,
+              z.ZodString,
+            ]
+          >;
           name: z.ZodString;
           identity: z.ZodString;
-          status: z.ZodEnum<{
-            dead: 'dead';
-            idle: 'idle';
-            stalled: 'stalled';
-            working: 'working';
-          }>;
+          status: z.ZodUnion<
+            [
+              z.ZodEnum<{
+                dead: 'dead';
+                idle: 'idle';
+                stalled: 'stalled';
+                working: 'working';
+              }>,
+              z.ZodString,
+            ]
+          >;
           current_hook_bead_id: z.ZodNullable<z.ZodString>;
           dispatch_attempts: z.ZodDefault<z.ZodNumber>;
           last_activity_at: z.ZodNullable<z.ZodString>;
@@ -433,19 +463,29 @@ export declare const RpcAgentOutput: z.ZodPipe<
     {
       id: z.ZodString;
       rig_id: z.ZodNullable<z.ZodString>;
-      role: z.ZodEnum<{
-        mayor: 'mayor';
-        polecat: 'polecat';
-        refinery: 'refinery';
-      }>;
+      role: z.ZodUnion<
+        [
+          z.ZodEnum<{
+            mayor: 'mayor';
+            polecat: 'polecat';
+            refinery: 'refinery';
+          }>,
+          z.ZodString,
+        ]
+      >;
       name: z.ZodString;
       identity: z.ZodString;
-      status: z.ZodEnum<{
-        dead: 'dead';
-        idle: 'idle';
-        stalled: 'stalled';
-        working: 'working';
-      }>;
+      status: z.ZodUnion<
+        [
+          z.ZodEnum<{
+            dead: 'dead';
+            idle: 'idle';
+            stalled: 'stalled';
+            working: 'working';
+          }>,
+          z.ZodString,
+        ]
+      >;
       current_hook_bead_id: z.ZodNullable<z.ZodString>;
       dispatch_attempts: z.ZodDefault<z.ZodNumber>;
       last_activity_at: z.ZodNullable<z.ZodString>;
@@ -646,19 +686,29 @@ export declare const RpcSlingResultOutput: z.ZodPipe<
         {
           id: z.ZodString;
           rig_id: z.ZodNullable<z.ZodString>;
-          role: z.ZodEnum<{
-            mayor: 'mayor';
-            polecat: 'polecat';
-            refinery: 'refinery';
-          }>;
+          role: z.ZodUnion<
+            [
+              z.ZodEnum<{
+                mayor: 'mayor';
+                polecat: 'polecat';
+                refinery: 'refinery';
+              }>,
+              z.ZodString,
+            ]
+          >;
           name: z.ZodString;
           identity: z.ZodString;
-          status: z.ZodEnum<{
-            dead: 'dead';
-            idle: 'idle';
-            stalled: 'stalled';
-            working: 'working';
-          }>;
+          status: z.ZodUnion<
+            [
+              z.ZodEnum<{
+                dead: 'dead';
+                idle: 'idle';
+                stalled: 'stalled';
+                working: 'working';
+              }>,
+              z.ZodString,
+            ]
+          >;
           current_hook_bead_id: z.ZodNullable<z.ZodString>;
           dispatch_attempts: z.ZodDefault<z.ZodNumber>;
           last_activity_at: z.ZodNullable<z.ZodString>;
@@ -742,19 +792,29 @@ export declare const RpcRigDetailOutput: z.ZodPipe<
           {
             id: z.ZodString;
             rig_id: z.ZodNullable<z.ZodString>;
-            role: z.ZodEnum<{
-              mayor: 'mayor';
-              polecat: 'polecat';
-              refinery: 'refinery';
-            }>;
+            role: z.ZodUnion<
+              [
+                z.ZodEnum<{
+                  mayor: 'mayor';
+                  polecat: 'polecat';
+                  refinery: 'refinery';
+                }>,
+                z.ZodString,
+              ]
+            >;
             name: z.ZodString;
             identity: z.ZodString;
-            status: z.ZodEnum<{
-              dead: 'dead';
-              idle: 'idle';
-              stalled: 'stalled';
-              working: 'working';
-            }>;
+            status: z.ZodUnion<
+              [
+                z.ZodEnum<{
+                  dead: 'dead';
+                  idle: 'idle';
+                  stalled: 'stalled';
+                  working: 'working';
+                }>,
+                z.ZodString,
+              ]
+            >;
             current_hook_bead_id: z.ZodNullable<z.ZodString>;
             dispatch_attempts: z.ZodDefault<z.ZodNumber>;
             last_activity_at: z.ZodNullable<z.ZodString>;

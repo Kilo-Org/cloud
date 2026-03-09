@@ -103,10 +103,10 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         agents: {
           id: string;
           rig_id: string | null;
-          role: 'mayor' | 'polecat' | 'refinery';
+          role: string;
           name: string;
           identity: string;
-          status: 'dead' | 'idle' | 'stalled' | 'working';
+          status: string;
           current_hook_bead_id: string | null;
           dispatch_attempts: number;
           last_activity_at: string | null;
@@ -193,10 +193,10 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       output: {
         id: string;
         rig_id: string | null;
-        role: 'mayor' | 'polecat' | 'refinery';
+        role: string;
         name: string;
         identity: string;
-        status: 'dead' | 'idle' | 'stalled' | 'working';
+        status: string;
         current_hook_bead_id: string | null;
         dispatch_attempts: number;
         last_activity_at: string | null;
@@ -248,10 +248,10 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         agent: {
           id: string;
           rig_id: string | null;
-          role: 'mayor' | 'polecat' | 'refinery';
+          role: string;
           name: string;
           identity: string;
-          status: 'dead' | 'idle' | 'stalled' | 'working';
+          status: string;
           current_hook_bead_id: string | null;
           dispatch_attempts: number;
           last_activity_at: string | null;
@@ -695,10 +695,10 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             agents: {
               id: string;
               rig_id: string | null;
-              role: 'mayor' | 'polecat' | 'refinery';
+              role: string;
               name: string;
               identity: string;
-              status: 'dead' | 'idle' | 'stalled' | 'working';
+              status: string;
               current_hook_bead_id: string | null;
               dispatch_attempts: number;
               last_activity_at: string | null;
@@ -785,10 +785,10 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           output: {
             id: string;
             rig_id: string | null;
-            role: 'mayor' | 'polecat' | 'refinery';
+            role: string;
             name: string;
             identity: string;
-            status: 'dead' | 'idle' | 'stalled' | 'working';
+            status: string;
             current_hook_bead_id: string | null;
             dispatch_attempts: number;
             last_activity_at: string | null;
@@ -840,10 +840,10 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             agent: {
               id: string;
               rig_id: string | null;
-              role: 'mayor' | 'polecat' | 'refinery';
+              role: string;
               name: string;
               identity: string;
-              status: 'dead' | 'idle' | 'stalled' | 'working';
+              status: string;
               current_hook_bead_id: string | null;
               dispatch_attempts: number;
               last_activity_at: string | null;

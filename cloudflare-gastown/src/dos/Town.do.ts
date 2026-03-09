@@ -920,10 +920,14 @@ export class TownDO extends DurableObject<Env> {
 
     // If this triage request was created for an escalation, close the
     // linked escalation bead too so it doesn't sit open indefinitely.
-    const escalationBeadId =
-      typeof triageBead.metadata?.escalation_bead_id === 'string'
-        ? triageBead.metadata.escalation_bead_id
+    // The escalation_bead_id is nested under metadata.context (set by
+    // createTriageRequest's TriageRequestMetadata structure).
+    const ctx =
+      typeof triageBead.metadata?.context === 'object' && triageBead.metadata.context !== null
+        ? (triageBead.metadata.context as Record<string, unknown>)
         : null;
+    const escalationBeadId =
+      typeof ctx?.escalation_bead_id === 'string' ? ctx.escalation_bead_id : null;
     if (escalationBeadId) {
       beadOps.updateBeadStatus(this.sql, escalationBeadId, 'closed', input.agent_id);
     }
@@ -2694,6 +2698,7 @@ export class TownDO extends DurableObject<Env> {
 
     if (!started) {
       agents.unhookBead(this.sql, refineryAgent.id);
+      agents.updateAgentStatus(this.sql, refineryAgent.id, 'idle');
       console.error(
         `${TOWN_LOG} processReviewQueue: refinery agent failed to start for entry=${entry.id}`
       );

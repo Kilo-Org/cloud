@@ -53,10 +53,10 @@ export const BeadOutput = z.object({
 export const AgentOutput = z.object({
   id: z.string(),
   rig_id: z.string().nullable(),
-  role: z.enum(['polecat', 'refinery', 'mayor', 'witness']),
+  role: z.enum(['polecat', 'refinery', 'mayor']).or(z.string()),
   name: z.string(),
   identity: z.string(),
-  status: z.enum(['idle', 'working', 'stalled', 'dead']),
+  status: z.enum(['idle', 'working', 'stalled', 'dead']).or(z.string()),
   current_hook_bead_id: z.string().nullable(),
   dispatch_attempts: z.number().default(0),
   last_activity_at: z.string().nullable(),
@@ -184,4 +184,40 @@ export const RpcPtySessionOutput = rpcSafe(PtySessionOutput);
 export const RpcConvoyOutput = rpcSafe(ConvoyOutput);
 export const RpcConvoyDetailOutput = rpcSafe(ConvoyDetailOutput);
 export const RpcSlingResultOutput = rpcSafe(SlingResultOutput);
+
+// Alarm status
+const AlarmStatusOutput = z.object({
+  alarm: z.object({
+    nextFireAt: z.string().nullable(),
+    intervalMs: z.number(),
+    intervalLabel: z.string(),
+  }),
+  agents: z.object({
+    working: z.number(),
+    idle: z.number(),
+    stalled: z.number(),
+    dead: z.number(),
+    total: z.number(),
+  }),
+  beads: z.object({
+    open: z.number(),
+    inProgress: z.number(),
+    failed: z.number(),
+    triageRequests: z.number(),
+  }),
+  patrol: z.object({
+    guppWarnings: z.number(),
+    guppEscalations: z.number(),
+    stalledAgents: z.number(),
+    orphanedHooks: z.number(),
+  }),
+  recentEvents: z.array(
+    z.object({
+      time: z.string(),
+      type: z.string(),
+      message: z.string(),
+    })
+  ),
+});
+export const RpcAlarmStatusOutput = rpcSafe(AlarmStatusOutput);
 export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);

@@ -99,8 +99,6 @@ export function systemPromptForRole(params: {
       switch (params.role) {
         case 'refinery':
           return `${base} You review code quality and merge PRs. Check for correctness, style, and test coverage.`;
-        case 'witness':
-          return `${base} You monitor agent health and report anomalies.`;
         default:
           return base;
       }
@@ -172,6 +170,8 @@ export async function startAgentInContainer(
     platformIntegrationId?: string;
     /** For convoy beads: the convoy's feature branch to branch from instead of defaultBranch. */
     convoyFeatureBranch?: string;
+    /** All rigs in the town (mayor only) — used to set up browse worktrees on fresh containers. */
+    rigs?: Array<{ rigId: string; gitUrl: string; defaultBranch: string }>;
   }
 ): Promise<boolean> {
   console.log(
@@ -259,6 +259,10 @@ export async function startAgentInContainer(
         defaultBranch: params.defaultBranch,
         envVars,
         platformIntegrationId: params.platformIntegrationId,
+        // For convoy agents, start from the convoy's feature branch so the
+        // worktree includes all previously merged convoy work.
+        startPoint: params.convoyFeatureBranch ? `origin/${params.convoyFeatureBranch}` : undefined,
+        rigs: params.rigs,
       }),
     });
 

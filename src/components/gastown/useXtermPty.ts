@@ -100,6 +100,8 @@ export function useXtermPty({
           selectionBackground: '#3a3a5a',
         },
         allowProposedApi: true,
+        // Disable xterm's scrollback so kilo's TUI handles all scrolling.
+        scrollback: 0,
       });
 
       term.loadAddon(fitAddon);

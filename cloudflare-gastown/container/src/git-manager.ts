@@ -142,6 +142,13 @@ async function exec(cmd: string, args: string[], cwd?: string): Promise<string> 
     cwd,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: {
+      ...process.env,
+      // Prevent git from prompting for credentials in the container.
+      // Public repos clone without auth; private repos fail fast with
+      // a clear error instead of hanging on a username prompt.
+      GIT_TERMINAL_PROMPT: '0',
+    },
   });
 
   const exitCode = await proc.exited;
@@ -246,10 +253,27 @@ async function createWorktreeInner(options: WorktreeOptions): Promise<string> {
     return dir;
   }
 
+  // When a startPoint is provided (e.g. a convoy feature branch), create
+  // the new branch from that ref so the agent begins with the latest
+  // merged work from upstream. Without a startPoint, try to track the
+  // remote branch or fall back to the repo's current HEAD.
+  const startPoint = options.startPoint;
   try {
-    await exec('git', ['branch', '--track', options.branch, `origin/${options.branch}`], repo);
+    if (startPoint) {
+      await exec('git', ['branch', options.branch, startPoint], repo);
+    } else {
+      await exec('git', ['branch', '--track', options.branch, `origin/${options.branch}`], repo);
+    }
   } catch {
-    await exec('git', ['branch', options.branch], repo);
+    // Fall back to origin/<defaultBranch> so we always branch from the
+    // latest remote tip rather than the repo's local HEAD (which may be
+    // stale in a --no-checkout bare clone).
+    const fallback = options.defaultBranch ? `origin/${options.defaultBranch}` : undefined;
+    if (fallback) {
+      await exec('git', ['branch', options.branch, fallback], repo);
+    } else {
+      await exec('git', ['branch', options.branch], repo);
+    }
   }
 
   await exec('git', ['worktree', 'add', dir, options.branch], repo);
@@ -284,6 +308,64 @@ export async function listWorktrees(rigId: string): Promise<string[]> {
     .split('\n')
     .filter(line => line.startsWith('worktree '))
     .map(line => line.replace('worktree ', ''));
+}
+
+/**
+ * Create (or update) a read-only browse worktree for a rig on its default branch.
+ * This gives the mayor agent a checked-out view of the codebase at
+ * `/workspace/rigs/<rigId>/browse/` that it can navigate into via external_directory.
+ *
+ * If the browse worktree already exists, pulls latest from the remote.
+ */
+export function setupRigBrowseWorktree(
+  options: CloneOptions & { envVars?: Record<string, string> }
+): Promise<string> {
+  return withRigLock(options.rigId, async () => {
+    // Ensure the repo is cloned/up-to-date first
+    await cloneRepoInner(options);
+    return setupBrowseWorktreeInner(options.rigId, options.defaultBranch);
+  });
+}
+
+async function setupBrowseWorktreeInner(rigId: string, defaultBranch: string): Promise<string> {
+  validatePathSegment(rigId, 'rigId');
+  const repo = await repoDir(rigId);
+  const browseDir = resolve(WORKSPACE_ROOT, rigId, 'browse');
+  await assertInsideWorkspace(browseDir);
+
+  if (await pathExists(browseDir)) {
+    // Already exists — pull latest. Log failures so callers know the
+    // browse worktree may contain stale code.
+    try {
+      await exec('git', ['checkout', defaultBranch], browseDir);
+      await exec('git', ['pull', '--rebase', '--autostash'], browseDir);
+      console.log(`Updated browse worktree for rig ${rigId} at ${browseDir}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+      console.warn(`Browse worktree refresh failed for rig ${rigId} (may be stale): ${msg}`);
+    }
+    return browseDir;
+  }
+
+  // Create a worktree on the default branch for browsing.
+  // Force-create (or reset) the tracking branch to origin/<defaultBranch>
+  // so a recreated browse worktree always starts from the latest remote
+  // tip rather than a stale local ref.
+  const trackingBranch = `browse-${rigId.slice(0, 8)}`;
+  try {
+    await exec(
+      'git',
+      ['branch', '--force', '--track', trackingBranch, `origin/${defaultBranch}`],
+      repo
+    );
+  } catch {
+    // --force --track may fail on very old git; fall back to create-or-reset
+    await exec('git', ['branch', '-f', trackingBranch, `origin/${defaultBranch}`], repo);
+  }
+
+  await exec('git', ['worktree', 'add', browseDir, trackingBranch], repo);
+  console.log(`Created browse worktree for rig ${rigId} at ${browseDir}`);
+  return browseDir;
 }
 
 export type MergeOutcome = {

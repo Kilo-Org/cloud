@@ -30,7 +30,7 @@ export type Bead = {
   closed_at: string | null;
 };
 
-export type AgentRole = 'polecat' | 'refinery' | 'mayor' | 'witness';
+export type AgentRole = 'polecat' | 'refinery' | 'mayor';
 export type AgentStatus = 'idle' | 'working' | 'stalled' | 'dead';
 
 export type Agent = {

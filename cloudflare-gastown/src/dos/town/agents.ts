@@ -335,7 +335,7 @@ export function allocatePolecatName(sql: SqlStorage): string {
 
 /**
  * Find an idle agent of the given role, or create one.
- * For singleton roles (witness, refinery, mayor), reuse existing.
+ * For singleton roles (mayor), reuse existing.
  * For polecats, create a new one.
  */
 export function getOrCreateAgent(
@@ -345,7 +345,7 @@ export function getOrCreateAgent(
   townId: string
 ): Agent {
   // Town-wide singletons: one per town, not tied to a rig.
-  const townSingletonRoles = ['witness', 'mayor'];
+  const townSingletonRoles = ['mayor'];
 
   if (townSingletonRoles.includes(role)) {
     const existing = listAgents(sql, { role });

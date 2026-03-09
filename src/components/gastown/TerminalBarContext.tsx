@@ -5,7 +5,7 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 type TerminalTab = {
   id: string;
   label: string;
-  kind: 'mayor' | 'agent';
+  kind: 'mayor' | 'agent' | 'status';
   agentId: string;
 };
 

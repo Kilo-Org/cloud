@@ -174,6 +174,21 @@ export class GastownClient {
       body: JSON.stringify({ summary }),
     });
   }
+
+  /**
+   * Resolve a triage_request bead with the chosen action and notes.
+   * The TownDO closes the triage request and executes any side effects.
+   */
+  async resolveTriage(input: {
+    triage_request_bead_id: string;
+    action: string;
+    resolution_notes: string;
+  }): Promise<Bead> {
+    return this.request<Bead>(this.rigPath('/triage/resolve'), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
 }
 
 /**

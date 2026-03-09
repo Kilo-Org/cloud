@@ -158,23 +158,26 @@ function ConvoyCard({
       {/* Convoy header */}
       <div className="mb-2 flex items-center justify-between">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-medium text-violet-400">
+          <span className="shrink-0 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-medium text-violet-400">
             CONVOY
           </span>
-          <span className="max-w-[300px] truncate text-xs font-medium text-white/70">
+          <span
+            className="min-w-0 shrink truncate text-xs font-medium text-white/70"
+            title={convoy.title}
+          >
             {convoy.title}
           </span>
           {convoy.feature_branch && (
             <span
-              className="flex items-center gap-1 text-[9px] text-white/25"
+              className="flex min-w-0 shrink items-center gap-1 text-[9px] text-white/25"
               title={convoy.feature_branch}
             >
-              <GitBranch className="size-2.5" />
-              <span className="max-w-[140px] truncate font-mono">{convoy.feature_branch}</span>
+              <GitBranch className="size-2.5 shrink-0" />
+              <span className="min-w-0 truncate font-mono">{convoy.feature_branch}</span>
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <span className="font-mono text-[10px] text-white/30">
             {convoy.closed_beads}/{convoy.total_beads}
           </span>

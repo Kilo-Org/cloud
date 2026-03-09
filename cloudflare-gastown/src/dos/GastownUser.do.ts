@@ -2,8 +2,12 @@ import { DurableObject } from 'cloudflare:workers';
 import { createTableUserTowns, user_towns, UserTownRecord } from '../db/tables/user-towns.table';
 import { createTableUserRigs, user_rigs, UserRigRecord } from '../db/tables/user-rigs.table';
 import { query } from '../util/query.util';
+import { getTownDOStub } from './Town.do';
 
 const USER_LOG = '[GastownUser.do]';
+
+/** Health watchdog interval — check town alarms every 5 minutes */
+const WATCHDOG_INTERVAL_MS = 5 * 60_000;
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -49,6 +53,9 @@ export class GastownUserDO extends DurableObject<Env> {
   private async initializeDatabase(): Promise<void> {
     query(this.sql, createTableUserTowns(), []);
     query(this.sql, createTableUserRigs(), []);
+    // Arm the watchdog on every initialization so existing users (who
+    // created towns before the watchdog was added) get health checks.
+    await this.armWatchdogIfNeeded();
   }
 
   // ── Towns ─────────────────────────────────────────────────────────────
@@ -78,6 +85,9 @@ export class GastownUserDO extends DurableObject<Env> {
     console.log(`${USER_LOG} createTown: created town id=${town.id}`);
     // TODO: Should create the Town DO now, call setTownId, and then some function like ensureContainer
     // In the background, this way the town will likely be ready to go when the user gets to the UI
+
+    // Arm the health watchdog so it starts checking this town's alarm
+    await this.armWatchdogIfNeeded();
 
     return town;
   }
@@ -222,6 +232,57 @@ export class GastownUserDO extends DurableObject<Env> {
 
   async ping(): Promise<string> {
     return 'pong';
+  }
+
+  // ── Health Watchdog ───────────────────────────────────────────────────
+
+  /**
+   * Arm the watchdog alarm if this user has any towns. Called after
+   * creating a town to ensure the watchdog runs.
+   */
+  private async armWatchdogIfNeeded(): Promise<void> {
+    const currentAlarm = await this.ctx.storage.getAlarm();
+    if (!currentAlarm || currentAlarm < Date.now()) {
+      const towns = UserTownRecord.array().parse([
+        ...query(this.sql, /* sql */ `SELECT * FROM ${user_towns} LIMIT 1`, []),
+      ]);
+      if (towns.length > 0) {
+        await this.ctx.storage.setAlarm(Date.now() + WATCHDOG_INTERVAL_MS);
+      }
+    }
+  }
+
+  /**
+   * Watchdog alarm: periodically ping each town's TownDO to verify its
+   * alarm is firing and re-arm it if not. This is the external observer
+   * that catches a silently broken alarm handler.
+   *
+   * See #442 — replaces the Boot agent's role from local Gastown.
+   */
+  async alarm(): Promise<void> {
+    await this.ensureInitialized();
+    const towns = UserTownRecord.array().parse([
+      ...query(this.sql, /* sql */ `SELECT * FROM ${user_towns}`, []),
+    ]);
+
+    if (towns.length === 0) return;
+
+    console.log(`${USER_LOG} watchdog: checking ${towns.length} town(s)`);
+
+    for (const town of towns) {
+      try {
+        const townStub = getTownDOStub(this.env, town.id);
+        const health = await townStub.healthCheck();
+        if (!health.alarmSet) {
+          console.warn(`${USER_LOG} watchdog: re-armed alarm for town=${town.id} (was missing)`);
+        }
+      } catch (err) {
+        console.error(`${USER_LOG} watchdog: healthCheck failed for town=${town.id}:`, err);
+      }
+    }
+
+    // Re-arm the watchdog
+    await this.ctx.storage.setAlarm(Date.now() + WATCHDOG_INTERVAL_MS);
   }
 }
 

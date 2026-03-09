@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
-const AgentRole = z.enum(['polecat', 'refinery', 'mayor', 'witness']);
-const AgentProcessStatus = z.enum(['idle', 'working', 'stalled', 'dead']);
+// Accept legacy role values (e.g. 'witness' from pre-#442 towns) so that
+// queries parsing through AgentMetadataRecord don't throw on old rows.
+// Application code should only create the known roles below.
+const AgentRole = z.enum(['polecat', 'refinery', 'mayor']).or(z.string());
+const AgentProcessStatus = z.enum(['idle', 'working', 'stalled', 'dead']).or(z.string());
 
 export const AgentMetadataRecord = z.object({
   bead_id: z.string(),
@@ -32,13 +35,16 @@ export type AgentMetadataRecord = z.output<typeof AgentMetadataRecord>;
 
 export const agent_metadata = getTableFromZodSchema('agent_metadata', AgentMetadataRecord);
 
+// CHECK constraints are intentionally omitted — Cloudflare DO SQLite
+// provides no way to alter CHECK constraints on existing tables, and
+// Zod validates all values at the application layer. See #442.
 export function createTableAgentMetadata(): string {
   return getCreateTableQueryFromTable(agent_metadata, {
     bead_id: `text primary key references beads(bead_id)`,
-    role: `text not null check(role in ('polecat', 'refinery', 'mayor', 'witness'))`,
+    role: `text not null`,
     identity: `text not null unique`,
     container_process_id: `text`,
-    status: `text not null default 'idle' check(status in ('idle', 'working', 'stalled', 'dead'))`,
+    status: `text not null default 'idle'`,
     current_hook_bead_id: `text references beads(bead_id)`,
     dispatch_attempts: `integer not null default 0`,
     checkpoint: `text`,

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
 
-const AgentRole = z.enum(['polecat', 'refinery', 'mayor', 'witness']);
+const AgentRole = z.enum(['polecat', 'refinery', 'mayor']);
 const AgentStatus = z.enum(['idle', 'working', 'blocked', 'dead']);
 
 export const RigAgentRecord = z.object({
@@ -31,10 +31,10 @@ export function createTableRigAgents(): string {
   return getCreateTableQueryFromTable(rig_agents, {
     id: `text primary key`,
     rig_id: `text`,
-    role: `text not null check(role in ('polecat', 'refinery', 'mayor', 'witness'))`,
+    role: `text not null`,
     name: `text not null`,
     identity: `text not null unique`,
-    status: `text not null default 'idle' check(status in ('idle', 'working', 'blocked', 'dead'))`,
+    status: `text not null default 'idle'`,
     current_hook_bead_id: `text references rig_beads(id)`,
     dispatch_attempts: `integer not null default 0`,
     last_activity_at: `text`,

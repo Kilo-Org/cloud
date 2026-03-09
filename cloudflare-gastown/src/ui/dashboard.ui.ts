@@ -93,7 +93,7 @@ export function dashboardHtml(): string {
         <option value="polecat">polecat</option>
         <option value="refinery">refinery</option>
         <option value="mayor">mayor</option>
-        <option value="witness">witness</option>
+
       </select>
       <input type="text" id="agentIdentity" placeholder="identity" style="min-width:120px" />
       <button class="primary" onclick="registerAgent()">Register</button>

@@ -1818,6 +1818,23 @@ export class TownDO extends DurableObject<Env> {
     const beadId = generateId();
     const timestamp = now();
 
+    // Resolve convoy context from the source agent's hooked bead so the
+    // escalation is associated with the convoy for display and future
+    // automated handling (Phase 4: convoy-aware triage).
+    let convoyId: string | null = null;
+    let sourceBeadId: string | null = null;
+    if (input.source_agent_id) {
+      const agent = agents.getAgent(this.sql, input.source_agent_id);
+      if (agent?.current_hook_bead_id) {
+        sourceBeadId = agent.current_hook_bead_id;
+        convoyId = beadOps.getConvoyForBead(this.sql, sourceBeadId);
+      }
+    }
+
+    const metadata: Record<string, unknown> = {};
+    if (convoyId) metadata.convoy_id = convoyId;
+    if (sourceBeadId) metadata.source_bead_id = sourceBeadId;
+
     // Create the escalation bead
     query(
       this.sql,
@@ -1842,7 +1859,7 @@ export class TownDO extends DurableObject<Env> {
         null,
         input.severity === 'critical' ? 'critical' : input.severity === 'high' ? 'high' : 'medium',
         JSON.stringify(['gt:escalation', `severity:${input.severity}`]),
-        '{}',
+        JSON.stringify(metadata),
         input.source_agent_id ?? null,
         timestamp,
         timestamp,
@@ -1878,6 +1895,8 @@ export class TownDO extends DurableObject<Env> {
         severity: input.severity,
         rig_id: input.source_rig_id,
         category: input.category,
+        convoy_id: convoyId,
+        source_bead_id: sourceBeadId,
       },
       options:
         input.severity === 'low'

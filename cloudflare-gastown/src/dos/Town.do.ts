@@ -820,7 +820,9 @@ export class TownDO extends DurableObject<Env> {
         case 'ESCALATE_TO_MAYOR':
         case 'ESCALATE': {
           const message = input.resolution_notes || triageBead.title || 'Triage escalation';
-          this.sendMayorMessage(`[Triage Escalation] ${message}`).catch(err =>
+          this.sendMayorMessage(
+            `[Triage Escalation] ${message}\n\nAgent: ${targetAgentId ?? 'unknown'}\nBead: ${snapshotHookedBeadId ?? 'unknown'}`
+          ).catch(err =>
             console.warn(`${TOWN_LOG} resolveTriage: mayor notification failed:`, err)
           );
           break;
@@ -915,6 +917,16 @@ export class TownDO extends DurableObject<Env> {
         resolution_notes: input.resolution_notes,
       },
     });
+
+    // If this triage request was created for an escalation, close the
+    // linked escalation bead too so it doesn't sit open indefinitely.
+    const escalationBeadId =
+      typeof triageBead.metadata?.escalation_bead_id === 'string'
+        ? triageBead.metadata.escalation_bead_id
+        : null;
+    if (escalationBeadId) {
+      beadOps.updateBeadStatus(this.sql, escalationBeadId, 'closed', input.agent_id);
+    }
 
     console.log(
       `${TOWN_LOG} resolveTriage: bead=${input.triage_request_bead_id} action=${input.action}`
@@ -1854,7 +1866,27 @@ export class TownDO extends DurableObject<Env> {
     const escalation = this.getEscalation(beadId);
     if (!escalation) throw new Error('Failed to create escalation');
 
-    // Notify mayor for medium+ severity
+    // Create a triage request so the patrol→triage→resolve loop can
+    // act on the escalation. Without this, escalation beads sit open
+    // with no assignee and no automated follow-up.
+    patrol.createTriageRequest(this.sql, {
+      triageType: 'escalation',
+      agentBeadId: input.source_agent_id ?? null,
+      title: `Escalation (${input.severity}): ${input.message.slice(0, 80)}`,
+      context: {
+        escalation_bead_id: beadId,
+        severity: input.severity,
+        rig_id: input.source_rig_id,
+        category: input.category,
+      },
+      options:
+        input.severity === 'low'
+          ? ['NUDGE', 'CLOSE_BEAD', 'PROVIDE_GUIDANCE']
+          : ['ESCALATE_TO_MAYOR', 'RESTART', 'CLOSE_BEAD', 'REASSIGN_BEAD'],
+      rigId: input.source_rig_id,
+    });
+
+    // Notify mayor directly for medium+ severity (in addition to triage)
     if (input.severity !== 'low') {
       this.sendMayorMessage(
         `[Escalation:${input.severity}] rig=${input.source_rig_id} ${input.message}`

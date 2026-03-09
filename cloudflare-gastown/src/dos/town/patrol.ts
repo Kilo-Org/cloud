@@ -45,7 +45,8 @@ export type TriageType =
   | 'stuck_agent'
   | 'help_request'
   | 'zombie_confirm'
-  | 'crash_loop';
+  | 'crash_loop'
+  | 'escalation';
 
 export type TriageRequestMetadata = {
   triage_type: TriageType;

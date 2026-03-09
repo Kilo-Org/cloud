@@ -34,6 +34,7 @@ export const StartAgentRequest = z.object({
         rigId: z.string(),
         gitUrl: z.string(),
         defaultBranch: z.string(),
+        platformIntegrationId: z.string().optional(),
       })
     )
     .optional(),

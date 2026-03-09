@@ -171,7 +171,12 @@ export async function startAgentInContainer(
     /** For convoy beads: the convoy's feature branch to branch from instead of defaultBranch. */
     convoyFeatureBranch?: string;
     /** All rigs in the town (mayor only) — used to set up browse worktrees on fresh containers. */
-    rigs?: Array<{ rigId: string; gitUrl: string; defaultBranch: string }>;
+    rigs?: Array<{
+      rigId: string;
+      gitUrl: string;
+      defaultBranch: string;
+      platformIntegrationId?: string;
+    }>;
   }
 ): Promise<boolean> {
   console.log(

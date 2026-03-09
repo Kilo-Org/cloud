@@ -433,10 +433,16 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
     // up for all known rigs before writing AGENTS.md so the mayor (and its
     // sub-agents) can immediately browse codebases.
     if (request.rigs?.length) {
-      const envVars = await resolveGitCredentials(request);
+      // Resolve credentials per-rig since each may use a different
+      // GitHub App installation (platformIntegrationId).
+      const baseEnvVars = request.envVars ?? {};
       await Promise.allSettled(
         request.rigs.map(async rig => {
           try {
+            const envVars = await resolveGitCredentials({
+              envVars: baseEnvVars,
+              platformIntegrationId: rig.platformIntegrationId,
+            });
             await setupRigBrowseWorktree({
               rigId: rig.rigId,
               gitUrl: rig.gitUrl,

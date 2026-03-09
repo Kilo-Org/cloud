@@ -69,5 +69,5 @@ ${situations}
 ---
 
 Process each situation above. For each one, call gt_triage_resolve with your decision.
-When all are resolved, call gt_bead_close on your hooked bead to signal completion.`;
+When all are resolved, call gt_done to signal completion.`;
 }

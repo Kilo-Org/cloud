@@ -981,12 +981,21 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /** Build the rig list for mayor agent startup (browse worktree setup on fresh containers). */
-  private rigListForMayor(): Array<{ rigId: string; gitUrl: string; defaultBranch: string }> {
-    return rigs.listRigs(this.sql).map(r => ({
-      rigId: r.id,
-      gitUrl: r.git_url,
-      defaultBranch: r.default_branch,
-    }));
+  private async rigListForMayor(): Promise<
+    Array<{ rigId: string; gitUrl: string; defaultBranch: string; platformIntegrationId?: string }>
+  > {
+    const rigRecords = rigs.listRigs(this.sql);
+    return Promise.all(
+      rigRecords.map(async r => {
+        const rc = await this.getRigConfig(r.id);
+        return {
+          rigId: r.id,
+          gitUrl: r.git_url,
+          defaultBranch: r.default_branch,
+          platformIntegrationId: rc?.platformIntegrationId,
+        };
+      })
+    );
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1056,7 +1065,7 @@ export class TownDO extends DurableObject<Env> {
         defaultBranch: rigConfig?.defaultBranch ?? 'main',
         kilocodeToken,
         townConfig,
-        rigs: this.rigListForMayor(),
+        rigs: await this.rigListForMayor(),
       });
 
       if (started) {
@@ -1139,7 +1148,7 @@ export class TownDO extends DurableObject<Env> {
       defaultBranch: rigConfig?.defaultBranch ?? 'main',
       kilocodeToken,
       townConfig,
-      rigs: this.rigListForMayor(),
+      rigs: await this.rigListForMayor(),
     });
 
     if (started) {
@@ -3225,7 +3234,7 @@ export class TownDO extends DurableObject<Env> {
               AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
               AND (
                 ${agent_metadata.last_activity_at} IS NULL
-                OR ${agent_metadata.last_activity_at} < datetime('now', '-5 minutes')
+                OR ${agent_metadata.last_activity_at} < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 minutes')
               )
           `,
           []

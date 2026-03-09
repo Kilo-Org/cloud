@@ -334,11 +334,12 @@ async function setupBrowseWorktreeInner(rigId: string, defaultBranch: string): P
   await assertInsideWorkspace(browseDir);
 
   if (await pathExists(browseDir)) {
-    // Already exists — pull latest. Log failures so callers know the
-    // browse worktree may contain stale code.
+    // Already exists — fetch latest and reset the tracking branch to
+    // origin/<defaultBranch>. The worktree lives on the synthetic
+    // browse-<rigId> branch, not on <defaultBranch> directly.
     try {
-      await exec('git', ['checkout', defaultBranch], browseDir);
-      await exec('git', ['pull', '--rebase', '--autostash'], browseDir);
+      await exec('git', ['fetch', 'origin', defaultBranch], browseDir);
+      await exec('git', ['reset', '--hard', `origin/${defaultBranch}`], browseDir);
       console.log(`Updated browse worktree for rig ${rigId} at ${browseDir}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);

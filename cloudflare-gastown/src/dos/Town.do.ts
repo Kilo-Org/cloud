@@ -799,18 +799,18 @@ export class TownDO extends DurableObject<Env> {
           break;
         }
         case 'CLOSE_BEAD': {
-          // Stop the agent in the container first so it can't push stale
-          // changes after the bead is marked failed.
-          if (targetAgent?.status === 'working' || targetAgent?.status === 'stalled') {
-            dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
-          }
           // Fail the bead that was hooked when the triage request was
           // created (not the agent's current hook, which may differ).
           const beadToClose = snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
           if (beadToClose) {
             beadOps.updateBeadStatus(this.sql, beadToClose, 'failed', input.agent_id);
-            // Only unhook if the agent is still hooked to this bead
+            // Only stop and unhook if the agent is still working on this
+            // specific bead. If the agent has moved on, stopping it would
+            // abort unrelated work.
             if (targetAgent?.current_hook_bead_id === beadToClose) {
+              if (targetAgent.status === 'working' || targetAgent.status === 'stalled') {
+                dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
+              }
               agents.unhookBead(this.sql, targetAgentId);
             }
           }
@@ -839,16 +839,16 @@ export class TownDO extends DurableObject<Env> {
           break;
         }
         case 'REASSIGN_BEAD': {
-          // Stop the agent in the container before reassigning so the old
-          // polecat can't push changes for work being handed off.
-          if (targetAgent?.status === 'working' || targetAgent?.status === 'stalled') {
-            dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
-          }
           // Target the bead from the triage snapshot, not the agent's current hook.
           const beadToReassign = snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
           if (beadToReassign) {
-            // Only unhook if the agent is still hooked to this bead
+            // Only stop and unhook if the agent is still working on this
+            // specific bead. If the agent has moved on, stopping it would
+            // abort unrelated work.
             if (targetAgent?.current_hook_bead_id === beadToReassign) {
+              if (targetAgent.status === 'working' || targetAgent.status === 'stalled') {
+                dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
+              }
               agents.unhookBead(this.sql, targetAgentId);
             }
             // Reset the bead to open so the scheduler can re-assign it

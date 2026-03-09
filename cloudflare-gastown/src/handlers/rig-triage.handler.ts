@@ -28,7 +28,7 @@ const ResolveTriageBody = z.object({
   resolution_notes: z.string(),
 });
 
-export async function handleResolveTriage(c: Context<GastownEnv>, params: { rigId: string }) {
+export async function handleResolveTriage(c: Context<GastownEnv>, _params: { rigId: string }) {
   const agentId = getEnforcedAgentId(c);
   if (!agentId) {
     return c.json(resError('Agent authentication required'), 401);

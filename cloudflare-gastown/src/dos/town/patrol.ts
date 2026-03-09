@@ -15,7 +15,7 @@ import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { query } from '../../util/query.util';
 import { sendMail } from './mail';
 import { deleteAgent, getOrCreateAgent, hookBead, unhookBead } from './agents';
-import { createBead, logBeadEvent, updateBeadStatus } from './beads';
+import { createBead, updateBeadStatus } from './beads';
 
 const LOG = '[patrol]';
 

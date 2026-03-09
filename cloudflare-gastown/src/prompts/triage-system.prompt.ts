@@ -18,7 +18,7 @@ export function buildTriageSystemPrompt(pendingRequests: TriageRequestBead[]): s
   const situations = pendingRequests
     .map((req, i) => {
       const meta = req.metadata ?? {};
-      const triageType = String(meta.triage_type ?? 'unknown').toUpperCase();
+      const triageType = `${(meta.triage_type ?? 'unknown') as string}`.toUpperCase();
       const options = Array.isArray(meta.options) ? (meta.options as string[]).join(' | ') : 'N/A';
       const context =
         typeof meta.context === 'object' && meta.context !== null

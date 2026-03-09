@@ -70,11 +70,12 @@ const TOWN_LOG = '[Town.do]';
 
 /** Format a bead_events row into a human-readable message for the status feed. */
 function formatEventMessage(row: Record<string, unknown>): string {
-  const eventType = String(row.event_type ?? '');
-  const beadTitle = row.bead_title ? String(row.bead_title) : null;
-  const newValue = row.new_value ? String(row.new_value) : null;
-  const agentId = row.agent_id ? String(row.agent_id).slice(0, 8) : null;
-  const beadId = row.bead_id ? String(row.bead_id).slice(0, 8) : null;
+  const s = (v: unknown) => (v == null ? '' : `${v as string}`);
+  const eventType = s(row.event_type);
+  const beadTitle = row.bead_title ? s(row.bead_title) : null;
+  const newValue = row.new_value ? s(row.new_value) : null;
+  const agentId = row.agent_id ? s(row.agent_id).slice(0, 8) : null;
+  const beadId = row.bead_id ? s(row.bead_id).slice(0, 8) : null;
 
   const target = beadTitle ? `"${beadTitle}"` : beadId ? `bead ${beadId}…` : 'unknown';
   const actor = agentId ? `agent ${agentId}…` : 'system';
@@ -3138,7 +3139,7 @@ export class TownDO extends DurableObject<Env> {
     ];
     const agentCounts = { working: 0, idle: 0, stalled: 0, dead: 0, total: 0 };
     for (const row of agentRows) {
-      const s = String(row.status);
+      const s = `${row.status as string}`;
       const c = Number(row.cnt);
       if (s in agentCounts) (agentCounts as Record<string, number>)[s] = c;
       agentCounts.total += c;
@@ -3159,7 +3160,7 @@ export class TownDO extends DurableObject<Env> {
     ];
     const beadCounts = { open: 0, inProgress: 0, failed: 0, triageRequests: 0 };
     for (const row of beadRows) {
-      const s = String(row.status);
+      const s = `${row.status as string}`;
       const c = Number(row.cnt);
       if (s === 'open') beadCounts.open = c;
       else if (s === 'in_progress') beadCounts.inProgress = c;
@@ -3241,8 +3242,8 @@ export class TownDO extends DurableObject<Env> {
     ];
 
     const recentEvents = recentRows.map(row => ({
-      time: String(row.created_at),
-      type: String(row.event_type),
+      time: `${row.created_at as string}`,
+      type: `${row.event_type as string}`,
       message: formatEventMessage(row),
     }));
 

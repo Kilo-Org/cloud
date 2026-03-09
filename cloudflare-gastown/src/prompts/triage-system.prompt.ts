@@ -45,8 +45,8 @@ You will be given a list of situations. For each one:
 3. Call gt_triage_resolve with the triage request bead ID and your chosen action.
 4. Briefly explain your reasoning in the resolution_notes field.
 
-When you have resolved all situations, call gt_bead_close on your hooked bead to signal completion.
-Do NOT call gt_done — it submits work to the review queue, which is not appropriate for triage.
+When you have resolved all situations, call gt_done to signal completion.
+This will close the triage batch, unhook you, and return you to idle.
 
 ## Guidelines
 

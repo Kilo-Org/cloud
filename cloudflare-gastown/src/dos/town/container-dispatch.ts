@@ -96,16 +96,24 @@ export async function ensureContainerToken(
     );
   }
 
-  // Push to running process so existing agents pick up the fresh token
+  // Push to running process so existing agents pick up the fresh token.
+  // Throw on non-2xx so the alarm's throttle doesn't advance on failure.
   try {
-    await container.fetch('http://container/refresh-token', {
+    const resp = await container.fetch('http://container/refresh-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     });
-  } catch {
-    // Container may not be running yet — that's fine, the token will
-    // be in envVars when it boots.
+    if (!resp.ok) {
+      throw new Error(`container returned ${resp.status}`);
+    }
+  } catch (err) {
+    // If the container isn't running yet, the token will be in envVars
+    // when it boots. But if it IS running and rejected the refresh,
+    // propagate the error so the alarm retries on the next tick.
+    const isContainerDown =
+      err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'));
+    if (!isContainerDown) throw err;
   }
 
   return token;

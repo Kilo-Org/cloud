@@ -1,8 +1,7 @@
 import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils';
-import { verifyAgentJWT, type AgentJWTPayload } from '../util/jwt.util';
-import { verifyContainerSecret } from '../util/container-secret.util';
+import { verifyAgentJWT, verifyContainerJWT, type AgentJWTPayload } from '../util/jwt.util';
 import { resError } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
 
@@ -35,35 +34,27 @@ export const townIdMiddleware = createMiddleware<GastownEnv>(async (c, next) => 
 });
 
 /**
- * Try to authenticate with a container secret (HMAC-based, no expiry).
- * Returns the AgentJWTPayload-shaped object if successful, null otherwise.
- * Agent identity comes from X-Gastown-* headers which are trusted because
- * the container secret proves the request came from the right town's container.
+ * Try to authenticate with a container-scoped JWT (scope: 'container').
+ * Returns an AgentJWTPayload-shaped object if successful, null otherwise.
+ * Container JWTs carry { townId, userId } but not agentId/rigId — those
+ * come from the route params and are trusted because the JWT proves the
+ * request came from the right town's container.
  */
-async function tryContainerSecretAuth(
+function tryContainerJWTAuth(
   c: Context<GastownEnv>,
   token: string,
   jwtSecret: string
-): Promise<AgentJWTPayload | null> {
-  // Container secrets contain colons (format: townId:nonce:hmac).
-  // JWTs contain dots (format: header.payload.signature).
-  // Quick format check to avoid unnecessary HMAC computation on JWTs.
-  if (!token.includes(':') || token.includes('.')) return null;
-
-  const result = await verifyContainerSecret(token, jwtSecret);
+): AgentJWTPayload | null {
+  const result = verifyContainerJWT(token, jwtSecret);
   if (!result.success) return null;
 
-  // Build an AgentJWTPayload from the container secret + headers.
-  // The container secret proves town membership; headers provide agent identity.
-  const agentId = c.req.header('X-Gastown-Agent-Id') ?? '';
-  const rigId = c.req.header('X-Gastown-Rig-Id') ?? '';
-  const userId = c.req.header('X-Gastown-User-Id') ?? '';
-
+  // Populate agentId/rigId from route params — the container JWT proves
+  // the request came from this town's container, so we trust the URL.
   return {
-    agentId,
-    rigId,
+    agentId: c.req.param('agentId') ?? '',
+    rigId: c.req.param('rigId') ?? '',
     townId: result.payload.townId,
-    userId,
+    userId: result.payload.userId,
   };
 }
 
@@ -87,8 +78,8 @@ export const authMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
     return c.json(resError('Internal server error'), 500);
   }
 
-  // Try container secret first (fast HMAC check, no expiry)
-  let payload = await tryContainerSecretAuth(c, token, secret);
+  // Try container-scoped JWT first (scope: 'container', 8h expiry + alarm refresh)
+  let payload = tryContainerJWTAuth(c, token, secret);
 
   // Fall back to legacy JWT verification
   if (!payload) {

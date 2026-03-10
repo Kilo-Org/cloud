@@ -26,20 +26,18 @@ function isApiResponse(
 
 export class GastownClient {
   private baseUrl: string;
-  private containerSecret: string | undefined;
+  private containerToken: string | undefined;
   private token: string;
   private agentId: string;
   private rigId: string;
   private townId: string;
-  private userId: string | undefined;
   constructor(env: GastownEnv) {
     this.baseUrl = env.apiUrl.replace(/\/+$/, '');
-    this.containerSecret = env.containerSecret;
+    this.containerToken = env.containerToken;
     this.token = env.sessionToken;
     this.agentId = env.agentId;
     this.rigId = env.rigId;
     this.townId = env.townId;
-    this.userId = env.userId;
   }
 
   private rigPath(path: string): string {
@@ -54,14 +52,9 @@ export class GastownClient {
     // Normalize headers so callers can pass plain objects, Headers instances, or tuples
     const headers = new Headers(init?.headers);
     headers.set('Content-Type', 'application/json');
-    // Prefer container secret (no expiry) over legacy JWT (8h expiry)
-    headers.set('Authorization', `Bearer ${this.containerSecret ?? this.token}`);
-    // When using container secret, identity must be sent via headers
-    if (this.containerSecret) {
-      headers.set('X-Gastown-Agent-Id', this.agentId);
-      headers.set('X-Gastown-Rig-Id', this.rigId);
-      if (this.userId) headers.set('X-Gastown-User-Id', this.userId);
-    }
+    // Prefer container-scoped JWT (shared, refreshed by alarm) over
+    // legacy per-agent JWT (8h expiry, no refresh)
+    headers.set('Authorization', `Bearer ${this.containerToken ?? this.token}`);
 
     let response: Response;
     try {
@@ -208,19 +201,17 @@ export class GastownClient {
  */
 export class MayorGastownClient {
   private baseUrl: string;
-  private containerSecret: string | undefined;
+  private containerToken: string | undefined;
   private token: string;
   private agentId: string;
   private townId: string;
-  private userId: string | undefined;
 
   constructor(env: MayorGastownEnv) {
     this.baseUrl = env.apiUrl.replace(/\/+$/, '');
-    this.containerSecret = env.containerSecret;
+    this.containerToken = env.containerToken;
     this.token = env.sessionToken;
     this.agentId = env.agentId;
     this.townId = env.townId;
-    this.userId = env.userId;
   }
 
   private mayorPath(path: string): string {
@@ -230,12 +221,8 @@ export class MayorGastownClient {
   private async request<T>(url: string, init?: RequestInit): Promise<T> {
     const headers = new Headers(init?.headers);
     headers.set('Content-Type', 'application/json');
-    // Prefer container secret (no expiry) over legacy JWT (8h expiry)
-    headers.set('Authorization', `Bearer ${this.containerSecret ?? this.token}`);
-    if (this.containerSecret) {
-      headers.set('X-Gastown-Agent-Id', this.agentId);
-      if (this.userId) headers.set('X-Gastown-User-Id', this.userId);
-    }
+    // Prefer container-scoped JWT over legacy per-agent JWT
+    headers.set('Authorization', `Bearer ${this.containerToken ?? this.token}`);
 
     let response: Response;
     try {
@@ -354,18 +341,18 @@ export class GastownApiError extends Error {
 
 export function createClientFromEnv(): GastownClient {
   const apiUrl = process.env.GASTOWN_API_URL;
-  const containerSecret = process.env.GASTOWN_CONTAINER_SECRET;
+  const containerToken = process.env.GASTOWN_CONTAINER_TOKEN;
   const sessionToken = process.env.GASTOWN_SESSION_TOKEN;
   const agentId = process.env.GASTOWN_AGENT_ID;
   const rigId = process.env.GASTOWN_RIG_ID;
   const townId = process.env.GASTOWN_TOWN_ID;
 
-  // Require either containerSecret or sessionToken (prefer containerSecret)
-  const hasAuth = containerSecret || sessionToken;
+  // Require either containerToken or sessionToken (prefer containerToken)
+  const hasAuth = containerToken || sessionToken;
   if (!apiUrl || !hasAuth || !agentId || !rigId || !townId) {
     const missing = [
       !apiUrl && 'GASTOWN_API_URL',
-      !hasAuth && 'GASTOWN_CONTAINER_SECRET or GASTOWN_SESSION_TOKEN',
+      !hasAuth && 'GASTOWN_CONTAINER_TOKEN or GASTOWN_SESSION_TOKEN',
       !agentId && 'GASTOWN_AGENT_ID',
       !rigId && 'GASTOWN_RIG_ID',
       !townId && 'GASTOWN_TOWN_ID',
@@ -375,27 +362,26 @@ export function createClientFromEnv(): GastownClient {
 
   return new GastownClient({
     apiUrl,
-    containerSecret: containerSecret ?? undefined,
+    containerToken: containerToken ?? undefined,
     sessionToken: sessionToken ?? '',
     agentId,
     rigId,
     townId,
-    userId: process.env.GASTOWN_USER_ID ?? undefined,
   });
 }
 
 export function createMayorClientFromEnv(): MayorGastownClient {
   const apiUrl = process.env.GASTOWN_API_URL;
-  const containerSecret = process.env.GASTOWN_CONTAINER_SECRET;
+  const containerToken = process.env.GASTOWN_CONTAINER_TOKEN;
   const sessionToken = process.env.GASTOWN_SESSION_TOKEN;
   const agentId = process.env.GASTOWN_AGENT_ID;
   const townId = process.env.GASTOWN_TOWN_ID;
 
-  const hasAuth = containerSecret || sessionToken;
+  const hasAuth = containerToken || sessionToken;
   if (!apiUrl || !hasAuth || !agentId || !townId) {
     const missing = [
       !apiUrl && 'GASTOWN_API_URL',
-      !hasAuth && 'GASTOWN_CONTAINER_SECRET or GASTOWN_SESSION_TOKEN',
+      !hasAuth && 'GASTOWN_CONTAINER_TOKEN or GASTOWN_SESSION_TOKEN',
       !agentId && 'GASTOWN_AGENT_ID',
       !townId && 'GASTOWN_TOWN_ID',
     ].filter(Boolean);
@@ -404,10 +390,9 @@ export function createMayorClientFromEnv(): MayorGastownClient {
 
   return new MayorGastownClient({
     apiUrl,
-    containerSecret: containerSecret ?? undefined,
+    containerToken: containerToken ?? undefined,
     sessionToken: sessionToken ?? '',
     agentId,
     townId,
-    userId: process.env.GASTOWN_USER_ID ?? undefined,
   });
 }

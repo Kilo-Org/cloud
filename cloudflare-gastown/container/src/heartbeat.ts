@@ -57,11 +57,6 @@ async function sendHeartbeats(): Promise<void> {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${sessionToken}`,
       };
-      // When using a container secret (contains ':'), send agent identity headers
-      if (sessionToken.includes(':')) {
-        headers['X-Gastown-Agent-Id'] = agent.agentId;
-        headers['X-Gastown-Rig-Id'] = agent.rigId;
-      }
       const response = await fetch(
         `${gastownApiUrl}/api/towns/${agent.townId}/rigs/${agent.rigId}/agents/${agent.agentId}/heartbeat`,
         {

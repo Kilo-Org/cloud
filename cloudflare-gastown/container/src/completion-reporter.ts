@@ -17,7 +17,7 @@ export async function reportAgentCompleted(
   reason?: string
 ): Promise<void> {
   const apiUrl = agent.gastownApiUrl;
-  const authToken = agent.gastownContainerSecret ?? agent.gastownSessionToken;
+  const authToken = agent.gastownContainerToken ?? agent.gastownSessionToken;
   if (!apiUrl || !authToken) {
     console.warn(
       `Cannot report agent ${agent.agentId} completion: no API credentials on agent record`
@@ -33,10 +33,7 @@ export async function reportAgentCompleted(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${authToken}`,
     };
-    if (agent.gastownContainerSecret) {
-      headers['X-Gastown-Agent-Id'] = agent.agentId;
-      headers['X-Gastown-Rig-Id'] = agent.rigId;
-    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers,

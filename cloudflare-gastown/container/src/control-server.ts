@@ -294,8 +294,8 @@ app.post('/git/merge', async c => {
   const apiUrl = req.envVars?.GASTOWN_API_URL ?? process.env.GASTOWN_API_URL;
   // Prefer container secret (no expiry) over session token (8h JWT)
   const token =
-    req.envVars?.GASTOWN_CONTAINER_SECRET ??
-    process.env.GASTOWN_CONTAINER_SECRET ??
+    req.envVars?.GASTOWN_CONTAINER_TOKEN ??
+    process.env.GASTOWN_CONTAINER_TOKEN ??
     req.envVars?.GASTOWN_SESSION_TOKEN ??
     process.env.GASTOWN_SESSION_TOKEN;
 
@@ -523,7 +523,7 @@ export function startControlServer(): void {
   // Start heartbeat if env vars are configured.
   // Prefer container secret (no expiry) over session token (8h JWT).
   const apiUrl = process.env.GASTOWN_API_URL;
-  const authToken = process.env.GASTOWN_CONTAINER_SECRET ?? process.env.GASTOWN_SESSION_TOKEN;
+  const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
   if (apiUrl && authToken) {
     startHeartbeat(apiUrl, authToken);
   }

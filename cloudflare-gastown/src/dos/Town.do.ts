@@ -1964,6 +1964,17 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
+    // Refresh the container-scoped JWT before any work that might
+    // trigger API calls. Throttled to once per hour (tokens have 8h
+    // expiry, so hourly refresh provides ample safety margin).
+    if (this.hasActiveWork()) {
+      try {
+        await this.refreshContainerToken();
+      } catch (err) {
+        console.warn(`${TOWN_LOG} alarm: refreshContainerToken failed`, err);
+      }
+    }
+
     // Process reviews FIRST so the refinery gets assigned before the
     // scheduler dispatches new polecats. This prevents downstream beads
     // from starting before upstream reviews are merged.
@@ -2020,6 +2031,26 @@ export class TownDO extends DurableObject<Env> {
     } catch (err) {
       console.warn(`${TOWN_LOG} alarm: status broadcast failed`, err);
     }
+  }
+
+  /**
+   * Push a fresh container-scoped JWT to the TownContainerDO. Called
+   * from the alarm handler, throttled to once per hour (tokens have
+   * 8h expiry). The TownContainerDO stores it as an env var so it's
+   * available to all agents in the container.
+   */
+  private lastContainerTokenRefreshAt = 0;
+  private async refreshContainerToken(): Promise<void> {
+    const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
+    const now = Date.now();
+    if (now - this.lastContainerTokenRefreshAt < TOKEN_REFRESH_INTERVAL_MS) return;
+    this.lastContainerTokenRefreshAt = now;
+
+    const townId = this.townId;
+    if (!townId) return;
+    const townConfig = await this.getTownConfig();
+    const userId = townConfig.owner_user_id ?? townId;
+    await dispatch.ensureContainerToken(this.env, townId, userId);
   }
 
   private hasActiveWork(): boolean {

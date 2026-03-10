@@ -1,6 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import { verifyAgentJWT } from '../util/jwt.util';
-import { verifyContainerSecret } from '../util/container-secret.util';
+import { verifyAgentJWT, verifyContainerJWT } from '../util/jwt.util';
 import { resError } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
 import { extractBearerToken } from '@kilocode/worker-utils';
@@ -29,22 +28,20 @@ export const mayorAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) 
     return c.json(resError('Internal server error'), 500);
   }
 
-  // Try container secret first (HMAC-based, no expiry)
-  if (token.includes(':') && !token.includes('.')) {
-    const csResult = await verifyContainerSecret(token, secret);
-    if (csResult.success) {
-      const townId = c.req.param('townId');
-      if (townId && csResult.payload.townId !== townId) {
-        return c.json(resError('Token townId does not match route'), 403);
-      }
-      c.set('agentJWT', {
-        agentId: c.req.header('X-Gastown-Agent-Id') ?? '',
-        rigId: c.req.header('X-Gastown-Rig-Id') ?? '',
-        townId: csResult.payload.townId,
-        userId: c.req.header('X-Gastown-User-Id') ?? '',
-      });
-      return next();
+  // Try container-scoped JWT first (scope: 'container', carries townId + userId)
+  const containerResult = verifyContainerJWT(token, secret);
+  if (containerResult.success) {
+    const townId = c.req.param('townId');
+    if (townId && containerResult.payload.townId !== townId) {
+      return c.json(resError('Token townId does not match route'), 403);
     }
+    c.set('agentJWT', {
+      agentId: '',
+      rigId: '',
+      townId: containerResult.payload.townId,
+      userId: containerResult.payload.userId,
+    });
+    return next();
   }
 
   // Fall back to legacy JWT verification

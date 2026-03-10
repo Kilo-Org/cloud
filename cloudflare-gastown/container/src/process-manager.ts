@@ -97,17 +97,12 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
 
   // Persist to AgentDO via the worker (fire-and-forget)
   const agent = agents.get(agentId);
-  const authToken = agent?.gastownContainerSecret ?? agent?.gastownSessionToken;
+  const authToken = agent?.gastownContainerToken ?? agent?.gastownSessionToken;
   if (agent?.gastownApiUrl && authToken) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${authToken}`,
     };
-    // When using container secret, send agent identity headers
-    if (agent.gastownContainerSecret) {
-      headers['X-Gastown-Agent-Id'] = agentId;
-      headers['X-Gastown-Rig-Id'] = agent.rigId ?? '_';
-    }
     // POST to the worker's agent-events endpoint for persistent storage
     fetch(
       `${agent.gastownApiUrl}/api/towns/${agent.townId ?? '_'}/rigs/${agent.rigId ?? '_'}/agent-events`,
@@ -322,8 +317,8 @@ export async function startAgent(
     messageCount: 0,
     exitReason: null,
     gastownApiUrl: request.envVars?.GASTOWN_API_URL ?? process.env.GASTOWN_API_URL ?? null,
-    gastownContainerSecret:
-      request.envVars?.GASTOWN_CONTAINER_SECRET ?? process.env.GASTOWN_CONTAINER_SECRET ?? null,
+    gastownContainerToken:
+      request.envVars?.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null,
     gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,

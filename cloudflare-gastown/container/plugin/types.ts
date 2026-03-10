@@ -119,26 +119,22 @@ export type ConvoyDetail = Convoy & {
 // Environment variable config for the plugin (rig-scoped agents)
 export type GastownEnv = {
   apiUrl: string;
-  /** Container secret (HMAC-based, no expiry) — preferred auth mechanism. */
-  containerSecret?: string;
+  /** Container-scoped JWT (shared by all agents, refreshed by alarm). */
+  containerToken?: string;
   /** Legacy per-agent JWT (8h expiry) — fallback during rollout. */
   sessionToken: string;
   agentId: string;
   rigId: string;
   townId: string;
-  /** Owner userId — needed by mayor tool routes (e.g. listRigs). */
-  userId?: string;
 };
 
 // Environment variable config for the mayor (town-scoped)
 export type MayorGastownEnv = {
   apiUrl: string;
-  /** Container secret (HMAC-based, no expiry) — preferred auth mechanism. */
-  containerSecret?: string;
+  /** Container-scoped JWT (shared by all agents, refreshed by alarm). */
+  containerToken?: string;
   /** Legacy per-agent JWT (8h expiry) — fallback during rollout. */
   sessionToken: string;
   agentId: string;
   townId: string;
-  /** Owner userId — needed by mayor tool routes (e.g. listRigs). */
-  userId?: string;
 };

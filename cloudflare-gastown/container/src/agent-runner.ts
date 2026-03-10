@@ -93,9 +93,8 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   // via TownContainerDO.envVars and inherited through process.env.)
   const conditionalKeys = [
     'GASTOWN_API_URL',
-    'GASTOWN_CONTAINER_SECRET',
+    'GASTOWN_CONTAINER_TOKEN',
     'GASTOWN_SESSION_TOKEN',
-    'GASTOWN_USER_ID',
     'KILOCODE_TOKEN',
   ];
   for (const key of conditionalKeys) {

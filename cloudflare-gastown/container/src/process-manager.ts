@@ -108,6 +108,12 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${authToken}`,
     };
+    // When using a container JWT, send agent identity so the handler's
+    // getEnforcedAgentId() ownership check still works.
+    if (process.env.GASTOWN_CONTAINER_TOKEN || agent.gastownContainerToken) {
+      headers['X-Gastown-Agent-Id'] = agentId;
+      if (agent.rigId) headers['X-Gastown-Rig-Id'] = agent.rigId;
+    }
     // POST to the worker's agent-events endpoint for persistent storage
     fetch(
       `${agent.gastownApiUrl}/api/towns/${agent.townId ?? '_'}/rigs/${agent.rigId ?? '_'}/agent-events`,

@@ -50,10 +50,6 @@ All values in **USD** with decimals.
 - For non-org users: use `getBalanceForUser()` from `src/lib/user.balance.ts`
 - Reference: `src/lib/organizations/organization-usage.ts`
 
-## No-Limit Case
-- If user has no limit configured (`microdollar_limit IS NULL`): treat as unlimited
-- Return `limits: []` for no-limit case (same as non-org users)
-
 ### Step 4: Format Response
 - Convert microdollars to USD using `fromMicrodollars()` from `@/lib/utils`
 - Compute `reset_at` as next midnight UTC for daily limits

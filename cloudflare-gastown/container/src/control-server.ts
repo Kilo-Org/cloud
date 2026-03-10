@@ -292,7 +292,12 @@ app.post('/git/merge', async c => {
   // Run the merge in the background so we can return 202 immediately.
   // The Rig DO will be notified via callback when the merge completes.
   const apiUrl = req.envVars?.GASTOWN_API_URL ?? process.env.GASTOWN_API_URL;
-  const token = req.envVars?.GASTOWN_SESSION_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
+  // Prefer container secret (no expiry) over session token (8h JWT)
+  const token =
+    req.envVars?.GASTOWN_CONTAINER_SECRET ??
+    process.env.GASTOWN_CONTAINER_SECRET ??
+    req.envVars?.GASTOWN_SESSION_TOKEN ??
+    process.env.GASTOWN_SESSION_TOKEN;
 
   const doMerge = async () => {
     const outcome = await mergeBranch({
@@ -515,11 +520,12 @@ app.onError((err, c) => {
 export function startControlServer(): void {
   const PORT = 8080;
 
-  // Start heartbeat if env vars are configured
+  // Start heartbeat if env vars are configured.
+  // Prefer container secret (no expiry) over session token (8h JWT).
   const apiUrl = process.env.GASTOWN_API_URL;
-  const sessionToken = process.env.GASTOWN_SESSION_TOKEN;
-  if (apiUrl && sessionToken) {
-    startHeartbeat(apiUrl, sessionToken);
+  const authToken = process.env.GASTOWN_CONTAINER_SECRET ?? process.env.GASTOWN_SESSION_TOKEN;
+  if (apiUrl && authToken) {
+    startHeartbeat(apiUrl, authToken);
   }
 
   // Handle graceful shutdown

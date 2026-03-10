@@ -26,12 +26,14 @@ function isApiResponse(
 
 export class GastownClient {
   private baseUrl: string;
+  private containerSecret: string | undefined;
   private token: string;
   private agentId: string;
   private rigId: string;
   private townId: string;
   constructor(env: GastownEnv) {
     this.baseUrl = env.apiUrl.replace(/\/+$/, '');
+    this.containerSecret = env.containerSecret;
     this.token = env.sessionToken;
     this.agentId = env.agentId;
     this.rigId = env.rigId;
@@ -50,7 +52,13 @@ export class GastownClient {
     // Normalize headers so callers can pass plain objects, Headers instances, or tuples
     const headers = new Headers(init?.headers);
     headers.set('Content-Type', 'application/json');
-    headers.set('Authorization', `Bearer ${this.token}`);
+    // Prefer container secret (no expiry) over legacy JWT (8h expiry)
+    headers.set('Authorization', `Bearer ${this.containerSecret ?? this.token}`);
+    // When using container secret, agent identity must be sent via headers
+    if (this.containerSecret) {
+      headers.set('X-Gastown-Agent-Id', this.agentId);
+      headers.set('X-Gastown-Rig-Id', this.rigId);
+    }
 
     let response: Response;
     try {
@@ -193,16 +201,18 @@ export class GastownClient {
 
 /**
  * Mayor-scoped client for town-level cross-rig operations.
- * Uses `/api/mayor/:townId/tools/*` routes authenticated via townId-scoped JWT.
+ * Uses `/api/mayor/:townId/tools/*` routes authenticated via container secret or JWT.
  */
 export class MayorGastownClient {
   private baseUrl: string;
+  private containerSecret: string | undefined;
   private token: string;
   private agentId: string;
   private townId: string;
 
   constructor(env: MayorGastownEnv) {
     this.baseUrl = env.apiUrl.replace(/\/+$/, '');
+    this.containerSecret = env.containerSecret;
     this.token = env.sessionToken;
     this.agentId = env.agentId;
     this.townId = env.townId;
@@ -215,7 +225,11 @@ export class MayorGastownClient {
   private async request<T>(url: string, init?: RequestInit): Promise<T> {
     const headers = new Headers(init?.headers);
     headers.set('Content-Type', 'application/json');
-    headers.set('Authorization', `Bearer ${this.token}`);
+    // Prefer container secret (no expiry) over legacy JWT (8h expiry)
+    headers.set('Authorization', `Bearer ${this.containerSecret ?? this.token}`);
+    if (this.containerSecret) {
+      headers.set('X-Gastown-Agent-Id', this.agentId);
+    }
 
     let response: Response;
     try {
@@ -334,15 +348,18 @@ export class GastownApiError extends Error {
 
 export function createClientFromEnv(): GastownClient {
   const apiUrl = process.env.GASTOWN_API_URL;
+  const containerSecret = process.env.GASTOWN_CONTAINER_SECRET;
   const sessionToken = process.env.GASTOWN_SESSION_TOKEN;
   const agentId = process.env.GASTOWN_AGENT_ID;
   const rigId = process.env.GASTOWN_RIG_ID;
   const townId = process.env.GASTOWN_TOWN_ID;
 
-  if (!apiUrl || !sessionToken || !agentId || !rigId || !townId) {
+  // Require either containerSecret or sessionToken (prefer containerSecret)
+  const hasAuth = containerSecret || sessionToken;
+  if (!apiUrl || !hasAuth || !agentId || !rigId || !townId) {
     const missing = [
       !apiUrl && 'GASTOWN_API_URL',
-      !sessionToken && 'GASTOWN_SESSION_TOKEN',
+      !hasAuth && 'GASTOWN_CONTAINER_SECRET or GASTOWN_SESSION_TOKEN',
       !agentId && 'GASTOWN_AGENT_ID',
       !rigId && 'GASTOWN_RIG_ID',
       !townId && 'GASTOWN_TOWN_ID',
@@ -350,24 +367,39 @@ export function createClientFromEnv(): GastownClient {
     throw new Error(`Missing required Gastown environment variables: ${missing.join(', ')}`);
   }
 
-  return new GastownClient({ apiUrl, sessionToken, agentId, rigId, townId });
+  return new GastownClient({
+    apiUrl,
+    containerSecret: containerSecret ?? undefined,
+    sessionToken: sessionToken ?? '',
+    agentId,
+    rigId,
+    townId,
+  });
 }
 
 export function createMayorClientFromEnv(): MayorGastownClient {
   const apiUrl = process.env.GASTOWN_API_URL;
+  const containerSecret = process.env.GASTOWN_CONTAINER_SECRET;
   const sessionToken = process.env.GASTOWN_SESSION_TOKEN;
   const agentId = process.env.GASTOWN_AGENT_ID;
   const townId = process.env.GASTOWN_TOWN_ID;
 
-  if (!apiUrl || !sessionToken || !agentId || !townId) {
+  const hasAuth = containerSecret || sessionToken;
+  if (!apiUrl || !hasAuth || !agentId || !townId) {
     const missing = [
       !apiUrl && 'GASTOWN_API_URL',
-      !sessionToken && 'GASTOWN_SESSION_TOKEN',
+      !hasAuth && 'GASTOWN_CONTAINER_SECRET or GASTOWN_SESSION_TOKEN',
       !agentId && 'GASTOWN_AGENT_ID',
       !townId && 'GASTOWN_TOWN_ID',
     ].filter(Boolean);
     throw new Error(`Missing required mayor environment variables: ${missing.join(', ')}`);
   }
 
-  return new MayorGastownClient({ apiUrl, sessionToken, agentId, townId });
+  return new MayorGastownClient({
+    apiUrl,
+    containerSecret: containerSecret ?? undefined,
+    sessionToken: sessionToken ?? '',
+    agentId,
+    townId,
+  });
 }

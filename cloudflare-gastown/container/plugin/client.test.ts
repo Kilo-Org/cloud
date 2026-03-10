@@ -7,6 +7,7 @@ const TEST_ENV: GastownEnv = {
   sessionToken: 'test-jwt-token',
   agentId: 'agent-111',
   rigId: 'rig-222',
+  townId: 'town-333',
 };
 
 function mockFetch(data: unknown, status = 200) {
@@ -48,7 +49,9 @@ describe('GastownClient', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/agents/agent-111/prime');
+    expect(url).toBe(
+      'https://gastown.example.com/api/towns/town-333/rigs/rig-222/agents/agent-111/prime'
+    );
     const headers = new Headers(init.headers);
     expect(headers.get('Authorization')).toBe('Bearer test-jwt-token');
     expect(headers.get('Content-Type')).toBe('application/json');
@@ -81,7 +84,7 @@ describe('GastownClient', () => {
     expect(result).toEqual(bead);
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
-    expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/beads/bead-1');
+    expect(url).toBe('https://gastown.example.com/api/towns/town-333/rigs/rig-222/beads/bead-1');
   });
 
   it('closeBead() sends agent_id in body', async () => {
@@ -94,7 +97,9 @@ describe('GastownClient', () => {
       string,
       RequestInit,
     ];
-    expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/beads/bead-1/close');
+    expect(url).toBe(
+      'https://gastown.example.com/api/towns/town-333/rigs/rig-222/beads/bead-1/close'
+    );
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ agent_id: 'agent-111' });
   });
@@ -112,7 +117,9 @@ describe('GastownClient', () => {
       string,
       RequestInit,
     ];
-    expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/agents/agent-111/done');
+    expect(url).toBe(
+      'https://gastown.example.com/api/towns/town-333/rigs/rig-222/agents/agent-111/done'
+    );
     expect(JSON.parse(init.body as string)).toEqual({
       branch: 'feat/test',
       pr_url: 'https://github.com/pr/1',
@@ -145,7 +152,9 @@ describe('GastownClient', () => {
     expect(result).toEqual(mail);
 
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
-    expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/agents/agent-111/mail');
+    expect(url).toBe(
+      'https://gastown.example.com/api/towns/town-333/rigs/rig-222/agents/agent-111/mail'
+    );
   });
 
   it('writeCheckpoint() posts data to checkpoint endpoint', async () => {
@@ -157,7 +166,9 @@ describe('GastownClient', () => {
       string,
       RequestInit,
     ];
-    expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/agents/agent-111/checkpoint');
+    expect(url).toBe(
+      'https://gastown.example.com/api/towns/town-333/rigs/rig-222/agents/agent-111/checkpoint'
+    );
     expect(JSON.parse(init.body as string)).toEqual({ data: { step: 3, files: ['a.ts'] } });
   });
 
@@ -172,7 +183,7 @@ describe('GastownClient', () => {
       string,
       RequestInit,
     ];
-    expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/escalations');
+    expect(url).toBe('https://gastown.example.com/api/towns/town-333/rigs/rig-222/escalations');
     expect(JSON.parse(init.body as string)).toEqual({ title: 'blocked', priority: 'high' });
   });
 
@@ -246,7 +257,9 @@ describe('GastownClient', () => {
     // Verify no double slashes in the URL by calling prime
     void c.prime();
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
-    expect(url).toBe('https://gastown.example.com/api/rigs/rig-222/agents/agent-111/prime');
+    expect(url).toBe(
+      'https://gastown.example.com/api/towns/town-333/rigs/rig-222/agents/agent-111/prime'
+    );
   });
 });
 
@@ -262,6 +275,7 @@ describe('createClientFromEnv', () => {
     process.env.GASTOWN_SESSION_TOKEN = 'tok';
     process.env.GASTOWN_AGENT_ID = 'agent-1';
     process.env.GASTOWN_RIG_ID = 'rig-1';
+    process.env.GASTOWN_TOWN_ID = 'town-1';
 
     const client = createClientFromEnv();
     expect(client).toBeInstanceOf(GastownClient);

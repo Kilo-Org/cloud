@@ -5,6 +5,7 @@
 
 import { getTownContainerStub } from '../TownContainer.do';
 import { signAgentJWT } from '../../util/jwt.util';
+import { mintContainerSecret } from '../../util/container-secret.util';
 import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
 import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
 import type { TownConfig } from '../../types';
@@ -41,6 +42,9 @@ export async function resolveJWTSecret(env: Env): Promise<string | null> {
 /**
  * Mint a short-lived agent JWT for the given agent to authenticate
  * API calls back to the gastown worker.
+ *
+ * @deprecated Prefer container secrets (ensureContainerSecret) for new code.
+ * Agent JWTs are retained for backwards compatibility during rollout.
  */
 export async function mintAgentToken(
   env: Env,
@@ -55,6 +59,36 @@ export async function mintAgentToken(
     secret,
     8 * 3600
   );
+}
+
+/**
+ * Ensure the container has a valid GASTOWN_CONTAINER_SECRET env var.
+ * Mints an HMAC-based token scoped to the townId and stores it on
+ * the TownContainerDO via setEnvVar(). The token has no expiry — it
+ * lives as long as the container process does. On container sleep/wake,
+ * a new token is minted automatically because setEnvVar re-runs.
+ *
+ * Returns the container secret so callers can also pass it as a
+ * per-request env var (for agents started before the env var was set).
+ */
+export async function ensureContainerSecret(env: Env, townId: string): Promise<string | null> {
+  const jwtSecret = await resolveJWTSecret(env);
+  if (!jwtSecret) {
+    console.error(`${TOWN_LOG} ensureContainerSecret: no JWT secret available`);
+    return null;
+  }
+
+  const secret = await mintContainerSecret(jwtSecret, townId);
+  try {
+    const container = getTownContainerStub(env, townId);
+    await container.setEnvVar('GASTOWN_CONTAINER_SECRET', secret);
+  } catch (err) {
+    console.warn(
+      `${TOWN_LOG} ensureContainerSecret: setEnvVar failed (container may not be running):`,
+      err instanceof Error ? err.message : err
+    );
+  }
+  return secret;
 }
 
 /** Build the initial prompt for an agent from its bead. */
@@ -183,6 +217,13 @@ export async function startAgentInContainer(
     `${TOWN_LOG} startAgentInContainer: agentId=${params.agentId} role=${params.role} name=${params.agentName}`
   );
   try {
+    // Ensure the container has a valid GASTOWN_CONTAINER_SECRET.
+    // This is the primary auth mechanism — an HMAC token that never expires,
+    // scoped to this town, and lives as long as the container process.
+    const containerSecret = await ensureContainerSecret(env, params.townId);
+
+    // Also mint a per-agent JWT as fallback during rollout. Once all
+    // container code reads GASTOWN_CONTAINER_SECRET, this can be removed.
     const token = await mintAgentToken(env, {
       agentId: params.agentId,
       rigId: params.rigId,
@@ -190,10 +231,10 @@ export async function startAgentInContainer(
       userId: params.userId,
     });
 
-    if (!token) {
+    if (!containerSecret && !token) {
       console.error(
-        `${TOWN_LOG} startAgentInContainer: ABORTING — failed to mint JWT for agent ${params.agentId}. ` +
-          'The agent would start without GASTOWN_SESSION_TOKEN and be unable to call back to the worker.'
+        `${TOWN_LOG} startAgentInContainer: ABORTING — failed to mint any auth token for agent ${params.agentId}. ` +
+          'The agent would start without credentials and be unable to call back to the worker.'
       );
       return false;
     }
@@ -212,13 +253,16 @@ export async function startAgentInContainer(
       envVars.GITLAB_INSTANCE_URL = params.townConfig.git_auth.gitlab_instance_url;
     }
 
+    // Container secret is the primary auth mechanism (no expiry).
+    // The JWT is kept as a fallback during rollout.
+    if (containerSecret) envVars.GASTOWN_CONTAINER_SECRET = containerSecret;
     if (token) envVars.GASTOWN_SESSION_TOKEN = token;
     // kilocodeToken: prefer rig-level, fall back to town config
     const kilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
     if (kilocodeToken) envVars.KILOCODE_TOKEN = kilocodeToken;
 
     console.log(
-      `${TOWN_LOG} startAgentInContainer: envVars built: keys=[${Object.keys(envVars).join(',')}] hasGitToken=${!!envVars.GIT_TOKEN} hasGitlabToken=${!!envVars.GITLAB_TOKEN} hasJwt=${!!token} hasKilocodeToken=${!!kilocodeToken} git_auth_keys=[${Object.keys(params.townConfig.git_auth ?? {}).join(',')}]`
+      `${TOWN_LOG} startAgentInContainer: envVars built: keys=[${Object.keys(envVars).join(',')}] hasGitToken=${!!envVars.GIT_TOKEN} hasGitlabToken=${!!envVars.GITLAB_TOKEN} hasContainerSecret=${!!containerSecret} hasJwt=${!!token} hasKilocodeToken=${!!kilocodeToken} git_auth_keys=[${Object.keys(params.townConfig.git_auth ?? {}).join(',')}]`
     );
 
     const containerConfig = await buildContainerConfig(storage, env);
@@ -302,6 +346,7 @@ export async function startMergeInContainer(
   }
 ): Promise<boolean> {
   try {
+    const containerSecret = await ensureContainerSecret(env, params.townId);
     const token = await mintAgentToken(env, {
       agentId: params.agentId,
       rigId: params.rigId,
@@ -319,6 +364,7 @@ export async function startMergeInContainer(
     if (params.townConfig.git_auth?.gitlab_instance_url) {
       envVars.GITLAB_INSTANCE_URL = params.townConfig.git_auth.gitlab_instance_url;
     }
+    if (containerSecret) envVars.GASTOWN_CONTAINER_SECRET = containerSecret;
     if (token) envVars.GASTOWN_SESSION_TOKEN = token;
     if (env.GASTOWN_API_URL) envVars.GASTOWN_API_URL = env.GASTOWN_API_URL;
     const mergeKilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;

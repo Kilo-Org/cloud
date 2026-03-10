@@ -48,11 +48,13 @@ function tryContainerJWTAuth(
   const result = verifyContainerJWT(token, jwtSecret);
   if (!result.success) return null;
 
-  // Populate agentId/rigId from route params — the container JWT proves
-  // the request came from this town's container, so we trust the URL.
+  // Populate agentId/rigId from route params, falling back to headers
+  // for routes that don't have :agentId/:rigId params (e.g. /triage/resolve,
+  // /mail). The container JWT proves the request came from this town's
+  // container, so we trust both the URL and the identity headers.
   return {
-    agentId: c.req.param('agentId') ?? '',
-    rigId: c.req.param('rigId') ?? '',
+    agentId: c.req.param('agentId') ?? c.req.header('X-Gastown-Agent-Id') ?? '',
+    rigId: c.req.param('rigId') ?? c.req.header('X-Gastown-Rig-Id') ?? '',
     townId: result.payload.townId,
     userId: result.payload.userId,
   };

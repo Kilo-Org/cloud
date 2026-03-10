@@ -57,6 +57,13 @@ export class GastownClient {
     // init, then the legacy per-agent JWT.
     const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? this.containerToken ?? this.token;
     headers.set('Authorization', `Bearer ${authToken}`);
+    // When using a container-scoped JWT, send agent identity headers so
+    // the auth middleware can populate agentId/rigId on routes that don't
+    // have :agentId/:rigId params (e.g. /triage/resolve, /mail).
+    if (process.env.GASTOWN_CONTAINER_TOKEN || this.containerToken) {
+      headers.set('X-Gastown-Agent-Id', this.agentId);
+      headers.set('X-Gastown-Rig-Id', this.rigId);
+    }
 
     let response: Response;
     try {
@@ -227,6 +234,9 @@ export class MayorGastownClient {
     // then init-time token, then legacy per-agent JWT.
     const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? this.containerToken ?? this.token;
     headers.set('Authorization', `Bearer ${authToken}`);
+    if (process.env.GASTOWN_CONTAINER_TOKEN || this.containerToken) {
+      headers.set('X-Gastown-Agent-Id', this.agentId);
+    }
 
     let response: Response;
     try {

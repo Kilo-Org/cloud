@@ -381,7 +381,7 @@ export async function startMergeInContainer(
   }
 ): Promise<boolean> {
   try {
-    const userId = params.townConfig.owner_user_id ?? '';
+    const userId = params.townConfig.owner_user_id ?? params.townId;
     const containerToken = await ensureContainerToken(env, params.townId, userId);
     const agentToken = await mintAgentToken(env, {
       agentId: params.agentId,

@@ -46,7 +46,13 @@ All values in **USD** with decimals.
 - Call `getBalanceAndOrgSettings()` to get balance, settings, and plan
 - Note: This returns computed balance but NOT raw usage/limit values
 - Need to separately query `organization_user_usage` and `organization_user_limits` tables for the limits array
+- No existing helper exposes raw usage + limit — may need a new query or helper function
+- For non-org users: use `getBalanceForUser()` from `src/lib/user.balance.ts`
 - Reference: `src/lib/organizations/organization-usage.ts`
+
+## No-Limit Case
+- If user has no limit configured (`microdollar_limit IS NULL`): treat as unlimited
+- Return `limits: []` for no-limit case (same as non-org users)
 
 ### Step 4: Format Response
 - Convert microdollars to USD using `fromMicrodollars()` from `@/lib/utils`
@@ -65,6 +71,7 @@ All values in **USD** with decimals.
 |------|---------|
 | `src/lib/organizations/organization-usage.ts` | getBalanceAndOrgSettings() for balance/plan |
 | `src/lib/user.server.ts` | getUserFromAuth() - correct auth entry point |
+| `src/lib/user.balance.ts` | getBalanceForUser() for non-org users |
 | `src/lib/organizations/organization-types.ts` | Type definitions |
 | `src/lib/utils.ts` | fromMicrodollars() for unit conversion |
 
@@ -76,6 +83,10 @@ All values in **USD** with decimals.
 ## Non-Org Users
 - If authenticated user has no organizationId: `limits: []`
 - Balance still available via `getBalanceForUser()`
+
+## No-Limit Case
+- If user has no limit configured (`microdollar_limit IS NULL`): treat as unlimited
+- Return `limits: []` for no-limit case (same as non-org users)
 
 ## Reset At Computation
 - DB doesn't store `reset_at` explicitly

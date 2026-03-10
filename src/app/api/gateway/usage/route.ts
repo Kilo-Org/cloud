@@ -16,8 +16,7 @@ import { and, eq, sql } from 'drizzle-orm';
  * GET /api/gateway/usage
  *
  * Returns the current user's quota/usage state for the Kilo gateway.
- * Used by third-party tools (like OpenClaw) to display before hitting limits.
- usage bars and warn *
+ * Used by third-party tools (like OpenClaw) to display usage bars and warn before hitting limits.
  * Response:
  * {
  *   "limits": [{ "period": "daily", "used": 1.50, "limit": 2.00, "reset_at": "2026-03-11T00:00:00Z" }],

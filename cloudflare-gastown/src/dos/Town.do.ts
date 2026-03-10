@@ -2464,8 +2464,13 @@ export class TownDO extends DurableObject<Env> {
     if (pendingCount === 0) return;
 
     // Check if a triage batch bead is already in progress (meaning a
-    // triage agent is working). We can't filter by role since triage
-    // uses polecat role; instead check for an open gt:triage batch bead.
+    // triage agent is working), or recently failed (cooldown to prevent
+    // rapid retry loops). Skip dispatch in either case.
+    const triageBatchLike = patrol.TRIAGE_LABEL_LIKE.replace(
+      patrol.TRIAGE_REQUEST_LABEL,
+      patrol.TRIAGE_BATCH_LABEL
+    );
+    const cooldownCutoff = new Date(Date.now() - DISPATCH_COOLDOWN_MS).toISOString();
     const existingBatch = [
       ...query(
         this.sql,
@@ -2473,16 +2478,19 @@ export class TownDO extends DurableObject<Env> {
           SELECT ${beads.bead_id} FROM ${beads}
           WHERE ${beads.type} = 'issue'
             AND ${beads.labels} LIKE ?
-            AND ${beads.status} IN ('open', 'in_progress')
             AND ${beads.created_by} = 'patrol'
+            AND (
+              ${beads.status} IN ('open', 'in_progress')
+              OR (${beads.status} = 'failed' AND ${beads.updated_at} > ?)
+            )
           LIMIT 1
         `,
-        [patrol.TRIAGE_LABEL_LIKE.replace(patrol.TRIAGE_REQUEST_LABEL, patrol.TRIAGE_BATCH_LABEL)]
+        [triageBatchLike, cooldownCutoff]
       ),
     ];
     if (existingBatch.length > 0) {
       console.log(
-        `${TOWN_LOG} maybeDispatchTriageAgent: triage agent already working, skipping (${pendingCount} pending)`
+        `${TOWN_LOG} maybeDispatchTriageAgent: triage batch bead active or in cooldown, skipping (${pendingCount} pending)`
       );
       return;
     }
@@ -2555,19 +2563,10 @@ export class TownDO extends DurableObject<Env> {
       agents.updateAgentStatus(this.sql, triageAgent.id, 'working');
     } else {
       agents.unhookBead(this.sql, triageAgent.id);
+      // Failing the batch bead triggers cooldown: the guard at the top of
+      // this method skips dispatch while a failed batch bead's updated_at
+      // is within DISPATCH_COOLDOWN_MS.
       beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'failed', triageAgent.id);
-      // Apply dispatch cooldown so the next alarm tick doesn't immediately
-      // retry. Setting last_activity_at = now() makes the agent invisible
-      // to schedulePendingWork for DISPATCH_COOLDOWN_MS (2 min).
-      query(
-        this.sql,
-        /* sql */ `
-          UPDATE ${agent_metadata}
-          SET ${agent_metadata.columns.last_activity_at} = ?
-          WHERE ${agent_metadata.bead_id} = ?
-        `,
-        [now(), triageAgent.id]
-      );
       console.error(`${TOWN_LOG} maybeDispatchTriageAgent: triage agent failed to start`);
     }
   }

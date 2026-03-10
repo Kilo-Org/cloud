@@ -585,8 +585,10 @@ export function detectCrashLoops(sql: SqlStorage): void {
 
   // Exclude triage agents from crash loop detection — their failures must
   // not create new triage requests, which would feed the feedback loop.
-  // An agent is considered a triage agent if its current hooked bead has
-  // the gt:triage or gt:triage-request label (both start with "gt:triage").
+  // We check whether the *failed bead itself* carries a triage label
+  // (gt:triage or gt:triage-request). This is stable even after unhook
+  // clears current_hook_bead_id, because the bead_event.bead_id still
+  // points to the triage batch bead that was failed.
   const TRIAGE_LABEL_ANY = `%"gt:triage%`;
 
   const rows = CrashRow.array().parse([
@@ -600,11 +602,9 @@ export function detectCrashLoops(sql: SqlStorage): void {
           AND be.agent_id IS NOT NULL
           AND be.created_at > ?
           AND NOT EXISTS (
-            SELECT 1 FROM ${agent_metadata}
-            INNER JOIN ${beads} AS hooked
-              ON ${agent_metadata.current_hook_bead_id} = hooked.${beads.columns.bead_id}
-            WHERE ${agent_metadata.bead_id} = be.agent_id
-              AND hooked.${beads.columns.labels} LIKE ?
+            SELECT 1 FROM ${beads} AS failed_bead
+            WHERE failed_bead.${beads.columns.bead_id} = be.bead_id
+              AND failed_bead.${beads.columns.labels} LIKE ?
           )
         GROUP BY be.agent_id
         HAVING fail_count >= ?

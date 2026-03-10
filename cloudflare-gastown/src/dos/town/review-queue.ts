@@ -18,6 +18,7 @@ import {
   getBead,
   closeBead,
   updateBeadStatus,
+  updateConvoyProgress,
   createBead,
   getConvoyForBead,
   getConvoyFeatureBranch,
@@ -273,7 +274,17 @@ export function completeReviewWithResult(
   });
 
   if (input.status === 'merged') {
+    const mergeTimestamp = now();
     closeBead(sql, entry.bead_id, entry.agent_id);
+
+    // Explicitly trigger convoy progress for the source bead after the MR closes.
+    // closeBead → updateBeadStatus → updateConvoyProgress, but only if the source
+    // bead's status actually changes. If the polecat already closed the source bead
+    // before submitting to the review queue, the guard in updateBeadStatus short-
+    // circuits and updateConvoyProgress is never called. Calling it here directly
+    // ensures the convoy recounts after the MR bead is now closed (not in-flight),
+    // so the source bead passes the NOT EXISTS guard and counts toward closedCount.
+    updateConvoyProgress(sql, entry.bead_id, mergeTimestamp);
 
     // If this was a convoy landing MR, also set landed_at on the convoy metadata
     const sourceBead = getBead(sql, entry.bead_id);

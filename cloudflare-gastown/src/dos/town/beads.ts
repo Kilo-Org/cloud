@@ -226,7 +226,7 @@ export function updateBeadStatus(
  * recount closed beads and update convoy_metadata. Auto-lands the
  * convoy when all tracked beads are closed.
  */
-function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp: string): void {
+export function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp: string): void {
   const convoyRows = [
     ...query(
       sql,
@@ -667,11 +667,18 @@ export function getConvoyDependencyEdges(
 }
 
 /**
- * Find the convoy a bead belongs to (if any) via 'tracks' dependencies.
- * Returns the convoy bead_id or null.
+ * Find the convoy a bead belongs to (if any).
+ *
+ * Two cases:
+ * 1. Normal source bead: tracked by a convoy via bead_dependencies
+ *    (bead_id = sourceBeadId, depends_on_bead_id = convoyId, type = 'tracks').
+ *    Returns the convoy bead_id.
+ * 2. The bead IS the convoy (e.g. for the final landing MR where processConvoyLandings
+ *    passes the convoy bead_id as the source). Returns beadId itself.
  */
 export function getConvoyForBead(sql: SqlStorage, beadId: string): string | null {
-  const rows = [
+  // Case 1: bead is tracked by a convoy
+  const trackRows = [
     ...query(
       sql,
       /* sql */ `
@@ -683,8 +690,24 @@ export function getConvoyForBead(sql: SqlStorage, beadId: string): string | null
       [beadId]
     ),
   ];
-  if (rows.length === 0) return null;
-  return z.object({ depends_on_bead_id: z.string() }).parse(rows[0]).depends_on_bead_id;
+  if (trackRows.length > 0) {
+    return z.object({ depends_on_bead_id: z.string() }).parse(trackRows[0]).depends_on_bead_id;
+  }
+
+  // Case 2: bead is itself a convoy (has convoy_metadata)
+  const metaRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT 1 FROM ${convoy_metadata}
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
+      [beadId]
+    ),
+  ];
+  if (metaRows.length > 0) return beadId;
+
+  return null;
 }
 
 /**

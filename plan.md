@@ -19,8 +19,8 @@ Authorization: Bearer <api_key>
   "limits": [
     {
       "period": "daily",
-      "used": 150000,
-      "limit": 200000,
+      "used": 1.50,
+      "limit": 2.00,
       "reset_at": "2026-03-11T00:00:00Z"
     }
   ],
@@ -28,6 +28,8 @@ Authorization: Bearer <api_key>
   "balance_usd": 10.50
 }
 ```
+
+All values in **USD** with decimals.
 
 ## Implementation Steps
 
@@ -37,25 +39,19 @@ Authorization: Bearer <api_key>
 - Location: `src/app/api/gateway/usage/`
 
 ### Step 2: Authentication
-- Validate Bearer token against organization API keys
-- Reference: `src/lib/tokens.ts` for token validation
-- Reference: `src/app/api/gateway/[...path]/route.ts` for auth pattern
+- Use `getUserFromAuth()` from `src/lib/user.server.ts` as the auth entry point
+- This validates the Bearer token and returns the authenticated user
 
 ### Step 3: Query Usage Data
-- Use `getBalanceAndOrgSettings()` which already fetches balance, plan, limits, and usage in a single query
+- Call `getBalanceAndOrgSettings()` to get balance, settings, and plan
+- Note: This returns computed balance but NOT raw usage/limit values
+- Need to separately query `organization_user_usage` and `organization_user_limits` tables for the limits array
 - Reference: `src/lib/organizations/organization-usage.ts`
-- Reference: `src/lib/user.server.ts` → `getUserFromAuth()` for auth entry point
 
 ### Step 4: Format Response
-- Query usage from `organization_user_usage` table
-- Query limits from `organization_user_limits` table
-- Balance is derived from `organizations.total_microdollars_acquired - organizations.microdollars_used` (handled by getBalanceAndOrgSettings)
 - Convert microdollars to USD using `fromMicrodollars()` from `@/lib/utils`
 - Compute `reset_at` as next midnight UTC for daily limits
-
-### Step 4: Format Response
 - Return JSON with limits array, plan, and balance_usd
-- Match the response shape from the issue
 
 ## Files to Modify
 
@@ -67,10 +63,8 @@ Authorization: Bearer <api_key>
 
 | File | Purpose |
 |------|---------|
-| `src/lib/organizations/organization-usage.ts` | Existing usage logic, getBalanceAndOrgSettings() |
+| `src/lib/organizations/organization-usage.ts` | getBalanceAndOrgSettings() for balance/plan |
 | `src/lib/user.server.ts` | getUserFromAuth() - correct auth entry point |
-| `src/lib/tokens.ts` | Token validation (internal) |
-| `src/app/api/gateway/[...path]/route.ts` | Auth pattern reference |
 | `src/lib/organizations/organization-types.ts` | Type definitions |
 | `src/lib/utils.ts` | fromMicrodollars() for unit conversion |
 
@@ -85,7 +79,7 @@ Authorization: Bearer <api_key>
 
 ## Reset At Computation
 - DB doesn't store `reset_at` explicitly
-- For daily limits: compute as next midnight UTC (`new Date().toISOString() set to tomorrow 00:00 UTC`)
+- For daily limits: compute as next midnight UTC
 
 ## Testing
 

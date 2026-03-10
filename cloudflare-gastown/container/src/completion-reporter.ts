@@ -17,7 +17,9 @@ export async function reportAgentCompleted(
   reason?: string
 ): Promise<void> {
   const apiUrl = agent.gastownApiUrl;
-  const authToken = agent.gastownContainerToken ?? agent.gastownSessionToken;
+  // Prefer live container token (refreshed via POST /refresh-token)
+  const authToken =
+    process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? agent.gastownSessionToken;
   if (!apiUrl || !authToken) {
     console.warn(
       `Cannot report agent ${agent.agentId} completion: no API credentials on agent record`

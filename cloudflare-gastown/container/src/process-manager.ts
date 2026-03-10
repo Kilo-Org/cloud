@@ -97,7 +97,12 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
 
   // Persist to AgentDO via the worker (fire-and-forget)
   const agent = agents.get(agentId);
-  const authToken = agent?.gastownContainerToken ?? agent?.gastownSessionToken;
+  // Prefer live container token (refreshed via POST /refresh-token),
+  // then the per-agent cached token, then the legacy session token.
+  const authToken =
+    process.env.GASTOWN_CONTAINER_TOKEN ??
+    agent?.gastownContainerToken ??
+    agent?.gastownSessionToken;
   if (agent?.gastownApiUrl && authToken) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

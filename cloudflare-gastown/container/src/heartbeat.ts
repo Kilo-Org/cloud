@@ -39,7 +39,10 @@ export function stopHeartbeat(): void {
 }
 
 async function sendHeartbeats(): Promise<void> {
-  if (!gastownApiUrl || !sessionToken) return;
+  // Prefer the live container token (refreshed via POST /refresh-token)
+  // over the token captured at startHeartbeat() time.
+  const currentToken = process.env.GASTOWN_CONTAINER_TOKEN ?? sessionToken;
+  if (!gastownApiUrl || !currentToken) return;
 
   const active = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
 
@@ -55,7 +58,7 @@ async function sendHeartbeats(): Promise<void> {
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionToken}`,
+        Authorization: `Bearer ${currentToken}`,
       };
       const response = await fetch(
         `${gastownApiUrl}/api/towns/${agent.townId}/rigs/${agent.rigId}/agents/${agent.agentId}/heartbeat`,

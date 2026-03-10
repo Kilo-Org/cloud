@@ -127,8 +127,13 @@ app.post('/agents/start', async c => {
       `[control-server] /agents/start: success agentId=${agent.agentId} port=${agent.serverPort} session=${agent.sessionId}`
     );
     // Strip sensitive fields before returning — the caller only needs
-    // agent metadata, not the internal session token or API URL.
-    const { gastownSessionToken: _, gastownApiUrl: _url, ...safeAgent } = agent;
+    // agent metadata, not the internal tokens or API URL.
+    const {
+      gastownSessionToken: _,
+      gastownContainerToken: _ct,
+      gastownApiUrl: _url,
+      ...safeAgent
+    } = agent;
     return c.json(safeAgent, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

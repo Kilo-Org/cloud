@@ -52,9 +52,11 @@ export class GastownClient {
     // Normalize headers so callers can pass plain objects, Headers instances, or tuples
     const headers = new Headers(init?.headers);
     headers.set('Content-Type', 'application/json');
-    // Prefer container-scoped JWT (shared, refreshed by alarm) over
-    // legacy per-agent JWT (8h expiry, no refresh)
-    headers.set('Authorization', `Bearer ${this.containerToken ?? this.token}`);
+    // Prefer the live container token from process.env (refreshed by the
+    // TownDO alarm via POST /refresh-token), then the token captured at
+    // init, then the legacy per-agent JWT.
+    const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? this.containerToken ?? this.token;
+    headers.set('Authorization', `Bearer ${authToken}`);
 
     let response: Response;
     try {
@@ -221,8 +223,10 @@ export class MayorGastownClient {
   private async request<T>(url: string, init?: RequestInit): Promise<T> {
     const headers = new Headers(init?.headers);
     headers.set('Content-Type', 'application/json');
-    // Prefer container-scoped JWT over legacy per-agent JWT
-    headers.set('Authorization', `Bearer ${this.containerToken ?? this.token}`);
+    // Prefer live container token (refreshed via POST /refresh-token),
+    // then init-time token, then legacy per-agent JWT.
+    const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? this.containerToken ?? this.token;
+    headers.set('Authorization', `Bearer ${authToken}`);
 
     let response: Response;
     try {

@@ -2050,7 +2050,7 @@ export class TownDO extends DurableObject<Env> {
     if (!townId) return;
     const townConfig = await this.getTownConfig();
     const userId = townConfig.owner_user_id ?? townId;
-    await dispatch.ensureContainerToken(this.env, townId, userId);
+    await dispatch.refreshContainerToken(this.env, townId, userId);
   }
 
   private hasActiveWork(): boolean {

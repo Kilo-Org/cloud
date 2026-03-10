@@ -63,8 +63,11 @@ export async function mintAgentToken(
 /**
  * Mint a container-scoped JWT and store it on the TownContainerDO.
  * One JWT per container — shared by all agents in the town. Carries
- * { townId, userId, scope: 'container' } with a 30-day expiry (far
- * longer than any container will run, but bounded for safety).
+ * { townId, userId, scope: 'container' } with 8h expiry.
+ *
+ * Stores via setEnvVar() so the token is available on the next container
+ * boot. For the running process, call refreshContainerToken() which also
+ * pushes to the container's /refresh-token endpoint.
  *
  * Returns the token so callers can also pass it as a per-agent env var.
  */
@@ -90,6 +93,38 @@ export async function ensureContainerToken(
     );
   }
   return token;
+}
+
+/**
+ * Refresh the container token on both the TownContainerDO (for next boot)
+ * and the running container process (via POST /refresh-token). This ensures
+ * already-running agents pick up the fresh token for subsequent API calls.
+ */
+export async function refreshContainerToken(
+  env: Env,
+  townId: string,
+  userId: string
+): Promise<void> {
+  const token = await ensureContainerToken(env, townId, userId);
+  if (!token) return;
+
+  // Push to the running container process so process.env is updated
+  try {
+    const container = getTownContainerStub(env, townId);
+    const resp = await container.fetch('http://container/refresh-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    if (!resp.ok) {
+      console.warn(`${TOWN_LOG} refreshContainerToken: container returned ${resp.status}`);
+    }
+  } catch (err) {
+    console.warn(
+      `${TOWN_LOG} refreshContainerToken: failed to push to container:`,
+      err instanceof Error ? err.message : err
+    );
+  }
 }
 
 /** Build the initial prompt for an agent from its bead. */
@@ -354,6 +389,14 @@ export async function startMergeInContainer(
       townId: params.townId,
       userId,
     });
+
+    if (!containerToken && !agentToken) {
+      console.error(
+        `${TOWN_LOG} startMergeInContainer: ABORTING — failed to mint any auth token for merge entry ${params.entryId}. ` +
+          'The merge process would start without credentials and be unable to report results.'
+      );
+      return false;
+    }
 
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
     if (params.townConfig.git_auth?.github_token) {

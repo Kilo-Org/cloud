@@ -93,6 +93,20 @@ app.get('/health', c => {
   return c.json(response);
 });
 
+// POST /refresh-token
+// Hot-swap the container-scoped JWT on the running process. Called by
+// the TownDO alarm to push a fresh token before the current one expires.
+// Updates process.env so all subsequent API calls use the new token.
+app.post('/refresh-token', async c => {
+  const body: unknown = await c.req.json().catch(() => null);
+  if (!body || typeof body !== 'object' || !('token' in body) || typeof body.token !== 'string') {
+    return c.json({ error: 'Missing or invalid token field' }, 400);
+  }
+  process.env.GASTOWN_CONTAINER_TOKEN = body.token;
+  console.log('[control-server] Container token refreshed');
+  return c.json({ refreshed: true });
+});
+
 // POST /agents/start
 app.post('/agents/start', async c => {
   const body: unknown = await c.req.json().catch(() => null);

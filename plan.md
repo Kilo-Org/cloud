@@ -42,10 +42,16 @@ Authorization: Bearer <api_key>
 - Reference: `src/app/api/gateway/[...path]/route.ts` for auth pattern
 
 ### Step 3: Query Usage Data
-- Query from `organization_user_usage` table
-- Query from `organization_user_limits` table  
-- Query from `organization_user_credits` for balance
+- Use `getBalanceAndOrgSettings()` which already fetches balance, plan, limits, and usage in a single query
 - Reference: `src/lib/organizations/organization-usage.ts`
+- Reference: `src/lib/user.server.ts` → `getUserFromAuth()` for auth entry point
+
+### Step 4: Format Response
+- Query usage from `organization_user_usage` table
+- Query limits from `organization_user_limits` table
+- Balance is derived from `organizations.total_microdollars_acquired - organizations.microdollars_used` (handled by getBalanceAndOrgSettings)
+- Convert microdollars to USD using `fromMicrodollars()` from `@/lib/utils`
+- Compute `reset_at` as next midnight UTC for daily limits
 
 ### Step 4: Format Response
 - Return JSON with limits array, plan, and balance_usd
@@ -61,10 +67,25 @@ Authorization: Bearer <api_key>
 
 | File | Purpose |
 |------|---------|
-| `src/lib/organizations/organization-usage.ts` | Existing usage logic |
-| `src/lib/tokens.ts` | Token validation |
-| `src/app/api/gateway/[...path]/route.ts` | Auth pattern |
+| `src/lib/organizations/organization-usage.ts` | Existing usage logic, getBalanceAndOrgSettings() |
+| `src/lib/user.server.ts` | getUserFromAuth() - correct auth entry point |
+| `src/lib/tokens.ts` | Token validation (internal) |
+| `src/app/api/gateway/[...path]/route.ts` | Auth pattern reference |
 | `src/lib/organizations/organization-types.ts` | Type definitions |
+| `src/lib/utils.ts` | fromMicrodollars() for unit conversion |
+
+## Response Units
+- All values in **USD** (not microdollars or tokens)
+- Use `fromMicrodollars()` to convert DB values to USD
+- Format: `"used": 1.50` (USD with decimals), `"balance_usd": 10.50`
+
+## Non-Org Users
+- If authenticated user has no organizationId: `limits: []`
+- Balance still available via `getBalanceForUser()`
+
+## Reset At Computation
+- DB doesn't store `reset_at` explicitly
+- For daily limits: compute as next midnight UTC (`new Date().toISOString() set to tomorrow 00:00 UTC`)
 
 ## Testing
 

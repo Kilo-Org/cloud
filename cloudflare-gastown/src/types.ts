@@ -48,7 +48,7 @@ export type BeadFilter = {
 
 // -- Agents (now beads + agent_metadata) --
 
-export const AgentRole = z.enum(['polecat', 'refinery', 'mayor']);
+export const AgentRole = z.enum(['polecat', 'refinery', 'mayor', 'triage']);
 export type AgentRole = z.infer<typeof AgentRole>;
 
 export const AgentStatus = z.enum(['idle', 'working', 'stalled', 'dead']);

@@ -37,6 +37,8 @@ export const STALE_HOOK_MS = 30 * 60_000; // 30 min
 export const CRASH_LOOP_WINDOW_MS = 30 * 60_000; // 30 min
 /** Minimum failures within the window to flag a crash loop */
 export const CRASH_LOOP_THRESHOLD = 3;
+/** Maximum number of open triage request beads allowed at once */
+export const MAX_OPEN_TRIAGE_REQUESTS = 5;
 
 // ── Triage request types ────────────────────────────────────────────
 
@@ -103,6 +105,28 @@ export function createTriageRequest(
       ),
     ];
     if (existing.length > 0) return;
+  }
+
+  // Global cap: skip if there are already too many open triage requests.
+  // Prevents unbounded accumulation during feedback loops.
+  const openCountRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT COUNT(*) AS cnt FROM ${beads}
+        WHERE ${beads.type} = 'issue'
+          AND ${beads.labels} LIKE ?
+          AND ${beads.status} = 'open'
+      `,
+      [TRIAGE_LABEL_LIKE]
+    ),
+  ];
+  const openCount = Number(z.object({ cnt: z.number() }).parse(openCountRows[0]).cnt);
+  if (openCount >= MAX_OPEN_TRIAGE_REQUESTS) {
+    console.warn(
+      `${LOG} createTriageRequest: global cap reached (${openCount} open), skipping type=${params.triageType}`
+    );
+    return;
   }
 
   const metadata: TriageRequestMetadata = {
@@ -559,6 +583,12 @@ export function detectCrashLoops(sql: SqlStorage): void {
     fail_count: z.number(),
   });
 
+  // Exclude triage agents from crash loop detection — their failures must
+  // not create new triage requests, which would feed the feedback loop.
+  // An agent is considered a triage agent if its current hooked bead has
+  // the gt:triage or gt:triage-request label (both start with "gt:triage").
+  const TRIAGE_LABEL_ANY = `%"gt:triage%`;
+
   const rows = CrashRow.array().parse([
     ...query(
       sql,
@@ -569,10 +599,17 @@ export function detectCrashLoops(sql: SqlStorage): void {
           AND be.new_value = 'failed'
           AND be.agent_id IS NOT NULL
           AND be.created_at > ?
+          AND NOT EXISTS (
+            SELECT 1 FROM ${agent_metadata}
+            INNER JOIN ${beads} AS hooked
+              ON ${agent_metadata.current_hook_bead_id} = hooked.${beads.columns.bead_id}
+            WHERE ${agent_metadata.bead_id} = be.agent_id
+              AND hooked.${beads.columns.labels} LIKE ?
+          )
         GROUP BY be.agent_id
         HAVING fail_count >= ?
       `,
-      [windowCutoff, CRASH_LOOP_THRESHOLD]
+      [windowCutoff, TRIAGE_LABEL_ANY, CRASH_LOOP_THRESHOLD]
     ),
   ]);
 

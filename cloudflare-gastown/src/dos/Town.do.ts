@@ -2500,7 +2500,9 @@ export class TownDO extends DurableObject<Env> {
       userId: rigConfig.userId,
       agentId: triageAgent.id,
       agentName: triageAgent.name,
-      role: 'polecat',
+      // Use 'triage' role so the container skips the git clone entirely.
+      // Triage work is purely reasoning — no code changes needed.
+      role: 'triage',
       identity: triageAgent.identity,
       beadId: triageBead.bead_id,
       beadTitle: triageBead.title,
@@ -2521,6 +2523,18 @@ export class TownDO extends DurableObject<Env> {
     } else {
       agents.unhookBead(this.sql, triageAgent.id);
       beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'failed', triageAgent.id);
+      // Apply dispatch cooldown so the next alarm tick doesn't immediately
+      // retry. Setting last_activity_at = now() makes the agent invisible
+      // to schedulePendingWork for DISPATCH_COOLDOWN_MS (2 min).
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${agent_metadata}
+          SET ${agent_metadata.columns.last_activity_at} = ?
+          WHERE ${agent_metadata.bead_id} = ?
+        `,
+        [now(), triageAgent.id]
+      );
       console.error(`${TOWN_LOG} maybeDispatchTriageAgent: triage agent failed to start`);
     }
   }

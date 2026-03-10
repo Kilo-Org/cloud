@@ -27,6 +27,7 @@ import {
   ChevronRight,
   ChevronDown,
   Layers,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -341,7 +342,17 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
               townId={townId}
               events={events.slice(0, 80)}
               isLoading={townEventsQuery.isLoading}
-              onEventClick={event => openDrawer({ type: 'event', event })}
+              onEventClick={event => {
+                if (
+                  event.event_type === 'agent_status' &&
+                  event.agent_id != null &&
+                  event.rig_id != null
+                ) {
+                  openDrawer({ type: 'agent', agentId: event.agent_id, rigId: event.rig_id, townId });
+                } else {
+                  openDrawer({ type: 'event', event });
+                }
+              }}
             />
           </div>
         </div>
@@ -439,6 +450,18 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
                   <AnimatePresence mode="popLayout">
                     {recentAgents.map((agent, i) => {
                       const RoleIcon = ROLE_ICONS[agent.role] ?? Bot;
+                      const showStatusBubble =
+                        agent.status === 'working' &&
+                        agent.agent_status_message != null &&
+                        agent.agent_status_message.length > 0;
+                      const isStale =
+                        showStatusBubble &&
+                        agent.agent_status_updated_at != null &&
+                        Date.now() - new Date(agent.agent_status_updated_at).getTime() > 10 * 60 * 1000;
+                      const truncatedMsg =
+                        agent.agent_status_message && agent.agent_status_message.length > 80
+                          ? `${agent.agent_status_message.slice(0, 80)}…`
+                          : (agent.agent_status_message ?? '');
                       return (
                         <motion.div
                           key={agent.id}
@@ -455,36 +478,62 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
                               townId,
                             });
                           }}
-                          className="group/agent flex cursor-pointer items-center gap-2.5 rounded-lg border border-white/[0.05] bg-white/[0.015] px-3 py-2 transition-colors hover:border-white/[0.1] hover:bg-white/[0.03]"
+                          className="group/agent cursor-pointer rounded-lg border border-white/[0.05] bg-white/[0.015] px-3 py-2 transition-colors hover:border-white/[0.1] hover:bg-white/[0.03]"
                         >
-                          <div className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.05]">
-                            <RoleIcon className="size-3.5 text-white/40" />
-                            <span
-                              className={`absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-[oklch(0.12_0_0)] ${AGENT_STATUS_DOT[agent.status] ?? 'bg-white/20'}`}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate text-xs font-medium text-white/75">
-                                {agent.name}
-                              </span>
-                              <span className="shrink-0 text-[9px] text-white/25 capitalize">
-                                {agent.role}
-                              </span>
+                          <div className="flex items-center gap-2.5">
+                            <div className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-white/[0.05]">
+                              <RoleIcon className="size-3.5 text-white/40" />
+                              <span
+                                className={`absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-[oklch(0.12_0_0)] ${AGENT_STATUS_DOT[agent.status] ?? 'bg-white/20'}`}
+                              />
                             </div>
-                            <div className="flex items-center gap-1.5 text-[10px] text-white/25">
-                              <span>{(agent as Agent & { rigName: string }).rigName}</span>
-                              <span className="text-white/10">·</span>
-                              <span>
-                                {agent.last_activity_at
-                                  ? formatDistanceToNow(new Date(agent.last_activity_at), {
-                                      addSuffix: true,
-                                    })
-                                  : 'no activity'}
-                              </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate text-xs font-medium text-white/75">
+                                  {agent.name}
+                                </span>
+                                <span className="shrink-0 text-[9px] text-white/25 capitalize">
+                                  {agent.role}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[10px] text-white/25">
+                                <span>{(agent as Agent & { rigName: string }).rigName}</span>
+                                <span className="text-white/10">·</span>
+                                <span>
+                                  {agent.last_activity_at
+                                    ? formatDistanceToNow(new Date(agent.last_activity_at), {
+                                        addSuffix: true,
+                                      })
+                                    : 'no activity'}
+                                </span>
+                              </div>
                             </div>
+                            <ChevronRight className="size-3 shrink-0 text-white/0 transition-colors group-hover/agent:text-white/20" />
                           </div>
-                          <ChevronRight className="size-3 shrink-0 text-white/0 transition-colors group-hover/agent:text-white/20" />
+
+                          <AnimatePresence>
+                            {showStatusBubble && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: isStale ? 0.35 : 1, y: 0 }}
+                                exit={{ opacity: 0, y: -4 }}
+                                transition={{ duration: 0.25, ease: 'easeOut' }}
+                                className="mt-1.5 flex items-start gap-1.5 rounded-md border border-white/[0.05] bg-white/[0.025] px-2 py-1"
+                              >
+                                <MessageSquare className="mt-0.5 size-2.5 shrink-0 text-white/20" />
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-[10px] italic leading-snug ${isStale ? 'text-white/20' : 'text-white/50'}`}>
+                                    {truncatedMsg}
+                                  </p>
+                                  {agent.agent_status_updated_at && (
+                                    <p className="mt-0.5 text-[9px] text-white/20">
+                                      {formatDistanceToNow(new Date(agent.agent_status_updated_at), { addSuffix: true })}
+                                    </p>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </motion.div>
                       );
                     })}

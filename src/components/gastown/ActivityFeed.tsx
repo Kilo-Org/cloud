@@ -78,7 +78,9 @@ function eventDescription(event: {
       return `${rigPrefix}Mail sent`;
     case 'agent_status': {
       const msg = event.new_value ?? (event.metadata?.message as string | undefined);
-      return `${rigPrefix}${msg ?? 'Agent status update'}`;
+      const agentName = event.metadata?.agent_name as string | undefined;
+      const body = msg ?? 'Agent status update';
+      return agentName ? `${rigPrefix}${agentName}: ${body}` : `${rigPrefix}${body}`;
     }
     default:
       return `${rigPrefix}${event.event_type}`;

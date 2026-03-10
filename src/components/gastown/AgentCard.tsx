@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Bot, Crown, Shield, Eye, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { motion, AnimatePresence } from 'motion/react';
 
 type Agent = {
   id: string;
@@ -16,6 +17,8 @@ type Agent = {
   last_activity_at: string | null;
   checkpoint?: unknown;
   created_at: string;
+  agent_status_message?: string | null;
+  agent_status_updated_at?: string | null;
 };
 
 type AgentCardProps = {
@@ -39,8 +42,25 @@ const statusColors: Record<string, string> = {
   dead: 'bg-red-500',
 };
 
+const TEN_MINUTES_MS = 10 * 60 * 1000;
+
 export function AgentCard({ agent, isSelected, onSelect, onDelete }: AgentCardProps) {
   const Icon = roleIcons[agent.role] ?? Bot;
+
+  const showStatusBubble =
+    agent.status === 'working' &&
+    agent.agent_status_message != null &&
+    agent.agent_status_message.length > 0;
+
+  const isStale =
+    showStatusBubble &&
+    agent.agent_status_updated_at != null &&
+    Date.now() - new Date(agent.agent_status_updated_at).getTime() > TEN_MINUTES_MS;
+
+  const truncatedMessage =
+    agent.agent_status_message && agent.agent_status_message.length > 80
+      ? `${agent.agent_status_message.slice(0, 80)}…`
+      : (agent.agent_status_message ?? '');
 
   return (
     <Card
@@ -95,6 +115,27 @@ export function AgentCard({ agent, isSelected, onSelect, onDelete }: AgentCardPr
             </button>
           )}
         </div>
+
+        <AnimatePresence>
+          {showStatusBubble && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: isStale ? 0.35 : 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="mt-2 rounded-lg border border-white/[0.07] bg-white/[0.04] px-2.5 py-1.5"
+            >
+              <p className={cn('text-xs italic leading-snug', isStale ? 'text-white/30' : 'text-white/65')}>
+                {truncatedMessage}
+              </p>
+              {agent.agent_status_updated_at && (
+                <p className="mt-0.5 text-[10px] text-white/30">
+                  {formatDistanceToNow(new Date(agent.agent_status_updated_at), { addSuffix: true })}
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </CardContent>
     </Card>
   );

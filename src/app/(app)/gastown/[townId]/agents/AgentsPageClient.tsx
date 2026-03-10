@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
-import { Bot, Crown, Shield, Eye, Clock, Hexagon } from 'lucide-react';
+import { Bot, Crown, Shield, Eye, Clock, Hexagon, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
@@ -79,6 +79,18 @@ export function AgentsPageClient({ townId }: { townId: string }) {
             {allAgents.map((agent, i) => {
               const RoleIcon = ROLE_ICONS[agent.role] ?? Bot;
               const rigId = (agent as Agent & { rigId: string }).rigId;
+              const showStatusBubble =
+                agent.status === 'working' &&
+                agent.agent_status_message != null &&
+                agent.agent_status_message.length > 0;
+              const isStale =
+                showStatusBubble &&
+                agent.agent_status_updated_at != null &&
+                Date.now() - new Date(agent.agent_status_updated_at).getTime() > 10 * 60 * 1000;
+              const truncatedMsg =
+                agent.agent_status_message && agent.agent_status_message.length > 80
+                  ? `${agent.agent_status_message.slice(0, 80)}…`
+                  : (agent.agent_status_message ?? '');
               return (
                 <motion.div
                   key={agent.id}
@@ -124,6 +136,30 @@ export function AgentsPageClient({ townId }: { townId: string }) {
                   <div className="mt-2 text-[10px] text-white/20">
                     {(agent as Agent & { rigName: string }).rigName}
                   </div>
+
+                  <AnimatePresence>
+                    {showStatusBubble && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: isStale ? 0.35 : 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.25, ease: 'easeOut' }}
+                        className="mt-2 flex items-start gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5"
+                      >
+                        <MessageSquare className="mt-0.5 size-2.5 shrink-0 text-white/25" />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[10px] italic leading-snug ${isStale ? 'text-white/25' : 'text-white/55'}`}>
+                            {truncatedMsg}
+                          </p>
+                          {agent.agent_status_updated_at && (
+                            <p className="mt-0.5 text-[9px] text-white/25">
+                              {formatDistanceToNow(new Date(agent.agent_status_updated_at), { addSuffix: true })}
+                            </p>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               );
             })}

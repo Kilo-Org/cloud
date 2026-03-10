@@ -297,6 +297,29 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Broadcast a lightweight agent_status event to all connected status
+   * WebSocket clients. Called whenever an agent updates its status message.
+   */
+  private broadcastAgentStatus(agentId: string, message: string): void {
+    const sockets = this.ctx.getWebSockets('status');
+    if (sockets.length === 0) return;
+
+    const payload = JSON.stringify({
+      type: 'agent_status',
+      agentId,
+      message,
+      timestamp: now(),
+    });
+    for (const ws of sockets) {
+      try {
+        ws.send(payload);
+      } catch {
+        // Client disconnected — will be cleaned up by webSocketClose
+      }
+    }
+  }
+
   // ── Initialization ──────────────────────────────────────────────────
 
   private async ensureInitialized(): Promise<void> {
@@ -666,6 +689,7 @@ export class TownDO extends DurableObject<Env> {
         metadata: { agentId, message },
       });
     }
+    this.broadcastAgentStatus(agentId, message);
   }
 
   // ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ

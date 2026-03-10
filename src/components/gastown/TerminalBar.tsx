@@ -158,12 +158,25 @@ type AlarmStatus = {
   recentEvents: Array<{ time: string; type: string; message: string }>;
 };
 
+type AgentStatusEvent = {
+  type: 'agent_status';
+  agentId: string;
+  message: string;
+  timestamp: string;
+};
+
 /**
  * Hook that connects to the TownDO status WebSocket and returns the
  * latest alarm status snapshot. Falls back to tRPC polling if the
  * WebSocket fails or disconnects.
+ *
+ * The optional `onAgentStatus` callback is invoked for `agent_status`
+ * events so callers can react in real time (e.g. invalidate listAgents).
  */
-function useAlarmStatusWs(townId: string): {
+function useAlarmStatusWs(
+  townId: string,
+  onAgentStatus?: (event: AgentStatusEvent) => void
+): {
   data: AlarmStatus | null;
   connected: boolean;
   error: string | null;
@@ -174,6 +187,8 @@ function useAlarmStatusWs(townId: string): {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const onAgentStatusRef = useRef(onAgentStatus);
+  onAgentStatusRef.current = onAgentStatus;
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -190,7 +205,19 @@ function useAlarmStatusWs(townId: string): {
     ws.onmessage = (e: MessageEvent) => {
       if (!mountedRef.current || typeof e.data !== 'string') return;
       try {
-        setData(JSON.parse(e.data) as AlarmStatus);
+        const parsed: unknown = JSON.parse(e.data);
+        if (
+          parsed !== null &&
+          typeof parsed === 'object' &&
+          'type' in parsed &&
+          (parsed as Record<string, unknown>).type === 'agent_status'
+        ) {
+          // Lightweight agent_status event — dispatch to callback, don't
+          // overwrite the alarm status snapshot.
+          onAgentStatusRef.current?.(parsed as AgentStatusEvent);
+        } else {
+          setData(parsed as AlarmStatus);
+        }
       } catch {
         // Ignore malformed messages
       }
@@ -224,8 +251,32 @@ function useAlarmStatusWs(townId: string): {
 }
 
 function AlarmStatusPane({ townId }: { townId: string }) {
-  const { data: wsData, connected: wsConnected, error: wsError } = useAlarmStatusWs(townId);
   const trpc = useGastownTRPC();
+  const queryClient = useQueryClient();
+
+  // Invalidate listAgents for all rigs in this town when an agent_status
+  // event arrives over the WebSocket, so agent cards update immediately
+  // without waiting for the next 5s poll cycle.
+  // tRPC @tanstack/react-query v11 query keys have the shape:
+  // [['gastown', 'listAgents'], { input: ..., type: 'query' }]
+  const handleAgentStatus = useCallback(
+    (_event: AgentStatusEvent) => {
+      void queryClient.invalidateQueries({
+        predicate: query => {
+          const key = query.queryKey;
+          if (!Array.isArray(key) || !Array.isArray(key[0])) return false;
+          const path = key[0] as string[];
+          return path.includes('listAgents');
+        },
+      });
+    },
+    [queryClient]
+  );
+
+  const { data: wsData, connected: wsConnected, error: wsError } = useAlarmStatusWs(
+    townId,
+    handleAgentStatus
+  );
 
   // Fall back to polling when WebSocket is unavailable (blocked, errored,
   // or never connected). The tRPC query is disabled while the WS is

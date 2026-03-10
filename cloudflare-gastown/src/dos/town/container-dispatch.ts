@@ -257,6 +257,9 @@ export async function startAgentInContainer(
     // The JWT is kept as a fallback during rollout.
     if (containerSecret) envVars.GASTOWN_CONTAINER_SECRET = containerSecret;
     if (token) envVars.GASTOWN_SESSION_TOKEN = token;
+    // userId is needed by mayor tool routes (e.g. listRigs) and was
+    // previously carried only inside the JWT payload.
+    envVars.GASTOWN_USER_ID = params.userId;
     // kilocodeToken: prefer rig-level, fall back to town config
     const kilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
     if (kilocodeToken) envVars.KILOCODE_TOKEN = kilocodeToken;

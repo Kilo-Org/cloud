@@ -126,6 +126,8 @@ export type GastownEnv = {
   agentId: string;
   rigId: string;
   townId: string;
+  /** Owner userId — needed by mayor tool routes (e.g. listRigs). */
+  userId?: string;
 };
 
 // Environment variable config for the mayor (town-scoped)
@@ -137,4 +139,6 @@ export type MayorGastownEnv = {
   sessionToken: string;
   agentId: string;
   townId: string;
+  /** Owner userId — needed by mayor tool routes (e.g. listRigs). */
+  userId?: string;
 };

@@ -31,6 +31,7 @@ export class GastownClient {
   private agentId: string;
   private rigId: string;
   private townId: string;
+  private userId: string | undefined;
   constructor(env: GastownEnv) {
     this.baseUrl = env.apiUrl.replace(/\/+$/, '');
     this.containerSecret = env.containerSecret;
@@ -38,6 +39,7 @@ export class GastownClient {
     this.agentId = env.agentId;
     this.rigId = env.rigId;
     this.townId = env.townId;
+    this.userId = env.userId;
   }
 
   private rigPath(path: string): string {
@@ -54,10 +56,11 @@ export class GastownClient {
     headers.set('Content-Type', 'application/json');
     // Prefer container secret (no expiry) over legacy JWT (8h expiry)
     headers.set('Authorization', `Bearer ${this.containerSecret ?? this.token}`);
-    // When using container secret, agent identity must be sent via headers
+    // When using container secret, identity must be sent via headers
     if (this.containerSecret) {
       headers.set('X-Gastown-Agent-Id', this.agentId);
       headers.set('X-Gastown-Rig-Id', this.rigId);
+      if (this.userId) headers.set('X-Gastown-User-Id', this.userId);
     }
 
     let response: Response;
@@ -209,6 +212,7 @@ export class MayorGastownClient {
   private token: string;
   private agentId: string;
   private townId: string;
+  private userId: string | undefined;
 
   constructor(env: MayorGastownEnv) {
     this.baseUrl = env.apiUrl.replace(/\/+$/, '');
@@ -216,6 +220,7 @@ export class MayorGastownClient {
     this.token = env.sessionToken;
     this.agentId = env.agentId;
     this.townId = env.townId;
+    this.userId = env.userId;
   }
 
   private mayorPath(path: string): string {
@@ -229,6 +234,7 @@ export class MayorGastownClient {
     headers.set('Authorization', `Bearer ${this.containerSecret ?? this.token}`);
     if (this.containerSecret) {
       headers.set('X-Gastown-Agent-Id', this.agentId);
+      if (this.userId) headers.set('X-Gastown-User-Id', this.userId);
     }
 
     let response: Response;
@@ -374,6 +380,7 @@ export function createClientFromEnv(): GastownClient {
     agentId,
     rigId,
     townId,
+    userId: process.env.GASTOWN_USER_ID ?? undefined,
   });
 }
 
@@ -401,5 +408,6 @@ export function createMayorClientFromEnv(): MayorGastownClient {
     sessionToken: sessionToken ?? '',
     agentId,
     townId,
+    userId: process.env.GASTOWN_USER_ID ?? undefined,
   });
 }

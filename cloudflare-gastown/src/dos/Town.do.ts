@@ -2044,13 +2044,15 @@ export class TownDO extends DurableObject<Env> {
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
     const now = Date.now();
     if (now - this.lastContainerTokenRefreshAt < TOKEN_REFRESH_INTERVAL_MS) return;
-    this.lastContainerTokenRefreshAt = now;
 
     const townId = this.townId;
     if (!townId) return;
     const townConfig = await this.getTownConfig();
     const userId = townConfig.owner_user_id ?? townId;
     await dispatch.refreshContainerToken(this.env, townId, userId);
+    // Only mark as refreshed after success — failed refreshes should
+    // be retried on the next alarm tick, not throttled for an hour.
+    this.lastContainerTokenRefreshAt = now;
   }
 
   private hasActiveWork(): boolean {

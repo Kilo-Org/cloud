@@ -61,13 +61,14 @@ export async function mintAgentToken(
 }
 
 /**
- * Mint a container-scoped JWT and store it on the TownContainerDO.
+ * Mint a container-scoped JWT and push it to the TownContainerDO.
  * One JWT per container — shared by all agents in the town. Carries
  * { townId, userId, scope: 'container' } with 8h expiry.
  *
- * Stores via setEnvVar() so the token is available on the next container
- * boot. For the running process, call refreshContainerToken() which also
- * pushes to the container's /refresh-token endpoint.
+ * Pushes via both setEnvVar() (for next container boot) and
+ * POST /refresh-token (for the running process). This ensures that
+ * all code paths — existing agents, heartbeat, event persistence —
+ * pick up the fresh token immediately.
  *
  * Returns the token so callers can also pass it as a per-agent env var.
  */
@@ -83,8 +84,10 @@ export async function ensureContainerToken(
   }
 
   const token = signContainerJWT({ townId, userId }, jwtSecret);
+  const container = getTownContainerStub(env, townId);
+
+  // Store for next boot
   try {
-    const container = getTownContainerStub(env, townId);
     await container.setEnvVar('GASTOWN_CONTAINER_TOKEN', token);
   } catch (err) {
     console.warn(
@@ -92,40 +95,29 @@ export async function ensureContainerToken(
       err instanceof Error ? err.message : err
     );
   }
-  return token;
-}
 
-/**
- * Refresh the container token on both the TownContainerDO (for next boot)
- * and the running container process (via POST /refresh-token). This ensures
- * already-running agents pick up the fresh token for subsequent API calls.
- */
-export async function refreshContainerToken(
-  env: Env,
-  townId: string,
-  userId: string
-): Promise<void> {
-  const token = await ensureContainerToken(env, townId, userId);
-  if (!token) return;
-
-  // Push to the running container process so process.env is updated
+  // Push to running process so existing agents pick up the fresh token
   try {
-    const container = getTownContainerStub(env, townId);
-    const resp = await container.fetch('http://container/refresh-token', {
+    await container.fetch('http://container/refresh-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     });
-    if (!resp.ok) {
-      console.warn(`${TOWN_LOG} refreshContainerToken: container returned ${resp.status}`);
-    }
-  } catch (err) {
-    console.warn(
-      `${TOWN_LOG} refreshContainerToken: failed to push to container:`,
-      err instanceof Error ? err.message : err
-    );
+  } catch {
+    // Container may not be running yet — that's fine, the token will
+    // be in envVars when it boots.
   }
+
+  return token;
 }
+
+/**
+ * Alias for ensureContainerToken — both functions now push to the
+ * running container process via POST /refresh-token. Kept as a
+ * separate export for call-site readability (alarm code calls
+ * "refresh", dispatch code calls "ensure").
+ */
+export const refreshContainerToken = ensureContainerToken;
 
 /** Build the initial prompt for an agent from its bead. */
 export function buildPrompt(params: {

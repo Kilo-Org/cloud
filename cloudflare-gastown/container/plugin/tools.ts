@@ -203,12 +203,29 @@ export function createTools(client: GastownClient) {
           .describe('Brief explanation of your reasoning for choosing this action'),
       },
       async execute(args) {
-        const bead = await client.resolveTriage({
+        await client.resolveTriage({
           triage_request_bead_id: args.triage_request_bead_id,
           action: args.action,
           resolution_notes: args.resolution_notes,
         });
         return `Triage request ${args.triage_request_bead_id} resolved with action: ${args.action}`;
+      },
+    }),
+
+    gt_status: tool({
+      description:
+        'Emit a plain-language status update visible on the dashboard. ' +
+        'Call this when starting a new phase of work (e.g. "Installing dependencies", ' +
+        '"Writing tests", "Fixing lint errors"). Write it as a brief sentence for a teammate, ' +
+        'not a log line. Do NOT call this on every tool use â only at meaningful phase transitions.',
+      args: {
+        message: tool.schema
+          .string()
+          .describe('A 1-2 sentence plain-language description of what you are currently doing.'),
+      },
+      async execute(args) {
+        await client.updateAgentStatusMessage(args.message);
+        return 'Status updated.';
       },
     }),
   };

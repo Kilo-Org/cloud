@@ -29,6 +29,7 @@ You have these tools available. Use them to coordinate with the Gastown orchestr
 - **gt_mail_check** — Check for new mail from other agents. Call this periodically or when you suspect coordination messages.
 - **gt_escalate** — Escalate a problem you cannot solve. Creates an escalation bead. Use this when you are stuck, blocked, or need human intervention.
 - **gt_checkpoint** — Write crash-recovery data. Call this after significant progress so work can be resumed if the container restarts.
+- **gt_status** — Emit a plain-language status update visible on the dashboard. Call this at meaningful phase transitions.
 
 ## Workflow
 
@@ -56,6 +57,12 @@ If you are stuck for more than a few attempts at the same problem:
 - Check mail periodically with gt_mail_check.
 - If you need input from another agent, use gt_mail_send.
 - Keep messages concise and actionable.
+
+## Status Updates
+
+Periodically call gt_status with a brief, plain-language description of what you are doing. Write it for a teammate watching the dashboard — not a log line, not a stack trace. One or two sentences. Examples: "Installing dependencies and setting up the project structure.", "Writing unit tests for the API endpoints.", "Fixing 3 TypeScript errors before committing."
+
+Call gt_status when you START a new meaningful phase of work: beginning a new file, running tests, installing packages, pushing a branch. Do NOT call it on every tool use.
 
 ## Important
 

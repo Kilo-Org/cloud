@@ -74,6 +74,8 @@ export type Agent = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   checkpoint: any;
   created_at: string;
+  agent_status_message: string | null;
+  agent_status_updated_at: string | null;
 };
 
 export type RegisterAgentInput = {

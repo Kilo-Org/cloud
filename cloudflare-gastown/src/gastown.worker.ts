@@ -37,6 +37,7 @@ import {
   handleHeartbeat,
   handleGetOrCreateAgent,
   handleDeleteAgent,
+  handleUpdateAgentStatusMessage,
 } from './handlers/rig-agents.handler';
 import { handleSendMail } from './handlers/rig-mail.handler';
 import { handleAppendAgentEvent, handleGetAgentEvents } from './handlers/rig-agent-events.handler';
@@ -226,6 +227,9 @@ app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/mail', c =>
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/heartbeat', c =>
   handleHeartbeat(c, c.req.param())
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/status', c =>
+  handleUpdateAgentStatusMessage(c, c.req.param())
 );
 
 // ── Agent Events ─────────────────────────────────────────────────────────

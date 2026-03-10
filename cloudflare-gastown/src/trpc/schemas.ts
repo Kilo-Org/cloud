@@ -62,6 +62,8 @@ export const AgentOutput = z.object({
   last_activity_at: z.string().nullable(),
   checkpoint: z.unknown().optional(),
   created_at: z.string(),
+  agent_status_message: z.string().nullable().optional().default(null),
+  agent_status_updated_at: z.string().nullable().optional().default(null),
 });
 
 // BeadEvent (output shape, after transforms)

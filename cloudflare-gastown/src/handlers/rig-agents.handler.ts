@@ -33,6 +33,10 @@ const WriteCheckpointBody = z.object({
   data: z.unknown(),
 });
 
+const UpdateAgentStatusMessageBody = z.object({
+  message: z.string().min(1),
+});
+
 export async function handleRegisterAgent(c: Context<GastownEnv>, params: { rigId: string }) {
   const parsed = RegisterAgentBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
@@ -223,6 +227,23 @@ export async function handleGetOrCreateAgent(c: Context<GastownEnv>, params: { r
   const agent = await town.getOrCreateAgent(parsed.data.role, params.rigId);
   console.log(`${AGENT_LOG} handleGetOrCreateAgent: result=${JSON.stringify(agent).slice(0, 200)}`);
   return c.json(resSuccess(agent));
+}
+
+export async function handleUpdateAgentStatusMessage(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const parsed = UpdateAgentStatusMessageBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const townId = c.get('townId');
+  const town = getTownDOStub(c.env, townId);
+  await town.updateAgentStatusMessage(params.agentId, parsed.data.message);
+  return c.json(resSuccess({ ok: true }));
 }
 
 export async function handleDeleteAgent(

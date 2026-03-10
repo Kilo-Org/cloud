@@ -29,6 +29,8 @@ export const AgentMetadataRecord = z.object({
     })
     .pipe(z.unknown()),
   last_activity_at: z.string().nullable(),
+  agent_status_message: z.string().nullable(),
+  agent_status_updated_at: z.string().nullable(),
 });
 
 export type AgentMetadataRecord = z.output<typeof AgentMetadataRecord>;
@@ -49,5 +51,7 @@ export function createTableAgentMetadata(): string {
     dispatch_attempts: `integer not null default 0`,
     checkpoint: `text`,
     last_activity_at: `text`,
+    agent_status_message: `text`,
+    agent_status_updated_at: `text`,
   });
 }

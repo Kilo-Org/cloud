@@ -653,7 +653,22 @@ export class TownDO extends DurableObject<Env> {
     await this.armAlarmIfNeeded();
   }
 
-  // ══════════════════════════════════════════════════════════════════
+  async updateAgentStatusMessage(agentId: string, message: string): Promise<void> {
+    await this.ensureInitialized();
+    agents.updateAgentStatusMessage(this.sql, agentId, message);
+    const agent = agents.getAgent(this.sql, agentId);
+    if (agent?.current_hook_bead_id) {
+      beadOps.logBeadEvent(this.sql, {
+        beadId: agent.current_hook_bead_id,
+        agentId,
+        eventType: 'agent_status',
+        newValue: message,
+        metadata: { agentId, message },
+      });
+    }
+  }
+
+  // ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   // Mail
   // ══════════════════════════════════════════════════════════════════
 
@@ -2270,7 +2285,8 @@ export class TownDO extends DurableObject<Env> {
                  ${agent_metadata.status} AS status,
                  ${agent_metadata.current_hook_bead_id},
                  ${agent_metadata.dispatch_attempts}, ${agent_metadata.last_activity_at},
-                 ${agent_metadata.checkpoint}
+                 ${agent_metadata.checkpoint},
+                 ${agent_metadata.agent_status_message}, ${agent_metadata.agent_status_updated_at}
           FROM ${beads}
           INNER JOIN ${agent_metadata} ON ${beads.bead_id} = ${agent_metadata.bead_id}
           WHERE ${agent_metadata.status} = 'idle'
@@ -2294,6 +2310,8 @@ export class TownDO extends DurableObject<Env> {
         last_activity_at: row.last_activity_at,
         checkpoint: row.checkpoint,
         created_at: row.created_at,
+        agent_status_message: row.agent_status_message,
+        agent_status_updated_at: row.agent_status_updated_at,
       }));
 
     console.log(`${TOWN_LOG} schedulePendingWork: found ${pendingAgents.length} pending agents`);

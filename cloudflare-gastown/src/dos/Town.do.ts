@@ -93,6 +93,8 @@ function formatEventMessage(row: Record<string, unknown>): string {
       return `PR creation failed for ${target}`;
     case 'escalation_created':
       return `Escalation created: ${target}`;
+    case 'agent_status':
+      return `${actor}: ${newValue ?? 'status update'}`;
     default:
       return `${eventType}: ${target}`;
   }

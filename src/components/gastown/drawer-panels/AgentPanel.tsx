@@ -108,13 +108,15 @@ export function AgentPanel({
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 py-2">
             <MessageSquare className="mt-0.5 size-3.5 shrink-0 text-white/30" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-white/40 uppercase tracking-wide">Status</p>
-              <p className="mt-0.5 text-xs italic text-white/70 leading-snug">
+              <p className="text-xs font-medium tracking-wide text-white/40 uppercase">Status</p>
+              <p className="mt-0.5 text-xs leading-snug text-white/70 italic">
                 {agent.agent_status_message}
               </p>
               {agent.agent_status_updated_at && (
                 <p className="mt-0.5 text-[10px] text-white/30">
-                  {formatDistanceToNow(new Date(agent.agent_status_updated_at), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(agent.agent_status_updated_at), {
+                    addSuffix: true,
+                  })}
                 </p>
               )}
             </div>

@@ -186,7 +186,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       output: void;
       meta: object;
     }>;
-     listAgents: import('@trpc/server').TRPCQueryProcedure<{
+    listAgents: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         rigId: string;
       };

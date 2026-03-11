@@ -125,12 +125,19 @@ export function AgentCard({ agent, isSelected, onSelect, onDelete }: AgentCardPr
               transition={{ duration: 0.25, ease: 'easeOut' }}
               className="mt-2 rounded-lg border border-white/[0.07] bg-white/[0.04] px-2.5 py-1.5"
             >
-              <p className={cn('text-xs italic leading-snug', isStale ? 'text-white/30' : 'text-white/65')}>
+              <p
+                className={cn(
+                  'text-xs leading-snug italic',
+                  isStale ? 'text-white/30' : 'text-white/65'
+                )}
+              >
                 {truncatedMessage}
               </p>
               {agent.agent_status_updated_at && (
                 <p className="mt-0.5 text-[10px] text-white/30">
-                  {formatDistanceToNow(new Date(agent.agent_status_updated_at), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(agent.agent_status_updated_at), {
+                    addSuffix: true,
+                  })}
                 </p>
               )}
             </motion.div>

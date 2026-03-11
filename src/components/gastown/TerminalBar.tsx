@@ -273,10 +273,11 @@ function AlarmStatusPane({ townId }: { townId: string }) {
     [queryClient]
   );
 
-  const { data: wsData, connected: wsConnected, error: wsError } = useAlarmStatusWs(
-    townId,
-    handleAgentStatus
-  );
+  const {
+    data: wsData,
+    connected: wsConnected,
+    error: wsError,
+  } = useAlarmStatusWs(townId, handleAgentStatus);
 
   // Fall back to polling when WebSocket is unavailable (blocked, errored,
   // or never connected). The tRPC query is disabled while the WS is

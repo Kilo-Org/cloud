@@ -148,12 +148,16 @@ export function AgentsPageClient({ townId }: { townId: string }) {
                       >
                         <MessageSquare className="mt-0.5 size-2.5 shrink-0 text-white/25" />
                         <div className="min-w-0 flex-1">
-                          <p className={`text-[10px] italic leading-snug ${isStale ? 'text-white/25' : 'text-white/55'}`}>
+                          <p
+                            className={`text-[10px] leading-snug italic ${isStale ? 'text-white/25' : 'text-white/55'}`}
+                          >
                             {truncatedMsg}
                           </p>
                           {agent.agent_status_updated_at && (
                             <p className="mt-0.5 text-[9px] text-white/25">
-                              {formatDistanceToNow(new Date(agent.agent_status_updated_at), { addSuffix: true })}
+                              {formatDistanceToNow(new Date(agent.agent_status_updated_at), {
+                                addSuffix: true,
+                              })}
                             </p>
                           )}
                         </div>

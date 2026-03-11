@@ -55,3 +55,11 @@ export function createTableAgentMetadata(): string {
     agent_status_updated_at: `text`,
   });
 }
+
+/** Idempotent ALTER statements for existing databases. */
+export function migrateAgentMetadata(): string[] {
+  return [
+    `ALTER TABLE agent_metadata ADD COLUMN agent_status_message text`,
+    `ALTER TABLE agent_metadata ADD COLUMN agent_status_updated_at text`,
+  ];
+}

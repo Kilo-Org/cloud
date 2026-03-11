@@ -47,6 +47,7 @@ export function dashboardHtml(): string {
   .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11px; }
   .badge.open { background: #1f6feb33; color: #58a6ff; }
   .badge.in_progress { background: #d29922aa; color: #e3b341; }
+  .badge.in_review { background: #8957e533; color: #bc8cff; }
   .badge.closed { background: #3fb95033; color: #3fb950; }
   .badge.idle { background: #21262d; color: #8b949e; }
   .badge.working { background: #d29922aa; color: #e3b341; }

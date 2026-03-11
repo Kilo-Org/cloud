@@ -30,17 +30,19 @@ type BeadBoardProps = {
   agentNameById?: Record<string, string>;
 };
 
-const statusColumns = ['open', 'in_progress', 'closed'] as const;
+const statusColumns = ['open', 'in_progress', 'in_review', 'closed'] as const;
 
 const statusLabels: Record<string, string> = {
   open: 'Open',
   in_progress: 'In Progress',
+  in_review: 'In Review',
   closed: 'Closed',
 };
 
 const statusColors: Record<string, string> = {
   open: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   in_progress: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  in_review: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   closed: 'bg-green-500/10 text-green-400 border-green-500/20',
 };
 
@@ -160,7 +162,7 @@ export function BeadBoard({
 }: BeadBoardProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         {statusColumns.map(status => (
           <div key={status}>
             <Skeleton className="mb-3 h-6 w-24" />
@@ -175,7 +177,7 @@ export function BeadBoard({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
       {statusColumns.map((status, colIdx) => {
         const columnBeads = beads.filter(b => b.status === status && b.type !== 'agent');
         return (

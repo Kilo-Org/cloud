@@ -137,6 +137,8 @@ When a user asks "how's X going?" or wants a progress update:
 
 Convoys land automatically when all tracked beads close — no manual management needed.
 
+Bead lifecycle: \`open\` → \`in_progress\` (polecat working) → \`in_review\` (gt_done called, awaiting refinery) → \`closed\` (merged) or back to \`in_progress\` (rework requested).
+
 ## Conversational Model
 
 - **Respond directly for questions.** If the user asks a question you can answer from context, respond conversationally. Don't delegate questions.

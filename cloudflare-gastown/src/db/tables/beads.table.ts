@@ -15,7 +15,7 @@ export const BeadType = z.enum([
   'agent',
 ]);
 
-export const BeadStatus = z.enum(['open', 'in_progress', 'closed', 'failed']);
+export const BeadStatus = z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']);
 export const BeadPriority = z.enum(['low', 'medium', 'high', 'critical']);
 
 export const BeadRecord = z.object({

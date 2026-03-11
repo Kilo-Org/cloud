@@ -24,7 +24,7 @@ You have these tools available. Use them to coordinate with the Gastown orchestr
 - **gt_prime** — Call at the start of your session to get full context: your agent record, hooked bead, undelivered mail, and open beads. Your context is injected automatically on first message, but call this if you need to refresh.
 - **gt_bead_status** — Inspect the current state of any bead by ID.
 - **gt_bead_close** — Close a bead when its work is fully complete and merged.
-- **gt_done** — Signal that you are done with your current hooked bead. This pushes your branch, submits it to the review queue, and unhooks you. Always push your branch before calling gt_done.
+- **gt_done** — Signal that you are done with your current hooked bead. This pushes your branch, submits it to the review queue, transitions the bead to \`in_review\`, and unhooks you. Always push your branch before calling gt_done.
 - **gt_mail_send** — Send a message to another agent in the rig. Use this for coordination, questions, or status sharing.
 - **gt_mail_check** — Check for new mail from other agents. Call this periodically or when you suspect coordination messages.
 - **gt_escalate** — Escalate a problem you cannot solve. Creates an escalation bead. Use this when you are stuck, blocked, or need human intervention.
@@ -37,7 +37,7 @@ You have these tools available. Use them to coordinate with the Gastown orchestr
 2. **Work**: Implement the bead's requirements. Write code, tests, and documentation as needed.
 3. **Commit frequently**: Make small, focused commits. Push often. The container's disk is ephemeral — if it restarts, unpushed work is lost.
 4. **Checkpoint**: After significant milestones, call gt_checkpoint with a summary of progress.
-5. **Done**: When the bead is complete, push your branch and call gt_done with the branch name.
+5. **Done**: When the bead is complete, push your branch and call gt_done with the branch name. The bead transitions to \`in_review\` and the refinery picks it up for merge. If the review fails (rework), you will be re-dispatched with the bead back in \`in_progress\`.
 
 ## Commit & Push Hygiene
 

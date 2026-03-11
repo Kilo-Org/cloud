@@ -757,6 +757,32 @@ export class TownDO extends DurableObject<Env> {
     if (input.status === 'merged' && sourceBeadId) {
       this.dispatchUnblockedBeads(sourceBeadId);
     }
+
+    // When a review fails or conflicts (rework), the source bead was
+    // returned to in_progress. Re-hook the original polecat and re-dispatch
+    // so the rework starts automatically.
+    if ((input.status === 'failed' || input.status === 'conflict') && sourceBeadId) {
+      const sourceBead = beadOps.getBead(this.sql, sourceBeadId);
+      if (sourceBead?.assignee_agent_bead_id) {
+        try {
+          agents.hookBead(this.sql, sourceBead.assignee_agent_bead_id, sourceBeadId);
+          const hookedAgent = agents.getAgent(this.sql, sourceBead.assignee_agent_bead_id);
+          if (hookedAgent) {
+            this.dispatchAgent(hookedAgent, sourceBead).catch(err =>
+              console.error(
+                `${TOWN_LOG} completeReviewWithResult: fire-and-forget rework dispatch failed for bead=${sourceBeadId}`,
+                err
+              )
+            );
+          }
+        } catch (err) {
+          console.warn(
+            `${TOWN_LOG} completeReviewWithResult: could not re-hook agent for rework bead=${sourceBeadId}:`,
+            err
+          );
+        }
+      }
+    }
   }
 
   async agentDone(agentId: string, input: AgentDoneInput): Promise<void> {

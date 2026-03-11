@@ -13,6 +13,7 @@ import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { db } from '@/lib/drizzle';
 import { fromMicrodollars } from '@/lib/utils';
 import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
+import { nemotron_3_super_free_model } from '@/lib/providers/nvidia';
 
 export type KiloNotification = {
   id: string;
@@ -71,6 +72,18 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     },
     showIn: ['extension'],
     expiresAt: '2026-03-09T08:00:00Z',
+  },
+  {
+    id: 'nemotron-3-super-launch-mar-11',
+    title: 'NVIDIA Nemotron 3 Super is Here',
+    message:
+      'NVIDIA Nemotron 3 Super is now live in Kilo — and free to use for a limited time!',
+    suggestModelId: nemotron_3_super_free_model.public_id,
+    action: {
+      actionText: 'Learn More',
+      actionURL: 'https://blog.kilo.ai/nvidia-nemotron-3-super-launch',
+    },
+    showIn: ['extension', 'cli'],
   },
 ];
 

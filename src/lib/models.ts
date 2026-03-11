@@ -13,6 +13,7 @@ import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
 import { minimax_m21_free_model, minimax_m25_free_model } from '@/lib/providers/minimax';
 import { kimi_k25_free_model } from '@/lib/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/providers/morph';
+import { nemotron_3_super_free_model } from '@/lib/providers/nvidia';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { zai_glm5_free_model } from '@/lib/providers/zai';
 
@@ -24,6 +25,7 @@ export const preferredModels = [
   minimax_m25_free_model.is_enabled ? minimax_m25_free_model.public_id : 'minimax/minimax-m2.5',
   kimi_k25_free_model.is_enabled ? kimi_k25_free_model.public_id : 'moonshotai/kimi-k2.5',
   giga_potato_thinking_model.is_enabled ? giga_potato_thinking_model.public_id : null,
+  nemotron_3_super_free_model.is_enabled ? nemotron_3_super_free_model.public_id : 'nvidia/nemotron-3-super-120b-a12b',
   'arcee-ai/trinity-large-preview:free',
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
@@ -62,6 +64,7 @@ export const kiloFreeModels = [
   minimax_m25_free_model,
   minimax_m21_free_model,
   morph_warp_grep_free_model,
+  nemotron_3_super_free_model,
   grok_code_fast_1_optimized_free_model,
   zai_glm5_free_model,
 ] as KiloFreeModel[];

@@ -427,8 +427,12 @@ export async function syncAndStoreProviders() {
       .insert(modelsByProvider)
       .values({ data: providers, openrouter: openrouter_data, vercel: vercel_data })
       .returning();
-    await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
-    return results[0];
+    const inserted = results[0];
+    if (!inserted) {
+      throw new Error('Failed to insert models_by_provider row: insert returned no rows');
+    }
+    await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, inserted.id));
+    return inserted;
   });
 
   return {

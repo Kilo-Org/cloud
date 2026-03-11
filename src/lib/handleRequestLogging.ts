@@ -37,7 +37,7 @@ export function handleRequestLogging(params: {
         .returning({ id: api_request_log.id });
       logExceptInTest(
         '[handleRequestLogging] Inserted into api_request_log',
-        apiRequestLogId[0].id
+        apiRequestLogId[0]?.id
       );
     } catch (e) {
       logExceptInTest('[handleRequestLogging] Failed to insert api_request_log', e);

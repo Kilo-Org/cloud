@@ -239,6 +239,10 @@ export const adminRouter = createTRPCRouter({
         where: eq(kilocode_users.id, input.userId),
       });
 
+      if (!after) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found after kilo pass check' });
+      }
+
       return { before, after };
     }),
 

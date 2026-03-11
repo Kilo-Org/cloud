@@ -85,9 +85,19 @@ export async function POST(request: NextRequest) {
     const logWebhook = async (action: string) => {
       try {
         // Determine owner from integration
-        const owner = integration.owned_by_organization_id
-          ? { type: 'org' as const, id: integration.owned_by_organization_id }
-          : ({ type: 'user' as const, id: integration.owned_by_user_id } as Owner);
+        const ownerId = integration.owned_by_organization_id ?? integration.owned_by_user_id;
+        if (!ownerId) {
+          logExceptInTest('Integration has no owner (both owned_by_organization_id and owned_by_user_id are null)');
+          captureMessage('GitLab webhook: integration has no owner', {
+            level: 'error',
+            tags: { source: 'gitlab_webhook_owner' },
+            extra: { integrationId: integration.id },
+          });
+          return { isDuplicate: false, webhookEventId: undefined };
+        }
+        const owner: Owner = integration.owned_by_organization_id
+          ? { type: 'org', id: integration.owned_by_organization_id }
+          : { type: 'user', id: ownerId };
 
         const { id, isDuplicate } = await logWebhookEvent({
           owner,

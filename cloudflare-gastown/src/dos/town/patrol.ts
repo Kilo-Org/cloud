@@ -108,25 +108,30 @@ export function createTriageRequest(
   }
 
   // Global cap: skip if there are already too many open triage requests.
-  // Prevents unbounded accumulation during feedback loops.
-  const openCountRows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT COUNT(*) AS cnt FROM ${beads}
-        WHERE ${beads.type} = 'issue'
-          AND ${beads.labels} LIKE ?
-          AND ${beads.status} = 'open'
-      `,
-      [TRIAGE_LABEL_LIKE]
-    ),
-  ];
-  const openCount = Number(z.object({ cnt: z.number() }).parse(openCountRows[0]).cnt);
-  if (openCount >= MAX_OPEN_TRIAGE_REQUESTS) {
-    console.warn(
-      `${LOG} createTriageRequest: global cap reached (${openCount} open), skipping type=${params.triageType}`
-    );
-    return;
+  // Prevents unbounded accumulation during feedback loops from patrol's
+  // automatic detections. Escalations are exempt — they are agent/user
+  // initiated and silently dropping them would leave the escalation bead
+  // open with no automated follow-up.
+  if (params.triageType !== 'escalation') {
+    const openCountRows = [
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT COUNT(*) AS cnt FROM ${beads}
+          WHERE ${beads.type} = 'issue'
+            AND ${beads.labels} LIKE ?
+            AND ${beads.status} = 'open'
+        `,
+        [TRIAGE_LABEL_LIKE]
+      ),
+    ];
+    const openCount = Number(z.object({ cnt: z.number() }).parse(openCountRows[0]).cnt);
+    if (openCount >= MAX_OPEN_TRIAGE_REQUESTS) {
+      console.warn(
+        `${LOG} createTriageRequest: global cap reached (${openCount} open), skipping type=${params.triageType}`
+      );
+      return;
+    }
   }
 
   const metadata: TriageRequestMetadata = {

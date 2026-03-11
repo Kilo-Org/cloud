@@ -992,6 +992,24 @@ export class TownDO extends DurableObject<Env> {
       },
     });
 
+    // Log a triage_resolved event on the target bead so the action shows
+    // up in the activity feed for the bead that was actually affected.
+    const targetBeadId = snapshotHookedBeadId ?? targetAgentId;
+    if (targetBeadId && targetBeadId !== input.triage_request_bead_id) {
+      beadOps.logBeadEvent(this.sql, {
+        beadId: targetBeadId,
+        agentId: input.agent_id,
+        eventType: 'triage_resolved',
+        newValue: action,
+        metadata: {
+          action,
+          resolution_notes: input.resolution_notes,
+          triage_request_bead_id: input.triage_request_bead_id,
+          target_agent_id: targetAgentId,
+        },
+      });
+    }
+
     // If this triage request was created for an escalation, close the
     // linked escalation bead too so it doesn't sit open indefinitely.
     // The escalation_bead_id is nested under metadata.context (set by

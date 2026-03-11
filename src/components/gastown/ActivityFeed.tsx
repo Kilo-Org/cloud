@@ -15,6 +15,7 @@ import {
   Mail,
   MessageSquare,
   ChevronRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -29,6 +30,7 @@ const EVENT_ICONS: Record<string, typeof Activity> = {
   review_completed: GitMerge,
   mail_sent: Mail,
   agent_status: MessageSquare,
+  triage_resolved: ShieldCheck,
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -42,6 +44,7 @@ const EVENT_COLORS: Record<string, string> = {
   review_completed: 'text-green-600',
   mail_sent: 'text-sky-500',
   agent_status: 'text-white/50',
+  triage_resolved: 'text-amber-500',
 };
 
 type TownEvent = GastownOutputs['gastown']['getTownEvents'][number];
@@ -76,6 +79,12 @@ function eventDescription(event: {
       return `${rigPrefix}Review ${event.new_value ?? 'completed'}`;
     case 'mail_sent':
       return `${rigPrefix}Mail sent`;
+    case 'triage_resolved': {
+      const action = event.new_value ?? (event.metadata?.action as string | undefined) ?? 'unknown';
+      const notes = event.metadata?.resolution_notes as string | undefined;
+      const desc = `${rigPrefix}Triage: ${action}`;
+      return notes ? `${desc} — ${notes}` : desc;
+    }
     case 'agent_status': {
       const msg = event.new_value ?? (event.metadata?.message as string | undefined);
       const agentName = event.metadata?.agent_name as string | undefined;

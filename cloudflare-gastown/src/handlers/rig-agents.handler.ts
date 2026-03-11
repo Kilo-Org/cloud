@@ -34,7 +34,7 @@ const WriteCheckpointBody = z.object({
 });
 
 const UpdateAgentStatusMessageBody = z.object({
-  message: z.string().min(1),
+  message: z.string().trim().min(1).max(280),
 });
 
 export async function handleRegisterAgent(c: Context<GastownEnv>, params: { rigId: string }) {

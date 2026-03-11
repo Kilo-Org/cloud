@@ -5,7 +5,7 @@ import { StytchClient } from '@/components/auth/StytchClient';
 import { AnimatedLogo } from '@/components/AnimatedLogo';
 import BigLoader from '@/components/BigLoader';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { getStytchStatus, handleSignupPromotion } from '@/lib/stytch';
+import { getStytchStatus } from '@/lib/stytch';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 
@@ -14,8 +14,6 @@ export default async function AccountVerificationPage({ searchParams }: AppPageP
   const params = await searchParams;
   const telemetry_id = typeof params.telemetry_id === 'string' ? params.telemetry_id : null;
   const stytchStatus = await getStytchStatus(user, telemetry_id, await headers());
-
-  await handleSignupPromotion(user, stytchStatus || false);
 
   if (stytchStatus !== null) {
     // Check for callbackPath to redirect to after verification

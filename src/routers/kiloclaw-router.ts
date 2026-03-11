@@ -34,6 +34,7 @@ import {
 } from '@/lib/kiloclaw/instance-registry';
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
+import { getRewardfulReferral } from '@/lib/rewardful';
 
 const kilocodeDefaultModelSchema = z
   .string()
@@ -504,9 +505,12 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
+      const rewardfulReferral = await getRewardfulReferral();
+
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         customer: stripeCustomerId,
+        ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
         billing_address_collection: 'required',
         line_items: [{ price: STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID, quantity: 1 }],
         ...(STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID

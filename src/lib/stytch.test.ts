@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { insertTestUser } from '../tests/helpers/user.helper';
 import { db } from './drizzle';
-import { stytch_fingerprints, credit_transactions } from '@kilocode/db/schema';
+import { stytch_fingerprints } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { FraudFingerprintLookupResponse } from 'stytch';
 
@@ -9,7 +9,6 @@ import {
   saveFingerprints,
   isKnownFingerprintOfOtherUser,
   getStoredFingerprint,
-  handleSignupPromotion,
 } from '@/lib/stytch';
 
 beforeEach(async () => {
@@ -181,25 +180,6 @@ describe('Stytch Fingerprint Functions', () => {
       });
 
       expect(savedFingerprint?.kilo_free_tier_allowed).toBe(false);
-    });
-
-    test('should automatically grant welcome credits and set default model when validation passes', async () => {
-      const user = await insertTestUser();
-      const fingerprintData = createMockFingerprintData();
-      const headers = createMockHeaders();
-
-      const { kilo_free_tier_allowed } = await saveFingerprints(user, fingerprintData, headers);
-      expect(kilo_free_tier_allowed).toBe(true);
-
-      await handleSignupPromotion(user, kilo_free_tier_allowed);
-
-      // Check if credit was granted
-      const creditTransaction = await db.query.credit_transactions.findFirst({
-        where: eq(credit_transactions.kilo_user_id, user.id),
-      });
-
-      expect(creditTransaction?.credit_category).toBe('automatic-welcome-credits');
-      expect(creditTransaction?.amount_microdollars).toBe(5000000); // $5 in microdollars
     });
   });
 

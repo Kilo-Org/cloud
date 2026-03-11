@@ -170,13 +170,6 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     description: 'temp fix for stytch 1usd bug',
   },
   {
-    credit_category: 'automatic-welcome-credits',
-    description: 'Free credits for new users who pass both Turnstile and Stytch validation',
-    amount_usd: 5,
-    is_idempotent: true,
-    expiry_hours: PROMO_CREDIT_EXPIRY_HRS,
-  },
-  {
     credit_category: 'autocomplete-rollout-2025-11',
     description: 'Autocomplete feature rollout - $1 credit with 30 day expiry',
     amount_usd: 1,

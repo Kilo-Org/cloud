@@ -9,9 +9,6 @@ import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
 import { cachedPosthogQuery } from '@/lib/posthog-query';
 import * as z from 'zod';
-import { subDays } from 'date-fns';
-import { hasReceivedPromotion } from '@/lib/promotionalCredits';
-
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { db } from '@/lib/drizzle';
 import { fromMicrodollars } from '@/lib/utils';
@@ -84,7 +81,6 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
-    generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
     generateKimiFreeEndingNotification,
   ];
@@ -259,39 +255,6 @@ async function generateByokProvidersNotification(user: User): Promise<KiloNotifi
     console.error('[generateByokProvidersNotification]', e);
     return [];
   }
-}
-
-async function generateFirstDayWelcomeNotification(user: User): Promise<KiloNotification[]> {
-  // Check if user was created within the last day
-  if (new Date(user.created_at) < subDays(new Date(), 1)) {
-    return [];
-  }
-
-  // Check if user has received the signup bonus
-  const hasReceivedBonus = await hasReceivedPromotion(user.id, 'automatic-welcome-credits');
-  if (!hasReceivedBonus) {
-    return [];
-  }
-
-  // Check if user still has credit balance
-  const { balance } = await getBalanceForUser(user);
-  if (balance <= 1) {
-    return [];
-  }
-
-  return [
-    {
-      id: 'first-day-welcome-jan-8',
-      title: 'Welcome to Kilo Code!',
-      message:
-        'We added $5 to your balance to get started! If you want something to try, try asking Kilo to clone Kilo-Org/KiloMan and run it.',
-      action: {
-        actionText: 'Open Kilo-Org/KiloMan',
-        actionURL: 'https://github.com/Kilo-Org/kiloman',
-      },
-      showIn: ['cli', 'extension'],
-    },
-  ];
 }
 
 async function generateKiloPassNotification(user: User): Promise<KiloNotification[]> {

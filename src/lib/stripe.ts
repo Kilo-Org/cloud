@@ -53,6 +53,7 @@ import {
 } from '@/lib/config.server';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
+import { getRewardfulReferral } from '@/lib/rewardful';
 
 if (!APP_URL) throw new Error('APP_URL constant is not set');
 
@@ -900,10 +901,12 @@ export async function createAutoTopUpSetupCheckoutSession(
   amountCents: number = 5000
 ): Promise<string | null> {
   const amountDollars = amountCents / 100;
+  const rewardfulReferral = await getRewardfulReferral();
 
   const checkoutSession = await client.checkout.sessions.create({
     mode: 'payment',
     customer: stripeCustomerId,
+    ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
     billing_address_collection: 'required',
     line_items: [
       {
@@ -978,9 +981,12 @@ export async function getStripeTopUpCheckoutUrl(
     cancelUrl = `${APP_URL}/organizations/${organizationId}?${TOPUP_CANCELED_QUERY_STRING_KEY}=true`;
   }
 
+  const rewardfulReferral = await getRewardfulReferral();
+
   const checkoutSession = await client.checkout.sessions.create({
     mode: 'payment',
     customer: stripeCustomerId,
+    ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
     billing_address_collection: 'required',
     line_items: line_items,
     invoice_creation: {
@@ -1077,10 +1083,12 @@ export async function getStripeSeatsCheckoutUrl(
     ];
 
     const successUrl = `${process.env.NEXTAUTH_URL}/payments/subscriptions/success?organizationId=${organizationId}&${STRIPE_SUB_QUERY_STRING_KEY}={CHECKOUT_SESSION_ID}`;
+    const rewardfulReferral = await getRewardfulReferral();
 
     const checkoutSession = await client.checkout.sessions.create({
       mode: 'subscription',
       customer: stripeCustomerId,
+      ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
       allow_promotion_codes: true,
       billing_address_collection: 'required',
       line_items: line_items,

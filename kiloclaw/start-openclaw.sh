@@ -139,6 +139,12 @@ else
 fi
 export KILOCLAW_FRESH_INSTALL
 
+# Seed TOOLS.md on first provision only — the bot may update it at runtime.
+if [ "$KILOCLAW_FRESH_INSTALL" = "true" ]; then
+    mkdir -p /root/.openclaw/workspace
+    cp /usr/local/share/kiloclaw/TOOLS.md /root/.openclaw/workspace/TOOLS.md
+fi
+
 # ============================================================
 # INSTANCE FEATURE FLAGS
 # ============================================================

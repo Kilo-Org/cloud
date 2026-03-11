@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Roboto_Mono, JetBrains_Mono } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { Providers } from '../components/Providers';
@@ -111,6 +112,19 @@ export default function RootLayout({
 
         {process.env.NEXT_PUBLIC_GTM_ID && (
           <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
+        )}
+
+        {process.env.NEXT_PUBLIC_REWARDFUL_ID && (
+          <>
+            <Script id="rewardful-queue" strategy="beforeInteractive">
+              {`(function(w,r){w._rwq=r;w[r]=w[r]||function(){(w[r].q=w[r].q||[]).push(arguments)}})(window,'rewardful');rewardful('ready',function(){if(Rewardful.referral){document.cookie='rewardful_referral='+encodeURIComponent(Rewardful.referral)+';path=/;max-age=7776000;SameSite=Lax'+(location.protocol==='https:'?';Secure':'')}});`}
+            </Script>
+            <Script
+              strategy="beforeInteractive"
+              src="https://r.wdfl.co/rw.js"
+              data-rewardful={process.env.NEXT_PUBLIC_REWARDFUL_ID}
+            />
+          </>
         )}
       </body>
     </html>

@@ -107,7 +107,7 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy startup script
-# Build cache bust: 2026-03-10-v59-uv-pip-global-prefix
+# Build cache bust: 2026-03-11-v60-tools-md
 RUN echo "9"
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
@@ -120,6 +120,10 @@ RUN ls -l /usr/local/bin/start-openclaw.sh \
 
 # Copy custom skills
 COPY skills/ /root/clawd/skills/
+
+# Stage TOOLS.md outside /root so it survives the Fly Volume mount.
+# start-openclaw.sh copies it to /root/.openclaw/workspace/TOOLS.md on first boot.
+COPY container/TOOLS.md /usr/local/share/kiloclaw/TOOLS.md
 
 # Expose the gateway port
 EXPOSE 18789

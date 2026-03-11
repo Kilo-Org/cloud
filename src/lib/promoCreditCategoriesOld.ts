@@ -45,4 +45,12 @@ export const promoCategoriesOld: PromoCreditCategoryConfig[] = [
     is_idempotent: false,
     obsolete: true,
   },
+  {
+    credit_category: 'automatic-welcome-credits',
+    description: 'Free credits for new users who pass both Turnstile and Stytch validation.',
+    amount_usd: 5,
+    is_idempotent: true,
+    expiry_hours: PROMO_CREDIT_EXPIRY_HRS,
+    obsolete: true,
+  },
 ];

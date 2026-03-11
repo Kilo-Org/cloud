@@ -38,6 +38,7 @@ import {
 import { fromMicrodollars } from '@/lib/utils';
 import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { getRewardfulReferral } from '@/lib/rewardful';
 
 const KiloPassTierSchema = z.enum(KiloPassTier);
 
@@ -928,10 +929,12 @@ export const kiloPassRouter = createTRPCRouter({
       }
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
+      const rewardfulReferral = await getRewardfulReferral();
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         customer: stripeCustomerId,
+        ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
         allow_promotion_codes: true,
         billing_address_collection: 'required',
         line_items: [{ price: priceId, quantity: 1 }],

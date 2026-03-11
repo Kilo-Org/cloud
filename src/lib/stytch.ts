@@ -9,7 +9,6 @@ import { getFraudDetectionHeaders } from './utils';
 import { captureException } from '@sentry/nextjs';
 import { updateStytchValidation } from './customerInfo';
 import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFromStytchFreeCredits';
-import { grantCreditForCategory } from './promotionalCredits';
 import PostHogClient from '@/lib/posthog';
 
 const NEXT_PUBLIC_STYTCH_PROJECT_ENV = getEnvVariable('NEXT_PUBLIC_STYTCH_PROJECT_ENV');
@@ -171,26 +170,4 @@ export async function saveFingerprints(
   }
 
   return { kilo_free_tier_allowed };
-}
-
-/**
- * Handles signup promotion logic: grants credits for users who pass
- * both Turnstile and Stytch validation
- */
-export async function handleSignupPromotion(user: User, passedValidations: boolean): Promise<void> {
-  if (passedValidations) {
-    try {
-      // Grant automatic-welcome-credits for passing both Turnstile and Stytch validation
-      await grantCreditForCategory(user, {
-        credit_category: 'automatic-welcome-credits',
-        counts_as_selfservice: false,
-      });
-    } catch (error) {
-      // Don't fail the entire process if credit granting fails
-      captureException(error, {
-        tags: { source: 'signup_promotion_credit_grant' },
-        extra: { userId: user.id, email: user.google_user_email },
-      });
-    }
-  }
 }

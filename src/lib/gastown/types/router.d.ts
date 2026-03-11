@@ -316,6 +316,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         beads: {
           open: number;
           inProgress: number;
+          inReview: number;
           failed: number;
           triageRequests: number;
         };
@@ -914,6 +915,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             beads: {
               open: number;
               inProgress: number;
+              inReview: number;
               failed: number;
               triageRequests: number;
             };

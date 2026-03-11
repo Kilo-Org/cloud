@@ -31,8 +31,11 @@ const ResolveTriageBody = z.object({
 export async function handleResolveTriage(c: Context<GastownEnv>, _params: { rigId: string }) {
   // In production, agentId comes from the verified JWT. In development
   // (where authMiddleware is skipped), fall back to the identity header
-  // the container client sends with every request.
-  const agentId = getEnforcedAgentId(c) || c.req.header('X-Gastown-Agent-Id');
+  // the container client sends with every request. The fallback is gated
+  // on ENVIRONMENT to prevent header spoofing in production.
+  const agentId =
+    getEnforcedAgentId(c) ||
+    (c.env.ENVIRONMENT === 'development' ? c.req.header('X-Gastown-Agent-Id') : null);
   if (!agentId) {
     return c.json(resError('Agent authentication required'), 401);
   }

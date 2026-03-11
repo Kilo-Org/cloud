@@ -204,6 +204,7 @@ const AlarmStatusOutput = z.object({
   beads: z.object({
     open: z.number(),
     inProgress: z.number(),
+    inReview: z.number(),
     failed: z.number(),
     triageRequests: z.number(),
   }),

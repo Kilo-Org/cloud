@@ -148,7 +148,13 @@ export function TerminalBar({ townId }: TerminalBarProps) {
 type AlarmStatus = {
   alarm: { nextFireAt: string | null; intervalMs: number; intervalLabel: string };
   agents: { working: number; idle: number; stalled: number; dead: number; total: number };
-  beads: { open: number; inProgress: number; failed: number; triageRequests: number };
+  beads: {
+    open: number;
+    inProgress: number;
+    inReview: number;
+    failed: number;
+    triageRequests: number;
+  };
   patrol: {
     guppWarnings: number;
     guppEscalations: number;
@@ -371,6 +377,11 @@ function AlarmStatusPane({ townId }: { townId: string }) {
               label="In Progress"
               value={data.beads.inProgress}
               highlight={data.beads.inProgress > 0}
+            />
+            <StatusRow
+              label="In Review"
+              value={data.beads.inReview}
+              highlight={data.beads.inReview > 0}
             />
             <StatusRow label="Failed" value={data.beads.failed} warn={data.beads.failed > 0} />
             <StatusRow

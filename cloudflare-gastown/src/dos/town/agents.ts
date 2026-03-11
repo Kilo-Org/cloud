@@ -244,7 +244,9 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
       SET ${agent_metadata.columns.current_hook_bead_id} = ?,
           ${agent_metadata.columns.status} = 'idle',
           ${agent_metadata.columns.dispatch_attempts} = 0,
-          ${agent_metadata.columns.last_activity_at} = ?
+          ${agent_metadata.columns.last_activity_at} = ?,
+          ${agent_metadata.columns.agent_status_message} = NULL,
+          ${agent_metadata.columns.agent_status_updated_at} = NULL
       WHERE ${agent_metadata.bead_id} = ?
     `,
     [beadId, now(), agentId]
@@ -458,11 +460,7 @@ export function readCheckpoint(sql: SqlStorage, agentId: string): unknown {
 
 // ── Status Message ───────────────────────────────────────
 
-export function updateAgentStatusMessage(
-  sql: SqlStorage,
-  agentId: string,
-  message: string
-): void {
+export function updateAgentStatusMessage(sql: SqlStorage, agentId: string, message: string): void {
   query(
     sql,
     /* sql */ `

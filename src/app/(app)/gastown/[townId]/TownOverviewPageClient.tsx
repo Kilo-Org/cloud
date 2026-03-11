@@ -343,15 +343,18 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
               events={events.slice(0, 80)}
               isLoading={townEventsQuery.isLoading}
               onEventClick={event => {
-                if (
-                  event.event_type === 'agent_status' &&
-                  event.agent_id != null &&
-                  event.rig_id != null
-                ) {
-                  openDrawer({ type: 'agent', agentId: event.agent_id, rigId: event.rig_id, townId });
-                } else {
-                  openDrawer({ type: 'event', event });
+                if (event.event_type === 'agent_status' && event.agent_id != null) {
+                  // rig_id is not on the bead_events row — resolve it from
+                  // the already-fetched agentsByRig map instead.
+                  const rigId = Object.entries(agentsByRig).find(([, agents]) =>
+                    agents.some(a => a.id === event.agent_id)
+                  )?.[0];
+                  if (rigId) {
+                    openDrawer({ type: 'agent', agentId: event.agent_id, rigId, townId });
+                    return;
+                  }
                 }
+                openDrawer({ type: 'event', event });
               }}
             />
           </div>
@@ -457,7 +460,8 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
                       const isStale =
                         showStatusBubble &&
                         agent.agent_status_updated_at != null &&
-                        Date.now() - new Date(agent.agent_status_updated_at).getTime() > 10 * 60 * 1000;
+                        Date.now() - new Date(agent.agent_status_updated_at).getTime() >
+                          10 * 60 * 1000;
                       const truncatedMsg =
                         agent.agent_status_message && agent.agent_status_message.length > 80
                           ? `${agent.agent_status_message.slice(0, 80)}…`
@@ -522,12 +526,17 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
                               >
                                 <MessageSquare className="mt-0.5 size-2.5 shrink-0 text-white/20" />
                                 <div className="min-w-0 flex-1">
-                                  <p className={`text-[10px] italic leading-snug ${isStale ? 'text-white/20' : 'text-white/50'}`}>
+                                  <p
+                                    className={`text-[10px] leading-snug italic ${isStale ? 'text-white/20' : 'text-white/50'}`}
+                                  >
                                     {truncatedMsg}
                                   </p>
                                   {agent.agent_status_updated_at && (
                                     <p className="mt-0.5 text-[9px] text-white/20">
-                                      {formatDistanceToNow(new Date(agent.agent_status_updated_at), { addSuffix: true })}
+                                      {formatDistanceToNow(
+                                        new Date(agent.agent_status_updated_at),
+                                        { addSuffix: true }
+                                      )}
                                     </p>
                                   )}
                                 </div>

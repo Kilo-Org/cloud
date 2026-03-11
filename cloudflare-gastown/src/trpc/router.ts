@@ -278,7 +278,7 @@ export const gastownRouter = router({
     .input(
       z.object({
         rigId: z.string().uuid(),
-        status: z.enum(['open', 'in_progress', 'closed', 'failed']).optional(),
+        status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']).optional(),
       })
     )
     .output(z.array(RpcBeadOutput))

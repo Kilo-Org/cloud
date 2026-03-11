@@ -125,7 +125,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
             | 'merge_request'
             | 'message'
             | 'molecule';
-          status: 'closed' | 'failed' | 'in_progress' | 'open';
+          status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
           title: string;
           body: string | null;
           rig_id: string | null;
@@ -152,7 +152,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
     listBeads: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         rigId: string;
-        status?: 'closed' | 'failed' | 'in_progress' | 'open' | undefined;
+        status?: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open' | undefined;
       };
       output: {
         bead_id: string;
@@ -164,7 +164,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           | 'merge_request'
           | 'message'
           | 'molecule';
-        status: 'closed' | 'failed' | 'in_progress' | 'open';
+        status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
         title: string;
         body: string | null;
         rig_id: string | null;
@@ -235,7 +235,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
             | 'merge_request'
             | 'message'
             | 'molecule';
-          status: 'closed' | 'failed' | 'in_progress' | 'open';
+          status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
           title: string;
           body: string | null;
           rig_id: string | null;
@@ -723,7 +723,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                 | 'merge_request'
                 | 'message'
                 | 'molecule';
-              status: 'closed' | 'failed' | 'in_progress' | 'open';
+              status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
               title: string;
               body: string | null;
               rig_id: string | null;
@@ -750,7 +750,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
         listBeads: import('@trpc/server').TRPCQueryProcedure<{
           input: {
             rigId: string;
-            status?: 'closed' | 'failed' | 'in_progress' | 'open' | undefined;
+            status?: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open' | undefined;
           };
           output: {
             bead_id: string;
@@ -762,7 +762,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               | 'merge_request'
               | 'message'
               | 'molecule';
-            status: 'closed' | 'failed' | 'in_progress' | 'open';
+            status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
             title: string;
             body: string | null;
             rig_id: string | null;
@@ -833,7 +833,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                 | 'merge_request'
                 | 'message'
                 | 'molecule';
-              status: 'closed' | 'failed' | 'in_progress' | 'open';
+              status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
               title: string;
               body: string | null;
               rig_id: string | null;

@@ -34,7 +34,7 @@ export const RigOutput = z.object({
 export const BeadOutput = z.object({
   bead_id: z.string(),
   type: z.enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent']),
-  status: z.enum(['open', 'in_progress', 'closed', 'failed']),
+  status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']),
   title: z.string(),
   body: z.string().nullable(),
   rig_id: z.string().nullable(),

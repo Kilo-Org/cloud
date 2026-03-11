@@ -220,12 +220,31 @@ export function deleteAgent(sql: SqlStorage, agentId: string): void {
 
 // ── Hooks (GUPP) ────────────────────────────────────────────────────
 
+/** Bead types that are system-managed and should never be hooked to an agent. */
+const UNHOOKABLE_BEAD_TYPES = new Set(['escalation', 'convoy', 'agent', 'message']);
+
 export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void {
   const agent = getAgent(sql, agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
 
   const bead = getBead(sql, beadId);
   if (!bead) throw new Error(`Bead ${beadId} not found`);
+
+  // Prevent hooking to system-managed bead types that no agent should
+  // work on directly. Escalation beads are resolved by triage, convoy
+  // beads are containers, agent/message beads are metadata records.
+  if (UNHOOKABLE_BEAD_TYPES.has(bead.type)) {
+    throw new Error(`Cannot hook agent to bead ${beadId}: type '${bead.type}' is not workable`);
+  }
+
+  // Triage request beads are resolved by the triage agent via
+  // gt_triage_resolve, not by hooking. Prevent polecats from
+  // accidentally picking these up.
+  if (bead.labels.includes('gt:triage-request')) {
+    throw new Error(
+      `Cannot hook agent to bead ${beadId}: triage requests are resolved via gt_triage_resolve`
+    );
+  }
 
   // Already hooked to this bead — idempotent
   if (agent.current_hook_bead_id === beadId) return;

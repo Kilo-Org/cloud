@@ -172,9 +172,22 @@ export function SettingsTab({
               <div>
                 <p className="text-muted-foreground mb-1.5 text-xs">Running Version</p>
                 <div className="flex items-center gap-2">
-                  <code className="bg-muted text-foreground rounded px-2 py-1 text-sm font-medium">
-                    {runningVersion ?? '—'}
-                  </code>
+                  {runningVersion ? (
+                    <code className="bg-muted text-foreground rounded px-2 py-1 text-sm font-medium">
+                      {runningVersion}
+                    </code>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <code className="bg-muted text-muted-foreground cursor-help rounded px-2 py-1 text-sm font-medium">
+                          —
+                        </code>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Unable to determine the running OpenClaw version</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   {needsImageUpgrade && (
                     <Tooltip>
                       <TooltipTrigger asChild>

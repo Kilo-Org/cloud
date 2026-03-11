@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { registerHealthRoute } from './health';
+import { registerHealthRoute, parseOpenclawVersion } from './health';
 import type { Supervisor } from '../supervisor';
 
 const MOCK_STATS = {
@@ -22,6 +22,43 @@ function createMockSupervisor(): Supervisor {
     getStats: () => MOCK_STATS,
   };
 }
+
+describe('parseOpenclawVersion', () => {
+  it('parses full output with commit hash', () => {
+    expect(parseOpenclawVersion('OpenClaw 2026.3.8 (3caab92)')).toEqual({
+      version: '2026.3.8',
+      commit: '3caab92',
+    });
+  });
+
+  it('parses output without commit hash', () => {
+    expect(parseOpenclawVersion('OpenClaw 2026.3.8')).toEqual({
+      version: '2026.3.8',
+      commit: null,
+    });
+  });
+
+  it('parses bare calver', () => {
+    expect(parseOpenclawVersion('2026.3.8')).toEqual({
+      version: '2026.3.8',
+      commit: null,
+    });
+  });
+
+  it('returns null version for unrecognised output', () => {
+    expect(parseOpenclawVersion('something unexpected')).toEqual({
+      version: null,
+      commit: null,
+    });
+  });
+
+  it('returns null version for empty string', () => {
+    expect(parseOpenclawVersion('')).toEqual({
+      version: null,
+      commit: null,
+    });
+  });
+});
 
 describe('GET /_kilo/health', () => {
   it('returns 200 with minimal payload', async () => {

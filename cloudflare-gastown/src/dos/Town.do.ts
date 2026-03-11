@@ -681,12 +681,19 @@ export class TownDO extends DurableObject<Env> {
     agents.updateAgentStatusMessage(this.sql, agentId, message);
     const agent = agents.getAgent(this.sql, agentId);
     if (agent?.current_hook_bead_id) {
+      const rig = agent.rig_id ? rigs.getRig(this.sql, agent.rig_id) : null;
       beadOps.logBeadEvent(this.sql, {
         beadId: agent.current_hook_bead_id,
         agentId,
         eventType: 'agent_status',
         newValue: message,
-        metadata: { agentId, message },
+        metadata: {
+          agentId,
+          message,
+          agent_name: agent.name,
+          rig_id: agent.rig_id,
+          rig_name: rig?.name,
+        },
       });
     }
     this.broadcastAgentStatus(agentId, message);

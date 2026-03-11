@@ -79,8 +79,12 @@ function eventDescription(event: {
     case 'agent_status': {
       const msg = event.new_value ?? (event.metadata?.message as string | undefined);
       const agentName = event.metadata?.agent_name as string | undefined;
+      const rigName = event.metadata?.rig_name as string | undefined;
       const body = msg ?? 'Agent status update';
-      return agentName ? `${rigPrefix}${agentName}: ${body}` : `${rigPrefix}${body}`;
+      // Prefer metadata rig_name over the top-level rig_name (which is
+      // never populated for bead_events rows).
+      const prefix = rigName ? `[${rigName}] ` : rigPrefix;
+      return agentName ? `${prefix}${agentName}: ${body}` : `${prefix}${body}`;
     }
     default:
       return `${rigPrefix}${event.event_type}`;

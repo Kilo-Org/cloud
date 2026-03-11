@@ -112,6 +112,8 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           last_activity_at: string | null;
           checkpoint?: unknown;
           created_at: string;
+          agent_status_message?: string | null;
+          agent_status_updated_at?: string | null;
         }[];
         beads: {
           bead_id: string;
@@ -259,6 +261,8 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           last_activity_at: string | null;
           checkpoint?: unknown;
           created_at: string;
+          agent_status_message?: string | null;
+          agent_status_updated_at?: string | null;
         };
       };
       meta: object;
@@ -706,6 +710,8 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               last_activity_at: string | null;
               checkpoint?: unknown;
               created_at: string;
+              agent_status_message?: string | null;
+              agent_status_updated_at?: string | null;
             }[];
             beads: {
               bead_id: string;
@@ -853,6 +859,8 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               last_activity_at: string | null;
               checkpoint?: unknown;
               created_at: string;
+              agent_status_message?: string | null;
+              agent_status_updated_at?: string | null;
             };
           };
           meta: object;

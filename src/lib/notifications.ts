@@ -72,19 +72,6 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     showIn: ['extension'],
     expiresAt: '2026-03-09T08:00:00Z',
   },
-  {
-    id: 'nvidia-nemotron-3-super-launch-mar-11',
-    title: 'NVIDIA Nemotron 3 Super is live in Kilo!',
-    message:
-      'NVIDIA Nemotron 3 Super is now free to use for a limited time in Kilo — 120B parameter model with 256k context window!',
-    action: {
-      actionText: 'Learn more',
-      actionURL: 'https://blog.kilo.ai/nvidia-nemotron-3-super-launch',
-    },
-    suggestModelId: 'nvidia/nemotron-3-super-120b-a12b:free',
-    showIn: ['extension', 'cli'],
-    expiresAt: '2026-03-25T08:00:00Z',
-  },
 ];
 
 export async function generateUserNotifications(user: User): Promise<KiloNotification[]> {

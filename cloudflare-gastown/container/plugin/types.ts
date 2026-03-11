@@ -1,7 +1,7 @@
 // Types mirroring the Town DO domain model.
 // These are the API response shapes — the plugin never touches SQLite directly.
 
-export type BeadStatus = 'open' | 'in_progress' | 'closed' | 'failed';
+export type BeadStatus = 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed';
 export type BeadType =
   | 'issue'
   | 'message'

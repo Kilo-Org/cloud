@@ -78,12 +78,12 @@ export function createMayorTools(client: MayorGastownClient) {
     gt_list_beads: tool({
       description:
         'List beads (work items) in a specific rig. ' +
-        'Optionally filter by status (open, in_progress, closed, failed) or type (issue, message, escalation, merge_request). ' +
+        'Optionally filter by status (open, in_progress, in_review, closed, failed) or type (issue, message, escalation, merge_request). ' +
         'Use this to check what work exists in a rig, what is in progress, and what has been completed.',
       args: {
         rig_id: tool.schema.string().describe('The UUID of the rig to list beads from'),
         status: tool.schema
-          .enum(['open', 'in_progress', 'closed', 'failed'])
+          .enum(['open', 'in_progress', 'in_review', 'closed', 'failed'])
           .describe('Filter by bead status')
           .optional(),
         type: tool.schema

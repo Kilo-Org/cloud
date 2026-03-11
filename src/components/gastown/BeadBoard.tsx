@@ -162,7 +162,7 @@ export function BeadBoard({
 }: BeadBoardProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         {statusColumns.map(status => (
           <div key={status}>
             <Skeleton className="mb-3 h-6 w-24" />

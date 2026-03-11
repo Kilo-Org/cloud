@@ -93,6 +93,7 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
   const inProgressBeads = beads.filter(
     b => b.status === 'in_progress' && b.type !== 'agent'
   ).length;
+  const inReviewBeads = beads.filter(b => b.status === 'in_review' && b.type !== 'agent').length;
   const closedBeads = beads.filter(b => b.status === 'closed' && b.type !== 'agent').length;
 
   return (
@@ -126,9 +127,10 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-3 border-b border-white/[0.06]">
+      <div className="grid grid-cols-4 border-b border-white/[0.06]">
         <RigStatCell label="Open" value={openBeads} color="text-sky-400" />
         <RigStatCell label="In Progress" value={inProgressBeads} color="text-amber-400" />
+        <RigStatCell label="In Review" value={inReviewBeads} color="text-purple-400" />
         <RigStatCell label="Closed" value={closedBeads} color="text-emerald-400" />
       </div>
 

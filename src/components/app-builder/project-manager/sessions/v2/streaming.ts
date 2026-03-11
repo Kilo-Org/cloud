@@ -97,10 +97,11 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
   function createProcessorCallbacks(): EventProcessorCallbacks {
     return {
       onMessageUpdated: (sessionId, messageId, message, parentSessionId) => {
+        if (!message.info) return;
         const update = messageUpdater(sessionId, parentSessionId);
         const storedMsg: StoredMessage = { info: message.info, parts: message.parts };
         update(messages => {
-          const idx = messages.findIndex(m => m.info.id === messageId);
+          const idx = messages.findIndex(m => m.info?.id === messageId);
           if (idx >= 0) {
             const updated = [...messages];
             updated[idx] = storedMsg;
@@ -110,7 +111,7 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
           // (only applies to parent session messages)
           if (parentSessionId === null && message.info.role === 'user') {
             const optimisticIdx = messages.findIndex(
-              m => m.info.role === 'user' && m.info.id.startsWith('optimistic-')
+              m => m.info?.role === 'user' && m.info?.id.startsWith('optimistic-')
             );
             if (optimisticIdx >= 0) {
               const updated = [...messages];
@@ -120,17 +121,18 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
           }
           const updated = [...messages, storedMsg];
           if (parentSessionId !== null) {
-            updated.sort((a, b) => a.info.time.created - b.info.time.created);
+            updated.sort((a, b) => (a.info?.time.created ?? 0) - (b.info?.time.created ?? 0));
           }
           return updated;
         });
       },
 
       onMessageCompleted: (sessionId, messageId, message, parentSessionId) => {
+        if (!message.info) return;
         const update = messageUpdater(sessionId, parentSessionId);
         const storedMsg: StoredMessage = { info: message.info, parts: message.parts };
         update(messages => {
-          const idx = messages.findIndex(m => m.info.id === messageId);
+          const idx = messages.findIndex(m => m.info?.id === messageId);
           if (idx >= 0) {
             const updated = [...messages];
             updated[idx] = storedMsg;
@@ -138,7 +140,7 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
           }
           const updated = [...messages, storedMsg];
           if (parentSessionId !== null) {
-            updated.sort((a, b) => a.info.time.created - b.info.time.created);
+            updated.sort((a, b) => (a.info?.time.created ?? 0) - (b.info?.time.created ?? 0));
           }
           return updated;
         });
@@ -149,7 +151,7 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
           sessionId,
           parentSessionId
         )(messages => {
-          const idx = messages.findIndex(m => m.info.id === messageId);
+          const idx = messages.findIndex(m => m.info?.id === messageId);
           if (idx < 0) return messages;
           const msg = messages[idx];
           const partIdx = msg.parts.findIndex(p => p.id === part.id);
@@ -170,7 +172,7 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
           sessionId,
           parentSessionId
         )(messages => {
-          const idx = messages.findIndex(m => m.info.id === messageId);
+          const idx = messages.findIndex(m => m.info?.id === messageId);
           if (idx < 0) return messages;
           const msg = messages[idx];
           const newParts = msg.parts.filter(p => p.id !== partId);

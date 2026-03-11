@@ -772,6 +772,7 @@ export const loadSessionToIndexedDbAtom = atom(
     if (messages.length > 0) {
       const loadedMessagesMap = new Map<string, StoredMessage>();
       for (const msg of messages) {
+        if (!msg.info) continue;
         loadedMessagesMap.set(msg.info.id, msg);
       }
       set(messagesMapAtom, loadedMessagesMap);

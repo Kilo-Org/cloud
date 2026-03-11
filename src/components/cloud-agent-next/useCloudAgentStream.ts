@@ -252,6 +252,7 @@ export function useCloudAgentStream({
   const callbacks: EventProcessorCallbacks = useMemo(
     () => ({
       onMessageUpdated: (sessionId, messageId, message, parentSessionId) => {
+        if (!message.info) return;
         if (parentSessionId === null) {
           // When the server echoes the user message we displayed optimistically, remove the placeholder
           if (optimisticMessageIdRef.current && message.info.role === 'user') {

@@ -253,6 +253,7 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
    */
   function handleMessageUpdated(data: EventMessageUpdated['properties']): void {
     const { info } = data;
+    if (!info || typeof info !== 'object' || typeof info.role !== 'string') return;
     const sessionId = info.sessionID;
     const messageId = info.id;
     const key = messageKey(sessionId, messageId);

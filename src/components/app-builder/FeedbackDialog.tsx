@@ -200,19 +200,22 @@ function buildV1RecentMessages(
 function buildV2RecentMessages(
   messages: StoredMessage[]
 ): { role: string; text: string; ts: number }[] {
-  return messages.slice(-5).map(msg => {
-    const textContent = msg.parts
-      .filter(isTextPart)
-      .map(p => p.text)
-      .join('')
-      .slice(0, 10_000);
+  return messages
+    .slice(-5)
+    .filter(msg => msg.info != null)
+    .map(msg => {
+      const textContent = msg.parts
+        .filter(isTextPart)
+        .map(p => p.text)
+        .join('')
+        .slice(0, 10_000);
 
-    return {
-      role: msg.info.role,
-      text: textContent,
-      ts: msg.info.time.created,
-    };
-  });
+      return {
+        role: msg.info.role,
+        text: textContent,
+        ts: msg.info.time.created,
+      };
+    });
 }
 
 function noopSubscribe() {

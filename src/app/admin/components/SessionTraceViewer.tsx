@@ -44,6 +44,7 @@ function formatModelLabel(providerId: unknown, modelId: unknown): string | null 
 }
 
 function getV2MessageModelLabel(message: StoredMessage): string | null {
+  if (!message.info) return null;
   if (message.info.role === 'user') {
     const model = message.info.model;
     if (!model) {
@@ -377,7 +378,7 @@ export function SessionTraceViewer() {
                 <p className="text-muted-foreground">No messages in this session</p>
               ) : isV2 ? (
                 <div className="space-y-2">
-                  {v2Messages.map((msg, index) => {
+                  {v2Messages.filter(msg => msg.info != null).map((msg, index) => {
                     const userMessageModel =
                       msg.info.role === 'user' ? getV2MessageModelLabel(msg) : null;
 

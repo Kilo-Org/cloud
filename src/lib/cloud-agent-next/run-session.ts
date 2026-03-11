@@ -248,7 +248,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   const processor = createEventProcessor({
     callbacks: {
       onMessageCompleted: (_sid, _mid, message) => {
-        if (message.info.role !== 'assistant') return;
+        if (!message.info || message.info.role !== 'assistant') return;
         const text = extractTextFromMessage(message);
         if (text) completionResult = text;
 

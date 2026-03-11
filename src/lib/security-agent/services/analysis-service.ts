@@ -109,7 +109,7 @@ function buildAnalysisPrompt(finding: SecurityFinding): string {
 export function extractLastAssistantMessage(snapshot: SessionSnapshot): string | null {
   for (let i = snapshot.messages.length - 1; i >= 0; i--) {
     const msg = snapshot.messages[i];
-    if (msg.info.role !== 'assistant') continue;
+    if (!msg.info || msg.info.role !== 'assistant') continue;
 
     let text = '';
     for (const p of msg.parts) {

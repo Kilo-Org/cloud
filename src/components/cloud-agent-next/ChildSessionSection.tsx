@@ -215,12 +215,12 @@ function ChildSessionMessage({
     <div className="bg-muted/30 rounded-md p-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Badge variant="outline" className="text-xs">
-          {message.info.role}
+          {message.info?.role ?? 'unknown'}
         </Badge>
         {isStreaming && (
           <span className="text-muted-foreground animate-pulse text-xs">streaming...</span>
         )}
-        <DevDebugInfo messageId={message.info.id} sessionId={message.info.sessionID} />
+        <DevDebugInfo messageId={message.info?.id} sessionId={message.info?.sessionID} />
       </div>
       <div className="mt-2 space-y-1">
         {message.parts.map((part, index) => {
@@ -303,7 +303,7 @@ export function getCurrentRunningTool(
   // Search messages in reverse order (most recent first)
   for (let i = childMessages.length - 1; i >= 0; i--) {
     const msg = childMessages[i];
-    if (msg.info.role !== 'assistant') continue;
+    if (!msg.info || msg.info.role !== 'assistant') continue;
 
     // Search parts in reverse order
     for (let j = msg.parts.length - 1; j >= 0; j--) {

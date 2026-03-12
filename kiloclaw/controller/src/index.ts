@@ -12,6 +12,8 @@ import { createSupervisor } from './supervisor';
 import { registerHealthRoute } from './routes/health';
 import { registerGatewayRoutes } from './routes/gateway';
 import { registerConfigRoutes } from './routes/config';
+import { registerPairingRoutes } from './routes/pairing';
+import { createPairingCache } from './pairing-cache';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
@@ -130,14 +132,18 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     console.error('[gog] Failed to write credentials:', err);
   }
 
+  const pairingCache = createPairingCache();
+
   const supervisor = createSupervisor({
     gatewayArgs: config.gatewayArgs,
+    onStdoutLine: line => pairingCache.onPairingLogLine(line),
   });
 
   const app = new Hono();
   registerHealthRoute(app, supervisor, config.expectedToken);
   registerGatewayRoutes(app, supervisor, config.expectedToken);
   registerConfigRoutes(app, supervisor, config.expectedToken);
+  registerPairingRoutes(app, pairingCache, config.expectedToken);
   app.all(
     '*',
     createHttpProxy({
@@ -170,6 +176,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   });
 
   await supervisor.start();
+  pairingCache.start();
 
   await new Promise<void>(resolve => {
     server.listen(config.port, '0.0.0.0', () => {
@@ -188,6 +195,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     shuttingDown = true;
     console.log(`[controller] Received ${signal}, shutting down`);
 
+    pairingCache.cleanup();
     await supervisor.shutdown(signal);
     await new Promise<void>(resolve => {
       server.close(() => resolve());

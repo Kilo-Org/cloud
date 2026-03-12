@@ -42,7 +42,6 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   // Fetch all beads — used both for finding this bead and computing dependency graph.
-  // listBeads returns [] until bead-0 admin endpoints are merged.
   const allBeadsQuery = useQuery(trpc.admin.gastown.listBeads.queryOptions({ townId }));
   const allBeads = allBeadsQuery.data ?? [];
   const bead = allBeads.find(b => b.bead_id === beadId) ?? null;

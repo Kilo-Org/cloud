@@ -36,3 +36,15 @@ export const gastownProcedure = procedure.use(async ({ ctx, next }) => {
   }
   return next({ ctx });
 });
+
+/**
+ * Admin-only procedure — requires `isAdmin` on the JWT. Used for admin
+ * panel endpoints that bypass per-user ownership checks (e.g. town-wide
+ * bead/agent listing for support diagnostics).
+ */
+export const adminProcedure = procedure.use(async ({ ctx, next }) => {
+  if (!ctx.isAdmin) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+  }
+  return next({ ctx });
+});

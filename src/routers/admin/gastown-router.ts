@@ -312,6 +312,40 @@ async function gastownTrpcGet<T>(
   return parsed.success ? parsed.data.result.data : null;
 }
 
+/**
+ * Call a Gastown worker tRPC mutation (POST) and return the result.
+ * Returns null on failure.
+ */
+async function gastownTrpcMutate<T>(
+  adminUser: User,
+  procedure: string,
+  input: unknown,
+  schema: z.ZodType<T>
+): Promise<T | null> {
+  const headers = buildAdminHeaders(adminUser);
+  const url = `${GASTOWN_SERVICE_URL}/trpc/${procedure}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    console.error(
+      `[admin/gastown] tRPC mutate ${procedure} failed: ${response.status} ${body.slice(0, 200)}`
+    );
+    throw new TRPCError({
+      code: response.status === 404 ? 'NOT_FOUND' : 'INTERNAL_SERVER_ERROR',
+      message: `Gastown tRPC ${procedure} failed: ${response.status}`,
+    });
+  }
+
+  const raw: unknown = await response.json();
+  const resultSchema = z.object({ result: z.object({ data: schema }) });
+  const parsed = resultSchema.safeParse(raw);
+  return parsed.success ? parsed.data.result.data : null;
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 export const adminGastownRouter = createTRPCRouter({
@@ -389,20 +423,15 @@ export const adminGastownRouter = createTRPCRouter({
         type: z
           .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
           .optional(),
-        rigId: z.string().uuid().optional(),
+        limit: z.number().int().positive().max(500).default(200),
       })
     )
     .output(z.array(BeadRecord))
     .query(async ({ input, ctx }) => {
-      if (!input.rigId) {
-        // Town-wide listing requires admin-bypass endpoint (bead 0).
-        return [];
-      }
-      // Per-rig listing via tRPC listBeads (requires rig ownership — will fail for other users' rigs).
       const result = await gastownTrpcGet(
         ctx.user,
-        'gastown.listBeads',
-        { rigId: input.rigId, status: input.status },
+        'gastown.adminListBeads',
+        { townId: input.townId, status: input.status, type: input.type, limit: input.limit },
         z.array(BeadRecord)
       );
       return result ?? [];
@@ -438,22 +467,13 @@ export const adminGastownRouter = createTRPCRouter({
    * Admin-level town-wide listing requires bead 0 admin endpoints.
    */
   listAgents: adminProcedure
-    .input(
-      z.object({
-        townId: z.string().uuid(),
-        rigId: z.string().uuid().optional(),
-      })
-    )
+    .input(z.object({ townId: z.string().uuid() }))
     .output(z.array(AgentRecord))
     .query(async ({ input, ctx }) => {
-      if (!input.rigId) {
-        // Town-wide listing requires admin-bypass endpoint (bead 0).
-        return [];
-      }
       const result = await gastownTrpcGet(
         ctx.user,
-        'gastown.listAgents',
-        { rigId: input.rigId },
+        'gastown.adminListAgents',
+        { townId: input.townId },
         z.array(AgentRecord)
       );
       return result ?? [];
@@ -592,73 +612,70 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   // ── Admin interventions ───────────────────────────────────────────────────
-  // All write to audit log via TownDO.logAdminAction() (added in bead 0).
-  // These throw METHOD_NOT_SUPPORTED until bead 0 adds admin intervention
-  // endpoints to the Gastown worker.
 
-  /** Force-reset an agent: sets status to idle and unhooks the bead. */
   forceResetAgent: adminProcedure
     .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
-    .mutation(async ({ input }) => {
-      void input;
-      throw new TRPCError({
-        code: 'METHOD_NOT_SUPPORTED',
-        message: 'Requires bead 0 admin intervention endpoints on the Gastown worker.',
-      });
+    .mutation(async ({ input, ctx }) => {
+      await gastownTrpcMutate(
+        ctx.user,
+        'gastown.adminForceResetAgent',
+        { townId: input.townId, agentId: input.agentId },
+        z.void().or(z.null())
+      );
     }),
 
-  /** Force-close a bead. */
   forceCloseBead: adminProcedure
     .input(z.object({ townId: z.string().uuid(), beadId: z.string().uuid() }))
-    .mutation(async ({ input }) => {
-      void input;
-      throw new TRPCError({
-        code: 'METHOD_NOT_SUPPORTED',
-        message: 'Requires bead 0 admin intervention endpoints on the Gastown worker.',
-      });
+    .mutation(async ({ input, ctx }) => {
+      await gastownTrpcMutate(
+        ctx.user,
+        'gastown.adminForceCloseBead',
+        { townId: input.townId, beadId: input.beadId },
+        BeadRecord
+      );
     }),
 
-  /** Force-fail a bead. */
   forceFailBead: adminProcedure
     .input(z.object({ townId: z.string().uuid(), beadId: z.string().uuid() }))
-    .mutation(async ({ input }) => {
-      void input;
-      throw new TRPCError({
-        code: 'METHOD_NOT_SUPPORTED',
-        message: 'Requires bead 0 admin intervention endpoints on the Gastown worker.',
-      });
+    .mutation(async ({ input, ctx }) => {
+      await gastownTrpcMutate(
+        ctx.user,
+        'gastown.adminForceFailBead',
+        { townId: input.townId, beadId: input.beadId },
+        BeadRecord
+      );
     }),
 
-  /** Force-restart the town container. */
   forceRestartContainer: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
-    .mutation(async ({ input }) => {
-      void input;
-      throw new TRPCError({
-        code: 'METHOD_NOT_SUPPORTED',
-        message: 'Requires bead 0 admin intervention endpoints on the Gastown worker.',
-      });
+    .mutation(async ({ input, ctx }) => {
+      await gastownTrpcMutate(
+        ctx.user,
+        'gastown.adminForceRestartContainer',
+        { townId: input.townId },
+        z.void().or(z.null())
+      );
     }),
 
-  /** Force-retry a stalled review queue entry. */
+  /** Force-retry a stalled review queue entry. Not yet implemented on the worker. */
   forceRetryReview: adminProcedure
     .input(z.object({ townId: z.string().uuid(), entryId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       void input;
       throw new TRPCError({
         code: 'METHOD_NOT_SUPPORTED',
-        message: 'Requires bead 0 admin intervention endpoints on the Gastown worker.',
+        message: 'Review retry requires manual re-submission — not yet implemented.',
       });
     }),
 
-  /** Force-refresh git credentials for a rig. */
+  /** Force-refresh git credentials for a rig. Not yet implemented on the worker. */
   forceRefreshCredentials: adminProcedure
     .input(z.object({ townId: z.string().uuid(), rigId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       void input;
       throw new TRPCError({
         code: 'METHOD_NOT_SUPPORTED',
-        message: 'Requires bead 0 admin intervention endpoints on the Gastown worker.',
+        message: 'Credential refresh not yet implemented.',
       });
     }),
 

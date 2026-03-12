@@ -82,7 +82,7 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
         )}
         {!isLoading && queueEntries.length === 0 && (
           <p className="text-muted-foreground py-8 text-center text-sm">
-            No active review queue entries. (Town-wide listing requires bead 0 admin endpoints.)
+            No active review queue entries.
           </p>
         )}
         {queueEntries.length > 0 && (

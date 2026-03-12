@@ -8,7 +8,7 @@
 /* eslint-disable @typescript-eslint/await-thenable -- DO RPC stubs return Rpc.Promisified which is thenable at runtime */
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { router, gastownProcedure } from './init';
+import { router, gastownProcedure, adminProcedure } from './init';
 import { getTownDOStub } from '../dos/Town.do';
 import { getTownContainerStub } from '../dos/TownContainer.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
@@ -597,6 +597,68 @@ export const gastownRouter = router({
       if (!convoy) return null;
       const status = await townStub.getConvoyStatus(input.convoyId);
       return status ?? { ...convoy, beads: [] };
+    }),
+
+  // ── Admin-only routes (bypass ownership checks) ──────────────────────
+
+  adminListBeads: adminProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        status: z.enum(['open', 'in_progress', 'closed', 'failed']).optional(),
+        type: z
+          .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
+          .optional(),
+        limit: z.number().int().positive().max(500).default(200),
+      })
+    )
+    .output(z.array(RpcBeadOutput))
+    .query(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.listBeads({
+        status: input.status,
+        type: input.type,
+        limit: input.limit,
+      });
+    }),
+
+  adminListAgents: adminProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(z.array(RpcAgentOutput))
+    .query(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.listAgents({});
+    }),
+
+  adminForceRestartContainer: adminProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const containerStub = getTownContainerStub(ctx.env, input.townId);
+      await containerStub.destroy();
+    }),
+
+  adminForceResetAgent: adminProcedure
+    .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.unhookBead(input.agentId);
+      await townStub.updateAgentStatus(input.agentId, 'idle');
+    }),
+
+  adminForceCloseBead: adminProcedure
+    .input(z.object({ townId: z.string().uuid(), beadId: z.string().uuid() }))
+    .output(RpcBeadOutput)
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.closeBead(input.beadId, 'admin');
+    }),
+
+  adminForceFailBead: adminProcedure
+    .input(z.object({ townId: z.string().uuid(), beadId: z.string().uuid() }))
+    .output(RpcBeadOutput)
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.updateBeadStatus(input.beadId, 'failed', 'admin');
     }),
 });
 

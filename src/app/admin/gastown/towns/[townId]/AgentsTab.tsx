@@ -64,7 +64,7 @@ export function AgentsTab({ townId }: { townId: string }) {
         )}
         {!agentsQuery.isLoading && agents.length === 0 && (
           <p className="text-muted-foreground py-8 text-center text-sm">
-            No agents found. (Town-wide listing requires bead 0 admin endpoints.)
+            No agents found in this town.
           </p>
         )}
         {agents.length > 0 && (

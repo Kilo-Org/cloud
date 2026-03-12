@@ -166,7 +166,7 @@ export function BeadsTab({ townId }: { townId: string }) {
         )}
         {!beadsQuery.isLoading && beads.length === 0 && (
           <p className="text-muted-foreground py-8 text-center text-sm">
-            No beads found. (Town-wide listing requires bead 0 admin endpoints.)
+            No beads found matching the current filters.
           </p>
         )}
         {beads.length > 0 && (

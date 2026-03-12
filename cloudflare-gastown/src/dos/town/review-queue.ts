@@ -18,6 +18,7 @@ import {
   getBead,
   closeBead,
   updateBeadStatus,
+  updateConvoyProgress,
   createBead,
   getConvoyForBead,
   getConvoyFeatureBranch,
@@ -273,7 +274,14 @@ export function completeReviewWithResult(
   });
 
   if (input.status === 'merged') {
+    const mergeTimestamp = now();
     closeBead(sql, entry.bead_id, entry.agent_id);
+
+    // closeBead → updateBeadStatus short-circuits when completeReview already
+    // set the status to 'closed' via direct SQL, so updateConvoyProgress is
+    // never reached transitively. Call it explicitly to ensure the convoy
+    // recounts after the MR bead is closed.
+    updateConvoyProgress(sql, entry.bead_id, mergeTimestamp);
 
     // If this was a convoy landing MR, also set landed_at on the convoy metadata
     const sourceBead = getBead(sql, entry.bead_id);

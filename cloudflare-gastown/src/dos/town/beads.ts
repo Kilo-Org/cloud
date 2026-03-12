@@ -230,7 +230,7 @@ export function updateBeadStatus(
  * recount closed beads and update convoy_metadata. Auto-lands the
  * convoy when all tracked beads are closed.
  */
-function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp: string): void {
+export function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp: string): void {
   const convoyRows = [
     ...query(
       sql,

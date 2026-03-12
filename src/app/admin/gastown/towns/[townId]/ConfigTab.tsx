@@ -49,9 +49,9 @@ export function ConfigTab({ townId }: { townId: string }) {
 
   const saveField = (field: string) => {
     if (field === 'default_model') {
-      updateConfigMutation.mutate({ townId, update: { default_model: editValue || undefined } });
+      updateConfigMutation.mutate({ townId, update: { default_model: editValue || null } });
     } else if (field === 'small_model') {
-      updateConfigMutation.mutate({ townId, update: { small_model: editValue || undefined } });
+      updateConfigMutation.mutate({ townId, update: { small_model: editValue || null } });
     } else if (field === 'max_polecats_per_rig') {
       const num = parseInt(editValue, 10);
       if (!isNaN(num) && num > 0) {

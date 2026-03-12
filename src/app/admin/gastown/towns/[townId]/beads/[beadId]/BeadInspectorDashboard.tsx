@@ -119,7 +119,10 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
   const events = (eventsQuery.data ?? []).filter(e => e.bead_id === beadId);
   const dispatchAttempts = dispatchAttemptsQuery.data ?? [];
 
-  // Dependency graph: beads whose metadata references this beadId
+  // Dependency graph: reads from metadata.depends_on as a temporary fallback.
+  // The canonical source is the bead_dependencies table, but that requires a
+  // dedicated admin endpoint (bead 0). Once available, switch to querying
+  // bead_dependencies for accurate blocker/convoy/tracks edges.
   const getMetaDeps = (meta: Record<string, unknown>): string[] => {
     const raw = meta['depends_on'];
     return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : [];

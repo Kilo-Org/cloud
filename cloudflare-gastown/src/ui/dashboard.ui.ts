@@ -53,6 +53,10 @@ export function dashboardHtml(): string {
   .badge.working { background: #d29922aa; color: #e3b341; }
   .badge.blocked { background: #f8514933; color: #f85149; }
   .badge.dead { background: #f8514966; color: #f85149; }
+  textarea.body-edit { background: #161b22; border: 1px solid #30363d; color: #c9d1d9;
+                       padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px;
+                       width: 100%; min-height: 80px; resize: vertical; }
+  textarea.body-edit:focus { border-color: #58a6ff; outline: none; }
   .empty { color: #484f58; font-style: italic; }
   #toast { position: fixed; bottom: 16px; right: 16px; background: #1f6feb;
            color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 12px;
@@ -196,6 +200,87 @@ export function dashboardHtml(): string {
     <div id="escalationResult"></div>
   </div>
 </div>
+</div>
+
+<!-- Mayor Edit Controls -->
+<div class="panel">
+  <h2>Mayor Edit Controls</h2>
+  <div class="row">
+    <label>Town ID</label>
+    <input type="text" id="mayorTownId" placeholder="town-abc" style="min-width:160px" />
+    <label style="min-width:80px">Mayor Token</label>
+    <input type="text" id="mayorToken" placeholder="Bearer token for mayor auth" style="flex:1;min-width:240px" />
+  </div>
+
+  <h2 style="margin-top:12px">Bead Edit</h2>
+  <div class="row">
+    <label>Rig ID</label>
+    <input type="text" id="editBeadRigId" placeholder="rig ID" style="min-width:160px" />
+    <label>Bead ID</label>
+    <input type="text" id="editBeadId" placeholder="bead ID" style="min-width:160px" />
+  </div>
+  <div class="row">
+    <label>Title</label>
+    <input type="text" id="editBeadTitle" placeholder="new title (optional)" style="flex:1;min-width:200px" />
+  </div>
+  <div class="row" style="align-items:flex-start">
+    <label style="padding-top:4px">Body</label>
+    <textarea class="body-edit" id="editBeadBody" placeholder="new body (optional)"></textarea>
+  </div>
+  <div class="row">
+    <label>Status</label>
+    <select id="editBeadStatus">
+      <option value="">— unchanged —</option>
+      <option value="open">open</option>
+      <option value="in_progress">in_progress</option>
+      <option value="closed">closed</option>
+      <option value="failed">failed</option>
+    </select>
+    <label>Priority</label>
+    <select id="editBeadPriority">
+      <option value="">— unchanged —</option>
+      <option value="low">low</option>
+      <option value="medium">medium</option>
+      <option value="high">high</option>
+      <option value="critical">critical</option>
+    </select>
+    <button class="primary" onclick="mayorBeadSave()">Save Bead</button>
+  </div>
+  <div class="row">
+    <label>Reassign to</label>
+    <input type="text" id="editBeadReassignAgent" placeholder="agent ID" style="min-width:160px" />
+    <button onclick="mayorBeadReassign()">Reassign</button>
+    <button class="danger" onclick="mayorBeadDelete()">Delete Bead</button>
+  </div>
+  <div id="editBeadResult"></div>
+
+  <h2 style="margin-top:12px">Agent Controls</h2>
+  <div class="row">
+    <label>Rig ID</label>
+    <input type="text" id="editAgentRigId" placeholder="rig ID" style="min-width:160px" />
+    <label>Agent ID</label>
+    <input type="text" id="editAgentId" placeholder="agent ID" style="min-width:160px" />
+  </div>
+  <div class="row">
+    <button onclick="mayorAgentReset()">Reset to Idle</button>
+    <button onclick="mayorAgentUnhook()">Unhook</button>
+  </div>
+  <div id="editAgentResult"></div>
+
+  <h2 style="margin-top:12px">Convoy Controls</h2>
+  <div class="row">
+    <label>Convoy ID</label>
+    <input type="text" id="editConvoyId" placeholder="convoy ID" style="min-width:200px" />
+    <label>Merge Mode</label>
+    <select id="editConvoyMergeMode">
+      <option value="">— unchanged —</option>
+      <option value="review-then-land">review-then-land</option>
+      <option value="review-and-merge">review-and-merge</option>
+    </select>
+    <button onclick="mayorConvoyUpdate()">Save</button>
+    <button class="danger" onclick="mayorConvoyClose()">Force Close</button>
+  </div>
+  <div id="editConvoyResult"></div>
 </div>
 
 <!-- Town Container -->
@@ -360,6 +445,166 @@ async function api(method, path, body) {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ── Mayor API helper ─────────────────────────────────────────────────
+
+function mayorToken() { return el('mayorToken').value.trim(); }
+function mayorTownId() { return el('mayorTownId').value.trim(); }
+
+async function mayorApi(method, path, body) {
+  const log = el('apiLog');
+  const token = mayorToken();
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+    },
+  };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+
+  const tag = method + ' ' + path;
+  log.innerHTML += '<span class="info">' + esc(tag) + '</span>\\n';
+
+  try {
+    const res = await fetch(path, opts);
+    const data = await res.json();
+    const cls = res.ok ? 'ok' : 'err';
+    log.innerHTML += '<span class="' + cls + '">' + res.status + '</span> '
+      + esc(JSON.stringify(data, null, 2)) + '\\n\\n';
+    log.scrollTop = log.scrollHeight;
+    if (!res.ok) toast(data.error || res.status, true);
+    return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    log.innerHTML += '<span class="err">FETCH ERROR: ' + esc(e.message) + '</span>\\n\\n';
+    toast(e.message, true);
+    return { ok: false, status: 0, data: null };
+  }
+}
+
+// ── Mayor: Bead edit ─────────────────────────────────────────────────
+
+async function mayorBeadSave() {
+  const tId = mayorTownId();
+  const rId = el('editBeadRigId').value.trim();
+  const bId = el('editBeadId').value.trim();
+  if (!tId || !rId || !bId) { toast('Fill in Town ID, Rig ID, and Bead ID', true); return; }
+  const body = {};
+  const title = el('editBeadTitle').value.trim();
+  const bodyText = el('editBeadBody').value.trim();
+  const status = el('editBeadStatus').value;
+  const priority = el('editBeadPriority').value;
+  if (title) body.title = title;
+  if (bodyText) body.body = bodyText;
+  if (status) body.status = status;
+  if (priority) body.priority = priority;
+  if (!Object.keys(body).length) { toast('Provide at least one field to update', true); return; }
+  const r = await mayorApi('PATCH', '/api/mayor/' + tId + '/tools/rigs/' + rId + '/beads/' + bId, body);
+  if (r.ok) {
+    el('editBeadResult').innerHTML = '<p class="ok" style="color:#3fb950">Bead updated</p>';
+    toast('Bead saved');
+    await loadBeads();
+  } else {
+    el('editBeadResult').innerHTML = '<p class="err" style="color:#f85149">Error: ' + esc(r.data?.error ?? 'unknown') + '</p>';
+  }
+}
+
+async function mayorBeadReassign() {
+  const tId = mayorTownId();
+  const rId = el('editBeadRigId').value.trim();
+  const bId = el('editBeadId').value.trim();
+  const agentId = el('editBeadReassignAgent').value.trim();
+  if (!tId || !rId || !bId || !agentId) { toast('Fill in Town ID, Rig ID, Bead ID, and Agent ID', true); return; }
+  const r = await mayorApi('POST', '/api/mayor/' + tId + '/tools/rigs/' + rId + '/beads/' + bId + '/reassign', { agent_id: agentId });
+  if (r.ok) {
+    el('editBeadResult').innerHTML = '<p class="ok" style="color:#3fb950">Bead reassigned</p>';
+    toast('Bead reassigned');
+    await loadBeads();
+  } else {
+    el('editBeadResult').innerHTML = '<p class="err" style="color:#f85149">Error: ' + esc(r.data?.error ?? 'unknown') + '</p>';
+  }
+}
+
+async function mayorBeadDelete() {
+  const tId = mayorTownId();
+  const rId = el('editBeadRigId').value.trim();
+  const bId = el('editBeadId').value.trim();
+  if (!tId || !rId || !bId) { toast('Fill in Town ID, Rig ID, and Bead ID', true); return; }
+  if (!confirm('Delete bead ' + bId + '? This cannot be undone.')) return;
+  const r = await mayorApi('DELETE', '/api/mayor/' + tId + '/tools/rigs/' + rId + '/beads/' + bId);
+  if (r.ok) {
+    el('editBeadResult').innerHTML = '<p class="ok" style="color:#3fb950">Bead deleted</p>';
+    el('editBeadId').value = '';
+    toast('Bead deleted');
+    await loadBeads();
+  } else {
+    el('editBeadResult').innerHTML = '<p class="err" style="color:#f85149">Error: ' + esc(r.data?.error ?? 'unknown') + '</p>';
+  }
+}
+
+// ── Mayor: Agent controls ────────────────────────────────────────────
+
+async function mayorAgentReset() {
+  const tId = mayorTownId();
+  const rId = el('editAgentRigId').value.trim();
+  const aId = el('editAgentId').value.trim();
+  if (!tId || !rId || !aId) { toast('Fill in Town ID, Rig ID, and Agent ID', true); return; }
+  const r = await mayorApi('POST', '/api/mayor/' + tId + '/tools/rigs/' + rId + '/agents/' + aId + '/reset', {});
+  if (r.ok) {
+    el('editAgentResult').innerHTML = '<p class="ok" style="color:#3fb950">Agent reset to idle</p>';
+    toast('Agent reset');
+    await loadAgents();
+  } else {
+    el('editAgentResult').innerHTML = '<p class="err" style="color:#f85149">Error: ' + esc(r.data?.error ?? 'unknown') + '</p>';
+  }
+}
+
+async function mayorAgentUnhook() {
+  const tId = mayorTownId();
+  const rId = el('editAgentRigId').value.trim();
+  const aId = el('editAgentId').value.trim();
+  if (!rId || !aId) { toast('Fill in Rig ID and Agent ID', true); return; }
+  const r = await api('DELETE', '/api/rigs/' + rId + '/agents/' + aId + '/hook');
+  if (r.ok) {
+    el('editAgentResult').innerHTML = '<p class="ok" style="color:#3fb950">Agent unhooked</p>';
+    toast('Agent unhooked');
+    await loadAgents();
+  } else {
+    el('editAgentResult').innerHTML = '<p class="err" style="color:#f85149">Error: ' + esc(r.data?.error ?? 'unknown') + '</p>';
+  }
+}
+
+// ── Mayor: Convoy controls ───────────────────────────────────────────
+
+async function mayorConvoyUpdate() {
+  const tId = mayorTownId();
+  const cId = el('editConvoyId').value.trim();
+  if (!tId || !cId) { toast('Fill in Town ID and Convoy ID', true); return; }
+  const merge_mode = el('editConvoyMergeMode').value;
+  if (!merge_mode) { toast('Select a merge mode to update', true); return; }
+  const r = await mayorApi('PATCH', '/api/mayor/' + tId + '/tools/convoys/' + cId, { merge_mode });
+  if (r.ok) {
+    el('editConvoyResult').innerHTML = '<p class="ok" style="color:#3fb950">Convoy updated</p>';
+    toast('Convoy updated');
+  } else {
+    el('editConvoyResult').innerHTML = '<p class="err" style="color:#f85149">Error: ' + esc(r.data?.error ?? 'unknown') + '</p>';
+  }
+}
+
+async function mayorConvoyClose() {
+  const tId = mayorTownId();
+  const cId = el('editConvoyId').value.trim();
+  if (!tId || !cId) { toast('Fill in Town ID and Convoy ID', true); return; }
+  if (!confirm('Force-close convoy ' + cId + ' and all its open beads?')) return;
+  const r = await mayorApi('POST', '/api/mayor/' + tId + '/tools/convoys/' + cId + '/close', {});
+  if (r.ok) {
+    el('editConvoyResult').innerHTML = '<p class="ok" style="color:#3fb950">Convoy force-closed</p>';
+    toast('Convoy closed');
+    await loadBeads();
+  } else {
+    el('editConvoyResult').innerHTML = '<p class="err" style="color:#f85149">Error: ' + esc(r.data?.error ?? 'unknown') + '</p>';
+  }
+}
 
 function toast(msg, isErr) {
   const t = el('toast');

@@ -19,6 +19,7 @@ export const BeadEventType = z.enum([
   'pr_creation_failed',
   'agent_status',
   'triage_resolved',
+  'fields_updated',
 ]);
 
 export type BeadEventType = z.infer<typeof BeadEventType>;

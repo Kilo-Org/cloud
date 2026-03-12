@@ -91,6 +91,7 @@ function makeFakeMayorClient(overrides: Partial<MayorGastownClient> = {}): Mayor
     listBeads: vi.fn<() => Promise<Bead[]>>().mockResolvedValue([]),
     listAgents: vi.fn<() => Promise<Agent[]>>().mockResolvedValue([]),
     sendMail: vi.fn().mockResolvedValue(undefined),
+    nudge: vi.fn<() => Promise<{ nudge_id: string }>>().mockResolvedValue({ nudge_id: 'nudge-1' }),
     slingBatch: vi.fn<() => Promise<SlingBatchResult>>().mockResolvedValue({
       convoy: FAKE_CONVOY,
       beads: [
@@ -407,6 +408,36 @@ describe('mayor tools', () => {
       expect(result).toContain('Convoy started');
       expect(result).toContain('2 bead(s)');
       expect(client.startConvoy).toHaveBeenCalledWith('convoy-staged-1');
+    });
+  });
+
+  describe('gt_nudge', () => {
+    it('sends a nudge and returns the nudge_id', async () => {
+      const result = await tools.gt_nudge.execute(
+        { rig_id: 'rig-1', target_agent_id: 'agent-1', message: 'Wake up!' },
+        CTX
+      );
+      expect(result).toContain('nudge-1');
+      expect(result).toContain('wait-idle');
+      expect(client.nudge).toHaveBeenCalledWith({
+        rig_id: 'rig-1',
+        target_agent_id: 'agent-1',
+        message: 'Wake up!',
+        mode: 'wait-idle',
+      });
+    });
+
+    it('passes explicit mode through to the client', async () => {
+      await tools.gt_nudge.execute(
+        { rig_id: 'rig-1', target_agent_id: 'agent-2', message: 'Urgent!', mode: 'immediate' },
+        CTX
+      );
+      expect(client.nudge).toHaveBeenCalledWith({
+        rig_id: 'rig-1',
+        target_agent_id: 'agent-2',
+        message: 'Urgent!',
+        mode: 'immediate',
+      });
     });
   });
 });

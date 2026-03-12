@@ -11,10 +11,10 @@
 import { z } from 'zod';
 import { beads, BeadRecord as BeadRecordSchema } from '../../db/tables/beads.table';
 import { agent_metadata, AgentMetadataRecord } from '../../db/tables/agent-metadata.table';
+import { agent_nudges } from '../../db/tables/agent-nudges.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
 import { query } from '../../util/query.util';
-import { sendMail } from './mail';
 import { deleteAgent, getOrCreateAgent, hookBead, unhookBead } from './agents';
 import { createBead, updateBeadStatus } from './beads';
 
@@ -163,12 +163,15 @@ export function createTriageRequest(
 
 /**
  * Tiered GUPP violation handling:
- * - 30 min: send GUPP_CHECK mail (existing behavior)
- * - 1h: escalate to mayor
+ * - 30 min: nudge agent with GUPP_CHECK warning
+ * - 1h: nudge agent with GUPP_ESCALATION, create triage request
  * - 2h: force-stop agent, create triage request for dirty polecat
  *
  * Returns agent IDs that were force-stopped (caller should stop them
  * in the container).
+ *
+ * The `queueNudge` callback sends a time-sensitive message to the agent.
+ * It is fire-and-forget (returns a Promise that the caller ignores).
  */
 export function detectGUPPViolations(
   sql: SqlStorage,
@@ -176,7 +179,12 @@ export function detectGUPPViolations(
     bead_id: string;
     current_hook_bead_id: string | null;
     last_activity_at: string | null;
-  }>
+  }>,
+  queueNudge: (
+    agentId: string,
+    message: string,
+    opts: { mode: 'immediate'; source: string; priority: 'urgent' }
+  ) => Promise<string>
 ): string[] {
   const nowMs = Date.now();
   const forceStopIds: string[] = [];
@@ -219,29 +227,28 @@ export function detectGUPPViolations(
     } else if (staleMs >= GUPP_ESCALATE_MS) {
       // Tier 2: create a triage request for the stuck agent. The triage
       // agent (or mayor, if escalated) will decide whether to restart,
-      // nudge, or force-stop. Also warn the stuck agent directly.
+      // nudge, or force-stop. Also nudge the stuck agent directly.
       const existingEsc = [
         ...query(
           sql,
           /* sql */ `
-            SELECT ${beads.bead_id} FROM ${beads}
-            WHERE ${beads.type} = 'message'
-              AND ${beads.assignee_agent_bead_id} = ?
-              AND ${beads.title} = 'GUPP_ESCALATION'
-              AND ${beads.status} = 'open'
+            SELECT ${agent_nudges.nudge_id} FROM ${agent_nudges}
+            WHERE ${agent_nudges.agent_bead_id} = ?
+              AND ${agent_nudges.source} = 'witness'
+              AND ${agent_nudges.message} LIKE '%GUPP_ESCALATION%'
+              AND ${agent_nudges.delivered_at} IS NULL
             LIMIT 1
           `,
           [agent.bead_id]
         ),
       ];
       if (existingEsc.length === 0) {
-        // Notify the stuck agent
-        sendMail(sql, {
-          from_agent_id: 'patrol',
-          to_agent_id: agent.bead_id,
-          subject: 'GUPP_ESCALATION',
-          body: `You have been inactive for ${Math.round(staleMs / 60_000)} minutes. This has been escalated. You will be force-stopped if inactivity continues.`,
-        });
+        // Nudge the stuck agent — time-sensitive, deliver immediately
+        queueNudge(
+          agent.bead_id,
+          `GUPP_ESCALATION: You have been inactive for ${Math.round(staleMs / 60_000)} minutes. This has been escalated. You will be force-stopped if inactivity continues.`,
+          { mode: 'immediate', source: 'witness', priority: 'urgent' }
+        ).catch(() => {});
 
         // Create a triage request so the triage agent (or mayor) is aware
         createTriageRequest(sql, {
@@ -260,28 +267,28 @@ export function detectGUPPViolations(
         console.log(`${LOG} GUPP escalation: agent=${agent.bead_id}`);
       }
     } else if (staleMs >= GUPP_WARN_MS) {
-      // Tier 1: send warning mail (existing behavior, idempotent)
+      // Tier 1: nudge agent with GUPP_CHECK warning (idempotent)
       const existingGupp = [
         ...query(
           sql,
           /* sql */ `
-            SELECT ${beads.bead_id} FROM ${beads}
-            WHERE ${beads.type} = 'message'
-              AND ${beads.assignee_agent_bead_id} = ?
-              AND ${beads.title} = 'GUPP_CHECK'
-              AND ${beads.status} = 'open'
+            SELECT ${agent_nudges.nudge_id} FROM ${agent_nudges}
+            WHERE ${agent_nudges.agent_bead_id} = ?
+              AND ${agent_nudges.source} = 'witness'
+              AND ${agent_nudges.message} LIKE '%GUPP_CHECK%'
+              AND ${agent_nudges.delivered_at} IS NULL
             LIMIT 1
           `,
           [agent.bead_id]
         ),
       ];
       if (existingGupp.length === 0) {
-        sendMail(sql, {
-          from_agent_id: 'patrol',
-          to_agent_id: agent.bead_id,
-          subject: 'GUPP_CHECK',
-          body: 'You have had work hooked for 30+ minutes with no activity. Are you stuck? If so, call gt_escalate.',
-        });
+        queueNudge(
+          agent.bead_id,
+          'GUPP_CHECK: You have had work hooked for 30+ minutes with no activity. Are you stuck? If so, call gt_escalate.',
+          { mode: 'immediate', source: 'witness', priority: 'urgent' }
+        ).catch(() => {});
+        console.log(`${LOG} GUPP warn: agent=${agent.bead_id} stale=${Math.round(staleMs / 60_000)}min`);
       }
     }
   }

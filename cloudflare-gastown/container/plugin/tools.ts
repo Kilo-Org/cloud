@@ -217,7 +217,7 @@ export function createTools(client: GastownClient) {
         'Emit a plain-language status update visible on the dashboard. ' +
         'Call this when starting a new phase of work (e.g. "Installing dependencies", ' +
         '"Writing tests", "Fixing lint errors"). Write it as a brief sentence for a teammate, ' +
-        'not a log line. Do NOT call this on every tool use â only at meaningful phase transitions.',
+        'not a log line. Do NOT call this on every tool use â only at meaningful phase transitions.',
       args: {
         message: tool.schema
           .string()
@@ -226,6 +226,33 @@ export function createTools(client: GastownClient) {
       async execute(args) {
         await client.updateAgentStatusMessage(args.message);
         return 'Status updated.';
+      },
+    }),
+
+    gt_nudge: tool({
+      description:
+        'Send a real-time nudge to another agent. Unlike gt_mail_send (which queues a formal ' +
+        "persistent message), gt_nudge delivers immediately at the agent's next idle moment. " +
+        'Use this for time-sensitive coordination: wake up an agent, request a status check, ' +
+        'or notify of a blocking issue.',
+      args: {
+        target_agent_id: tool.schema.string().describe('UUID of the agent to nudge'),
+        message: tool.schema.string().describe('The message to deliver'),
+        mode: tool.schema
+          .enum(['wait-idle', 'immediate', 'queue'])
+          .describe(
+            'Delivery mode: wait-idle (default) delivers at next idle moment; ' +
+              'immediate injects mid-task; queue delivers with TTL'
+          )
+          .optional(),
+      },
+      async execute(args) {
+        const result = await client.nudge({
+          target_agent_id: args.target_agent_id,
+          message: args.message,
+          mode: args.mode ?? 'wait-idle',
+        });
+        return `Nudge queued: ${result.nudge_id} (mode: ${args.mode ?? 'wait-idle'})`;
       },
     }),
   };

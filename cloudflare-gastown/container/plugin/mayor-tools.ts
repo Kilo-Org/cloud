@@ -446,5 +446,34 @@ export function createMayorTools(client: MayorGastownClient) {
         return `UI action "${action.type}" broadcast to dashboard.`;
       },
     }),
+
+    gt_nudge: tool({
+      description:
+        'Send a real-time nudge to a polecat agent in any rig. Unlike gt_mail_send (which queues ' +
+        'a formal persistent message), gt_nudge delivers immediately at the agent\'s next idle moment. ' +
+        'Use this for time-sensitive coordination: wake up an agent, request a status check, ' +
+        'or notify of a blocking issue.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the target agent belongs to'),
+        target_agent_id: tool.schema.string().describe('UUID of the agent to nudge'),
+        message: tool.schema.string().describe('The message to deliver'),
+        mode: tool.schema
+          .enum(['wait-idle', 'immediate', 'queue'])
+          .describe(
+            'Delivery mode: wait-idle (default) delivers at next idle moment; ' +
+              'immediate injects mid-task; queue delivers with TTL'
+          )
+          .optional(),
+      },
+      async execute(args) {
+        const result = await client.nudge({
+          rig_id: args.rig_id,
+          target_agent_id: args.target_agent_id,
+          message: args.message,
+          mode: args.mode ?? 'wait-idle',
+        });
+        return `Nudge queued: ${result.nudge_id} (mode: ${args.mode ?? 'wait-idle'})`;
+      },
+    }),
   };
 }

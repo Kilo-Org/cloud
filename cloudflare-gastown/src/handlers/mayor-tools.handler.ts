@@ -337,6 +337,30 @@ export async function handleMayorListConvoys(c: Context<GastownEnv>, params: { t
 }
 
 /**
+ * GET /api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/pending-nudges
+ * Returns undelivered, non-expired nudges for the given agent.
+ * Allows the mayor to inspect an agent's nudge queue and decide whether to intervene.
+ */
+export async function handleMayorGetPendingNudges(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string; agentId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorGetPendingNudges: townId=${params.townId} rigId=${params.rigId} agentId=${params.agentId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const nudges = await town.getPendingNudges(params.agentId);
+
+  return c.json(resSuccess(nudges));
+}
+
+/**
  * GET /api/mayor/:townId/tools/convoys/:convoyId
  * Detailed convoy status with per-bead breakdown.
  */

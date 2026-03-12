@@ -42,6 +42,9 @@ import {
   handleGetOrCreateAgent,
   handleDeleteAgent,
   handleUpdateAgentStatusMessage,
+  handleGetPendingNudges,
+  handleNudgeDelivered,
+  handleNudge,
 } from './handlers/rig-agents.handler';
 import { handleSendMail } from './handlers/rig-mail.handler';
 import { handleAppendAgentEvent, handleGetAgentEvents } from './handlers/rig-agent-events.handler';
@@ -110,6 +113,7 @@ import {
   handleMayorEscalationAcknowledge,
   handleMayorConvoyStart,
   handleMayorUiAction,
+  handleMayorGetPendingNudges,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
@@ -325,6 +329,15 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/status', c =>
     handleUpdateAgentStatusMessage(c, c.req.param())
   )
 );
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/pending-nudges', c =>
+  handleGetPendingNudges(c, c.req.param())
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/nudge-delivered', c =>
+  handleNudgeDelivered(c, c.req.param())
+);
+
+// Agent-to-agent nudge: any authenticated agent can nudge another agent in the rig
+app.post('/api/towns/:townId/rigs/:rigId/nudge', c => handleNudge(c, c.req.param()));
 
 // ── Agent Events ─────────────────────────────────────────────────────────
 
@@ -657,6 +670,9 @@ app.post('/api/mayor/:townId/tools/ui-action', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/ui-action', () =>
     handleMayorUiAction(c, c.req.param())
   )
+);
+app.get('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/pending-nudges', c =>
+  handleMayorGetPendingNudges(c, c.req.param())
 );
 
 app.post('/api/mayor/:townId/tools/sling', c =>

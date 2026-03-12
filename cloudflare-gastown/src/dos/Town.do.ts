@@ -41,6 +41,12 @@ import { review_metadata } from '../db/tables/review-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
+import {
+  agent_nudges,
+  AgentNudgeRecord,
+  createTableAgentNudges,
+  getIndexesAgentNudges,
+} from '../db/tables/agent-nudges.table';
 import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
@@ -430,6 +436,12 @@ export class TownDO extends DurableObject<Env> {
 
     // Rig registry
     rigs.initRigTables(this.sql);
+
+    // Nudges
+    query(this.sql, createTableAgentNudges(), []);
+    for (const idx of getIndexesAgentNudges()) {
+      query(this.sql, idx, []);
+    }
 
     // Ensure the alarm loop is running. After a deploy/restart, the
     // Cloudflare runtime normally delivers missed alarms, but if the alarm
@@ -1044,6 +1056,164 @@ export class TownDO extends DurableObject<Env> {
   }
 
   // ══════════════════════════════════════════════════════════════════
+  // Nudges
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * Queue a nudge for an agent. If mode is 'immediate', attempts to push
+   * the message directly via the container and marks it delivered on success.
+   * Returns the nudge_id.
+   */
+  async queueNudge(
+    agentId: string,
+    message: string,
+    options?: {
+      mode?: 'wait-idle' | 'immediate' | 'queue';
+      priority?: 'normal' | 'urgent';
+      source?: string;
+      ttlSeconds?: number;
+    }
+  ): Promise<string> {
+    await this.ensureInitialized();
+
+    const nudgeId = crypto.randomUUID();
+    const mode = options?.mode ?? 'wait-idle';
+    const priority = options?.priority ?? 'normal';
+    const source = options?.source ?? 'system';
+
+    let expiresAt: string | null = null;
+    if (mode === 'queue' && options?.ttlSeconds != null) {
+      expiresAt = new Date(Date.now() + options.ttlSeconds * 1000).toISOString();
+    }
+
+    query(
+      this.sql,
+      /* sql */ `
+        INSERT INTO ${agent_nudges} (
+          ${agent_nudges.columns.nudge_id},
+          ${agent_nudges.columns.agent_bead_id},
+          ${agent_nudges.columns.message},
+          ${agent_nudges.columns.mode},
+          ${agent_nudges.columns.priority},
+          ${agent_nudges.columns.source},
+          ${agent_nudges.columns.expires_at}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [nudgeId, agentId, message, mode, priority, source, expiresAt]
+    );
+
+    console.log(
+      `${TOWN_LOG} queueNudge: nudge_id=${nudgeId} agent=${agentId} mode=${mode} priority=${priority} source=${source}`
+    );
+
+    if (mode === 'immediate') {
+      const sent = await dispatch.sendMessageToAgent(this.env, this.townId, agentId, message);
+      if (sent) {
+        query(
+          this.sql,
+          /* sql */ `
+            UPDATE ${agent_nudges}
+            SET ${agent_nudges.columns.delivered_at} = datetime('now')
+            WHERE ${agent_nudges.nudge_id} = ?
+          `,
+          [nudgeId]
+        );
+        console.log(`${TOWN_LOG} queueNudge: immediate nudge delivered to agent=${agentId}`);
+      } else {
+        console.warn(
+          `${TOWN_LOG} queueNudge: immediate delivery failed for agent=${agentId}, nudge queued for retry`
+        );
+      }
+    }
+
+    return nudgeId;
+  }
+
+  /**
+   * Return undelivered, non-expired nudges for an agent.
+   * Urgent nudges are returned first, then FIFO within same priority.
+   */
+  async getPendingNudges(
+    agentId: string
+  ): Promise<
+    { nudge_id: string; message: string; mode: string; priority: string; source: string }[]
+  > {
+    await this.ensureInitialized();
+
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT
+            ${agent_nudges.nudge_id},
+            ${agent_nudges.message},
+            ${agent_nudges.mode},
+            ${agent_nudges.priority},
+            ${agent_nudges.source}
+          FROM ${agent_nudges}
+          WHERE ${agent_nudges.agent_bead_id} = ?
+            AND ${agent_nudges.delivered_at} IS NULL
+            AND (${agent_nudges.expires_at} IS NULL OR ${agent_nudges.expires_at} > datetime('now'))
+          ORDER BY
+            CASE ${agent_nudges.priority} WHEN 'urgent' THEN 0 ELSE 1 END ASC,
+            ${agent_nudges.created_at} ASC
+        `,
+        [agentId]
+      ),
+    ];
+
+    return AgentNudgeRecord.pick({
+      nudge_id: true,
+      message: true,
+      mode: true,
+      priority: true,
+      source: true,
+    })
+      .array()
+      .parse(rows);
+  }
+
+  /** Mark a nudge as delivered. */
+  async markNudgeDelivered(nudgeId: string): Promise<void> {
+    await this.ensureInitialized();
+
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agent_nudges}
+        SET ${agent_nudges.columns.delivered_at} = datetime('now')
+        WHERE ${agent_nudges.nudge_id} = ?
+      `,
+      [nudgeId]
+    );
+  }
+
+  /**
+   * Expire nudges whose expires_at has passed.
+   * Called from the alarm loop. Returns the count of nudges expired.
+   */
+  async expireStaleNudges(): Promise<number> {
+    await this.ensureInitialized();
+
+    const result = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${agent_nudges}
+          SET ${agent_nudges.columns.delivered_at} = datetime('now')
+          WHERE ${agent_nudges.expires_at} IS NOT NULL
+            AND ${agent_nudges.expires_at} < datetime('now')
+            AND ${agent_nudges.delivered_at} IS NULL
+          RETURNING ${agent_nudges.nudge_id}
+        `,
+        []
+      ),
+    ];
+
+    return result.length;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
   // Review Queue & Molecules
   // ══════════════════════════════════════════════════════════════════
 
@@ -1289,16 +1459,16 @@ export class TownDO extends DurableObject<Env> {
           break;
         }
         case 'NUDGE': {
-          // Send a nudge message to the stuck agent
-          if (targetAgent) {
-            mail.sendMail(this.sql, {
-              from_agent_id: 'patrol',
-              to_agent_id: targetAgentId,
-              subject: 'TRIAGE_NUDGE',
-              body:
-                input.resolution_notes ||
+          // Nudge the stuck agent — time-sensitive, deliver immediately
+          if (targetAgent && targetAgentId) {
+            this.queueNudge(
+              targetAgentId,
+              input.resolution_notes ||
                 'The triage system has flagged you as potentially stuck. Please report your status.',
-            });
+              { mode: 'immediate', source: 'triage', priority: 'urgent' }
+            ).catch(err =>
+              console.warn(`${TOWN_LOG} resolveTriage: nudge failed for agent=${targetAgentId}:`, err)
+            );
             this.emitEvent({
               event: 'nudge.queued',
               townId: this.townId,
@@ -2673,6 +2843,11 @@ export class TownDO extends DurableObject<Env> {
       console.warn(`${TOWN_LOG} alarm: deliverPendingMail failed`, err);
     }
     try {
+      await this.expireStaleNudges();
+    } catch (err) {
+      console.warn(`${TOWN_LOG} alarm: expireStaleNudges failed`, err);
+    }
+    try {
       await this.reEscalateStaleEscalations();
     } catch (err) {
       console.warn(`${TOWN_LOG} alarm: reEscalation failed`, err);
@@ -3088,7 +3263,11 @@ export class TownDO extends DurableObject<Env> {
       ),
     ]);
 
-    const forceStopIds = patrol.detectGUPPViolations(this.sql, currentWorking);
+    const forceStopIds = patrol.detectGUPPViolations(
+      this.sql,
+      currentWorking,
+      (agentId, message, opts) => this.queueNudge(agentId, message, opts)
+    );
 
     // Force-stop agents in the container (best-effort)
     for (const agentId of forceStopIds) {

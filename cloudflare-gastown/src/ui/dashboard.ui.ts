@@ -71,6 +71,12 @@ export function dashboardHtml(): string {
   .chip.active { background: #1f6feb33; border-color: #58a6ff; color: #58a6ff; }
   .chip .remove { margin-left: 4px; color: #484f58; font-size: 10px; }
   .chip .remove:hover { color: #f85149; }
+  .badge.nudge-count { background: #d29922aa; color: #e3b341; cursor: pointer; }
+  .badge.nudge-count:hover { background: #e3b34133; }
+  .nudge-list { margin-top: 6px; font-size: 11px; }
+  .nudge-item { border: 1px solid #21262d; border-radius: 4px; padding: 6px 8px; margin-bottom: 4px; }
+  .nudge-item .nudge-meta { color: #484f58; font-size: 10px; margin-bottom: 2px; }
+  .nudge-item .nudge-msg { color: #c9d1d9; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -125,6 +131,30 @@ export function dashboardHtml(): string {
       <button onclick="checkMail()">Check Mail</button>
     </div>
     <div id="mailResult"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Nudges</h2>
+    <div class="row">
+      <label>From</label>
+      <select id="nudgeFrom"></select>
+      <span style="color:#484f58">→</span>
+      <select id="nudgeTo"></select>
+    </div>
+    <div class="row">
+      <input type="text" id="nudgeMessage" placeholder="message" style="flex:1;min-width:200px" />
+      <select id="nudgeMode">
+        <option value="wait-idle">wait-idle</option>
+        <option value="immediate">immediate</option>
+        <option value="queue">queue</option>
+      </select>
+      <button class="primary" onclick="sendNudge()">Nudge</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <select id="nudgeCheckAgent"></select>
+      <button onclick="checkPendingNudges()">Check Pending</button>
+    </div>
+    <div id="nudgeResult"></div>
   </div>
 
   <div class="panel">
@@ -719,7 +749,7 @@ function renderAgents() {
 }
 
 function populateAgentSelects() {
-  const ids = ['mailFrom','mailTo','mailCheckAgent','actionAgent','rqAgent'];
+  const ids = ['mailFrom','mailTo','mailCheckAgent','actionAgent','rqAgent','nudgeFrom','nudgeTo','nudgeCheckAgent'];
   for (const id of ids) {
     const sel = el(id);
     const prev = sel.value;
@@ -933,6 +963,63 @@ async function createEscalation() {
   if (!title) { toast('Escalation title required', true); return; }
   const r = await api('POST', '/api/rigs/' + rigId() + '/escalations', { title, body: body || title });
   if (r.ok) { el('escTitle').value = ''; el('escBody').value = ''; await loadBeads(); toast('Escalation created'); }
+}
+
+// ── Nudges ──────────────────────────────────────────────────────────
+
+async function sendNudge() {
+  if (!rigId()) { toast('Set a Rig ID first', true); return; }
+  const from = el('nudgeFrom').value;
+  const to = el('nudgeTo').value;
+  const message = el('nudgeMessage').value.trim();
+  const mode = el('nudgeMode').value;
+  if (!to || !message) { toast('Select target agent and enter message', true); return; }
+  const r = await api('POST', '/api/towns/' + townId() + '/rigs/' + rigId() + '/nudge', {
+    source_agent_id: from,
+    target_agent_id: to,
+    message,
+    mode,
+  });
+  if (r.ok) {
+    el('nudgeMessage').value = '';
+    toast('Nudge sent: ' + (r.data.data?.nudge_id ?? ''));
+  }
+}
+
+async function checkPendingNudges() {
+  if (!rigId()) { toast('Set a Rig ID first', true); return; }
+  const agentId = el('nudgeCheckAgent').value;
+  if (!agentId) { toast('Select an agent', true); return; }
+  const r = await api('GET', '/api/towns/' + townId() + '/rigs/' + rigId() + '/agents/' + agentId + '/pending-nudges');
+  if (!r.ok) return;
+  const nudges = r.data.data || [];
+  if (!nudges.length) {
+    el('nudgeResult').innerHTML = '<p class="empty">No pending nudges</p>';
+    return;
+  }
+  let h = '<div class="nudge-list">';
+  for (const n of nudges) {
+    const preview = n.message.length > 80 ? n.message.slice(0, 80) + '…' : n.message;
+    h += '<div class="nudge-item">'
+      + '<div class="nudge-meta">source: ' + esc(n.source) + ' | mode: ' + esc(n.mode) + ' | priority: ' + esc(n.priority) + ' | ' + esc(n.created_at ?? '') + '</div>'
+      + '<div class="nudge-msg">' + esc(preview) + '</div>'
+      + '<div style="margin-top:4px">'
+      + '<button class="primary" style="font-size:11px;padding:2px 8px" onclick="deliverNudgeNow(\\'' + agentId + '\\', ' + JSON.stringify(n.message).replace(/</g, '\\\\u003c') + ')">Deliver Now</button>'
+      + '</div>'
+      + '</div>';
+  }
+  h += '</div>';
+  el('nudgeResult').innerHTML = h;
+}
+
+async function deliverNudgeNow(agentId, message) {
+  if (!rigId()) { toast('Set a Rig ID first', true); return; }
+  const r = await api('POST', '/api/towns/' + townId() + '/rigs/' + rigId() + '/nudge', {
+    target_agent_id: agentId,
+    message: message,
+    mode: 'immediate',
+  });
+  if (r.ok) toast('Nudge delivered: ' + (r.data.data?.nudge_id ?? ''));
 }
 
 // ── Town Container ──────────────────────────────────────────────────

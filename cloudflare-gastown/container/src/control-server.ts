@@ -392,6 +392,80 @@ app.post('/git/merge', async c => {
   return c.json(result, 202);
 });
 
+// GET /agents/:agentId/pending-nudges
+// Proxies to the gastown worker to fetch undelivered nudges for an agent.
+// Called by the process-manager when the agent goes idle.
+app.get('/agents/:agentId/pending-nudges', async c => {
+  const { agentId } = c.req.param();
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const rigId = process.env.GASTOWN_RIG_ID;
+
+  if (!apiUrl || !token || !townId || !rigId) {
+    return c.json({ error: 'Missing gastown configuration' }, 503);
+  }
+
+  try {
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/pending-nudges`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Gastown-Agent-Id': agentId,
+          'X-Gastown-Rig-Id': rigId,
+        },
+      }
+    );
+    const body: unknown = await resp.json();
+    return c.json(body, resp.status as 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: message }, 500);
+  }
+});
+
+// POST /agents/:agentId/nudge-delivered
+// Marks a nudge as delivered via the gastown worker.
+// Body: { nudge_id: string }
+app.post('/agents/:agentId/nudge-delivered', async c => {
+  const { agentId } = c.req.param();
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const rigId = process.env.GASTOWN_RIG_ID;
+
+  if (!apiUrl || !token || !townId || !rigId) {
+    return c.json({ error: 'Missing gastown configuration' }, 503);
+  }
+
+  const body: unknown = await c.req.json().catch(() => null);
+  if (!body || typeof body !== 'object' || !('nudge_id' in body) || typeof body.nudge_id !== 'string') {
+    return c.json({ error: 'Missing or invalid nudge_id field' }, 400);
+  }
+
+  try {
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/nudge-delivered`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'X-Gastown-Agent-Id': agentId,
+          'X-Gastown-Rig-Id': rigId,
+        },
+        body: JSON.stringify({ nudge_id: body.nudge_id }),
+      }
+    );
+    const respBody: unknown = await resp.json();
+    return c.json(respBody, resp.status as 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: message }, 500);
+  }
+});
+
 // ── PTY proxy routes ──────────────────────────────────────────────────
 // Proxy PTY operations to the agent's internal SDK server.
 // The SDK server (kilo serve) exposes /pty/* routes on 127.0.0.1:<port>.

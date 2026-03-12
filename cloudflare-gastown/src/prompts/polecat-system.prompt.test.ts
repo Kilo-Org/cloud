@@ -7,6 +7,7 @@ describe('buildPolecatSystemPrompt', () => {
     rigId: 'rig-123',
     townId: 'town-abc',
     identity: 'polecat-alpha',
+    gates: [],
   };
 
   it('should include agent name and identity', () => {
@@ -49,5 +50,22 @@ describe('buildPolecatSystemPrompt', () => {
     const prompt = buildPolecatSystemPrompt(params);
     expect(prompt).toContain('gt_escalate');
     expect(prompt).toContain('stuck');
+  });
+
+  it('should include Pre-Submission Gates section when gates are provided', () => {
+    const prompt = buildPolecatSystemPrompt({
+      ...params,
+      gates: ['pnpm test', 'pnpm lint', 'pnpm build'],
+    });
+    expect(prompt).toContain('## Pre-Submission Gates');
+    expect(prompt).toContain('1. `pnpm test`');
+    expect(prompt).toContain('2. `pnpm lint`');
+    expect(prompt).toContain('3. `pnpm build`');
+    expect(prompt).toContain('Do NOT call gt_done until all gates pass');
+  });
+
+  it('should not include Pre-Submission Gates section when gates is empty', () => {
+    const prompt = buildPolecatSystemPrompt({ ...params, gates: [] });
+    expect(prompt).not.toContain('## Pre-Submission Gates');
   });
 });

@@ -150,6 +150,7 @@ export function systemPromptForRole(params: {
   agentName: string;
   rigId: string;
   townId: string;
+  gates: string[];
 }): string {
   switch (params.role) {
     case 'polecat':
@@ -158,6 +159,7 @@ export function systemPromptForRole(params: {
         rigId: params.rigId,
         townId: params.townId,
         identity: params.identity,
+        gates: params.gates,
       });
     case 'mayor':
       return buildMayorSystemPrompt({
@@ -333,6 +335,7 @@ export async function startAgentInContainer(
             agentName: params.agentName,
             rigId: params.rigId,
             townId: params.townId,
+            gates: params.townConfig.refinery?.gates ?? [],
           }),
         gitUrl: params.gitUrl,
         branch: params.convoyFeatureBranch

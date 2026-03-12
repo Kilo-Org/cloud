@@ -9,7 +9,26 @@ export function buildPolecatSystemPrompt(params: {
   rigId: string;
   townId: string;
   identity: string;
+  gates: string[];
 }): string {
+  const gatesSection =
+    params.gates.length > 0
+      ? `
+## Pre-Submission Gates
+
+Before calling gt_done, run ALL of the following quality gates to validate your work:
+
+${params.gates.map((g, i) => `${i + 1}. \`${g}\``).join('\n')}
+
+If any gate fails:
+- Fix the issue and re-run the failing gate.
+- Repeat until all gates pass.
+- If you cannot fix a gate failure after a few attempts, call gt_escalate with the full failure output, then call gt_done anyway — let the refinery make the final call.
+
+Do NOT call gt_done until all gates pass (or you have escalated a failure you cannot fix).
+`
+      : '';
+
   return `You are ${params.agentName}, a polecat agent in Gastown rig "${params.rigId}" (town "${params.townId}").
 Your identity: ${params.identity}
 
@@ -38,7 +57,7 @@ You have these tools available. Use them to coordinate with the Gastown orchestr
 3. **Commit frequently**: Make small, focused commits. Push often. The container's disk is ephemeral — if it restarts, unpushed work is lost.
 4. **Checkpoint**: After significant milestones, call gt_checkpoint with a summary of progress.
 5. **Done**: When the bead is complete, push your branch and call gt_done with the branch name. The bead transitions to \`in_review\` and the refinery picks it up for merge. If the review fails (rework), you will be re-dispatched with the bead back in \`in_progress\`.
-
+${gatesSection}
 ## Commit & Push Hygiene
 
 - Commit after every meaningful unit of work (new function, passing test, config change).

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createPairingCache } from './pairing-cache';
+import { createPairingCache, OPENCLAW_BIN } from './pairing-cache';
 
 type ExecImpl = (
   command: string,
@@ -162,7 +162,7 @@ describe('createPairingCache', () => {
       const result = await cache.approveChannel('telegram', 'ABC123');
 
       expect(result).toEqual({ success: true, message: 'Pairing approved', statusHint: 200 });
-      expect(execImpl).toHaveBeenCalledWith('openclaw', [
+      expect(execImpl).toHaveBeenCalledWith(OPENCLAW_BIN, [
         'pairing',
         'approve',
         'telegram',
@@ -210,7 +210,7 @@ describe('createPairingCache', () => {
       const result = await cache.approveDevice('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
 
       expect(result).toEqual({ success: true, message: 'Device approved', statusHint: 200 });
-      expect(execImpl).toHaveBeenCalledWith('openclaw', [
+      expect(execImpl).toHaveBeenCalledWith(OPENCLAW_BIN, [
         'devices',
         'approve',
         'a1b2c3d4-e5f6-7890-abcd-ef1234567890',

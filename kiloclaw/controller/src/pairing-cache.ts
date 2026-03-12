@@ -71,6 +71,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const PAIRING_KEYWORDS = ['pairing', 'pair request', 'device request', 'approve', 'paired'];
 
+export const OPENCLAW_BIN = '/usr/local/bin/openclaw';
+
 function defaultExecImpl(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return execFileAsync(command, args, {
     encoding: 'utf8',
@@ -83,10 +85,24 @@ function defaultReadConfigImpl(): unknown {
   return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 }
 
+type ChannelConfig = {
+  enabled?: boolean;
+  botToken?: string;
+  token?: string;
+  appToken?: string;
+};
+
+type OpenClawConfig = {
+  channels?: Record<string, ChannelConfig | undefined>;
+};
+
+function isOpenClawConfig(value: unknown): value is OpenClawConfig {
+  return typeof value === 'object' && value !== null;
+}
+
 function detectChannels(config: unknown): string[] {
-  if (typeof config !== 'object' || config === null) return [];
-  const cfg = config as Record<string, unknown>;
-  const ch = (cfg.channels ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  if (!isOpenClawConfig(config)) return [];
+  const ch = config.channels ?? {};
   const channels: string[] = [];
   if (ch.telegram?.enabled && ch.telegram?.botToken) channels.push('telegram');
   if (ch.discord?.enabled && ch.discord?.token) channels.push('discord');
@@ -126,20 +142,40 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
 
     const results = await Promise.allSettled(
       channels.map(async (channel) => {
-        const { stdout } = await execImpl('openclaw', ['pairing', 'list', channel, '--json']);
-        const data = JSON.parse(stdout.trim()) as { requests?: unknown[] };
-        return ((data.requests ?? []) as Array<Record<string, unknown>>).map(
-          (req) => ({ ...req, channel }) as unknown as ChannelPairingRequest
-        );
+        const { stdout } = await execImpl(OPENCLAW_BIN, ['pairing', 'list', channel, '--json']);
+        const parsed: unknown = JSON.parse(stdout.trim());
+        const data = parsed && typeof parsed === 'object' && 'requests' in parsed
+          ? parsed
+          : { requests: [] };
+        const requests = Array.isArray((data as { requests: unknown }).requests)
+          ? (data as { requests: unknown[] }).requests
+          : [];
+        return requests.map((req): ChannelPairingRequest => {
+          const r = req && typeof req === 'object' ? req : {};
+          return {
+            code: String((r as Record<string, unknown>).code ?? ''),
+            id: String((r as Record<string, unknown>).id ?? ''),
+            channel,
+            ...('meta' in r ? { meta: (r as Record<string, unknown>).meta } : {}),
+            ...('createdAt' in r ? { createdAt: String((r as Record<string, unknown>).createdAt) } : {}),
+          };
+        });
       })
     );
 
     const allRequests: ChannelPairingRequest[] = [];
     let anySuccess = false;
-    for (const result of results) {
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
       if (result.status === 'fulfilled') {
         allRequests.push(...result.value);
         anySuccess = true;
+      } else {
+        const err = result.reason;
+        const msg = err && typeof err === 'object' && 'stderr' in err
+          ? String(err.stderr).trim()
+          : String(err);
+        console.error(`[pairing-cache] ${channels[i]}: ${msg}`);
       }
     }
 
@@ -150,23 +186,24 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
 
   const refreshDevicePairing = async (): Promise<void> => {
     try {
-      const { stdout } = await execImpl('openclaw', ['devices', 'list', '--json']);
-      const data = JSON.parse(stdout.trim()) as { pending?: unknown[] };
-      const pending = Array.isArray(data.pending) ? data.pending : [];
+      const { stdout } = await execImpl(OPENCLAW_BIN, ['devices', 'list', '--json']);
+      const parsed: unknown = JSON.parse(stdout.trim());
+      const data = parsed && typeof parsed === 'object' ? parsed : {};
+      const pending = 'pending' in data && Array.isArray((data as { pending: unknown }).pending)
+        ? (data as { pending: unknown[] }).pending
+        : [];
 
-      const requests: DevicePairingRequest[] = pending.map(
-        (req: unknown) => {
-          const r = req as Record<string, unknown>;
-          return {
-            requestId: r.requestId as string,
-            deviceId: r.deviceId as string,
-            role: r.role as string | undefined,
-            platform: r.platform as string | undefined,
-            clientId: r.clientId as string | undefined,
-            ts: r.ts as number | undefined,
-          };
-        }
-      );
+      const requests: DevicePairingRequest[] = pending.map((req: unknown) => {
+        const r = req && typeof req === 'object' ? (req as Record<string, unknown>) : {};
+        return {
+          requestId: String(r.requestId ?? ''),
+          deviceId: String(r.deviceId ?? ''),
+          ...(r.role !== undefined ? { role: String(r.role) } : {}),
+          ...(r.platform !== undefined ? { platform: String(r.platform) } : {}),
+          ...(r.clientId !== undefined ? { clientId: String(r.clientId) } : {}),
+          ...(typeof r.ts === 'number' ? { ts: r.ts } : {}),
+        };
+      });
 
       deviceCache = { requests, lastUpdated: nowImpl() };
     } catch {
@@ -187,7 +224,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
     }
 
     try {
-      await execImpl('openclaw', ['pairing', 'approve', channel, code, '--notify']);
+      await execImpl(OPENCLAW_BIN, ['pairing', 'approve', channel, code, '--notify']);
       await refreshChannelPairing();
       return { success: true, message: 'Pairing approved', statusHint: 200 };
     } catch (err) {
@@ -202,7 +239,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
     }
 
     try {
-      await execImpl('openclaw', ['devices', 'approve', requestId]);
+      await execImpl(OPENCLAW_BIN, ['devices', 'approve', requestId]);
       await refreshDevicePairing();
       return { success: true, message: 'Device approved', statusHint: 200 };
     } catch (err) {

@@ -688,6 +688,14 @@ export const gastownRouter = router({
         limit: input.limit,
       });
     }),
+
+  adminGetBead: adminProcedure
+    .input(z.object({ townId: z.string().uuid(), beadId: z.string().uuid() }))
+    .output(RpcBeadOutput.nullable())
+    .query(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.getBeadAsync(input.beadId);
+    }),
 });
 
 export type GastownRouter = typeof gastownRouter;

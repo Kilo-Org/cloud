@@ -7,6 +7,7 @@
 import * as React from 'react';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogFooter,
@@ -41,7 +42,9 @@ type AlertDialogCancelProps = React.ComponentPropsWithoutRef<typeof Button>;
 
 const AlertDialogCancel = React.forwardRef<HTMLButtonElement, AlertDialogCancelProps>(
   ({ className, ...props }, ref) => (
-    <Button ref={ref} variant="outline" className={cn('mt-2 sm:mt-0', className)} {...props} />
+    <DialogClose asChild>
+      <Button ref={ref} variant="outline" className={cn('mt-2 sm:mt-0', className)} {...props} />
+    </DialogClose>
   )
 );
 AlertDialogCancel.displayName = 'AlertDialogCancel';

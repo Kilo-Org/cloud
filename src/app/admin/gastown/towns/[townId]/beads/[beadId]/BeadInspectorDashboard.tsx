@@ -41,10 +41,13 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
   const queryClient = useQueryClient();
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
-  // Fetch all beads — used both for finding this bead and computing dependency graph.
+  // Fetch the specific bead by ID (not limited by pagination).
+  const beadQuery = useQuery(trpc.admin.gastown.getBead.queryOptions({ townId, beadId }));
+  const bead = beadQuery.data ?? null;
+
+  // Fetch all beads for computing the dependency graph.
   const allBeadsQuery = useQuery(trpc.admin.gastown.listBeads.queryOptions({ townId }));
   const allBeads = allBeadsQuery.data ?? [];
-  const bead = allBeads.find(b => b.bead_id === beadId) ?? null;
 
   const eventsQuery = useQuery(
     trpc.admin.gastown.getBeadEvents.queryOptions({ townId, beadId, limit: 500 })
@@ -55,6 +58,7 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
   );
 
   const invalidateAll = () => {
+    void queryClient.invalidateQueries(trpc.admin.gastown.getBead.queryFilter({ townId, beadId }));
     void queryClient.invalidateQueries(trpc.admin.gastown.listBeads.queryFilter({ townId }));
     void queryClient.invalidateQueries(trpc.admin.gastown.getBeadEvents.queryFilter({ townId }));
   };
@@ -114,7 +118,7 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
     forceFailMutation.isPending ||
     forceResetAgentMutation.isPending;
 
-  // Filter events to only those for this bead (server doesn't filter by beadId yet)
+  // Filter events to only those for this bead
   const events = (eventsQuery.data ?? []).filter(e => e.bead_id === beadId);
   const dispatchAttempts = dispatchAttemptsQuery.data ?? [];
 
@@ -165,12 +169,12 @@ export function BeadInspectorDashboard({ townId, beadId }: { townId: string; bea
         )}
       </div>
 
-      {allBeadsQuery.isLoading && (
+      {beadQuery.isLoading && (
         <p className="text-muted-foreground py-8 text-center text-sm">Loading bead…</p>
       )}
-      {allBeadsQuery.isError && (
+      {beadQuery.isError && (
         <p className="py-8 text-center text-sm text-red-400">
-          Failed to load bead: {allBeadsQuery.error.message}
+          Failed to load bead: {beadQuery.error.message}
         </p>
       )}
 

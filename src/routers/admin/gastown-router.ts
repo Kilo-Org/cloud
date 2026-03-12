@@ -434,9 +434,20 @@ export const adminGastownRouter = createTRPCRouter({
       return result ?? [];
     }),
 
+  getBead: adminProcedure
+    .input(z.object({ townId: z.string().uuid(), beadId: z.string().uuid() }))
+    .output(BeadRecord.nullable())
+    .query(async ({ input, ctx }) => {
+      return gastownTrpcGet(
+        ctx.user,
+        'gastown.adminGetBead',
+        { townId: input.townId, beadId: input.beadId },
+        BeadRecord
+      );
+    }),
+
   /**
    * Get bead events for a town or specific bead.
-   * Calls tRPC gastown.getTownEvents (requires town ownership).
    */
   getBeadEvents: adminProcedure
     .input(

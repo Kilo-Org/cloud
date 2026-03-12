@@ -62,3 +62,39 @@ export const OpenclawConfigResponseSchema = z.object({
   config: z.record(z.string(), z.unknown()),
   etag: z.string(),
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// Controller pairing responses
+// ──────────────────────────────────────────────────────────────────────
+
+export const ControllerChannelPairingResponseSchema = z.object({
+  requests: z.array(
+    z.object({
+      code: z.string(),
+      id: z.string(),
+      channel: z.string(),
+      meta: z.unknown().optional(),
+      createdAt: z.string().optional(),
+    })
+  ),
+  lastUpdated: z.string(),
+});
+
+export const ControllerDevicePairingResponseSchema = z.object({
+  requests: z.array(
+    z.object({
+      requestId: z.string(),
+      deviceId: z.string(),
+      role: z.string().optional(),
+      platform: z.string().optional(),
+      clientId: z.string().optional(),
+      ts: z.number().optional(),
+    })
+  ),
+  lastUpdated: z.string(),
+});
+
+export const ControllerPairingApproveResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+});

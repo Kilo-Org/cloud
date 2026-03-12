@@ -430,8 +430,9 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
   let request = originalRequest;
   let workdir: string;
 
-  if (request.role === 'mayor') {
-    // Mayor doesn't need a repo clone — just a git-initialized directory
+  if (request.role === 'mayor' || request.lightweight) {
+    // Mayor and lightweight agents (e.g. triage) don't need a repo clone —
+    // just a git-initialized directory so kilo serve has a valid git root.
     workdir = await createMayorWorkspace(request.rigId);
 
     // On fresh containers the browse worktrees won't exist yet. Set them

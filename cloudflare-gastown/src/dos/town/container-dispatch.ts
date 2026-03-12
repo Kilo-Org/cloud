@@ -240,6 +240,8 @@ export async function startAgentInContainer(
     platformIntegrationId?: string;
     /** For convoy beads: the convoy's feature branch to branch from instead of defaultBranch. */
     convoyFeatureBranch?: string;
+    /** Skip repo clone — use a lightweight workspace (for reasoning-only agents like triage). */
+    lightweight?: boolean;
     /** All rigs in the town (mayor only) — used to set up browse worktrees on fresh containers. */
     rigs?: Array<{
       rigId: string;
@@ -346,6 +348,7 @@ export async function startAgentInContainer(
         // For convoy agents, start from the convoy's feature branch so the
         // worktree includes all previously merged convoy work.
         startPoint: params.convoyFeatureBranch ? `origin/${params.convoyFeatureBranch}` : undefined,
+        lightweight: params.lightweight,
         rigs: params.rigs,
       }),
     });

@@ -27,6 +27,8 @@ export const StartAgentRequest = z.object({
   platformIntegrationId: z.string().optional(),
   /** Git ref to branch from (e.g. convoy feature branch). Falls back to HEAD if absent. */
   startPoint: z.string().optional(),
+  /** Skip repo clone — use a lightweight git-init-only workspace (for reasoning-only agents like triage). */
+  lightweight: z.boolean().optional(),
   /** Rig list for mayor agents — used to set up browse worktrees on fresh containers. */
   rigs: z
     .array(

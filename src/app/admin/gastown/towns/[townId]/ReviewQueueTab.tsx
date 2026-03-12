@@ -165,7 +165,8 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
-                          onClick={() => setEntryToRetry({ id: entry.bead_id, title: entry.title })}
+                          disabled
+                          title="Review retry not yet implemented"
                         >
                           Force Retry
                         </Button>

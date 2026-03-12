@@ -660,6 +660,34 @@ export const gastownRouter = router({
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.updateBeadStatus(input.beadId, 'failed', 'admin');
     }),
+
+  adminGetAlarmStatus: adminProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(RpcAlarmStatusOutput)
+    .query(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.setTownId(input.townId);
+      return townStub.getAlarmStatus();
+    }),
+
+  adminGetTownEvents: adminProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        beadId: z.string().uuid().optional(),
+        since: z.string().optional(),
+        limit: z.number().int().positive().max(500).default(100),
+      })
+    )
+    .output(z.array(RpcBeadEventOutput))
+    .query(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.listBeadEvents({
+        beadId: input.beadId,
+        since: input.since,
+        limit: input.limit,
+      });
+    }),
 });
 
 export type GastownRouter = typeof gastownRouter;

@@ -392,9 +392,7 @@ export const adminGastownRouter = createTRPCRouter({
 
   /**
    * Get the alarm status snapshot for a town.
-   * Calls the tRPC gastown.getAlarmStatus with admin JWT.
-   * Requires admin-bypass support on the Gastown worker (bead 0) since
-   * verifyTownOwnership is checked per town.
+   * Calls the admin-bypass gastown.adminGetAlarmStatus endpoint.
    */
   getTownHealth: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
@@ -402,7 +400,7 @@ export const adminGastownRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       return gastownTrpcGet(
         ctx.user,
-        'gastown.getAlarmStatus',
+        'gastown.adminGetAlarmStatus',
         { townId: input.townId },
         AlarmStatusRecord
       );
@@ -453,8 +451,8 @@ export const adminGastownRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const result = await gastownTrpcGet(
         ctx.user,
-        'gastown.getTownEvents',
-        { townId: input.townId, since: input.since, limit: input.limit },
+        'gastown.adminGetTownEvents',
+        { townId: input.townId, beadId: input.beadId, since: input.since, limit: input.limit },
         z.array(BeadEventRecord)
       );
       return result ?? [];

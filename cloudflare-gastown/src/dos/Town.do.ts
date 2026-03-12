@@ -2652,6 +2652,7 @@ export class TownDO extends DurableObject<Env> {
       townConfig,
       systemPromptOverride: systemPrompt,
       platformIntegrationId: rigConfig.platformIntegrationId,
+      lightweight: true,
     });
 
     if (started) {

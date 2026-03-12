@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSupervisor } from './supervisor';
 
@@ -272,5 +273,136 @@ describe('createSupervisor', () => {
     vi.advanceTimersByTime(60_000);
     expect(spawnImpl).toHaveBeenCalledTimes(1);
     expect(supervisor.getState()).toBe('shutting_down');
+  });
+});
+
+class FakeChildProcessWithStdout extends EventEmitter {
+  pid: number;
+  stdout: PassThrough;
+  stderr: PassThrough;
+  kill = vi.fn((_signal: NodeJS.Signals | 'SIGKILL') => true);
+
+  constructor(pid: number) {
+    super();
+    this.pid = pid;
+    this.stdout = new PassThrough();
+    this.stderr = new PassThrough();
+  }
+}
+
+function createSpawnHarnessWithStdout() {
+  const children: FakeChildProcessWithStdout[] = [];
+  let pid = 2000;
+  const spawnImpl = vi.fn(() => {
+    const child = new FakeChildProcessWithStdout(pid++);
+    children.push(child);
+    queueMicrotask(() => child.emit('spawn'));
+    return child as never;
+  });
+  return { spawnImpl, children };
+}
+
+describe('onStdoutLine callback', () => {
+  it('delivers complete lines to the callback', async () => {
+    const { spawnImpl, children } = createSpawnHarnessWithStdout();
+    const lines: string[] = [];
+    const supervisor = createSupervisor({
+      gatewayArgs: ['--port', '3001'],
+      spawnImpl: spawnImpl as never,
+      onStdoutLine: line => lines.push(line),
+    });
+
+    await supervisor.start();
+    await flushMicrotasks();
+
+    children[0].stdout.push('hello world\n');
+    expect(lines).toEqual(['hello world']);
+  });
+
+  it('buffers partial lines until newline', async () => {
+    const { spawnImpl, children } = createSpawnHarnessWithStdout();
+    const lines: string[] = [];
+    const supervisor = createSupervisor({
+      gatewayArgs: ['--port', '3001'],
+      spawnImpl: spawnImpl as never,
+      onStdoutLine: line => lines.push(line),
+    });
+
+    await supervisor.start();
+    await flushMicrotasks();
+
+    children[0].stdout.push('partial');
+    expect(lines).toEqual([]);
+
+    children[0].stdout.push(' line\n');
+    expect(lines).toEqual(['partial line']);
+  });
+
+  it('handles multiple lines in one chunk', async () => {
+    const { spawnImpl, children } = createSpawnHarnessWithStdout();
+    const lines: string[] = [];
+    const supervisor = createSupervisor({
+      gatewayArgs: ['--port', '3001'],
+      spawnImpl: spawnImpl as never,
+      onStdoutLine: line => lines.push(line),
+    });
+
+    await supervisor.start();
+    await flushMicrotasks();
+
+    children[0].stdout.push('line1\nline2\nline3\n');
+    expect(lines).toEqual(['line1', 'line2', 'line3']);
+  });
+
+  it('resets line buffer when child exits', async () => {
+    const { spawnImpl, children } = createSpawnHarnessWithStdout();
+    const lines: string[] = [];
+    const supervisor = createSupervisor({
+      gatewayArgs: ['--port', '3001'],
+      spawnImpl: spawnImpl as never,
+      onStdoutLine: line => lines.push(line),
+    });
+
+    await supervisor.start();
+    await flushMicrotasks();
+
+    children[0].stdout.push('partial data without newline');
+    children[0].emit('exit', 1, null);
+
+    // Partial data should be discarded, not delivered
+    expect(lines).toEqual([]);
+  });
+
+  it('still pipes stdout to process.stdout when callback is set', async () => {
+    const { spawnImpl, children } = createSpawnHarnessWithStdout();
+    const pipeSpy = vi.spyOn(children.length === 0 ? PassThrough.prototype : PassThrough.prototype, 'pipe');
+    const supervisor = createSupervisor({
+      gatewayArgs: ['--port', '3001'],
+      spawnImpl: spawnImpl as never,
+      onStdoutLine: () => {},
+    });
+
+    await supervisor.start();
+    await flushMicrotasks();
+
+    expect(children[0].stdout.pipe).toBeDefined();
+    // Verify pipe was called (stdout is piped to process.stdout)
+    expect(pipeSpy).toHaveBeenCalled();
+    pipeSpy.mockRestore();
+  });
+
+  it('works without onStdoutLine callback (backward compat)', async () => {
+    const { spawnImpl, children } = createSpawnHarnessWithStdout();
+    const supervisor = createSupervisor({
+      gatewayArgs: ['--port', '3001'],
+      spawnImpl: spawnImpl as never,
+    });
+
+    await supervisor.start();
+    await flushMicrotasks();
+
+    // Should not crash when pushing data without a callback
+    children[0].stdout.push('some output\n');
+    expect(supervisor.getState()).toBe('running');
   });
 });

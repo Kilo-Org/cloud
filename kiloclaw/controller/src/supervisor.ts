@@ -55,6 +55,7 @@ type SupervisorOptions = {
   spawnImpl?: SpawnLike;
   setTimeoutImpl?: typeof setTimeout;
   clearTimeoutImpl?: typeof clearTimeout;
+  onStdoutLine?: (line: string) => void;
 };
 
 export function createSupervisor(options: SupervisorOptions): Supervisor {
@@ -70,6 +71,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     spawnImpl = spawn,
     setTimeoutImpl = setTimeout,
     clearTimeoutImpl = clearTimeout,
+    onStdoutLine,
   } = options;
 
   let state: SupervisorState = 'stopped';
@@ -86,6 +88,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
   let childExitPromise: Promise<void> | null = null;
   let resolveChildExit: (() => void) | null = null;
   let opQueue: Promise<void> = Promise.resolve();
+  let lineBuf = '';
 
   const clearRestartTimer = () => {
     if (restartTimer) {
@@ -143,6 +146,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
 
     child = null;
     runningSinceMs = null;
+    lineBuf = '';
     resolveExitWaiters();
 
     if (shuttingDown) {
@@ -192,6 +196,17 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
 
     spawned.stdout?.pipe(process.stdout);
     spawned.stderr?.pipe(process.stderr);
+
+    if (onStdoutLine && spawned.stdout) {
+      spawned.stdout.on('data', (chunk: Buffer | string) => {
+        lineBuf += typeof chunk === 'string' ? chunk : chunk.toString();
+        const parts = lineBuf.split('\n');
+        lineBuf = parts.pop() ?? '';
+        for (const line of parts) {
+          onStdoutLine(line);
+        }
+      });
+    }
 
     spawned.once('spawn', () => {
       if (child !== spawned) return;

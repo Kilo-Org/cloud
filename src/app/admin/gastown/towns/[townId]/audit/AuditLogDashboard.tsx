@@ -34,8 +34,7 @@ export function AuditLogDashboard({ townId }: { townId: string }) {
   });
 
   const sorted = [...filtered].sort((a, b) => {
-    const diff =
-      new Date(a.performed_at).getTime() - new Date(b.performed_at).getTime();
+    const diff = new Date(a.performed_at).getTime() - new Date(b.performed_at).getTime();
     return sortDir === 'desc' ? -diff : diff;
   });
 
@@ -80,9 +79,7 @@ export function AuditLogDashboard({ townId }: { townId: string }) {
         </CardHeader>
         <CardContent>
           {auditQuery.isLoading && (
-            <p className="text-muted-foreground py-8 text-center text-sm">
-              Loading audit log…
-            </p>
+            <p className="text-muted-foreground py-8 text-center text-sm">Loading audit log…</p>
           )}
           {auditQuery.isError && (
             <p className="py-8 text-center text-sm text-red-400">
@@ -119,22 +116,17 @@ export function AuditLogDashboard({ townId }: { townId: string }) {
                     <th className="text-muted-foreground pb-2 text-left font-medium">
                       Target Type
                     </th>
-                    <th className="text-muted-foreground pb-2 text-left font-medium">
-                      Target ID
-                    </th>
+                    <th className="text-muted-foreground pb-2 text-left font-medium">Target ID</th>
                     <th className="text-muted-foreground pb-2 text-left font-medium">Detail</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sorted.map(entry => {
                     const isExpanded = expandedIds.has(entry.id);
-                    const hasDetail =
-                      entry.detail != null && Object.keys(entry.detail).length > 0;
+                    const hasDetail = entry.detail != null && Object.keys(entry.detail).length > 0;
                     return (
                       <React.Fragment key={entry.id}>
-                        <tr
-                          className="hover:bg-muted/40 border-b transition-colors"
-                        >
+                        <tr className="hover:bg-muted/40 border-b transition-colors">
                           <td
                             className="text-muted-foreground py-2 pr-4 text-xs"
                             title={format(new Date(entry.performed_at), 'PPpp')}
@@ -182,7 +174,7 @@ export function AuditLogDashboard({ townId }: { townId: string }) {
                         </tr>
                         {isExpanded && hasDetail && (
                           <tr className="border-b">
-                            <td colSpan={6} className="bg-muted/20 py-2 pl-4 pr-4">
+                            <td colSpan={6} className="bg-muted/20 py-2 pr-4 pl-4">
                               <pre className="overflow-x-auto rounded bg-gray-900/50 p-3 font-mono text-xs text-gray-300">
                                 {JSON.stringify(entry.detail, null, 2)}
                               </pre>

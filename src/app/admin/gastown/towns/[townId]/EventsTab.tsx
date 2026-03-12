@@ -20,9 +20,7 @@ export function EventsTab({ townId }: { townId: string }) {
   const [agentFilter, setAgentFilter] = useState('');
   const [limit, setLimit] = useState(100);
 
-  const eventsQuery = useQuery(
-    trpc.admin.gastown.getBeadEvents.queryOptions({ townId, limit })
-  );
+  const eventsQuery = useQuery(trpc.admin.gastown.getBeadEvents.queryOptions({ townId, limit }));
 
   const events = eventsQuery.data ?? [];
 
@@ -84,7 +82,7 @@ export function EventsTab({ townId }: { townId: string }) {
                 <tr className="border-b">
                   <th className="text-muted-foreground pb-2 text-left font-medium">
                     <button
-                      className="flex items-center gap-1 hover:text-foreground transition-colors"
+                      className="hover:text-foreground flex items-center gap-1 transition-colors"
                       onClick={toggleSort}
                     >
                       Time

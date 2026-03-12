@@ -7,11 +7,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { AuditLogDashboard } from './AuditLogDashboard';
 
-export default async function AuditLogPage({
-  params,
-}: {
-  params: Promise<{ townId: string }>;
-}) {
+export default async function AuditLogPage({ params }: { params: Promise<{ townId: string }> }) {
   const { townId } = await params;
 
   const breadcrumbs = (

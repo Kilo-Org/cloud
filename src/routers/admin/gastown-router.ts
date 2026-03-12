@@ -233,7 +233,6 @@ const GastownApiResponseSchema = z.union([
   z.object({ success: z.literal(true), data: z.unknown() }),
   z.object({ success: z.literal(false), error: z.string() }),
 ]);
-type GastownApiResponse = z.infer<typeof GastownApiResponseSchema>;
 
 /** GET request to the Gastown worker, parsing the response with the given schema. */
 async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>): Promise<T> {

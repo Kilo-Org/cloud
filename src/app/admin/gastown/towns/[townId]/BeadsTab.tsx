@@ -198,14 +198,7 @@ export function BeadsTab({ townId }: { townId: string }) {
                       <span className="font-mono text-xs">{bead.type}</span>
                     </td>
                     <td className="py-2 pr-4">
-                      <Badge
-                        variant="outline"
-                        className={
-                          (beadStatuses as readonly string[]).includes(bead.status)
-                            ? STATUS_COLORS[bead.status as BeadStatus]
-                            : ''
-                        }
-                      >
+                      <Badge variant="outline" className={STATUS_COLORS[bead.status]}>
                         {bead.status}
                       </Badge>
                     </td>

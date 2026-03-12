@@ -55,7 +55,7 @@ function deriveHealthStatus(
   return 'green';
 }
 
-function TownRow({ town, userId }: { town: { id: string; name: string; created_at: string }; userId: string }) {
+function TownRow({ town }: { town: { id: string; name: string; created_at: string } }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -112,9 +112,7 @@ function TownRow({ town, userId }: { town: { id: string; name: string; created_a
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell className="text-muted-foreground text-sm">
-        {formatDate(town.created_at)}
-      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">{formatDate(town.created_at)}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
@@ -160,15 +158,11 @@ export function UserAdminGastown({ userId }: { userId: string }) {
       <CardContent className="space-y-6">
         {/* Towns */}
         <div>
-          <h4 className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+          <h4 className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
             Towns
           </h4>
-          {townsQuery.isLoading && (
-            <p className="text-muted-foreground text-sm">Loading towns…</p>
-          )}
-          {townsQuery.error && (
-            <p className="text-sm text-red-400">Failed to load towns</p>
-          )}
+          {townsQuery.isLoading && <p className="text-muted-foreground text-sm">Loading towns…</p>}
+          {townsQuery.error && <p className="text-sm text-red-400">Failed to load towns</p>}
           {townsQuery.data && townsQuery.data.length === 0 && (
             <p className="text-muted-foreground text-sm">No towns found</p>
           )}
@@ -186,7 +180,7 @@ export function UserAdminGastown({ userId }: { userId: string }) {
               </TableHeader>
               <TableBody>
                 {townsQuery.data.map(town => (
-                  <TownRow key={town.id} town={town} userId={userId} />
+                  <TownRow key={town.id} town={town} />
                 ))}
               </TableBody>
             </Table>
@@ -195,15 +189,11 @@ export function UserAdminGastown({ userId }: { userId: string }) {
 
         {/* Rigs */}
         <div>
-          <h4 className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+          <h4 className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
             Rigs
           </h4>
-          {rigsQuery.isLoading && (
-            <p className="text-muted-foreground text-sm">Loading rigs…</p>
-          )}
-          {rigsQuery.error && (
-            <p className="text-sm text-red-400">Failed to load rigs</p>
-          )}
+          {rigsQuery.isLoading && <p className="text-muted-foreground text-sm">Loading rigs…</p>}
+          {rigsQuery.error && <p className="text-sm text-red-400">Failed to load rigs</p>}
           {rigsQuery.data && rigsQuery.data.length === 0 && (
             <p className="text-muted-foreground text-sm">No rigs found</p>
           )}

@@ -206,13 +206,13 @@ export function restoreConfig(
   );
 }
 
-function isErrorUnknownRoute(error: unknown): boolean {
+export function isErrorUnknownRoute(error: unknown): boolean {
   // If a controller predates a new route, the request will either:
   //   - fall through to the catch-all proxy (401 REQUIRE_PROXY_TOKEN)
   //   - forward to the gateway which returns 404 for the unknown path.
   return (
     error instanceof GatewayControllerError &&
-    (error.status === 404 || error.code === 'controller_route_unavailable')
+    (error.status === 404 || error.status === 401 || error.code === 'controller_route_unavailable')
   );
 }
 

@@ -2,6 +2,13 @@ import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
+import { callGatewayController, isErrorUnknownRoute } from './gateway';
+import {
+  GatewayControllerError,
+  ControllerChannelPairingResponseSchema,
+  ControllerDevicePairingResponseSchema,
+  ControllerPairingApproveResponseSchema,
+} from '../gateway-controller-types';
 
 const PAIRING_CACHE_TTL_SECONDS = 120;
 const DEVICE_PAIRING_CACHE_TTL_SECONDS = 120;
@@ -35,6 +42,27 @@ export async function listPairingRequests(
   const { flyMachineId } = state;
   if (state.status !== 'running' || !flyMachineId) {
     return { requests: [] };
+  }
+
+  // Try controller first
+  try {
+    const path = forceRefresh
+      ? '/_kilo/pairing/channels?refresh=true'
+      : '/_kilo/pairing/channels';
+    const result = await callGatewayController(
+      state,
+      env,
+      path,
+      'GET',
+      ControllerChannelPairingResponseSchema
+    );
+    return { requests: result.requests };
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) {
+      // Fall through to fly exec
+    } else {
+      throw error;
+    }
   }
 
   const cacheKey = pairingCacheKey(state);
@@ -109,6 +137,26 @@ export async function approvePairingRequest(
     return { success: false, message: 'Invalid pairing code' };
   }
 
+  // Try controller first
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/pairing/channels/approve',
+      'POST',
+      ControllerPairingApproveResponseSchema,
+      { channel, code }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) {
+      // Fall through to fly exec
+    } else if (error instanceof GatewayControllerError && error.status === 400) {
+      return { success: false, message: error.message };
+    } else {
+      throw error;
+    }
+  }
+
   const result = await fly.execCommand(
     flyConfig,
     flyMachineId,
@@ -165,6 +213,27 @@ export async function listDevicePairingRequests(
   const { flyMachineId } = state;
   if (state.status !== 'running' || !flyMachineId) {
     return { requests: [] };
+  }
+
+  // Try controller first
+  try {
+    const path = forceRefresh
+      ? '/_kilo/pairing/devices?refresh=true'
+      : '/_kilo/pairing/devices';
+    const result = await callGatewayController(
+      state,
+      env,
+      path,
+      'GET',
+      ControllerDevicePairingResponseSchema
+    );
+    return { requests: result.requests };
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) {
+      // Fall through to fly exec
+    } else {
+      throw error;
+    }
   }
 
   const cacheKey = devicePairingCacheKey(state);
@@ -234,6 +303,26 @@ export async function approveDevicePairingRequest(
 
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
     return { success: false, message: 'Invalid request ID' };
+  }
+
+  // Try controller first
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/pairing/devices/approve',
+      'POST',
+      ControllerPairingApproveResponseSchema,
+      { requestId }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) {
+      // Fall through to fly exec
+    } else if (error instanceof GatewayControllerError && error.status === 400) {
+      return { success: false, message: error.message };
+    } else {
+      throw error;
+    }
   }
 
   const result = await fly.execCommand(

@@ -241,6 +241,7 @@ beforeEach(() => {
 
   // Mock global fetch for waitForHealthy() health probe.
   // Returns gateway running + root 200 so start() doesn't block.
+  // Returns 404 for /_kilo/pairing/* so controller-first pairing falls back to fly exec.
   vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation((url: string) => {
@@ -250,6 +251,14 @@ beforeEach(() => {
           status: 200,
           json: () => Promise.resolve({ state: 'running' }),
         });
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/pairing/')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'Not found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
       }
       // Root path probe — return non-502
       return Promise.resolve({ ok: true, status: 200 });
@@ -2585,6 +2594,272 @@ describe('approveDevicePairingRequest', () => {
     );
 
     expect(result).toEqual({ success: false, message: 'Approval failed' });
+  });
+});
+
+// ============================================================================
+// Controller-first pairing (try controller, fall back to fly exec)
+// ============================================================================
+
+import { GatewayControllerError } from './gateway-controller-types';
+
+describe('controller-first pairing', () => {
+  it('channel list via controller — returns only requests, strips lastUpdated', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          requests: [{ code: 'ABC', id: 'r1', channel: 'telegram' }],
+          lastUpdated: '2026-03-12T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.listPairingRequests();
+
+    expect(result).toEqual({ requests: [{ code: 'ABC', id: 'r1', channel: 'telegram' }] });
+    expect(result).not.toHaveProperty('lastUpdated');
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel list fallback on 404 — runs fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: JSON.stringify({ requests: [{ code: 'XYZ', id: 'r2', channel: 'discord' }] }),
+      stderr: '',
+    });
+
+    const result = await instance.listPairingRequests();
+
+    expect(result.requests).toHaveLength(1);
+    expect(result.requests[0].code).toBe('XYZ');
+    expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel list fallback on 401 — runs fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: JSON.stringify({ requests: [{ code: 'QRS', id: 'r3', channel: 'slack' }] }),
+      stderr: '',
+    });
+
+    const result = await instance.listPairingRequests();
+
+    expect(result.requests).toHaveLength(1);
+    expect(result.requests[0].code).toBe('QRS');
+    expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel list throws on 500 — no fallback', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Internal error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.listPairingRequests()).rejects.toSatisfy((err: unknown) => {
+      return err instanceof GatewayControllerError && err.status === 500;
+    });
+
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel list throws on 502 — no fallback', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Bad gateway' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.listPairingRequests()).rejects.toSatisfy((err: unknown) => {
+      return err instanceof GatewayControllerError && err.status === 502;
+    });
+
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device list via controller — returns only requests', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          requests: [{ requestId: 'abc-123', deviceId: 'dev-1', role: 'operator' }],
+          lastUpdated: '2026-03-12T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result).toEqual({
+      requests: [{ requestId: 'abc-123', deviceId: 'dev-1', role: 'operator' }],
+    });
+    expect(result).not.toHaveProperty('lastUpdated');
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel approve via controller — returns success', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ success: true, message: 'Pairing approved' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({ success: true, message: 'Pairing approved' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel approve 400 from controller — returns failure without throwing', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'Invalid channel name' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({ success: false, message: 'Invalid channel name' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel approve fallback on 404 — runs fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'approved',
+      stderr: '',
+    });
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({ success: true, message: 'Pairing approved' });
+    expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device approve via controller — returns success', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ success: true, message: 'Device pairing approved' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.approveDevicePairingRequest('58f4ac67-12b4-4f6e-adee-ff3463a7c30c');
+
+    expect(result).toEqual({ success: true, message: 'Device pairing approved' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device approve fallback on 404 — runs fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'approved',
+      stderr: '',
+    });
+
+    const result = await instance.approveDevicePairingRequest('58f4ac67-12b4-4f6e-adee-ff3463a7c30c');
+
+    expect(result).toEqual({ success: true, message: 'Device pairing approved' });
+    expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel list with forceRefresh — appends ?refresh=true to controller URL', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          requests: [],
+          lastUpdated: '2026-03-12T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    await instance.listPairingRequests(true);
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://acct-test.fly.dev/_kilo/pairing/channels?refresh=true'
+    );
+    fetchSpy.mockRestore();
   });
 });
 

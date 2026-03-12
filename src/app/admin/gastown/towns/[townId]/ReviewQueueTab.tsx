@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,6 +56,10 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
       onSuccess: () => {
         void queryClient.invalidateQueries(trpc.admin.gastown.listBeads.queryFilter({ townId }));
         setEntryToRetry(null);
+        toast.success('Review retry requested');
+      },
+      onError: err => {
+        toast.error(`Failed to retry review: ${err.message}`);
       },
     })
   );
@@ -70,9 +75,7 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
       </CardHeader>
       <CardContent>
         {isLoading && (
-          <p className="text-muted-foreground py-8 text-center text-sm">
-            Loading review queue…
-          </p>
+          <p className="text-muted-foreground py-8 text-center text-sm">Loading review queue…</p>
         )}
         {isError && (
           <p className="py-8 text-center text-sm text-red-400">Failed to load review queue.</p>
@@ -102,7 +105,10 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
               <tbody>
                 {queueEntries.map(entry => {
                   const prUrl =
-                    typeof entry.metadata['pr_url'] === 'string' ? entry.metadata['pr_url'] : null;
+                    typeof entry.metadata['pr_url'] === 'string' &&
+                    /^https?:\/\//.test(entry.metadata['pr_url'])
+                      ? entry.metadata['pr_url']
+                      : null;
                   return (
                     <tr
                       key={entry.bead_id}
@@ -150,10 +156,7 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
                         {formatDistanceToNow(new Date(entry.created_at), { addSuffix: false })}
                       </td>
                       <td className="py-2 pr-4">
-                        <Badge
-                          variant="outline"
-                          className={STATUS_COLORS[entry.status] ?? ''}
-                        >
+                        <Badge variant="outline" className={STATUS_COLORS[entry.status] ?? ''}>
                           {entry.status}
                         </Badge>
                       </td>
@@ -162,9 +165,7 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
-                          onClick={() =>
-                            setEntryToRetry({ id: entry.bead_id, title: entry.title })
-                          }
+                          onClick={() => setEntryToRetry({ id: entry.bead_id, title: entry.title })}
                         >
                           Force Retry
                         </Button>
@@ -184,8 +185,8 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
             <DialogTitle>Force Retry Review</DialogTitle>
             <DialogDescription>
               This will force-retry the review for{' '}
-              <span className="font-semibold">{entryToRetry?.title}</span>. This action is logged
-              in the audit trail.
+              <span className="font-semibold">{entryToRetry?.title}</span>. This action is logged in
+              the audit trail.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -198,8 +199,7 @@ export function ReviewQueueTab({ townId }: { townId: string }) {
             </Button>
             <Button
               onClick={() =>
-                entryToRetry &&
-                forceRetryMutation.mutate({ townId, entryId: entryToRetry.id })
+                entryToRetry && forceRetryMutation.mutate({ townId, entryId: entryToRetry.id })
               }
               disabled={forceRetryMutation.isPending}
             >

@@ -229,13 +229,11 @@ function buildAdminHeaders(adminUser: User): Record<string, string> {
   return headers;
 }
 
-type GastownSuccessResponse<T> = { success: true; data: T };
-type GastownErrorResponse = { success: false; error: string };
-type GastownApiResponse<T> = GastownSuccessResponse<T> | GastownErrorResponse;
-
-function isGastownSuccess<T>(res: GastownApiResponse<T>): res is GastownSuccessResponse<T> {
-  return res.success === true;
-}
+const GastownApiResponseSchema = z.union([
+  z.object({ success: z.literal(true), data: z.unknown() }),
+  z.object({ success: z.literal(false), error: z.string() }),
+]);
+type GastownApiResponse = z.infer<typeof GastownApiResponseSchema>;
 
 /** GET request to the Gastown worker, parsing the response with the given schema. */
 async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>): Promise<T> {
@@ -252,8 +250,8 @@ async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>
     });
   }
 
-  const raw = (await response.json()) as GastownApiResponse<unknown>;
-  if (!isGastownSuccess(raw)) {
+  const raw = GastownApiResponseSchema.parse(await response.json());
+  if (!raw.success) {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Gastown error: ${raw.error}` });
   }
   return schema.parse(raw.data);
@@ -280,8 +278,8 @@ async function gastownPatch<T>(
     });
   }
 
-  const raw = (await response.json()) as GastownApiResponse<unknown>;
-  if (!isGastownSuccess(raw)) {
+  const raw = GastownApiResponseSchema.parse(await response.json());
+  if (!raw.success) {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Gastown error: ${raw.error}` });
   }
   return schema.parse(raw.data);
@@ -302,7 +300,11 @@ async function gastownTrpcGet<T>(
   const headers = buildAdminHeaders(adminUser);
   const url = `${GASTOWN_SERVICE_URL}/trpc/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
   const response = await fetch(url, { headers });
-  if (!response.ok) return null;
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    console.error(`[admin/gastown] tRPC proxy ${procedure} failed: ${response.status}`);
+    return null;
+  }
 
   const raw: unknown = await response.json();
   const resultSchema = z.object({ result: z.object({ data: schema }) });

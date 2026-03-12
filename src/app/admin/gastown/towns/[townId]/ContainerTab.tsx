@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +30,10 @@ export function ContainerTab({ townId }: { townId: string }) {
     trpc.admin.gastown.forceRestartContainer.mutationOptions({
       onSuccess: () => {
         setShowRestartDialog(false);
+        toast.success('Container restart requested');
+      },
+      onError: err => {
+        toast.error(`Failed to restart container: ${err.message}`);
       },
     })
   );
@@ -78,7 +83,12 @@ export function ContainerTab({ townId }: { townId: string }) {
           {healthQuery.isLoading && (
             <p className="text-muted-foreground text-sm">Loading health status…</p>
           )}
-          {!healthQuery.isLoading && (
+          {healthQuery.isError && (
+            <p className="text-sm text-red-400">
+              Failed to load container health: {healthQuery.error.message}
+            </p>
+          )}
+          {!healthQuery.isLoading && !healthQuery.isError && (
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3">
                 <span className="text-muted-foreground text-sm">Status:</span>

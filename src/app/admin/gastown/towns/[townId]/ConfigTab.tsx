@@ -58,10 +58,11 @@ export function ConfigTab({ townId }: { townId: string }) {
         updateConfigMutation.mutate({ townId, update: { max_polecats_per_rig: num } });
       }
     } else if (field === 'merge_strategy') {
-      updateConfigMutation.mutate({
-        townId,
-        update: { merge_strategy: editValue as 'direct' | 'pr' },
-      });
+      const validStrategies = ['direct', 'pr'] as const;
+      const strategy = validStrategies.find(s => s === editValue);
+      if (strategy) {
+        updateConfigMutation.mutate({ townId, update: { merge_strategy: strategy } });
+      }
     }
   };
 
@@ -182,7 +183,9 @@ export function ConfigTab({ townId }: { townId: string }) {
               <div className="flex items-center justify-between gap-4 border-b pb-3">
                 <div>
                   <Label className="text-sm font-medium">Small Model</Label>
-                  <p className="text-muted-foreground text-xs">Lightweight model for simple tasks</p>
+                  <p className="text-muted-foreground text-xs">
+                    Lightweight model for simple tasks
+                  </p>
                 </div>
                 {editingField === 'small_model' ? (
                   <div className="flex items-center gap-2">
@@ -229,9 +232,7 @@ export function ConfigTab({ townId }: { townId: string }) {
               <div className="flex items-center justify-between gap-4 border-b pb-3">
                 <div>
                   <Label className="text-sm font-medium">Max Polecats per Rig</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Concurrency limit per rig
-                  </p>
+                  <p className="text-muted-foreground text-xs">Concurrency limit per rig</p>
                 </div>
                 {editingField === 'max_polecats_per_rig' ? (
                   <div className="flex items-center gap-2">
@@ -268,10 +269,7 @@ export function ConfigTab({ townId }: { townId: string }) {
                       variant="outline"
                       className="h-7 text-xs"
                       onClick={() =>
-                        startEdit(
-                          'max_polecats_per_rig',
-                          String(config.max_polecats_per_rig ?? '')
-                        )
+                        startEdit('max_polecats_per_rig', String(config.max_polecats_per_rig ?? ''))
                       }
                     >
                       Edit

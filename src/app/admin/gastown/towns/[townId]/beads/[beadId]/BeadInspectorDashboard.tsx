@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,22 +36,14 @@ type ConfirmAction = {
   description: string;
 };
 
-export function BeadInspectorDashboard({
-  townId,
-  beadId,
-}: {
-  townId: string;
-  beadId: string;
-}) {
+export function BeadInspectorDashboard({ townId, beadId }: { townId: string; beadId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   // Fetch all beads — used both for finding this bead and computing dependency graph.
   // listBeads returns [] until bead-0 admin endpoints are merged.
-  const allBeadsQuery = useQuery(
-    trpc.admin.gastown.listBeads.queryOptions({ townId })
-  );
+  const allBeadsQuery = useQuery(trpc.admin.gastown.listBeads.queryOptions({ townId }));
   const allBeads = allBeadsQuery.data ?? [];
   const bead = allBeads.find(b => b.bead_id === beadId) ?? null;
 
@@ -72,6 +65,10 @@ export function BeadInspectorDashboard({
       onSuccess: () => {
         invalidateAll();
         setConfirmAction(null);
+        toast.success('Bead closed successfully');
+      },
+      onError: err => {
+        toast.error(`Failed to close bead: ${err.message}`);
       },
     })
   );
@@ -81,6 +78,10 @@ export function BeadInspectorDashboard({
       onSuccess: () => {
         invalidateAll();
         setConfirmAction(null);
+        toast.success('Bead marked as failed');
+      },
+      onError: err => {
+        toast.error(`Failed to fail bead: ${err.message}`);
       },
     })
   );
@@ -90,6 +91,10 @@ export function BeadInspectorDashboard({
       onSuccess: () => {
         invalidateAll();
         setConfirmAction(null);
+        toast.success('Agent reset successfully');
+      },
+      onError: err => {
+        toast.error(`Failed to reset agent: ${err.message}`);
       },
     })
   );
@@ -106,40 +111,34 @@ export function BeadInspectorDashboard({
   };
 
   const isMutating =
-    forceCloseMutation.isPending || forceFailMutation.isPending || forceResetAgentMutation.isPending;
+    forceCloseMutation.isPending ||
+    forceFailMutation.isPending ||
+    forceResetAgentMutation.isPending;
 
   // Filter events to only those for this bead (server doesn't filter by beadId yet)
   const events = (eventsQuery.data ?? []).filter(e => e.bead_id === beadId);
   const dispatchAttempts = dispatchAttemptsQuery.data ?? [];
 
   // Dependency graph: beads whose metadata references this beadId
-  // Beads that this bead depends on: look at bead.metadata.depends_on
-  const thisBeadDeps = bead != null
-    ? ((bead.metadata as Record<string, unknown>)['depends_on'] as string[] | undefined) ?? []
-    : [];
+  const getMetaDeps = (meta: Record<string, unknown>): string[] => {
+    const raw = meta['depends_on'];
+    return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : [];
+  };
+
+  const thisBeadDeps = bead != null ? getMetaDeps(bead.metadata) : [];
   const dependsOnBeads = allBeads.filter(b => thisBeadDeps.includes(b.bead_id));
 
-  // Beads that depend on this bead: look for other beads whose metadata.depends_on includes beadId
-  const dependentBeads = allBeads.filter(b => {
-    const meta = b.metadata as Record<string, unknown>;
-    const deps = meta['depends_on'] as string[] | undefined;
-    return Array.isArray(deps) && deps.includes(beadId);
-  });
+  // Beads that depend on this bead
+  const dependentBeads = allBeads.filter(b => getMetaDeps(b.metadata).includes(beadId));
 
   // Agent history from events (deduplicated)
   const agentHistory = Array.from(
-    new Map(
-      events
-        .filter(e => e.agent_id != null)
-        .map(e => [e.agent_id, e])
-    ).values()
+    new Map(events.filter(e => e.agent_id != null).map(e => [e.agent_id, e])).values()
   );
 
   // Convoy membership
-  const convoyId =
-    bead != null
-      ? ((bead.metadata as Record<string, unknown>)['convoy_id'] as string | undefined)
-      : undefined;
+  const rawConvoyId = bead != null ? bead.metadata['convoy_id'] : undefined;
+  const convoyId = typeof rawConvoyId === 'string' ? rawConvoyId : undefined;
   const convoyBead = convoyId ? allBeads.find(b => b.bead_id === convoyId) : undefined;
 
   return (
@@ -183,19 +182,19 @@ export function BeadInspectorDashboard({
             <CardContent>
               <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm md:grid-cols-3">
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Type
                   </dt>
                   <dd className="font-mono">{bead.type}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Priority
                   </dt>
                   <dd className="font-mono">{bead.priority}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Created
                   </dt>
                   <dd title={format(new Date(bead.created_at), 'PPpp')}>
@@ -204,7 +203,7 @@ export function BeadInspectorDashboard({
                 </div>
                 {bead.closed_at && (
                   <div>
-                    <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       Closed
                     </dt>
                     <dd title={format(new Date(bead.closed_at), 'PPpp')}>
@@ -214,7 +213,7 @@ export function BeadInspectorDashboard({
                 )}
                 {bead.assignee_agent_bead_id && (
                   <div>
-                    <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       Assigned Agent
                     </dt>
                     <dd>
@@ -229,7 +228,7 @@ export function BeadInspectorDashboard({
                 )}
                 {bead.rig_id && (
                   <div>
-                    <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       Rig
                     </dt>
                     <dd className="font-mono text-xs">{bead.rig_id.slice(0, 8)}…</dd>
@@ -237,7 +236,7 @@ export function BeadInspectorDashboard({
                 )}
                 {bead.labels.length > 0 && (
                   <div className="col-span-2 md:col-span-3">
-                    <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       Labels
                     </dt>
                     <dd className="mt-1 flex flex-wrap gap-1">
@@ -251,7 +250,7 @@ export function BeadInspectorDashboard({
                 )}
                 {bead.title && (
                   <div className="col-span-2 md:col-span-3">
-                    <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       Title
                     </dt>
                     <dd>{bead.title}</dd>
@@ -337,18 +336,13 @@ export function BeadInspectorDashboard({
           {events.length > 0 && (
             <div className="relative ml-2 flex flex-col gap-0">
               {[...events]
-                .sort(
-                  (a, b) =>
-                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                )
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                 .map((event, idx) => (
                   <div key={event.bead_event_id} className="flex gap-4">
                     {/* Timeline line + dot */}
                     <div className="flex flex-col items-center">
                       <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gray-400" />
-                      {idx < events.length - 1 && (
-                        <div className="w-px flex-1 bg-gray-700" />
-                      )}
+                      {idx < events.length - 1 && <div className="w-px flex-1 bg-gray-700" />}
                     </div>
                     <div className="pb-4">
                       <div className="flex flex-wrap items-center gap-2">
@@ -417,7 +411,10 @@ export function BeadInspectorDashboard({
                 </thead>
                 <tbody>
                   {agentHistory.map(event => (
-                    <tr key={event.bead_event_id} className="hover:bg-muted/40 border-b transition-colors">
+                    <tr
+                      key={event.bead_event_id}
+                      className="hover:bg-muted/40 border-b transition-colors"
+                    >
                       <td className="py-2 pr-4">
                         <Link
                           href={`/admin/gastown/towns/${townId}/agents/${event.agent_id}`}
@@ -454,7 +451,7 @@ export function BeadInspectorDashboard({
         <CardContent className="space-y-4">
           {convoyBead && (
             <div>
-              <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+              <p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
                 Convoy
               </p>
               <Link
@@ -468,7 +465,7 @@ export function BeadInspectorDashboard({
           )}
 
           <div>
-            <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+            <p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
               Depends On
             </p>
             {dependsOnBeads.length === 0 ? (
@@ -497,7 +494,7 @@ export function BeadInspectorDashboard({
           </div>
 
           <div>
-            <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+            <p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
               Depended On By
             </p>
             {dependentBeads.length === 0 ? (
@@ -556,10 +553,7 @@ export function BeadInspectorDashboard({
                 </thead>
                 <tbody>
                   {dispatchAttempts.map(attempt => (
-                    <tr
-                      key={attempt.id}
-                      className="hover:bg-muted/40 border-b transition-colors"
-                    >
+                    <tr key={attempt.id} className="hover:bg-muted/40 border-b transition-colors">
                       <td
                         className="text-muted-foreground py-2 pr-4 text-xs"
                         title={format(new Date(attempt.attempted_at), 'PPpp')}
@@ -593,9 +587,7 @@ export function BeadInspectorDashboard({
                         )}
                       </td>
                       <td className="py-2 text-xs text-red-400">
-                        {attempt.error_message ?? (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        {attempt.error_message ?? <span className="text-muted-foreground">—</span>}
                       </td>
                     </tr>
                   ))}

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,10 @@ export function AgentsTab({ townId }: { townId: string }) {
       onSuccess: () => {
         void queryClient.invalidateQueries(trpc.admin.gastown.listAgents.queryFilter({ townId }));
         setAgentToReset(null);
+        toast.success('Agent reset successfully');
+      },
+      onError: err => {
+        toast.error(`Failed to reset agent: ${err.message}`);
       },
     })
   );
@@ -94,10 +99,7 @@ export function AgentsTab({ townId }: { townId: string }) {
                       <span className="font-mono text-xs">{agent.role}</span>
                     </td>
                     <td className="py-2 pr-4">
-                      <Badge
-                        variant="outline"
-                        className={AGENT_STATUS_COLORS[agent.status] ?? ''}
-                      >
+                      <Badge variant="outline" className={AGENT_STATUS_COLORS[agent.status] ?? ''}>
                         {agent.status}
                       </Badge>
                     </td>
@@ -146,9 +148,8 @@ export function AgentsTab({ townId }: { townId: string }) {
           <DialogHeader>
             <DialogTitle>Force Reset Agent</DialogTitle>
             <DialogDescription>
-              This will reset agent{' '}
-              <span className="font-semibold">{agentToReset?.name}</span> to idle status and unhook
-              any hooked bead. This action is logged in the audit trail.
+              This will reset agent <span className="font-semibold">{agentToReset?.name}</span> to
+              idle status and unhook any hooked bead. This action is logged in the audit trail.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -162,8 +163,7 @@ export function AgentsTab({ townId }: { townId: string }) {
             <Button
               variant="destructive"
               onClick={() =>
-                agentToReset &&
-                forceResetMutation.mutate({ townId, agentId: agentToReset.id })
+                agentToReset && forceResetMutation.mutate({ townId, agentId: agentToReset.id })
               }
               disabled={forceResetMutation.isPending}
             >

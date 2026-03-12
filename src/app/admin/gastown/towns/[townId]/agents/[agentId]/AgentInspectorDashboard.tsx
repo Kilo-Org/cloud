@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,16 +29,23 @@ const AGENT_STATUS_COLORS: Record<string, string> = {
   stalled: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
 };
 
-
 type SortDir = 'asc' | 'desc';
 
-export function AgentInspectorDashboard({
-  townId,
-  agentId,
-}: {
-  townId: string;
-  agentId: string;
-}) {
+function toRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function safeString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function safeTimestamp(value: unknown): number {
+  if (typeof value !== 'string') return 0;
+  const t = new Date(value).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+export function AgentInspectorDashboard({ townId, agentId }: { townId: string; agentId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -67,6 +75,10 @@ export function AgentInspectorDashboard({
       onSuccess: () => {
         void queryClient.invalidateQueries(trpc.admin.gastown.listAgents.queryFilter({ townId }));
         setConfirmReset(false);
+        toast.success('Agent reset successfully');
+      },
+      onError: err => {
+        toast.error(`Failed to reset agent: ${err.message}`);
       },
     })
   );
@@ -85,14 +97,11 @@ export function AgentInspectorDashboard({
   const filteredAgentEvents = agentEvents
     .filter(e => {
       if (!eventSearch) return true;
-      const ev = e as Record<string, unknown>;
-      return JSON.stringify(ev).toLowerCase().includes(eventSearch.toLowerCase());
+      return JSON.stringify(e).toLowerCase().includes(eventSearch.toLowerCase());
     })
     .sort((a, b) => {
-      const ea = a as Record<string, unknown>;
-      const eb = b as Record<string, unknown>;
-      const ta = new Date(ea['created_at'] as string).getTime();
-      const tb = new Date(eb['created_at'] as string).getTime();
+      const ta = safeTimestamp(toRecord(a)['created_at']);
+      const tb = safeTimestamp(toRecord(b)['created_at']);
       return eventSortDir === 'desc' ? tb - ta : ta - tb;
     });
 
@@ -132,31 +141,31 @@ export function AgentInspectorDashboard({
             <CardContent>
               <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm md:grid-cols-3">
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Name
                   </dt>
                   <dd className="font-semibold">{agent.name}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Role
                   </dt>
                   <dd className="font-mono">{agent.role}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Identity
                   </dt>
                   <dd className="font-mono text-xs">{agent.identity}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Dispatch Attempts
                   </dt>
                   <dd>{agent.dispatch_attempts}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Last Active
                   </dt>
                   <dd>
@@ -168,7 +177,7 @@ export function AgentInspectorDashboard({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                     Created
                   </dt>
                   <dd title={format(new Date(agent.created_at), 'PPpp')}>
@@ -177,7 +186,7 @@ export function AgentInspectorDashboard({
                 </div>
                 {agent.current_hook_bead_id && (
                   <div>
-                    <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       Current Hooked Bead
                     </dt>
                     <dd>
@@ -192,7 +201,7 @@ export function AgentInspectorDashboard({
                 )}
                 {agent.rig_id && (
                   <div>
-                    <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                       Rig
                     </dt>
                     <dd className="font-mono text-xs">{agent.rig_id.slice(0, 8)}…</dd>
@@ -242,9 +251,7 @@ export function AgentInspectorDashboard({
                   <tr className="border-b">
                     <th className="text-muted-foreground pb-2 text-left font-medium">Bead</th>
                     <th className="text-muted-foreground pb-2 text-left font-medium">Events</th>
-                    <th className="text-muted-foreground pb-2 text-left font-medium">
-                      Last Event
-                    </th>
+                    <th className="text-muted-foreground pb-2 text-left font-medium">Last Event</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -335,17 +342,15 @@ export function AgentInspectorDashboard({
                 </thead>
                 <tbody>
                   {filteredAgentEvents.map((rawEvent, idx) => {
-                    const ev = rawEvent as Record<string, unknown>;
-                    const eventId = String(ev['id'] ?? ev['agent_event_id'] ?? idx);
-                    const createdAt = String(ev['created_at'] ?? '');
-                    const eventType = String(ev['event_type'] ?? '');
-                    const oldValue = ev['old_value'] as string | null | undefined;
-                    const newValue = ev['new_value'] as string | null | undefined;
+                    const ev = toRecord(rawEvent);
+                    const eventId =
+                      safeString(ev['id']) || safeString(ev['agent_event_id']) || String(idx);
+                    const createdAt = safeString(ev['created_at']);
+                    const eventType = safeString(ev['event_type']);
+                    const oldValue = typeof ev['old_value'] === 'string' ? ev['old_value'] : null;
+                    const newValue = typeof ev['new_value'] === 'string' ? ev['new_value'] : null;
                     return (
-                      <tr
-                        key={eventId}
-                        className="hover:bg-muted/40 border-b transition-colors"
-                      >
+                      <tr key={eventId} className="hover:bg-muted/40 border-b transition-colors">
                         <td
                           className="text-muted-foreground py-2 pr-4 text-xs"
                           title={createdAt ? format(new Date(createdAt), 'PPpp') : ''}
@@ -437,10 +442,7 @@ export function AgentInspectorDashboard({
                 </thead>
                 <tbody>
                   {dispatchAttempts.map(attempt => (
-                    <tr
-                      key={attempt.id}
-                      className="hover:bg-muted/40 border-b transition-colors"
-                    >
+                    <tr key={attempt.id} className="hover:bg-muted/40 border-b transition-colors">
                       <td
                         className="text-muted-foreground py-2 pr-4 text-xs"
                         title={format(new Date(attempt.attempted_at), 'PPpp')}
@@ -500,8 +502,8 @@ export function AgentInspectorDashboard({
             <AlertDialogTitle>Force Reset Agent</AlertDialogTitle>
             <AlertDialogDescription>
               This will reset agent{' '}
-              <span className="font-semibold">{agent?.name ?? agentId.slice(0, 8)}</span>{' '}
-              to idle status and unhook any hooked bead. This action is logged in the audit trail.
+              <span className="font-semibold">{agent?.name ?? agentId.slice(0, 8)}</span> to idle
+              status and unhook any hooked bead. This action is logged in the audit trail.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -516,8 +518,6 @@ export function AgentInspectorDashboard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-
     </div>
   );
 }

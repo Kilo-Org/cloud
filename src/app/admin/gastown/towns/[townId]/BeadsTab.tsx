@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,15 +25,19 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 
-type BeadStatus = 'open' | 'in_progress' | 'closed' | 'failed';
-type BeadType =
-  | 'issue'
-  | 'message'
-  | 'escalation'
-  | 'merge_request'
-  | 'convoy'
-  | 'molecule'
-  | 'agent';
+const beadStatuses = ['open', 'in_progress', 'closed', 'failed'] as const;
+type BeadStatus = (typeof beadStatuses)[number];
+
+const beadTypes = [
+  'issue',
+  'message',
+  'escalation',
+  'merge_request',
+  'convoy',
+  'molecule',
+  'agent',
+] as const;
+type BeadType = (typeof beadTypes)[number];
 
 const STATUS_COLORS: Record<BeadStatus, string> = {
   open: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -68,6 +73,10 @@ export function BeadsTab({ townId }: { townId: string }) {
       onSuccess: () => {
         void queryClient.invalidateQueries(trpc.admin.gastown.listBeads.queryFilter({ townId }));
         setConfirmAction(null);
+        toast.success('Bead closed successfully');
+      },
+      onError: err => {
+        toast.error(`Failed to close bead: ${err.message}`);
       },
     })
   );
@@ -77,6 +86,10 @@ export function BeadsTab({ townId }: { townId: string }) {
       onSuccess: () => {
         void queryClient.invalidateQueries(trpc.admin.gastown.listBeads.queryFilter({ townId }));
         setConfirmAction(null);
+        toast.success('Bead marked as failed');
+      },
+      onError: err => {
+        toast.error(`Failed to fail bead: ${err.message}`);
       },
     })
   );
@@ -101,7 +114,10 @@ export function BeadsTab({ townId }: { townId: string }) {
           <div className="flex gap-2">
             <Select
               value={statusFilter}
-              onValueChange={v => setStatusFilter(v as BeadStatus | 'all')}
+              onValueChange={v => {
+                if (v === 'all' || (beadStatuses as readonly string[]).includes(v))
+                  setStatusFilter(v as BeadStatus | 'all');
+              }}
             >
               <SelectTrigger className="w-36">
                 <SelectValue placeholder="All statuses" />
@@ -115,7 +131,13 @@ export function BeadsTab({ townId }: { townId: string }) {
               </SelectContent>
             </Select>
 
-            <Select value={typeFilter} onValueChange={v => setTypeFilter(v as BeadType | 'all')}>
+            <Select
+              value={typeFilter}
+              onValueChange={v => {
+                if (v === 'all' || (beadTypes as readonly string[]).includes(v))
+                  setTypeFilter(v as BeadType | 'all');
+              }}
+            >
               <SelectTrigger className="w-36">
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
@@ -169,9 +191,7 @@ export function BeadsTab({ townId }: { townId: string }) {
                         className="hover:text-foreground text-blue-400 transition-colors"
                       >
                         <span className="font-mono text-xs">{bead.bead_id.slice(0, 8)}…</span>
-                        {bead.title && (
-                          <span className="ml-2 max-w-64 truncate">{bead.title}</span>
-                        )}
+                        {bead.title && <span className="ml-2 max-w-64 truncate">{bead.title}</span>}
                       </Link>
                     </td>
                     <td className="py-2 pr-4">
@@ -180,7 +200,11 @@ export function BeadsTab({ townId }: { townId: string }) {
                     <td className="py-2 pr-4">
                       <Badge
                         variant="outline"
-                        className={STATUS_COLORS[bead.status as BeadStatus] ?? ''}
+                        className={
+                          (beadStatuses as readonly string[]).includes(bead.status)
+                            ? STATUS_COLORS[bead.status as BeadStatus]
+                            : ''
+                        }
                       >
                         {bead.status}
                       </Badge>
@@ -249,8 +273,7 @@ export function BeadsTab({ townId }: { townId: string }) {
               {confirmAction?.type === 'close' ? 'Force Close Bead' : 'Force Fail Bead'}
             </DialogTitle>
             <DialogDescription>
-              This will{' '}
-              {confirmAction?.type === 'close' ? 'force-close' : 'force-fail'} bead{' '}
+              This will {confirmAction?.type === 'close' ? 'force-close' : 'force-fail'} bead{' '}
               <span className="font-mono">{confirmAction?.beadId.slice(0, 8)}…</span>
               {confirmAction?.title ? ` (${confirmAction.title})` : ''}. This action is logged in
               the audit trail.

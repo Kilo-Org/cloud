@@ -35,6 +35,7 @@ const MayorSlingBatchBody = z
     merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
     /** Set to true only when ALL tasks are genuinely independent (no shared files, no shared state). */
     parallel: z.boolean().optional(),
+    staged: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     // Require dependency graph unless explicitly opted out with parallel: true.
@@ -288,6 +289,7 @@ export async function handleMayorSlingBatch(c: Context<GastownEnv>, params: { to
     convoyTitle: parsed.data.convoy_title,
     tasks: parsed.data.tasks,
     merge_mode: parsed.data.merge_mode,
+    staged: parsed.data.staged,
   });
 
   console.log(
@@ -601,4 +603,35 @@ export async function handleMayorEscalationAcknowledge(
 
   if (!escalation) return c.json(resError('Escalation not found'), 404);
   return c.json(resSuccess(escalation));
+}
+
+/**
+ * POST /api/mayor/:townId/tools/convoys/:convoyId/start
+ * Transition a staged convoy to active: hook agents and begin dispatch.
+ */
+export async function handleMayorConvoyStart(
+  c: Context<GastownEnv>,
+  params: { townId: string; convoyId: string }
+) {
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyStart: townId=${params.townId} convoyId=${params.convoyId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  let result: Awaited<ReturnType<typeof town.startConvoy>>;
+  try {
+    result = await town.startConvoy(params.convoyId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('not found') || message.includes('not staged')) {
+      return c.json(resError('Convoy not found or not staged'), 404);
+    }
+    throw err;
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyStart: completed, convoy=${result.convoy.id} beads=${result.beads.length}`
+  );
+
+  return c.json(resSuccess(result));
 }

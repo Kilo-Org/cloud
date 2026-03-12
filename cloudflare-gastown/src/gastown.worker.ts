@@ -95,6 +95,7 @@ import {
   handleMayorConvoyUpdate,
   handleMayorBeadDelete,
   handleMayorEscalationAcknowledge,
+  handleMayorConvoyStart,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
@@ -655,6 +656,9 @@ app.post('/api/mayor/:townId/tools/escalations/:escalationId/acknowledge', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/escalations/:escalationId/acknowledge', () =>
     handleMayorEscalationAcknowledge(c, c.req.param())
   )
+);
+app.post('/api/mayor/:townId/tools/convoys/:convoyId/start', c =>
+  handleMayorConvoyStart(c, c.req.param())
 );
 
 // ── tRPC ────────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import type {
   BeadType,
   Convoy,
   ConvoyDetail,
+  ConvoyStartResult,
   GastownEnv,
   Mail,
   MayorGastownEnv,
@@ -334,10 +335,18 @@ export class MayorGastownClient {
     tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
     merge_mode?: 'review-then-land' | 'review-and-merge';
     parallel?: boolean;
+    staged?: boolean;
   }): Promise<SlingBatchResult> {
     return this.request<SlingBatchResult>(this.mayorPath('/sling-batch'), {
       method: 'POST',
       body: JSON.stringify(input),
+    });
+  }
+
+  async startConvoy(convoyId: string): Promise<ConvoyStartResult> {
+    return this.request<ConvoyStartResult>(this.mayorPath(`/convoys/${convoyId}/start`), {
+      method: 'POST',
+      body: JSON.stringify({}),
     });
   }
 

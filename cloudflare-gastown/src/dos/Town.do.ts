@@ -171,6 +171,7 @@ type ConvoyEntry = {
   id: string;
   title: string;
   status: 'active' | 'landed';
+  staged: boolean;
   total_beads: number;
   closed_beads: number;
   created_by: string | null;
@@ -185,6 +186,7 @@ function toConvoy(row: ConvoyBeadRecord): ConvoyEntry {
     id: row.bead_id,
     title: row.title,
     status: row.status === 'closed' ? 'landed' : 'active',
+    staged: row.staged === 1,
     total_beads: row.total_beads,
     closed_beads: row.closed_beads,
     created_by: row.created_by,
@@ -199,7 +201,7 @@ const CONVOY_JOIN = /* sql */ `
   SELECT ${beads}.*,
          ${convoy_metadata.total_beads}, ${convoy_metadata.closed_beads},
          ${convoy_metadata.landed_at}, ${convoy_metadata.feature_branch},
-         ${convoy_metadata.merge_mode}
+         ${convoy_metadata.merge_mode}, ${convoy_metadata.staged}
   FROM ${beads}
   INNER JOIN ${convoy_metadata} ON ${beads.bead_id} = ${convoy_metadata.bead_id}
 `;
@@ -1849,7 +1851,8 @@ export class TownDO extends DurableObject<Env> {
     convoyTitle: string;
     tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
     merge_mode?: 'review-then-land' | 'review-and-merge';
-  }): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent }> }> {
+    staged?: boolean;
+  }): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent | null }> }> {
     await this.ensureInitialized();
 
     const convoyId = generateId();
@@ -1941,21 +1944,24 @@ export class TownDO extends DurableObject<Env> {
 
     const mergeMode = input.merge_mode ?? 'review-then-land';
 
+    const stagedValue = input.staged ? 1 : 0;
+
     query(
       this.sql,
       /* sql */ `
         INSERT INTO ${convoy_metadata} (
           ${convoy_metadata.columns.bead_id}, ${convoy_metadata.columns.total_beads},
           ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at},
-          ${convoy_metadata.columns.feature_branch}, ${convoy_metadata.columns.merge_mode}
-        ) VALUES (?, ?, ?, ?, ?, ?)
+          ${convoy_metadata.columns.feature_branch}, ${convoy_metadata.columns.merge_mode},
+          ${convoy_metadata.columns.staged}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      [convoyId, input.tasks.length, 0, null, featureBranch, mergeMode]
+      [convoyId, input.tasks.length, 0, null, featureBranch, mergeMode, stagedValue]
     );
 
     // 2. Create all beads and track their IDs (needed for depends_on resolution)
     const beadIds: string[] = [];
-    const results: Array<{ bead: Bead; agent: Agent }> = [];
+    const results: Array<{ bead: Bead; agent: Agent | null }> = [];
 
     for (const task of input.tasks) {
       const createdBead = beadOps.createBead(this.sql, {
@@ -2002,24 +2008,109 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    // 4. For each bead: assign a polecat, but only dispatch if unblocked
-    for (let i = 0; i < beadIds.length; i++) {
-      const beadId = beadIds[i];
-      const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
-      agents.hookBead(this.sql, agent.id, beadId);
+    if (input.staged) {
+      // Staged mode: collect beads without hooking agents or dispatching.
+      for (const beadId of beadIds) {
+        const bead = beadOps.getBead(this.sql, beadId);
+        if (!bead) continue;
+        results.push({ bead, agent: null });
+      }
+    } else {
+      // 4. For each bead: assign a polecat, but only dispatch if unblocked
+      for (let i = 0; i < beadIds.length; i++) {
+        const beadId = beadIds[i];
+        const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
+        agents.hookBead(this.sql, agent.id, beadId);
 
+        const bead = beadOps.getBead(this.sql, beadId);
+        const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
+        if (!bead) continue;
+
+        // Only dispatch beads with no unresolved blockers
+        if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
+          this.dispatchAgent(hookedAgent, bead).catch(err =>
+            console.error(`${TOWN_LOG} slingConvoy: fire-and-forget dispatchAgent failed:`, err)
+          );
+        } else {
+          console.log(
+            `${TOWN_LOG} slingConvoy: bead=${beadId} blocked, deferring dispatch until deps close`
+          );
+        }
+
+        results.push({ bead, agent: hookedAgent });
+      }
+
+      await this.armAlarmIfNeeded();
+    }
+
+    const convoy = this.getConvoy(convoyId);
+    if (!convoy) throw new Error('Failed to create convoy');
+    return { convoy, beads: results };
+  }
+
+  /**
+   * Transition a staged convoy to active: hook agents and begin dispatch.
+   */
+  async startConvoy(
+    convoyId: string
+  ): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent }> }> {
+    await this.ensureInitialized();
+
+    const convoy = this.getConvoy(convoyId);
+    if (!convoy) throw new Error(`Convoy not found: ${convoyId}`);
+    if (!convoy.staged) throw new Error(`Convoy is not staged: ${convoyId}`);
+
+    // Mark convoy as active
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${convoy_metadata}
+        SET ${convoy_metadata.columns.staged} = 0
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
+      [convoyId]
+    );
+
+    // Find all beads tracked by this convoy
+    const trackedRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${bead_dependencies.bead_id}
+          FROM ${bead_dependencies}
+          WHERE ${bead_dependencies.depends_on_bead_id} = ?
+            AND ${bead_dependencies.dependency_type} = 'tracks'
+        `,
+        [convoyId]
+      ),
+    ];
+
+    const BeadIdRow = z.object({ bead_id: z.string() });
+    const trackedBeadIds = BeadIdRow.array()
+      .parse(trackedRows)
+      .map(r => r.bead_id);
+
+    const results: Array<{ bead: Bead; agent: Agent }> = [];
+
+    for (const beadId of trackedBeadIds) {
       const bead = beadOps.getBead(this.sql, beadId);
-      const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
       if (!bead) continue;
 
-      // Only dispatch beads with no unresolved blockers
+      const rigId = bead.rig_id;
+      if (!rigId) continue;
+
+      const agent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
+      agents.hookBead(this.sql, agent.id, beadId);
+
+      const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
+
       if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
         this.dispatchAgent(hookedAgent, bead).catch(err =>
-          console.error(`${TOWN_LOG} slingConvoy: fire-and-forget dispatchAgent failed:`, err)
+          console.error(`${TOWN_LOG} startConvoy: fire-and-forget dispatchAgent failed:`, err)
         );
       } else {
         console.log(
-          `${TOWN_LOG} slingConvoy: bead=${beadId} blocked, deferring dispatch until deps close`
+          `${TOWN_LOG} startConvoy: bead=${beadId} blocked, deferring dispatch until deps close`
         );
       }
 
@@ -2028,14 +2119,14 @@ export class TownDO extends DurableObject<Env> {
 
     await this.armAlarmIfNeeded();
 
-    const convoy = this.getConvoy(convoyId);
-    if (!convoy) throw new Error('Failed to create convoy');
+    const updatedConvoy = this.getConvoy(convoyId);
+    if (!updatedConvoy) throw new Error(`Failed to re-fetch convoy after start: ${convoyId}`);
     this.emitEvent({
       event: 'convoy.created',
       townId: this.townId,
       convoyId,
     });
-    return { convoy, beads: results };
+    return { convoy: updatedConvoy, beads: results };
   }
 
   /**

@@ -97,12 +97,19 @@ export type SlingBatchResult = {
 export type Convoy = {
   id: string;
   title: string;
-  status: 'active' | 'landed';
+  status: 'active' | 'staged' | 'landed';
+  staged: boolean;
   total_beads: number;
   closed_beads: number;
   created_by: string | null;
   created_at: string;
   landed_at: string | null;
+};
+
+// Result returned by POST /convoys/:id/start
+export type ConvoyStartResult = {
+  convoy: Convoy;
+  beads: Array<{ bead: Bead; agent: Agent }>;
 };
 
 // Detailed convoy status with per-bead breakdown

@@ -5,6 +5,7 @@ import type {
   Bead,
   Convoy,
   ConvoyDetail,
+  ConvoyStartResult,
   Rig,
   SlingBatchResult,
   SlingResult,
@@ -60,8 +61,21 @@ const FAKE_CONVOY: Convoy = {
   id: 'convoy-1',
   title: 'JWT Authentication',
   status: 'active',
+  staged: false,
   total_beads: 3,
   closed_beads: 1,
+  created_by: null,
+  created_at: '2026-03-05T00:00:00Z',
+  landed_at: null,
+};
+
+const FAKE_STAGED_CONVOY: Convoy = {
+  id: 'convoy-staged-1',
+  title: 'Big Refactor',
+  status: 'staged',
+  staged: true,
+  total_beads: 2,
+  closed_beads: 0,
   created_by: null,
   created_at: '2026-03-05T00:00:00Z',
   landed_at: null,
@@ -95,8 +109,22 @@ function makeFakeMayorClient(overrides: Partial<MayorGastownClient> = {}): Mayor
       ],
     }),
     listConvoys: vi.fn<() => Promise<Convoy[]>>().mockResolvedValue([FAKE_CONVOY]),
+    startConvoy: vi.fn<() => Promise<ConvoyStartResult>>().mockResolvedValue({
+      convoy: { ...FAKE_STAGED_CONVOY, status: 'active', staged: false },
+      beads: [
+        {
+          bead: { ...FAKE_BEAD, bead_id: 'bead-1', title: 'Task 1' },
+          agent: { ...FAKE_AGENT, id: 'agent-1', name: 'Toast' },
+        },
+        {
+          bead: { ...FAKE_BEAD, bead_id: 'bead-2', title: 'Task 2' },
+          agent: { ...FAKE_AGENT, id: 'agent-2', name: 'Muffin' },
+        },
+      ],
+    }),
     getConvoyStatus: vi.fn<() => Promise<ConvoyDetail>>().mockResolvedValue({
       ...FAKE_CONVOY,
+      staged: false,
       beads: [
         {
           bead_id: 'bead-1',
@@ -337,6 +365,47 @@ describe('mayor tools', () => {
       expect(result).toContain('esc-1');
       expect(result).toContain('acknowledged');
       expect(client.acknowledgeEscalation).toHaveBeenCalledWith('esc-1');
+    });
+  });
+
+  describe('gt_sling_batch staged', () => {
+    it('passes staged=true to client and reports convoy as staged', async () => {
+      client = makeFakeMayorClient({
+        slingBatch: vi.fn<() => Promise<SlingBatchResult>>().mockResolvedValue({
+          convoy: FAKE_STAGED_CONVOY,
+          beads: [
+            {
+              bead: { ...FAKE_BEAD, bead_id: 'bead-1', title: 'Task 1' },
+              agent: { ...FAKE_AGENT, id: 'agent-1', name: 'Toast' },
+            },
+            {
+              bead: { ...FAKE_BEAD, bead_id: 'bead-2', title: 'Task 2' },
+              agent: { ...FAKE_AGENT, id: 'agent-2', name: 'Muffin' },
+            },
+          ],
+        }),
+      });
+      tools = createMayorTools(client);
+
+      const tasks = [{ title: 'Task 1' }, { title: 'Task 2', depends_on: [0] }];
+      const result = await tools.gt_sling_batch.execute(
+        { rig_id: 'rig-1', convoy_title: 'Big Refactor', tasks, staged: true },
+        CTX
+      );
+
+      expect(result).toContain('Convoy staged:');
+      expect(result).toContain('convoy-staged-1');
+      expect(result).toContain('gt_convoy_start');
+      expect(client.slingBatch).toHaveBeenCalledWith(expect.objectContaining({ staged: true }));
+    });
+  });
+
+  describe('gt_convoy_start', () => {
+    it('starts a staged convoy and reports bead count', async () => {
+      const result = await tools.gt_convoy_start.execute({ convoy_id: 'convoy-staged-1' }, CTX);
+      expect(result).toContain('Convoy started');
+      expect(result).toContain('2 bead(s)');
+      expect(client.startConvoy).toHaveBeenCalledWith('convoy-staged-1');
     });
   });
 });

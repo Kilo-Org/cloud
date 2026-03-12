@@ -169,6 +169,14 @@ export function createMayorTools(client: MayorGastownClient) {
               'that need ordering, which causes merge conflicts and failures.'
           )
           .optional(),
+        staged: tool.schema
+          .boolean()
+          .describe(
+            'If true, creates the convoy plan without dispatching agents. ' +
+              'The user can review and edit before calling gt_convoy_start to begin execution. ' +
+              'Default: false (dispatch immediately).'
+          )
+          .optional(),
       },
       async execute(args) {
         const result = await client.slingBatch({
@@ -177,6 +185,7 @@ export function createMayorTools(client: MayorGastownClient) {
           tasks: args.tasks,
           merge_mode: args.merge_mode,
           parallel: args.parallel,
+          staged: args.staged,
         });
 
         const beadLines = result.beads.map(
@@ -184,14 +193,17 @@ export function createMayorTools(client: MayorGastownClient) {
             `  ${i + 1}. "${b.bead.title}" → ${b.agent.name} (${b.agent.id})`
         );
         const mode = args.merge_mode ?? 'review-then-land';
+        const staged = args.staged === true;
         return [
-          `Convoy created: "${result.convoy.title}" (${result.convoy.id})`,
+          `Convoy ${staged ? 'staged' : 'created'}: "${result.convoy.title}" (${result.convoy.id})`,
           `Merge mode: ${mode}`,
           `Tracking ${result.convoy.total_beads} beads:`,
           ...beadLines,
-          mode === 'review-then-land'
-            ? `Beads will be reviewed and merged into the convoy feature branch. A final PR/merge to main occurs when all beads are done.`
-            : `Each bead will go through the full review + merge/PR cycle independently.`,
+          staged
+            ? `Convoy is staged — agents have NOT been dispatched. Call gt_convoy_start with convoy_id "${result.convoy.id}" when ready to begin execution.`
+            : mode === 'review-then-land'
+              ? `Beads will be reviewed and merged into the convoy feature branch. A final PR/merge to main occurs when all beads are done.`
+              : `Each bead will go through the full review + merge/PR cycle independently.`,
         ].join('\n');
       },
     }),
@@ -220,6 +232,21 @@ export function createMayorTools(client: MayorGastownClient) {
       async execute(args) {
         const status = await client.getConvoyStatus(args.convoy_id);
         return JSON.stringify(status, null, 2);
+      },
+    }),
+
+    gt_convoy_start: tool({
+      description:
+        'Start a staged convoy. Transitions the convoy from staged (planned but not executing) ' +
+        'to active: hooks agents to all tracked beads and begins dispatch. ' +
+        'Call this when the user approves a staged plan and says to start it.',
+      args: {
+        convoy_id: tool.schema.string().describe('The UUID of the staged convoy to start'),
+      },
+      async execute(args) {
+        const result = await client.startConvoy(args.convoy_id);
+        const beadCount = result.beads?.length ?? 0;
+        return `Convoy started. ${beadCount} bead(s) dispatched to agents.`;
       },
     }),
 

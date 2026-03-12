@@ -24,6 +24,7 @@ import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router'
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
+import { adminGastownRouter } from '@/routers/admin/gastown-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
@@ -1094,4 +1095,5 @@ export const adminRouter = createTRPCRouter({
   bulkUserCredits: bulkUserCreditsRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,
+  gastown: adminGastownRouter,
 });

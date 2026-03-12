@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { UserAdminOrganizations } from '@/app/admin/components/UserAdmin/UserAdminOrganizations';
 import { UserAdminKiloPass } from '@/app/admin/components/UserAdmin/UserAdminKiloPass';
+import { UserAdminGastown } from '@/app/admin/components/UserAdmin/UserAdminGastown';
 
 export function UserAdminDashboard({ ...user }: UserDetailProps) {
   const breadcrumbs = (
@@ -59,6 +60,8 @@ export function UserAdminDashboard({ ...user }: UserDetailProps) {
           <UserAdminInvoices stripe_customer_id={user.stripe_customer_id} />
           <UserAdminReferrals kilo_user_id={user.id} />
         </div>
+
+        <UserAdminGastown userId={user.id} />
       </div>
     </AdminPage>
   );

@@ -22,6 +22,7 @@ import {
   Upload,
   Bell,
   Server,
+  Network,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -143,6 +144,11 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'Managed Indexing',
     url: '/admin/code-indexing',
     icon: () => <Database />,
+  },
+  {
+    title: () => 'Gastown',
+    url: '/admin/gastown',
+    icon: () => <Network />,
   },
 ];
 

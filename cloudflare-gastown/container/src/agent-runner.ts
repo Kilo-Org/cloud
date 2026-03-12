@@ -333,23 +333,24 @@ async function verifyGitCredentials(
 }
 
 /**
- * Create a minimal git-initialized workspace for a reasoning-only agent
- * (e.g. triage) that doesn't need a real repo clone.
- * kilo serve requires a git repo in the working directory, so we init
- * a bare local repo with an empty initial commit.
+ * Create a minimal git-initialized workspace for the mayor agent.
+ * The mayor doesn't need a real repo clone — it's a conversational
+ * orchestrator that delegates work via tools. But kilo serve requires
+ * a git repo in the working directory.
  */
-async function createLightweightWorkspace(label: string, rigId: string): Promise<string> {
+async function createMayorWorkspace(rigId: string): Promise<string> {
   const { mkdir: mkdirAsync } = await import('node:fs/promises');
   const { existsSync } = await import('node:fs');
   const path = await import('node:path');
-  // Validate to prevent path traversal
+  // Validate rigId to prevent path traversal (rigId is synthetic: "mayor-<townId>")
   // eslint-disable-next-line no-control-regex
   if (!rigId || /\.\.[/\\]|[/\\]\.\.|^\.\.$/.test(rigId) || /[\x00-\x1f]/.test(rigId)) {
-    throw new Error(`Invalid rigId for lightweight workspace: ${rigId}`);
+    throw new Error(`Invalid rigId for mayor workspace: ${rigId}`);
   }
-  const dir = path.resolve('/workspace/rigs', rigId, `${label}-workspace`);
+  const dir = path.resolve('/workspace/rigs', rigId, 'mayor-workspace');
   await mkdirAsync(dir, { recursive: true });
 
+  // Initialize a bare git repo if not already present
   if (!existsSync(`${dir}/.git`)) {
     const init = Bun.spawn(['git', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' });
     await init.exited;
@@ -359,20 +360,10 @@ async function createLightweightWorkspace(label: string, rigId: string): Promise
       stderr: 'pipe',
     });
     await commit.exited;
-    console.log(`Created ${label} workspace at ${dir}`);
+    console.log(`Created mayor workspace at ${dir}`);
   }
 
   return dir;
-}
-
-/**
- * Create a minimal git-initialized workspace for the mayor agent.
- * The mayor doesn't need a real repo clone — it's a conversational
- * orchestrator that delegates work via tools. But kilo serve requires
- * a git repo in the working directory.
- */
-async function createMayorWorkspace(rigId: string): Promise<string> {
-  return createLightweightWorkspace('mayor', rigId);
 }
 
 /**
@@ -429,7 +420,7 @@ async function writeMayorSystemPromptToAgentsMd(
 
 /**
  * Run the full agent startup sequence:
- * 1. Clone/fetch the rig's git repo (or create minimal workspace for mayor/triage)
+ * 1. Clone/fetch the rig's git repo (or create minimal workspace for mayor)
  * 2. Create an isolated worktree for the agent's branch
  * 3. Configure git credentials for push/fetch
  * 4. Start a kilo serve instance for the worktree (or reuse existing)
@@ -439,11 +430,7 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
   let request = originalRequest;
   let workdir: string;
 
-  if (request.role === 'triage') {
-    // Triage agents are pure reasoning — no code changes, no git needed.
-    // Use a lightweight workspace to avoid clone failures feeding the loop.
-    workdir = await createLightweightWorkspace('triage', request.rigId);
-  } else if (request.role === 'mayor') {
+  if (request.role === 'mayor') {
     // Mayor doesn't need a repo clone — just a git-initialized directory
     workdir = await createMayorWorkspace(request.rigId);
 

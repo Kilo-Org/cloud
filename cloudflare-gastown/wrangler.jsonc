@@ -52,6 +52,7 @@
     "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
     "KILO_API_URL": "https://api.kilo.ai",
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
+    "SENTRY_DSN": "", // populated via wrangler secret or secrets store in prod
   },
 
   // Hyperdrive binding for Postgres (user lookups, token generation)
@@ -61,6 +62,10 @@
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
+  ],
+
+  "analytics_engine_datasets": [
+    { "binding": "GASTOWN_AE", "dataset": "gastown_events" },
   ],
 
   "services": [
@@ -122,6 +127,9 @@
           "service": "git-token-service",
           "entrypoint": "GitTokenRPCEntrypoint",
         },
+      ],
+      "analytics_engine_datasets": [
+        { "binding": "GASTOWN_AE", "dataset": "gastown_events" },
       ],
       "secrets_store_secrets": [
         {

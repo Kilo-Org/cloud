@@ -14,6 +14,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import * as Sentry from '@sentry/cloudflare';
 import { z } from 'zod';
 
 // Sub-modules (plain functions, not classes — per coding style)
@@ -44,6 +45,7 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
+import { writeEvent } from '../util/analytics.util';
 import { BeadPriority } from '../types';
 import type {
   TownConfig,
@@ -325,6 +327,57 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Broadcast an incremental bead lifecycle event to all connected status
+   * WebSocket clients. Called after bead create/update/close operations.
+   */
+  private broadcastBeadEvent(event: {
+    type: 'bead.created' | 'bead.status_changed' | 'bead.closed' | 'bead.failed';
+    beadId: string;
+    title?: string;
+    status?: string;
+    rigId?: string;
+    convoyId?: string;
+  }): void {
+    const sockets = this.ctx.getWebSockets('status');
+    if (sockets.length === 0) return;
+    const frame = JSON.stringify({ channel: 'bead', ...event, ts: now() });
+    for (const ws of sockets) {
+      try {
+        ws.send(frame);
+      } catch {
+        // Client disconnected — will be cleaned up by webSocketClose
+      }
+    }
+  }
+
+  /**
+   * Broadcast convoy progress to all connected status WebSocket clients.
+   * Called from onBeadClosed() after updating closed_beads count.
+   */
+  private broadcastConvoyProgress(
+    convoyId: string,
+    totalBeads: number,
+    closedBeads: number
+  ): void {
+    const sockets = this.ctx.getWebSockets('status');
+    if (sockets.length === 0) return;
+    const frame = JSON.stringify({
+      channel: 'convoy',
+      convoyId,
+      totalBeads,
+      closedBeads,
+      ts: now(),
+    });
+    for (const ws of sockets) {
+      try {
+        ws.send(frame);
+      } catch {
+        // Client disconnected — will be cleaned up by webSocketClose
+      }
+    }
+  }
+
   // ── Initialization ──────────────────────────────────────────────────
 
   private async ensureInitialized(): Promise<void> {
@@ -538,7 +591,22 @@ export class TownDO extends DurableObject<Env> {
 
   async createBead(input: CreateBeadInput): Promise<Bead> {
     await this.ensureInitialized();
-    return beadOps.createBead(this.sql, input);
+    const bead = beadOps.createBead(this.sql, input);
+    writeEvent(this.env, {
+      event: 'bead.created',
+      townId: this.townId,
+      rigId: input.rig_id,
+      beadId: bead.bead_id,
+      beadType: input.type,
+    });
+    this.broadcastBeadEvent({
+      type: 'bead.created',
+      beadId: bead.bead_id,
+      title: bead.title,
+      status: bead.status,
+      rigId: bead.rig_id ?? undefined,
+    });
+    return bead;
   }
 
   async getBeadAsync(beadId: string): Promise<Bead | null> {
@@ -557,9 +625,49 @@ export class TownDO extends DurableObject<Env> {
     // when the bead reaches a terminal status (closed/failed).
     const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId);
 
-    // When a bead closes, check if any blocked beads are now unblocked and dispatch them.
-    if (status === 'closed' || status === 'failed') {
+    if (status === 'closed') {
+      const durationMs = Date.now() - new Date(bead.created_at).getTime();
+      writeEvent(this.env, {
+        event: 'bead.closed',
+        townId: this.townId,
+        rigId: bead.rig_id ?? undefined,
+        beadId,
+        beadType: bead.type,
+        durationMs,
+      });
+      this.broadcastBeadEvent({
+        type: 'bead.closed',
+        beadId,
+        title: bead.title,
+        status: 'closed',
+        rigId: bead.rig_id ?? undefined,
+      });
+      // When a bead closes, check if any blocked beads are now unblocked and dispatch them.
       this.dispatchUnblockedBeads(beadId);
+    } else if (status === 'failed') {
+      writeEvent(this.env, {
+        event: 'bead.failed',
+        townId: this.townId,
+        rigId: bead.rig_id ?? undefined,
+        beadId,
+        beadType: bead.type,
+      });
+      this.broadcastBeadEvent({
+        type: 'bead.failed',
+        beadId,
+        title: bead.title,
+        status: 'failed',
+        rigId: bead.rig_id ?? undefined,
+      });
+      this.dispatchUnblockedBeads(beadId);
+    } else {
+      this.broadcastBeadEvent({
+        type: 'bead.status_changed',
+        beadId,
+        title: bead.title,
+        status,
+        rigId: bead.rig_id ?? undefined,
+      });
     }
 
     return bead;
@@ -840,6 +948,12 @@ export class TownDO extends DurableObject<Env> {
   async submitToReviewQueue(input: ReviewQueueInput): Promise<void> {
     await this.ensureInitialized();
     reviewQueue.submitToReviewQueue(this.sql, input);
+    writeEvent(this.env, {
+      event: 'review.submitted',
+      townId: this.townId,
+      rigId: input.rig_id,
+      beadId: input.bead_id,
+    });
     await this.armAlarmIfNeeded();
   }
 
@@ -869,11 +983,24 @@ export class TownDO extends DurableObject<Env> {
 
     reviewQueue.completeReviewWithResult(this.sql, input);
 
-    // When a review is merged, the source bead's pending MR is now resolved.
-    // Downstream beads that were blocked (because hasUnresolvedBlockers saw
-    // the open MR) should now be dispatched.
-    if (input.status === 'merged' && sourceBeadId) {
-      this.dispatchUnblockedBeads(sourceBeadId);
+    if (input.status === 'merged') {
+      writeEvent(this.env, {
+        event: 'review.completed',
+        townId: this.townId,
+        beadId: input.entry_id,
+      });
+      // When a review is merged, the source bead's pending MR is now resolved.
+      // Downstream beads that were blocked (because hasUnresolvedBlockers saw
+      // the open MR) should now be dispatched.
+      if (sourceBeadId) {
+        this.dispatchUnblockedBeads(sourceBeadId);
+      }
+    } else if (input.status === 'failed' || input.status === 'conflict') {
+      writeEvent(this.env, {
+        event: 'review.failed',
+        townId: this.townId,
+        beadId: input.entry_id,
+      });
     }
 
     // When a review fails or conflicts (rework), the source bead was
@@ -925,6 +1052,13 @@ export class TownDO extends DurableObject<Env> {
     }
     if (resolvedAgentId) {
       reviewQueue.agentCompleted(this.sql, resolvedAgentId, input);
+      const agent = agents.getAgent(this.sql, resolvedAgentId);
+      writeEvent(this.env, {
+        event: 'agent.exited',
+        townId: this.townId,
+        agentId: resolvedAgentId,
+        role: agent?.role,
+      });
     }
   }
 
@@ -1531,6 +1665,11 @@ export class TownDO extends DurableObject<Env> {
 
     const convoy = this.getConvoy(convoyId);
     if (!convoy) throw new Error('Failed to create convoy');
+    writeEvent(this.env, {
+      event: 'convoy.created',
+      townId: this.townId,
+      convoyId,
+    });
     return convoy;
   }
 
@@ -1564,6 +1703,9 @@ export class TownDO extends DurableObject<Env> {
     );
 
     const convoy = this.getConvoy(input.convoyId);
+    if (convoy) {
+      this.broadcastConvoyProgress(input.convoyId, convoy.total_beads, convoy.closed_beads);
+    }
     if (convoy && convoy.status === 'active' && convoy.closed_beads >= convoy.total_beads) {
       const timestamp = now();
       query(
@@ -1584,6 +1726,11 @@ export class TownDO extends DurableObject<Env> {
         `,
         [timestamp, input.convoyId]
       );
+      writeEvent(this.env, {
+        event: 'convoy.landed',
+        townId: this.townId,
+        convoyId: input.convoyId,
+      });
       return this.getConvoy(input.convoyId);
     }
     return convoy;
@@ -1862,6 +2009,11 @@ export class TownDO extends DurableObject<Env> {
 
     const convoy = this.getConvoy(convoyId);
     if (!convoy) throw new Error('Failed to create convoy');
+    writeEvent(this.env, {
+      event: 'convoy.created',
+      townId: this.townId,
+      convoyId,
+    });
     return { convoy, beads: results };
   }
 
@@ -2101,6 +2253,15 @@ export class TownDO extends DurableObject<Env> {
     const escalation = this.getEscalation(beadId);
     if (!escalation) throw new Error('Failed to create escalation');
 
+    writeEvent(this.env, {
+      event: 'escalation.created',
+      townId: this.townId,
+      rigId: input.source_rig_id,
+      agentId: input.source_agent_id,
+      beadId,
+      convoyId: convoyId ?? undefined,
+    });
+
     // Create a triage request so the patrol→triage→resolve loop can
     // act on the escalation. Without this, escalation beads sit open
     // with no assignee and no automated follow-up.
@@ -2196,26 +2357,31 @@ export class TownDO extends DurableObject<Env> {
       await this.processReviewQueue();
     } catch (err) {
       console.error(`${TOWN_LOG} alarm: processReviewQueue failed`, err);
+      Sentry.captureException(err);
     }
     try {
       await this.processConvoyLandings();
     } catch (err) {
       console.error(`${TOWN_LOG} alarm: processConvoyLandings failed`, err);
+      Sentry.captureException(err);
     }
     try {
       await this.schedulePendingWork();
     } catch (err) {
       console.error(`${TOWN_LOG} alarm: schedulePendingWork failed`, err);
+      Sentry.captureException(err);
     }
     try {
       await this.witnessPatrol();
     } catch (err) {
       console.error(`${TOWN_LOG} alarm: witnessPatrol failed`, err);
+      Sentry.captureException(err);
     }
     try {
       this.deaconPatrol();
     } catch (err) {
       console.error(`${TOWN_LOG} alarm: deaconPatrol failed`, err);
+      Sentry.captureException(err);
     }
     try {
       await this.deliverPendingMail();
@@ -2231,6 +2397,21 @@ export class TownDO extends DurableObject<Env> {
       await this.maybeDispatchTriageAgent();
     } catch (err) {
       console.warn(`${TOWN_LOG} alarm: maybeDispatchTriageAgent failed`, err);
+    }
+    try {
+      this.checkReviewQueueDepth();
+    } catch (e) {
+      console.warn(`${TOWN_LOG} checkReviewQueueDepth failed`, e);
+    }
+    try {
+      this.checkEscalationRate();
+    } catch (e) {
+      console.warn(`${TOWN_LOG} checkEscalationRate failed`, e);
+    }
+    try {
+      this.checkAgentRestartLoops();
+    } catch (e) {
+      console.warn(`${TOWN_LOG} checkAgentRestartLoops failed`, e);
     }
 
     // Re-arm: fast when active, slow when idle
@@ -2399,6 +2580,14 @@ export class TownDO extends DurableObject<Env> {
           [agent.id]
         );
         console.log(`${TOWN_LOG} dispatchAgent: started agent=${agent.name}(${agent.id})`);
+        writeEvent(this.env, {
+          event: 'agent.spawned',
+          townId: this.townId,
+          rigId,
+          agentId: agent.id,
+          beadId: bead.bead_id,
+          role: agent.role,
+        });
       } else {
         // Container failed to start — roll back to idle
         query(
@@ -2410,10 +2599,19 @@ export class TownDO extends DurableObject<Env> {
           `,
           [agent.id]
         );
+        writeEvent(this.env, {
+          event: 'agent.dispatch_failed',
+          townId: this.townId,
+          rigId,
+          agentId: agent.id,
+          beadId: bead.bead_id,
+          role: agent.role,
+        });
       }
       return started;
     } catch (err) {
       console.error(`${TOWN_LOG} dispatchAgent: failed for agent=${agent.id}:`, err);
+      Sentry.captureException(err, { extra: { agentId: agent.id, beadId: bead.bead_id } });
       // Roll back agent and bead to prevent them from being stuck in
       // working/in_progress state when the container call throws.
       try {
@@ -2432,6 +2630,13 @@ export class TownDO extends DurableObject<Env> {
       } catch (rollbackErr) {
         console.error(`${TOWN_LOG} dispatchAgent: rollback also failed:`, rollbackErr);
       }
+      writeEvent(this.env, {
+        event: 'agent.dispatch_failed',
+        townId: this.townId,
+        agentId: agent.id,
+        beadId: bead.bead_id,
+        role: agent.role,
+      });
       return false;
     }
   }
@@ -2667,6 +2872,81 @@ export class TownDO extends DurableObject<Env> {
 
     // ── Crash loop detection ───────────────────────────────────────
     patrol.detectCrashLoops(this.sql);
+  }
+
+  // ── Proactive alerting checks ────────────────────────────────────────
+
+  private checkReviewQueueDepth(): void {
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT COUNT(*) as cnt
+          FROM ${beads}
+          WHERE ${beads.type} = 'merge_request'
+            AND ${beads.status} IN ('open', 'in_progress')
+        `,
+        []
+      ),
+    ];
+    const depth = Number(rows[0]?.cnt ?? 0);
+    const threshold = 10;
+    if (depth >= threshold) {
+      console.warn(`${TOWN_LOG} ALERT: review queue depth=${depth} >= threshold=${threshold}`);
+      writeEvent(this.env, { event: 'review.queue_depth_alert', value: depth, townId: this.townId });
+    }
+  }
+
+  private checkEscalationRate(): void {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT COUNT(*) as cnt
+          FROM ${beads}
+          WHERE ${beads.type} = 'escalation'
+            AND ${beads.created_at} > ?
+        `,
+        [tenMinutesAgo]
+      ),
+    ];
+    const rate = Number(rows[0]?.cnt ?? 0);
+    const threshold = 5;
+    if (rate >= threshold) {
+      console.warn(`${TOWN_LOG} ALERT: ${rate} escalations in last 10 minutes`);
+      writeEvent(this.env, { event: 'escalation.rate_spike', value: rate, townId: this.townId });
+    }
+  }
+
+  private checkAgentRestartLoops(): void {
+    const RestartLoopRow = AgentMetadataRecord.pick({
+      bead_id: true,
+      dispatch_attempts: true,
+    });
+    const rows = RestartLoopRow.array().parse([
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${agent_metadata.bead_id}, ${agent_metadata.dispatch_attempts}
+          FROM ${agent_metadata}
+          WHERE ${agent_metadata.dispatch_attempts} > 5
+            AND ${agent_metadata.status} IN ('working', 'stalled')
+        `,
+        []
+      ),
+    ]);
+    for (const row of rows) {
+      console.warn(
+        `${TOWN_LOG} ALERT: agent=${row.bead_id} has ${row.dispatch_attempts} dispatch attempts (possible restart loop)`
+      );
+      writeEvent(this.env, {
+        event: 'agent.restart_loop',
+        agentId: row.bead_id,
+        value: row.dispatch_attempts,
+        townId: this.townId,
+      });
+    }
   }
 
   /**

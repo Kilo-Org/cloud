@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/cloudflare';
+import { withSentry } from '@sentry/cloudflare';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -469,6 +471,7 @@ app.notFound(c => c.json(resError('Not found'), 404));
 
 app.onError((err, c) => {
   console.error('Unhandled error', { error: err.message, stack: err.stack });
+  Sentry.captureException(err);
   return c.json(resError('Internal server error'), 500);
 });
 
@@ -482,52 +485,59 @@ const WS_STREAM_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/s
 const WS_PTY_PATTERN = /^\/api\/towns\/([^/]+)\/container\/agents\/([^/]+)\/pty\/([^/]+)\/connect$/;
 const WS_STATUS_PATTERN = /^\/api\/towns\/([^/]+)\/status\/ws$/;
 
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // Intercept WebSocket upgrade requests for agent streaming and PTY.
-    // Must bypass Hono — the DO returns a 101 + WebSocketPair that the
-    // runtime handles directly.
-    if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
-      // WebSocket upgrades use capability-token auth, not JWT headers.
-      // Browsers cannot send custom headers on WebSocket connections.
-      // The stream endpoint uses a ticket obtained via authenticated POST,
-      // and PTY uses a session ID obtained via authenticated POST.
-      const url = new URL(request.url);
+export default withSentry(
+  (env: Env) => ({
+    dsn: env.SENTRY_DSN ?? '',
+    tracesSampleRate: 0.1,
+    enabled: !!env.SENTRY_DSN,
+  }),
+  {
+    async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+      // Intercept WebSocket upgrade requests for agent streaming and PTY.
+      // Must bypass Hono — the DO returns a 101 + WebSocketPair that the
+      // runtime handles directly.
+      if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+        // WebSocket upgrades use capability-token auth, not JWT headers.
+        // Browsers cannot send custom headers on WebSocket connections.
+        // The stream endpoint uses a ticket obtained via authenticated POST,
+        // and PTY uses a session ID obtained via authenticated POST.
+        const url = new URL(request.url);
 
-      // Agent event stream
-      const streamMatch = url.pathname.match(WS_STREAM_PATTERN);
-      if (streamMatch) {
-        const townId = streamMatch[1];
-        const agentId = streamMatch[2];
-        console.log(`[gastown-worker] WS upgrade (stream): townId=${townId} agentId=${agentId}`);
-        const stub = getTownContainerStub(env, townId);
-        return stub.fetch(request);
+        // Agent event stream
+        const streamMatch = url.pathname.match(WS_STREAM_PATTERN);
+        if (streamMatch) {
+          const townId = streamMatch[1];
+          const agentId = streamMatch[2];
+          console.log(`[gastown-worker] WS upgrade (stream): townId=${townId} agentId=${agentId}`);
+          const stub = getTownContainerStub(env, townId);
+          return stub.fetch(request);
+        }
+
+        // PTY terminal connection
+        const ptyMatch = url.pathname.match(WS_PTY_PATTERN);
+        if (ptyMatch) {
+          const townId = ptyMatch[1];
+          const agentId = ptyMatch[2];
+          const ptyId = ptyMatch[3];
+          console.log(
+            `[gastown-worker] WS upgrade (pty): townId=${townId} agentId=${agentId} ptyId=${ptyId}`
+          );
+          const stub = getTownContainerStub(env, townId);
+          return stub.fetch(request);
+        }
+
+        // Town alarm status (real-time push)
+        const statusMatch = url.pathname.match(WS_STATUS_PATTERN);
+        if (statusMatch) {
+          const townId = statusMatch[1];
+          console.log(`[gastown-worker] WS upgrade (status): townId=${townId}`);
+          const stub = getTownDOStub(env, townId);
+          return stub.fetch(request);
+        }
       }
 
-      // PTY terminal connection
-      const ptyMatch = url.pathname.match(WS_PTY_PATTERN);
-      if (ptyMatch) {
-        const townId = ptyMatch[1];
-        const agentId = ptyMatch[2];
-        const ptyId = ptyMatch[3];
-        console.log(
-          `[gastown-worker] WS upgrade (pty): townId=${townId} agentId=${agentId} ptyId=${ptyId}`
-        );
-        const stub = getTownContainerStub(env, townId);
-        return stub.fetch(request);
-      }
-
-      // Town alarm status (real-time push)
-      const statusMatch = url.pathname.match(WS_STATUS_PATTERN);
-      if (statusMatch) {
-        const townId = statusMatch[1];
-        console.log(`[gastown-worker] WS upgrade (status): townId=${townId}`);
-        const stub = getTownDOStub(env, townId);
-        return stub.fetch(request);
-      }
-    }
-
-    // All other requests go through Hono
-    return app.fetch(request, env, ctx);
-  },
-};
+      // All other requests go through Hono
+      return app.fetch(request, env, ctx);
+    },
+  }
+);

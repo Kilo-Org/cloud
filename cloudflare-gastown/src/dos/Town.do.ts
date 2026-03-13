@@ -227,8 +227,8 @@ export class TownDO extends DurableObject<Env> {
     });
   }
 
-  private emitEvent(data: Omit<GastownEventData, 'userId'>): void {
-    writeEvent(this.env, { ...data, userId: this._ownerUserId });
+  private emitEvent(data: Omit<GastownEventData, 'userId' | 'delivery'>): void {
+    writeEvent(this.env, { ...data, delivery: 'internal', userId: this._ownerUserId });
   }
 
   // ── WebSocket: status broadcast ──────────────────────────────────────

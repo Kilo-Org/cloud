@@ -1,3 +1,7 @@
 .dev.vars
 container/dist/
 dist-types/
+
+# Sentry Config File
+.sentryclirc
+dist

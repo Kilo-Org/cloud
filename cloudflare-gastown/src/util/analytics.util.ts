@@ -1,4 +1,9 @@
+/**
+ * Controller-level event names emitted from HTTP/tRPC handlers.
+ * Internal DO events (bead lifecycle, agent dispatch) use `GastownInternalEventName`.
+ */
 export type GastownEventName =
+  // DO-internal lifecycle events
   | 'bead.created'
   | 'bead.status_changed'
   | 'bead.closed'
@@ -14,10 +19,18 @@ export type GastownEventName =
   | 'escalation.created'
   | 'escalation.acknowledged'
   | 'nudge.queued'
-  | 'nudge.delivered';
+  | 'nudge.delivered'
+  // Controller-level events (HTTP + tRPC) use string to avoid maintaining
+  // a massive union — event names are derived from route patterns.
+  | (string & {});
+
+export type GastownDelivery = 'http' | 'trpc' | 'internal';
 
 export type GastownEventData = {
   event: GastownEventName;
+  delivery?: GastownDelivery;
+  route?: string;
+  error?: string;
   userId?: string;
   townId?: string;
   rigId?: string;
@@ -26,9 +39,9 @@ export type GastownEventData = {
   convoyId?: string;
   role?: string; // 'polecat' | 'refinery' | 'mayor'
   beadType?: string;
-  durationMs?: number; // e.g. bead completion time
-  value?: number; // generic numeric value
-  label?: string; // extra string label
+  durationMs?: number;
+  value?: number;
+  label?: string;
 };
 
 /**
@@ -45,13 +58,13 @@ export function writeEvent(
       blobs: [
         data.event,
         data.userId ?? '',
+        data.delivery ?? '',
+        data.route ?? '',
+        data.error ?? '',
         data.townId ?? '',
         data.rigId ?? '',
         data.agentId ?? '',
         data.beadId ?? '',
-        data.convoyId ?? '',
-        data.role ?? '',
-        data.beadType ?? '',
         data.label ?? '',
       ],
       doubles: [data.durationMs ?? 0, data.value ?? 0],

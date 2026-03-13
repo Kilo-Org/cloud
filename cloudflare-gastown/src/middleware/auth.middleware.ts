@@ -12,6 +12,7 @@ export type AuthVariables = {
   kiloIsAdmin: boolean;
   kiloApiTokenPepper: string | null;
   kiloGastownAccess: boolean;
+  requestStartTime: number;
 };
 
 import { resolveSecret } from '../util/secret.util';

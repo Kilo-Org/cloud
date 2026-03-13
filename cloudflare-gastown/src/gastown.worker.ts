@@ -96,6 +96,7 @@ import {
   handleMayorEscalationAcknowledge,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
+import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
 import {
   handleGetMoleculeCurrentStep,
@@ -123,14 +124,17 @@ const app = new Hono<GastownEnv>();
 
 const WORKER_LOG = '[gastown-worker]';
 
+// ── Timing ──────────────────────────────────────────────────────────────
+// Capture high-resolution start timestamp before any other middleware.
+app.use('*', timingMiddleware);
+
 // ── Request logging ─────────────────────────────────────────────────────
 app.use('*', async (c, next) => {
   const method = c.req.method;
   const path = c.req.path;
-  const startTime = Date.now();
   console.log(`${WORKER_LOG} --> ${method} ${path}`);
   await next();
-  const elapsed = Date.now() - startTime;
+  const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
   console.log(`${WORKER_LOG} <-- ${method} ${path} ${c.res.status} (${elapsed}ms)`);
 });
 
@@ -179,34 +183,76 @@ app.use('/api/towns/:townId/rigs/:rigId/*', async (c: Context<GastownEnv, string
 
 // ── Beads ───────────────────────────────────────────────────────────────
 
-app.post('/api/towns/:townId/rigs/:rigId/beads', c => handleCreateBead(c, c.req.param()));
-app.get('/api/towns/:townId/rigs/:rigId/beads', c => handleListBeads(c, c.req.param()));
-app.get('/api/towns/:townId/rigs/:rigId/beads/:beadId', c => handleGetBead(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/beads', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/beads', () =>
+    handleCreateBead(c, c.req.param())
+  )
+);
+app.get('/api/towns/:townId/rigs/:rigId/beads', c =>
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/beads', () =>
+    handleListBeads(c, c.req.param())
+  )
+);
+app.get('/api/towns/:townId/rigs/:rigId/beads/:beadId', c =>
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/beads/:beadId', () =>
+    handleGetBead(c, c.req.param())
+  )
+);
 app.patch('/api/towns/:townId/rigs/:rigId/beads/:beadId/status', c =>
-  handleUpdateBeadStatus(c, c.req.param())
+  instrumented(c, 'PATCH /api/towns/:townId/rigs/:rigId/beads/:beadId/status', () =>
+    handleUpdateBeadStatus(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/rigs/:rigId/beads/:beadId/close', c =>
-  handleCloseBead(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/beads/:beadId/close', () =>
+    handleCloseBead(c, c.req.param())
+  )
 );
-app.post('/api/towns/:townId/rigs/:rigId/sling', c => handleSlingBead(c, c.req.param()));
-app.delete('/api/towns/:townId/rigs/:rigId/beads/:beadId', c => handleDeleteBead(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/sling', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/sling', () =>
+    handleSlingBead(c, c.req.param())
+  )
+);
+app.delete('/api/towns/:townId/rigs/:rigId/beads/:beadId', c =>
+  instrumented(c, 'DELETE /api/towns/:townId/rigs/:rigId/beads/:beadId', () =>
+    handleDeleteBead(c, c.req.param())
+  )
+);
 
 // ── Agents ──────────────────────────────────────────────────────────────
 
-app.post('/api/towns/:townId/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
-app.get('/api/towns/:townId/rigs/:rigId/agents', c => handleListAgents(c, c.req.param()));
-app.post('/api/towns/:townId/rigs/:rigId/agents/get-or-create', c =>
-  handleGetOrCreateAgent(c, c.req.param())
+app.post('/api/towns/:townId/rigs/:rigId/agents', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents', () =>
+    handleRegisterAgent(c, c.req.param())
+  )
 );
-app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId', c => handleGetAgent(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/agents', c =>
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/agents', () =>
+    handleListAgents(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/get-or-create', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/get-or-create', () =>
+    handleGetOrCreateAgent(c, c.req.param())
+  )
+);
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId', c =>
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/agents/:agentId', () =>
+    handleGetAgent(c, c.req.param())
+  )
+);
 app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId', c =>
-  handleDeleteAgent(c, c.req.param())
+  instrumented(c, 'DELETE /api/towns/:townId/rigs/:rigId/agents/:agentId', () =>
+    handleDeleteAgent(c, c.req.param())
+  )
 );
 
 // Dashboard-accessible agent events (before agentOnlyMiddleware so the
 // frontend can query events without an agent JWT)
 app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/events', c =>
-  handleGetAgentEvents(c, c.req.param())
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/agents/:agentId/events', () =>
+    handleGetAgentEvents(c, c.req.param())
+  )
 );
 
 // Agent-scoped routes — agentOnlyMiddleware enforces JWT agentId match
@@ -216,74 +262,120 @@ app.use(
     c.env.ENVIRONMENT === 'development' ? next() : agentOnlyMiddleware(c, next)
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/hook', c =>
-  handleHookBead(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/hook', () =>
+    handleHookBead(c, c.req.param())
+  )
 );
 app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/hook', c =>
-  handleUnhookBead(c, c.req.param())
+  instrumented(c, 'DELETE /api/towns/:townId/rigs/:rigId/agents/:agentId/hook', () =>
+    handleUnhookBead(c, c.req.param())
+  )
 );
-app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/prime', c => handlePrime(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/prime', c =>
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/agents/:agentId/prime', () =>
+    handlePrime(c, c.req.param())
+  )
+);
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/done', c =>
-  handleAgentDone(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/done', () =>
+    handleAgentDone(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/completed', c =>
-  handleAgentCompleted(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/completed', () =>
+    handleAgentCompleted(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/checkpoint', c =>
-  handleWriteCheckpoint(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/checkpoint', () =>
+    handleWriteCheckpoint(c, c.req.param())
+  )
 );
 app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/mail', c =>
-  handleCheckMail(c, c.req.param())
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/agents/:agentId/mail', () =>
+    handleCheckMail(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/heartbeat', c =>
-  handleHeartbeat(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/heartbeat', () =>
+    handleHeartbeat(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/status', c =>
-  handleUpdateAgentStatusMessage(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/status', () =>
+    handleUpdateAgentStatusMessage(c, c.req.param())
+  )
 );
 
 // ── Agent Events ─────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/agent-events', c =>
-  handleAppendAgentEvent(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agent-events', () =>
+    handleAppendAgentEvent(c, c.req.param())
+  )
 );
 
 // ── Mail ────────────────────────────────────────────────────────────────
 
-app.post('/api/towns/:townId/rigs/:rigId/mail', c => handleSendMail(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/mail', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/mail', () =>
+    handleSendMail(c, c.req.param())
+  )
+);
 
 // ── Review Queue ────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/review-queue', c =>
-  handleSubmitToReviewQueue(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/review-queue', () =>
+    handleSubmitToReviewQueue(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/rigs/:rigId/review-queue/:entryId/complete', c =>
-  handleCompleteReview(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/review-queue/:entryId/complete', () =>
+    handleCompleteReview(c, c.req.param())
+  )
 );
 
 // ── Bead Events ─────────────────────────────────────────────────────────
 
-app.get('/api/towns/:townId/rigs/:rigId/events', c => handleListBeadEvents(c, c.req.param()));
+app.get('/api/towns/:townId/rigs/:rigId/events', c =>
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/events', () =>
+    handleListBeadEvents(c, c.req.param())
+  )
+);
 
 // ── Molecules ────────────────────────────────────────────────────────────
 
-app.post('/api/towns/:townId/rigs/:rigId/molecules', c => handleCreateMolecule(c, c.req.param()));
+app.post('/api/towns/:townId/rigs/:rigId/molecules', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/molecules', () =>
+    handleCreateMolecule(c, c.req.param())
+  )
+);
 app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/molecule/current', c =>
-  handleGetMoleculeCurrentStep(c, c.req.param())
+  instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/agents/:agentId/molecule/current', () =>
+    handleGetMoleculeCurrentStep(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/molecule/advance', c =>
-  handleAdvanceMoleculeStep(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/molecule/advance', () =>
+    handleAdvanceMoleculeStep(c, c.req.param())
+  )
 );
 
 // ── Escalations ─────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/escalations', c =>
-  handleCreateEscalation(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/escalations', () =>
+    handleCreateEscalation(c, c.req.param())
+  )
 );
 
 // ── Triage ──────────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
-  handleResolveTriage(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/triage/resolve', () =>
+    handleResolveTriage(c, c.req.param())
+  )
 );
 
 // ── Kilo User Auth ──────────────────────────────────────────────────────
@@ -314,76 +406,140 @@ app.use('/api/towns/:townId/mayor/*', async (c: Context<GastownEnv, string>, nex
 // Town DO instances are keyed by owner_user_id. The userId path param routes
 // to the correct DO instance so each user's towns are isolated.
 
-app.post('/api/users/:userId/towns', c => handleCreateTown(c, c.req.param()));
-app.get('/api/users/:userId/towns', c => handleListTowns(c, c.req.param()));
-app.get('/api/users/:userId/towns/:townId', c => handleGetTown(c, c.req.param()));
-app.post('/api/users/:userId/rigs', c => handleCreateRig(c, c.req.param()));
-app.get('/api/users/:userId/rigs/:rigId', c => handleGetRig(c, c.req.param()));
-app.get('/api/users/:userId/towns/:townId/rigs', c => handleListRigs(c, c.req.param()));
-app.delete('/api/users/:userId/towns/:townId', c => handleDeleteTown(c, c.req.param()));
-app.delete('/api/users/:userId/rigs/:rigId', c => handleDeleteRig(c, c.req.param()));
+app.post('/api/users/:userId/towns', c =>
+  instrumented(c, 'POST /api/users/:userId/towns', () => handleCreateTown(c, c.req.param()))
+);
+app.get('/api/users/:userId/towns', c =>
+  instrumented(c, 'GET /api/users/:userId/towns', () => handleListTowns(c, c.req.param()))
+);
+app.get('/api/users/:userId/towns/:townId', c =>
+  instrumented(c, 'GET /api/users/:userId/towns/:townId', () => handleGetTown(c, c.req.param()))
+);
+app.post('/api/users/:userId/rigs', c =>
+  instrumented(c, 'POST /api/users/:userId/rigs', () => handleCreateRig(c, c.req.param()))
+);
+app.get('/api/users/:userId/rigs/:rigId', c =>
+  instrumented(c, 'GET /api/users/:userId/rigs/:rigId', () => handleGetRig(c, c.req.param()))
+);
+app.get('/api/users/:userId/towns/:townId/rigs', c =>
+  instrumented(c, 'GET /api/users/:userId/towns/:townId/rigs', () =>
+    handleListRigs(c, c.req.param())
+  )
+);
+app.delete('/api/users/:userId/towns/:townId', c =>
+  instrumented(c, 'DELETE /api/users/:userId/towns/:townId', () =>
+    handleDeleteTown(c, c.req.param())
+  )
+);
+app.delete('/api/users/:userId/rigs/:rigId', c =>
+  instrumented(c, 'DELETE /api/users/:userId/rigs/:rigId', () => handleDeleteRig(c, c.req.param()))
+);
 
 // ── Town Convoys ─────────────────────────────────────────────────────────
 
-app.post('/api/towns/:townId/convoys', c => handleCreateConvoy(c, c.req.param()));
-app.post('/api/towns/:townId/convoys/bead-closed', c => handleOnBeadClosed(c, c.req.param()));
+app.post('/api/towns/:townId/convoys', c =>
+  instrumented(c, 'POST /api/towns/:townId/convoys', () => handleCreateConvoy(c, c.req.param()))
+);
+app.post('/api/towns/:townId/convoys/bead-closed', c =>
+  instrumented(c, 'POST /api/towns/:townId/convoys/bead-closed', () =>
+    handleOnBeadClosed(c, c.req.param())
+  )
+);
 
 // ── Town Escalations ─────────────────────────────────────────────────────
 
-app.get('/api/towns/:townId/escalations', c => handleListEscalations(c, c.req.param()));
+app.get('/api/towns/:townId/escalations', c =>
+  instrumented(c, 'GET /api/towns/:townId/escalations', () =>
+    handleListEscalations(c, c.req.param())
+  )
+);
 app.post('/api/towns/:townId/escalations/:escalationId/acknowledge', c =>
-  handleAcknowledgeEscalation(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/escalations/:escalationId/acknowledge', () =>
+    handleAcknowledgeEscalation(c, c.req.param())
+  )
 );
 
 // ── Town Configuration ──────────────────────────────────────────────────
 
-app.get('/api/towns/:townId/config', c => handleGetTownConfig(c, c.req.param()));
-app.patch('/api/towns/:townId/config', c => handleUpdateTownConfig(c, c.req.param()));
+app.get('/api/towns/:townId/config', c =>
+  instrumented(c, 'GET /api/towns/:townId/config', () => handleGetTownConfig(c, c.req.param()))
+);
+app.patch('/api/towns/:townId/config', c =>
+  instrumented(c, 'PATCH /api/towns/:townId/config', () => handleUpdateTownConfig(c, c.req.param()))
+);
 
 // ── Town Events ─────────────────────────────────────────────────────────
 
-app.get('/api/users/:userId/towns/:townId/events', c => handleListTownEvents(c, c.req.param()));
+app.get('/api/users/:userId/towns/:townId/events', c =>
+  instrumented(c, 'GET /api/users/:userId/towns/:townId/events', () =>
+    handleListTownEvents(c, c.req.param())
+  )
+);
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().
 // Protected by Cloudflare Access at the perimeter; no additional auth required.
 
 app.post('/api/towns/:townId/container/agents/start', c =>
-  handleContainerStartAgent(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/container/agents/start', () =>
+    handleContainerStartAgent(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/container/agents/:agentId/stop', c =>
-  handleContainerStopAgent(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/container/agents/:agentId/stop', () =>
+    handleContainerStopAgent(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/container/agents/:agentId/message', c =>
-  handleContainerSendMessage(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/container/agents/:agentId/message', () =>
+    handleContainerSendMessage(c, c.req.param())
+  )
 );
 app.get('/api/towns/:townId/container/agents/:agentId/status', c =>
-  handleContainerAgentStatus(c, c.req.param())
+  instrumented(c, 'GET /api/towns/:townId/container/agents/:agentId/status', () =>
+    handleContainerAgentStatus(c, c.req.param())
+  )
 );
 app.post('/api/towns/:townId/container/agents/:agentId/stream-ticket', c =>
-  handleContainerStreamTicket(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/container/agents/:agentId/stream-ticket', () =>
+    handleContainerStreamTicket(c, c.req.param())
+  )
 );
 // Note: GET /api/towns/:townId/container/agents/:agentId/stream (WebSocket)
 // is handled outside Hono in the default export's fetch handler, which
 // routes the upgrade directly to TownContainerDO.fetch().
 
-app.get('/api/towns/:townId/container/health', c => handleContainerHealth(c, c.req.param()));
+app.get('/api/towns/:townId/container/health', c =>
+  instrumented(c, 'GET /api/towns/:townId/container/health', () =>
+    handleContainerHealth(c, c.req.param())
+  )
+);
 
 // PTY routes — proxy to container's SDK PTY endpoints
 app.post('/api/towns/:townId/container/agents/:agentId/pty', c =>
-  handleContainerProxy(c, c.req.param())
+  instrumented(c, 'POST /api/towns/:townId/container/agents/:agentId/pty', () =>
+    handleContainerProxy(c, c.req.param())
+  )
 );
 app.get('/api/towns/:townId/container/agents/:agentId/pty', c =>
-  handleContainerProxy(c, c.req.param())
+  instrumented(c, 'GET /api/towns/:townId/container/agents/:agentId/pty', () =>
+    handleContainerProxy(c, c.req.param())
+  )
 );
 app.get('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
-  handleContainerProxy(c, c.req.param())
+  instrumented(c, 'GET /api/towns/:townId/container/agents/:agentId/pty/:ptyId', () =>
+    handleContainerProxy(c, c.req.param())
+  )
 );
 app.put('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
-  handleContainerProxy(c, c.req.param())
+  instrumented(c, 'PUT /api/towns/:townId/container/agents/:agentId/pty/:ptyId', () =>
+    handleContainerProxy(c, c.req.param())
+  )
 );
 app.delete('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
-  handleContainerProxy(c, c.req.param())
+  instrumented(c, 'DELETE /api/towns/:townId/container/agents/:agentId/pty/:ptyId', () =>
+    handleContainerProxy(c, c.req.param())
+  )
 );
 // Note: GET /agents/:agentId/pty/:ptyId/connect (WebSocket) is handled
 // in the default export's fetch handler, bypassing Hono.
@@ -391,12 +547,34 @@ app.delete('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
 // ── Mayor ────────────────────────────────────────────────────────────────
 // MayorDO endpoints — town-level conversational agent with persistent session.
 
-app.post('/api/towns/:townId/mayor/configure', c => handleConfigureMayor(c, c.req.param()));
-app.post('/api/towns/:townId/mayor/message', c => handleSendMayorMessage(c, c.req.param()));
-app.get('/api/towns/:townId/mayor/status', c => handleGetMayorStatus(c, c.req.param()));
-app.post('/api/towns/:townId/mayor/ensure', c => handleEnsureMayor(c, c.req.param()));
-app.post('/api/towns/:townId/mayor/completed', c => handleMayorCompleted(c, c.req.param()));
-app.post('/api/towns/:townId/mayor/destroy', c => handleDestroyMayor(c, c.req.param()));
+app.post('/api/towns/:townId/mayor/configure', c =>
+  instrumented(c, 'POST /api/towns/:townId/mayor/configure', () =>
+    handleConfigureMayor(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/mayor/message', c =>
+  instrumented(c, 'POST /api/towns/:townId/mayor/message', () =>
+    handleSendMayorMessage(c, c.req.param())
+  )
+);
+app.get('/api/towns/:townId/mayor/status', c =>
+  instrumented(c, 'GET /api/towns/:townId/mayor/status', () =>
+    handleGetMayorStatus(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/mayor/ensure', c =>
+  instrumented(c, 'POST /api/towns/:townId/mayor/ensure', () => handleEnsureMayor(c, c.req.param()))
+);
+app.post('/api/towns/:townId/mayor/completed', c =>
+  instrumented(c, 'POST /api/towns/:townId/mayor/completed', () =>
+    handleMayorCompleted(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/mayor/destroy', c =>
+  instrumented(c, 'POST /api/towns/:townId/mayor/destroy', () =>
+    handleDestroyMayor(c, c.req.param())
+  )
+);
 
 // ── Mayor Tools ──────────────────────────────────────────────────────────
 // Tool endpoints called by the mayor's kilo serve session via the Gastown plugin.
@@ -408,38 +586,74 @@ app.post('/api/towns/:townId/mayor/destroy', c => handleDestroyMayor(c, c.req.pa
 // from the handler itself.
 app.use('/api/mayor/:townId/tools/*', mayorAuthMiddleware);
 
-app.post('/api/mayor/:townId/tools/sling', c => handleMayorSling(c, c.req.param()));
-app.post('/api/mayor/:townId/tools/sling-batch', c => handleMayorSlingBatch(c, c.req.param()));
-app.get('/api/mayor/:townId/tools/rigs', c => handleMayorListRigs(c, c.req.param()));
-app.get('/api/mayor/:townId/tools/rigs/:rigId/beads', c => handleMayorListBeads(c, c.req.param()));
-app.get('/api/mayor/:townId/tools/rigs/:rigId/agents', c =>
-  handleMayorListAgents(c, c.req.param())
+app.post('/api/mayor/:townId/tools/sling', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/sling', () => handleMayorSling(c, c.req.param()))
 );
-app.post('/api/mayor/:townId/tools/mail', c => handleMayorSendMail(c, c.req.param()));
-app.get('/api/mayor/:townId/tools/convoys', c => handleMayorListConvoys(c, c.req.param()));
+app.post('/api/mayor/:townId/tools/sling-batch', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/sling-batch', () =>
+    handleMayorSlingBatch(c, c.req.param())
+  )
+);
+app.get('/api/mayor/:townId/tools/rigs', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/rigs', () => handleMayorListRigs(c, c.req.param()))
+);
+app.get('/api/mayor/:townId/tools/rigs/:rigId/beads', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/rigs/:rigId/beads', () =>
+    handleMayorListBeads(c, c.req.param())
+  )
+);
+app.get('/api/mayor/:townId/tools/rigs/:rigId/agents', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/rigs/:rigId/agents', () =>
+    handleMayorListAgents(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/mail', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/mail', () => handleMayorSendMail(c, c.req.param()))
+);
+app.get('/api/mayor/:townId/tools/convoys', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/convoys', () =>
+    handleMayorListConvoys(c, c.req.param())
+  )
+);
 app.get('/api/mayor/:townId/tools/convoys/:convoyId', c =>
-  handleMayorConvoyStatus(c, c.req.param())
+  instrumented(c, 'GET /api/mayor/:townId/tools/convoys/:convoyId', () =>
+    handleMayorConvoyStatus(c, c.req.param())
+  )
 );
 app.patch('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', c =>
-  handleMayorBeadUpdate(c, c.req.param())
+  instrumented(c, 'PATCH /api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', () =>
+    handleMayorBeadUpdate(c, c.req.param())
+  )
 );
 app.post('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId/reassign', c =>
-  handleMayorBeadReassign(c, c.req.param())
+  instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/beads/:beadId/reassign', () =>
+    handleMayorBeadReassign(c, c.req.param())
+  )
 );
 app.delete('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', c =>
-  handleMayorBeadDelete(c, c.req.param())
+  instrumented(c, 'DELETE /api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', () =>
+    handleMayorBeadDelete(c, c.req.param())
+  )
 );
 app.post('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/reset', c =>
-  handleMayorAgentReset(c, c.req.param())
+  instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/reset', () =>
+    handleMayorAgentReset(c, c.req.param())
+  )
 );
 app.patch('/api/mayor/:townId/tools/convoys/:convoyId', c =>
-  handleMayorConvoyUpdate(c, c.req.param())
+  instrumented(c, 'PATCH /api/mayor/:townId/tools/convoys/:convoyId', () =>
+    handleMayorConvoyUpdate(c, c.req.param())
+  )
 );
 app.post('/api/mayor/:townId/tools/convoys/:convoyId/close', c =>
-  handleMayorConvoyClose(c, c.req.param())
+  instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/close', () =>
+    handleMayorConvoyClose(c, c.req.param())
+  )
 );
 app.post('/api/mayor/:townId/tools/escalations/:escalationId/acknowledge', c =>
-  handleMayorEscalationAcknowledge(c, c.req.param())
+  instrumented(c, 'POST /api/mayor/:townId/tools/escalations/:escalationId/acknowledge', () =>
+    handleMayorEscalationAcknowledge(c, c.req.param())
+  )
 );
 
 // ── tRPC ────────────────────────────────────────────────────────────────
@@ -461,6 +675,7 @@ app.use(
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
       console.error(`[gastown-trpc] error on ${path ?? 'unknown'}:`, error.message);
+      Sentry.captureException(error);
     },
   })
 );

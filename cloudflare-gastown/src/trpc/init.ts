@@ -1,4 +1,6 @@
 import { initTRPC, TRPCError } from '@trpc/server';
+import * as Sentry from '@sentry/cloudflare';
+import { writeEvent } from '../util/analytics.util';
 
 export type TRPCContext = {
   env: Env;
@@ -13,12 +15,42 @@ const t = initTRPC.context<TRPCContext>().create();
 export const router = t.router;
 
 /**
+ * Analytics middleware — wraps every tRPC procedure to emit an analytics
+ * event with timing and error capture. Runs before auth so even rejected
+ * requests are tracked.
+ */
+const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, next }) => {
+  const start = performance.now();
+  let error: string | undefined;
+  try {
+    const result = await next({ ctx });
+    return result;
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+    if (!(err instanceof TRPCError)) {
+      Sentry.captureException(err);
+    }
+    throw err;
+  } finally {
+    const durationMs = performance.now() - start;
+    writeEvent(ctx.env, {
+      event: path,
+      delivery: 'trpc',
+      route: `${type} ${path}`,
+      error,
+      userId: ctx.userId || undefined,
+      durationMs,
+    });
+  }
+});
+
+/**
  * Base procedure — requires a valid Kilo JWT (enforced by kiloAuthMiddleware
  * running before tRPC). The userId is extracted from the JWT and set on the
  * Hono context by kiloAuthMiddleware, then forwarded into the tRPC context
  * by the createContext callback in gastown.worker.ts.
  */
-export const procedure = t.procedure.use(async ({ ctx, next }) => {
+export const procedure = analyticsProcedure.use(async ({ ctx, next }) => {
   if (!ctx.userId) {
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
   }

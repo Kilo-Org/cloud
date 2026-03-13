@@ -279,6 +279,26 @@ export function BeadPanel({
               onChange={v => updateField('priority', v)}
               label="Priority"
             />
+            <div className="ml-auto flex items-center gap-1.5">
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={updateBeadMutation.isPending}
+                className="h-6 gap-1 bg-emerald-600 px-2.5 text-[10px] hover:bg-emerald-500"
+              >
+                {updateBeadMutation.isPending ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Save className="size-3" />
+                )}
+                Save
+              </Button>
+              {updateBeadMutation.isError && (
+                <span className="text-[10px] text-red-400">
+                  {updateBeadMutation.error?.message ?? 'Failed'}
+                </span>
+              )}
+            </div>
           </div>
         ) : (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -353,34 +373,6 @@ export function BeadPanel({
               placeholder='{"key": "value"}'
               className="min-h-[60px] border-white/10 bg-white/5 font-mono text-[10px] text-white/75"
             />
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={updateBeadMutation.isPending}
-              className="h-7 gap-1.5 bg-emerald-600 text-xs hover:bg-emerald-500"
-            >
-              {updateBeadMutation.isPending ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <Save className="size-3" />
-              )}
-              Save
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={cancelEdit}
-              className="h-7 text-xs text-white/50"
-            >
-              Cancel
-            </Button>
-            {updateBeadMutation.isError && (
-              <span className="text-[10px] text-red-400">
-                {updateBeadMutation.error?.message ?? 'Save failed'}
-              </span>
-            )}
           </div>
         </div>
       )}

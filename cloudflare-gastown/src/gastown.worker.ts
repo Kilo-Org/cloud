@@ -488,6 +488,7 @@ const WS_STATUS_PATTERN = /^\/api\/towns\/([^/]+)\/status\/ws$/;
 export default withSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN ?? '',
+    release: env.CF_VERSION_METADATA?.id,
     tracesSampleRate: 0.1,
     enabled: !!env.SENTRY_DSN,
   }),

@@ -1072,6 +1072,9 @@ importers:
       '@kilocode/eslint-config':
         specifier: workspace:*
         version: link:../packages/eslint-config
+      '@sentry/cli':
+        specifier: ^2.58.2
+        version: 2.58.2
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10

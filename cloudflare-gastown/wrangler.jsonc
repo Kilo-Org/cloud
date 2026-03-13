@@ -6,6 +6,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
+  "upload_source_maps": true,
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "routes": [
     {
       "pattern": "gastown.kiloapps.io/*",
@@ -52,7 +54,6 @@
     "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
     "KILO_API_URL": "https://api.kilo.ai",
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
-    "SENTRY_DSN": "", // populated via wrangler secret or secrets store in prod
   },
 
   // Hyperdrive binding for Postgres (user lookups, token generation)
@@ -64,9 +65,7 @@
     },
   ],
 
-  "analytics_engine_datasets": [
-    { "binding": "GASTOWN_AE", "dataset": "gastown_events" },
-  ],
+  "analytics_engine_datasets": [{ "binding": "GASTOWN_AE", "dataset": "gastown_events" }],
 
   "services": [
     {
@@ -128,9 +127,7 @@
           "entrypoint": "GitTokenRPCEntrypoint",
         },
       ],
-      "analytics_engine_datasets": [
-        { "binding": "GASTOWN_AE", "dataset": "gastown_events" },
-      ],
+      "analytics_engine_datasets": [{ "binding": "GASTOWN_AE", "dataset": "gastown_events" }],
       "secrets_store_secrets": [
         {
           "binding": "GASTOWN_JWT_SECRET",

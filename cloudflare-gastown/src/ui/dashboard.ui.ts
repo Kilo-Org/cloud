@@ -1080,10 +1080,23 @@ async function refreshAll() {
 
 let statusWs = null;
 let statusWsReconnectTimer = null;
+let statusWsTownId = null;
+
+function disconnectStatusWs() {
+  if (statusWsReconnectTimer) { clearTimeout(statusWsReconnectTimer); statusWsReconnectTimer = null; }
+  if (statusWs) { try { statusWs.close(); } catch {} statusWs = null; }
+  statusWsTownId = null;
+}
 
 function connectStatusWs() {
   const tid = townId();
   if (!tid) return;
+
+  // If the town changed, tear down the old socket first
+  if (statusWsTownId && statusWsTownId !== tid) {
+    disconnectStatusWs();
+  }
+
   if (statusWs && (statusWs.readyState === WebSocket.OPEN || statusWs.readyState === WebSocket.CONNECTING)) return;
 
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1092,6 +1105,7 @@ function connectStatusWs() {
 
   const ws = new WebSocket(url);
   statusWs = ws;
+  statusWsTownId = tid;
 
   ws.onopen = () => {
     log('[ws] status connected', 'ok');
@@ -1112,7 +1126,7 @@ function connectStatusWs() {
   ws.onclose = () => {
     log('[ws] status disconnected', 'err');
     statusWs = null;
-    // Reconnect after 5s
+    // Reconnect after 5s (only if still targeting the same town)
     if (statusWsReconnectTimer) clearTimeout(statusWsReconnectTimer);
     statusWsReconnectTimer = setTimeout(connectStatusWs, 5000);
   };
@@ -1139,8 +1153,8 @@ if (lastRig) {
   refreshAll();
 }
 
-// Connect status WebSocket if a town ID is already set
-connectStatusWs();
+// Reconnect the status WebSocket when the town ID changes
+el('townId').addEventListener('change', connectStatusWs);
 </script>
 </body>
 </html>`;

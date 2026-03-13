@@ -14,15 +14,11 @@ export type GastownEventName =
   | 'escalation.created'
   | 'escalation.acknowledged'
   | 'nudge.queued'
-  | 'nudge.delivered'
-  | 'container.cold_start'
-  | 'container.oom'
-  | 'review.queue_depth_alert'
-  | 'escalation.rate_spike'
-  | 'agent.restart_loop';
+  | 'nudge.delivered';
 
 export type GastownEventData = {
   event: GastownEventName;
+  userId?: string;
   townId?: string;
   rigId?: string;
   agentId?: string;
@@ -48,6 +44,7 @@ export function writeEvent(
     env.GASTOWN_AE.writeDataPoint({
       blobs: [
         data.event,
+        data.userId ?? '',
         data.townId ?? '',
         data.rigId ?? '',
         data.agentId ?? '',

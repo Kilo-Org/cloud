@@ -443,6 +443,18 @@ export async function handleMayorBeadReassign(
   if (!bead) {
     return c.json(resError('Bead not found'), 404);
   }
+  if (bead.rig_id !== params.rigId) {
+    return c.json(resError('Bead does not belong to this rig'), 403);
+  }
+
+  // Validate target agent belongs to this rig
+  const targetAgent = await town.getAgentAsync(parsed.data.agent_id);
+  if (!targetAgent) {
+    return c.json(resError('Target agent not found'), 404);
+  }
+  if (targetAgent.rig_id !== params.rigId) {
+    return c.json(resError('Target agent does not belong to this rig'), 403);
+  }
 
   // Hook the new agent first — if this fails, the old assignment is untouched
   await town.hookBead(parsed.data.agent_id, params.beadId);
@@ -478,6 +490,16 @@ export async function handleMayorAgentReset(
   );
 
   const town = getTownDOStub(c.env, params.townId);
+
+  // Verify the agent belongs to this rig
+  const agent = await town.getAgentAsync(params.agentId);
+  if (!agent) {
+    return c.json(resError('Agent not found'), 404);
+  }
+  if (agent.rig_id !== params.rigId) {
+    return c.json(resError('Agent does not belong to this rig'), 403);
+  }
+
   await town.resetAgent(params.agentId);
 
   return c.json(resSuccess({ reset: true }));

@@ -328,6 +328,16 @@ export const gastownRouter = router({
     .mutation(async ({ ctx, input }) => {
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
+
+      // Verify the bead belongs to this rig
+      const existing = await townStub.getBeadAsync(input.beadId);
+      if (!existing) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Bead not found' });
+      }
+      if (existing.rig_id !== input.rigId) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Bead does not belong to this rig' });
+      }
+
       const { rigId: _rigId, beadId, ...fields } = input;
       return townStub.updateBead(beadId, fields, ctx.userId);
     }),

@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 export declare const TownOutput: z.ZodObject<
   {
     id: z.ZodString;
@@ -38,6 +38,7 @@ export declare const BeadOutput: z.ZodObject<
       closed: 'closed';
       failed: 'failed';
       in_progress: 'in_progress';
+      in_review: 'in_review';
       open: 'open';
     }>;
     title: z.ZodString;
@@ -92,6 +93,8 @@ export declare const AgentOutput: z.ZodObject<
     last_activity_at: z.ZodNullable<z.ZodString>;
     checkpoint: z.ZodOptional<z.ZodUnknown>;
     created_at: z.ZodString;
+    agent_status_message: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
+    agent_status_updated_at: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
   },
   z.core.$strip
 >;
@@ -237,6 +240,7 @@ export declare const SlingResultOutput: z.ZodObject<
           closed: 'closed';
           failed: 'failed';
           in_progress: 'in_progress';
+          in_review: 'in_review';
           open: 'open';
         }>;
         title: z.ZodString;
@@ -291,6 +295,8 @@ export declare const SlingResultOutput: z.ZodObject<
         last_activity_at: z.ZodNullable<z.ZodString>;
         checkpoint: z.ZodOptional<z.ZodUnknown>;
         created_at: z.ZodString;
+        agent_status_message: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
+        agent_status_updated_at: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
       },
       z.core.$strip
     >;
@@ -340,6 +346,8 @@ export declare const RigDetailOutput: z.ZodObject<
           last_activity_at: z.ZodNullable<z.ZodString>;
           checkpoint: z.ZodOptional<z.ZodUnknown>;
           created_at: z.ZodString;
+          agent_status_message: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
+          agent_status_updated_at: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
         },
         z.core.$strip
       >
@@ -361,6 +369,7 @@ export declare const RigDetailOutput: z.ZodObject<
             closed: 'closed';
             failed: 'failed';
             in_progress: 'in_progress';
+            in_review: 'in_review';
             open: 'open';
           }>;
           title: z.ZodString;
@@ -434,6 +443,7 @@ export declare const RpcBeadOutput: z.ZodPipe<
         closed: 'closed';
         failed: 'failed';
         in_progress: 'in_progress';
+        in_review: 'in_review';
         open: 'open';
       }>;
       title: z.ZodString;
@@ -491,6 +501,8 @@ export declare const RpcAgentOutput: z.ZodPipe<
       last_activity_at: z.ZodNullable<z.ZodString>;
       checkpoint: z.ZodOptional<z.ZodUnknown>;
       created_at: z.ZodString;
+      agent_status_message: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
+      agent_status_updated_at: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
     },
     z.core.$strip
   >
@@ -660,6 +672,7 @@ export declare const RpcSlingResultOutput: z.ZodPipe<
             closed: 'closed';
             failed: 'failed';
             in_progress: 'in_progress';
+            in_review: 'in_review';
             open: 'open';
           }>;
           title: z.ZodString;
@@ -714,6 +727,8 @@ export declare const RpcSlingResultOutput: z.ZodPipe<
           last_activity_at: z.ZodNullable<z.ZodString>;
           checkpoint: z.ZodOptional<z.ZodUnknown>;
           created_at: z.ZodString;
+          agent_status_message: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
+          agent_status_updated_at: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
         },
         z.core.$strip
       >;
@@ -747,6 +762,7 @@ export declare const RpcAlarmStatusOutput: z.ZodPipe<
         {
           open: z.ZodNumber;
           inProgress: z.ZodNumber;
+          inReview: z.ZodNumber;
           failed: z.ZodNumber;
           triageRequests: z.ZodNumber;
         },
@@ -820,6 +836,8 @@ export declare const RpcRigDetailOutput: z.ZodPipe<
             last_activity_at: z.ZodNullable<z.ZodString>;
             checkpoint: z.ZodOptional<z.ZodUnknown>;
             created_at: z.ZodString;
+            agent_status_message: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
+            agent_status_updated_at: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
           },
           z.core.$strip
         >
@@ -841,6 +859,7 @@ export declare const RpcRigDetailOutput: z.ZodPipe<
               closed: 'closed';
               failed: 'failed';
               in_progress: 'in_progress';
+              in_review: 'in_review';
               open: 'open';
             }>;
             title: z.ZodString;

@@ -4,7 +4,7 @@ import { getTownDOStub } from '../dos/Town.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { BeadStatus, BeadType } from '../types';
+import { BeadStatus, BeadType, BeadPriority } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
 const HANDLER_LOG = '[mayor-tools.handler]';
@@ -327,4 +327,278 @@ export async function handleMayorConvoyStatus(
 
   if (!status) return c.json(resError('Convoy not found'), 404);
   return c.json(resSuccess(status));
+}
+
+// ── Edit operation schemas ────────────────────────────────────────────────
+
+const BeadUpdateBody = z
+  .object({
+    title: z.string().min(1).optional(),
+    body: z.string().nullable().optional(),
+    priority: BeadPriority.optional(),
+    labels: z.array(z.string()).optional(),
+    status: BeadStatus.optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+    rig_id: z.string().min(1).nullable().optional(),
+    parent_bead_id: z.string().min(1).nullable().optional(),
+  })
+  .refine(
+    data =>
+      data.title !== undefined ||
+      data.body !== undefined ||
+      data.priority !== undefined ||
+      data.labels !== undefined ||
+      data.status !== undefined ||
+      data.metadata !== undefined ||
+      data.rig_id !== undefined ||
+      data.parent_bead_id !== undefined,
+    { message: 'At least one field must be provided' }
+  );
+
+const BeadReassignBody = z.object({
+  agent_id: z.string().min(1),
+});
+
+const ConvoyUpdateBody = z
+  .object({
+    merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
+    feature_branch: z.string().min(1).optional(),
+  })
+  .refine(data => data.merge_mode !== undefined || data.feature_branch !== undefined, {
+    message: 'At least one field must be provided',
+  });
+
+// ── Edit handlers ─────────────────────────────────────────────────────────
+
+/**
+ * PATCH /api/mayor/:townId/tools/rigs/:rigId/beads/:beadId
+ * Partially update a bead's editable fields (title, body, priority, labels, status, metadata).
+ */
+export async function handleMayorBeadUpdate(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string; beadId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  const parsed = BeadUpdateBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorBeadUpdate: townId=${params.townId} rigId=${params.rigId} beadId=${params.beadId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+
+  // Verify the bead belongs to this rig (same check as handleMayorBeadDelete)
+  const existing = await town.getBeadAsync(params.beadId);
+  if (!existing) {
+    return c.json(resError('Bead not found'), 404);
+  }
+  if (existing.rig_id !== params.rigId) {
+    return c.json(resError('Bead does not belong to this rig'), 403);
+  }
+
+  const bead = await town.updateBead(params.beadId, parsed.data, 'mayor');
+
+  return c.json(resSuccess(bead));
+}
+
+/**
+ * POST /api/mayor/:townId/tools/rigs/:rigId/beads/:beadId/reassign
+ * Reassign a bead to a different agent. Unhooks the current agent (if any)
+ * and hooks the specified agent.
+ */
+export async function handleMayorBeadReassign(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string; beadId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  const parsed = BeadReassignBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorBeadReassign: townId=${params.townId} rigId=${params.rigId} beadId=${params.beadId} targetAgent=${parsed.data.agent_id}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+
+  const bead = await town.getBeadAsync(params.beadId);
+  if (!bead) {
+    return c.json(resError('Bead not found'), 404);
+  }
+  if (bead.rig_id !== params.rigId) {
+    return c.json(resError('Bead does not belong to this rig'), 403);
+  }
+
+  // Validate target agent belongs to this rig
+  const targetAgent = await town.getAgentAsync(parsed.data.agent_id);
+  if (!targetAgent) {
+    return c.json(resError('Target agent not found'), 404);
+  }
+  if (targetAgent.rig_id !== params.rigId) {
+    return c.json(resError('Target agent does not belong to this rig'), 403);
+  }
+
+  // Hook the new agent first — if this fails, the old assignment is untouched
+  await town.hookBead(parsed.data.agent_id, params.beadId);
+
+  // Only unhook the old agent if it is still hooked to this specific bead
+  if (bead.assignee_agent_bead_id && bead.assignee_agent_bead_id !== parsed.data.agent_id) {
+    const oldAgent = await town.getAgentAsync(bead.assignee_agent_bead_id);
+    if (oldAgent && oldAgent.current_hook_bead_id === params.beadId) {
+      await town.unhookBead(bead.assignee_agent_bead_id);
+    }
+  }
+
+  // Return the updated bead so clients can read the new assignee
+  const updated = await town.getBeadAsync(params.beadId);
+  return c.json(resSuccess(updated));
+}
+
+/**
+ * POST /api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/reset
+ * Force-reset an agent to idle, unhooking from any current bead.
+ */
+export async function handleMayorAgentReset(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string; agentId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorAgentReset: townId=${params.townId} rigId=${params.rigId} agentId=${params.agentId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+
+  // Verify the agent belongs to this rig
+  const agent = await town.getAgentAsync(params.agentId);
+  if (!agent) {
+    return c.json(resError('Agent not found'), 404);
+  }
+  if (agent.rig_id !== params.rigId) {
+    return c.json(resError('Agent does not belong to this rig'), 403);
+  }
+
+  await town.resetAgent(params.agentId);
+
+  return c.json(resSuccess({ reset: true }));
+}
+
+/**
+ * POST /api/mayor/:townId/tools/convoys/:convoyId/close
+ * Force-close a convoy and all its tracked open beads.
+ */
+export async function handleMayorConvoyClose(
+  c: Context<GastownEnv>,
+  params: { townId: string; convoyId: string }
+) {
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyClose: townId=${params.townId} convoyId=${params.convoyId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const convoy = await town.closeConvoy(params.convoyId);
+
+  if (!convoy) return c.json(resError('Convoy not found'), 404);
+  return c.json(resSuccess(convoy));
+}
+
+/**
+ * PATCH /api/mayor/:townId/tools/convoys/:convoyId
+ * Edit convoy metadata (merge_mode or feature_branch).
+ */
+export async function handleMayorConvoyUpdate(
+  c: Context<GastownEnv>,
+  params: { townId: string; convoyId: string }
+) {
+  const parsed = ConvoyUpdateBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyUpdate: townId=${params.townId} convoyId=${params.convoyId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const convoy = await town.updateConvoy(params.convoyId, parsed.data);
+
+  if (!convoy) return c.json(resError('Convoy not found'), 404);
+  return c.json(resSuccess(convoy));
+}
+
+/**
+ * DELETE /api/mayor/:townId/tools/rigs/:rigId/beads/:beadId
+ * Delete a bead that belongs to the specified rig.
+ */
+export async function handleMayorBeadDelete(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string; beadId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorBeadDelete: townId=${params.townId} rigId=${params.rigId} beadId=${params.beadId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+
+  // Verify the bead belongs to this rig
+  const bead = await town.getBeadAsync(params.beadId);
+  if (!bead) {
+    return c.json(resError('Bead not found'), 404);
+  }
+  if (bead.rig_id !== params.rigId) {
+    return c.json(resError('Bead does not belong to this rig'), 403);
+  }
+
+  await town.deleteBead(params.beadId);
+
+  return c.json(resSuccess({ deleted: true }));
+}
+
+/**
+ * POST /api/mayor/:townId/tools/escalations/:escalationId/acknowledge
+ * Acknowledge an escalation, marking it as reviewed.
+ */
+export async function handleMayorEscalationAcknowledge(
+  c: Context<GastownEnv>,
+  params: { townId: string; escalationId: string }
+) {
+  console.log(
+    `${HANDLER_LOG} handleMayorEscalationAcknowledge: townId=${params.townId} escalationId=${params.escalationId}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const escalation = await town.acknowledgeEscalation(params.escalationId);
+
+  if (!escalation) return c.json(resError('Escalation not found'), 404);
+  return c.json(resSuccess(escalation));
 }

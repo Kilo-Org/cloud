@@ -85,6 +85,13 @@ import {
   handleMayorSendMail,
   handleMayorListConvoys,
   handleMayorConvoyStatus,
+  handleMayorBeadUpdate,
+  handleMayorBeadReassign,
+  handleMayorAgentReset,
+  handleMayorConvoyClose,
+  handleMayorConvoyUpdate,
+  handleMayorBeadDelete,
+  handleMayorEscalationAcknowledge,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
@@ -410,6 +417,27 @@ app.post('/api/mayor/:townId/tools/mail', c => handleMayorSendMail(c, c.req.para
 app.get('/api/mayor/:townId/tools/convoys', c => handleMayorListConvoys(c, c.req.param()));
 app.get('/api/mayor/:townId/tools/convoys/:convoyId', c =>
   handleMayorConvoyStatus(c, c.req.param())
+);
+app.patch('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', c =>
+  handleMayorBeadUpdate(c, c.req.param())
+);
+app.post('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId/reassign', c =>
+  handleMayorBeadReassign(c, c.req.param())
+);
+app.delete('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', c =>
+  handleMayorBeadDelete(c, c.req.param())
+);
+app.post('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/reset', c =>
+  handleMayorAgentReset(c, c.req.param())
+);
+app.patch('/api/mayor/:townId/tools/convoys/:convoyId', c =>
+  handleMayorConvoyUpdate(c, c.req.param())
+);
+app.post('/api/mayor/:townId/tools/convoys/:convoyId/close', c =>
+  handleMayorConvoyClose(c, c.req.param())
+);
+app.post('/api/mayor/:townId/tools/escalations/:escalationId/acknowledge', c =>
+  handleMayorEscalationAcknowledge(c, c.req.param())
 );
 
 // ── tRPC ────────────────────────────────────────────────────────────────

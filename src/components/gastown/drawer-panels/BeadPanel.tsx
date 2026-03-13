@@ -1,8 +1,12 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
 
@@ -25,13 +29,21 @@ import {
   GitPullRequest,
   CircleDot,
   Layers,
+  Pencil,
+  X,
+  Save,
+  Loader2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+const BEAD_STATUSES = ['open', 'in_progress', 'in_review', 'closed', 'failed'] as const;
+const BEAD_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const;
+
 const STATUS_STYLES: Record<string, string> = {
   open: 'border-sky-500/30 bg-sky-500/10 text-sky-300',
   in_progress: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  in_review: 'border-violet-500/30 bg-violet-500/10 text-violet-300',
   closed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
   failed: 'border-red-500/30 bg-red-500/10 text-red-300',
 };
@@ -41,6 +53,17 @@ const PRIORITY_STYLES: Record<string, string> = {
   high: 'text-orange-400',
   medium: 'text-amber-400',
   low: 'text-white/50',
+};
+
+type EditState = {
+  title: string;
+  body: string;
+  status: string;
+  priority: string;
+  labels: string;
+  metadata: string;
+  rig_id: string;
+  parent_bead_id: string;
 };
 
 export function BeadPanel({
@@ -53,6 +76,7 @@ export function BeadPanel({
   push: (ref: ResourceRef) => void;
 }) {
   const trpc = useGastownTRPC();
+  const queryClient = useQueryClient();
   const beadsQuery = useQuery(trpc.gastown.listBeads.queryOptions({ rigId }));
   const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));
   const rigQuery = useQuery(trpc.gastown.getRig.queryOptions({ rigId }));
@@ -69,6 +93,120 @@ export function BeadPanel({
     acc[a.id] = a.name;
     return acc;
   }, {});
+
+  // ── Edit mode state ───────────────────────────────────────────────────
+  const [editing, setEditing] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [editState, setEditState] = useState<EditState>({
+    title: '',
+    body: '',
+    status: '',
+    priority: '',
+    labels: '',
+    metadata: '',
+    rig_id: '',
+    parent_bead_id: '',
+  });
+
+  const enterEditMode = useCallback(() => {
+    if (!bead) return;
+    setEditState({
+      title: bead.title,
+      body: bead.body ?? '',
+      status: bead.status,
+      priority: bead.priority,
+      labels: bead.labels.join(', '),
+      metadata:
+        bead.metadata && Object.keys(bead.metadata).length > 0
+          ? JSON.stringify(bead.metadata, null, 2)
+          : '',
+      rig_id: bead.rig_id ?? '',
+      parent_bead_id: bead.parent_bead_id ?? '',
+    });
+    setEditing(true);
+  }, [bead]);
+
+  const cancelEdit = useCallback(() => setEditing(false), []);
+
+  const updateField = useCallback(<K extends keyof EditState>(field: K, value: EditState[K]) => {
+    setEditState(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const {
+    mutate: doUpdateBead,
+    isPending: isUpdatePending,
+    isError: isUpdateError,
+    error: updateError,
+  } = useMutation(
+    trpc.gastown.updateBead.mutationOptions({
+      onSuccess: () => {
+        setEditing(false);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.listBeads.queryKey({ rigId }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.getRig.queryKey({ rigId }),
+        });
+      },
+    })
+  );
+
+  const handleSave = useCallback(() => {
+    if (!bead) return;
+
+    // Build the diff — only send fields that changed
+    const updates: Record<string, unknown> = {};
+    if (editState.title !== bead.title) updates.title = editState.title;
+    if (editState.body !== (bead.body ?? '')) {
+      updates.body = editState.body || null;
+    }
+    if (editState.status !== bead.status) updates.status = editState.status;
+    if (editState.priority !== bead.priority) updates.priority = editState.priority;
+    const newLabels = editState.labels
+      .split(',')
+      .map(l => l.trim())
+      .filter(Boolean);
+    const oldLabels = bead.labels;
+    if (JSON.stringify(newLabels) !== JSON.stringify(oldLabels)) {
+      updates.labels = newLabels;
+    }
+
+    if (editState.metadata.trim()) {
+      try {
+        const parsed = JSON.parse(editState.metadata) as Record<string, unknown>;
+        setMetadataError(null);
+        if (JSON.stringify(parsed) !== JSON.stringify(bead.metadata)) {
+          updates.metadata = parsed;
+        }
+      } catch {
+        setMetadataError('Invalid JSON in metadata field');
+        return;
+      }
+    } else if (bead.metadata && Object.keys(bead.metadata).length > 0) {
+      updates.metadata = {};
+    }
+
+    const newRigId = editState.rig_id || null;
+    if (newRigId !== (bead.rig_id ?? null)) {
+      updates.rig_id = newRigId;
+    }
+
+    const newParent = editState.parent_bead_id || null;
+    if (newParent !== (bead.parent_bead_id ?? null)) {
+      updates.parent_bead_id = newParent;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setEditing(false);
+      return;
+    }
+
+    doUpdateBead({
+      rigId,
+      beadId: bead.bead_id,
+      ...updates,
+    } as Parameters<typeof doUpdateBead>[0]);
+  }, [bead, editState, rigId, doUpdateBead]);
 
   if (!bead) {
     return <div className="p-6 text-center text-sm text-white/30">Loading bead…</div>;
@@ -98,91 +236,207 @@ export function BeadPanel({
     <div className="flex flex-col gap-0">
       {/* Title area */}
       <div className="border-b border-white/[0.06] px-5 pt-4 pb-4">
-        <div className="flex items-center gap-2 text-base font-semibold text-white/90">
+        <div className="flex items-center gap-2">
           <Hexagon className="size-4 shrink-0 text-[color:oklch(95%_0.15_108_/_0.7)]" />
-          <span className="truncate">{bead.title}</span>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span
-            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[bead.status] ?? 'border-white/10 text-white/50'}`}
-          >
-            {bead.status.replace('_', ' ')}
-          </span>
-          <Badge variant="outline" className="text-[10px]">
-            {bead.type}
-          </Badge>
-          <span
-            className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${PRIORITY_STYLES[bead.priority] ?? 'text-white/50'}`}
-          >
-            <Flag className="size-2.5" />
-            {bead.priority}
-          </span>
-        </div>
-      </div>
-
-      {/* Metadata grid */}
-      <div className="grid grid-cols-2 border-b border-white/[0.06]">
-        <MetaCell icon={Hash} label="Bead ID" value={bead.bead_id.slice(0, 8)} mono />
-        <MetaCell
-          icon={Clock}
-          label="Created"
-          value={format(new Date(bead.created_at), 'MMM d, HH:mm')}
-        />
-
-        {/* Assignee — clickable to open agent drawer */}
-        {bead.assignee_agent_bead_id ? (
+          {editing ? (
+            <Input
+              value={editState.title}
+              onChange={e => updateField('title', e.target.value)}
+              className="h-7 border-white/10 bg-white/5 text-sm font-semibold text-white/90"
+            />
+          ) : (
+            <span className="truncate text-base font-semibold text-white/90">{bead.title}</span>
+          )}
           <button
-            onClick={() => {
-              if (townId) {
-                push({
-                  type: 'agent',
-                  agentId: bead.assignee_agent_bead_id ?? '',
-                  rigId,
-                  townId,
-                });
-              }
-            }}
-            className="group/link flex flex-col border-r border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] [&:nth-child(2n)]:border-r-0"
+            onClick={editing ? cancelEdit : enterEditMode}
+            className="ml-auto shrink-0 rounded-md p-1 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
+            title={editing ? 'Cancel editing' : 'Edit bead'}
           >
-            <div className="flex items-center gap-1 text-[10px] text-white/30">
-              <User className="size-3" />
-              Assignee
-            </div>
-            <div className="mt-0.5 flex items-center gap-1 text-sm text-[color:oklch(95%_0.15_108)]">
-              <Bot className="size-3" />
-              <span className="truncate">
-                {assigneeName ?? bead.assignee_agent_bead_id.slice(0, 8)}
-              </span>
-              <ChevronRight className="size-3 shrink-0 text-white/15 transition-colors group-hover/link:text-white/30" />
-            </div>
+            {editing ? <X className="size-3.5" /> : <Pencil className="size-3.5" />}
           </button>
+        </div>
+
+        {editing ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <EditSelect
+              value={editState.status}
+              options={BEAD_STATUSES}
+              onChange={v => updateField('status', v)}
+              label="Status"
+            />
+            <EditSelect
+              value={editState.priority}
+              options={BEAD_PRIORITIES}
+              onChange={v => updateField('priority', v)}
+              label="Priority"
+            />
+            <div className="ml-auto flex items-center gap-1.5">
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={isUpdatePending}
+                className="gap-1bg-[color:oklch(95%_0.15_108_/_0.90)] h-6 px-2.5 text-[10px] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              >
+                {isUpdatePending ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Save className="size-3" />
+                )}
+                Save
+              </Button>
+              {isUpdateError && (
+                <span className="text-[10px] text-red-400">{updateError?.message ?? 'Failed'}</span>
+              )}
+            </div>
+          </div>
         ) : (
-          <MetaCell icon={User} label="Assignee" value="Unassigned" />
-        )}
-
-        <MetaCell
-          icon={Tags}
-          label="Labels"
-          value={bead.labels.length ? bead.labels.join(', ') : 'None'}
-        />
-
-        {/* Parent bead — clickable */}
-        {bead.parent_bead_id && (
-          <button
-            onClick={() => push({ type: 'bead', beadId: bead.parent_bead_id ?? '', rigId })}
-            className="group/link flex flex-col border-r border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] [&:nth-child(2n)]:border-r-0"
-          >
-            <div className="flex items-center gap-1 text-[10px] text-white/30">
-              <GitBranch className="size-3" />
-              Parent Bead
-            </div>
-            <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-[color:oklch(95%_0.15_108)]">
-              <span>{bead.parent_bead_id.slice(0, 8)}</span>
-              <ChevronRight className="size-3 shrink-0 text-white/15 transition-colors group-hover/link:text-white/30" />
-            </div>
-          </button>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[bead.status] ?? 'border-white/10 text-white/50'}`}
+            >
+              {bead.status.replace('_', ' ')}
+            </span>
+            <Badge variant="outline" className="text-[10px]">
+              {bead.type}
+            </Badge>
+            <span
+              className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${PRIORITY_STYLES[bead.priority] ?? 'text-white/50'}`}
+            >
+              <Flag className="size-2.5" />
+              {bead.priority}
+            </span>
+          </div>
         )}
       </div>
+
+      {/* Edit mode: additional fields */}
+      {editing && (
+        <div className="space-y-3 border-b border-white/[0.06] px-5 py-3">
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-white/30">Labels</label>
+            <Input
+              value={editState.labels}
+              onChange={e => updateField('labels', e.target.value)}
+              placeholder="comma-separated labels"
+              className="h-7 border-white/10 bg-white/5 text-xs text-white/75"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-white/30">Body</label>
+            <Textarea
+              value={editState.body}
+              onChange={e => updateField('body', e.target.value)}
+              placeholder="Bead description (Markdown)"
+              className="min-h-[80px] border-white/10 bg-white/5 text-xs text-white/75"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-[10px] font-medium text-white/30">Rig ID</label>
+              <Input
+                value={editState.rig_id}
+                onChange={e => updateField('rig_id', e.target.value)}
+                placeholder="rig UUID"
+                className="h-7 border-white/10 bg-white/5 font-mono text-[10px] text-white/75"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium text-white/30">
+                Parent Bead
+              </label>
+              <Input
+                value={editState.parent_bead_id}
+                onChange={e => updateField('parent_bead_id', e.target.value)}
+                placeholder="parent bead UUID"
+                className="h-7 border-white/10 bg-white/5 font-mono text-[10px] text-white/75"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-white/30">
+              Metadata (JSON)
+            </label>
+            <Textarea
+              value={editState.metadata}
+              onChange={e => {
+                updateField('metadata', e.target.value);
+                setMetadataError(null);
+              }}
+              placeholder='{"key": "value"}'
+              className={`min-h-[60px] border-white/10 bg-white/5 font-mono text-[10px] text-white/75 ${metadataError ? 'border-red-500/50' : ''}`}
+            />
+            {metadataError && (
+              <span className="mt-0.5 block text-[10px] text-red-400">{metadataError}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Metadata grid (read-only, hidden during edit) */}
+      {!editing && (
+        <div className="grid grid-cols-2 border-b border-white/[0.06]">
+          <MetaCell icon={Hash} label="Bead ID" value={bead.bead_id.slice(0, 8)} mono />
+          <MetaCell
+            icon={Clock}
+            label="Created"
+            value={format(new Date(bead.created_at), 'MMM d, HH:mm')}
+          />
+
+          {/* Assignee — clickable to open agent drawer */}
+          {bead.assignee_agent_bead_id ? (
+            <button
+              onClick={() => {
+                if (townId) {
+                  push({
+                    type: 'agent',
+                    agentId: bead.assignee_agent_bead_id ?? '',
+                    rigId,
+                    townId,
+                  });
+                }
+              }}
+              className="group/link flex flex-col border-r border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] [&:nth-child(2n)]:border-r-0"
+            >
+              <div className="flex items-center gap-1 text-[10px] text-white/30">
+                <User className="size-3" />
+                Assignee
+              </div>
+              <div className="mt-0.5 flex items-center gap-1 text-sm text-[color:oklch(95%_0.15_108)]">
+                <Bot className="size-3" />
+                <span className="truncate">
+                  {assigneeName ?? bead.assignee_agent_bead_id.slice(0, 8)}
+                </span>
+                <ChevronRight className="size-3 shrink-0 text-white/15 transition-colors group-hover/link:text-white/30" />
+              </div>
+            </button>
+          ) : (
+            <MetaCell icon={User} label="Assignee" value="Unassigned" />
+          )}
+
+          <MetaCell
+            icon={Tags}
+            label="Labels"
+            value={bead.labels.length ? bead.labels.join(', ') : 'None'}
+          />
+
+          {/* Parent bead — clickable */}
+          {bead.parent_bead_id && (
+            <button
+              onClick={() => push({ type: 'bead', beadId: bead.parent_bead_id ?? '', rigId })}
+              className="group/link flex flex-col border-r border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] [&:nth-child(2n)]:border-r-0"
+            >
+              <div className="flex items-center gap-1 text-[10px] text-white/30">
+                <GitBranch className="size-3" />
+                Parent Bead
+              </div>
+              <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-[color:oklch(95%_0.15_108)]">
+                <span>{bead.parent_bead_id.slice(0, 8)}</span>
+                <ChevronRight className="size-3 shrink-0 text-white/15 transition-colors group-hover/link:text-white/30" />
+              </div>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Convoy membership */}
       {parentConvoy && (
@@ -258,8 +512,8 @@ export function BeadPanel({
         </div>
       )}
 
-      {/* Body (markdown) */}
-      {bead.body && bead.body.trim().length > 0 && (
+      {/* Body (markdown) — hidden during edit since body is in the edit form */}
+      {!editing && bead.body && bead.body.trim().length > 0 && (
         <div className="border-b border-white/[0.06] px-5 py-4">
           <div className="mb-2 flex items-center gap-1.5">
             <FileText className="size-3 text-white/25" />
@@ -286,6 +540,35 @@ export function BeadPanel({
         <BeadEventTimeline rigId={rigId} beadId={bead.bead_id} />
       </div>
     </div>
+  );
+}
+
+// ── Edit select component ───────────────────────────────────────────────
+
+function EditSelect({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: string;
+  options: readonly string[];
+  onChange: (value: string) => void;
+  label: string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      aria-label={label}
+      className="h-6 rounded-md border border-white/10 bg-white/5 px-2 text-[10px] font-medium text-white/70 outline-none focus:border-white/20"
+    >
+      {options.map(opt => (
+        <option key={opt} value={opt} className="bg-zinc-900 text-white">
+          {opt.replace(/_/g, ' ')}
+        </option>
+      ))}
+    </select>
   );
 }
 

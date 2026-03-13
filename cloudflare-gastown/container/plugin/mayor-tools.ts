@@ -244,5 +244,118 @@ export function createMayorTools(client: MayorGastownClient) {
         return `Mail sent to agent ${args.to_agent_id} in rig ${args.rig_id}.`;
       },
     }),
+
+    gt_bead_update: tool({
+      description: "Edit a bead's status, title, body, priority, or labels.",
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the bead belongs to'),
+        bead_id: tool.schema.string().describe('The UUID of the bead to update'),
+        title: tool.schema.string().describe('New title for the bead').optional(),
+        body: tool.schema.string().describe('New body/description for the bead').optional(),
+        status: tool.schema
+          .enum(['open', 'in_progress', 'in_review', 'closed', 'failed'])
+          .describe('New status for the bead')
+          .optional(),
+        priority: tool.schema
+          .enum(['low', 'medium', 'high', 'critical'])
+          .describe('New priority for the bead')
+          .optional(),
+        labels: tool.schema
+          .array(tool.schema.string())
+          .describe('Replacement labels array for the bead')
+          .optional(),
+      },
+      async execute(args) {
+        const bead = await client.updateBead(args.rig_id, args.bead_id, {
+          title: args.title,
+          body: args.body,
+          status: args.status,
+          priority: args.priority,
+          labels: args.labels,
+        });
+        return `Bead ${bead.bead_id} updated. Status: ${bead.status}, Priority: ${bead.priority}, Title: "${bead.title}".`;
+      },
+    }),
+
+    gt_bead_reassign: tool({
+      description: 'Reassign a bead to a different agent.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the bead belongs to'),
+        bead_id: tool.schema.string().describe('The UUID of the bead to reassign'),
+        agent_id: tool.schema.string().describe('The UUID of the agent to assign the bead to'),
+      },
+      async execute(args) {
+        const bead = await client.reassignBead(args.rig_id, args.bead_id, args.agent_id);
+        return `Bead ${bead.bead_id} reassigned to agent ${args.agent_id}.`;
+      },
+    }),
+
+    gt_bead_delete: tool({
+      description: 'Delete a bead. Use with caution — this is irreversible.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the bead belongs to'),
+        bead_id: tool.schema.string().describe('The UUID of the bead to delete'),
+      },
+      async execute(args) {
+        await client.deleteBead(args.rig_id, args.bead_id);
+        return `Bead ${args.bead_id} deleted.`;
+      },
+    }),
+
+    gt_agent_reset: tool({
+      description: 'Force-reset an agent to idle, unhooking from any bead.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the agent belongs to'),
+        agent_id: tool.schema.string().describe('The UUID of the agent to reset'),
+      },
+      async execute(args) {
+        await client.resetAgent(args.rig_id, args.agent_id);
+        return `Agent ${args.agent_id} reset to idle.`;
+      },
+    }),
+
+    gt_convoy_close: tool({
+      description: 'Force-close a convoy and optionally its tracked beads.',
+      args: {
+        convoy_id: tool.schema.string().describe('The UUID of the convoy to force-close'),
+      },
+      async execute(args) {
+        await client.closeConvoy(args.convoy_id);
+        return `Convoy ${args.convoy_id} force-closed.`;
+      },
+    }),
+
+    gt_convoy_update: tool({
+      description: 'Edit convoy metadata (merge_mode, feature_branch).',
+      args: {
+        convoy_id: tool.schema.string().describe('The UUID of the convoy to update'),
+        merge_mode: tool.schema
+          .enum(['review-then-land', 'review-and-merge'])
+          .describe('New merge mode for the convoy')
+          .optional(),
+        feature_branch: tool.schema
+          .string()
+          .describe('New feature branch name for the convoy')
+          .optional(),
+      },
+      async execute(args) {
+        await client.updateConvoy(args.convoy_id, {
+          merge_mode: args.merge_mode,
+          feature_branch: args.feature_branch,
+        });
+        return `Convoy ${args.convoy_id} updated.`;
+      },
+    }),
+
+    gt_escalation_acknowledge: tool({
+      description: 'Acknowledge an escalation.',
+      args: {
+        escalation_id: tool.schema.string().describe('The UUID of the escalation to acknowledge'),
+      },
+      async execute(args) {
+        await client.acknowledgeEscalation(args.escalation_id);
+        return `Escalation ${args.escalation_id} acknowledged.`;
+      },
+    }),
   };
 }

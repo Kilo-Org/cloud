@@ -51,6 +51,8 @@ import type {
   CreateBeadInput,
   BeadFilter,
   Bead,
+  BeadStatus,
+  BeadPriority as BeadPriorityType,
   RegisterAgentInput,
   AgentFilter,
   Agent,
@@ -64,6 +66,7 @@ import type {
   Molecule,
   BeadEventRecord,
   MergeStrategy,
+  ConvoyMergeMode,
 } from '../types';
 
 const TOWN_LOG = '[Town.do]';
@@ -578,6 +581,121 @@ export class TownDO extends DurableObject<Env> {
   }): Promise<BeadEventRecord[]> {
     await this.ensureInitialized();
     return beadOps.listBeadEvents(this.sql, options);
+  }
+
+  /**
+   * Partially update a bead's editable fields.
+   * Only fields explicitly provided are updated (partial update semantics).
+   * Writes a `fields_updated` bead_event for auditability.
+   */
+  async updateBead(
+    beadId: string,
+    fields: Partial<{
+      title: string;
+      body: string | null;
+      priority: BeadPriorityType;
+      labels: string[];
+      status: BeadStatus;
+      metadata: Record<string, unknown>;
+    }>,
+    actorId: string
+  ): Promise<Bead> {
+    await this.ensureInitialized();
+    const bead = beadOps.updateBeadFields(this.sql, beadId, fields, actorId);
+
+    // When a bead closes via field update, check for newly unblocked beads
+    if (fields.status === 'closed' || fields.status === 'failed') {
+      this.dispatchUnblockedBeads(beadId);
+    }
+
+    return bead;
+  }
+
+  /**
+   * Force-reset an agent to idle, unhooking from its current bead if any.
+   * Sets the bead status back to 'open' so it can be re-dispatched.
+   * Writes a bead_event for auditability.
+   */
+  async resetAgent(agentId: string): Promise<void> {
+    await this.ensureInitialized();
+
+    const agent = agents.getAgent(this.sql, agentId);
+    if (!agent) throw new Error(`Agent ${agentId} not found`);
+
+    const hookedBeadId = agent.current_hook_bead_id;
+
+    if (hookedBeadId) {
+      // Return the bead to 'open' so the scheduler can re-assign it
+      const bead = beadOps.getBead(this.sql, hookedBeadId);
+      if (bead && bead.status !== 'closed' && bead.status !== 'failed') {
+        beadOps.updateBeadStatus(this.sql, hookedBeadId, 'open', agentId);
+      }
+
+      beadOps.logBeadEvent(this.sql, {
+        beadId: hookedBeadId,
+        agentId,
+        eventType: 'unhooked',
+        newValue: 'open',
+        metadata: { reason: 'agent_reset', actor: 'mayor' },
+      });
+
+      agents.unhookBead(this.sql, agentId);
+    }
+
+    agents.updateAgentStatus(this.sql, agentId, 'idle');
+
+    console.log(
+      `${TOWN_LOG} resetAgent: reset agent=${agentId} hookedBead=${hookedBeadId ?? 'none'}`
+    );
+  }
+
+  /**
+   * Edit convoy_metadata fields (merge_mode, feature_branch).
+   * Returns the updated convoy, or null if not found.
+   */
+  async updateConvoy(
+    convoyId: string,
+    fields: Partial<{ merge_mode: ConvoyMergeMode; feature_branch: string }>
+  ): Promise<ConvoyEntry | null> {
+    await this.ensureInitialized();
+
+    const convoy = this.getConvoy(convoyId);
+    if (!convoy) return null;
+
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+
+    if (fields.merge_mode !== undefined) {
+      setClauses.push(`${convoy_metadata.columns.merge_mode} = ?`);
+      values.push(fields.merge_mode);
+    }
+    if (fields.feature_branch !== undefined) {
+      setClauses.push(`${convoy_metadata.columns.feature_branch} = ?`);
+      values.push(fields.feature_branch);
+    }
+
+    if (setClauses.length > 0) {
+      values.push(convoyId);
+      // Dynamic SET clause — query() can't statically verify param count here,
+      // so use sql.exec() directly. The guard above guarantees values is non-empty.
+      this.sql.exec(
+        /* sql */ `UPDATE ${convoy_metadata} SET ${setClauses.join(', ')} WHERE ${convoy_metadata.bead_id} = ?`,
+        ...values
+      );
+
+      // Also update the convoy bead's updated_at
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [now(), convoyId]
+      );
+    }
+
+    return this.getConvoy(convoyId);
   }
 
   // ══════════════════════════════════════════════════════════════════

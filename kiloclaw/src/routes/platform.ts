@@ -83,7 +83,6 @@ const SAFE_ERROR_PREFIXES = [
   'Gateway controller ', // already sanitized at DO level
   'Config was modified ', // etag mismatch on config replace
   'Invalid secret patch: ', // catalog validation (allFieldsRequired, etc.)
-  'Config was modified ', // etag mismatch on config replace
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {

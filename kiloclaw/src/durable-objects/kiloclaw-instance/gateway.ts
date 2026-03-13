@@ -208,11 +208,14 @@ export function restoreConfig(
 
 export function isErrorUnknownRoute(error: unknown): boolean {
   // If a controller predates a new route, the request will either:
-  //   - fall through to the catch-all proxy (401 REQUIRE_PROXY_TOKEN)
+  //   - fall through to the catch-all proxy which returns 401 with code
+  //     'controller_route_unavailable' (for /_kilo/* paths)
   //   - forward to the gateway which returns 404 for the unknown path.
+  // We intentionally do NOT match bare 401 (without the code) to avoid
+  // masking genuine authentication failures.
   return (
     error instanceof GatewayControllerError &&
-    (error.status === 404 || error.status === 401 || error.code === 'controller_route_unavailable')
+    (error.status === 404 || error.code === 'controller_route_unavailable')
   );
 }
 

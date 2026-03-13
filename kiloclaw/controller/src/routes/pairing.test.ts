@@ -16,12 +16,12 @@ function createMockCache(): PairingCache {
     refreshChannelPairing: vi.fn(async () => undefined),
     refreshDevicePairing: vi.fn(async () => undefined),
     approveChannel: vi.fn(async () => ({
-      success: true,
+      success: true as const,
       message: 'Pairing approved',
       statusHint: 200 as const,
     })),
     approveDevice: vi.fn(async () => ({
-      success: true,
+      success: true as const,
       message: 'Device approved',
       statusHint: 200 as const,
     })),
@@ -97,6 +97,21 @@ describe('/_kilo/pairing routes', () => {
       expect(cache.refreshChannelPairing).toHaveBeenCalledOnce();
     });
 
+    it('returns stale cache when refresh throws', async () => {
+      const cache = createMockCache();
+      vi.mocked(cache.refreshChannelPairing).mockRejectedValueOnce(new Error('refresh boom'));
+      const app = createApp(cache);
+
+      const resp = await app.request('/_kilo/pairing/channels?refresh=true', {
+        headers: authHeaders(),
+      });
+      expect(resp.status).toBe(200);
+      // Still returns cache data despite refresh failure
+      const body = await resp.json();
+      expect(body).toHaveProperty('requests');
+      expect(cache.refreshChannelPairing).toHaveBeenCalledOnce();
+    });
+
     it('does not refresh when refresh param is absent', async () => {
       const cache = createMockCache();
       const app = createApp(cache);
@@ -121,6 +136,20 @@ describe('/_kilo/pairing routes', () => {
         lastUpdated: '2026-03-12T00:00:00.000Z',
       });
       expect(cache.refreshDevicePairing).not.toHaveBeenCalled();
+    });
+
+    it('returns stale cache when device refresh throws', async () => {
+      const cache = createMockCache();
+      vi.mocked(cache.refreshDevicePairing).mockRejectedValueOnce(new Error('refresh boom'));
+      const app = createApp(cache);
+
+      const resp = await app.request('/_kilo/pairing/devices?refresh=true', {
+        headers: authHeaders(),
+      });
+      expect(resp.status).toBe(200);
+      const body = await resp.json();
+      expect(body).toHaveProperty('requests');
+      expect(cache.refreshDevicePairing).toHaveBeenCalledOnce();
     });
 
     it('calls refreshDevicePairing when refresh=true', async () => {

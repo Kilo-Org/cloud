@@ -2593,7 +2593,7 @@ describe('approveDevicePairingRequest', () => {
       '58f4ac67-12b4-4f6e-adee-ff3463a7c30c'
     );
 
-    expect(result).toEqual({ success: false, message: 'Approval failed' });
+    expect(result).toEqual({ success: false, message: 'Approval failed: request not found' });
   });
 });
 
@@ -2651,12 +2651,12 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
-  it('channel list fallback on 401 — runs fly exec', async () => {
+  it('channel list fallback on 401 with controller_route_unavailable — runs fly exec', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { flyAppName: 'acct-test' });
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      new Response(JSON.stringify({ code: 'controller_route_unavailable', error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -2673,6 +2673,21 @@ describe('controller-first pairing', () => {
     expect(result.requests).toHaveLength(1);
     expect(result.requests[0].code).toBe('QRS');
     expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel list throws on bare 401 — no fallback (genuine auth failure)', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.listPairingRequests()).rejects.toThrow('Unauthorized');
     fetchSpy.mockRestore();
   });
 
@@ -2840,6 +2855,146 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
+  it('device approve 400 from controller — returns failure without throwing', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'Invalid request ID' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.approveDevicePairingRequest('58f4ac67-12b4-4f6e-adee-ff3463a7c30c');
+
+    expect(result).toEqual({ success: false, message: 'Invalid request ID' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device list fallback on 404 — runs fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: JSON.stringify({ requests: [{ requestId: 'r1', deviceId: 'd1' }] }),
+      stderr: '',
+    });
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result.requests).toHaveLength(1);
+    expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device list throws on 500 — no fallback', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Internal error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.listDevicePairingRequests()).rejects.toSatisfy((err: unknown) => {
+      return err instanceof GatewayControllerError && err.status === 500;
+    });
+
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel approve throws on 500 — no fallback', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Internal error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.approvePairingRequest('telegram', 'ABC123')).rejects.toSatisfy(
+      (err: unknown) => err instanceof GatewayControllerError && err.status === 500
+    );
+
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device approve throws on 500 — no fallback', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Internal error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(
+      instance.approveDevicePairingRequest('58f4ac67-12b4-4f6e-adee-ff3463a7c30c')
+    ).rejects.toSatisfy(
+      (err: unknown) => err instanceof GatewayControllerError && err.status === 500
+    );
+
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device list fallback on 401 with controller_route_unavailable — runs fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'Unauthorized', code: 'controller_route_unavailable' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: JSON.stringify({ requests: [{ requestId: 'r1', deviceId: 'd1' }] }),
+      stderr: '',
+    });
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result.requests).toHaveLength(1);
+    expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device list throws on bare 401 — no fallback (genuine auth failure)', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(instance.listDevicePairingRequests()).rejects.toThrow('Unauthorized');
+    fetchSpy.mockRestore();
+  });
+
   it('channel list with forceRefresh — appends ?refresh=true to controller URL', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { flyAppName: 'acct-test' });
@@ -2858,6 +3013,76 @@ describe('controller-first pairing', () => {
 
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       'https://acct-test.fly.dev/_kilo/pairing/channels?refresh=true'
+    );
+    fetchSpy.mockRestore();
+  });
+
+  it('channel approve fallback on 401 with controller_route_unavailable — runs fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'Unauthorized', code: 'controller_route_unavailable' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'approved',
+      stderr: '',
+    });
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({ success: true, message: 'Pairing approved' });
+    expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device approve fallback on 401 with controller_route_unavailable — runs fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'Unauthorized', code: 'controller_route_unavailable' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'approved',
+      stderr: '',
+    });
+
+    const result = await instance.approveDevicePairingRequest('58f4ac67-12b4-4f6e-adee-ff3463a7c30c');
+
+    expect(result).toEqual({ success: true, message: 'Device pairing approved' });
+    expect(flyClient.execCommand).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device list with forceRefresh — appends ?refresh=true to controller URL', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          requests: [],
+          lastUpdated: '2026-03-12T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    await instance.listDevicePairingRequests(true);
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://acct-test.fly.dev/_kilo/pairing/devices?refresh=true'
     );
     fetchSpy.mockRestore();
   });

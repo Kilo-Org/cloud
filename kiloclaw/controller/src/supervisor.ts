@@ -203,7 +203,11 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
         const parts = lineBuf.split('\n');
         lineBuf = parts.pop() ?? '';
         for (const line of parts) {
-          onStdoutLine(line);
+          try {
+            onStdoutLine(line);
+          } catch (err) {
+            console.error('[controller] onStdoutLine callback error:', err);
+          }
         }
       });
     }

@@ -65,6 +65,14 @@ export const OpenclawConfigResponseSchema = z.object({
 
 // ──────────────────────────────────────────────────────────────────────
 // Controller pairing responses
+//
+// These schemas describe the wire format returned by the controller's
+// HTTP endpoints and must stay in sync with the canonical types in
+// controller/src/pairing-cache.ts (CacheEntry, ChannelPairingRequest,
+// DevicePairingRequest, ApproveResult). Cross-package imports are not
+// possible, so changes to one must be mirrored in the other.
+// Note: ApproveResult.statusHint is consumed by the route handler and
+// not serialized to the client, so it is intentionally absent here.
 // ──────────────────────────────────────────────────────────────────────
 
 export const ControllerChannelPairingResponseSchema = z.object({

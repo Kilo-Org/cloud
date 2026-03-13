@@ -193,6 +193,19 @@ describe('createPairingCache', () => {
       });
     });
 
+    it('returns success when approve succeeds but post-approve refresh throws', async () => {
+      let callCount = 0;
+      const execImpl = vi.fn<ExecImpl>().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve({ stdout: '{}', stderr: '' });
+        return Promise.reject(new Error('refresh boom'));
+      });
+      const { cache } = createTestHarness({ execImpl });
+
+      const result = await cache.approveChannel('telegram', 'ABC');
+      expect(result).toEqual({ success: true, message: 'Pairing approved', statusHint: 200 });
+    });
+
     it('returns error on CLI failure', async () => {
       const execImpl = vi.fn<ExecImpl>().mockRejectedValue(new Error('cli boom'));
       const { cache } = createTestHarness({ execImpl });
@@ -215,6 +228,19 @@ describe('createPairingCache', () => {
         'approve',
         'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       ]);
+    });
+
+    it('returns success when approve succeeds but post-approve refresh throws', async () => {
+      let callCount = 0;
+      const execImpl = vi.fn<ExecImpl>().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve({ stdout: '{}', stderr: '' });
+        return Promise.reject(new Error('refresh boom'));
+      });
+      const { cache } = createTestHarness({ execImpl });
+
+      const result = await cache.approveDevice('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+      expect(result).toEqual({ success: true, message: 'Device approved', statusHint: 200 });
     });
 
     it('rejects non-UUID requestId', async () => {
@@ -450,6 +476,221 @@ describe('createPairingCache', () => {
       await cache.refreshDevicePairing();
       // lastUpdated should NOT be updated
       expect(cache.getDevicePairing().lastUpdated).toBe('2026-03-12T01:00:00.000Z');
+    });
+  });
+
+  describe('empty-field filtering', () => {
+    it('filters out channel requests with empty code', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({
+          requests: [
+            { code: '', id: '1' },
+            { code: 'ABC', id: '2' },
+          ],
+        }),
+        stderr: '',
+      });
+      const readConfigImpl = vi.fn(() => ({
+        channels: { telegram: { enabled: true, botToken: 'tok' } },
+      }));
+
+      const { cache } = createTestHarness({ execImpl, readConfigImpl });
+      await cache.refreshChannelPairing();
+
+      const result = cache.getChannelPairing();
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].code).toBe('ABC');
+    });
+
+    it('filters out channel requests with empty id', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({
+          requests: [
+            { code: 'ABC', id: '' },
+            { code: 'DEF', id: '2' },
+          ],
+        }),
+        stderr: '',
+      });
+      const readConfigImpl = vi.fn(() => ({
+        channels: { telegram: { enabled: true, botToken: 'tok' } },
+      }));
+
+      const { cache } = createTestHarness({ execImpl, readConfigImpl });
+      await cache.refreshChannelPairing();
+
+      const result = cache.getChannelPairing();
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].code).toBe('DEF');
+    });
+
+    it('filters out device requests with empty requestId', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({
+          pending: [
+            { requestId: '', deviceId: 'd1' },
+            { requestId: 'r2', deviceId: 'd2' },
+          ],
+        }),
+        stderr: '',
+      });
+
+      const { cache } = createTestHarness({ execImpl });
+      await cache.refreshDevicePairing();
+
+      const result = cache.getDevicePairing();
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].requestId).toBe('r2');
+    });
+
+    it('filters out device requests with empty deviceId', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({
+          pending: [
+            { requestId: 'r1', deviceId: '' },
+            { requestId: 'r2', deviceId: 'd2' },
+          ],
+        }),
+        stderr: '',
+      });
+
+      const { cache } = createTestHarness({ execImpl });
+      await cache.refreshDevicePairing();
+
+      const result = cache.getDevicePairing();
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].requestId).toBe('r2');
+    });
+  });
+
+  describe('post-cleanup behavior', () => {
+    it('refreshChannelPairing is a no-op after cleanup', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({ requests: [] }),
+        stderr: '',
+      });
+      const readConfigImpl = vi.fn(() => ({
+        channels: { telegram: { enabled: true, botToken: 'tok' } },
+      }));
+
+      const { cache } = createTestHarness({ execImpl, readConfigImpl });
+      cache.cleanup();
+
+      await cache.refreshChannelPairing();
+      expect(execImpl).not.toHaveBeenCalled();
+    });
+
+    it('refreshDevicePairing is a no-op after cleanup', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({ pending: [] }),
+        stderr: '',
+      });
+
+      const { cache } = createTestHarness({ execImpl });
+      cache.cleanup();
+
+      await cache.refreshDevicePairing();
+      expect(execImpl).not.toHaveBeenCalled();
+    });
+
+    it('onPairingLogLine is ignored after cleanup', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({ requests: [] }),
+        stderr: '',
+      });
+      const readConfigImpl = vi.fn(() => ({
+        channels: { telegram: { enabled: true, botToken: 'tok' } },
+      }));
+
+      const { cache } = createTestHarness({ execImpl, readConfigImpl });
+      cache.cleanup();
+
+      cache.onPairingLogLine('new pairing request received');
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      expect(execImpl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('detectChannels', () => {
+    it('detects Slack with botToken', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({ requests: [{ code: 'A', id: '1' }] }),
+        stderr: '',
+      });
+      const readConfigImpl = vi.fn(() => ({
+        channels: {
+          slack: { enabled: true, botToken: 'xoxb-tok' },
+        },
+      }));
+
+      const { cache } = createTestHarness({ execImpl, readConfigImpl });
+      await cache.refreshChannelPairing();
+
+      expect(execImpl).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining(['slack'])
+      );
+    });
+
+    it('detects Slack with appToken only', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({ requests: [{ code: 'A', id: '1' }] }),
+        stderr: '',
+      });
+      const readConfigImpl = vi.fn(() => ({
+        channels: {
+          slack: { enabled: true, appToken: 'xapp-tok' },
+        },
+      }));
+
+      const { cache } = createTestHarness({ execImpl, readConfigImpl });
+      await cache.refreshChannelPairing();
+
+      expect(execImpl).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining(['slack'])
+      );
+    });
+
+    it('skips Slack when disabled even with tokens', async () => {
+      const execImpl = vi.fn<ExecImpl>();
+      const readConfigImpl = vi.fn(() => ({
+        channels: {
+          slack: { enabled: false, botToken: 'xoxb-tok' },
+        },
+      }));
+
+      const { cache } = createTestHarness({ execImpl, readConfigImpl });
+      await cache.refreshChannelPairing();
+
+      expect(execImpl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('start idempotency', () => {
+    it('calling start twice does not create duplicate timers', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({
+        stdout: JSON.stringify({ requests: [] }),
+        stderr: '',
+      });
+      const readConfigImpl = vi.fn(() => ({
+        channels: { telegram: { enabled: true, botToken: 'tok' } },
+      }));
+
+      const { cache } = createTestHarness({ execImpl, readConfigImpl });
+      cache.start();
+      cache.start(); // second call should be no-op
+
+      // Advance past initial fetch (5s)
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      // With two channels (telegram), initial fetch calls exec twice
+      // If start() wasn't idempotent, we'd see 4 calls
+      const callsAfterInitial = execImpl.mock.calls.length;
+      expect(callsAfterInitial).toBe(2); // telegram channel + device list
+
+      cache.cleanup();
     });
   });
 

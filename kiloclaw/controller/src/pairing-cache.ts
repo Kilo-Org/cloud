@@ -22,15 +22,13 @@ export type DevicePairingRequest = {
 };
 
 export type CacheEntry<T> = {
-  requests: T[];
-  lastUpdated: string;
+  readonly requests: readonly T[];
+  readonly lastUpdated: string;
 };
 
-export type ApproveResult = {
-  success: boolean;
-  message: string;
-  statusHint: 200 | 400 | 500;
-};
+export type ApproveResult =
+  | { success: true; message: string; statusHint: 200 }
+  | { success: false; message: string; statusHint: 400 | 500 };
 
 export type PairingCache = {
   getChannelPairing: () => CacheEntry<ChannelPairingRequest>;
@@ -52,10 +50,6 @@ type ExecImpl = (
 type PairingCacheOptions = {
   execImpl?: ExecImpl;
   readConfigImpl?: () => unknown;
-  setTimeoutImpl?: typeof setTimeout;
-  clearTimeoutImpl?: typeof clearTimeout;
-  setIntervalImpl?: typeof setInterval;
-  clearIntervalImpl?: typeof clearInterval;
   nowImpl?: () => string;
 };
 
@@ -71,6 +65,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const PAIRING_KEYWORDS = ['pairing', 'pair request', 'device request', 'approve', 'paired'];
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function approveOk(message: string): ApproveResult {
+  return { success: true as const, message, statusHint: 200 as const };
+}
+
+function approveFail(message: string, statusHint: 400 | 500): ApproveResult {
+  return { success: false as const, message, statusHint };
+}
+
 export const OPENCLAW_BIN = '/usr/local/bin/openclaw';
 
 function defaultExecImpl(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
@@ -85,28 +91,25 @@ function defaultReadConfigImpl(): unknown {
   return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 }
 
-type ChannelConfig = {
-  enabled?: boolean;
-  botToken?: string;
-  token?: string;
-  appToken?: string;
-};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-type OpenClawConfig = {
-  channels?: Record<string, ChannelConfig | undefined>;
-};
-
-function isOpenClawConfig(value: unknown): value is OpenClawConfig {
-  return typeof value === 'object' && value !== null;
+function getArray(obj: Record<string, unknown>, key: string): unknown[] {
+  const val = obj[key];
+  return Array.isArray(val) ? val : [];
 }
 
 function detectChannels(config: unknown): string[] {
-  if (!isOpenClawConfig(config)) return [];
-  const ch = config.channels ?? {};
+  if (!isRecord(config)) return [];
+  const ch = isRecord(config.channels) ? config.channels : {};
+  const tg = isRecord(ch.telegram) ? ch.telegram : {};
+  const dc = isRecord(ch.discord) ? ch.discord : {};
+  const sl = isRecord(ch.slack) ? ch.slack : {};
   const channels: string[] = [];
-  if (ch.telegram?.enabled && ch.telegram?.botToken) channels.push('telegram');
-  if (ch.discord?.enabled && ch.discord?.token) channels.push('discord');
-  if (ch.slack?.enabled && (ch.slack?.botToken || ch.slack?.appToken)) channels.push('slack');
+  if (tg.enabled && tg.botToken) channels.push('telegram');
+  if (dc.enabled && dc.token) channels.push('discord');
+  if (sl.enabled && (sl.botToken || sl.appToken)) channels.push('slack');
   return channels;
 }
 
@@ -114,27 +117,26 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
   const {
     execImpl = defaultExecImpl,
     readConfigImpl = defaultReadConfigImpl,
-    setTimeoutImpl = setTimeout,
-    clearTimeoutImpl = clearTimeout,
-    setIntervalImpl = setInterval,
-    clearIntervalImpl = clearInterval,
     nowImpl = () => new Date().toISOString(),
   } = options ?? {};
 
   let channelCache: CacheEntry<ChannelPairingRequest> = { requests: [], lastUpdated: '' };
   let deviceCache: CacheEntry<DevicePairingRequest> = { requests: [], lastUpdated: '' };
 
+  let started = false;
+  let stopped = false;
   let initialTimer: ReturnType<typeof setTimeout> | null = null;
   let periodicTimer: ReturnType<typeof setInterval> | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   const refreshChannelPairing = async (): Promise<void> => {
+    if (stopped) return;
     let channels: string[];
     try {
       const config = readConfigImpl();
       channels = detectChannels(config);
-    } catch {
-      // No config available — nothing to refresh
+    } catch (err) {
+      console.warn(`[pairing-cache] could not read config: ${errorMessage(err)}`);
       return;
     }
 
@@ -144,22 +146,20 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       channels.map(async (channel) => {
         const { stdout } = await execImpl(OPENCLAW_BIN, ['pairing', 'list', channel, '--json']);
         const parsed: unknown = JSON.parse(stdout.trim());
-        const data = parsed && typeof parsed === 'object' && 'requests' in parsed
-          ? parsed
-          : { requests: [] };
-        const requests = Array.isArray((data as { requests: unknown }).requests)
-          ? (data as { requests: unknown[] }).requests
-          : [];
-        return requests.map((req): ChannelPairingRequest => {
-          const r = req && typeof req === 'object' ? req : {};
-          return {
-            code: String((r as Record<string, unknown>).code ?? ''),
-            id: String((r as Record<string, unknown>).id ?? ''),
-            channel,
-            ...('meta' in r ? { meta: (r as Record<string, unknown>).meta } : {}),
-            ...('createdAt' in r ? { createdAt: String((r as Record<string, unknown>).createdAt) } : {}),
-          };
-        });
+        const data = isRecord(parsed) ? parsed : {};
+        const requests = getArray(data, 'requests');
+        return requests
+          .map((req): ChannelPairingRequest => {
+            const r = isRecord(req) ? req : {};
+            return {
+              code: String(r.code ?? ''),
+              id: String(r.id ?? ''),
+              channel,
+              ...('meta' in r ? { meta: r.meta } : {}),
+              ...('createdAt' in r ? { createdAt: String(r.createdAt) } : {}),
+            };
+          })
+          .filter((req) => req.code !== '' && req.id !== '');
       })
     );
 
@@ -185,29 +185,30 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
   };
 
   const refreshDevicePairing = async (): Promise<void> => {
+    if (stopped) return;
     try {
       const { stdout } = await execImpl(OPENCLAW_BIN, ['devices', 'list', '--json']);
       const parsed: unknown = JSON.parse(stdout.trim());
-      const data = parsed && typeof parsed === 'object' ? parsed : {};
-      const pending = 'pending' in data && Array.isArray((data as { pending: unknown }).pending)
-        ? (data as { pending: unknown[] }).pending
-        : [];
+      const data = isRecord(parsed) ? parsed : {};
+      const pending = getArray(data, 'pending');
 
-      const requests: DevicePairingRequest[] = pending.map((req: unknown) => {
-        const r = req && typeof req === 'object' ? (req as Record<string, unknown>) : {};
-        return {
-          requestId: String(r.requestId ?? ''),
-          deviceId: String(r.deviceId ?? ''),
-          ...(r.role !== undefined ? { role: String(r.role) } : {}),
-          ...(r.platform !== undefined ? { platform: String(r.platform) } : {}),
-          ...(r.clientId !== undefined ? { clientId: String(r.clientId) } : {}),
-          ...(typeof r.ts === 'number' ? { ts: r.ts } : {}),
-        };
-      });
+      const requests: DevicePairingRequest[] = pending
+        .map((req: unknown) => {
+          const r = isRecord(req) ? req : {};
+          return {
+            requestId: String(r.requestId ?? ''),
+            deviceId: String(r.deviceId ?? ''),
+            ...(r.role !== undefined ? { role: String(r.role) } : {}),
+            ...(r.platform !== undefined ? { platform: String(r.platform) } : {}),
+            ...(r.clientId !== undefined ? { clientId: String(r.clientId) } : {}),
+            ...(typeof r.ts === 'number' ? { ts: r.ts } : {}),
+          };
+        })
+        .filter((req) => req.requestId !== '' && req.deviceId !== '');
 
       deviceCache = { requests, lastUpdated: nowImpl() };
-    } catch {
-      // Keep last-known-good
+    } catch (err) {
+      console.error(`[pairing-cache] device refresh failed: ${errorMessage(err)}`);
     }
   };
 
@@ -216,74 +217,90 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
   };
 
   const approveChannel = async (channel: string, code: string): Promise<ApproveResult> => {
-    if (!CHANNEL_RE.test(channel)) {
-      return { success: false, message: 'Invalid channel name', statusHint: 400 };
-    }
-    if (!CODE_RE.test(code)) {
-      return { success: false, message: 'Invalid pairing code', statusHint: 400 };
-    }
+    if (!CHANNEL_RE.test(channel)) return approveFail('Invalid channel name', 400);
+    if (!CODE_RE.test(code)) return approveFail('Invalid pairing code', 400);
 
     try {
       await execImpl(OPENCLAW_BIN, ['pairing', 'approve', channel, code, '--notify']);
-      await refreshChannelPairing();
-      return { success: true, message: 'Pairing approved', statusHint: 200 };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { success: false, message, statusHint: 500 };
-    }
-  };
-
-  const approveDevice = async (requestId: string): Promise<ApproveResult> => {
-    if (!UUID_RE.test(requestId)) {
-      return { success: false, message: 'Invalid request ID', statusHint: 400 };
+      console.error('[pairing-cache] channel approve failed:', err);
+      return approveFail(errorMessage(err), 500);
     }
 
     try {
-      await execImpl(OPENCLAW_BIN, ['devices', 'approve', requestId]);
-      await refreshDevicePairing();
-      return { success: true, message: 'Device approved', statusHint: 200 };
+      await refreshChannelPairing();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { success: false, message, statusHint: 500 };
+      console.warn('[pairing-cache] post-approve channel refresh failed:', errorMessage(err));
     }
+    return approveOk('Pairing approved');
+  };
+
+  const approveDevice = async (requestId: string): Promise<ApproveResult> => {
+    if (!UUID_RE.test(requestId)) return approveFail('Invalid request ID', 400);
+
+    try {
+      await execImpl(OPENCLAW_BIN, ['devices', 'approve', requestId]);
+    } catch (err) {
+      console.error('[pairing-cache] device approve failed:', err);
+      return approveFail(errorMessage(err), 500);
+    }
+
+    try {
+      await refreshDevicePairing();
+    } catch (err) {
+      console.warn('[pairing-cache] post-approve device refresh failed:', errorMessage(err));
+    }
+    return approveOk('Device approved');
   };
 
   const onPairingLogLine = (line: string): void => {
+    if (stopped) return;
     const lower = line.toLowerCase();
     const isPairingLine = PAIRING_KEYWORDS.some((kw) => lower.includes(kw));
     if (!isPairingLine) return;
 
-    // Fixed 2s delay from first trigger (non-sliding window)
+    // Non-sliding debounce: the first trigger in a quiet window starts a 2s timer;
+    // further triggers during that window are ignored.
     if (debounceTimer !== null) return;
 
-    debounceTimer = setTimeoutImpl(() => {
+    debounceTimer = setTimeout(() => {
       debounceTimer = null;
-      void refreshAll();
+      void refreshAll().catch(err => {
+        console.error('[pairing-cache] debounced refreshAll failed:', err);
+      });
     }, DEBOUNCE_DELAY_MS);
   };
 
   const start = (): void => {
-    initialTimer = setTimeoutImpl(() => {
+    if (started) return;
+    started = true;
+
+    initialTimer = setTimeout(() => {
       initialTimer = null;
-      void refreshAll();
+      void refreshAll().catch(err => {
+        console.error('[pairing-cache] initial refreshAll failed:', err);
+      });
     }, INITIAL_FETCH_DELAY_MS);
 
-    periodicTimer = setIntervalImpl(() => {
-      void refreshAll();
+    periodicTimer = setInterval(() => {
+      void refreshAll().catch(err => {
+        console.error('[pairing-cache] periodic refreshAll failed:', err);
+      });
     }, PERIODIC_INTERVAL_MS);
   };
 
   const cleanup = (): void => {
+    stopped = true;
     if (initialTimer !== null) {
-      clearTimeoutImpl(initialTimer);
+      clearTimeout(initialTimer);
       initialTimer = null;
     }
     if (periodicTimer !== null) {
-      clearIntervalImpl(periodicTimer);
+      clearInterval(periodicTimer);
       periodicTimer = null;
     }
     if (debounceTimer !== null) {
-      clearTimeoutImpl(debounceTimer);
+      clearTimeout(debounceTimer);
       debounceTimer = null;
     }
   };

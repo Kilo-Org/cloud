@@ -82,7 +82,7 @@ export function SeatUsageCard({ organizationId }: Props) {
             <Users className="h-4 w-4" />
             <CardTitle>Seat Usage</CardTitle>
           </div>
-          {currentUserRole === 'owner' && (
+          {(currentUserRole === 'owner' || currentUserRole === 'billing_manager') && (
             <LinkButton
               href={`/organizations/${organizationId}/subscription`}
               className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm transition-colors"

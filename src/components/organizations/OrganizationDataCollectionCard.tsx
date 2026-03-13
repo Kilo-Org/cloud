@@ -73,7 +73,8 @@ export function OrganizationDataCollectionCard({
   const currentDataCollection = organizationData.settings?.data_collection ?? null;
   const displayValue = currentDataCollection === null ? 'extension' : currentDataCollection;
 
-  const canEdit = currentUserRole === 'owner' && !isReadOnly;
+  const canEdit =
+    (currentUserRole === 'owner' || currentUserRole === 'billing_manager') && !isReadOnly;
 
   return (
     <Card>
@@ -134,7 +135,7 @@ export function OrganizationDataCollectionCard({
 
         {!canEdit && (
           <p className="text-muted-foreground text-xs">
-            Only organization owners and admins can modify data collection settings.
+            Only organization owners and billing managers can modify data collection settings.
           </p>
         )}
       </CardContent>

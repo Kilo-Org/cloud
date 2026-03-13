@@ -140,14 +140,10 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         });
       }
 
-      // Always verify the user belongs to this organization.
-      // When prior subscriptions exist, enforce owner role; otherwise just check membership
-      // (the org may still be mid-setup so the creator may not have a role yet).
-      if (subscriptions.length) {
-        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
-      } else {
-        await ensureOrganizationAccess(ctx, organizationId);
-      }
+      // Org creators always get an owner membership row at creation time, so there is
+      // no "mid-setup" window where the caller lacks a role. Enforce owner/billing_manager
+      // unconditionally, matching every other billing mutation in this router.
+      await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
 
       const result = await getStripeSeatsCheckoutUrl({
         kiloUserId: user.id,

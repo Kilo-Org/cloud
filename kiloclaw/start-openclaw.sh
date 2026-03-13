@@ -213,6 +213,34 @@ if [ "${KILOCLAW_KILO_CLI:-}" = "true" ]; then
 fi
 
 # ============================================================
+# GITHUB CONFIGURATION
+# ============================================================
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+    echo "Configuring GitHub access..."
+
+    echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null \
+        && gh auth setup-git 2>/dev/null \
+        && echo "gh CLI authenticated" \
+        || echo "WARNING: gh auth login failed"
+
+    if [ -n "${GITHUB_USERNAME:-}" ]; then
+        git config --global user.name "$GITHUB_USERNAME"
+        echo "git user.name set to $GITHUB_USERNAME"
+    fi
+    if [ -n "${GITHUB_EMAIL:-}" ]; then
+        git config --global user.email "$GITHUB_EMAIL"
+        echo "git user.email set to $GITHUB_EMAIL"
+    fi
+else
+    # Clean up any previously stored credentials from the persistent volume
+    # so that removing GitHub secrets actually de-authenticates the machine.
+    gh auth logout --hostname github.com 2>/dev/null || true
+    git config --global --unset user.name 2>/dev/null || true
+    git config --global --unset user.email 2>/dev/null || true
+    echo "GitHub: not configured (credentials cleared)"
+fi
+
+# ============================================================
 # PATCH CONFIG (channels, gateway auth, exec policy)
 # ============================================================
 # openclaw onboard handles provider/model config natively (kilocode provider,

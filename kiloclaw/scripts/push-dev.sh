@@ -3,8 +3,12 @@
 # timestamped tag, and update .dev.vars so the worker uses it on next
 # machine create/restart.
 #
-# Usage: ./scripts/push-dev.sh [app-name]
-#   app-name defaults to FLY_APP_NAME from .dev.vars, or "kiloclaw-dev"
+# Usage: ./scripts/push-dev.sh [--local] [app-name]
+#   --local    Use Dockerfile.local to install OpenClaw from a local tarball
+#              in openclaw-build/ instead of npm. Build your fork first:
+#              cd /path/to/openclaw && pnpm build && npm pack
+#              cp openclaw-*.tgz /path/to/kiloclaw/openclaw-build/
+#   app-name   defaults to FLY_APP_NAME from .dev.vars, or "kiloclaw-dev"
 #
 set -e
 
@@ -14,6 +18,30 @@ fly auth docker
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Parse --local flag
+USE_LOCAL=false
+for arg in "$@"; do
+  case "$arg" in
+    --local) USE_LOCAL=true; shift ;;
+  esac
+done
+
+# Select Dockerfile
+if [ "$USE_LOCAL" = true ]; then
+  DOCKERFILE="$KILOCLAW_DIR/Dockerfile.local"
+  # Validate that a tarball exists in openclaw-build/
+  if ! ls "$KILOCLAW_DIR"/openclaw-build/openclaw-*.tgz 1>/dev/null 2>&1; then
+    echo "Error: No openclaw-*.tgz found in openclaw-build/." >&2
+    echo "Build your fork first:" >&2
+    echo "  cd /path/to/openclaw && pnpm build && npm pack" >&2
+    echo "  cp openclaw-*.tgz $(cd "$KILOCLAW_DIR" && pwd)/openclaw-build/" >&2
+    exit 1
+  fi
+  echo "Using Dockerfile.local (local OpenClaw tarball)"
+else
+  DOCKERFILE="$KILOCLAW_DIR/Dockerfile"
+fi
 
 # Read app name from argument, .dev.vars, or default
 APP_NAME="${1:-}"
@@ -26,7 +54,7 @@ TAG="dev-$(date +%s)"
 IMAGE="registry.fly.io/$APP_NAME:$TAG"
 GIT_SHA="$(git -C "$KILOCLAW_DIR" rev-parse HEAD 2>/dev/null || echo 'unknown')"
 
-# Extract OpenClaw version from Dockerfile
+# Extract OpenClaw version from Dockerfile (only available when using npm install)
 OPENCLAW_VERSION=$(sed -n 's/.*openclaw@\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' "$KILOCLAW_DIR/Dockerfile" | head -1)
 
 echo "Building + pushing $IMAGE (linux/amd64) ..."
@@ -38,7 +66,7 @@ trap 'rm -f "$METADATA_FILE"' EXIT
 
 docker buildx build \
   --platform linux/amd64 \
-  -f "$KILOCLAW_DIR/Dockerfile" \
+  -f "$DOCKERFILE" \
   --build-arg "CONTROLLER_COMMIT=$GIT_SHA" \
   --build-arg "CONTROLLER_CACHE_BUST=$(date +%s)" \
   -t "$IMAGE" \

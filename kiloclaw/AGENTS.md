@@ -172,6 +172,7 @@ Before submitting any change:
 2. Update tests in the same PR -- do not defer
 3. Do not reintroduce optional `userId` or `sandboxId` parameters (they are always required)
 4. If changing `start-openclaw.sh`, bump the cache bust in the Dockerfile
+5. If adding or changing user-facing features, add a changelog entry to `src/app/(app)/claw/components/changelog-data.ts` (newest first)
 
 ## Test Targets by Change Type
 

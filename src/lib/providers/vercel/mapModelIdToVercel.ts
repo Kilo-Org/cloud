@@ -5,6 +5,8 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'arcee-ai/trinity-large-preview:free': 'arcee-ai/trinity-large-preview',
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
+  'mistralai/mistral-embed-2312': 'mistral/mistral-embed',
+  'mistralai/codestral-embed-2505': 'mistral/codestral-embed',
 };
 
 export function mapModelIdToVercel(modelId: string) {

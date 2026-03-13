@@ -37,7 +37,7 @@ describe('Secret Catalog', () => {
 
   describe('Icon validation', () => {
     it('all icon values are valid SecretIconKey members', () => {
-      const validIcons: Set<SecretIconKey> = new Set(['send', 'discord', 'slack', 'key']);
+      const validIcons: Set<SecretIconKey> = new Set(['send', 'discord', 'slack', 'key', 'github']);
       for (const entry of SECRET_CATALOG) {
         expect(validIcons.has(entry.icon)).toBe(true);
       }
@@ -108,6 +108,9 @@ describe('Secret Catalog', () => {
         'DISCORD_BOT_TOKEN',
         'SLACK_BOT_TOKEN',
         'SLACK_APP_TOKEN',
+        'GITHUB_TOKEN',
+        'GITHUB_USERNAME',
+        'GITHUB_EMAIL',
       ]);
 
       const catalogEnvVars = new Set(FIELD_KEY_TO_ENV_VAR.values());
@@ -122,6 +125,9 @@ describe('Secret Catalog', () => {
       expect(FIELD_KEY_TO_ENV_VAR.get('discordBotToken')).toBe('DISCORD_BOT_TOKEN');
       expect(FIELD_KEY_TO_ENV_VAR.get('slackBotToken')).toBe('SLACK_BOT_TOKEN');
       expect(FIELD_KEY_TO_ENV_VAR.get('slackAppToken')).toBe('SLACK_APP_TOKEN');
+      expect(FIELD_KEY_TO_ENV_VAR.get('githubToken')).toBe('GITHUB_TOKEN');
+      expect(FIELD_KEY_TO_ENV_VAR.get('githubUsername')).toBe('GITHUB_USERNAME');
+      expect(FIELD_KEY_TO_ENV_VAR.get('githubEmail')).toBe('GITHUB_EMAIL');
     });
 
     it('ENV_VAR_TO_FIELD_KEY is the exact reverse of FIELD_KEY_TO_ENV_VAR', () => {
@@ -136,6 +142,9 @@ describe('Secret Catalog', () => {
       expect(ENV_VAR_TO_FIELD_KEY.get('DISCORD_BOT_TOKEN')).toBe('discordBotToken');
       expect(ENV_VAR_TO_FIELD_KEY.get('SLACK_BOT_TOKEN')).toBe('slackBotToken');
       expect(ENV_VAR_TO_FIELD_KEY.get('SLACK_APP_TOKEN')).toBe('slackAppToken');
+      expect(ENV_VAR_TO_FIELD_KEY.get('GITHUB_TOKEN')).toBe('githubToken');
+      expect(ENV_VAR_TO_FIELD_KEY.get('GITHUB_USERNAME')).toBe('githubUsername');
+      expect(ENV_VAR_TO_FIELD_KEY.get('GITHUB_EMAIL')).toBe('githubEmail');
     });
   });
 
@@ -160,6 +169,9 @@ describe('Secret Catalog', () => {
       expect(FIELD_KEY_TO_ENTRY.get('discordBotToken')?.id).toBe('discord');
       expect(FIELD_KEY_TO_ENTRY.get('slackBotToken')?.id).toBe('slack');
       expect(FIELD_KEY_TO_ENTRY.get('slackAppToken')?.id).toBe('slack');
+      expect(FIELD_KEY_TO_ENTRY.get('githubToken')?.id).toBe('github');
+      expect(FIELD_KEY_TO_ENTRY.get('githubUsername')?.id).toBe('github');
+      expect(FIELD_KEY_TO_ENTRY.get('githubEmail')?.id).toBe('github');
     });
   });
 
@@ -172,9 +184,15 @@ describe('Secret Catalog', () => {
       expect(channels[2].id).toBe('slack');
     });
 
-    it('returns empty array for categories with no entries', () => {
+    it('returns all tool entries sorted by order', () => {
       const tools = getEntriesByCategory('tool');
-      expect(tools).toEqual([]);
+      expect(tools.length).toBe(1);
+      expect(tools[0].id).toBe('github');
+    });
+
+    it('returns empty array for categories with no entries', () => {
+      const providers = getEntriesByCategory('provider');
+      expect(providers).toEqual([]);
     });
   });
 
@@ -188,8 +206,16 @@ describe('Secret Catalog', () => {
       expect(keys.size).toBe(4);
     });
 
-    it('returns empty set for categories with no entries', () => {
+    it('returns all tool field keys', () => {
       const keys = getFieldKeysByCategory('tool');
+      expect(keys).toContain('githubToken');
+      expect(keys).toContain('githubUsername');
+      expect(keys).toContain('githubEmail');
+      expect(keys.size).toBe(3);
+    });
+
+    it('returns empty set for categories with no entries', () => {
+      const keys = getFieldKeysByCategory('provider');
       expect(keys.size).toBe(0);
     });
   });
@@ -272,6 +298,56 @@ describe('Secret Catalog', () => {
       expect(validateFieldValue('xapp-short', pattern)).toBe(false);
     });
 
+    it('accepts valid GitHub usernames', () => {
+      const pattern = '^[a-zA-Z\\d](?:[a-zA-Z\\d]|-(?=[a-zA-Z\\d])){0,38}$';
+      expect(validateFieldValue('octocat', pattern)).toBe(true);
+      expect(validateFieldValue('my-bot-user', pattern)).toBe(true);
+      expect(validateFieldValue('a', pattern)).toBe(true);
+      expect(validateFieldValue('User123', pattern)).toBe(true);
+    });
+
+    it('rejects invalid GitHub usernames', () => {
+      const pattern = '^[a-zA-Z\\d](?:[a-zA-Z\\d]|-(?=[a-zA-Z\\d])){0,38}$';
+      expect(validateFieldValue('-octocat', pattern)).toBe(false);
+      expect(validateFieldValue('octocat-', pattern)).toBe(false);
+      expect(validateFieldValue('my--name', pattern)).toBe(false);
+      expect(validateFieldValue('my_name', pattern)).toBe(false);
+      expect(validateFieldValue('user name', pattern)).toBe(false);
+    });
+
+    it('accepts valid email addresses', () => {
+      const pattern = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$';
+      expect(validateFieldValue('bot@example.com', pattern)).toBe(true);
+      expect(validateFieldValue('my-bot@my-org.io', pattern)).toBe(true);
+    });
+
+    it('rejects invalid email addresses', () => {
+      const pattern = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$';
+      expect(validateFieldValue('notanemail', pattern)).toBe(false);
+      expect(validateFieldValue('missing@domain', pattern)).toBe(false);
+      expect(validateFieldValue('has space@example.com', pattern)).toBe(false);
+    });
+
+    it('accepts valid GitHub classic tokens (ghp_)', () => {
+      const pattern = '^(ghp_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{22,255})$';
+      expect(validateFieldValue('ghp_' + 'A'.repeat(36), pattern)).toBe(true);
+      expect(validateFieldValue('ghp_' + 'abcDEF123456'.repeat(5), pattern)).toBe(true);
+    });
+
+    it('accepts valid GitHub fine-grained tokens (github_pat_)', () => {
+      const pattern = '^(ghp_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{22,255})$';
+      expect(validateFieldValue('github_pat_' + 'A'.repeat(22), pattern)).toBe(true);
+      expect(validateFieldValue('github_pat_' + 'abc_DEF_123'.repeat(5), pattern)).toBe(true);
+    });
+
+    it('rejects invalid GitHub tokens', () => {
+      const pattern = '^(ghp_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{22,255})$';
+      expect(validateFieldValue('ghp_short', pattern)).toBe(false);
+      expect(validateFieldValue('github_pat_short', pattern)).toBe(false);
+      expect(validateFieldValue('gho_invalidprefix', pattern)).toBe(false);
+      expect(validateFieldValue('invalid', pattern)).toBe(false);
+    });
+
     it('rejects empty strings', () => {
       const pattern = '^\\d{8,}:[A-Za-z0-9_-]{30,50}$';
       expect(validateFieldValue('', pattern)).toBe(false);
@@ -309,6 +385,21 @@ describe('Secret Catalog', () => {
       const slack = SECRET_CATALOG_MAP.get('slack');
       expect(slack?.fields.length).toBe(2);
       expect(slack?.fields.map(f => f.key)).toEqual(['slackBotToken', 'slackAppToken']);
+    });
+
+    it('github entry has allFieldsRequired set', () => {
+      const github = SECRET_CATALOG_MAP.get('github');
+      expect(github?.allFieldsRequired).toBe(true);
+    });
+
+    it('github entry has exactly 3 fields', () => {
+      const github = SECRET_CATALOG_MAP.get('github');
+      expect(github?.fields.length).toBe(3);
+      expect(github?.fields.map(f => f.key)).toEqual([
+        'githubUsername',
+        'githubEmail',
+        'githubToken',
+      ]);
     });
 
     it('telegram and discord do not have allFieldsRequired', () => {

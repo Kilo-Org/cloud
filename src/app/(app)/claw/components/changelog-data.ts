@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-03-12',
+    description:
+      'Added support for Google Account and GitHub machine user connections. Connect your Google account for Gmail, Calendar, and Docs access. Add a GitHub identity so your bot can clone repos, push commits, and open PRs.',
+    category: 'feature',
+    deployHint: 'redeploy_required',
+  },
+  {
     date: '2026-03-10',
     description:
       'New instances now redirect pip and uv package installs to the persistent volume so packages survive restarts. pip uses /root/.pip-global via PYTHONUSERBASE; uv uses /root/.uv for tools and cache. uv is now pre-installed in the base image. Only applies to newly provisioned instances.',

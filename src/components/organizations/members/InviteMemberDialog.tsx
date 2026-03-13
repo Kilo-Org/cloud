@@ -40,7 +40,6 @@ const emailSchema = z.email();
 
 const ROLE_LABELS = {
   owner: 'Owner',
-  admin: 'Admin',
   member: 'Member',
   billing_manager: 'Billing Manager',
 } as const;

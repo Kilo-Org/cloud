@@ -14,7 +14,7 @@ import type {
   OrganizationPlan,
 } from '@/lib/organizations/organization-types';
 import type { OpenRouterProviderConfig } from '@/lib/providers/openrouter/types';
-import { getFraudDetectionHeaders } from '@/lib/utils';
+import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/providers/openrouter';
@@ -546,6 +546,97 @@ export function countAndStoreFimUsage(
       }
 
       // Use the same logMicrodollarUsage as OpenRouter!
+      return logMicrodollarUsage(usageStats, usageContext);
+    })
+  );
+}
+
+// ============================================================================
+// Embedding-Specific Code
+// ============================================================================
+
+type EmbeddingUsage = {
+  prompt_tokens: number;
+  total_tokens: number;
+  cost?: number;
+};
+
+type EmbeddingResponse = {
+  id?: string;
+  object: 'list';
+  model: string;
+  usage: EmbeddingUsage;
+};
+
+export function parseEmbeddingUsageFromResponse(responseText: string): MicrodollarUsageStats {
+  const json: EmbeddingResponse = JSON.parse(responseText);
+
+  // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
+  const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
+
+  return {
+    messageId: json.id ?? null,
+    model: json.model,
+    responseContent: '',
+    hasError: !json.model,
+    inference_provider: null,
+    inputTokens: json.usage.prompt_tokens,
+    outputTokens: 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd,
+    is_byok: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled: false,
+  };
+}
+
+export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo {
+  const inputStr =
+    body.input == null
+      ? ''
+      : typeof body.input === 'string'
+        ? body.input
+        : Array.isArray(body.input) && typeof body.input[0] === 'string'
+          ? body.input[0]
+          : JSON.stringify(body.input).slice(0, 100);
+  return {
+    system_prompt_prefix: '',
+    system_prompt_length: 0,
+    user_prompt_prefix: inputStr.slice(0, 100),
+  };
+}
+
+export function countAndStoreEmbeddingUsage(
+  clonedResponse: Response,
+  usageContext: MicrodollarUsageContext,
+  requestSpan: Span | undefined
+) {
+  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
+
+  const usageStatsPromise = !clonedResponse.body
+    ? Promise.resolve(null)
+    : clonedResponse
+        .text()
+        .then(text => parseEmbeddingUsageFromResponse(text))
+        .catch(() => null);
+
+  after(
+    usageStatsPromise.then(usageStats => {
+      requestSpan?.end();
+      if (!usageStats) {
+        captureMessage('SUSPICIOUS: No embedding usage information', {
+          level: 'error',
+          tags: { source: 'embedding_usage_processing' },
+          extra: { usageContext },
+        });
+        return;
+      }
       return logMicrodollarUsage(usageStats, usageContext);
     })
   );

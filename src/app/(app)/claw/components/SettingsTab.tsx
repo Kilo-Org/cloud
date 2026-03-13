@@ -7,6 +7,7 @@ import {
   FileCode,
   Hash,
   Package,
+  ShieldCheck,
   RotateCcw,
   Save,
   Square,
@@ -213,6 +214,7 @@ export function SettingsTab({
   );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
+  const toolEntries = getEntriesByCategory('tool');
 
   function handleSave() {
     if (hasModelSelectionError) {
@@ -453,6 +455,56 @@ export function SettingsTab({
           ))}
         </div>
       </div>
+
+      {toolEntries.length > 0 && (
+        <>
+          <Separator />
+          <div>
+            <h3 className="text-foreground mb-1 text-sm font-medium">Tools</h3>
+            <p className="text-muted-foreground mb-4 text-xs">
+              Connect external tool accounts for your bot.
+            </p>
+            <div className="space-y-6">
+              {toolEntries.map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                  actionRowExtra={
+                    entry.id === 'github' ? (
+                      <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                        We recommend using a{' '}
+                        <a
+                          href="https://docs.github.com/en/get-started/start-your-journey/creating-an-account-on-github"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          dedicated account
+                        </a>{' '}
+                        with a{' '}
+                        <a
+                          href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          fine-grained token
+                        </a>{' '}
+                        minimally scoped to specific repos and permissions.
+                      </span>
+                    ) : undefined
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       <Separator />
 

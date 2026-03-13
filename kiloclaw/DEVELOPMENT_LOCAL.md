@@ -271,6 +271,56 @@ request falls through to the proxy, which returns a bare `401 Unauthorized`
 instead of the expected `controller_route_unavailable` code. This surfaces as a
 `GatewayControllerError: Unauthorized` in the worker logs.
 
+## Testing a Custom OpenClaw Build
+
+To test a local OpenClaw fork (e.g., a feature branch with embeddings support),
+use `Dockerfile.local` which installs OpenClaw from a tarball in `openclaw-build/`
+instead of npm.
+
+### 1. Build and pack your fork
+
+```bash
+cd /path/to/openclaw
+pnpm build && npm pack
+```
+
+This produces a file like `openclaw-2026.3.9.tgz` in the repo root.
+
+### 2. Copy the tarball
+
+```bash
+cp /path/to/openclaw/openclaw-*.tgz kiloclaw/openclaw-build/
+```
+
+The `openclaw-build/` directory is git-ignored for `.tgz` files, so tarballs
+won't be committed.
+
+### 3. Build and push with `--local`
+
+```bash
+# From kiloclaw/
+./scripts/push-dev.sh --local
+```
+
+This uses `Dockerfile.local` instead of the default `Dockerfile`. The script
+validates that a tarball exists in `openclaw-build/` before building. Everything
+else (tagging, pushing, `.dev.vars` updates) works the same as a normal push.
+
+### 4. Deploy
+
+1. Restart the KiloClaw worker: `pnpm run dev`
+2. From the dashboard (`localhost:3000`), destroy your existing instance
+   (Settings tab → Destroy), then create/provision a new one.
+3. The new instance will run your custom OpenClaw build.
+
+### Notes
+
+- `OPENCLAW_VERSION` in `.dev.vars` is extracted from the main `Dockerfile`'s
+  pinned npm version, so it won't reflect your fork's version. This is cosmetic.
+- Clean up old tarballs from `openclaw-build/` before copying a new one --
+  the `COPY openclaw-build/openclaw-*.tgz` glob must match exactly one file.
+- Remember to `fly auth docker` before pushing (token expires after 5 minutes).
+
 ## Provisioning and Using an Instance
 
 ### From the dashboard (`localhost:3000`):

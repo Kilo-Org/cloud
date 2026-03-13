@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import { useState } from 'react';
 import { AlertCircle, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,12 +23,14 @@ export function SecretEntrySection({
   mutations,
   onSecretsChanged,
   isDirty,
+  actionRowExtra,
 }: {
   entry: SecretCatalogEntry;
   configured: boolean;
   mutations: ClawMutations;
   onSecretsChanged?: (entryId: string) => void;
   isDirty: boolean;
+  actionRowExtra?: React.ReactNode;
 }) {
   const [tokens, setTokens] = useState<Record<string, string>>({});
   const [formatError, setFormatError] = useState<string | null>(null);
@@ -156,6 +159,7 @@ export function SecretEntrySection({
             Remove
           </Button>
         )}
+        {actionRowExtra}
       </div>
 
       <p className="text-muted-foreground text-xs">

@@ -70,9 +70,12 @@ function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
   return null;
 }
 
+const isPrivilegedRole = (role: OrganizationRole): boolean =>
+  role === 'owner' || role === 'billing_manager';
+
 // Business rules for member removal:
 // - Kilo admins can remove anyone
-// - Owners can remove anyone except themselves
+// - Owners and billing managers can remove anyone except themselves
 // - Members cannot remove anyone
 const canRemoveMember = (
   currentUserRole: OrganizationRole,
@@ -86,8 +89,8 @@ const canRemoveMember = (
   // Cannot remove yourself
   if (isCurrentUser) return false;
 
-  // Owners can remove anyone (except themselves)
-  if (currentUserRole === 'owner') return true;
+  // Owners and billing managers can remove anyone (except themselves)
+  if (isPrivilegedRole(currentUserRole)) return true;
 
   // Members cannot remove anyone
   return false;
@@ -150,9 +153,9 @@ function DeleteInvitationButton({ organizationId, member }: DeleteInvitationButt
   }
 
   // Apply same role restrictions as invitation creation
-  // - Owners can delete any invitation
+  // - Owners and billing managers can delete any invitation
   // - Members cannot delete invitations
-  const canDelete = isKiloAdmin || currentUserRole === 'owner';
+  const canDelete = isKiloAdmin || isPrivilegedRole(currentUserRole);
 
   if (!canDelete) {
     return null;
@@ -189,7 +192,7 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
     return null;
   }
 
-  const canCopy = isKiloAdmin || currentUserRole === 'owner';
+  const canCopy = isKiloAdmin || isPrivilegedRole(currentUserRole);
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -242,8 +245,9 @@ function EditLimitButton({ organization, member }: EditLimitButtonProps) {
     return null;
   }
 
-  // Only show edit limit button for active members and if user has permission (admin/owner only)
-  const canEditLimit = member.status === 'active' && (isKiloAdmin || currentUserRole === 'owner');
+  // Only show edit limit button for active members and if user has permission (admin/owner/billing_manager)
+  const canEditLimit =
+    member.status === 'active' && (isKiloAdmin || isPrivilegedRole(currentUserRole));
 
   if (!canEditLimit) {
     return null;
@@ -412,16 +416,16 @@ export function OrganizationAdminMembers({
                   // Determine what actions are available for this member
                   const canEditRole =
                     member.status === 'active' &&
-                    (isKiloAdmin || currentUserRole === 'owner') &&
+                    (isKiloAdmin || isPrivilegedRole(currentUserRole)) &&
                     (!isCurrentUser || isKiloAdmin);
                   const canEditLimit =
                     organizationData.plan === 'enterprise' &&
                     member.status === 'active' &&
-                    (isKiloAdmin || currentUserRole === 'owner');
+                    (isKiloAdmin || isPrivilegedRole(currentUserRole));
                   const canDelete =
                     member.status === 'active'
                       ? canRemoveMember(currentUserRole, isKiloAdmin, member.role, isCurrentUser)
-                      : isKiloAdmin || currentUserRole === 'owner';
+                      : isKiloAdmin || isPrivilegedRole(currentUserRole);
 
                   const hasAnyEditableActions = canEditRole || canEditLimit || canDelete;
 

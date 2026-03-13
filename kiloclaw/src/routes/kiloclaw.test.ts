@@ -11,7 +11,7 @@ describe('buildConfiguredSecrets', () => {
 
   it('returns all entries as false when no secrets are configured', () => {
     const result = buildConfiguredSecrets({});
-    expect(result).toEqual({ telegram: false, discord: false, slack: false });
+    expect(result).toEqual({ telegram: false, discord: false, slack: false, github: false });
   });
 
   it('marks entry as configured when encryptedSecrets has the env var key', () => {
@@ -60,6 +60,27 @@ describe('buildConfiguredSecrets', () => {
     expect(result.slack).toBe(true);
   });
 
+  it('marks github as configured only when all three fields are present', () => {
+    const partial = buildConfiguredSecrets({
+      encryptedSecrets: { GITHUB_TOKEN: envelope },
+    });
+    expect(partial.github).toBe(false);
+
+    const twoOfThree = buildConfiguredSecrets({
+      encryptedSecrets: { GITHUB_TOKEN: envelope, GITHUB_USERNAME: envelope },
+    });
+    expect(twoOfThree.github).toBe(false);
+
+    const full = buildConfiguredSecrets({
+      encryptedSecrets: {
+        GITHUB_TOKEN: envelope,
+        GITHUB_USERNAME: envelope,
+        GITHUB_EMAIL: envelope,
+      },
+    });
+    expect(full.github).toBe(true);
+  });
+
   it('does not use legacy channels fallback for non-channel category entries', () => {
     // If a non-channel entry were added, legacy channels storage should not count
     // This tests that CHANNEL_FIELD_KEYS gate is effective — a key not in the
@@ -67,10 +88,11 @@ describe('buildConfiguredSecrets', () => {
     const result = buildConfiguredSecrets({
       channels: { someNonChannelKey: envelope },
     });
-    // All current entries are channels, so this just verifies no crash
+    // Channel entries should be false, tool entries unaffected by legacy channels
     expect(result.telegram).toBe(false);
     expect(result.discord).toBe(false);
     expect(result.slack).toBe(false);
+    expect(result.github).toBe(false);
   });
 
   it('uses entry.id as the result key', () => {
@@ -79,7 +101,7 @@ describe('buildConfiguredSecrets', () => {
     expect(keys).toContain('telegram');
     expect(keys).toContain('discord');
     expect(keys).toContain('slack');
-    expect(keys).toHaveLength(3);
+    expect(keys).toHaveLength(4);
   });
 
   it('treats null values as not configured', () => {

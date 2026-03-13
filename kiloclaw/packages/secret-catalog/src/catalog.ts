@@ -89,6 +89,50 @@ const SECRET_CATALOG_RAW = [
     helpText: 'Get tokens from Slack App Management. Both Bot Token and App Token are required.',
     helpUrl: 'https://api.slack.com/apps',
   },
+  {
+    id: 'github',
+    label: 'GitHub',
+    category: 'tool',
+    icon: 'github',
+    order: 1,
+    allFieldsRequired: true,
+    fields: [
+      {
+        key: 'githubUsername',
+        label: 'Username',
+        placeholder: 'my-bot-user',
+        placeholderConfigured: 'Enter new username to replace',
+        envVar: 'GITHUB_USERNAME',
+        validationPattern: '^[a-zA-Z\\d](?:[a-zA-Z\\d]|-(?=[a-zA-Z\\d])){0,38}$',
+        validationMessage:
+          'GitHub usernames can only contain alphanumeric characters and hyphens, and cannot start or end with a hyphen.',
+        maxLength: 39,
+      },
+      {
+        key: 'githubEmail',
+        label: 'Email',
+        placeholder: 'bot@example.com',
+        placeholderConfigured: 'Enter new email to replace',
+        envVar: 'GITHUB_EMAIL',
+        validationPattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+        validationMessage: 'Enter a valid email address.',
+        maxLength: 254,
+      },
+      {
+        key: 'githubToken',
+        label: 'Personal Access Token',
+        placeholder: 'github_pat_...',
+        placeholderConfigured: 'Enter new token to replace',
+        envVar: 'GITHUB_TOKEN',
+        validationPattern: '^(ghp_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{22,255})$',
+        validationMessage:
+          'Personal access tokens only: classic (ghp_) or fine-grained (github_pat_). OAuth and Actions tokens are not supported.',
+        maxLength: 300,
+      },
+    ],
+    helpText: 'Manage your token from the GitHub developer settings.',
+    helpUrl: 'https://github.com/settings/tokens?type=beta',
+  },
 ] as const satisfies readonly SecretCatalogEntry[];
 
 // Runtime validation — fails fast at module load if catalog data is malformed

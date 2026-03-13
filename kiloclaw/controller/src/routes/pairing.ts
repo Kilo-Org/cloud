@@ -16,11 +16,7 @@ function approveResponse(c: Context, result: ApproveResult): Response {
   return c.json({ ...rest, error: result.message }, statusHint);
 }
 
-export function registerPairingRoutes(
-  app: Hono,
-  cache: PairingCache,
-  expectedToken: string
-): void {
+export function registerPairingRoutes(app: Hono, cache: PairingCache, expectedToken: string): void {
   app.use('/_kilo/pairing/*', async (c, next) => {
     const authHeader = c.req.header('authorization');
     const token = getBearerToken(authHeader);
@@ -30,7 +26,7 @@ export function registerPairingRoutes(
     await next();
   });
 
-  app.get('/_kilo/pairing/channels', async (c) => {
+  app.get('/_kilo/pairing/channels', async c => {
     if (c.req.query('refresh') === 'true') {
       try {
         await cache.refreshChannelPairing();
@@ -41,7 +37,7 @@ export function registerPairingRoutes(
     return c.json(cache.getChannelPairing());
   });
 
-  app.get('/_kilo/pairing/devices', async (c) => {
+  app.get('/_kilo/pairing/devices', async c => {
     if (c.req.query('refresh') === 'true') {
       try {
         await cache.refreshDevicePairing();
@@ -52,7 +48,7 @@ export function registerPairingRoutes(
     return c.json(cache.getDevicePairing());
   });
 
-  app.post('/_kilo/pairing/channels/approve', async (c) => {
+  app.post('/_kilo/pairing/channels/approve', async c => {
     let body: unknown;
     try {
       body = await c.req.json();
@@ -74,7 +70,7 @@ export function registerPairingRoutes(
     return approveResponse(c, await cache.approveChannel(channel, code));
   });
 
-  app.post('/_kilo/pairing/devices/approve', async (c) => {
+  app.post('/_kilo/pairing/devices/approve', async c => {
     let body: unknown;
     try {
       body = await c.req.json();

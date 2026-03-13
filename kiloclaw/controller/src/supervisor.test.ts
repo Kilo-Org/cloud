@@ -375,7 +375,10 @@ describe('onStdoutLine callback', () => {
 
   it('still pipes stdout to process.stdout when callback is set', async () => {
     const { spawnImpl, children } = createSpawnHarnessWithStdout();
-    const pipeSpy = vi.spyOn(children.length === 0 ? PassThrough.prototype : PassThrough.prototype, 'pipe');
+    const pipeSpy = vi.spyOn(
+      children.length === 0 ? PassThrough.prototype : PassThrough.prototype,
+      'pipe'
+    );
     const supervisor = createSupervisor({
       gatewayArgs: ['--port', '3001'],
       spawnImpl: spawnImpl as never,

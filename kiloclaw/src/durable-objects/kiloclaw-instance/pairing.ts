@@ -62,9 +62,7 @@ export async function listPairingRequests(
 
   // Try controller first
   try {
-    const path = forceRefresh
-      ? '/_kilo/pairing/channels?refresh=true'
-      : '/_kilo/pairing/channels';
+    const path = forceRefresh ? '/_kilo/pairing/channels?refresh=true' : '/_kilo/pairing/channels';
     const result = await callGatewayController(
       state,
       env,
@@ -232,9 +230,7 @@ export async function listDevicePairingRequests(
 
   // Try controller first
   try {
-    const path = forceRefresh
-      ? '/_kilo/pairing/devices?refresh=true'
-      : '/_kilo/pairing/devices';
+    const path = forceRefresh ? '/_kilo/pairing/devices?refresh=true' : '/_kilo/pairing/devices';
     const result = await callGatewayController(
       state,
       env,

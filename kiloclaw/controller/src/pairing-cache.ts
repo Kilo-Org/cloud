@@ -42,10 +42,7 @@ export type PairingCache = {
   cleanup: () => void;
 };
 
-type ExecImpl = (
-  command: string,
-  args: string[]
-) => Promise<{ stdout: string; stderr: string }>;
+type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
 
 type PairingCacheOptions = {
   execImpl?: ExecImpl;
@@ -79,7 +76,10 @@ function approveFail(message: string, statusHint: 400 | 500): ApproveResult {
 
 export const OPENCLAW_BIN = '/usr/local/bin/openclaw';
 
-function defaultExecImpl(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+function defaultExecImpl(
+  command: string,
+  args: string[]
+): Promise<{ stdout: string; stderr: string }> {
   return execFileAsync(command, args, {
     encoding: 'utf8',
     timeout: CLI_TIMEOUT_MS,
@@ -143,7 +143,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
     if (channels.length === 0) return;
 
     const results = await Promise.allSettled(
-      channels.map(async (channel) => {
+      channels.map(async channel => {
         const { stdout } = await execImpl(OPENCLAW_BIN, ['pairing', 'list', channel, '--json']);
         const parsed: unknown = JSON.parse(stdout.trim());
         const data = isRecord(parsed) ? parsed : {};
@@ -159,7 +159,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
               ...('createdAt' in r ? { createdAt: String(r.createdAt) } : {}),
             };
           })
-          .filter((req) => req.code !== '' && req.id !== '');
+          .filter(req => req.code !== '' && req.id !== '');
       })
     );
 
@@ -172,9 +172,10 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
         anySuccess = true;
       } else {
         const err = result.reason;
-        const msg = err && typeof err === 'object' && 'stderr' in err
-          ? String(err.stderr).trim()
-          : String(err);
+        const msg =
+          err && typeof err === 'object' && 'stderr' in err
+            ? String(err.stderr).trim()
+            : String(err);
         console.error(`[pairing-cache] ${channels[i]}: ${msg}`);
       }
     }
@@ -204,7 +205,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
             ...(typeof r.ts === 'number' ? { ts: r.ts } : {}),
           };
         })
-        .filter((req) => req.requestId !== '' && req.deviceId !== '');
+        .filter(req => req.requestId !== '' && req.deviceId !== '');
 
       deviceCache = { requests, lastUpdated: nowImpl() };
     } catch (err) {
@@ -256,7 +257,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
   const onPairingLogLine = (line: string): void => {
     if (stopped) return;
     const lower = line.toLowerCase();
-    const isPairingLine = PAIRING_KEYWORDS.some((kw) => lower.includes(kw));
+    const isPairingLine = PAIRING_KEYWORDS.some(kw => lower.includes(kw));
     if (!isPairingLine) return;
 
     // Non-sliding debounce: the first trigger in a quiet window starts a 2s timer;

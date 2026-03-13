@@ -222,7 +222,10 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
         {/* Left column: activity feed */}
         <div className="min-w-0 border-r border-white/[0.06]">
           {/* Stats strip */}
-          <div className="grid border-b border-white/[0.06]" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+          <div
+            className="grid border-b border-white/[0.06]"
+            style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}
+          >
             <StatCell
               label="Open"
               value={openBeadCount}

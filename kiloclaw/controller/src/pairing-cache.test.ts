@@ -1,15 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createPairingCache, OPENCLAW_BIN } from './pairing-cache';
 
-type ExecImpl = (
-  command: string,
-  args: string[]
-) => Promise<{ stdout: string; stderr: string }>;
+type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
 
-function createTestHarness(overrides?: {
-  execImpl?: ExecImpl;
-  readConfigImpl?: () => unknown;
-}) {
+function createTestHarness(overrides?: { execImpl?: ExecImpl; readConfigImpl?: () => unknown }) {
   const execImpl = overrides?.execImpl ?? vi.fn<ExecImpl>();
   const readConfigImpl =
     overrides?.readConfigImpl ??
@@ -627,10 +621,7 @@ describe('createPairingCache', () => {
       const { cache } = createTestHarness({ execImpl, readConfigImpl });
       await cache.refreshChannelPairing();
 
-      expect(execImpl).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining(['slack'])
-      );
+      expect(execImpl).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['slack']));
     });
 
     it('detects Slack with appToken only', async () => {
@@ -647,10 +638,7 @@ describe('createPairingCache', () => {
       const { cache } = createTestHarness({ execImpl, readConfigImpl });
       await cache.refreshChannelPairing();
 
-      expect(execImpl).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining(['slack'])
-      );
+      expect(execImpl).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['slack']));
     });
 
     it('skips Slack when disabled even with tokens', async () => {

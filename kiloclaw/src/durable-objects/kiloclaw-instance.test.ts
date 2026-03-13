@@ -156,7 +156,7 @@ function createFakeEnv() {
   return {
     FLY_API_TOKEN: 'test-token',
     FLY_APP_NAME: 'test-app',
-    FLY_REGION: 'us,eu',
+    FLY_REGION: 'dfw,ewr,iad,lax,sjc,eu',
     GATEWAY_TOKEN_SECRET: 'test-secret',
     NEXTAUTH_SECRET: 'test-nextauth-secret-at-least-32-chars',
     WORKER_ENV: 'development',
@@ -2157,8 +2157,8 @@ describe('start: 412 insufficient resources recovery', () => {
         compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }) as unknown,
       })
     );
-    // Regions are reversed from FLY_REGION='us,eu' so EU is tried first on recovery
-    expect(regions412Call[2]).toEqual(['eu', 'us']);
+    // Regions are reversed from FLY_REGION so EU is tried first on recovery
+    expect(regions412Call[2]).toEqual(['eu', 'sjc', 'lax', 'iad', 'ewr', 'dfw']);
     // source_volume_id should NOT be set for fresh provision
     const createVolumeCall = (flyClient.createVolumeWithFallback as Mock).mock
       .calls[0][1] as Record<string, unknown>;
@@ -2204,8 +2204,8 @@ describe('start: 412 insufficient resources recovery', () => {
         compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }) as unknown,
       })
     );
-    // Regions are reversed from FLY_REGION='us,eu' so EU is tried first on recovery
-    expect(regionsForkCall[2]).toEqual(['eu', 'us']);
+    // Regions are reversed from FLY_REGION so EU is tried first on recovery
+    expect(regionsForkCall[2]).toEqual(['eu', 'sjc', 'lax', 'iad', 'ewr', 'dfw']);
     // Old volume was deleted
     expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-1');
     // Machine was retried
@@ -2269,8 +2269,8 @@ describe('start: 412 insufficient resources recovery', () => {
         compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }) as unknown,
       })
     );
-    // Regions are reversed from FLY_REGION='us,eu' so EU is tried first on recovery
-    expect(regionsUpdateCall[2]).toEqual(['eu', 'us']);
+    // Regions are reversed from FLY_REGION so EU is tried first on recovery
+    expect(regionsUpdateCall[2]).toEqual(['eu', 'sjc', 'lax', 'iad', 'ewr', 'dfw']);
     // New machine was created
     expect(storage._store.get('flyMachineId')).toBe('machine-new');
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');

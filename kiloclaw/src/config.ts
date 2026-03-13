@@ -38,8 +38,9 @@ export const DEFAULT_MACHINE_GUEST = {
 export const DEFAULT_VOLUME_SIZE_GB = 10;
 
 /** Default Fly region priority list when FLY_REGION env var is not set.
- *  Callers shuffle before selecting so order here doesn't matter. */
-export const DEFAULT_FLY_REGION = 'us,eu';
+ *  Callers shuffle before selecting so order here doesn't matter.
+ *  ord omitted due to provisioning issues. */
+export const DEFAULT_FLY_REGION = 'dfw,ewr,iad,lax,sjc,eu';
 
 // Alarm cadence by instance status
 /** Running machines: fast health checks */

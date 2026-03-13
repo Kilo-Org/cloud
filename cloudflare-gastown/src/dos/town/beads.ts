@@ -32,7 +32,14 @@ import {
   migrateConvoyMetadata,
 } from '../../db/tables/convoy-metadata.table';
 import { query } from '../../util/query.util';
-import type { CreateBeadInput, BeadFilter, Bead, BeadStatus, BeadPriority } from '../../types';
+import type {
+  CreateBeadInput,
+  BeadFilter,
+  Bead,
+  BeadStatus,
+  BeadPriority,
+  BeadType,
+} from '../../types';
 import type { BeadEventType } from '../../db/tables/bead-events.table';
 
 function generateId(): string {
@@ -457,6 +464,9 @@ export function updateBeadFields(
     labels: string[];
     status: BeadStatus;
     metadata: Record<string, unknown>;
+    type: BeadType;
+    rig_id: string | null;
+    parent_bead_id: string | null;
   }>,
   actorId: string
 ): Bead {
@@ -495,6 +505,18 @@ export function updateBeadFields(
   if (fields.metadata !== undefined) {
     setClauses.push(`${beads.columns.metadata} = ?`);
     values.push(JSON.stringify(fields.metadata));
+  }
+  if (fields.type !== undefined) {
+    setClauses.push(`${beads.columns.type} = ?`);
+    values.push(fields.type);
+  }
+  if (fields.rig_id !== undefined) {
+    setClauses.push(`${beads.columns.rig_id} = ?`);
+    values.push(fields.rig_id);
+  }
+  if (fields.parent_bead_id !== undefined) {
+    setClauses.push(`${beads.columns.parent_bead_id} = ?`);
+    values.push(fields.parent_bead_id);
   }
 
   if (setClauses.length === 0) return bead;

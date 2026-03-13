@@ -49,6 +49,7 @@ export function dashboardHtml(): string {
   .badge.in_progress { background: #d29922aa; color: #e3b341; }
   .badge.in_review { background: #8957e533; color: #bc8cff; }
   .badge.closed { background: #3fb95033; color: #3fb950; }
+  .badge.failed { background: #f8514933; color: #f85149; }
   .badge.idle { background: #21262d; color: #8b949e; }
   .badge.working { background: #d29922aa; color: #e3b341; }
   .badge.blocked { background: #f8514933; color: #f85149; }
@@ -218,6 +219,7 @@ export function dashboardHtml(): string {
     <input type="text" id="editBeadRigId" placeholder="rig ID" style="min-width:160px" />
     <label>Bead ID</label>
     <input type="text" id="editBeadId" placeholder="bead ID" style="min-width:160px" />
+    <button onclick="mayorBeadLoad()">Load</button>
   </div>
   <div class="row">
     <label>Title</label>
@@ -233,6 +235,7 @@ export function dashboardHtml(): string {
       <option value="">— unchanged —</option>
       <option value="open">open</option>
       <option value="in_progress">in_progress</option>
+      <option value="in_review">in_review</option>
       <option value="closed">closed</option>
       <option value="failed">failed</option>
     </select>
@@ -244,9 +247,34 @@ export function dashboardHtml(): string {
       <option value="high">high</option>
       <option value="critical">critical</option>
     </select>
-    <button class="primary" onclick="mayorBeadSave()">Save Bead</button>
   </div>
   <div class="row">
+    <label>Type</label>
+    <select id="editBeadType">
+      <option value="">— unchanged —</option>
+      <option value="issue">issue</option>
+      <option value="message">message</option>
+      <option value="escalation">escalation</option>
+      <option value="merge_request">merge_request</option>
+      <option value="convoy">convoy</option>
+      <option value="molecule">molecule</option>
+      <option value="agent">agent</option>
+    </select>
+    <label>Rig</label>
+    <input type="text" id="editBeadRigIdField" placeholder="rig ID (optional)" style="min-width:140px" />
+    <label>Parent</label>
+    <input type="text" id="editBeadParentId" placeholder="parent bead ID (optional)" style="min-width:140px" />
+  </div>
+  <div class="row">
+    <label>Labels</label>
+    <input type="text" id="editBeadLabels" placeholder="comma-separated labels (e.g. bug, frontend, urgent)" style="flex:1;min-width:200px" />
+  </div>
+  <div class="row" style="align-items:flex-start">
+    <label style="padding-top:4px">Metadata</label>
+    <textarea class="body-edit" id="editBeadMetadata" placeholder='JSON object, e.g. {"key": "value"}' style="min-height:60px"></textarea>
+  </div>
+  <div class="row">
+    <button class="primary" onclick="mayorBeadSave()">Save Bead</button>
     <label>Reassign to</label>
     <input type="text" id="editBeadReassignAgent" placeholder="agent ID" style="min-width:160px" />
     <button onclick="mayorBeadReassign()">Reassign</button>
@@ -494,10 +522,25 @@ async function mayorBeadSave() {
   const bodyText = el('editBeadBody').value.trim();
   const status = el('editBeadStatus').value;
   const priority = el('editBeadPriority').value;
+  const beadType = el('editBeadType').value;
+  const rigIdField = el('editBeadRigIdField').value.trim();
+  const parentId = el('editBeadParentId').value.trim();
+  const labelsRaw = el('editBeadLabels').value.trim();
+  const metadataRaw = el('editBeadMetadata').value.trim();
   if (title) body.title = title;
   if (bodyText) body.body = bodyText;
   if (status) body.status = status;
   if (priority) body.priority = priority;
+  if (beadType) body.type = beadType;
+  if (rigIdField) body.rig_id = rigIdField;
+  if (parentId) body.parent_bead_id = parentId;
+  if (labelsRaw) {
+    body.labels = labelsRaw.split(',').map(function(l) { return l.trim(); }).filter(Boolean);
+  }
+  if (metadataRaw) {
+    try { body.metadata = JSON.parse(metadataRaw); }
+    catch { toast('Invalid JSON in metadata field', true); return; }
+  }
   if (!Object.keys(body).length) { toast('Provide at least one field to update', true); return; }
   const r = await mayorApi('PATCH', '/api/mayor/' + tId + '/tools/rigs/' + rId + '/beads/' + bId, body);
   if (r.ok) {
@@ -507,6 +550,32 @@ async function mayorBeadSave() {
   } else {
     el('editBeadResult').innerHTML = '<p class="err" style="color:#f85149">Error: ' + esc(r.data?.error ?? 'unknown') + '</p>';
   }
+}
+
+async function mayorBeadLoad() {
+  const tId = mayorTownId();
+  const rId = el('editBeadRigId').value.trim();
+  const bId = el('editBeadId').value.trim();
+  if (!tId || !rId || !bId) { toast('Fill in Town ID, Rig ID, and Bead ID', true); return; }
+  const r = await mayorApi('GET', '/api/mayor/' + tId + '/tools/rigs/' + rId + '/beads?limit=200');
+  if (!r.ok) { toast('Failed to load beads', true); return; }
+  const match = (r.data.data || []).find(function(b) { return b.bead_id === bId || b.id === bId; });
+  if (!match) { toast('Bead not found in rig', true); return; }
+  el('editBeadTitle').value = match.title || '';
+  el('editBeadBody').value = match.body || '';
+  el('editBeadStatus').value = match.status || '';
+  el('editBeadPriority').value = match.priority || '';
+  el('editBeadType').value = match.type || '';
+  el('editBeadRigIdField').value = match.rig_id || '';
+  el('editBeadParentId').value = match.parent_bead_id || '';
+  var labels = match.labels;
+  if (typeof labels === 'string') { try { labels = JSON.parse(labels); } catch {} }
+  el('editBeadLabels').value = Array.isArray(labels) ? labels.join(', ') : '';
+  var meta = match.metadata;
+  if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch {} }
+  el('editBeadMetadata').value = (meta && typeof meta === 'object' && Object.keys(meta).length > 0)
+    ? JSON.stringify(meta, null, 2) : '';
+  toast('Bead loaded');
 }
 
 async function mayorBeadReassign() {
@@ -685,21 +754,47 @@ async function loadBeads() {
 
 function renderBeads() {
   if (!beads.length) { el('beadsList').innerHTML = '<p class="empty">No beads</p>'; return; }
-  let h = '<table><tr><th>ID</th><th>Title</th><th>Type</th><th>Status</th><th>Assignee</th><th></th></tr>';
+  let h = '<table><tr><th>ID</th><th>Title</th><th>Type</th><th>Status</th><th>Priority</th><th>Assignee</th><th></th></tr>';
   for (const b of beads) {
     h += '<tr>'
       + '<td class="id" onclick="copyId(\\'' + b.id + '\\')">' + short(b.id) + '</td>'
       + '<td>' + esc(b.title) + '</td>'
       + '<td>' + b.type + '</td>'
       + '<td>' + badge(b.status) + '</td>'
+      + '<td>' + (b.priority || 'medium') + '</td>'
       + '<td>' + (b.assignee_agent_id ? short(b.assignee_agent_id) : '—') + '</td>'
       + '<td>'
+      + '<button onclick="editBead(\\'' + b.id + '\\')">Edit</button> '
       + (b.status !== 'closed' ? '<button onclick="closeBead(\\'' + b.id + '\\')">Close</button>' : '')
       + '</td>'
       + '</tr>';
   }
   h += '</table>';
   el('beadsList').innerHTML = h;
+}
+
+function editBead(beadId) {
+  const b = beads.find(function(bead) { return bead.id === beadId || bead.bead_id === beadId; });
+  if (!b) { toast('Bead not found', true); return; }
+  el('editBeadId').value = beadId;
+  el('editBeadRigId').value = b.rig_id || rigId();
+  el('editBeadTitle').value = b.title || '';
+  el('editBeadBody').value = b.body || '';
+  el('editBeadStatus').value = b.status || '';
+  el('editBeadPriority').value = b.priority || '';
+  el('editBeadType').value = b.type || '';
+  el('editBeadRigIdField').value = b.rig_id || '';
+  el('editBeadParentId').value = b.parent_bead_id || '';
+  var labels = b.labels;
+  if (typeof labels === 'string') { try { labels = JSON.parse(labels); } catch {} }
+  el('editBeadLabels').value = Array.isArray(labels) ? labels.join(', ') : '';
+  var meta = b.metadata;
+  if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch {} }
+  el('editBeadMetadata').value = (meta && typeof meta === 'object' && Object.keys(meta).length > 0)
+    ? JSON.stringify(meta, null, 2) : '';
+  // Scroll to the edit section
+  el('editBeadTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast('Editing bead ' + short(beadId));
 }
 
 async function createBead() {

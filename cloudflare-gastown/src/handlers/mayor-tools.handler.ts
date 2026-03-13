@@ -339,6 +339,9 @@ const BeadUpdateBody = z
     labels: z.array(z.string()).optional(),
     status: BeadStatus.optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    type: BeadType.optional(),
+    rig_id: z.string().min(1).nullable().optional(),
+    parent_bead_id: z.string().min(1).nullable().optional(),
   })
   .refine(
     data =>
@@ -347,7 +350,10 @@ const BeadUpdateBody = z
       data.priority !== undefined ||
       data.labels !== undefined ||
       data.status !== undefined ||
-      data.metadata !== undefined,
+      data.metadata !== undefined ||
+      data.type !== undefined ||
+      data.rig_id !== undefined ||
+      data.parent_bead_id !== undefined,
     { message: 'At least one field must be provided' }
   );
 

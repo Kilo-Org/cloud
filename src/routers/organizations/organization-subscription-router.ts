@@ -122,6 +122,11 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
       const { organizationId, seats, plan } = input;
+
+      // Check access before any Stripe calls to prevent unauthorized Stripe customer
+      // creation and billing state enumeration via error codes.
+      await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+
       const org = await getOrganizationById(organizationId);
       if (!org) {
         throw new TRPCError({
@@ -139,11 +144,6 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           message: 'Organization has active subscription(s)',
         });
       }
-
-      // Org creators always get an owner membership row at creation time, so there is
-      // no "mid-setup" window where the caller lacks a role. Enforce owner/billing_manager
-      // unconditionally, matching every other billing mutation in this router.
-      await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
 
       const result = await getStripeSeatsCheckoutUrl({
         kiloUserId: user.id,

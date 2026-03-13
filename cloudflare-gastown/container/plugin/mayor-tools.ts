@@ -253,7 +253,7 @@ export function createMayorTools(client: MayorGastownClient) {
         title: tool.schema.string().describe('New title for the bead').optional(),
         body: tool.schema.string().describe('New body/description for the bead').optional(),
         status: tool.schema
-          .enum(['open', 'in_progress', 'closed', 'failed'])
+          .enum(['open', 'in_progress', 'in_review', 'closed', 'failed'])
           .describe('New status for the bead')
           .optional(),
         priority: tool.schema

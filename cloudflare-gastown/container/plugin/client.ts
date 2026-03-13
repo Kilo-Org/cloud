@@ -355,7 +355,7 @@ export class MayorGastownClient {
     input: {
       title?: string;
       body?: string;
-      status?: 'open' | 'in_progress' | 'closed' | 'failed';
+      status?: 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed';
       priority?: 'low' | 'medium' | 'high' | 'critical';
       labels?: string[];
     }

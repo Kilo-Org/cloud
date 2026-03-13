@@ -496,10 +496,14 @@ export function updateBeadFields(
   if (fields.status !== undefined) {
     setClauses.push(`${beads.columns.status} = ?`);
     values.push(fields.status);
-    // Also set closed_at when transitioning to closed
     if (fields.status === 'closed') {
+      // Set closed_at when transitioning to closed (preserve existing if already set)
       setClauses.push(`${beads.columns.closed_at} = ?`);
       values.push(bead.closed_at ?? timestamp);
+    } else if (bead.closed_at) {
+      // Clear closed_at when reopening a previously-closed bead
+      setClauses.push(`${beads.columns.closed_at} = ?`);
+      values.push(null);
     }
   }
   if (fields.metadata !== undefined) {
@@ -525,10 +529,11 @@ export function updateBeadFields(
   values.push(timestamp);
   values.push(beadId);
 
-  query(
-    sql,
+  // Dynamic SET clause — query() can't statically verify param count here,
+  // so use sql.exec() directly. The early return above guarantees values is non-empty.
+  sql.exec(
     /* sql */ `UPDATE ${beads} SET ${setClauses.join(', ')} WHERE ${beads.bead_id} = ?`,
-    values
+    ...values
   );
 
   const changedFields = Object.keys(fields);

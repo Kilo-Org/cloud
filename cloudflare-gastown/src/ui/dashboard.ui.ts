@@ -249,17 +249,6 @@ export function dashboardHtml(): string {
     </select>
   </div>
   <div class="row">
-    <label>Type</label>
-    <select id="editBeadType">
-      <option value="">— unchanged —</option>
-      <option value="issue">issue</option>
-      <option value="message">message</option>
-      <option value="escalation">escalation</option>
-      <option value="merge_request">merge_request</option>
-      <option value="convoy">convoy</option>
-      <option value="molecule">molecule</option>
-      <option value="agent">agent</option>
-    </select>
     <label>Rig</label>
     <input type="text" id="editBeadRigIdField" placeholder="rig ID (optional)" style="min-width:140px" />
     <label>Parent</label>
@@ -522,7 +511,6 @@ async function mayorBeadSave() {
   const bodyText = el('editBeadBody').value.trim();
   const status = el('editBeadStatus').value;
   const priority = el('editBeadPriority').value;
-  const beadType = el('editBeadType').value;
   const rigIdField = el('editBeadRigIdField').value.trim();
   const parentId = el('editBeadParentId').value.trim();
   const labelsRaw = el('editBeadLabels').value.trim();
@@ -531,7 +519,6 @@ async function mayorBeadSave() {
   if (bodyText) body.body = bodyText;
   if (status) body.status = status;
   if (priority) body.priority = priority;
-  if (beadType) body.type = beadType;
   if (rigIdField) body.rig_id = rigIdField;
   if (parentId) body.parent_bead_id = parentId;
   if (labelsRaw) {
@@ -565,7 +552,6 @@ async function mayorBeadLoad() {
   el('editBeadBody').value = match.body || '';
   el('editBeadStatus').value = match.status || '';
   el('editBeadPriority').value = match.priority || '';
-  el('editBeadType').value = match.type || '';
   el('editBeadRigIdField').value = match.rig_id || '';
   el('editBeadParentId').value = match.parent_bead_id || '';
   var labels = match.labels;
@@ -782,7 +768,6 @@ function editBead(beadId) {
   el('editBeadBody').value = b.body || '';
   el('editBeadStatus').value = b.status || '';
   el('editBeadPriority').value = b.priority || '';
-  el('editBeadType').value = b.type || '';
   el('editBeadRigIdField').value = b.rig_id || '';
   el('editBeadParentId').value = b.parent_bead_id || '';
   var labels = b.labels;

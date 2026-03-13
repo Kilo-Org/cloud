@@ -676,10 +676,11 @@ export class TownDO extends DurableObject<Env> {
 
     if (setClauses.length > 0) {
       values.push(convoyId);
-      query(
-        this.sql,
+      // Dynamic SET clause — query() can't statically verify param count here,
+      // so use sql.exec() directly. The guard above guarantees values is non-empty.
+      this.sql.exec(
         /* sql */ `UPDATE ${convoy_metadata} SET ${setClauses.join(', ')} WHERE ${convoy_metadata.bead_id} = ?`,
-        values
+        ...values
       );
 
       // Also update the convoy bead's updated_at

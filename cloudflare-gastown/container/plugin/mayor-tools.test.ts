@@ -333,10 +333,7 @@ describe('mayor tools', () => {
 
   describe('gt_escalation_acknowledge', () => {
     it('acknowledges an escalation', async () => {
-      const result = await tools.gt_escalation_acknowledge.execute(
-        { escalation_id: 'esc-1' },
-        CTX
-      );
+      const result = await tools.gt_escalation_acknowledge.execute({ escalation_id: 'esc-1' }, CTX);
       expect(result).toContain('esc-1');
       expect(result).toContain('acknowledged');
       expect(client.acknowledgeEscalation).toHaveBeenCalledWith('esc-1');

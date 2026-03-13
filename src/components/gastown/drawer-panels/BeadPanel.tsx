@@ -39,15 +39,6 @@ import remarkGfm from 'remark-gfm';
 
 const BEAD_STATUSES = ['open', 'in_progress', 'in_review', 'closed', 'failed'] as const;
 const BEAD_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const;
-const BEAD_TYPES = [
-  'issue',
-  'message',
-  'escalation',
-  'merge_request',
-  'convoy',
-  'molecule',
-  'agent',
-] as const;
 
 const STATUS_STYLES: Record<string, string> = {
   open: 'border-sky-500/30 bg-sky-500/10 text-sky-300',
@@ -69,7 +60,6 @@ type EditState = {
   body: string;
   status: string;
   priority: string;
-  type: string;
   labels: string;
   metadata: string;
   rig_id: string;
@@ -111,7 +101,6 @@ export function BeadPanel({
     body: '',
     status: '',
     priority: '',
-    type: '',
     labels: '',
     metadata: '',
     rig_id: '',
@@ -125,7 +114,6 @@ export function BeadPanel({
       body: bead.body ?? '',
       status: bead.status,
       priority: bead.priority,
-      type: bead.type,
       labels: bead.labels.join(', '),
       metadata:
         bead.metadata && Object.keys(bead.metadata).length > 0
@@ -143,13 +131,21 @@ export function BeadPanel({
     setEditState(prev => ({ ...prev, [field]: value }));
   }, []);
 
-  const updateBeadMutation = useMutation(
+  const {
+    mutate: doUpdateBead,
+    isPending: isUpdatePending,
+    isError: isUpdateError,
+    error: updateError,
+  } = useMutation(
     trpc.gastown.updateBead.mutationOptions({
       onSuccess: () => {
         setEditing(false);
-        // Invalidate bead-related queries to refresh data
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey({ rigId }) });
-        queryClient.invalidateQueries({ queryKey: trpc.gastown.getRig.queryKey({ rigId }) });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.listBeads.queryKey({ rigId }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.getRig.queryKey({ rigId }),
+        });
       },
     })
   );
@@ -165,8 +161,6 @@ export function BeadPanel({
     }
     if (editState.status !== bead.status) updates.status = editState.status;
     if (editState.priority !== bead.priority) updates.priority = editState.priority;
-    if (editState.type !== bead.type) updates.type = editState.type;
-
     const newLabels = editState.labels
       .split(',')
       .map(l => l.trim())
@@ -204,12 +198,12 @@ export function BeadPanel({
       return;
     }
 
-    updateBeadMutation.mutate({
+    doUpdateBead({
       rigId,
       beadId: bead.bead_id,
       ...updates,
-    } as Parameters<typeof updateBeadMutation.mutate>[0]);
-  }, [bead, editState, rigId, updateBeadMutation]);
+    } as Parameters<typeof doUpdateBead>[0]);
+  }, [bead, editState, rigId, doUpdateBead]);
 
   if (!bead) {
     return <div className="p-6 text-center text-sm text-white/30">Loading bead…</div>;
@@ -268,12 +262,6 @@ export function BeadPanel({
               label="Status"
             />
             <EditSelect
-              value={editState.type}
-              options={BEAD_TYPES}
-              onChange={v => updateField('type', v)}
-              label="Type"
-            />
-            <EditSelect
               value={editState.priority}
               options={BEAD_PRIORITIES}
               onChange={v => updateField('priority', v)}
@@ -283,20 +271,18 @@ export function BeadPanel({
               <Button
                 size="sm"
                 onClick={handleSave}
-                disabled={updateBeadMutation.isPending}
-                className="h-6 gap-1 bg-emerald-600 px-2.5 text-[10px] hover:bg-emerald-500"
+                disabled={isUpdatePending}
+                className="gap-1bg-[color:oklch(95%_0.15_108_/_0.90)] h-6 px-2.5 text-[10px] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
               >
-                {updateBeadMutation.isPending ? (
+                {isUpdatePending ? (
                   <Loader2 className="size-3 animate-spin" />
                 ) : (
                   <Save className="size-3" />
                 )}
                 Save
               </Button>
-              {updateBeadMutation.isError && (
-                <span className="text-[10px] text-red-400">
-                  {updateBeadMutation.error?.message ?? 'Failed'}
-                </span>
+              {isUpdateError && (
+                <span className="text-[10px] text-red-400">{updateError?.message ?? 'Failed'}</span>
               )}
             </div>
           </div>

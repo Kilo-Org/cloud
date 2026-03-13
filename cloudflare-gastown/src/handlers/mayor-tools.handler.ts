@@ -339,7 +339,6 @@ const BeadUpdateBody = z
     labels: z.array(z.string()).optional(),
     status: BeadStatus.optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
-    type: BeadType.optional(),
     rig_id: z.string().min(1).nullable().optional(),
     parent_bead_id: z.string().min(1).nullable().optional(),
   })
@@ -351,7 +350,6 @@ const BeadUpdateBody = z
       data.labels !== undefined ||
       data.status !== undefined ||
       data.metadata !== undefined ||
-      data.type !== undefined ||
       data.rig_id !== undefined ||
       data.parent_bead_id !== undefined,
     { message: 'At least one field must be provided' }
@@ -398,6 +396,16 @@ export async function handleMayorBeadUpdate(
   );
 
   const town = getTownDOStub(c.env, params.townId);
+
+  // Verify the bead belongs to this rig (same check as handleMayorBeadDelete)
+  const existing = await town.getBeadAsync(params.beadId);
+  if (!existing) {
+    return c.json(resError('Bead not found'), 404);
+  }
+  if (existing.rig_id !== params.rigId) {
+    return c.json(resError('Bead does not belong to this rig'), 403);
+  }
+
   const bead = await town.updateBead(params.beadId, parsed.data, 'mayor');
 
   return c.json(resSuccess(bead));
@@ -431,19 +439,25 @@ export async function handleMayorBeadReassign(
 
   const town = getTownDOStub(c.env, params.townId);
 
-  // Unhook any currently assigned agent
   const bead = await town.getBeadAsync(params.beadId);
   if (!bead) {
     return c.json(resError('Bead not found'), 404);
   }
-  if (bead.assignee_agent_bead_id) {
-    await town.unhookBead(bead.assignee_agent_bead_id);
-  }
 
-  // Hook the new agent
+  // Hook the new agent first — if this fails, the old assignment is untouched
   await town.hookBead(parsed.data.agent_id, params.beadId);
 
-  return c.json(resSuccess({ reassigned: true }));
+  // Only unhook the old agent if it is still hooked to this specific bead
+  if (bead.assignee_agent_bead_id && bead.assignee_agent_bead_id !== parsed.data.agent_id) {
+    const oldAgent = await town.getAgentAsync(bead.assignee_agent_bead_id);
+    if (oldAgent && oldAgent.current_hook_bead_id === params.beadId) {
+      await town.unhookBead(bead.assignee_agent_bead_id);
+    }
+  }
+
+  // Return the updated bead so clients can read the new assignee
+  const updated = await town.getBeadAsync(params.beadId);
+  return c.json(resSuccess(updated));
 }
 
 /**

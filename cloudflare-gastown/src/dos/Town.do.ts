@@ -644,7 +644,9 @@ export class TownDO extends DurableObject<Env> {
 
     agents.updateAgentStatus(this.sql, agentId, 'idle');
 
-    console.log(`${TOWN_LOG} resetAgent: reset agent=${agentId} hookedBead=${hookedBeadId ?? 'none'}`);
+    console.log(
+      `${TOWN_LOG} resetAgent: reset agent=${agentId} hookedBead=${hookedBeadId ?? 'none'}`
+    );
   }
 
   /**

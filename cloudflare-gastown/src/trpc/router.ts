@@ -306,17 +306,6 @@ export const gastownRouter = router({
           body: z.string().nullable().optional(),
           status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']).optional(),
           priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
-          type: z
-            .enum([
-              'issue',
-              'message',
-              'escalation',
-              'merge_request',
-              'convoy',
-              'molecule',
-              'agent',
-            ])
-            .optional(),
           labels: z.array(z.string()).optional(),
           metadata: z.record(z.string(), z.unknown()).optional(),
           rig_id: z.string().min(1).nullable().optional(),
@@ -328,7 +317,6 @@ export const gastownRouter = router({
             data.body !== undefined ||
             data.status !== undefined ||
             data.priority !== undefined ||
-            data.type !== undefined ||
             data.labels !== undefined ||
             data.metadata !== undefined ||
             data.rig_id !== undefined ||

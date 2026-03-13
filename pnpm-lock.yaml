@@ -1066,6 +1066,9 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.12.8
         version: 0.12.8(@cloudflare/workers-types@4.20260305.0)(@vitest/runner@4.0.18)(@vitest/snapshot@4.0.18)(vitest@3.2.4)
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 4.20260305.0
       '@kilocode/eslint-config':
         specifier: workspace:*
         version: link:../packages/eslint-config

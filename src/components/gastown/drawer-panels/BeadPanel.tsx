@@ -96,6 +96,7 @@ export function BeadPanel({
 
   // ── Edit mode state ───────────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({
     title: '',
     body: '',
@@ -173,11 +174,13 @@ export function BeadPanel({
     if (editState.metadata.trim()) {
       try {
         const parsed = JSON.parse(editState.metadata) as Record<string, unknown>;
+        setMetadataError(null);
         if (JSON.stringify(parsed) !== JSON.stringify(bead.metadata)) {
           updates.metadata = parsed;
         }
       } catch {
-        // Invalid JSON — skip metadata update
+        setMetadataError('Invalid JSON in metadata field');
+        return;
       }
     } else if (bead.metadata && Object.keys(bead.metadata).length > 0) {
       updates.metadata = {};
@@ -355,10 +358,16 @@ export function BeadPanel({
             </label>
             <Textarea
               value={editState.metadata}
-              onChange={e => updateField('metadata', e.target.value)}
+              onChange={e => {
+                updateField('metadata', e.target.value);
+                setMetadataError(null);
+              }}
               placeholder='{"key": "value"}'
-              className="min-h-[60px] border-white/10 bg-white/5 font-mono text-[10px] text-white/75"
+              className={`min-h-[60px] border-white/10 bg-white/5 font-mono text-[10px] text-white/75 ${metadataError ? 'border-red-500/50' : ''}`}
             />
+            {metadataError && (
+              <span className="mt-0.5 block text-[10px] text-red-400">{metadataError}</span>
+            )}
           </div>
         </div>
       )}

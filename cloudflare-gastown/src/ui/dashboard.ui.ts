@@ -618,8 +618,8 @@ async function mayorAgentUnhook() {
   const tId = mayorTownId();
   const rId = el('editAgentRigId').value.trim();
   const aId = el('editAgentId').value.trim();
-  if (!rId || !aId) { toast('Fill in Rig ID and Agent ID', true); return; }
-  const r = await api('DELETE', '/api/rigs/' + rId + '/agents/' + aId + '/hook');
+  if (!tId || !rId || !aId) { toast('Fill in Town ID, Rig ID, and Agent ID', true); return; }
+  const r = await mayorApi('DELETE', '/api/mayor/' + tId + '/tools/rigs/' + rId + '/agents/' + aId + '/hook');
   if (r.ok) {
     el('editAgentResult').innerHTML = '<p class="ok" style="color:#3fb950">Agent unhooked</p>';
     toast('Agent unhooked');
@@ -742,16 +742,17 @@ function renderBeads() {
   if (!beads.length) { el('beadsList').innerHTML = '<p class="empty">No beads</p>'; return; }
   let h = '<table><tr><th>ID</th><th>Title</th><th>Type</th><th>Status</th><th>Priority</th><th>Assignee</th><th></th></tr>';
   for (const b of beads) {
+    const bid = b.bead_id || b.id;
     h += '<tr>'
-      + '<td class="id" onclick="copyId(\\'' + b.id + '\\')">' + short(b.id) + '</td>'
+      + '<td class="id" onclick="copyId(\\'' + bid + '\\')">' + short(bid) + '</td>'
       + '<td>' + esc(b.title) + '</td>'
       + '<td>' + b.type + '</td>'
       + '<td>' + badge(b.status) + '</td>'
       + '<td>' + (b.priority || 'medium') + '</td>'
-      + '<td>' + (b.assignee_agent_id ? short(b.assignee_agent_id) : '—') + '</td>'
+      + '<td>' + (b.assignee_agent_bead_id ? short(b.assignee_agent_bead_id) : '—') + '</td>'
       + '<td>'
-      + '<button onclick="editBead(\\'' + b.id + '\\')">Edit</button> '
-      + (b.status !== 'closed' ? '<button onclick="closeBead(\\'' + b.id + '\\')">Close</button>' : '')
+      + '<button onclick="editBead(\\'' + bid + '\\')">Edit</button> '
+      + (b.status !== 'closed' ? '<button onclick="closeBead(\\'' + bid + '\\')">Close</button>' : '')
       + '</td>'
       + '</tr>';
   }

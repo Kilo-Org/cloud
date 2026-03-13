@@ -296,6 +296,54 @@ export const gastownRouter = router({
       await townStub.deleteBead(input.beadId);
     }),
 
+  updateBead: gastownProcedure
+    .input(
+      z
+        .object({
+          rigId: z.string().uuid(),
+          beadId: z.string().uuid(),
+          title: z.string().min(1).optional(),
+          body: z.string().nullable().optional(),
+          status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']).optional(),
+          priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+          type: z
+            .enum([
+              'issue',
+              'message',
+              'escalation',
+              'merge_request',
+              'convoy',
+              'molecule',
+              'agent',
+            ])
+            .optional(),
+          labels: z.array(z.string()).optional(),
+          metadata: z.record(z.string(), z.unknown()).optional(),
+          rig_id: z.string().min(1).nullable().optional(),
+          parent_bead_id: z.string().min(1).nullable().optional(),
+        })
+        .refine(
+          data =>
+            data.title !== undefined ||
+            data.body !== undefined ||
+            data.status !== undefined ||
+            data.priority !== undefined ||
+            data.type !== undefined ||
+            data.labels !== undefined ||
+            data.metadata !== undefined ||
+            data.rig_id !== undefined ||
+            data.parent_bead_id !== undefined,
+          { message: 'At least one field to update must be provided' }
+        )
+    )
+    .output(RpcBeadOutput)
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      const { rigId: _rigId, beadId, ...fields } = input;
+      return townStub.updateBead(beadId, fields, ctx.userId);
+    }),
+
   // ── Agents ──────────────────────────────────────────────────────────
 
   listAgents: gastownProcedure

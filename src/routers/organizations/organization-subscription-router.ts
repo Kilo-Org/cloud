@@ -140,10 +140,13 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         });
       }
 
-      // if any subscriptions exist we need to enforce security
-      // otherwise, we can't enforce ownership as the org is still not finished being set up
+      // Always verify the user belongs to this organization.
+      // When prior subscriptions exist, enforce owner role; otherwise just check membership
+      // (the org may still be mid-setup so the creator may not have a role yet).
       if (subscriptions.length) {
         await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+      } else {
+        await ensureOrganizationAccess(ctx, organizationId);
       }
 
       const result = await getStripeSeatsCheckoutUrl({

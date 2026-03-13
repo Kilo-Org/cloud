@@ -25,7 +25,7 @@ export function createTableTownEscalations(): string {
     id: `text primary key`,
     source_rig_id: `text not null`,
     source_agent_id: `text`,
-    severity: `text not null check(severity in ('low', 'medium', 'high', 'critical'))`,
+    severity: `text not null`,
     category: `text`,
     message: `text not null`,
     acknowledged: `integer not null default 0`,

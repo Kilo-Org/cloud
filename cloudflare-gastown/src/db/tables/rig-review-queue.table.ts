@@ -26,7 +26,7 @@ export function createTableRigReviewQueue(): string {
     bead_id: `text not null references rig_beads(id)`,
     branch: `text not null`,
     pr_url: `text`,
-    status: `text not null default 'pending' check(status in ('pending', 'running', 'merged', 'failed'))`,
+    status: `text not null default 'pending'`,
     summary: `text`,
     created_at: `text not null`,
     processed_at: `text`,

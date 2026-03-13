@@ -17,7 +17,7 @@ export function createTableBeadDependencies(): string {
   return getCreateTableQueryFromTable(bead_dependencies, {
     bead_id: `text not null references beads(bead_id)`,
     depends_on_bead_id: `text not null references beads(bead_id)`,
-    dependency_type: `text not null default 'blocks' check(dependency_type in ('blocks', 'tracks', 'parent-child'))`,
+    dependency_type: `text not null default 'blocks'`,
   });
 }
 

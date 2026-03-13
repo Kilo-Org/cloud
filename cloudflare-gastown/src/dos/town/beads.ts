@@ -77,6 +77,62 @@ export function initBeadTables(sql: SqlStorage): void {
       // Column already exists — expected after first run
     }
   }
+
+  // Migration: drop CHECK constraints from existing tables.
+  // SQLite has no ALTER TABLE DROP CONSTRAINT — the only way is to recreate
+  // the table. We detect tables with CHECK constraints via sqlite_master and
+  // rebuild them without constraints.
+  dropCheckConstraints(sql);
+}
+
+/**
+ * Detect tables with CHECK constraints and recreate them without.
+ * Uses SQLite's "CREATE TABLE ... AS SELECT" pattern to rebuild.
+ *
+ * Idempotent: if a table has no CHECK constraints, it's skipped.
+ */
+function dropCheckConstraints(sql: SqlStorage): void {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT name, sql as create_sql
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND sql LIKE '%check(%'
+      `,
+      []
+    ),
+  ];
+
+  for (const row of rows) {
+    const tableName = String(row.name);
+    const originalSql = String(row.create_sql);
+
+    // Strip all check(...) clauses from the CREATE TABLE statement
+    const cleanedSql = originalSql.replace(/\s*check\s*\([^)]*\)/gi, '');
+
+    // Skip if nothing changed (shouldn't happen given the WHERE clause)
+    if (cleanedSql === originalSql) continue;
+
+    // Rebuild the table: rename → recreate → copy → drop old
+    const tmpName = `_${tableName}_migrate`;
+    try {
+      query(sql, /* sql */ `ALTER TABLE "${tableName}" RENAME TO "${tmpName}"`, []);
+      query(sql, cleanedSql, []);
+      query(sql, /* sql */ `INSERT INTO "${tableName}" SELECT * FROM "${tmpName}"`, []);
+      query(sql, /* sql */ `DROP TABLE "${tmpName}"`, []);
+    } catch (err) {
+      // If migration fails mid-way, try to restore the original table
+      try {
+        query(sql, /* sql */ `DROP TABLE IF EXISTS "${tableName}"`, []);
+        query(sql, /* sql */ `ALTER TABLE "${tmpName}" RENAME TO "${tableName}"`, []);
+      } catch {
+        // Best effort — the original table name should still be usable
+      }
+      console.warn(`[beads] CHECK constraint migration failed for ${tableName}:`, err);
+    }
+  }
 }
 
 export function createBead(sql: SqlStorage, input: CreateBeadInput): Bead {

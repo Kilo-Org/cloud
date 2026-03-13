@@ -23,7 +23,7 @@ export function createTableRigMolecules(): string {
     bead_id: `text not null references rig_beads(id)`,
     formula: `text not null`,
     current_step: `integer not null default 0`,
-    status: `text not null default 'active' check(status in ('active', 'completed', 'failed'))`,
+    status: `text not null default 'active'`,
     created_at: `text not null`,
     updated_at: `text not null`,
   });

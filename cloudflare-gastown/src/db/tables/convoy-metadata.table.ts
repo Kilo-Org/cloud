@@ -32,7 +32,7 @@ export function createTableConvoyMetadata(): string {
     closed_beads: `integer not null default 0`,
     landed_at: `text`,
     feature_branch: `text`,
-    merge_mode: `text check(merge_mode in ('review-then-land', 'review-and-merge'))`,
+    merge_mode: `text`,
   });
 }
 
@@ -40,6 +40,6 @@ export function createTableConvoyMetadata(): string {
 export function migrateConvoyMetadata(): string[] {
   return [
     `ALTER TABLE convoy_metadata ADD COLUMN feature_branch text`,
-    `ALTER TABLE convoy_metadata ADD COLUMN merge_mode text check(merge_mode in ('review-then-land', 'review-and-merge'))`,
+    `ALTER TABLE convoy_metadata ADD COLUMN merge_mode text`,
   ];
 }

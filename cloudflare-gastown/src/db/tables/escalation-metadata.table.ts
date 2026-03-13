@@ -22,7 +22,7 @@ export const escalation_metadata = getTableFromZodSchema(
 export function createTableEscalationMetadata(): string {
   return getCreateTableQueryFromTable(escalation_metadata, {
     bead_id: `text primary key references beads(bead_id)`,
-    severity: `text not null check(severity in ('low', 'medium', 'high', 'critical'))`,
+    severity: `text not null`,
     category: `text`,
     acknowledged: `integer not null default 0`,
     re_escalation_count: `integer not null default 0`,

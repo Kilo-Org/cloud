@@ -70,9 +70,7 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -83,9 +81,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT SUM(_sample_interval) AS total_events FROM gastown_events WHERE $timeFilter",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -94,16 +89,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT SUM(_sample_interval) AS total_events FROM gastown_events WHERE $timeFilter",
+          "rawSql": "SELECT SUM(_sample_interval) AS total_events FROM gastown_events WHERE $timeFilter",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT SUM(_sample_interval) AS total_events FROM gastown_events WHERE $timeFilter"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Total Events",
@@ -146,9 +144,7 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -159,9 +155,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE $timeFilter AND blob2 != ''",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -170,16 +163,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE $timeFilter AND blob2 != ''",
+          "rawSql": "SELECT COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE $timeFilter AND blob2 != ''",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE $timeFilter AND blob2 != ''"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Unique Users",
@@ -231,9 +227,7 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -244,9 +238,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc')",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -255,16 +246,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc')",
+          "rawSql": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc')",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc')"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Avg Latency",
@@ -318,9 +312,7 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -331,9 +323,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -342,16 +331,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter",
+          "rawSql": "SELECT SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Error Rate",
@@ -570,6 +562,8 @@
           "adHocValuesQuery": "",
           "add_metadata": true,
           "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
           "format": "time_series",
@@ -581,13 +575,11 @@
           "rawSql": "SELECT $timeSeries AS t, blob3 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t",
           "refId": "A",
           "round": "0s",
-          "skip_comments": true,
-          "useWindowFuncForMacros": true,
-          "dateTimeColDataType": "timestamp",
-          "dateTimeType": "DATETIME",
           "showFormattedSQL": false,
           "showHelp": false,
-          "table": "gastown_events"
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Event Volume (by delivery)",
@@ -663,9 +655,7 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": [
-            "sum"
-          ],
+          "calcs": ["sum"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -679,9 +669,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob1 IN (SELECT blob1 FROM gastown_events WHERE $timeFilter GROUP BY blob1 ORDER BY SUM(_sample_interval) DESC LIMIT 15) GROUP BY t, label ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -690,16 +677,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob1 IN (SELECT blob1 FROM gastown_events WHERE $timeFilter GROUP BY blob1 ORDER BY SUM(_sample_interval) DESC LIMIT 15) GROUP BY t, label ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Event Volume (top events)",
@@ -802,9 +792,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors FROM gastown_events WHERE $timeFilter AND blob5 != '' GROUP BY t, label ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -813,16 +800,20 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
+          "formattedQuery": "/* grafana dashboard='Gastown Operations', user=admin */\nSELECT (intDiv(toUInt32(timestamp), 2) * 2) * 1000 AS t, blob1 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors FROM gastown_events WHERE timestamp >= toDateTime(1773451903) AND timestamp <= toDateTime(1773453703) AND blob5 != '' GROUP BY t, label ORDER BY t",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors FROM gastown_events WHERE $timeFilter AND blob5 != '' GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors FROM gastown_events WHERE $timeFilter AND blob5 != '' GROUP BY t, label ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors FROM gastown_events WHERE $timeFilter AND blob5 != '' GROUP BY t, label ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Error Count Over Time (by event)",
@@ -915,9 +906,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, blob3 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -926,16 +914,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob3 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob3 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, blob3 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Error Rate Over Time (by delivery)",
@@ -1023,9 +1014,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT blob1 AS event, SUM(_sample_interval) AS total, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(IF(blob5 = '', _sample_interval, 0)) AS success_count, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter GROUP BY event HAVING error_count > 0 ORDER BY error_count DESC LIMIT 50",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1034,16 +1022,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT blob1 AS event, SUM(_sample_interval) AS total, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(IF(blob5 = '', _sample_interval, 0)) AS success_count, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter GROUP BY event HAVING error_count > 0 ORDER BY error_count DESC LIMIT 50",
+          "rawSql": "SELECT blob1 AS event, SUM(_sample_interval) AS total, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(IF(blob5 = '', _sample_interval, 0)) AS success_count, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter GROUP BY event HAVING error_count > 0 ORDER BY error_count DESC LIMIT 50",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT blob1 AS event, SUM(_sample_interval) AS total, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(IF(blob5 = '', _sample_interval, 0)) AS success_count, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter GROUP BY event HAVING error_count > 0 ORDER BY error_count DESC LIMIT 50"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Error Counts by Event",
@@ -1103,9 +1094,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT blob5 AS error_message, blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob5 != '' GROUP BY error_message, event ORDER BY count DESC LIMIT 30",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1114,16 +1102,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT blob5 AS error_message, blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob5 != '' GROUP BY error_message, event ORDER BY count DESC LIMIT 30",
+          "rawSql": "SELECT blob5 AS error_message, blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob5 != '' GROUP BY error_message, event ORDER BY count DESC LIMIT 30",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT blob5 AS error_message, blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob5 != '' GROUP BY error_message, event ORDER BY count DESC LIMIT 30"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Top Error Messages",
@@ -1227,9 +1218,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, blob3 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1238,16 +1226,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob3 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob3 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, blob3 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Avg Latency Over Time (by delivery)",
@@ -1324,10 +1315,7 @@
       "id": 13,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
+          "calcs": ["mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1341,9 +1329,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') AND blob1 IN (SELECT blob1 FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY blob1 ORDER BY SUM(_sample_interval) DESC LIMIT 15) GROUP BY t, label ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1352,16 +1337,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') AND blob1 IN (SELECT blob1 FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY blob1 ORDER BY SUM(_sample_interval) DESC LIMIT 15) GROUP BY t, label ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Avg Latency Over Time (top events)",
@@ -1469,9 +1457,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT blob4 AS route, blob3 AS delivery, SUM(_sample_interval) AS count, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms, MAX(double1) AS max_ms FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') AND blob4 != '' GROUP BY route, delivery HAVING count > 5 ORDER BY avg_latency_ms DESC LIMIT 40",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1480,16 +1465,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT blob4 AS route, blob3 AS delivery, SUM(_sample_interval) AS count, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms, MAX(double1) AS max_ms FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') AND blob4 != '' GROUP BY route, delivery HAVING count > 5 ORDER BY avg_latency_ms DESC LIMIT 40",
+          "rawSql": "SELECT blob4 AS route, blob3 AS delivery, SUM(_sample_interval) AS count, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms, MAX(double1) AS max_ms FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') AND blob4 != '' GROUP BY route, delivery HAVING count > 5 ORDER BY avg_latency_ms DESC LIMIT 40",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT blob4 AS route, blob3 AS delivery, SUM(_sample_interval) AS count, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms, MAX(double1) AS max_ms FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') AND blob4 != '' GROUP BY route, delivery HAVING count > 5 ORDER BY avg_latency_ms DESC LIMIT 40"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Slowest Endpoints",
@@ -1593,9 +1581,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, 'users' AS label, COUNT(DISTINCT blob2) AS active_users FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY t ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1604,16 +1589,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, 'users' AS label, COUNT(DISTINCT blob2) AS active_users FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'users' AS label, COUNT(DISTINCT blob2) AS active_users FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY t ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, 'users' AS label, COUNT(DISTINCT blob2) AS active_users FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY t ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Active Users Over Time",
@@ -1703,9 +1691,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, 'towns' AS label, COUNT(DISTINCT blob6) AS active_towns FROM gastown_events WHERE $timeFilter AND blob6 != '' GROUP BY t ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1714,16 +1699,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, 'towns' AS label, COUNT(DISTINCT blob6) AS active_towns FROM gastown_events WHERE $timeFilter AND blob6 != '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'towns' AS label, COUNT(DISTINCT blob6) AS active_towns FROM gastown_events WHERE $timeFilter AND blob6 != '' GROUP BY t ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, 'towns' AS label, COUNT(DISTINCT blob6) AS active_towns FROM gastown_events WHERE $timeFilter AND blob6 != '' GROUP BY t ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Active Towns Over Time",
@@ -1835,9 +1823,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT blob2 AS user_id, SUM(_sample_interval) AS total_events, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms, COUNT(DISTINCT blob6) AS town_count FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY user_id ORDER BY total_events DESC LIMIT 25",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1846,16 +1831,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT blob2 AS user_id, SUM(_sample_interval) AS total_events, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms, COUNT(DISTINCT blob6) AS town_count FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY user_id ORDER BY total_events DESC LIMIT 25",
+          "rawSql": "SELECT blob2 AS user_id, SUM(_sample_interval) AS total_events, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms, COUNT(DISTINCT blob6) AS town_count FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY user_id ORDER BY total_events DESC LIMIT 25",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT blob2 AS user_id, SUM(_sample_interval) AS total_events, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms, COUNT(DISTINCT blob6) AS town_count FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY user_id ORDER BY total_events DESC LIMIT 25"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Top Users by Event Count",
@@ -1955,9 +1943,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT blob2 AS user_id, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(_sample_interval) AS total_events, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY user_id HAVING error_count > 0 ORDER BY error_count DESC LIMIT 25",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -1966,16 +1951,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT blob2 AS user_id, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(_sample_interval) AS total_events, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY user_id HAVING error_count > 0 ORDER BY error_count DESC LIMIT 25",
+          "rawSql": "SELECT blob2 AS user_id, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(_sample_interval) AS total_events, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY user_id HAVING error_count > 0 ORDER BY error_count DESC LIMIT 25",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT blob2 AS user_id, SUM(IF(blob5 != '', _sample_interval, 0)) AS error_count, SUM(_sample_interval) AS total_events, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY user_id HAVING error_count > 0 ORDER BY error_count DESC LIMIT 25"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Top Users by Error Count",
@@ -2002,16 +1990,35 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
             "hideFrom": {
-              "legend": false,
-              "tooltip": false,
               "viz": false
-            }
+            },
+            "inspect": false
           },
-          "mappings": []
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -2023,36 +2030,12 @@
       },
       "id": 19,
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
-        },
-        "sort": "desc",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
+        "cellHeight": "sm",
+        "showHeader": true
       },
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT blob3 AS delivery, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY delivery ORDER BY count DESC",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -2061,20 +2044,24 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
+          "formattedQuery": "/* grafana dashboard='Gastown Operations', user=admin */\nSELECT blob3 AS delivery, SUM(_sample_interval) AS count FROM gastown_events WHERE timestamp >= toDateTime(1773451903) AND timestamp <= toDateTime(1773453703) GROUP BY delivery ORDER BY count DESC",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT blob3 AS delivery, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY delivery ORDER BY count DESC",
+          "rawSql": "SELECT blob3 AS delivery, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY delivery ORDER BY count DESC",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT blob3 AS delivery, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY delivery ORDER BY count DESC"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Events by Delivery Type",
-      "type": "piechart"
+      "type": "table"
     },
     {
       "datasource": {
@@ -2084,16 +2071,35 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
             "hideFrom": {
-              "legend": false,
-              "tooltip": false,
               "viz": false
-            }
+            },
+            "inspect": false
           },
-          "mappings": []
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -2105,36 +2111,12 @@
       },
       "id": 20,
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
-        },
-        "sort": "desc",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
+        "cellHeight": "sm",
+        "showHeader": true
       },
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY event ORDER BY count DESC LIMIT 10",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -2143,20 +2125,24 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
+          "formattedQuery": "/* grafana dashboard='Gastown Operations', user=admin */\nSELECT blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE timestamp >= toDateTime(1773451903) AND timestamp <= toDateTime(1773453703) GROUP BY event ORDER BY count DESC LIMIT 10",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY event ORDER BY count DESC LIMIT 10",
+          "rawSql": "SELECT blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY event ORDER BY count DESC LIMIT 10",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT blob1 AS event, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY event ORDER BY count DESC LIMIT 10"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Top 10 Events (share of total)",
-      "type": "piechart"
+      "type": "table"
     },
     {
       "datasource": {
@@ -2252,9 +2238,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "table",
-          "rawSql": "SELECT blob1 AS event, SUM(_sample_interval) AS total, SUM(IF(blob5 = '', _sample_interval, 0)) AS success, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms FROM gastown_events WHERE $timeFilter GROUP BY event ORDER BY total DESC LIMIT 50",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -2263,16 +2246,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "table",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT blob1 AS event, SUM(_sample_interval) AS total, SUM(IF(blob5 = '', _sample_interval, 0)) AS success, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms FROM gastown_events WHERE $timeFilter GROUP BY event ORDER BY total DESC LIMIT 50",
+          "rawSql": "SELECT blob1 AS event, SUM(_sample_interval) AS total, SUM(IF(blob5 = '', _sample_interval, 0)) AS success, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms FROM gastown_events WHERE $timeFilter GROUP BY event ORDER BY total DESC LIMIT 50",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT blob1 AS event, SUM(_sample_interval) AS total, SUM(IF(blob5 = '', _sample_interval, 0)) AS success, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS error_rate, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_latency_ms FROM gastown_events WHERE $timeFilter GROUP BY event ORDER BY total DESC LIMIT 50"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "All Events Summary",
@@ -2361,9 +2347,7 @@
       "id": 22,
       "options": {
         "legend": {
-          "calcs": [
-            "sum"
-          ],
+          "calcs": ["sum"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2377,9 +2361,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob3 = 'internal' AND blob1 LIKE 'bead.%' GROUP BY t, label ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -2388,16 +2369,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob3 = 'internal' AND blob1 LIKE 'bead.%' GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob3 = 'internal' AND blob1 LIKE 'bead.%' GROUP BY t, label ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob3 = 'internal' AND blob1 LIKE 'bead.%' GROUP BY t, label ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Bead Lifecycle Events",
@@ -2473,9 +2457,7 @@
       "id": 23,
       "options": {
         "legend": {
-          "calcs": [
-            "sum"
-          ],
+          "calcs": ["sum"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2489,9 +2471,6 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "format": "time_series",
-          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob3 = 'internal' AND (blob1 LIKE 'agent.%' OR blob1 LIKE 'review.%' OR blob1 LIKE 'convoy.%' OR blob1 LIKE 'escalation.%' OR blob1 LIKE 'nudge.%') GROUP BY t, label ORDER BY t",
-          "refId": "A",
           "adHocFilters": [],
           "adHocValuesQuery": "",
           "add_metadata": true,
@@ -2500,16 +2479,19 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob3 = 'internal' AND (blob1 LIKE 'agent.%' OR blob1 LIKE 'review.%' OR blob1 LIKE 'convoy.%' OR blob1 LIKE 'escalation.%' OR blob1 LIKE 'nudge.%') GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob3 = 'internal' AND (blob1 LIKE 'agent.%' OR blob1 LIKE 'review.%' OR blob1 LIKE 'convoy.%' OR blob1 LIKE 'escalation.%' OR blob1 LIKE 'nudge.%') GROUP BY t, label ORDER BY t",
+          "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
           "showHelp": false,
           "skip_comments": true,
           "table": "gastown_events",
-          "useWindowFuncForMacros": true,
-          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob3 = 'internal' AND (blob1 LIKE 'agent.%' OR blob1 LIKE 'review.%' OR blob1 LIKE 'convoy.%' OR blob1 LIKE 'escalation.%' OR blob1 LIKE 'nudge.%') GROUP BY t, label ORDER BY t"
+          "useWindowFuncForMacros": true
         }
       ],
       "title": "Agent & Review Events",
@@ -2518,10 +2500,7 @@
   ],
   "preload": false,
   "schemaVersion": 42,
-  "tags": [
-    "gastown",
-    "observability"
-  ],
+  "tags": ["gastown", "observability"],
   "templating": {
     "list": [
       {
@@ -2546,6 +2525,6 @@
   "timezone": "browser",
   "title": "Gastown Operations",
   "uid": "gastown-ops-1",
-  "version": 4,
+  "version": 6,
   "weekStart": ""
 }

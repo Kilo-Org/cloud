@@ -39,13 +39,6 @@ FORMAT JSON`;
   SUM(_sample_interval) as count
 FROM gastown_events
 WHERE timestamp > NOW() - INTERVAL '${hours}' HOUR
-  AND blob1 IN (
-    SELECT blob1 FROM gastown_events 
-    WHERE timestamp > NOW() - INTERVAL '${hours}' HOUR
-    GROUP BY blob1 
-    ORDER BY SUM(_sample_interval) DESC 
-    LIMIT 15
-  )
 GROUP BY hour, event
 ORDER BY hour ASC
 FORMAT JSON`;

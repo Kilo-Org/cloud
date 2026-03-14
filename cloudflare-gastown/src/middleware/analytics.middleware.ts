@@ -14,31 +14,38 @@ export async function timingMiddleware(c: Context<GastownEnv>, next: Next): Prom
 /**
  * Derive a short event name from an HTTP route pattern.
  *
+ * The last non-param segment determines the resource name. When the route
+ * ends with a param (e.g. `:beadId`), the verb is action-specific; when
+ * it ends with a collection, GET maps to "list" instead of "get".
+ *
  * Examples:
- *   "POST /api/towns/:townId/rigs/:rigId/beads"        → "bead.create"
- *   "GET  /api/towns/:townId/rigs/:rigId/beads"         → "bead.list"
- *   "GET  /api/towns/:townId/rigs/:rigId/beads/:beadId" → "bead.get"
- *   "POST /api/towns/:townId/mayor/ensure"              → "mayor.ensure"
+ *   "POST /api/towns/:townId/rigs/:rigId/beads"              → "beads.create"
+ *   "GET  /api/towns/:townId/rigs/:rigId/beads"               → "beads.list"
+ *   "GET  /api/towns/:townId/rigs/:rigId/beads/:beadId"       → "beads.get"
+ *   "DELETE /api/towns/:townId/rigs/:rigId/beads/:beadId"     → "beads.delete"
+ *   "POST /api/towns/:townId/mayor/ensure"                    → "mayor.ensure"
+ *   "PATCH /api/towns/:townId/rigs/:rigId/beads/:beadId/status" → "beads.status.update"
  */
 function deriveHttpEventName(method: string, routePath: string): string {
-  // Strip /api prefix and parameter segments
-  const stripped = routePath.replace(/^\/api\//, '').replace(/\/:[^/]+/g, '');
+  const segments = routePath
+    .replace(/^\/api\//, '')
+    .split('/')
+    .filter(Boolean);
 
-  // Get the meaningful tail segments (skip towns/rigs/users prefixes)
-  const segments = stripped.split('/').filter(Boolean);
-
-  // Remove common prefix segments
-  const prefixes = new Set(['towns', 'rigs', 'users', 'mayor']);
+  // Collect non-param segments after stripping common parent resources
+  const parentResources = new Set(['towns', 'rigs', 'users']);
   const meaningful: string[] = [];
-  for (const seg of segments) {
-    if (!prefixes.has(seg)) meaningful.push(seg);
-  }
+  const endsWithParam = segments.length > 0 && segments[segments.length - 1].startsWith(':');
 
-  const tail = meaningful.join('.');
+  for (const seg of segments) {
+    if (seg.startsWith(':')) continue; // skip params
+    if (parentResources.has(seg)) continue; // skip parent resource names
+    meaningful.push(seg);
+  }
 
   // Map HTTP methods to action verbs
   const verbMap: Record<string, string> = {
-    GET: 'get',
+    GET: endsWithParam ? 'get' : 'list',
     POST: 'create',
     PUT: 'update',
     PATCH: 'update',
@@ -46,6 +53,7 @@ function deriveHttpEventName(method: string, routePath: string): string {
   };
 
   const verb = verbMap[method] ?? method.toLowerCase();
+  const tail = meaningful.join('.');
 
   if (!tail) return `http.${verb}`;
   return `${tail}.${verb}`;

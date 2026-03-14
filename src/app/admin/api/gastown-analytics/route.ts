@@ -26,7 +26,7 @@ function buildQuery(queryType: QueryType, hours: number): string {
       return `SELECT 
   SUM(_sample_interval) as total_events,
   count(DISTINCT blob2) as unique_users,
-  SUM(_sample_interval * double1) / SUM(_sample_interval) as avg_latency_ms,
+  SUM(IF(blob3 IN ('http', 'trpc'), _sample_interval * double1, 0)) / SUM(IF(blob3 IN ('http', 'trpc'), _sample_interval, 1)) as avg_latency_ms,
   SUM(IF(blob5 != '', _sample_interval, 0)) as error_count
 FROM gastown_events
 WHERE timestamp > NOW() - INTERVAL '${hours}' HOUR
@@ -62,7 +62,7 @@ FORMAT JSON`;
   blob2 as user_id,
   SUM(_sample_interval) as total_events,
   SUM(IF(blob5 != '', _sample_interval, 0)) as error_count,
-  SUM(_sample_interval * double1) / SUM(_sample_interval) as avg_latency_ms
+  SUM(IF(blob3 IN ('http', 'trpc'), _sample_interval * double1, 0)) / SUM(IF(blob3 IN ('http', 'trpc'), _sample_interval, 1)) as avg_latency_ms
 FROM gastown_events
 WHERE timestamp > NOW() - INTERVAL '${hours}' HOUR
   AND blob2 != ''

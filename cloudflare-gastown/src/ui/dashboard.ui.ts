@@ -1110,12 +1110,12 @@ function renderConvoys(convoys, convoyTownId) {
       ? c.closed_beads + '/' + c.total_beads
       : '—';
     h += '<tr>'
-      + '<td class="id" onclick="copyId(\\'' + c.convoy_id + '\\')">' + short(c.convoy_id) + '</td>'
+      + '<td class="id" onclick="copyId(\\'' + c.id + '\\')">' + short(c.id) + '</td>'
       + '<td>' + esc(c.title || '—') + '</td>'
       + '<td>' + statusBadge + '</td>'
       + '<td>' + progress + '</td>'
       + '<td>'
-      + (isStaged ? '<button class="primary" onclick="startConvoy(\\'' + c.convoy_id + '\\', \\'' + convoyTownId + '\\')">Start Convoy</button>' : '')
+      + (isStaged ? '<button class="primary" onclick="startConvoy(\\'' + c.id + '\\', \\'' + convoyTownId + '\\')">Start Convoy</button>' : '')
       + '</td>'
       + '</tr>';
   }

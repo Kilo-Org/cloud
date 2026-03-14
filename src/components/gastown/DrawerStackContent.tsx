@@ -5,6 +5,7 @@ import type { ResourceRef } from './DrawerStack';
 import { BeadPanel } from './drawer-panels/BeadPanel';
 import { AgentPanel } from './drawer-panels/AgentPanel';
 import { EventPanel } from './drawer-panels/EventPanel';
+import { ConvoyPanel } from './drawer-panels/ConvoyPanel';
 
 /**
  * Dispatch function that maps a ResourceRef to the right panel component.
@@ -29,5 +30,9 @@ export function renderDrawerContent(
       );
     case 'event':
       return <EventPanel event={resource.event} push={helpers.push} />;
+    case 'convoy':
+      return (
+        <ConvoyPanel convoyId={resource.convoyId} townId={resource.townId} push={helpers.push} />
+      );
   }
 }

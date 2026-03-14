@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
-import { CheckCircle, GitBranch, Loader2, X, ArrowRight } from 'lucide-react';
+import { CheckCircle, GitBranch, Loader2, X, ArrowRight, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type ConvoyDetail = GastownOutputs['gastown']['listConvoys'][number];
@@ -13,7 +13,9 @@ export type ConvoyTimelineProps = {
   convoys: ConvoyDetail[];
   collapsed?: boolean;
   onSelectBead?: (beadId: string, rigId: string | null) => void;
+  onSelectConvoy?: (convoyId: string) => void;
   onCloseConvoy?: (convoyId: string) => void;
+  onStartConvoy?: (convoyId: string) => void;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -105,7 +107,9 @@ export function ConvoyTimeline({
   convoys,
   collapsed = false,
   onSelectBead,
+  onSelectConvoy,
   onCloseConvoy,
+  onStartConvoy,
 }: ConvoyTimelineProps) {
   if (convoys.length === 0) {
     return null;
@@ -125,7 +129,9 @@ export function ConvoyTimeline({
               key={convoy.id}
               convoy={convoy}
               onSelectBead={onSelectBead}
+              onSelectConvoy={onSelectConvoy ? () => onSelectConvoy(convoy.id) : undefined}
               onClose={onCloseConvoy ? () => onCloseConvoy(convoy.id) : undefined}
+              onStart={convoy.staged && onStartConvoy ? () => onStartConvoy(convoy.id) : undefined}
             />
           ))}
         </motion.div>
@@ -137,13 +143,18 @@ export function ConvoyTimeline({
 function ConvoyCard({
   convoy,
   onSelectBead,
+  onSelectConvoy,
   onClose,
+  onStart,
 }: {
   convoy: ConvoyDetail;
   onSelectBead?: (beadId: string, rigId: string | null) => void;
+  onSelectConvoy?: () => void;
   onClose?: () => void;
+  onStart?: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const isStaged = 'staged' in convoy && convoy.staged === true;
   const progress = convoy.total_beads > 0 ? convoy.closed_beads / convoy.total_beads : 0;
 
   const waves = useMemo(
@@ -154,19 +165,24 @@ function ConvoyCard({
   const hasDag = (convoy.dependency_edges ?? []).length > 0;
 
   return (
-    <div className="min-w-0 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+    <div
+      className={`min-w-0 rounded-lg border p-3 ${isStaged ? 'border-dashed border-amber-500/30 bg-amber-500/[0.03]' : 'border-white/[0.06] bg-white/[0.02]'}`}
+    >
       {/* Convoy header */}
       <div className="mb-2 flex items-center justify-between">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-medium text-violet-400">
-            CONVOY
-          </span>
           <span
-            className="min-w-0 shrink truncate text-xs font-medium text-white/70"
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium ${isStaged ? 'border border-dashed border-amber-500/40 bg-amber-500/15 text-amber-400' : 'bg-violet-500/15 text-violet-400'}`}
+          >
+            {isStaged ? 'STAGED' : 'CONVOY'}
+          </span>
+          <button
+            onClick={onSelectConvoy}
+            className="min-w-0 shrink truncate text-xs font-medium text-white/70 transition-colors hover:text-white/90"
             title={convoy.title}
           >
             {convoy.title}
-          </span>
+          </button>
           {convoy.feature_branch && (
             <span
               className="flex min-w-0 shrink items-center gap-1 text-[9px] text-white/25"
@@ -178,6 +194,16 @@ function ConvoyCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {onStart && (
+            <button
+              onClick={onStart}
+              className="flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-medium text-amber-400 transition-colors hover:bg-amber-500/30"
+              title="Start convoy — dispatch agents"
+            >
+              <Play className="size-2.5" />
+              Start
+            </button>
+          )}
           <span className="font-mono text-[10px] text-white/30">
             {convoy.closed_beads}/{convoy.total_beads}
           </span>

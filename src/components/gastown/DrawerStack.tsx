@@ -10,7 +10,8 @@ import type { TownEvent } from './ActivityFeed';
 export type ResourceRef =
   | { type: 'bead'; beadId: string; rigId: string }
   | { type: 'agent'; agentId: string; rigId: string; townId?: string }
-  | { type: 'event'; event: TownEvent };
+  | { type: 'event'; event: TownEvent }
+  | { type: 'convoy'; convoyId: string; townId: string };
 
 type DrawerStackEntry = {
   key: string;

@@ -645,6 +645,22 @@ export const gastownRouter = router({
       return status ?? { ...convoy, beads: [] };
     }),
 
+  startConvoy: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        convoyId: z.string().uuid(),
+      })
+    )
+    .output(RpcConvoyDetailOutput.nullable())
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.startConvoy(input.convoyId);
+      const status = await townStub.getConvoyStatus(input.convoyId);
+      return status ?? null;
+    }),
+
   // ── Admin-only routes (bypass ownership checks) ──────────────────────
 
   adminListBeads: adminProcedure

@@ -118,6 +118,7 @@ export const ConvoyOutput = z.object({
   id: z.string(),
   title: z.string(),
   status: z.enum(['active', 'landed']),
+  staged: z.boolean(),
   total_beads: z.number(),
   closed_beads: z.number(),
   created_by: z.string().nullable(),

@@ -108,6 +108,17 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
       onError: err => toast.error(err.message),
     })
   );
+  const startConvoyMutation = useMutation(
+    trpc.gastown.startConvoy.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.listConvoys.queryKey({ townId }),
+        });
+        toast.success('Convoy started');
+      },
+      onError: err => toast.error(err.message),
+    })
+  );
 
   const rigs = rigsQuery.data ?? [];
   const events = townEventsQuery.data ?? [];
@@ -335,7 +346,9 @@ export function TownOverviewPageClient({ townId }: TownOverviewPageClientProps) 
                   onSelectBead={(beadId, rigId) => {
                     if (rigId) openDrawer({ type: 'bead', beadId, rigId });
                   }}
+                  onSelectConvoy={convoyId => openDrawer({ type: 'convoy', convoyId, townId })}
                   onCloseConvoy={convoyId => closeConvoyMutation.mutate({ townId, convoyId })}
+                  onStartConvoy={convoyId => startConvoyMutation.mutate({ townId, convoyId })}
                 />
               </div>
             </div>

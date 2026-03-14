@@ -189,8 +189,13 @@ export function createMayorTools(client: MayorGastownClient) {
         });
 
         const beadLines = result.beads.map(
-          (b: { bead: { title: string }; agent: { name: string; id: string } }, i: number) =>
-            `  ${i + 1}. "${b.bead.title}" → ${b.agent.name} (${b.agent.id})`
+          (
+            b: { bead: { title: string }; agent: { name: string; id: string } | null },
+            i: number
+          ) =>
+            b.agent
+              ? `  ${i + 1}. "${b.bead.title}" → ${b.agent.name} (${b.agent.id})`
+              : `  ${i + 1}. "${b.bead.title}" (unassigned, pending gt_convoy_start)`
         );
         const mode = args.merge_mode ?? 'review-then-land';
         const staged = args.staged === true;

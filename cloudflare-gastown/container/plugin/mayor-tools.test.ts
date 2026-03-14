@@ -376,11 +376,11 @@ describe('mayor tools', () => {
           beads: [
             {
               bead: { ...FAKE_BEAD, bead_id: 'bead-1', title: 'Task 1' },
-              agent: { ...FAKE_AGENT, id: 'agent-1', name: 'Toast' },
+              agent: null,
             },
             {
               bead: { ...FAKE_BEAD, bead_id: 'bead-2', title: 'Task 2' },
-              agent: { ...FAKE_AGENT, id: 'agent-2', name: 'Muffin' },
+              agent: null,
             },
           ],
         }),
@@ -396,6 +396,7 @@ describe('mayor tools', () => {
       expect(result).toContain('Convoy staged:');
       expect(result).toContain('convoy-staged-1');
       expect(result).toContain('gt_convoy_start');
+      expect(result).toContain('unassigned, pending gt_convoy_start');
       expect(client.slingBatch).toHaveBeenCalledWith(expect.objectContaining({ staged: true }));
     });
   });

@@ -88,9 +88,10 @@ export type SlingResult = {
 };
 
 // Sling batch result (convoy + beads + agents)
+// agent is null for staged convoys (agents aren't assigned until gt_convoy_start)
 export type SlingBatchResult = {
   convoy: Convoy;
-  beads: Array<{ bead: Bead; agent: Agent }>;
+  beads: Array<{ bead: Bead; agent: Agent | null }>;
 };
 
 // Convoy summary (returned by list and status endpoints)

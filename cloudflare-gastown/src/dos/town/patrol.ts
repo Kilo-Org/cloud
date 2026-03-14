@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { beads, BeadRecord as BeadRecordSchema } from '../../db/tables/beads.table';
 import { agent_metadata, AgentMetadataRecord } from '../../db/tables/agent-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
+import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
 import { query } from '../../util/query.util';
 import { sendMail } from './mail';
 import { deleteAgent, getOrCreateAgent, hookBead, unhookBead } from './agents';
@@ -501,8 +502,10 @@ export function detectStaleHooks(sql: SqlStorage): void {
 }
 
 /**
- * Feed stranded convoys: find active convoys that have open beads with
- * no assigned agent. Auto-sling by assigning idle polecats.
+ * Feed stranded convoys: find active (non-staged) convoys that have open
+ * beads with no assigned agent. Auto-sling by assigning idle polecats.
+ * Staged convoys are excluded — their beads remain unassigned until
+ * the convoy is explicitly started via startConvoy().
  */
 export function feedStrandedConvoys(sql: SqlStorage, townId: string): void {
   // Find open issue beads that:
@@ -524,9 +527,11 @@ export function feedStrandedConvoys(sql: SqlStorage, townId: string): void {
         FROM ${bead_dependencies}
         INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
         INNER JOIN ${beads} AS convoy ON ${bead_dependencies.depends_on_bead_id} = convoy.${beads.columns.bead_id}
+        INNER JOIN ${convoy_metadata} ON ${convoy_metadata.bead_id} = convoy.${beads.columns.bead_id}
         WHERE ${bead_dependencies.dependency_type} = 'tracks'
           AND convoy.${beads.columns.type} = 'convoy'
           AND convoy.${beads.columns.status} = 'open'
+          AND ${convoy_metadata.staged} = 0
           AND ${beads.status} = 'open'
           AND ${beads.type} = 'issue'
           AND ${beads.assignee_agent_bead_id} IS NULL

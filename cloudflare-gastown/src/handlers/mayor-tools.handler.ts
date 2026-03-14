@@ -618,7 +618,7 @@ export async function handleMayorConvoyStart(
   );
 
   const town = getTownDOStub(c.env, params.townId);
-  let result: Awaited<ReturnType<typeof town.startConvoy>>;
+  let result: { convoy: { id: string }; beads: unknown[] };
   try {
     result = await town.startConvoy(params.convoyId);
   } catch (err) {

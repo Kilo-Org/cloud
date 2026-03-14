@@ -93,16 +93,26 @@ function formatCount(n: number): string {
 
 // ── Pivot timeseries data for recharts ───────────────────────────────
 
-/** Pivot rows [{hour, event, count}] into [{hour, eventA: 5, eventB: 3}] */
-function pivotTimeseries(rows: EventTimeseriesRow[]): {
-  data: Record<string, unknown>[];
-  events: string[];
-} {
-  const eventSet = new Set<string>();
-  const byHour = new Map<string, Record<string, unknown>>();
-
+/** Pivot rows [{hour, event, count}] into [{hour, eventA: 5, eventB: 3}], keeping only the top N events by total volume */
+function pivotTimeseries(
+  rows: EventTimeseriesRow[],
+  topN = 15
+): { data: Record<string, unknown>[]; events: string[] } {
+  // Sum totals per event to determine the top N
+  const totals = new Map<string, number>();
   for (const row of rows) {
-    eventSet.add(row.event);
+    totals.set(row.event, (totals.get(row.event) ?? 0) + Number(row.count));
+  }
+  const topEvents = new Set(
+    [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, topN)
+      .map(([event]) => event)
+  );
+
+  const byHour = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    if (!topEvents.has(row.event)) continue;
     let entry = byHour.get(row.hour);
     if (!entry) {
       entry = { hour: row.hour };
@@ -111,7 +121,7 @@ function pivotTimeseries(rows: EventTimeseriesRow[]): {
     entry[row.event] = Number(row.count);
   }
 
-  const events = [...eventSet];
+  const events = [...topEvents];
   const data = [...byHour.values()].sort((a, b) => String(a.hour).localeCompare(String(b.hour)));
   return { data, events };
 }
@@ -268,9 +278,18 @@ function ErrorRatesChart({ hours }: { hours: number }) {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={Math.max(400, chartData.length * 28)}>
-          <ComposedChart layout="vertical" data={chartData} margin={{ left: 140 }}>
+          <ComposedChart layout="vertical" data={chartData} margin={{ left: 140, right: 40 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-            <XAxis type="number" className="text-xs" />
+            <XAxis xAxisId="count" type="number" className="text-xs" orientation="bottom" />
+            <XAxis
+              xAxisId="pct"
+              type="number"
+              className="text-xs"
+              orientation="top"
+              domain={[0, 100]}
+              unit="%"
+              hide
+            />
             <YAxis
               dataKey="event"
               type="category"
@@ -285,9 +304,9 @@ function ErrorRatesChart({ hours }: { hours: number }) {
               }}
             />
             <Legend />
-            <Bar dataKey="success" stackId="a" fill="#16a34a" name="Success" />
-            <Bar dataKey="errors" stackId="a" fill="#dc2626" name="Errors" />
-            <Line dataKey="errorRate" stroke="#f59e0b" name="Error %" dot={false} />
+            <Bar xAxisId="count" dataKey="success" stackId="a" fill="#16a34a" name="Success" />
+            <Bar xAxisId="count" dataKey="errors" stackId="a" fill="#dc2626" name="Errors" />
+            <Line xAxisId="pct" dataKey="errorRate" stroke="#f59e0b" name="Error %" dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </CardContent>

@@ -307,6 +307,16 @@ async function subscribeToEvents(
         agent.exitReason = 'Event stream error';
         broadcastEvent(agent.agentId, 'agent.exited', { reason: 'stream error' });
         void reportAgentCompleted(agent, 'failed', 'Event stream error');
+
+        // Release SDK session on stream error (same cleanup as normal completion)
+        const inst = sdkInstances.get(agent.workdir);
+        if (inst) {
+          inst.sessionCount--;
+          if (inst.sessionCount <= 0) {
+            inst.server.close();
+            sdkInstances.delete(agent.workdir);
+          }
+        }
       }
     }
   } finally {

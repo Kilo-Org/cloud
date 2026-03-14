@@ -70,7 +70,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "/total_events/",
           "values": false
         },
@@ -144,7 +146,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "/unique_users/",
           "values": false
         },
@@ -227,7 +231,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -312,7 +318,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -655,7 +663,9 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": ["sum"],
+          "calcs": [
+            "sum"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -681,8 +691,8 @@
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
-          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t",
-          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t",
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t LIMIT 500",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter GROUP BY t, label ORDER BY t LIMIT 500",
           "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
@@ -692,7 +702,7 @@
           "useWindowFuncForMacros": true
         }
       ],
-      "title": "Event Volume (top events)",
+      "title": "Event Volume (all events)",
       "type": "timeseries"
     },
     {
@@ -1323,8 +1333,8 @@
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
-          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t",
-          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t",
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t LIMIT 500",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE $timeFilter AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t LIMIT 500",
           "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
@@ -1334,7 +1344,7 @@
           "useWindowFuncForMacros": true
         }
       ],
-      "title": "Avg Latency Over Time (top events)",
+      "title": "Avg Latency Over Time (all events)",
       "type": "heatmap"
     },
     {
@@ -2329,7 +2339,9 @@
       "id": 22,
       "options": {
         "legend": {
-          "calcs": ["sum"],
+          "calcs": [
+            "sum"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2439,7 +2451,9 @@
       "id": 23,
       "options": {
         "legend": {
-          "calcs": ["sum"],
+          "calcs": [
+            "sum"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -2482,7 +2496,10 @@
   ],
   "preload": false,
   "schemaVersion": 42,
-  "tags": ["gastown", "observability"],
+  "tags": [
+    "gastown",
+    "observability"
+  ],
   "templating": {
     "list": [
       {

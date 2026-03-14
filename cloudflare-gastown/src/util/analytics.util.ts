@@ -56,16 +56,19 @@ export function writeEvent(
   try {
     env.GASTOWN_AE.writeDataPoint({
       blobs: [
-        data.event,
-        data.userId ?? '',
-        data.delivery ?? '',
-        data.route ?? '',
-        data.error ?? '',
-        data.townId ?? '',
-        data.rigId ?? '',
-        data.agentId ?? '',
-        data.beadId ?? '',
-        data.label ?? '',
+        data.event, // blob1
+        data.userId ?? '', // blob2
+        data.delivery ?? '', // blob3
+        data.route ?? '', // blob4
+        data.error ?? '', // blob5
+        data.townId ?? '', // blob6
+        data.rigId ?? '', // blob7
+        data.agentId ?? '', // blob8
+        data.beadId ?? '', // blob9
+        data.label ?? '', // blob10
+        data.convoyId ?? '', // blob11
+        data.role ?? '', // blob12
+        data.beadType ?? '', // blob13
       ],
       doubles: [data.durationMs ?? 0, data.value ?? 0],
       indexes: [data.event],

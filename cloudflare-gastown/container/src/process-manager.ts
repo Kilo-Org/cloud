@@ -283,6 +283,16 @@ async function subscribeToEvents(
         agent.exitReason = 'completed';
         broadcastEvent(agent.agentId, 'agent.exited', { reason: 'completed' });
         void reportAgentCompleted(agent, 'completed');
+
+        // Release SDK session so the server can shut down when idle
+        const inst = sdkInstances.get(agent.workdir);
+        if (inst) {
+          inst.sessionCount--;
+          if (inst.sessionCount <= 0) {
+            inst.server.close();
+            sdkInstances.delete(agent.workdir);
+          }
+        }
         break;
       }
     }

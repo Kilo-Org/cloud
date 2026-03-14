@@ -56,6 +56,7 @@ declare namespace Cloudflare {
 		HYPERDRIVE?: Hyperdrive;
 		CF_VERSION_METADATA?: WorkerVersionMetadata;
 		SENTRY_DSN?: string; // worker secret
+		SENTRY_RELEASE?: string; // deploy-time --var
 	}
 }
 interface Env extends Cloudflare.Env {}

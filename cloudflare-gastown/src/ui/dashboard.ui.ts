@@ -1153,7 +1153,8 @@ if (lastRig) {
   refreshAll();
 }
 
-// Reconnect the status WebSocket when the town ID changes
+// Connect the status WebSocket on load and reconnect when the town ID changes
+connectStatusWs();
 el('townId').addEventListener('change', connectStatusWs);
 </script>
 </body>

@@ -71,7 +71,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": ["lastNotNull"],
-          "fields": "",
+          "fields": "/total_events/",
           "values": false
         },
         "showPercentChange": false,
@@ -89,12 +89,12 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
-          "format": "table",
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
-          "query": "SELECT SUM(_sample_interval) AS total_events FROM gastown_events WHERE $timeFilter",
-          "rawSql": "SELECT SUM(_sample_interval) AS total_events FROM gastown_events WHERE $timeFilter",
+          "query": "SELECT $timeSeries AS t, 'total_events' AS label, SUM(_sample_interval) AS total_events FROM gastown_events WHERE $timeFilter GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'total_events' AS label, SUM(_sample_interval) AS total_events FROM gastown_events WHERE $timeFilter GROUP BY t ORDER BY t",
           "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
@@ -145,7 +145,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": ["lastNotNull"],
-          "fields": "",
+          "fields": "/unique_users/",
           "values": false
         },
         "showPercentChange": false,
@@ -163,12 +163,12 @@
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
           "extrapolate": true,
-          "format": "table",
+          "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
-          "query": "SELECT COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE $timeFilter AND blob2 != ''",
-          "rawSql": "SELECT COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE $timeFilter AND blob2 != ''",
+          "query": "SELECT $timeSeries AS t, 'unique_users' AS label, COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'unique_users' AS label, COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE $timeFilter AND blob2 != '' GROUP BY t ORDER BY t",
           "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
@@ -1251,79 +1251,60 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "insertNulls": false,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
-            },
-            "showPoints": "never",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
             }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
           },
           "unit": "ms"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 15,
         "w": 12,
         "x": 12,
         "y": 42
       },
       "id": 13,
       "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "max": 500,
+          "mode": "scheme",
+          "reverse": true,
+          "scale": "exponential",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
         "legend": {
-          "calcs": ["mean", "max"],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
         },
         "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": false
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "reverse": false
         }
       },
       "pluginVersion": "12.4.1",
@@ -1338,6 +1319,7 @@
           "editorMode": "sql",
           "extrapolate": true,
           "format": "time_series",
+          "formattedQuery": "/* grafana dashboard='Gastown Operations', user=admin */\nSELECT (intDiv(toUInt32(timestamp), 2) * 2) * 1000 AS t, blob1 AS label, SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_duration FROM gastown_events WHERE timestamp >= toDateTime(1773452703) AND timestamp <= toDateTime(1773454503) AND blob3 IN ('http', 'trpc') GROUP BY t, label ORDER BY t",
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
@@ -1353,7 +1335,7 @@
         }
       ],
       "title": "Avg Latency Over Time (top events)",
-      "type": "timeseries"
+      "type": "heatmap"
     },
     {
       "datasource": {
@@ -1441,7 +1423,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 57
       },
       "id": 14,
       "options": {
@@ -1489,7 +1471,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 67
       },
       "id": 104,
       "panels": [],
@@ -1562,7 +1544,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 61
+        "y": 68
       },
       "id": 15,
       "options": {
@@ -1672,7 +1654,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 61
+        "y": 68
       },
       "id": 16,
       "options": {
@@ -1807,7 +1789,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 69
+        "y": 76
       },
       "id": 17,
       "options": {
@@ -1927,7 +1909,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 69
+        "y": 76
       },
       "id": 18,
       "options": {
@@ -1975,7 +1957,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 79
+        "y": 86
       },
       "id": 105,
       "panels": [],
@@ -2026,7 +2008,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 80
+        "y": 87
       },
       "id": 19,
       "options": {
@@ -2107,7 +2089,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 80
+        "y": 87
       },
       "id": 20,
       "options": {
@@ -2222,7 +2204,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 80
+        "y": 87
       },
       "id": 21,
       "options": {
@@ -2270,7 +2252,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 88
+        "y": 95
       },
       "id": 106,
       "panels": [],
@@ -2342,7 +2324,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 89
+        "y": 96
       },
       "id": 22,
       "options": {
@@ -2452,7 +2434,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 89
+        "y": 96
       },
       "id": 23,
       "options": {
@@ -2525,6 +2507,6 @@
   "timezone": "browser",
   "title": "Gastown Operations",
   "uid": "gastown-ops-1",
-  "version": 6,
+  "version": 9,
   "weekStart": ""
 }

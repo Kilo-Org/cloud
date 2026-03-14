@@ -51,23 +51,18 @@ function now(): string {
 }
 
 export function initBeadTables(sql: SqlStorage): void {
+  // Create all tables first (IF NOT EXISTS — safe for existing DOs)
   query(sql, createTableBeads(), []);
-  for (const idx of getIndexesBeads()) {
-    query(sql, idx, []);
-  }
   query(sql, createTableBeadEvents(), []);
-  for (const idx of getIndexesBeadEvents()) {
-    query(sql, idx, []);
-  }
   query(sql, createTableBeadDependencies(), []);
-  for (const idx of getIndexesBeadDependencies()) {
-    query(sql, idx, []);
-  }
-  // Satellite metadata tables
   query(sql, createTableAgentMetadata(), []);
   query(sql, createTableReviewMetadata(), []);
   query(sql, createTableEscalationMetadata(), []);
   query(sql, createTableConvoyMetadata(), []);
+
+  // Migration: drop CHECK constraints from existing tables.
+  // Must run BEFORE index creation — rebuilding a table drops its indexes.
+  dropCheckConstraints(sql);
 
   // Migrations: add columns to existing tables (idempotent)
   for (const stmt of [...migrateConvoyMetadata(), ...migrateAgentMetadata()]) {
@@ -78,11 +73,16 @@ export function initBeadTables(sql: SqlStorage): void {
     }
   }
 
-  // Migration: drop CHECK constraints from existing tables.
-  // SQLite has no ALTER TABLE DROP CONSTRAINT — the only way is to recreate
-  // the table. We detect tables with CHECK constraints via sqlite_master and
-  // rebuild them without constraints.
-  dropCheckConstraints(sql);
+  // Create indexes after migrations (IF NOT EXISTS — idempotent)
+  for (const idx of getIndexesBeads()) {
+    query(sql, idx, []);
+  }
+  for (const idx of getIndexesBeadEvents()) {
+    query(sql, idx, []);
+  }
+  for (const idx of getIndexesBeadDependencies()) {
+    query(sql, idx, []);
+  }
 }
 
 /**
@@ -106,11 +106,16 @@ function dropCheckConstraints(sql: SqlStorage): void {
   ];
 
   for (const row of rows) {
-    const tableName = String(row.name);
-    const originalSql = String(row.create_sql);
+    if (typeof row.name !== 'string' || typeof row.create_sql !== 'string') continue;
+    const tableName = row.name;
+    const originalSql = row.create_sql;
 
-    // Strip all check(...) clauses from the CREATE TABLE statement
-    const cleanedSql = originalSql.replace(/\s*check\s*\([^)]*\)/gi, '');
+    // Strip all check(...) clauses from the CREATE TABLE statement.
+    // Handles nested parens like check(status in ('open', 'closed')).
+    const cleanedSql = originalSql.replace(
+      /,?\s*check\s*\((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*\)/gi,
+      ''
+    );
 
     // Skip if nothing changed (shouldn't happen given the WHERE clause)
     if (cleanedSql === originalSql) continue;

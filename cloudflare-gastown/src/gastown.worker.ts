@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/cloudflare';
 import { withSentry } from '@sentry/cloudflare';
+import { TRPCError } from '@trpc/server';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -675,7 +676,9 @@ app.use(
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
       console.error(`[gastown-trpc] error on ${path ?? 'unknown'}:`, error.message);
-      Sentry.captureException(error);
+      if (!(error instanceof TRPCError)) {
+        Sentry.captureException(error);
+      }
     },
   })
 );
@@ -703,7 +706,7 @@ const WS_STATUS_PATTERN = /^\/api\/towns\/([^/]+)\/status\/ws$/;
 export default withSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN ?? '',
-    release: env.CF_VERSION_METADATA?.id,
+    release: env.SENTRY_RELEASE || env.CF_VERSION_METADATA?.id,
     tracesSampleRate: 0.1,
     enabled: !!env.SENTRY_DSN,
   }),

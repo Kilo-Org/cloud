@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/cloudflare';
 import type { Context, Next } from 'hono';
 import type { GastownEnv } from '../gastown.worker';
 import { writeEvent } from '../util/analytics.util';
@@ -77,7 +76,7 @@ export async function instrumented(
     return response;
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
-    Sentry.captureException(err);
+    // Sentry capture happens in app.onError() — don't double-report
     throw err;
   } finally {
     const durationMs = performance.now() - startTime;
@@ -88,7 +87,7 @@ export async function instrumented(
       delivery: 'http',
       route,
       error,
-      userId: c.get('kiloUserId'),
+      userId: c.get('kiloUserId') || c.get('agentJWT')?.userId,
       townId: c.req.param('townId') as string | undefined,
       rigId: c.req.param('rigId') as string | undefined,
       agentId: c.req.param('agentId') as string | undefined,

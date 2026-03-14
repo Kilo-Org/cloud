@@ -1,5 +1,4 @@
 import { initTRPC, TRPCError } from '@trpc/server';
-import * as Sentry from '@sentry/cloudflare';
 import { writeEvent } from '../util/analytics.util';
 
 export type TRPCContext = {
@@ -27,9 +26,7 @@ const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, next }) => 
     return result;
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
-    if (!(err instanceof TRPCError)) {
-      Sentry.captureException(err);
-    }
+    // Sentry capture happens in trpcServer({ onError }) — don't double-report
     throw err;
   } finally {
     const durationMs = performance.now() - start;

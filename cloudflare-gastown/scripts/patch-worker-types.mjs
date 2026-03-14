@@ -26,7 +26,7 @@ if (!src.includes('SENTRY_DSN')) {
   // the Cloudflare namespace (the one that has CF_VERSION_METADATA, HYPERDRIVE, etc.)
   src = src.replace(
     /(interface Env \{[\s\S]*?)((\n\t)\})/,
-    '$1$3\tSENTRY_DSN?: string; // worker secret$2'
+    '$1$3\tSENTRY_DSN?: string; // worker secret\n\t\tSENTRY_RELEASE?: string; // deploy-time --var$2'
   );
 }
 

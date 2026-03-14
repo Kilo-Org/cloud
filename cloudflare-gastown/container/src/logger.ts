@@ -13,9 +13,15 @@ function flatten(data?: unknown): Record<string, unknown> {
 
 export const log = {
   info: (msg: string, data?: unknown) =>
-    console.log(JSON.stringify({ level: 'info', msg, ...flatten(data), ts: new Date().toISOString() })),
+    console.log(
+      JSON.stringify({ level: 'info', msg, ...flatten(data), ts: new Date().toISOString() })
+    ),
   warn: (msg: string, data?: unknown) =>
-    console.warn(JSON.stringify({ level: 'warn', msg, ...flatten(data), ts: new Date().toISOString() })),
+    console.warn(
+      JSON.stringify({ level: 'warn', msg, ...flatten(data), ts: new Date().toISOString() })
+    ),
   error: (msg: string, data?: unknown) =>
-    console.error(JSON.stringify({ level: 'error', msg, ...flatten(data), ts: new Date().toISOString() })),
+    console.error(
+      JSON.stringify({ level: 'error', msg, ...flatten(data), ts: new Date().toISOString() })
+    ),
 };

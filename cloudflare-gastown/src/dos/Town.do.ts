@@ -2097,11 +2097,25 @@ export class TownDO extends DurableObject<Env> {
       const rigId = bead.rig_id;
       if (!rigId) continue;
 
-      const agent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
-      agents.hookBead(this.sql, agent.id, beadId);
+      // Skip beads already hooked from a prior partial attempt (retry-safe).
+      let hookedAgent: Agent;
+      if (bead.assignee_agent_bead_id) {
+        const existing = agents.getAgent(this.sql, bead.assignee_agent_bead_id);
+        if (existing) {
+          hookedAgent = existing;
+        } else {
+          // Orphaned assignee reference — re-hook with a fresh agent
+          const agent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
+          agents.hookBead(this.sql, agent.id, beadId);
+          hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
+        }
+      } else {
+        const agent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
+        agents.hookBead(this.sql, agent.id, beadId);
+        hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
+      }
 
-      const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
-      // Re-read bead after hookBead so assignee_agent_bead_id is up to date
+      // Re-read bead after potential hookBead so assignee_agent_bead_id is up to date
       const updatedBead = beadOps.getBead(this.sql, beadId) ?? bead;
 
       if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {

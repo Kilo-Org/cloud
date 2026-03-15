@@ -2069,17 +2069,6 @@ export class TownDO extends DurableObject<Env> {
     if (!convoy) throw new Error(`Convoy not found: ${convoyId}`);
     if (!convoy.staged) throw new Error(`Convoy is not staged: ${convoyId}`);
 
-    // Mark convoy as active
-    query(
-      this.sql,
-      /* sql */ `
-        UPDATE ${convoy_metadata}
-        SET ${convoy_metadata.columns.staged} = 0
-        WHERE ${convoy_metadata.bead_id} = ?
-      `,
-      [convoyId]
-    );
-
     // Find all beads tracked by this convoy
     const trackedRows = [
       ...query(
@@ -2127,6 +2116,18 @@ export class TownDO extends DurableObject<Env> {
 
       results.push({ bead: updatedBead, agent: hookedAgent });
     }
+
+    // Clear the staged flag only after all agents are successfully hooked.
+    // If the loop above throws, the convoy stays staged so the caller can retry.
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${convoy_metadata}
+        SET ${convoy_metadata.columns.staged} = 0
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
+      [convoyId]
+    );
 
     await this.armAlarmIfNeeded();
 

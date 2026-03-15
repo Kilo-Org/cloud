@@ -2339,7 +2339,12 @@ export class TownDO extends DurableObject<Env> {
     );
     // Acknowledging an escalation also closes it — the mayor has seen
     // the issue and doesn't need it sitting open in the queue.
-    beadOps.updateBeadStatus(this.sql, escalationId, 'closed', null);
+    // Guard with getBead so stale/duplicate acknowledge calls remain
+    // idempotent instead of throwing on a missing bead.
+    const escalationBead = beadOps.getBead(this.sql, escalationId);
+    if (escalationBead && escalationBead.status !== 'closed') {
+      beadOps.updateBeadStatus(this.sql, escalationId, 'closed', null);
+    }
     this.emitEvent({
       event: 'escalation.acknowledged',
       townId: this.townId,

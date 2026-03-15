@@ -2498,12 +2498,13 @@ export class TownDO extends DurableObject<Env> {
       } catch (err) {
         console.warn(`${TOWN_LOG} alarm: container health check failed`, err);
       }
-    }
 
-    // Refresh the container-scoped JWT before any work that might
-    // trigger API calls. Throttled to once per hour (tokens have 8h
-    // expiry, so hourly refresh provides ample safety margin).
-    if (this.hasActiveWork()) {
+      // Refresh the container-scoped JWT before any work that might
+      // trigger API calls. Throttled to once per hour (tokens have 8h
+      // expiry, so hourly refresh provides ample safety margin).
+      // Gated on hasRigs (not hasActiveWork) because the container may
+      // still be running with an idle mayor accepting user messages,
+      // even when there are no active beads or agents.
       try {
         await this.refreshContainerToken();
       } catch (err) {

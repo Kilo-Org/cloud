@@ -371,7 +371,7 @@ export function dashboardHtml(): string {
     <label>Town ID</label>
     <input type="text" id="convoyTownId" placeholder="town-abc" style="min-width:160px" />
     <label style="margin-left:8px">Mayor Token</label>
-    <input type="text" id="mayorToken" placeholder="mayor token" style="min-width:200px" />
+    <input type="text" id="convoyMayorToken" placeholder="mayor token" style="min-width:200px" />
     <button class="primary" onclick="loadConvoys()">Load Convoys</button>
   </div>
   <div id="convoysList"></div>
@@ -1077,13 +1077,13 @@ async function containerSendMessage() {
 async function loadConvoys() {
   const convoyTownId = el('convoyTownId').value.trim();
   if (!convoyTownId) { toast('Set a Town ID first', true); return; }
-  const mayorToken = el('mayorToken').value.trim();
+  const token = el('convoyMayorToken').value.trim();
   const log = el('apiLog');
   const path = '/api/mayor/' + convoyTownId + '/tools/convoys';
   log.innerHTML += '<span class="info">GET ' + esc(path) + '</span>\\n';
   try {
     const res = await fetch(path, {
-      headers: { 'Authorization': 'Bearer ' + mayorToken, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
     });
     const data = await res.json();
     const cls = res.ok ? 'ok' : 'err';
@@ -1124,14 +1124,14 @@ function renderConvoys(convoys, convoyTownId) {
 }
 
 async function startConvoy(convoyId, convoyTownId) {
-  const mayorToken = el('mayorToken').value.trim();
+  const token = el('convoyMayorToken').value.trim();
   const log = el('apiLog');
   const path = '/api/mayor/' + convoyTownId + '/tools/convoys/' + convoyId + '/start';
   log.innerHTML += '<span class="info">POST ' + esc(path) + '</span>\\n';
   try {
     const res = await fetch(path, {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + mayorToken, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: '{}',
     });
     const data = await res.json();

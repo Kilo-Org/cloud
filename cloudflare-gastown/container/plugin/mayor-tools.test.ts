@@ -72,7 +72,7 @@ const FAKE_CONVOY: Convoy = {
 const FAKE_STAGED_CONVOY: Convoy = {
   id: 'convoy-staged-1',
   title: 'Big Refactor',
-  status: 'staged',
+  status: 'active',
   staged: true,
   total_beads: 2,
   closed_beads: 0,

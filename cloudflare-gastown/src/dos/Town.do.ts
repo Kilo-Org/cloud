@@ -2107,9 +2107,11 @@ export class TownDO extends DurableObject<Env> {
       agents.hookBead(this.sql, agent.id, beadId);
 
       const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
+      // Re-read bead after hookBead so assignee_agent_bead_id is up to date
+      const updatedBead = beadOps.getBead(this.sql, beadId) ?? bead;
 
       if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
-        this.dispatchAgent(hookedAgent, bead).catch(err =>
+        this.dispatchAgent(hookedAgent, updatedBead).catch(err =>
           console.error(`${TOWN_LOG} startConvoy: fire-and-forget dispatchAgent failed:`, err)
         );
       } else {
@@ -2118,7 +2120,7 @@ export class TownDO extends DurableObject<Env> {
         );
       }
 
-      results.push({ bead, agent: hookedAgent });
+      results.push({ bead: updatedBead, agent: hookedAgent });
     }
 
     await this.armAlarmIfNeeded();
@@ -2126,7 +2128,7 @@ export class TownDO extends DurableObject<Env> {
     const updatedConvoy = this.getConvoy(convoyId);
     if (!updatedConvoy) throw new Error(`Failed to re-fetch convoy after start: ${convoyId}`);
     this.emitEvent({
-      event: 'convoy.created',
+      event: 'convoy.started',
       townId: this.townId,
       convoyId,
     });

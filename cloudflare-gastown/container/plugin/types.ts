@@ -95,10 +95,12 @@ export type SlingBatchResult = {
 };
 
 // Convoy summary (returned by list and status endpoints)
+// Staging is tracked by the `staged` boolean, not the status field.
+// status tracks the convoy lifecycle: active (in progress) or landed (complete).
 export type Convoy = {
   id: string;
   title: string;
-  status: 'active' | 'staged' | 'landed';
+  status: 'active' | 'landed';
   staged: boolean;
   total_beads: number;
   closed_beads: number;

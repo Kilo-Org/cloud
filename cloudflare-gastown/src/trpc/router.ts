@@ -575,6 +575,15 @@ export const gastownRouter = router({
       return townStub.updateTownConfig(input.config);
     }),
 
+  refreshContainerToken: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.setTownId(input.townId);
+      await townStub.forceRefreshContainerToken();
+    }),
+
   // ── Events ──────────────────────────────────────────────────────────
 
   getBeadEvents: gastownProcedure

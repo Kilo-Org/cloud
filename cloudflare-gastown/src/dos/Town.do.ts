@@ -450,6 +450,20 @@ export class TownDO extends DurableObject<Env> {
     return result;
   }
 
+  /**
+   * Force-refresh the container token, bypassing the 1-hour throttle.
+   * Called from the user-facing tRPC mutation so operators can manually
+   * push a fresh JWT to the running container.
+   */
+  async forceRefreshContainerToken(): Promise<void> {
+    const townId = this.townId;
+    if (!townId) throw new Error('townId not set');
+    const townConfig = await this.getTownConfig();
+    const userId = townConfig.owner_user_id ?? townId;
+    await dispatch.refreshContainerToken(this.env, townId, userId);
+    this.lastContainerTokenRefreshAt = Date.now();
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // Rig Registry
   // ══════════════════════════════════════════════════════════════════

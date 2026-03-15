@@ -523,6 +523,13 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    refreshContainerToken: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+      };
+      output: void;
+      meta: object;
+    }>;
     getBeadEvents: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         rigId: string;
@@ -1455,6 +1462,13 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               | undefined;
             staged_convoys_default: boolean;
           };
+          meta: object;
+        }>;
+        refreshContainerToken: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+          };
+          output: void;
           meta: object;
         }>;
         getBeadEvents: import('@trpc/server').TRPCQueryProcedure<{

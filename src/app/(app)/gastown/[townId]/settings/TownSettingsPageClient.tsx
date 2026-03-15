@@ -22,6 +22,8 @@ import {
   Shield,
   Variable,
   Layers,
+  RefreshCw,
+  Container,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -37,6 +39,7 @@ const SECTIONS = [
   { id: 'convoys', label: 'Convoys', icon: Layers },
   { id: 'merge-strategy', label: 'Merge Strategy', icon: GitPullRequest },
   { id: 'refinery', label: 'Refinery', icon: Shield },
+  { id: 'container', label: 'Container', icon: Container },
 ] as const;
 
 function useScrollSpy(sectionIds: readonly string[]) {
@@ -90,6 +93,13 @@ export function TownSettingsPageClient({ townId }: Props) {
         toast.success('Configuration saved');
       },
       onError: err => toast.error(err.message),
+    })
+  );
+
+  const refreshToken = useMutation(
+    trpc.gastown.refreshContainerToken.mutationOptions({
+      onSuccess: () => toast.success('Container token refreshed'),
+      onError: err => toast.error(`Token refresh failed: ${err.message}`),
     })
   );
 
@@ -465,6 +475,39 @@ export function TownSettingsPageClient({ townId }: Props) {
                     <p className="text-[11px] text-white/30">
                       Automatically merge when all gates pass.
                     </p>
+                  </div>
+                </div>
+              </SettingsSection>
+
+              {/* ── Container ──────────────────────────────────────── */}
+              <SettingsSection
+                id="container"
+                title="Container"
+                description="Manage the town's container runtime and authentication tokens."
+                icon={Container}
+                index={6}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                    <div>
+                      <p className="text-sm text-white/70">Container Token</p>
+                      <p className="text-[11px] text-white/30">
+                        JWT shared by all agents in the container. Auto-refreshed hourly (8h
+                        expiry). Force a refresh if agents are experiencing auth failures.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => refreshToken.mutate({ townId })}
+                      disabled={refreshToken.isPending}
+                      variant="secondary"
+                      size="sm"
+                      className="ml-4 shrink-0 gap-1.5"
+                    >
+                      <RefreshCw
+                        className={`size-3 ${refreshToken.isPending ? 'animate-spin' : ''}`}
+                      />
+                      {refreshToken.isPending ? 'Refreshing...' : 'Refresh Token'}
+                    </Button>
                   </div>
                 </div>
               </SettingsSection>

@@ -417,6 +417,7 @@ export declare const gastownRouter: import("@trpc/server").TRPCBuiltRouter<{
             container?: {
                 sleep_after_minutes?: number | undefined;
             } | undefined;
+            staged_convoys_default: boolean;
         };
         meta: object;
     }>;
@@ -447,6 +448,7 @@ export declare const gastownRouter: import("@trpc/server").TRPCBuiltRouter<{
                 container?: {
                     sleep_after_minutes?: number | undefined;
                 } | undefined;
+                staged_convoys_default?: boolean | undefined;
             };
         };
         output: {
@@ -473,6 +475,7 @@ export declare const gastownRouter: import("@trpc/server").TRPCBuiltRouter<{
             container?: {
                 sleep_after_minutes?: number | undefined;
             } | undefined;
+            staged_convoys_default: boolean;
         };
         meta: object;
     }>;
@@ -1234,6 +1237,7 @@ export declare const wrappedGastownRouter: import("@trpc/server").TRPCBuiltRoute
                 container?: {
                     sleep_after_minutes?: number | undefined;
                 } | undefined;
+                staged_convoys_default: boolean;
             };
             meta: object;
         }>;
@@ -1264,6 +1268,7 @@ export declare const wrappedGastownRouter: import("@trpc/server").TRPCBuiltRoute
                     container?: {
                         sleep_after_minutes?: number | undefined;
                     } | undefined;
+                    staged_convoys_default?: boolean | undefined;
                 };
             };
             output: {
@@ -1290,6 +1295,7 @@ export declare const wrappedGastownRouter: import("@trpc/server").TRPCBuiltRoute
                 container?: {
                     sleep_after_minutes?: number | undefined;
                 } | undefined;
+                staged_convoys_default: boolean;
             };
             meta: object;
         }>;

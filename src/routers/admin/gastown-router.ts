@@ -135,6 +135,7 @@ const TownConfigRecord = z.object({
   alarm_interval_active: z.number().optional(),
   alarm_interval_idle: z.number().optional(),
   container: z.object({ sleep_after_minutes: z.number().optional() }).optional(),
+  staged_convoys_default: z.boolean().optional(),
 });
 
 const ConvoyDetailRecord = z.object({

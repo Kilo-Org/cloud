@@ -1855,6 +1855,10 @@ export class TownDO extends DurableObject<Env> {
   }): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent | null }> }> {
     await this.ensureInitialized();
 
+    // Resolve staged: explicit request wins, otherwise fall back to town config default.
+    const townConfig = await this.getTownConfig();
+    const isStaged = input.staged ?? townConfig.staged_convoys_default;
+
     const convoyId = generateId();
     const timestamp = now();
 
@@ -1944,7 +1948,7 @@ export class TownDO extends DurableObject<Env> {
 
     const mergeMode = input.merge_mode ?? 'review-then-land';
 
-    const stagedValue = input.staged ? 1 : 0;
+    const stagedValue = isStaged ? 1 : 0;
 
     query(
       this.sql,
@@ -2008,7 +2012,7 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    if (input.staged) {
+    if (isStaged) {
       // Staged mode: collect beads without hooking agents or dispatching.
       for (const beadId of beadIds) {
         const bead = beadOps.getBead(this.sql, beadId);

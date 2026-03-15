@@ -454,13 +454,17 @@ export class TownDO extends DurableObject<Env> {
    * Force-refresh the container token, bypassing the 1-hour throttle.
    * Called from the user-facing tRPC mutation so operators can manually
    * push a fresh JWT to the running container.
+   *
+   * Unlike the alarm-driven refreshContainerToken, this propagates ALL
+   * errors (including container-down) so the UI can show a real failure
+   * instead of a false success.
    */
   async forceRefreshContainerToken(): Promise<void> {
     const townId = this.townId;
     if (!townId) throw new Error('townId not set');
     const townConfig = await this.getTownConfig();
     const userId = townConfig.owner_user_id ?? townId;
-    await dispatch.refreshContainerToken(this.env, townId, userId);
+    await dispatch.forceRefreshContainerToken(this.env, townId, userId);
     this.lastContainerTokenRefreshAt = Date.now();
   }
 

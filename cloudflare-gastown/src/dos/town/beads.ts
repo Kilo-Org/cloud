@@ -250,7 +250,7 @@ export function updateBeadStatus(
   sql: SqlStorage,
   beadId: string,
   status: string,
-  agentId: string
+  agentId: string | null
 ): Bead {
   const bead = getBead(sql, beadId);
   if (!bead) throw new Error(`Bead ${beadId} not found`);

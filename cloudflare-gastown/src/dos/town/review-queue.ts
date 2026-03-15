@@ -570,21 +570,60 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
 }
 
 /**
+ * Result from agentCompleted indicating whether a rework was triggered.
+ * When non-null, the TownDO caller should dispatch a polecat for the
+ * source bead.
+ */
+export type AgentCompletedResult = {
+  reworkSourceBeadId: string | null;
+};
+
+/**
  * Called by the container when an agent process completes (or fails).
  * Closes/fails the bead and unhooks the agent.
+ *
+ * For refineries that exit with 'completed' without having merged,
+ * this triggers the rework flow: the MR bead is failed and the source
+ * bead is returned to in_progress so a polecat can be re-dispatched.
  */
 export function agentCompleted(
   sql: SqlStorage,
   agentId: string,
   input: { status: 'completed' | 'failed'; reason?: string }
-): void {
+): AgentCompletedResult {
+  const result: AgentCompletedResult = { reworkSourceBeadId: null };
   const agent = getAgent(sql, agentId);
-  if (!agent) return;
+  if (!agent) return result;
 
   if (agent.current_hook_bead_id) {
-    const beadStatus = input.status === 'completed' ? 'closed' : 'failed';
-    updateBeadStatus(sql, agent.current_hook_bead_id, beadStatus, agentId);
-    unhookBead(sql, agentId);
+    // When a refinery exits with 'completed' but the MR bead is still
+    // in_progress (not closed/merged), it means the refinery requested
+    // rework. Route through completeReviewWithResult so the source bead
+    // is returned to in_progress for re-dispatch.
+    if (agent.role === 'refinery' && input.status === 'completed') {
+      const mrBead = getBead(sql, agent.current_hook_bead_id);
+      if (mrBead && mrBead.status !== 'closed') {
+        const sourceBeadId =
+          typeof mrBead.metadata?.source_bead_id === 'string'
+            ? mrBead.metadata.source_bead_id
+            : null;
+        completeReviewWithResult(sql, {
+          entry_id: agent.current_hook_bead_id,
+          status: 'failed',
+          message: input.reason ?? 'Refinery exited without merge — rework needed',
+        });
+        result.reworkSourceBeadId = sourceBeadId;
+        unhookBead(sql, agentId);
+        // Mark agent idle (below)
+      } else {
+        // MR was already closed (merged) — normal completion
+        unhookBead(sql, agentId);
+      }
+    } else {
+      const beadStatus = input.status === 'completed' ? 'closed' : 'failed';
+      updateBeadStatus(sql, agent.current_hook_bead_id, beadStatus, agentId);
+      unhookBead(sql, agentId);
+    }
   }
 
   // Mark agent idle
@@ -598,6 +637,8 @@ export function agentCompleted(
     `,
     [agentId]
   );
+
+  return result;
 }
 
 // ── Molecules ───────────────────────────────────────────────────────

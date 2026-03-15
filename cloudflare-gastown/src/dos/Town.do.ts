@@ -2049,6 +2049,11 @@ export class TownDO extends DurableObject<Env> {
 
     const convoy = this.getConvoy(convoyId);
     if (!convoy) throw new Error('Failed to create convoy');
+    this.emitEvent({
+      event: 'convoy.created',
+      townId: this.townId,
+      convoyId,
+    });
     return { convoy, beads: results };
   }
 

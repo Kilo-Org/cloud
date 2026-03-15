@@ -628,6 +628,20 @@ export const gastownRouter = router({
       return townStub.listConvoysDetailed();
     }),
 
+  getConvoy: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        convoyId: z.string().uuid(),
+      })
+    )
+    .output(RpcConvoyDetailOutput.nullable())
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.getConvoyStatus(input.convoyId);
+    }),
+
   closeConvoy: gastownProcedure
     .input(
       z.object({

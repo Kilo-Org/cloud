@@ -113,16 +113,19 @@ export function ConvoyPanel({
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
 
-  const convoysQuery = useQuery({
-    ...trpc.gastown.listConvoys.queryOptions({ townId }),
+  const convoyQuery = useQuery({
+    ...trpc.gastown.getConvoy.queryOptions({ townId, convoyId }),
     refetchInterval: 5_000,
   });
 
-  const convoy = (convoysQuery.data ?? []).find(c => c.id === convoyId);
+  const convoy = convoyQuery.data ?? null;
 
   const startConvoyMutation = useMutation(
     trpc.gastown.startConvoy.mutationOptions({
       onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.getConvoy.queryKey({ townId, convoyId }),
+        });
         void queryClient.invalidateQueries({
           queryKey: trpc.gastown.listConvoys.queryKey({ townId }),
         });
@@ -137,7 +140,7 @@ export function ConvoyPanel({
     [convoy?.beads, convoy?.dependency_edges]
   );
 
-  if (convoysQuery.isLoading) {
+  if (convoyQuery.isLoading) {
     return (
       <div className="flex h-40 items-center justify-center">
         <Loader2 className="size-5 animate-spin text-white/20" />

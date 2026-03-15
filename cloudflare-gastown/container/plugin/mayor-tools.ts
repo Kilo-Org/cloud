@@ -198,7 +198,7 @@ export function createMayorTools(client: MayorGastownClient) {
               : `  ${i + 1}. "${b.bead.title}" (unassigned, pending gt_convoy_start)`
         );
         const mode = args.merge_mode ?? 'review-then-land';
-        const staged = args.staged === true;
+        const staged = result.convoy.staged;
         return [
           `Convoy ${staged ? 'staged' : 'created'}: "${result.convoy.title}" (${result.convoy.id})`,
           `Merge mode: ${mode}`,

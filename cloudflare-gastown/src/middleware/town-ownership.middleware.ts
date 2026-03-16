@@ -6,15 +6,23 @@ import { getGastownUserStub } from '../dos/GastownUser.do';
 /**
  * Middleware that verifies the authenticated Kilo user owns the `:townId`
  * route param. Must run after `kiloAuthMiddleware` (reads `kiloUserId`
- * from the Hono context).
+ * and `kiloIsAdmin` from the Hono context).
+ *
+ * Admins bypass the ownership check so admin-panel routes (e.g. town
+ * config inspection/updates) continue to work for any town.
  *
  * Returns 401 if no userId is set, 403 if the town doesn't belong to the
- * caller.
+ * caller and they are not an admin.
  */
 export const townOwnershipMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
   const userId = c.get('kiloUserId');
   if (!userId) {
     return c.json(resError('Unauthorized'), 401);
+  }
+
+  // Admins can access any town (e.g. admin panel inspection routes)
+  if (c.get('kiloIsAdmin')) {
+    return next();
   }
 
   const townId = c.req.param('townId');

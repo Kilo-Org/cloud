@@ -341,6 +341,12 @@ export function normalizeUiAction(action: UiAction, townId: string): UiAction {
   return action;
 }
 
+/** Extract the rigId from a UI action, if present. */
+export function uiActionRigId(action: UiAction): string | null {
+  if ('rigId' in action) return action.rigId;
+  return null;
+}
+
 // Re-export satellite metadata types for convenience
 export type { AgentMetadataRecord } from './db/tables/agent-metadata.table';
 export type { ReviewMetadataRecord } from './db/tables/review-metadata.table';

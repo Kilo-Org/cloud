@@ -4,7 +4,7 @@ import type { GastownEnv } from '../gastown.worker';
 import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { UiActionSchema, normalizeUiAction } from '../types';
+import { UiActionSchema, normalizeUiAction, uiActionRigId } from '../types';
 
 const MAYOR_HANDLER_LOG = '[mayor.handler]';
 
@@ -185,6 +185,16 @@ export async function handleBroadcastUiAction(c: Context<GastownEnv>, params: { 
 
   const town = getTownDOStub(c.env, params.townId);
   await town.setTownId(params.townId);
+
+  // Validate that the referenced rig belongs to this town
+  const rigId = uiActionRigId(action);
+  if (rigId) {
+    const rig = await town.getRigAsync(rigId);
+    if (!rig) {
+      return c.json({ success: false, error: `Rig ${rigId} does not belong to this town` }, 400);
+    }
+  }
+
   await town.broadcastUiAction(action);
   return c.json(resSuccess({ broadcast: true }), 200);
 }

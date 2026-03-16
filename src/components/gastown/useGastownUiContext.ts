@@ -30,7 +30,10 @@ function pageFromPathname(pathname: string, townId: string): string {
   const base = `/gastown/${townId}`;
   if (pathname === base) return 'town-overview';
   const suffix = pathname.slice(base.length + 1);
-  if (suffix.startsWith('rigs/')) return 'rig-detail';
+  if (suffix.startsWith('rigs/')) {
+    const rigId = suffix.split('/')[1];
+    return rigId ? `rig-detail (rigId: ${rigId})` : 'rigs';
+  }
   if (suffix.startsWith('beads')) return 'beads';
   if (suffix.startsWith('agents')) return 'agents';
   if (suffix.startsWith('merges')) return 'merges';

@@ -12,11 +12,14 @@
  */
 
 import { writeFileSync, readFileSync } from 'node:fs';
+import { z } from 'zod';
 
-type ContextSnapshot = {
-  context: string;
-  receivedAt: number;
-};
+const ContextSnapshotSchema = z.object({
+  context: z.string(),
+  receivedAt: z.number(),
+});
+
+type ContextSnapshot = z.infer<typeof ContextSnapshotSchema>;
 
 /** Max snapshots retained. Oldest are evicted when this is exceeded. */
 const MAX_SNAPSHOTS = 5;
@@ -72,8 +75,7 @@ function readSnapshots(): ContextSnapshot[] {
   try {
     const raw = readFileSync(CONTEXT_FILE, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed;
+    return z.array(ContextSnapshotSchema).parse(parsed);
   } catch {
     return [];
   }

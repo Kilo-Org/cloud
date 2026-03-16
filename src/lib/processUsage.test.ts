@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
+import { api_kind, microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
 import { eq, getTableColumns } from 'drizzle-orm';
 import { findUserById } from './user';
 import { Readable } from 'node:stream';
@@ -407,6 +407,29 @@ describe('logMicrodollarUsage', () => {
     });
     expect(metadataRecord).toBeTruthy();
     expect(metadataRecord?.session_id).toBe('task-abc123');
+  });
+
+  test.each([
+    { apiKind: 'fim_completions', userId: 'test-api-kind-fim', email: 'fim@example.com', msgId: 'test-msg-fim' },
+    { apiKind: 'embeddings', userId: 'test-api-kind-embed', email: 'embed@example.com', msgId: 'test-msg-embed' },
+  ] as const)('stores api_kind=$apiKind in metadata', async ({ apiKind, userId, email, msgId }) => {
+    const user = await insertTestUser({ id: userId, microdollars_used: 0, google_user_email: email });
+
+    const usageStats: MicrodollarUsageStats = { ...BASE_USAGE_STATS, messageId: msgId };
+    const usageContext: MicrodollarUsageContext = { ...createBaseUsageContext(user), api_kind: apiKind };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, msgId),
+    });
+    expect(metadataRecord).toBeTruthy();
+    expect(metadataRecord?.api_kind_id).not.toBeNull();
+
+    const apiKindRow = await db.query.api_kind.findFirst({
+      where: eq(api_kind.api_kind_id, metadataRecord!.api_kind_id!),
+    });
+    expect(apiKindRow?.api_kind).toBe(apiKind);
   });
 
   test('stores usage data without incrementing user microdollars for zero cost', async () => {

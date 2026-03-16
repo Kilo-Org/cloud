@@ -37,8 +37,10 @@ jest.mock('@/lib/user.server', () => ({
 }));
 
 const mockGetStytchStatus = jest.fn<Promise<boolean | null>, [User, string | null, Headers]>();
+const mockHandleSignupPromotion = jest.fn<Promise<void>, [User, boolean]>();
 jest.mock('@/lib/stytch', () => ({
   getStytchStatus: (...args: [User, string | null, Headers]) => mockGetStytchStatus(...args),
+  handleSignupPromotion: (...args: [User, boolean]) => mockHandleSignupPromotion(...args),
 }));
 
 // Mock React components that aren't relevant to redirect testing

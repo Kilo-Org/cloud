@@ -403,7 +403,7 @@ export const gastownRouter = router({
         message: z.string().min(1),
         model: z.string().default('anthropic/claude-sonnet-4.6'),
         rigId: z.string().uuid().optional(),
-        uiContext: z.string().optional(),
+        uiContext: z.string().max(10_000).optional(),
       })
     )
     .output(RpcMayorSendResultOutput)

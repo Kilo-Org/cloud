@@ -11,7 +11,7 @@ const MAYOR_HANDLER_LOG = '[mayor.handler]';
 const SendMayorMessageBody = z.object({
   message: z.string().min(1),
   model: z.string().optional(),
-  uiContext: z.string().optional(), // XML string from getContextXml()
+  uiContext: z.string().max(10_000).optional(),
 });
 
 const MayorCompletedBody = z.object({
@@ -130,7 +130,7 @@ export async function handleDestroyMayor(c: Context<GastownEnv>, params: { townI
 }
 
 const SetDashboardContextBody = z.object({
-  context: z.string(),
+  context: z.string().max(10_000),
 });
 
 const BroadcastUiActionBody = z.object({

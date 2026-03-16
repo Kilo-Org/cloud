@@ -164,13 +164,14 @@ export const GastownPlugin: Plugin = async ({ client }) => {
         // Read dashboard context from in-memory store (pushed by the
         // TownDO via the container's POST /dashboard-context endpoint).
         // No network call — the store lives in the same process.
+        // Always remove the previous context block so stale context
+        // doesn't survive a read failure (e.g. file temporarily missing).
+        const marker = '--- DASHBOARD CONTEXT ---';
+        const idx = output.system.findIndex(s => s.includes(marker));
+        if (idx !== -1) output.system.splice(idx, 1);
+
         const dashboardContext = readDashboardContextBlock();
         if (dashboardContext) {
-          // Remove any stale context block from a previous turn
-          const marker = '--- DASHBOARD CONTEXT ---';
-          const idx = output.system.findIndex(s => s.includes(marker));
-          if (idx !== -1) output.system.splice(idx, 1);
-
           output.system.push(
             [`--- DASHBOARD CONTEXT ---`, dashboardContext, `--- END DASHBOARD CONTEXT ---`].join(
               '\n'

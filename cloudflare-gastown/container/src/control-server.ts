@@ -13,6 +13,7 @@ import {
   registerEventSink,
 } from './process-manager';
 import { startHeartbeat, stopHeartbeat } from './heartbeat';
+import { pushContext as pushDashboardContext } from './dashboard-context';
 import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
 import { StartAgentRequest, SendMessageRequest, MergeRequest, SetupRepoRequest } from './types';
 import type {
@@ -91,6 +92,24 @@ app.get('/health', c => {
     uptime: getUptime(),
   };
   return c.json(response);
+});
+
+// POST /dashboard-context
+// Receives a dashboard context snapshot pushed from the TownDO.
+// Stored in-memory for the plugin to read on each LLM call — no
+// network round-trip needed at prompt time.
+app.post('/dashboard-context', async c => {
+  const body: unknown = await c.req.json().catch(() => null);
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !('context' in body) ||
+    typeof body.context !== 'string'
+  ) {
+    return c.json({ error: 'Missing or invalid context field' }, 400);
+  }
+  pushDashboardContext(body.context);
+  return c.json({ pushed: true });
 });
 
 // POST /refresh-token

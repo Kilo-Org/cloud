@@ -2,6 +2,7 @@ import type { Plugin } from '@kilocode/plugin';
 import { createClientFromEnv, createMayorClientFromEnv, GastownApiError } from './client';
 import { createTools } from './tools';
 import { createMayorTools } from './mayor-tools';
+import { buildContextBlock as buildDashboardContextBlock } from '../src/dashboard-context';
 
 const SERVICE = 'gastown-plugin';
 console.log(`[${SERVICE}] Starting...`);
@@ -116,27 +117,22 @@ export const GastownPlugin: Plugin = async ({ client }) => {
     // - Rig agents: prime context (bead assignment, mail, open beads)
     // - Mayor: dashboard context (what the user is currently viewing)
     'experimental.chat.system.transform': async (_input, output) => {
-      if (isMayor && mayorClient) {
-        // Fetch the latest dashboard context from the TownDO on every
-        // LLM call so the mayor always sees what the user is looking at.
-        try {
-          const dashboardContext = await mayorClient.fetchDashboardContext();
-          if (dashboardContext) {
-            // Remove any stale context block from a previous turn
-            const marker = '--- DASHBOARD CONTEXT ---';
-            const idx = output.system.findIndex(s => s.includes(marker));
-            if (idx !== -1) output.system.splice(idx, 1);
+      if (isMayor) {
+        // Read dashboard context from in-memory store (pushed by the
+        // TownDO via the container's POST /dashboard-context endpoint).
+        // No network call — the store lives in the same process.
+        const dashboardContext = buildDashboardContextBlock();
+        if (dashboardContext) {
+          // Remove any stale context block from a previous turn
+          const marker = '--- DASHBOARD CONTEXT ---';
+          const idx = output.system.findIndex(s => s.includes(marker));
+          if (idx !== -1) output.system.splice(idx, 1);
 
-            output.system.push(
-              [`--- DASHBOARD CONTEXT ---`, dashboardContext, `--- END DASHBOARD CONTEXT ---`].join(
-                '\n'
-              )
-            );
-          }
-        } catch (err) {
-          // Best-effort — don't block the LLM call if context fetch fails
-          const message = err instanceof Error ? err.message : String(err);
-          console.warn(`[${SERVICE}] dashboard context fetch failed: ${message}`);
+          output.system.push(
+            [`--- DASHBOARD CONTEXT ---`, dashboardContext, `--- END DASHBOARD CONTEXT ---`].join(
+              '\n'
+            )
+          );
         }
       } else {
         // Rig agents: inject prime context on the first message

@@ -458,6 +458,9 @@ export class TownDO extends DurableObject<Env> {
 
   async setDashboardContext(context: string): Promise<void> {
     this._dashboardContext = context;
+    // Best-effort push to the running container so the plugin has it
+    // in-memory for the next LLM call without a network round-trip.
+    await dispatch.pushDashboardContext(this.env, this.townId, context);
   }
 
   async getDashboardContext(): Promise<string | null> {

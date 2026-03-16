@@ -559,6 +559,30 @@ export async function stopAgentInContainer(
 }
 
 /**
+ * Push the latest dashboard context XML to the running container.
+ * Best-effort — silently ignores failures if the container is down.
+ */
+export async function pushDashboardContext(
+  env: Env,
+  townId: string,
+  context: string
+): Promise<void> {
+  const container = getTownContainerStub(env, townId);
+  try {
+    const resp = await container.fetch('http://container/dashboard-context', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ context }),
+    });
+    if (!resp.ok) {
+      console.warn(`${TOWN_LOG} pushDashboardContext: container returned ${resp.status}`);
+    }
+  } catch {
+    // Container not running — context will be pushed on next navigation
+  }
+}
+
+/**
  * Send a follow-up message to an existing agent in the container.
  */
 export async function sendMessageToAgent(

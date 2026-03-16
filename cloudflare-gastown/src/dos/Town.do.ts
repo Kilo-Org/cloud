@@ -440,6 +440,7 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private _townId: string | null = null;
+  private _dashboardContext: string | null = null;
 
   private get townId(): string {
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
@@ -453,6 +454,10 @@ export class TownDO extends DurableObject<Env> {
   async setTownId(townId: string): Promise<void> {
     this._townId = townId;
     await this.ctx.storage.put('town:id', townId);
+  }
+
+  async setDashboardContext(context: string): Promise<void> {
+    this._dashboardContext = context;
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1480,8 +1485,9 @@ export class TownDO extends DurableObject<Env> {
       `${TOWN_LOG} sendMayorMessage: townId=${townId} mayorId=${mayor.id} containerStatus=${containerStatus.status} isAlive=${isAlive}`
     );
 
-    const combinedMessage = uiContext
-      ? `<system-reminder>\n${uiContext}\n</system-reminder>\n\n${message}`
+    const effectiveContext = uiContext ?? this._dashboardContext;
+    const combinedMessage = effectiveContext
+      ? `<system-reminder>\n${effectiveContext}\n</system-reminder>\n\n${message}`
       : message;
 
     let sessionStatus: 'idle' | 'active' | 'starting';

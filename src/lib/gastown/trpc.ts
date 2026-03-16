@@ -42,7 +42,7 @@ async function fetchToken(): Promise<string> {
   return parsed.token;
 }
 
-async function getToken(): Promise<string> {
+export async function getToken(): Promise<string> {
   // Return cached token if still fresh (5 min buffer)
   if (cachedToken && Date.now() < tokenExpiresAt - 5 * 60 * 1000) {
     return cachedToken;

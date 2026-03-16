@@ -79,6 +79,7 @@ import {
   handleMayorCompleted,
   handleDestroyMayor,
   handleBroadcastUiAction,
+  handleSetDashboardContext,
 } from './handlers/mayor.handler';
 import {
   handleMayorSling,
@@ -577,6 +578,11 @@ app.post('/api/towns/:townId/mayor/completed', c =>
 app.post('/api/towns/:townId/mayor/destroy', c =>
   instrumented(c, 'POST /api/towns/:townId/mayor/destroy', () =>
     handleDestroyMayor(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/mayor/dashboard-context', c =>
+  instrumented(c, 'POST /api/towns/:townId/mayor/dashboard-context', () =>
+    handleSetDashboardContext(c, c.req.param())
   )
 );
 app.post('/api/towns/:townId/mayor/ui-action', c =>

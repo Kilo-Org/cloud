@@ -129,9 +129,36 @@ export async function handleDestroyMayor(c: Context<GastownEnv>, params: { townI
   return c.json(resSuccess({ destroyed: true }), 200);
 }
 
+const SetDashboardContextBody = z.object({
+  context: z.string(),
+});
+
 const BroadcastUiActionBody = z.object({
   action: UiActionSchema,
 });
+
+/**
+ * POST /api/towns/:townId/mayor/dashboard-context
+ * Store the current dashboard context (XML string) in the TownDO.
+ * Used as a fallback when sendMayorMessage is called without explicit uiContext.
+ */
+export async function handleSetDashboardContext(
+  c: Context<GastownEnv>,
+  params: { townId: string }
+) {
+  const body = await parseJsonBody(c);
+  const parsed = SetDashboardContextBody.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  const town = getTownDOStub(c.env, params.townId);
+  await town.setDashboardContext(parsed.data.context);
+  return c.json(resSuccess({ stored: true }), 200);
+}
 
 /**
  * POST /api/towns/:townId/mayor/ui-action

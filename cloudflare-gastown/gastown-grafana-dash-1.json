@@ -70,7 +70,7 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": ["sum"],
           "fields": "/total_events/",
           "values": false
         },
@@ -90,6 +90,8 @@
           "editorMode": "sql",
           "extrapolate": true,
           "format": "time_series",
+          "formattedQuery": "/* grafana dashboard='Gastown Operations', user=admin */\nSELECT (intDiv(toUInt32(timestamp), 300) * 300) * 1000 AS t, 'total_events' AS label, SUM(_sample_interval) AS total_events FROM gastown_events WHERE timestamp >= toDateTime(1773498042) AND timestamp <= toDateTime(1773670842) GROUP BY t ORDER BY t",
+          "initialized": true,
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
@@ -144,7 +146,7 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": ["distinctCount"],
           "fields": "/unique_users/",
           "values": false
         },
@@ -164,6 +166,8 @@
           "editorMode": "sql",
           "extrapolate": true,
           "format": "time_series",
+          "formattedQuery": "/* grafana dashboard='Gastown Operations', user=admin */\nSELECT (intDiv(toUInt32(timestamp), 120) * 120) * 1000 AS t, 'unique_users' AS label, COUNT(DISTINCT blob2) AS unique_users FROM gastown_events WHERE timestamp >= toDateTime(1773605268) AND timestamp <= toDateTime(1773691668) AND blob2 != '' GROUP BY t ORDER BY t",
+          "initialized": true,
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
@@ -724,29 +728,16 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 30,
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "insertNulls": false,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
+            "lineWidth": 1,
             "scaleDistribution": {
               "type": "linear"
-            },
-            "showPoints": "never",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -777,17 +768,26 @@
       },
       "id": 8,
       "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
-          "mode": "multi",
-          "sort": "desc"
-        }
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": -30,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "12.4.1",
       "targets": [
@@ -801,7 +801,8 @@
           "editorMode": "sql",
           "extrapolate": true,
           "format": "time_series",
-          "formattedQuery": "/* grafana dashboard='Gastown Operations', user=admin */\nSELECT (intDiv(toUInt32(timestamp), 2) * 2) * 1000 AS t, blob1 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors FROM gastown_events WHERE timestamp >= toDateTime(1773451903) AND timestamp <= toDateTime(1773453703) AND blob5 != '' GROUP BY t, label ORDER BY t",
+          "formattedQuery": "/* grafana dashboard='Gastown Operations', user=admin */\nSELECT (intDiv(toUInt32(timestamp), 120) * 120) * 1000 AS t, blob1 AS label, SUM(IF(blob5 != '', _sample_interval, 0)) AS errors FROM gastown_events WHERE timestamp >= toDateTime(1773498042) AND timestamp <= toDateTime(1773670842) AND blob5 != '' GROUP BY t, label ORDER BY t",
+          "initialized": true,
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
@@ -817,7 +818,7 @@
         }
       ],
       "title": "Error Count Over Time (by event)",
-      "type": "timeseries"
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -2500,13 +2501,13 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Gastown Operations",
   "uid": "gastown-ops-1",
-  "version": 9,
+  "version": 16,
   "weekStart": ""
 }

@@ -89,7 +89,11 @@ export function TerminalBar({ townId }: TerminalBarProps) {
               settings: `/gastown/${townId}/settings`,
             };
             const path = pageMap[action.page];
-            if (path) router.push(path);
+            if (path) {
+              // Close any open drawers so they don't cover the new page
+              drawerStack.closeAll();
+              router.push(path);
+            }
           }
           break;
         case 'highlight_bead':
@@ -315,7 +319,10 @@ function useAlarmStatusWs(
         } else if (msg.channel === 'ui_action') {
           // UI action from the mayor — dispatch to callback for DrawerStack/router.
           onUiActionRef.current?.(parsed as UiActionEvent);
-        } else {
+        } else if ('alarm' in msg) {
+          // Only alarm snapshots have an `alarm` field. Bead, convoy,
+          // and other channel frames are silently ignored here to avoid
+          // overwriting the status data with the wrong shape.
           setData(parsed as AlarmStatus);
         }
       } catch {

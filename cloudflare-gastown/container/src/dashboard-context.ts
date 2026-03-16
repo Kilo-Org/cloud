@@ -11,7 +11,7 @@
  * growth.
  */
 
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, renameSync } from 'node:fs';
 import { z } from 'zod';
 
 const ContextSnapshotSchema = z.object({
@@ -26,6 +26,7 @@ const MAX_SNAPSHOTS = 5;
 
 /** Well-known path both processes agree on. */
 const CONTEXT_FILE = '/tmp/gastown-dashboard-context.json';
+const CONTEXT_FILE_TMP = '/tmp/gastown-dashboard-context.json.tmp';
 
 // ── Writer (control-server process) ──────────────────────────────────
 
@@ -37,7 +38,10 @@ export function pushContext(context: string): void {
     existing.splice(0, existing.length - MAX_SNAPSHOTS);
   }
   try {
-    writeFileSync(CONTEXT_FILE, JSON.stringify(existing));
+    // Write to a temp file then atomically rename to avoid the plugin
+    // reading truncated JSON during a concurrent readFileSync.
+    writeFileSync(CONTEXT_FILE_TMP, JSON.stringify(existing));
+    renameSync(CONTEXT_FILE_TMP, CONTEXT_FILE);
   } catch {
     // Best-effort — don't crash the control-server
   }

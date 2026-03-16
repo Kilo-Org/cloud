@@ -24,6 +24,7 @@ type ActivityEntry = {
 
 const MAX_ACTIVITY_ENTRIES = 10;
 const SYNC_DEBOUNCE_MS = 2_000;
+const SYNC_RETRY_MS = 10_000;
 
 /** Derive a human-readable page label from the pathname. */
 function pageFromPathname(pathname: string, townId: string): string {
@@ -102,6 +103,7 @@ export function useGastownUiContext(townId: string, gastownUrl: string): string 
   const { stack } = useDrawerStack();
   const activityRef = useRef<ActivityEntry[]>([]);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncedRef = useRef<string>('');
   const prevPathnameRef = useRef<string>(pathname);
   const prevDrawerRef = useRef<ResourceRef | null>(null);
@@ -145,15 +147,16 @@ export function useGastownUiContext(townId: string, gastownUrl: string): string 
   const page = pageFromPathname(pathname, townId);
   const contextXml = buildContextXml(page, topDrawer, activityRef.current);
 
-  // Debounced sync to TownDO
+  // Sync context XML to TownDO. Retries on failure so the mayor
+  // doesn't permanently lose context after a transient error.
   useEffect(() => {
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(() => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+
+    function doSync() {
       if (contextXml === lastSyncedRef.current) return;
       const xml = contextXml;
 
-      // Fire-and-forget POST to store context on the TownDO.
-      // Only mark as synced after success so failures are retried.
       getToken()
         .then(token =>
           fetch(`${gastownUrl}/api/towns/${townId}/mayor/dashboard-context`, {
@@ -166,15 +169,24 @@ export function useGastownUiContext(townId: string, gastownUrl: string): string 
           })
         )
         .then(resp => {
-          if (resp.ok) lastSyncedRef.current = xml;
+          if (resp.ok) {
+            lastSyncedRef.current = xml;
+          } else {
+            // Schedule a retry — the effect won't re-run since contextXml
+            // hasn't changed, so we need an explicit retry timer.
+            retryTimerRef.current = setTimeout(doSync, SYNC_RETRY_MS);
+          }
         })
         .catch(() => {
-          // Best-effort — will retry on next context change or debounce tick
+          retryTimerRef.current = setTimeout(doSync, SYNC_RETRY_MS);
         });
-    }, SYNC_DEBOUNCE_MS);
+    }
+
+    syncTimerRef.current = setTimeout(doSync, SYNC_DEBOUNCE_MS);
 
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
   }, [contextXml, townId, gastownUrl]);
 

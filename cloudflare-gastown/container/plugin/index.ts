@@ -1,11 +1,54 @@
 import type { Plugin } from '@kilocode/plugin';
+import { readFileSync } from 'node:fs';
 import { createClientFromEnv, createMayorClientFromEnv, GastownApiError } from './client';
 import { createTools } from './tools';
 import { createMayorTools } from './mayor-tools';
-import { buildContextBlock as buildDashboardContextBlock } from '../src/dashboard-context';
 
 const SERVICE = 'gastown-plugin';
 console.log(`[${SERVICE}] Starting...`);
+
+// ── Dashboard context reader ─────────────────────────────────────────
+// Reads the shared JSON file written by the control-server process
+// (see container/src/dashboard-context.ts). Both processes share the
+// container filesystem so this is a cheap local read with no network
+// round-trip. The file path must stay in sync with CONTEXT_FILE there.
+
+const CONTEXT_FILE = '/tmp/gastown-dashboard-context.json';
+
+type ContextSnapshot = { context: string; receivedAt: number };
+
+function readDashboardContextBlock(): string | null {
+  let snapshots: ContextSnapshot[];
+  try {
+    const raw = readFileSync(CONTEXT_FILE, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    snapshots = parsed;
+  } catch {
+    return null;
+  }
+
+  const latest = snapshots[snapshots.length - 1];
+  if (snapshots.length === 1) return latest.context;
+
+  const breadcrumbs = snapshots
+    .slice(0, -1)
+    .map(s => {
+      const pageMatch = s.context.match(/page="([^"]+)"/);
+      const page = pageMatch ? pageMatch[1] : 'unknown';
+      const diff = Date.now() - s.receivedAt;
+      const ago =
+        diff < 60_000
+          ? `${Math.round(diff / 1000)}s ago`
+          : diff < 3600_000
+            ? `${Math.round(diff / 60_000)}m ago`
+            : `${Math.round(diff / 3600_000)}h ago`;
+      return `  - ${ago}: was viewing ${page}`;
+    })
+    .join('\n');
+
+  return [latest.context, '<navigation-history>', breadcrumbs, '</navigation-history>'].join('\n');
+}
 
 function formatPrimeContextForInjection(primeResult: string): string {
   return [
@@ -121,7 +164,7 @@ export const GastownPlugin: Plugin = async ({ client }) => {
         // Read dashboard context from in-memory store (pushed by the
         // TownDO via the container's POST /dashboard-context endpoint).
         // No network call — the store lives in the same process.
-        const dashboardContext = buildDashboardContextBlock();
+        const dashboardContext = readDashboardContextBlock();
         if (dashboardContext) {
           // Remove any stale context block from a previous turn
           const marker = '--- DASHBOARD CONTEXT ---';

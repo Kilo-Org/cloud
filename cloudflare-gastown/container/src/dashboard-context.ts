@@ -1,14 +1,17 @@
 /**
- * In-memory store for dashboard context pushed from the TownDO.
+ * Dashboard context store — shared between control-server and plugin
+ * via a JSON file on disk.
  *
- * The TownDO pushes a context snapshot (XML string describing the user's
- * current page, open drawer, and recent navigation) whenever the
- * dashboard navigates. The plugin reads the latest snapshot on each LLM
- * call to inject it into the system prompt — no network round-trip.
+ * The control-server (Bun process) writes snapshots when the TownDO
+ * pushes context. The plugin (kilo serve process) reads the file on
+ * each LLM call. Both processes share the container filesystem so
+ * this is a cheap local read with no network round-trip.
  *
- * A capped ring buffer of the most recent snapshots is kept so the mayor
- * can see a short history of user activity without unbounded growth.
+ * A capped ring buffer of the most recent snapshots prevents unbounded
+ * growth.
  */
+
+import { writeFileSync, readFileSync } from 'node:fs';
 
 type ContextSnapshot = {
   context: string;
@@ -18,44 +21,41 @@ type ContextSnapshot = {
 /** Max snapshots retained. Oldest are evicted when this is exceeded. */
 const MAX_SNAPSHOTS = 5;
 
-const snapshots: ContextSnapshot[] = [];
+/** Well-known path both processes agree on. */
+const CONTEXT_FILE = '/tmp/gastown-dashboard-context.json';
+
+// ── Writer (control-server process) ──────────────────────────────────
 
 /** Called by the control-server when the TownDO pushes a new snapshot. */
 export function pushContext(context: string): void {
-  snapshots.push({ context, receivedAt: Date.now() });
-  if (snapshots.length > MAX_SNAPSHOTS) {
-    snapshots.splice(0, snapshots.length - MAX_SNAPSHOTS);
+  const existing = readSnapshots();
+  existing.push({ context, receivedAt: Date.now() });
+  if (existing.length > MAX_SNAPSHOTS) {
+    existing.splice(0, existing.length - MAX_SNAPSHOTS);
+  }
+  try {
+    writeFileSync(CONTEXT_FILE, JSON.stringify(existing));
+  } catch {
+    // Best-effort — don't crash the control-server
   }
 }
 
-/**
- * Return the latest snapshot's context string, or null if nothing has
- * been pushed yet.
- */
-export function getLatestContext(): string | null {
-  if (snapshots.length === 0) return null;
-  return snapshots[snapshots.length - 1].context;
-}
+// ── Reader (plugin process) ──────────────────────────────────────────
 
 /**
  * Build a combined context block from all retained snapshots.
- * The most recent entry is labelled "current"; older entries provide a
- * brief breadcrumb trail of recent user activity.
- *
  * Returns null if no context has been pushed.
  */
 export function buildContextBlock(): string | null {
+  const snapshots = readSnapshots();
   if (snapshots.length === 0) return null;
 
-  // Only the latest snapshot gets the full XML. Older ones are
-  // summarised as one-line breadcrumbs to keep token cost low.
   const latest = snapshots[snapshots.length - 1];
   if (snapshots.length === 1) return latest.context;
 
   const breadcrumbs = snapshots
     .slice(0, -1)
     .map(s => {
-      // Extract just the page attribute from <current-view page="..." />
       const pageMatch = s.context.match(/page="([^"]+)"/);
       const page = pageMatch ? pageMatch[1] : 'unknown';
       const ago = formatAgo(s.receivedAt);
@@ -64,6 +64,19 @@ export function buildContextBlock(): string | null {
     .join('\n');
 
   return [latest.context, '<navigation-history>', breadcrumbs, '</navigation-history>'].join('\n');
+}
+
+// ── Shared helpers ───────────────────────────────────────────────────
+
+function readSnapshots(): ContextSnapshot[] {
+  try {
+    const raw = readFileSync(CONTEXT_FILE, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch {
+    return [];
+  }
 }
 
 function formatAgo(epochMs: number): string {

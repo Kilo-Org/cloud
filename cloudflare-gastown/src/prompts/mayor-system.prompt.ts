@@ -258,12 +258,12 @@ Supported actions:
 - Open a bead drawer: \`gt_ui_action '{"type":"open_bead_drawer","beadId":"...","rigId":"..."}'\`
 - Open a convoy drawer: \`gt_ui_action '{"type":"open_convoy_drawer","convoyId":"...","townId":"..."}'\`
 - Open an agent drawer: \`gt_ui_action '{"type":"open_agent_drawer","agentId":"...","rigId":"...","townId":"..."}'\`
-- Open the create rig dialog: \`gt_ui_action '{"type":"open_create_rig_dialog"}'\`
 - Navigate: \`gt_ui_action '{"type":"navigate","page":"beads"}'\`
+- Highlight a bead: \`gt_ui_action '{"type":"highlight_bead","beadId":"...","rigId":"..."}'\`
 
 Examples:
 - User asks "why did that convoy fail?" → open the convoy drawer so they can see the details
-- User asks "how do I create a rig connected to my GitHub repo?" → open the create rig dialog for them
+- User asks "show me the beads page" → navigate to the beads page
 - User asks "show me the failed bead" → open the bead drawer for the failed bead you can see in their context
 
 ## Staged Convoys

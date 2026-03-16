@@ -100,21 +100,24 @@ export function useGastownUiContext(townId: string, gastownUrl: string): string 
   const activityRef = useRef<ActivityEntry[]>([]);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncedRef = useRef<string>('');
+  const prevPathnameRef = useRef<string>(pathname);
+  const prevDrawerRef = useRef<ResourceRef | null>(null);
 
   const topDrawer = stack.length > 0 ? stack[stack.length - 1].resource : null;
 
-  // Track page navigation
-  useEffect(() => {
+  // Track activity changes synchronously during render so the XML
+  // built below always includes the current navigation state.
+  if (pathname !== prevPathnameRef.current) {
+    prevPathnameRef.current = pathname;
     const page = pageFromPathname(pathname, townId);
     activityRef.current = [
       { timestamp: new Date().toISOString(), action: 'page_view', page },
       ...activityRef.current.slice(0, MAX_ACTIVITY_ENTRIES - 1),
     ];
-  }, [pathname, townId]);
+  }
 
-  // Track drawer opens
-  useEffect(() => {
-    if (!topDrawer) return;
+  if (topDrawer !== prevDrawerRef.current && topDrawer) {
+    prevDrawerRef.current = topDrawer;
     activityRef.current = [
       {
         timestamp: new Date().toISOString(),
@@ -131,9 +134,11 @@ export function useGastownUiContext(townId: string, gastownUrl: string): string 
       },
       ...activityRef.current.slice(0, MAX_ACTIVITY_ENTRIES - 1),
     ];
-  }, [topDrawer]);
+  } else if (!topDrawer) {
+    prevDrawerRef.current = null;
+  }
 
-  // Build current context XML
+  // Build current context XML (includes the just-recorded activity)
   const page = pageFromPathname(pathname, townId);
   const contextXml = buildContextXml(page, topDrawer, activityRef.current);
 
@@ -142,9 +147,10 @@ export function useGastownUiContext(townId: string, gastownUrl: string): string 
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     syncTimerRef.current = setTimeout(() => {
       if (contextXml === lastSyncedRef.current) return;
-      lastSyncedRef.current = contextXml;
+      const xml = contextXml;
 
-      // Fire-and-forget POST to store context on the TownDO
+      // Fire-and-forget POST to store context on the TownDO.
+      // Only mark as synced after success so failures are retried.
       getToken()
         .then(token =>
           fetch(`${gastownUrl}/api/towns/${townId}/mayor/dashboard-context`, {
@@ -153,11 +159,14 @@ export function useGastownUiContext(townId: string, gastownUrl: string): string 
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({ context: contextXml }),
+            body: JSON.stringify({ context: xml }),
           })
         )
+        .then(resp => {
+          if (resp.ok) lastSyncedRef.current = xml;
+        })
         .catch(() => {
-          // Best-effort — silently ignore failures
+          // Best-effort — will retry on next context change or debounce tick
         });
     }, SYNC_DEBOUNCE_MS);
 

@@ -131,7 +131,6 @@ export type UiActionInput =
   | { type: 'open_bead_drawer'; beadId: string; rigId: string }
   | { type: 'open_convoy_drawer'; convoyId: string; townId: string }
   | { type: 'open_agent_drawer'; agentId: string; rigId: string; townId: string }
-  | { type: 'open_create_rig_dialog' }
   | { type: 'navigate'; page: 'town-overview' | 'beads' | 'agents' | 'rigs' | 'settings' }
   | { type: 'highlight_bead'; beadId: string; rigId: string };
 

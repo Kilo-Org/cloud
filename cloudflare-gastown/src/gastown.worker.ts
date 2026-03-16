@@ -591,13 +591,6 @@ app.post('/api/towns/:townId/mayor/ui-action', c =>
   )
 );
 
-// Mayor tool: broadcast a UI action (called from the mayor container)
-app.post('/api/mayor/:townId/tools/ui-action', c =>
-  instrumented(c, 'POST /api/mayor/:townId/tools/ui-action', () =>
-    handleMayorUiAction(c, c.req.param())
-  )
-);
-
 // ── Mayor Tools ──────────────────────────────────────────────────────────
 // Tool endpoints called by the mayor's kilo serve session via the Gastown plugin.
 // Authenticated via mayor JWT (townId-scoped, no rigId restriction).
@@ -607,6 +600,13 @@ app.post('/api/mayor/:townId/tools/ui-action', c =>
 // the token. Skipping auth in dev leaves agentJWT null and causes 401s
 // from the handler itself.
 app.use('/api/mayor/:townId/tools/*', mayorAuthMiddleware);
+
+// Mayor tool: broadcast a UI action (called from the mayor container)
+app.post('/api/mayor/:townId/tools/ui-action', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/ui-action', () =>
+    handleMayorUiAction(c, c.req.param())
+  )
+);
 
 app.post('/api/mayor/:townId/tools/sling', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/sling', () => handleMayorSling(c, c.req.param()))

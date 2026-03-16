@@ -318,7 +318,6 @@ export const UiActionSchema = z.discriminatedUnion('type', [
     rigId: z.string().min(1),
     townId: z.string().min(1),
   }),
-  z.object({ type: z.literal('open_create_rig_dialog') }),
   z.object({
     type: z.literal('navigate'),
     page: z.enum(['town-overview', 'beads', 'agents', 'rigs', 'settings']),

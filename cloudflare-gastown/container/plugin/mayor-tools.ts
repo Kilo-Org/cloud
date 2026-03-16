@@ -6,7 +6,6 @@ const UI_ACTION_TYPES = new Set([
   'open_bead_drawer',
   'open_convoy_drawer',
   'open_agent_drawer',
-  'open_create_rig_dialog',
   'navigate',
   'highlight_bead',
 ]);
@@ -420,18 +419,16 @@ export function createMayorTools(client: MayorGastownClient) {
     gt_ui_action: tool({
       description:
         "Trigger a UI action in the user's dashboard. " +
-        'Lets you open drawers, navigate pages, and trigger dialogs on behalf of the user.\n\n' +
+        'Lets you open drawers, navigate pages, and highlight items on behalf of the user.\n\n' +
         'Supported action types:\n' +
         '- open_bead_drawer: Open a bead detail drawer. Required fields: beadId, rigId.\n' +
         '- open_convoy_drawer: Open a convoy detail drawer. Required fields: convoyId, townId.\n' +
         '- open_agent_drawer: Open an agent detail drawer. Required fields: agentId, rigId, townId.\n' +
-        '- open_create_rig_dialog: Open the create rig dialog. No additional fields required.\n' +
         '- navigate: Navigate to a dashboard page. Required field: page (one of: town-overview, beads, agents, rigs, settings).\n' +
         '- highlight_bead: Highlight a bead in the list. Required fields: beadId, rigId.\n\n' +
         'Examples:\n' +
         '- Open bead drawer: action_json = \'{"type":"open_bead_drawer","beadId":"<id>","rigId":"<id>"}\'\n' +
-        '- Navigate to beads: action_json = \'{"type":"navigate","page":"beads"}\'\n' +
-        '- Open create rig dialog: action_json = \'{"type":"open_create_rig_dialog"}\'',
+        '- Navigate to beads: action_json = \'{"type":"navigate","page":"beads"}\'',
       args: {
         action_json: tool.schema
           .string()

@@ -111,7 +111,6 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     requested_model: usageContext.requested_model,
     status_code: usageContext.status_code,
     editor_name: usageContext.editor_name,
-    api_kind: usageContext.api_kind,
     machine_id: usageContext.machine_id,
     is_user_byok: usageContext.user_byok,
     has_tools: usageContext.has_tools,
@@ -399,7 +398,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`system_prompt_prefix`, metadataFields.system_prompt_prefix)}
           , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
           , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
-          , ${createUpsertCTE(sql`api_kind`, metadataFields.api_kind)}
           , ${createUpsertCTE(sql`feature`, metadataFields.feature)}
           , ${createUpsertCTE(sql`mode`, metadataFields.mode)}
           , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
@@ -436,7 +434,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               system_prompt_prefix_id,
               finish_reason_id,
               editor_name_id,
-              api_kind_id,
               feature_id,
               mode_id,
               auto_model_id
@@ -473,7 +470,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
               (SELECT finish_reason_id FROM finish_reason_cte),
               (SELECT editor_name_id FROM editor_name_cte),
-              (SELECT api_kind_id FROM api_kind_cte),
               (SELECT feature_id FROM feature_cte),
               (SELECT mode_id FROM mode_cte),
               (SELECT auto_model_id FROM auto_model_cte)

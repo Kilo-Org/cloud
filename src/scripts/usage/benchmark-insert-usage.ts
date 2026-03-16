@@ -8,7 +8,6 @@ import { sql } from 'drizzle-orm';
 import type { UsageMetaData } from '@/lib/processUsage.types';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import stats from './stats.json';
-import { GatewayApiKindSchema } from '@/lib/providers/openrouter/types';
 
 const TOTAL_RECORDS = 100_000;
 
@@ -185,7 +184,6 @@ function generateRandomRecord(
     streamed: maybeNull(Math.random() < 0.8, 10),
     cancelled: maybeNull(Math.random() < 0.05, 50),
     editor_name: maybeNull(pickRandom(['vscode', 'cursor', 'windsurf', 'vim'], Math.random()), 30),
-    api_kind: maybeNull(pickRandom(GatewayApiKindSchema.options, Math.random()), 20),
     has_tools: maybeNull(Math.random() < 0.3, 20),
     machine_id: maybeNull(`machine-${Math.random().toString(36).substring(2, 10)}`, 40),
     feature: maybeNull(

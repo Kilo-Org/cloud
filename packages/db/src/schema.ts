@@ -644,7 +644,6 @@ export const microdollar_usage_metadata = pgTable(
     streamed: boolean(),
     cancelled: boolean(),
     editor_name_id: integer(),
-    api_kind_id: integer(),
     has_tools: boolean(),
     machine_id: text(),
     feature_id: integer(),
@@ -754,15 +753,6 @@ export const editor_name = pgTable(
   table => [uniqueIndex('UQ_editor_name').on(table.editor_name)]
 );
 
-export const api_kind = pgTable(
-  'api_kind',
-  {
-    api_kind_id: serial().notNull().primaryKey(),
-    api_kind: text().notNull(),
-  },
-  table => [uniqueIndex('UQ_api_kind').on(table.api_kind)]
-);
-
 export const feature = pgTable(
   'feature',
   {
@@ -832,7 +822,6 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   streamed: boolean(),
   cancelled: boolean(),
   editor_name: text(),
-  api_kind: text(),
   has_tools: boolean(),
   machine_id: text(),
   feature: text(),
@@ -883,7 +872,6 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.streamed,
     meta.cancelled,
     edit.editor_name,
-    ak.api_kind,
     meta.has_tools,
     meta.machine_id,
     feat.feature,
@@ -901,7 +889,6 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${http_user_agent} ua ON meta.http_user_agent_id = ua.http_user_agent_id
   LEFT JOIN ${finish_reason} frfr ON meta.finish_reason_id = frfr.finish_reason_id
   LEFT JOIN ${editor_name} edit ON meta.editor_name_id = edit.editor_name_id
-  LEFT JOIN ${api_kind} ak ON meta.api_kind_id = ak.api_kind_id
   LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id

@@ -55,7 +55,6 @@ function defineDefaultContextInfo(): UsageContextInfo {
     requested_model: 'anthropic/claude-3.7-sonnet',
     status_code: 200,
     editor_name: null,
-    api_kind: 'chat_completions',
     machine_id: null,
     is_user_byok: false,
     has_tools: false,

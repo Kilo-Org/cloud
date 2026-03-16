@@ -330,6 +330,17 @@ export const UiActionSchema = z.discriminatedUnion('type', [
 ]);
 export type UiAction = z.infer<typeof UiActionSchema>;
 
+/**
+ * Overwrite any `townId` field in the action with the route-scoped townId
+ * so callers can't reference resources outside the authenticated town.
+ */
+export function normalizeUiAction(action: UiAction, townId: string): UiAction {
+  if ('townId' in action) {
+    return { ...action, townId };
+  }
+  return action;
+}
+
 // Re-export satellite metadata types for convenience
 export type { AgentMetadataRecord } from './db/tables/agent-metadata.table';
 export type { ReviewMetadataRecord } from './db/tables/review-metadata.table';

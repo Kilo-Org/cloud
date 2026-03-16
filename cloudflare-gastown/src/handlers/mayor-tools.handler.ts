@@ -4,7 +4,7 @@ import { getTownDOStub } from '../dos/Town.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { BeadStatus, BeadType, BeadPriority, UiActionSchema } from '../types';
+import { BeadStatus, BeadType, BeadPriority, UiActionSchema, normalizeUiAction } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
 const HANDLER_LOG = '[mayor-tools.handler]';
@@ -659,7 +659,9 @@ export async function handleMayorUiAction(c: Context<GastownEnv>, params: { town
     `${HANDLER_LOG} handleMayorUiAction: townId=${params.townId} type=${parsed.data.action.type}`
   );
 
+  const action = normalizeUiAction(parsed.data.action, params.townId);
+
   const town = getTownDOStub(c.env, params.townId);
-  await town.broadcastUiAction(parsed.data.action);
+  await town.broadcastUiAction(action);
   return c.json(resSuccess({ broadcast: true }), 200);
 }

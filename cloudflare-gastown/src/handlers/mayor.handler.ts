@@ -4,7 +4,7 @@ import type { GastownEnv } from '../gastown.worker';
 import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { UiActionSchema } from '../types';
+import { UiActionSchema, normalizeUiAction } from '../types';
 
 const MAYOR_HANDLER_LOG = '[mayor.handler]';
 
@@ -181,8 +181,10 @@ export async function handleBroadcastUiAction(c: Context<GastownEnv>, params: { 
     `${MAYOR_HANDLER_LOG} handleBroadcastUiAction: townId=${params.townId} type=${parsed.data.action.type}`
   );
 
+  const action = normalizeUiAction(parsed.data.action, params.townId);
+
   const town = getTownDOStub(c.env, params.townId);
   await town.setTownId(params.townId);
-  await town.broadcastUiAction(parsed.data.action);
+  await town.broadcastUiAction(action);
   return c.json(resSuccess({ broadcast: true }), 200);
 }

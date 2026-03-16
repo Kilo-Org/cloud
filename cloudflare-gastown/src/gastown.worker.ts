@@ -15,6 +15,7 @@ import {
   type AuthVariables,
 } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
+import { townOwnershipMiddleware } from './middleware/town-ownership.middleware';
 import { trpcServer } from '@hono/trpc-server';
 import { wrappedGastownRouter } from './trpc/router';
 import {
@@ -391,21 +392,13 @@ app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
 app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
 );
-app.use('/api/towns/:townId/convoys/*', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
-);
-app.use('/api/towns/:townId/escalations/*', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
-);
-app.use('/api/towns/:townId/config', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
-);
-app.use('/api/towns/:townId/container/*', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
-);
-app.use('/api/towns/:townId/mayor/*', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
-);
+// Town routes: kilo auth + town ownership check (skipped in dev for auth only)
+app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
+  if (c.env.ENVIRONMENT === 'development') return next();
+  return kiloAuthMiddleware(c, async () => {
+    await townOwnershipMiddleware(c, next);
+  });
+});
 
 // ── Towns & Rigs ────────────────────────────────────────────────────────
 // Town DO instances are keyed by owner_user_id. The userId path param routes

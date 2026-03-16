@@ -2,24 +2,11 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import type { GastownEnv } from '../gastown.worker';
 import { getTownDOStub } from '../dos/Town.do';
-import { getGastownUserStub } from '../dos/GastownUser.do';
 import { resSuccess } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import { UiActionSchema } from '../types';
 
 const MAYOR_HANDLER_LOG = '[mayor.handler]';
-
-/** Verify the kilo-auth'd user owns the given town. Returns a 403 Response on failure. */
-async function verifyTownOwner(c: Context<GastownEnv>, townId: string): Promise<Response | null> {
-  const userId = c.get('kiloUserId');
-  if (!userId) return c.json({ success: false, error: 'Unauthorized' }, 401);
-  const userStub = getGastownUserStub(c.env, userId);
-  const town = await userStub.getTownAsync(townId);
-  if (!town || town.owner_user_id !== userId) {
-    return c.json({ success: false, error: 'Not your town' }, 403);
-  }
-  return null;
-}
 
 const SendMayorMessageBody = z.object({
   message: z.string().min(1),
@@ -57,9 +44,6 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
       400
     );
   }
-
-  const denied = await verifyTownOwner(c, params.townId);
-  if (denied) return denied;
 
   console.log(
     `${MAYOR_HANDLER_LOG} handleSendMayorMessage: townId=${params.townId} message="${parsed.data.message.slice(0, 80)}"`
@@ -162,9 +146,6 @@ export async function handleSetDashboardContext(
   c: Context<GastownEnv>,
   params: { townId: string }
 ) {
-  const denied = await verifyTownOwner(c, params.townId);
-  if (denied) return denied;
-
   const body = await parseJsonBody(c);
   const parsed = SetDashboardContextBody.safeParse(body);
   if (!parsed.success) {
@@ -187,9 +168,6 @@ export async function handleSetDashboardContext(
  * Protected by kiloAuthMiddleware (same as other /api/towns/:townId/mayor/* routes).
  */
 export async function handleBroadcastUiAction(c: Context<GastownEnv>, params: { townId: string }) {
-  const denied = await verifyTownOwner(c, params.townId);
-  if (denied) return denied;
-
   const body = await parseJsonBody(c);
   const parsed = BroadcastUiActionBody.safeParse(body);
   if (!parsed.success) {

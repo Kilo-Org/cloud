@@ -403,6 +403,7 @@ export const gastownRouter = router({
         message: z.string().min(1),
         model: z.string().default('anthropic/claude-sonnet-4.6'),
         rigId: z.string().uuid().optional(),
+        uiContext: z.string().optional(),
       })
     )
     .output(RpcMayorSendResultOutput)
@@ -411,7 +412,7 @@ export const gastownRouter = router({
 
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
-      return townStub.sendMayorMessage(input.message, input.model);
+      return townStub.sendMayorMessage(input.message, input.model, input.uiContext);
     }),
 
   getMayorStatus: gastownProcedure

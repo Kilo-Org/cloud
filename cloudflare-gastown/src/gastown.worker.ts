@@ -78,6 +78,7 @@ import {
   handleEnsureMayor,
   handleMayorCompleted,
   handleDestroyMayor,
+  handleBroadcastUiAction,
 } from './handlers/mayor.handler';
 import {
   handleMayorSling,
@@ -96,6 +97,7 @@ import {
   handleMayorBeadDelete,
   handleMayorEscalationAcknowledge,
   handleMayorConvoyStart,
+  handleMayorUiAction,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
@@ -575,6 +577,18 @@ app.post('/api/towns/:townId/mayor/completed', c =>
 app.post('/api/towns/:townId/mayor/destroy', c =>
   instrumented(c, 'POST /api/towns/:townId/mayor/destroy', () =>
     handleDestroyMayor(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/mayor/ui-action', c =>
+  instrumented(c, 'POST /api/towns/:townId/mayor/ui-action', () =>
+    handleBroadcastUiAction(c, c.req.param())
+  )
+);
+
+// Mayor tool: broadcast a UI action (called from the mayor container)
+app.post('/api/mayor/:townId/tools/ui-action', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/ui-action', () =>
+    handleMayorUiAction(c, c.req.param())
   )
 );
 

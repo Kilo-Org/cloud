@@ -1,5 +1,32 @@
 import { tool } from '@kilocode/plugin';
 import type { MayorGastownClient } from './client';
+import type { UiActionInput } from './types';
+
+const UI_ACTION_TYPES = new Set([
+  'open_bead_drawer',
+  'open_convoy_drawer',
+  'open_agent_drawer',
+  'open_create_rig_dialog',
+  'navigate',
+  'highlight_bead',
+]);
+
+/** Validate and narrow a parsed JSON object to UiActionInput.
+ * Full schema validation happens server-side; this guards the type locally. */
+function parseUiAction(value: unknown): UiActionInput {
+  if (typeof value !== 'object' || value === null || !('type' in value)) {
+    throw new Error('"action_json" must be a JSON object with a "type" field');
+  }
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.type !== 'string' || !UI_ACTION_TYPES.has(obj.type)) {
+    throw new Error(
+      `Unknown UI action type: "${String(obj.type)}". Supported: ${[...UI_ACTION_TYPES].join(', ')}`
+    );
+  }
+  // Server-side Zod schema validates required fields per action type.
+  // The cast is safe because we've verified the type discriminator.
+  return value as UiActionInput;
+}
 
 function parseJsonObject(value: string, label: string): Record<string, unknown> {
   let parsed: unknown;
@@ -387,6 +414,39 @@ export function createMayorTools(client: MayorGastownClient) {
       async execute(args) {
         await client.acknowledgeEscalation(args.escalation_id);
         return `Escalation ${args.escalation_id} acknowledged.`;
+      },
+    }),
+
+    gt_ui_action: tool({
+      description:
+        "Trigger a UI action in the user's dashboard. " +
+        'Lets you open drawers, navigate pages, and trigger dialogs on behalf of the user.\n\n' +
+        'Supported action types:\n' +
+        '- open_bead_drawer: Open a bead detail drawer. Required fields: beadId, rigId.\n' +
+        '- open_convoy_drawer: Open a convoy detail drawer. Required fields: convoyId, townId.\n' +
+        '- open_agent_drawer: Open an agent detail drawer. Required fields: agentId, rigId, townId.\n' +
+        '- open_create_rig_dialog: Open the create rig dialog. No additional fields required.\n' +
+        '- navigate: Navigate to a dashboard page. Required field: page (one of: town-overview, beads, agents, rigs, settings).\n' +
+        '- highlight_bead: Highlight a bead in the list. Required fields: beadId, rigId.\n\n' +
+        'Examples:\n' +
+        '- Open bead drawer: action_json = \'{"type":"open_bead_drawer","beadId":"<id>","rigId":"<id>"}\'\n' +
+        '- Navigate to beads: action_json = \'{"type":"navigate","page":"beads"}\'\n' +
+        '- Open create rig dialog: action_json = \'{"type":"open_create_rig_dialog"}\'',
+      args: {
+        action_json: tool.schema
+          .string()
+          .describe('JSON-encoded UiAction object specifying the UI action to perform'),
+      },
+      async execute(args) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(args.action_json);
+        } catch {
+          throw new Error('Invalid JSON in "action_json"');
+        }
+        const action = parseUiAction(parsed);
+        await client.broadcastUiAction(action);
+        return `UI action "${action.type}" broadcast to dashboard.`;
       },
     }),
   };

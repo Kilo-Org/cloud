@@ -69,6 +69,7 @@ import type {
   BeadEventRecord,
   MergeStrategy,
   ConvoyMergeMode,
+  UiAction,
 } from '../types';
 
 const TOWN_LOG = '[Town.do]';
@@ -372,6 +373,24 @@ export class TownDO extends DurableObject<Env> {
       closedBeads,
       ts: now(),
     });
+    for (const ws of sockets) {
+      try {
+        ws.send(frame);
+      } catch {
+        // Client disconnected — will be cleaned up by webSocketClose
+      }
+    }
+  }
+
+  /**
+   * Broadcast a ui_action event to all connected status WebSocket clients.
+   * Called by the mayor via the /mayor/ui-action HTTP route.
+   */
+  async broadcastUiAction(action: UiAction): Promise<void> {
+    await this.ensureInitialized();
+    const sockets = this.ctx.getWebSockets('status');
+    if (sockets.length === 0) return;
+    const frame = JSON.stringify({ channel: 'ui_action', action, ts: now() });
     for (const ws of sockets) {
       try {
         ws.send(frame);
@@ -1438,7 +1457,8 @@ export class TownDO extends DurableObject<Env> {
 
   async sendMayorMessage(
     message: string,
-    _model?: string
+    _model?: string,
+    uiContext?: string
   ): Promise<{ agentId: string; sessionStatus: 'idle' | 'active' | 'starting' }> {
     await this.ensureInitialized();
     const townId = this.townId;
@@ -1460,10 +1480,14 @@ export class TownDO extends DurableObject<Env> {
       `${TOWN_LOG} sendMayorMessage: townId=${townId} mayorId=${mayor.id} containerStatus=${containerStatus.status} isAlive=${isAlive}`
     );
 
+    const combinedMessage = uiContext
+      ? `<system-reminder>\n${uiContext}\n</system-reminder>\n\n${message}`
+      : message;
+
     let sessionStatus: 'idle' | 'active' | 'starting';
 
     if (isAlive) {
-      const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, message);
+      const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, combinedMessage);
       sessionStatus = sent ? 'active' : 'idle';
     } else {
       const townConfig = await this.getTownConfig();

@@ -4,12 +4,14 @@ import type { GastownEnv } from '../gastown.worker';
 import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
+import { UiActionSchema } from '../types';
 
 const MAYOR_HANDLER_LOG = '[mayor.handler]';
 
 const SendMayorMessageBody = z.object({
   message: z.string().min(1),
   model: z.string().optional(),
+  uiContext: z.string().optional(), // XML string from getContextXml()
 });
 
 const MayorCompletedBody = z.object({
@@ -51,7 +53,11 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
   // Ensure the TownDO knows its real UUID (ctx.id.name is unreliable in local dev)
   // TODO: This should only be done on town creation. Why are we doing it here?
   await town.setTownId(params.townId);
-  const result = await town.sendMayorMessage(parsed.data.message, parsed.data.model);
+  const result = await town.sendMayorMessage(
+    parsed.data.message,
+    parsed.data.model,
+    parsed.data.uiContext
+  );
   return c.json(resSuccess(result), 200);
 }
 
@@ -121,4 +127,34 @@ export async function handleDestroyMayor(c: Context<GastownEnv>, params: { townI
     await town.deleteAgent(status.session.agentId);
   }
   return c.json(resSuccess({ destroyed: true }), 200);
+}
+
+const BroadcastUiActionBody = z.object({
+  action: UiActionSchema,
+});
+
+/**
+ * POST /api/towns/:townId/mayor/ui-action
+ * Broadcast a UI action to all connected dashboard WebSocket clients.
+ * Called by the mayor agent to trigger navigation/drawer actions in the dashboard.
+ * Protected by kiloAuthMiddleware (same as other /api/towns/:townId/mayor/* routes).
+ */
+export async function handleBroadcastUiAction(c: Context<GastownEnv>, params: { townId: string }) {
+  const body = await parseJsonBody(c);
+  const parsed = BroadcastUiActionBody.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${MAYOR_HANDLER_LOG} handleBroadcastUiAction: townId=${params.townId} type=${parsed.data.action.type}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  await town.setTownId(params.townId);
+  await town.broadcastUiAction(parsed.data.action);
+  return c.json(resSuccess({ broadcast: true }), 200);
 }

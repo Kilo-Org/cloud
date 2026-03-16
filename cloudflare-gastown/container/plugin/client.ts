@@ -15,6 +15,7 @@ import type {
   Rig,
   SlingBatchResult,
   SlingResult,
+  UiActionInput,
 } from './types';
 
 function isApiResponse(
@@ -413,6 +414,13 @@ export class MayorGastownClient {
   async acknowledgeEscalation(escalationId: string): Promise<void> {
     await this.request<void>(this.mayorPath(`/escalations/${escalationId}/acknowledge`), {
       method: 'POST',
+    });
+  }
+
+  async broadcastUiAction(action: UiActionInput): Promise<void> {
+    await this.request<void>(this.mayorPath('/ui-action'), {
+      method: 'POST',
+      body: JSON.stringify({ action }),
     });
   }
 }

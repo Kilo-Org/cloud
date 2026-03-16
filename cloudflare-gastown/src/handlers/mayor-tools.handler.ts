@@ -4,7 +4,7 @@ import { getTownDOStub } from '../dos/Town.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { BeadStatus, BeadType, BeadPriority } from '../types';
+import { BeadStatus, BeadType, BeadPriority, UiActionSchema } from '../types';
 import type { GastownEnv } from '../gastown.worker';
 
 const HANDLER_LOG = '[mayor-tools.handler]';
@@ -634,4 +634,32 @@ export async function handleMayorConvoyStart(
   );
 
   return c.json(resSuccess(result));
+}
+
+const MayorUiActionBody = z.object({
+  action: UiActionSchema,
+});
+
+/**
+ * POST /api/mayor/:townId/tools/ui-action
+ * Mayor tool: broadcast a UI action to all connected dashboard WebSocket clients.
+ * Allows the mayor to trigger navigation/drawer actions in the user's dashboard.
+ */
+export async function handleMayorUiAction(c: Context<GastownEnv>, params: { townId: string }) {
+  const body = await parseJsonBody(c);
+  const parsed = MayorUiActionBody.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorUiAction: townId=${params.townId} type=${parsed.data.action.type}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  await town.broadcastUiAction(parsed.data.action);
+  return c.json(resSuccess({ broadcast: true }), 200);
 }

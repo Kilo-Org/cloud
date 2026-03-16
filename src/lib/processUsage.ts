@@ -118,6 +118,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     session_id: usageContext.session_id,
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
+    api_format: usageContext.api_kind,
   };
 }
 
@@ -401,6 +402,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`feature`, metadataFields.feature)}
           , ${createUpsertCTE(sql`mode`, metadataFields.mode)}
           , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
+          , ${createUpsertCTE(sql`api_format`, metadataFields.api_format)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -436,7 +438,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               editor_name_id,
               feature_id,
               mode_id,
-              auto_model_id
+              auto_model_id,
+              api_format_id
             )
             SELECT
               ${metadataFields.id},
@@ -472,7 +475,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT editor_name_id FROM editor_name_cte),
               (SELECT feature_id FROM feature_cte),
               (SELECT mode_id FROM mode_cte),
-              (SELECT auto_model_id FROM auto_model_cte)
+              (SELECT auto_model_id FROM auto_model_cte),
+              (SELECT api_format_id FROM api_format_cte)
           )
           UPDATE kilocode_users
           SET microdollars_used = microdollars_used + ${coreUsageFields.cost}

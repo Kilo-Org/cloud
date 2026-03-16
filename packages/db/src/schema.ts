@@ -637,6 +637,7 @@ export const microdollar_usage_metadata = pgTable(
     mode_id: integer(),
     auto_model_id: integer(),
     market_cost: bigint({ mode: 'number' }),
+    api_format_id: integer(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
@@ -766,6 +767,15 @@ export const auto_model = pgTable(
   table => [uniqueIndex('UQ_auto_model').on(table.auto_model)]
 );
 
+export const api_format = pgTable(
+  'api_format',
+  {
+    api_format_id: serial().notNull().primaryKey(),
+    api_format: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_api_format').on(table.api_format)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -815,6 +825,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   mode: text(),
   auto_model: text(),
   market_cost: bigint({ mode: 'number' }),
+  api_format: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -864,7 +875,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.session_id,
     md.mode,
     am.auto_model,
-    meta.market_cost
+    meta.market_cost,
+    af.api_format
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -878,6 +890,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id
+  LEFT JOIN ${api_format} af ON meta.api_format_id = af.api_format_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;

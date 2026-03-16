@@ -112,14 +112,40 @@ export const GastownPlugin: Plugin = async ({ client }) => {
     //   console.log(`[${SERVICE}] experimental.text.complete:`, input, output);
     // },
 
-    // Inject prime context into the system prompt on the first message (rig agents only)
+    // Inject context into the system prompt before each LLM call.
+    // - Rig agents: prime context (bead assignment, mail, open beads)
+    // - Mayor: dashboard context (what the user is currently viewing)
     'experimental.chat.system.transform': async (_input, output) => {
-      // console.log(`[${SERVICE}] experimental.chat.system.transform:`, output);
-      const alreadyInjected = output.system.some(s => s.includes('GASTOWN CONTEXT'));
-      if (!alreadyInjected) {
-        const primeResult = await primeAndLog();
-        if (primeResult) {
-          output.system.push(formatPrimeContextForInjection(primeResult));
+      if (isMayor && mayorClient) {
+        // Fetch the latest dashboard context from the TownDO on every
+        // LLM call so the mayor always sees what the user is looking at.
+        try {
+          const dashboardContext = await mayorClient.fetchDashboardContext();
+          if (dashboardContext) {
+            // Remove any stale context block from a previous turn
+            const marker = '--- DASHBOARD CONTEXT ---';
+            const idx = output.system.findIndex(s => s.includes(marker));
+            if (idx !== -1) output.system.splice(idx, 1);
+
+            output.system.push(
+              [`--- DASHBOARD CONTEXT ---`, dashboardContext, `--- END DASHBOARD CONTEXT ---`].join(
+                '\n'
+              )
+            );
+          }
+        } catch (err) {
+          // Best-effort — don't block the LLM call if context fetch fails
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(`[${SERVICE}] dashboard context fetch failed: ${message}`);
+        }
+      } else {
+        // Rig agents: inject prime context on the first message
+        const alreadyInjected = output.system.some(s => s.includes('GASTOWN CONTEXT'));
+        if (!alreadyInjected) {
+          const primeResult = await primeAndLog();
+          if (primeResult) {
+            output.system.push(formatPrimeContextForInjection(primeResult));
+          }
         }
       }
     },

@@ -460,6 +460,10 @@ export class TownDO extends DurableObject<Env> {
     this._dashboardContext = context;
   }
 
+  async getDashboardContext(): Promise<string | null> {
+    return this._dashboardContext;
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // Town Configuration
   // ══════════════════════════════════════════════════════════════════

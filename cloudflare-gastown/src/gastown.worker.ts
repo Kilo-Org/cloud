@@ -99,6 +99,7 @@ import {
   handleMayorEscalationAcknowledge,
   handleMayorConvoyStart,
   handleMayorUiAction,
+  handleMayorGetDashboardContext,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
@@ -679,6 +680,11 @@ app.post('/api/mayor/:townId/tools/escalations/:escalationId/acknowledge', c =>
 );
 app.post('/api/mayor/:townId/tools/convoys/:convoyId/start', c =>
   handleMayorConvoyStart(c, c.req.param())
+);
+app.get('/api/mayor/:townId/tools/dashboard-context', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/dashboard-context', () =>
+    handleMayorGetDashboardContext(c, c.req.param())
+  )
 );
 
 // ── tRPC ────────────────────────────────────────────────────────────────

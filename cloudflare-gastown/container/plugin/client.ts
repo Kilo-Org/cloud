@@ -423,6 +423,13 @@ export class MayorGastownClient {
       body: JSON.stringify({ action }),
     });
   }
+
+  async fetchDashboardContext(): Promise<string | null> {
+    const result = await this.request<{ context: string | null }>(
+      this.mayorPath('/dashboard-context')
+    );
+    return result?.context ?? null;
+  }
 }
 
 export class GastownApiError extends Error {

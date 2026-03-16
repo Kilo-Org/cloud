@@ -34,6 +34,78 @@ export function TerminalBar({ townId }: TerminalBarProps) {
     setActiveTabId,
     setCollapsed,
   } = useTerminalBar();
+  const queryClient = useQueryClient();
+  const drawerStack = useDrawerStack();
+  const router = useRouter();
+
+  // ── Always-on WebSocket for alarm status + UI action dispatch ──────
+  // Lifted here so the connection persists regardless of which tab is active.
+
+  const handleAgentStatus = useCallback(
+    (_event: AgentStatusEvent) => {
+      void queryClient.invalidateQueries({
+        predicate: query => {
+          const key = query.queryKey;
+          if (!Array.isArray(key) || !Array.isArray(key[0])) return false;
+          const path = key[0] as string[];
+          return path.includes('listAgents');
+        },
+      });
+    },
+    [queryClient]
+  );
+
+  const handleUiAction = useCallback(
+    (event: UiActionEvent) => {
+      const { action } = event;
+      switch (action.type) {
+        case 'open_bead_drawer':
+          if (action.beadId && action.rigId) {
+            drawerStack.open({ type: 'bead', beadId: action.beadId, rigId: action.rigId });
+          }
+          break;
+        case 'open_convoy_drawer':
+          if (action.convoyId && action.townId) {
+            drawerStack.open({ type: 'convoy', convoyId: action.convoyId, townId: action.townId });
+          }
+          break;
+        case 'open_agent_drawer':
+          if (action.agentId && action.rigId) {
+            drawerStack.open({
+              type: 'agent',
+              agentId: action.agentId,
+              rigId: action.rigId,
+              townId: action.townId,
+            });
+          }
+          break;
+        case 'navigate':
+          if (action.page) {
+            const pageMap: Record<string, string> = {
+              'town-overview': `/gastown/${townId}`,
+              beads: `/gastown/${townId}/beads`,
+              agents: `/gastown/${townId}/agents`,
+              rigs: `/gastown/${townId}`,
+              settings: `/gastown/${townId}/settings`,
+            };
+            const path = pageMap[action.page];
+            if (path) router.push(path);
+          }
+          break;
+        case 'highlight_bead':
+          if (action.beadId && action.rigId) {
+            drawerStack.open({ type: 'bead', beadId: action.beadId, rigId: action.rigId });
+          }
+          break;
+      }
+    },
+    [drawerStack, router, townId]
+  );
+
+  const alarmWs = useAlarmStatusWs(townId, {
+    onAgentStatus: handleAgentStatus,
+    onUiAction: handleUiAction,
+  });
 
   const sidebarLeft = isMobile ? '0px' : sidebarState === 'expanded' ? '16rem' : '3rem';
 
@@ -134,7 +206,7 @@ export function TerminalBar({ townId }: TerminalBarProps) {
             {activeTab.kind === 'mayor' ? (
               <MayorTerminalPane townId={townId} collapsed={collapsed} />
             ) : activeTab.kind === 'status' ? (
-              <AlarmStatusPane townId={townId} />
+              <AlarmStatusPane townId={townId} alarmWs={alarmWs} />
             ) : (
               <AgentTerminalPane townId={townId} agentId={activeTab.agentId} />
             )}
@@ -278,86 +350,16 @@ function useAlarmStatusWs(
   return { data, connected, error };
 }
 
-function AlarmStatusPane({ townId }: { townId: string }) {
+type AlarmWsResult = {
+  data: AlarmStatus | null;
+  connected: boolean;
+  error: string | null;
+};
+
+function AlarmStatusPane({ townId, alarmWs }: { townId: string; alarmWs: AlarmWsResult }) {
   const trpc = useGastownTRPC();
-  const queryClient = useQueryClient();
-  const drawerStack = useDrawerStack();
-  const router = useRouter();
 
-  // Invalidate listAgents for all rigs in this town when an agent_status
-  // event arrives over the WebSocket, so agent cards update immediately
-  // without waiting for the next 5s poll cycle.
-  // tRPC @tanstack/react-query v11 query keys have the shape:
-  // [['gastown', 'listAgents'], { input: ..., type: 'query' }]
-  const handleAgentStatus = useCallback(
-    (_event: AgentStatusEvent) => {
-      void queryClient.invalidateQueries({
-        predicate: query => {
-          const key = query.queryKey;
-          if (!Array.isArray(key) || !Array.isArray(key[0])) return false;
-          const path = key[0] as string[];
-          return path.includes('listAgents');
-        },
-      });
-    },
-    [queryClient]
-  );
-
-  // Handle UI actions from the mayor (open drawers, navigate pages)
-  const handleUiAction = useCallback(
-    (event: UiActionEvent) => {
-      const { action } = event;
-      switch (action.type) {
-        case 'open_bead_drawer':
-          if (action.beadId && action.rigId) {
-            drawerStack.open({ type: 'bead', beadId: action.beadId, rigId: action.rigId });
-          }
-          break;
-        case 'open_convoy_drawer':
-          if (action.convoyId && action.townId) {
-            drawerStack.open({ type: 'convoy', convoyId: action.convoyId, townId: action.townId });
-          }
-          break;
-        case 'open_agent_drawer':
-          if (action.agentId && action.rigId) {
-            drawerStack.open({
-              type: 'agent',
-              agentId: action.agentId,
-              rigId: action.rigId,
-              townId: action.townId,
-            });
-          }
-          break;
-        case 'navigate':
-          if (action.page) {
-            const pageMap: Record<string, string> = {
-              'town-overview': `/gastown/${townId}`,
-              beads: `/gastown/${townId}/beads`,
-              agents: `/gastown/${townId}/agents`,
-              rigs: `/gastown/${townId}`,
-              settings: `/gastown/${townId}/settings`,
-            };
-            const path = pageMap[action.page];
-            if (path) router.push(path);
-          }
-          break;
-        case 'highlight_bead':
-          // For highlight, open the bead drawer as a visual indicator
-          if (action.beadId && action.rigId) {
-            drawerStack.open({ type: 'bead', beadId: action.beadId, rigId: action.rigId });
-          }
-          break;
-        // open_create_rig_dialog: would need a dedicated dialog state — skip for now
-      }
-    },
-    [drawerStack, router, townId]
-  );
-
-  const {
-    data: wsData,
-    connected: wsConnected,
-    error: wsError,
-  } = useAlarmStatusWs(townId, { onAgentStatus: handleAgentStatus, onUiAction: handleUiAction });
+  const { data: wsData, connected: wsConnected, error: wsError } = alarmWs;
 
   // Fall back to polling when WebSocket is unavailable (blocked, errored,
   // or never connected). The tRPC query is disabled while the WS is

@@ -663,3 +663,17 @@ export async function handleMayorUiAction(c: Context<GastownEnv>, params: { town
   await town.broadcastUiAction(parsed.data.action);
   return c.json(resSuccess({ broadcast: true }), 200);
 }
+
+/**
+ * GET /api/mayor/:townId/tools/dashboard-context
+ * Fetch the latest dashboard context XML for injection into the mayor's prompt.
+ * Called by the gastown plugin's chat.system.transform hook.
+ */
+export async function handleMayorGetDashboardContext(
+  c: Context<GastownEnv>,
+  params: { townId: string }
+) {
+  const town = getTownDOStub(c.env, params.townId);
+  const context = await town.getDashboardContext();
+  return c.json(resSuccess({ context }), 200);
+}

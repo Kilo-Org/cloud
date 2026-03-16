@@ -58,6 +58,9 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
     );
   }
 
+  const denied = await verifyTownOwner(c, params.townId);
+  if (denied) return denied;
+
   console.log(
     `${MAYOR_HANDLER_LOG} handleSendMayorMessage: townId=${params.townId} message="${parsed.data.message.slice(0, 80)}"`
   );
@@ -172,6 +175,7 @@ export async function handleSetDashboardContext(
   }
 
   const town = getTownDOStub(c.env, params.townId);
+  await town.setTownId(params.townId);
   await town.setDashboardContext(parsed.data.context);
   return c.json(resSuccess({ stored: true }), 200);
 }

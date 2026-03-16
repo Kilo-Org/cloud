@@ -2,7 +2,6 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
 import type { OpenRouterReasoningConfig } from '@/lib/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 
@@ -145,9 +144,7 @@ const FRONTIER_MODE_TO_MODEL = new Map<string, ResolvedAutoModel>([
 
 const KIMI_K25_MODEL_ID = 'moonshotai/kimi-k2.5';
 
-const MINIMAX_M25_MODEL_ID = minimax_m25_free_model.is_enabled
-  ? minimax_m25_free_model.public_id
-  : 'minimax/minimax-m2.5';
+const MINIMAX_M25_MODEL_ID = 'minimax/minimax-m2.5';
 
 const BALANCED_CODE_MODEL: ResolvedAutoModel = {
   model: MINIMAX_M25_MODEL_ID,

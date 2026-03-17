@@ -2,7 +2,6 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import { getTownDOStub } from '../dos/Town.do';
-import { verifyOrgMembership } from '../util/org-membership.util';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
@@ -149,8 +148,9 @@ export async function handleDeleteOrgTown(
   const userId = c.get('kiloUserId');
   if (!userId) return c.json(resError('Authentication required'), 401);
 
-  // Verify owner role inline so this works in dev mode (where orgAuthMiddleware is skipped)
-  const membership = await verifyOrgMembership(c.env, params.orgId, userId);
+  // Verify owner role via JWT claims (works in dev mode where orgAuthMiddleware is skipped)
+  const memberships = c.get('kiloOrgMemberships') ?? [];
+  const membership = memberships.find(m => m.orgId === params.orgId);
   if (!membership || membership.role !== 'owner') {
     return c.json(resError('Only org owners can delete towns'), 403);
   }
@@ -180,8 +180,9 @@ export async function handleDeleteOrgRig(
   const userId = c.get('kiloUserId');
   if (!userId) return c.json(resError('Authentication required'), 401);
 
-  // Verify owner role inline so this works in dev mode (where orgAuthMiddleware is skipped)
-  const membership = await verifyOrgMembership(c.env, params.orgId, userId);
+  // Verify owner role via JWT claims (works in dev mode where orgAuthMiddleware is skipped)
+  const memberships = c.get('kiloOrgMemberships') ?? [];
+  const membership = memberships.find(m => m.orgId === params.orgId);
   if (!membership || membership.role !== 'owner') {
     return c.json(resError('Only org owners can delete rigs'), 403);
   }

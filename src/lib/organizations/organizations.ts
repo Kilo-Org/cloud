@@ -98,6 +98,28 @@ export async function getUserOrganizationsWithSeats(
   }));
 }
 
+/**
+ * Lightweight query returning just `{orgId, role}` for each org the user
+ * belongs to (excluding soft-deleted orgs). Used to bake org memberships
+ * into short-lived JWTs so downstream workers can check membership without
+ * a DB round-trip.
+ */
+export async function getUserOrgMemberships(
+  userId: User['id']
+): Promise<Array<{ orgId: string; role: OrganizationRole }>> {
+  const rows = await db
+    .select({
+      orgId: organization_memberships.organization_id,
+      role: organization_memberships.role,
+    })
+    .from(organization_memberships)
+    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+    .where(
+      and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
+    );
+  return rows;
+}
+
 export async function userHasOrganizations(userId: User['id']): Promise<boolean> {
   const result = await db
     .select({ id: organization_memberships.id })

@@ -749,6 +749,7 @@ app.use(
       isAdmin: c.get('kiloIsAdmin') ?? false,
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
       gastownAccess: c.get('kiloGastownAccess') ?? false,
+      orgMemberships: c.get('kiloOrgMemberships') ?? [],
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
       console.error(`[gastown-trpc] error on ${path ?? 'unknown'}:`, error.message);

@@ -13,7 +13,7 @@ import { getTownDOStub } from '../dos/Town.do';
 import { getTownContainerStub } from '../dos/TownContainer.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
 import { getGastownOrgStub } from '../dos/GastownOrg.do';
-import { verifyOrgMembership, listUserOrgIds } from '../util/org-membership.util';
+import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { TownConfigSchema, TownConfigUpdateSchema } from '../types';
@@ -79,6 +79,19 @@ function userFromCtx(ctx: TRPCContext): { id: string; api_token_pepper: string |
   return { id: ctx.userId, api_token_pepper: ctx.apiTokenPepper };
 }
 
+/** Look up a user's membership for a specific org from the JWT claims. */
+function getOrgMembership(
+  memberships: JwtOrgMembership[],
+  orgId: string
+): JwtOrgMembership | undefined {
+  return memberships.find(m => m.orgId === orgId);
+}
+
+/** List org IDs where the user has a non-billing_manager role (from JWT). */
+function listAccessibleOrgIds(memberships: JwtOrgMembership[]): string[] {
+  return memberships.filter(m => m.role !== 'billing_manager').map(m => m.orgId);
+}
+
 /**
  * Common interface for the rig/town management methods shared by
  * GastownUserDO and GastownOrgDO stubs. Used to abstract over
@@ -113,14 +126,15 @@ type UserRigRecord = {
  * Resolve the DO stub that owns rigs for a given town. For personal towns
  * this is GastownUserDO; for org towns it's GastownOrgDO.
  *
- * Also verifies the user has access (ownership or org membership).
+ * Also verifies the user has access (ownership or org membership via JWT).
  * Returns the stub so callers can perform rig operations without
  * knowing the ownership model.
  */
 async function resolveRigOwnerStub(
   env: Env,
   userId: string,
-  townId: string
+  townId: string,
+  memberships: JwtOrgMembership[]
 ): Promise<RigOwnerStub> {
   // Fast path: check if user owns this town personally
   const userStub = getGastownUserStub(env, userId);
@@ -132,7 +146,7 @@ async function resolveRigOwnerStub(
     return userStub;
   }
 
-  // Slow path: check TownDO config for org ownership
+  // Check TownDO config for org ownership, verify via JWT claims
   const townStub = getTownDOStub(env, townId);
   let config;
   try {
@@ -142,7 +156,7 @@ async function resolveRigOwnerStub(
   }
 
   if (config.owner_type === 'org' && config.organization_id) {
-    const membership = await verifyOrgMembership(env, config.organization_id, userId);
+    const membership = getOrgMembership(memberships, config.organization_id);
     if (!membership || membership.role === 'billing_manager') {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not an org member' });
     }
@@ -154,12 +168,15 @@ async function resolveRigOwnerStub(
 
 /**
  * Verify that a user has access to a town — either as the personal owner
- * or as a member of the owning org. Returns a record matching RpcTownOutput.
- *
- * Checks the user's personal DO first (fast path for personal towns).
- * Falls back to TownDO config to handle org-owned towns.
+ * or as a member of the owning org (checked via JWT claims).
+ * Returns a record matching RpcTownOutput.
  */
-async function verifyTownOwnership(env: Env, userId: string, townId: string) {
+async function verifyTownOwnership(
+  env: Env,
+  userId: string,
+  townId: string,
+  memberships: JwtOrgMembership[]
+) {
   // Fast path: personal town lookup
   const userStub = getGastownUserStub(env, userId);
   const personalTown = await userStub.getTownAsync(townId);
@@ -170,7 +187,7 @@ async function verifyTownOwnership(env: Env, userId: string, townId: string) {
     return personalTown;
   }
 
-  // Slow path: check if this is an org-owned town the user has access to
+  // Check TownDO config for org ownership, verify via JWT claims
   const townStub = getTownDOStub(env, townId);
   let config;
   try {
@@ -180,7 +197,7 @@ async function verifyTownOwnership(env: Env, userId: string, townId: string) {
   }
 
   if (config.owner_type === 'org' && config.organization_id) {
-    const membership = await verifyOrgMembership(env, config.organization_id, userId);
+    const membership = getOrgMembership(memberships, config.organization_id);
     if (!membership || membership.role === 'billing_manager') {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not an org member' });
     }
@@ -201,20 +218,21 @@ async function verifyTownOwnership(env: Env, userId: string, townId: string) {
 
 /**
  * Verify that a user has access to a rig — either through their personal DO
- * or through an org that owns the rig's town.
- *
- * Checks the user's personal DO first (fast path). Falls back to scanning
- * the user's org DOs for the rig.
+ * or through an org that owns the rig's town (checked via JWT claims).
  */
-async function verifyRigOwnership(env: Env, userId: string, rigId: string) {
+async function verifyRigOwnership(
+  env: Env,
+  userId: string,
+  rigId: string,
+  memberships: JwtOrgMembership[]
+) {
   // Fast path: personal rig lookup
   const userStub = getGastownUserStub(env, userId);
   const personalRig = await userStub.getRigAsync(rigId);
   if (personalRig) return personalRig;
 
-  // Slow path: check org DOs the user belongs to
-  const orgIds = await listUserOrgIds(env, userId);
-  for (const orgId of orgIds) {
+  // Check org DOs from JWT claims (billing_manager excluded)
+  for (const orgId of listAccessibleOrgIds(memberships)) {
     const orgStub = getGastownOrgStub(env, orgId);
     const orgRig = await orgStub.getRigAsync(rigId);
     if (orgRig) return orgRig;
@@ -276,13 +294,18 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcTownOutput)
     .query(async ({ ctx, input }) => {
-      return verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      return verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
     }),
 
   deleteTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx.userId, input.townId);
+      const ownerStub = await resolveRigOwnerStub(
+        ctx.env,
+        ctx.userId,
+        input.townId,
+        ctx.orgMemberships
+      );
 
       // Destroy the Town DO (agents, container, alarms, storage).
       // Let failures propagate — if cleanup fails, don't delete the
@@ -309,7 +332,12 @@ export const gastownRouter = router({
     .output(RpcRigOutput)
     .mutation(async ({ ctx, input }) => {
       const user = userFromCtx(ctx);
-      const ownerStub = await resolveRigOwnerStub(ctx.env, user.id, input.townId);
+      const ownerStub = await resolveRigOwnerStub(
+        ctx.env,
+        user.id,
+        input.townId,
+        ctx.orgMemberships
+      );
 
       // Generate kilocode token for agent LLM gateway auth
       const kilocodeToken = await mintKilocodeToken(ctx.env, user);
@@ -374,7 +402,12 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(z.array(RpcRigOutput))
     .query(async ({ ctx, input }) => {
-      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx.userId, input.townId);
+      const ownerStub = await resolveRigOwnerStub(
+        ctx.env,
+        ctx.userId,
+        input.townId,
+        ctx.orgMemberships
+      );
       return ownerStub.listRigs(input.townId);
     }),
 
@@ -382,7 +415,7 @@ export const gastownRouter = router({
     .input(z.object({ rigId: z.string().uuid() }))
     .output(RpcRigDetailOutput)
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       // Sequential to avoid "excessively deep" type inference with Rpc.Promisified DO stubs.
       const agentList = await townStub.listAgents({ rig_id: rig.id });
@@ -393,13 +426,18 @@ export const gastownRouter = router({
   deleteRig: gastownProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
       // Remove from Town DO first so the name is freed before the owner
       // record is deleted. If this fails the owner record is still intact
       // and the user can retry.
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.removeRig(input.rigId);
-      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx.userId, rig.town_id);
+      const ownerStub = await resolveRigOwnerStub(
+        ctx.env,
+        ctx.userId,
+        rig.town_id,
+        ctx.orgMemberships
+      );
       await ownerStub.deleteRig(input.rigId);
     }),
 
@@ -414,7 +452,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listBeads({ rig_id: rig.id, status: input.status });
     }),
@@ -422,7 +460,7 @@ export const gastownRouter = router({
   deleteBead: gastownProcedure
     .input(z.object({ rigId: z.string().uuid(), beadId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteBead(input.beadId);
     }),
@@ -457,7 +495,7 @@ export const gastownRouter = router({
     )
     .output(RpcBeadOutput)
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
 
       // Verify the bead belongs to this rig
@@ -479,7 +517,7 @@ export const gastownRouter = router({
     .input(z.object({ rigId: z.string().uuid() }))
     .output(z.array(RpcAgentOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listAgents({ rig_id: rig.id });
     }),
@@ -487,7 +525,7 @@ export const gastownRouter = router({
   deleteAgent: gastownProcedure
     .input(z.object({ rigId: z.string().uuid(), agentId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteAgent(input.agentId);
     }),
@@ -506,7 +544,7 @@ export const gastownRouter = router({
     .output(RpcSlingResultOutput)
     .mutation(async ({ ctx, input }) => {
       const user = userFromCtx(ctx);
-      const rig = await verifyRigOwnership(ctx.env, user.id, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, user.id, input.rigId, ctx.orgMemberships);
 
       // Best-effort: refresh git credentials before dispatching
       try {
@@ -539,7 +577,7 @@ export const gastownRouter = router({
     )
     .output(RpcMayorSendResultOutput)
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
 
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
@@ -550,7 +588,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcMayorStatusOutput)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
       return townStub.getMayorStatus();
@@ -560,7 +598,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcAlarmStatusOutput)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
       return townStub.getAlarmStatus();
@@ -570,7 +608,12 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcMayorSendResultOutput)
     .mutation(async ({ ctx, input }) => {
-      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx.userId, input.townId);
+      const ownerStub = await resolveRigOwnerStub(
+        ctx.env,
+        ctx.userId,
+        input.townId,
+        ctx.orgMemberships
+      );
 
       // Best-effort: refresh git credentials from the first rig with a GitHub URL
       try {
@@ -596,7 +639,7 @@ export const gastownRouter = router({
     .input(z.object({ agentId: z.string().uuid(), townId: z.string().uuid() }))
     .output(RpcStreamTicketOutput)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
 
       // Proxy to container control server to get a stream ticket
       const containerStub = getTownContainerStub(ctx.env, input.townId);
@@ -626,7 +669,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
     .output(RpcPtySessionOutput)
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
 
       // Proxy to container control server to create a PTY session
       const containerStub = getTownContainerStub(ctx.env, input.townId);
@@ -662,7 +705,7 @@ export const gastownRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
 
       const containerStub = getTownContainerStub(ctx.env, input.townId);
       const response = await containerStub.fetch(
@@ -687,7 +730,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcTownConfigSchema)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getTownConfig();
     }),
@@ -701,7 +744,7 @@ export const gastownRouter = router({
     )
     .output(RpcTownConfigSchema)
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.updateTownConfig(input.config);
     }),
@@ -709,7 +752,7 @@ export const gastownRouter = router({
   refreshContainerToken: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
       await townStub.forceRefreshContainerToken();
@@ -728,7 +771,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadEventOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listBeadEvents({
         beadId: input.beadId,
@@ -747,7 +790,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadEventOutput))
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.listBeadEvents({
         since: input.since,
@@ -763,7 +806,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcConvoyDetailOutput))
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.listConvoysDetailed();
     }),
@@ -777,7 +820,7 @@ export const gastownRouter = router({
     )
     .output(RpcConvoyDetailOutput.nullable())
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getConvoyStatus(input.convoyId);
     }),
@@ -791,7 +834,7 @@ export const gastownRouter = router({
     )
     .output(RpcConvoyDetailOutput.nullable())
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       const convoy = await townStub.closeConvoy(input.convoyId);
       if (!convoy) return null;
@@ -808,7 +851,7 @@ export const gastownRouter = router({
     )
     .output(RpcConvoyDetailOutput.nullable())
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.startConvoy(input.convoyId);
       const status = await townStub.getConvoyStatus(input.convoyId);
@@ -821,7 +864,7 @@ export const gastownRouter = router({
     .input(z.object({ organizationId: z.string() }))
     .output(z.array(RpcOrgTownOutput))
     .query(async ({ input, ctx }) => {
-      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role === 'billing_manager')
         throw new TRPCError({ code: 'FORBIDDEN' });
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
@@ -832,7 +875,7 @@ export const gastownRouter = router({
     .input(z.object({ organizationId: z.string(), name: z.string().min(1).max(64) }))
     .output(RpcOrgTownOutput)
     .mutation(async ({ input, ctx }) => {
-      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role === 'billing_manager')
         throw new TRPCError({ code: 'FORBIDDEN' });
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
@@ -857,7 +900,7 @@ export const gastownRouter = router({
   deleteOrgTown: gastownProcedure
     .input(z.object({ organizationId: z.string(), townId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
-      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role !== 'owner') throw new TRPCError({ code: 'FORBIDDEN' });
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       const town = await stub.getTownAsync(input.townId);
@@ -881,7 +924,7 @@ export const gastownRouter = router({
     .input(z.object({ organizationId: z.string(), townId: z.string().uuid() }))
     .output(z.array(RpcRigOutput))
     .query(async ({ input, ctx }) => {
-      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role === 'billing_manager')
         throw new TRPCError({ code: 'FORBIDDEN' });
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
@@ -903,7 +946,7 @@ export const gastownRouter = router({
     )
     .output(RpcRigOutput)
     .mutation(async ({ input, ctx }) => {
-      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role === 'billing_manager')
         throw new TRPCError({ code: 'FORBIDDEN' });
 

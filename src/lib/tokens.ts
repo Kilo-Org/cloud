@@ -17,6 +17,7 @@ export type JWTTokenExtraPayload = {
   gastownAccess?: boolean;
   createdOnPlatform?: string;
   tokenSource?: string;
+  orgMemberships?: Array<{ orgId: string; role: OrganizationRole }>;
 };
 
 const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;

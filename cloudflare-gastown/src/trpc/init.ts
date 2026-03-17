@@ -1,12 +1,15 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { writeEvent } from '../util/analytics.util';
 
+import type { JwtOrgMembership } from '../middleware/auth.middleware';
+
 export type TRPCContext = {
   env: Env;
   userId: string;
   isAdmin: boolean;
   apiTokenPepper: string | null;
   gastownAccess: boolean;
+  orgMemberships: JwtOrgMembership[];
 };
 
 const t = initTRPC.context<TRPCContext>().create();

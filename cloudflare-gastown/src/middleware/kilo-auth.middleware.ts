@@ -34,6 +34,7 @@ export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     c.set('kiloIsAdmin', payload.isAdmin === true);
     c.set('kiloApiTokenPepper', payload.apiTokenPepper ?? null);
     c.set('kiloGastownAccess', payload.gastownAccess === true);
+    c.set('kiloOrgMemberships', payload.orgMemberships ?? []);
   } catch (err) {
     console.warn(
       '[kilo-auth] token verification failed:',

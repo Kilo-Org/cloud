@@ -25,6 +25,10 @@ export const kiloTokenPayload = z.object({
   createdOnPlatform: z.string().optional(),
   tokenSource: z.string().optional(),
   deviceAuthRequestCode: z.string().optional(),
+  // Org memberships (baked into gastown tokens to avoid DB lookups)
+  orgMemberships: z
+    .array(z.object({ orgId: z.string(), role: z.enum(['owner', 'member', 'billing_manager']) }))
+    .optional(),
   // Standard JWT claims
   iat: z.number().optional(),
   exp: z.number().optional(),
@@ -48,6 +52,7 @@ export type SignKiloTokenExtra = Pick<
   | 'createdOnPlatform'
   | 'tokenSource'
   | 'deviceAuthRequestCode'
+  | 'orgMemberships'
 >;
 
 export async function signKiloToken(params: {

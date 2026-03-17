@@ -1,15 +1,14 @@
 import { createMiddleware } from 'hono/factory';
 import type { GastownEnv } from '../gastown.worker';
-import { verifyOrgMembership } from '../util/org-membership.util';
 import { resError } from '../util/res.util';
 
 /**
  * Verifies the authenticated Kilo user is a member of the org identified
- * by the `:orgId` route param, and that they have a role with sufficient
- * permissions (any role except `billing_manager`).
+ * by the `:orgId` route param, using org memberships from the JWT claims
+ * (set by kiloAuthMiddleware). Blocks `billing_manager` role.
  *
  * Sets `orgId` and `orgRole` on the Hono context for downstream handlers.
- * Must run after `kiloAuthMiddleware` (which sets `kiloUserId`).
+ * Must run after `kiloAuthMiddleware` (which sets `kiloUserId` and `kiloOrgMemberships`).
  */
 export const orgAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) => {
   const orgId = c.req.param('orgId');
@@ -17,7 +16,8 @@ export const orgAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =>
   const userId = c.get('kiloUserId');
   if (!userId) return c.json(resError('Authentication required'), 401);
 
-  const membership = await verifyOrgMembership(c.env, orgId, userId);
+  const memberships = c.get('kiloOrgMemberships') ?? [];
+  const membership = memberships.find(m => m.orgId === orgId);
   if (!membership) return c.json(resError('Not an org member'), 403);
   if (membership.role === 'billing_manager')
     return c.json(resError('Insufficient permissions'), 403);

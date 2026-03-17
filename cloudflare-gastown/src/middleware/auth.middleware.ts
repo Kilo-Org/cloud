@@ -5,6 +5,8 @@ import { verifyAgentJWT, verifyContainerJWT, type AgentJWTPayload } from '../uti
 import { resError } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
 
+export type JwtOrgMembership = { orgId: string; role: 'owner' | 'member' | 'billing_manager' };
+
 export type AuthVariables = {
   agentJWT: AgentJWTPayload;
   townId: string;
@@ -12,6 +14,7 @@ export type AuthVariables = {
   kiloIsAdmin: boolean;
   kiloApiTokenPepper: string | null;
   kiloGastownAccess: boolean;
+  kiloOrgMemberships: JwtOrgMembership[];
   requestStartTime: number;
   orgId?: string;
   orgRole?: string;

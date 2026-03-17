@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { generateApiToken } from '@/lib/tokens';
 import { isGastownEnabled } from '@/lib/gastown/feature-flags';
+import { getUserOrgMemberships } from '@/lib/organizations/organizations';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 
@@ -17,9 +18,9 @@ const ONE_HOUR_SECONDS = 60 * 60;
  * to the worker's tRPC endpoint (cross-origin).
  *
  * Access is controlled by the `gastown-access` PostHog feature flag.
- * The JWT includes `gastownAccess`, `isAdmin`, and `apiTokenPepper` so
- * the worker can enforce access and mint kilo API tokens without a DB
- * round-trip.
+ * The JWT includes `gastownAccess`, `isAdmin`, `apiTokenPepper`, and
+ * `orgMemberships` so the worker can enforce access and check org
+ * membership without DB round-trips.
  */
 export async function POST() {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -32,9 +33,11 @@ export async function POST() {
     return NextResponse.json({ error: 'Gastown access denied' }, { status: 403 });
   }
 
+  const orgMemberships = await getUserOrgMemberships(user.id);
+
   const token = generateApiToken(
     user,
-    { isAdmin: user.is_admin, gastownAccess: true },
+    { isAdmin: user.is_admin, gastownAccess: true, orgMemberships },
     { expiresIn: ONE_HOUR_SECONDS }
   );
   const expiresAt = new Date(Date.now() + 55 * 60 * 1000).toISOString();

@@ -867,7 +867,7 @@ export const gastownRouter = router({
   // ── Org Towns & Rigs ────────────────────────────────────────────────
 
   listOrgTowns: gastownProcedure
-    .input(z.object({ organizationId: z.string() }))
+    .input(z.object({ organizationId: z.string().uuid() }))
     .output(z.array(RpcOrgTownOutput))
     .query(async ({ input, ctx }) => {
       const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
@@ -878,7 +878,7 @@ export const gastownRouter = router({
     }),
 
   createOrgTown: gastownProcedure
-    .input(z.object({ organizationId: z.string(), name: z.string().min(1).max(64) }))
+    .input(z.object({ organizationId: z.string().uuid(), name: z.string().min(1).max(64) }))
     .output(RpcOrgTownOutput)
     .mutation(async ({ input, ctx }) => {
       const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
@@ -910,7 +910,7 @@ export const gastownRouter = router({
     }),
 
   deleteOrgTown: gastownProcedure
-    .input(z.object({ organizationId: z.string(), townId: z.string().uuid() }))
+    .input(z.object({ organizationId: z.string().uuid(), townId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role !== 'owner') throw new TRPCError({ code: 'FORBIDDEN' });
@@ -933,7 +933,7 @@ export const gastownRouter = router({
     }),
 
   listOrgRigs: gastownProcedure
-    .input(z.object({ organizationId: z.string(), townId: z.string().uuid() }))
+    .input(z.object({ organizationId: z.string().uuid(), townId: z.string().uuid() }))
     .output(z.array(RpcRigOutput))
     .query(async ({ input, ctx }) => {
       const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
@@ -948,7 +948,7 @@ export const gastownRouter = router({
   createOrgRig: gastownProcedure
     .input(
       z.object({
-        organizationId: z.string(),
+        organizationId: z.string().uuid(),
         townId: z.string().uuid(),
         name: z.string().min(1).max(64),
         gitUrl: z.string().url(),

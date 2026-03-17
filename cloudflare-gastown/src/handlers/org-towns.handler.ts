@@ -87,6 +87,11 @@ export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId
   );
 
   const orgDO = getGastownOrgStub(c.env, params.orgId);
+
+  // Verify the town belongs to this org before creating the rig
+  const town = await orgDO.getTownAsync(parsed.data.town_id);
+  if (!town) return c.json(resError('Town not found in this org'), 404);
+
   const rig = await orgDO.createRig(parsed.data);
   console.log(
     `${ORG_TOWNS_LOG} handleCreateOrgRig: rig created id=${rig.id}, now configuring Town DO`

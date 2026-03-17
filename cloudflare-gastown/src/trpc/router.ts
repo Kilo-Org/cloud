@@ -331,26 +331,34 @@ export const gastownRouter = router({
     .output(RpcRigOutput)
     .mutation(async ({ ctx, input }) => {
       const user = userFromCtx(ctx);
-      const ownerStub = await resolveRigOwnerStub(
+      const ownership = await resolveTownOwnership(
         ctx.env,
         user.id,
         input.townId,
         ctx.orgMemberships
       );
+      const ownerStub = ownership.stub;
 
-      // Generate kilocode token for agent LLM gateway auth
-      const kilocodeToken = await mintKilocodeToken(ctx.env, user);
-
-      // Store token on town config (used by container dispatch)
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
-      await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
 
-      // Resolve git credentials BEFORE configureRig so that
-      // townConfig.git_auth.github_token is populated when
-      // setupRigRepoInContainer reads it for the proactive clone.
+      // For org towns, use the town owner's identity for credentials;
+      // for personal towns the caller is always the owner.
+      const townConfig = await townStub.getTownConfig();
+      const credentialUserId = townConfig.owner_user_id ?? user.id;
+
+      // Only re-mint kilocode token if the caller is the owner (they
+      // have their own api_token_pepper in ctx). For org towns where
+      // a non-owner member adds a rig, keep the existing town token.
+      let kilocodeToken: string | undefined;
+      if (credentialUserId === user.id) {
+        kilocodeToken = await mintKilocodeToken(ctx.env, user);
+        await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
+      }
+
+      // Resolve git credentials using the town owner's identity
       try {
-        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, user.id);
+        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, credentialUserId);
       } catch (err) {
         console.warn('[gastown-trpc] createRig: git credential refresh failed', err);
       }
@@ -371,7 +379,7 @@ export const gastownRouter = router({
           townId: input.townId,
           gitUrl: input.gitUrl,
           defaultBranch: input.defaultBranch,
-          userId: user.id,
+          userId: credentialUserId,
           kilocodeToken,
           platformIntegrationId: input.platformIntegrationId,
         });
@@ -552,9 +560,11 @@ export const gastownRouter = router({
       const user = userFromCtx(ctx);
       const rig = await verifyRigOwnership(ctx.env, user.id, input.rigId, ctx.orgMemberships);
 
-      // Best-effort: refresh git credentials before dispatching
+      // Best-effort: refresh git credentials using the town owner's identity
+      const townConfig = await getTownDOStub(ctx.env, rig.town_id).getTownConfig();
+      const credentialUserId = townConfig.owner_user_id ?? user.id;
       try {
-        await refreshGitCredentials(ctx.env, rig.town_id, rig.git_url, user.id);
+        await refreshGitCredentials(ctx.env, rig.town_id, rig.git_url, credentialUserId);
       } catch (err) {
         console.warn('[gastown-trpc] sling: git credential refresh failed', err);
       }
@@ -621,12 +631,14 @@ export const gastownRouter = router({
         ctx.orgMemberships
       );
 
-      // Best-effort: refresh git credentials from the first rig with a GitHub URL
+      // Best-effort: refresh git credentials using the town owner's identity
+      const townConfig = await getTownDOStub(ctx.env, input.townId).getTownConfig();
+      const credentialUserId = townConfig.owner_user_id ?? ctx.userId;
       try {
         const rigList = await ownerStub.listRigs(input.townId);
         for (const rig of rigList) {
           if (extractGithubRepo(rig.git_url)) {
-            await refreshGitCredentials(ctx.env, input.townId, rig.git_url, ctx.userId);
+            await refreshGitCredentials(ctx.env, input.townId, rig.git_url, credentialUserId);
             break;
           }
         }
@@ -996,20 +1008,20 @@ export const gastownRouter = router({
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
 
-      // Mint kilocode token using the town owner's identity (not the calling member)
-      // so adding a rig doesn't rotate the town-wide credential.
+      // Use the town owner's identity for credentials. Only re-mint the
+      // kilocode token if the caller is the owner (they have their pepper
+      // in ctx). For non-owner members, keep the existing town token.
       const townConfig = await townStub.getTownConfig();
-      const ownerUserId = townConfig.owner_user_id ?? ctx.userId;
-      const ownerPepper = ownerUserId === ctx.userId ? ctx.apiTokenPepper : null;
-      const kilocodeToken = await mintKilocodeToken(ctx.env, {
-        id: ownerUserId,
-        api_token_pepper: ownerPepper,
-      });
-      await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
+      const credentialUserId = townConfig.owner_user_id ?? ctx.userId;
+      let kilocodeToken: string | undefined;
+      if (credentialUserId === ctx.userId) {
+        kilocodeToken = await mintKilocodeToken(ctx.env, userFromCtx(ctx));
+        await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
+      }
 
-      // Resolve git credentials before configureRig so the proactive clone has auth
+      // Resolve git credentials using the town owner's identity
       try {
-        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, ownerUserId);
+        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, credentialUserId);
       } catch (err) {
         console.warn('[gastown-trpc] createOrgRig: git credential refresh failed', err);
       }
@@ -1028,7 +1040,7 @@ export const gastownRouter = router({
           townId: input.townId,
           gitUrl: input.gitUrl,
           defaultBranch: input.defaultBranch,
-          userId: ownerUserId,
+          userId: credentialUserId,
           kilocodeToken,
           platformIntegrationId: input.platformIntegrationId,
         });

@@ -885,9 +885,14 @@ export const gastownRouter = router({
         created_by_user_id: ctx.userId,
       });
 
+      // Mint kilocode token so the mayor can start without waiting for rig creation
+      const user = userFromCtx(ctx);
+      const kilocodeToken = await mintKilocodeToken(ctx.env, user);
+
       const townStub = getTownDOStub(ctx.env, town.id);
       await townStub.setTownId(town.id);
       await townStub.updateTownConfig({
+        kilocode_token: kilocodeToken,
         owner_type: 'org',
         owner_id: input.organizationId,
         organization_id: input.organizationId,

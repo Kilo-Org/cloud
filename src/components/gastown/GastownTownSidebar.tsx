@@ -31,9 +31,18 @@ import { motion, AnimatePresence } from 'motion/react';
 
 type GastownTownSidebarProps = {
   townId: string;
+  /** Override the base path for org-scoped routes (e.g. /organizations/[id]/gastown/[townId]) */
+  basePath?: string;
+  /** Link target for the "All towns" back button */
+  backHref?: string;
 } & React.ComponentProps<typeof Sidebar>;
 
-export function GastownTownSidebar({ townId, ...sidebarProps }: GastownTownSidebarProps) {
+export function GastownTownSidebar({
+  townId,
+  basePath: basePathOverride,
+  backHref = '/gastown',
+  ...sidebarProps
+}: GastownTownSidebarProps) {
   const pathname = usePathname();
   const trpc = useGastownTRPC();
 
@@ -43,7 +52,7 @@ export function GastownTownSidebar({ townId, ...sidebarProps }: GastownTownSideb
   const townName = townQuery.data?.name ?? 'Town';
   const rigs = rigsQuery.data ?? [];
 
-  const basePath = `/gastown/${townId}`;
+  const basePath = basePathOverride ?? `/gastown/${townId}`;
 
   const isActive = (path: string) => {
     if (path === basePath) return pathname === basePath;
@@ -65,7 +74,7 @@ export function GastownTownSidebar({ townId, ...sidebarProps }: GastownTownSideb
         <div className="flex flex-col gap-3">
           {/* Back link */}
           <Link
-            href="/gastown"
+            href={backHref}
             prefetch={false}
             className="group/back inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-white/45 transition-colors hover:bg-white/5 hover:text-white/75"
           >

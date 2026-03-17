@@ -31,7 +31,8 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
   if (!config.owner_type || config.owner_type === 'user') {
     // Personal town — verify userId matches owner
     const ownerId = config.owner_id ?? config.owner_user_id;
-    if (ownerId && ownerId !== userId) return c.json(resError('Forbidden'), 403);
+    if (!ownerId) return c.json(resError('Town not found'), 404);
+    if (ownerId !== userId) return c.json(resError('Forbidden'), 403);
   } else {
     // Org-owned town — verify org membership via JWT claims
     const orgId = config.organization_id ?? config.owner_id;

@@ -24,9 +24,11 @@ import { Input } from '@/components/ui/input';
 
 type OrgTownListPageClientProps = {
   organizationId: string;
+  role: string;
 };
 
-export function OrgTownListPageClient({ organizationId }: OrgTownListPageClientProps) {
+export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageClientProps) {
+  const isOwner = role === 'owner';
   const router = useRouter();
   const trpc = useGastownTRPC();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -177,19 +179,21 @@ export function OrgTownListPageClient({ organizationId }: OrgTownListPageClientP
                     Created {formatDistanceToNow(new Date(town.created_at), { addSuffix: true })}
                   </p>
                 </div>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (
-                      confirm(`Delete town "${town.name}"? This will also delete all its rigs.`)
-                    ) {
-                      deleteTown.mutate({ organizationId, townId: town.id });
-                    }
-                  }}
-                  className="rounded p-1.5 text-white/35 transition-colors hover:bg-red-500/10 hover:text-red-300"
-                >
-                  <Trash2 className="size-4" />
-                </button>
+                {isOwner && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (
+                        confirm(`Delete town "${town.name}"? This will also delete all its rigs.`)
+                      ) {
+                        deleteTown.mutate({ organizationId, townId: town.id });
+                      }
+                    }}
+                    className="rounded p-1.5 text-white/35 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
               </CardContent>
             </Card>
           ))}

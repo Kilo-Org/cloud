@@ -750,9 +750,36 @@ export const gastownRouter = router({
     )
     .output(RpcTownConfigSchema)
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      const ownership = await resolveTownOwnership(
+        ctx.env,
+        ctx.userId,
+        input.townId,
+        ctx.orgMemberships
+      );
+
+      // Strip ownership fields — only the system (createTown flows) should set these
+      const {
+        owner_user_id: _a,
+        owner_type: _b,
+        owner_id: _c,
+        organization_id: _d,
+        created_by_user_id: _e,
+        ...safeConfig
+      } = input.config;
+
+      // For org towns, only owners can update config
+      if (ownership.type === 'org') {
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        if (!membership || membership.role !== 'owner') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only org owners can update town config',
+          });
+        }
+      }
+
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.updateTownConfig(input.config);
+      return townStub.updateTownConfig(safeConfig);
     }),
 
   refreshContainerToken: gastownProcedure

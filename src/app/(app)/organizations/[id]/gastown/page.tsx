@@ -5,7 +5,9 @@ export default async function OrgGastownPage({ params }: { params: Promise<{ id:
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => <OrgTownListPageClient organizationId={organization.id} />}
+      render={({ organization, role }) => (
+        <OrgTownListPageClient organizationId={organization.id} role={role} />
+      )}
     />
   );
 }

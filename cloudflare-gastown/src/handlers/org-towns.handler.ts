@@ -166,6 +166,10 @@ export async function handleDeleteOrgTown(
 
   const orgDO = getGastownOrgStub(c.env, params.orgId);
 
+  // Verify the town belongs to this org BEFORE destroying anything
+  const town = await orgDO.getTownAsync(params.townId);
+  if (!town) return c.json(resError('Town not found'), 404);
+
   // Destroy the Town DO (handles all rigs, agents, and mayor cleanup)
   try {
     const townDOStub = getTownDOStub(c.env, params.townId);

@@ -225,3 +225,14 @@ const AlarmStatusOutput = z.object({
 });
 export const RpcAlarmStatusOutput = rpcSafe(AlarmStatusOutput);
 export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);
+
+// OrgTown (from GastownOrgDO)
+export const OrgTownOutput = z.object({
+  id: z.string(),
+  name: z.string(),
+  owner_org_id: z.string(),
+  created_by_user_id: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export const RpcOrgTownOutput = rpcSafe(OrgTownOutput);

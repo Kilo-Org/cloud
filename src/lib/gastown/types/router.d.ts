@@ -923,6 +923,81 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       } | null;
       meta: object;
     }>;
+    listOrgTowns: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        organizationId: string;
+      };
+      output: {
+        id: string;
+        name: string;
+        owner_org_id: string;
+        created_by_user_id: string;
+        created_at: string;
+        updated_at: string;
+      }[];
+      meta: object;
+    }>;
+    createOrgTown: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        organizationId: string;
+        name: string;
+      };
+      output: {
+        id: string;
+        name: string;
+        owner_org_id: string;
+        created_by_user_id: string;
+        created_at: string;
+        updated_at: string;
+      };
+      meta: object;
+    }>;
+    deleteOrgTown: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        organizationId: string;
+        townId: string;
+      };
+      output: void;
+      meta: object;
+    }>;
+    listOrgRigs: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        organizationId: string;
+        townId: string;
+      };
+      output: {
+        id: string;
+        town_id: string;
+        name: string;
+        git_url: string;
+        default_branch: string;
+        platform_integration_id: string | null;
+        created_at: string;
+        updated_at: string;
+      }[];
+      meta: object;
+    }>;
+    createOrgRig: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        organizationId: string;
+        townId: string;
+        name: string;
+        gitUrl: string;
+        defaultBranch?: string | undefined;
+        platformIntegrationId?: string | undefined;
+      };
+      output: {
+        id: string;
+        town_id: string;
+        name: string;
+        git_url: string;
+        default_branch: string;
+        platform_integration_id: string | null;
+        created_at: string;
+        updated_at: string;
+      };
+      meta: object;
+    }>;
   }>
 >;
 export type GastownRouter = typeof gastownRouter;
@@ -1862,6 +1937,81 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             updated_at: string;
             closed_at: string | null;
           } | null;
+          meta: object;
+        }>;
+        listOrgTowns: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            organizationId: string;
+          };
+          output: {
+            id: string;
+            name: string;
+            owner_org_id: string;
+            created_by_user_id: string;
+            created_at: string;
+            updated_at: string;
+          }[];
+          meta: object;
+        }>;
+        createOrgTown: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            organizationId: string;
+            name: string;
+          };
+          output: {
+            id: string;
+            name: string;
+            owner_org_id: string;
+            created_by_user_id: string;
+            created_at: string;
+            updated_at: string;
+          };
+          meta: object;
+        }>;
+        deleteOrgTown: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            organizationId: string;
+            townId: string;
+          };
+          output: void;
+          meta: object;
+        }>;
+        listOrgRigs: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            organizationId: string;
+            townId: string;
+          };
+          output: {
+            id: string;
+            town_id: string;
+            name: string;
+            git_url: string;
+            default_branch: string;
+            platform_integration_id: string | null;
+            created_at: string;
+            updated_at: string;
+          }[];
+          meta: object;
+        }>;
+        createOrgRig: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            organizationId: string;
+            townId: string;
+            name: string;
+            gitUrl: string;
+            defaultBranch?: string | undefined;
+            platformIntegrationId?: string | undefined;
+          };
+          output: {
+            id: string;
+            town_id: string;
+            name: string;
+            git_url: string;
+            default_branch: string;
+            platform_integration_id: string | null;
+            created_at: string;
+            updated_at: string;
+          };
           meta: object;
         }>;
       }>

@@ -148,6 +148,11 @@ export default function OrganizationAppSidebar({
       url: `/organizations/${organizationId}/cloud/webhooks`,
     },
     {
+      title: 'Gastown',
+      icon: Bot,
+      url: `/organizations/${organizationId}/gastown`,
+    },
+    {
       title: 'Code Reviewer',
       icon: Bot,
       url: `/organizations/${organizationId}/code-reviews`,

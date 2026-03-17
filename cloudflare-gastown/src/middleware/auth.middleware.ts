@@ -13,6 +13,8 @@ export type AuthVariables = {
   kiloApiTokenPepper: string | null;
   kiloGastownAccess: boolean;
   requestStartTime: number;
+  orgId?: string;
+  orgRole?: string;
 };
 
 import { resolveSecret } from '../util/secret.util';

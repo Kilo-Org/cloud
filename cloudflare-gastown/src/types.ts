@@ -205,6 +205,15 @@ export const TownConfigSchema = z.object({
   /** Owner user ID — stored so the mayor can mint JWTs without a rig config */
   owner_user_id: z.string().optional(),
 
+  /** Town ownership type */
+  owner_type: z.enum(['user', 'org']).optional().default('user'),
+  /** Owner identifier — userId when owner_type='user', orgId when owner_type='org' */
+  owner_id: z.string().optional(),
+  /** The userId who originally created this town (for audit trail in org towns) */
+  created_by_user_id: z.string().optional(),
+  /** Organization ID — set when owner_type='org', convenience alias for owner_id */
+  organization_id: z.string().optional(),
+
   /** Kilo API token for LLM gateway authentication */
   kilocode_token: z.string().optional(),
 
@@ -269,6 +278,10 @@ export const TownConfigUpdateSchema = z.object({
     })
     .optional(),
   owner_user_id: z.string().optional(),
+  owner_type: z.enum(['user', 'org']).optional(),
+  owner_id: z.string().optional(),
+  created_by_user_id: z.string().optional(),
+  organization_id: z.string().optional(),
   kilocode_token: z.string().optional(),
   default_model: z.string().optional(),
   small_model: z.string().optional(),

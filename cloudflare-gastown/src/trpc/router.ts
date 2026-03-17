@@ -12,6 +12,8 @@ import { router, gastownProcedure, adminProcedure } from './init';
 import { getTownDOStub } from '../dos/Town.do';
 import { getTownContainerStub } from '../dos/TownContainer.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
+import { getGastownOrgStub } from '../dos/GastownOrg.do';
+import { verifyOrgMembership, listUserOrgIds } from '../util/org-membership.util';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { TownConfigSchema, TownConfigUpdateSchema } from '../types';
@@ -29,6 +31,7 @@ import {
   RpcRigDetailOutput,
   RpcConvoyDetailOutput,
   RpcAlarmStatusOutput,
+  RpcOrgTownOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 
@@ -76,25 +79,75 @@ function userFromCtx(ctx: TRPCContext): { id: string; api_token_pepper: string |
   return { id: ctx.userId, api_token_pepper: ctx.apiTokenPepper };
 }
 
+/**
+ * Verify that a user has access to a town — either as the personal owner
+ * or as a member of the owning org. Returns a record matching RpcTownOutput.
+ *
+ * Checks the user's personal DO first (fast path for personal towns).
+ * Falls back to TownDO config to handle org-owned towns.
+ */
 async function verifyTownOwnership(env: Env, userId: string, townId: string) {
+  // Fast path: personal town lookup
   const userStub = getGastownUserStub(env, userId);
-  const town = await userStub.getTownAsync(townId);
-  if (!town) {
+  const personalTown = await userStub.getTownAsync(townId);
+  if (personalTown) {
+    if (personalTown.owner_user_id !== userId) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+    }
+    return personalTown;
+  }
+
+  // Slow path: check if this is an org-owned town the user has access to
+  const townStub = getTownDOStub(env, townId);
+  let config;
+  try {
+    config = await townStub.getTownConfig();
+  } catch {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
   }
-  if (town.owner_user_id !== userId) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+
+  if (config.owner_type === 'org' && config.organization_id) {
+    const membership = await verifyOrgMembership(env, config.organization_id, userId);
+    if (!membership || membership.role === 'billing_manager') {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Not an org member' });
+    }
+    // Fetch the org town record for name/timestamps
+    const orgStub = getGastownOrgStub(env, config.organization_id);
+    const orgTown = await orgStub.getTownAsync(townId);
+    return {
+      id: townId,
+      name: orgTown?.name ?? townId,
+      owner_user_id: config.created_by_user_id ?? userId,
+      created_at: orgTown?.created_at ?? new Date().toISOString(),
+      updated_at: orgTown?.updated_at ?? new Date().toISOString(),
+    };
   }
-  return town;
+
+  throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
 }
 
+/**
+ * Verify that a user has access to a rig — either through their personal DO
+ * or through an org that owns the rig's town.
+ *
+ * Checks the user's personal DO first (fast path). Falls back to scanning
+ * the user's org DOs for the rig.
+ */
 async function verifyRigOwnership(env: Env, userId: string, rigId: string) {
+  // Fast path: personal rig lookup
   const userStub = getGastownUserStub(env, userId);
-  const rig = await userStub.getRigAsync(rigId);
-  if (!rig) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
+  const personalRig = await userStub.getRigAsync(rigId);
+  if (personalRig) return personalRig;
+
+  // Slow path: check org DOs the user belongs to
+  const orgIds = await listUserOrgIds(env, userId);
+  for (const orgId of orgIds) {
+    const orgStub = getGastownOrgStub(env, orgId);
+    const orgRig = await orgStub.getRigAsync(rigId);
+    if (orgRig) return orgRig;
   }
-  return rig;
+
+  throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
 }
 
 async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper: string | null }) {
@@ -691,6 +744,157 @@ export const gastownRouter = router({
       await townStub.startConvoy(input.convoyId);
       const status = await townStub.getConvoyStatus(input.convoyId);
       return status ?? null;
+    }),
+
+  // ── Org Towns & Rigs ────────────────────────────────────────────────
+
+  listOrgTowns: gastownProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .output(z.array(RpcOrgTownOutput))
+    .query(async ({ input, ctx }) => {
+      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      if (!membership || membership.role === 'billing_manager')
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      const stub = getGastownOrgStub(ctx.env, input.organizationId);
+      return stub.listTowns();
+    }),
+
+  createOrgTown: gastownProcedure
+    .input(z.object({ organizationId: z.string(), name: z.string().min(1).max(64) }))
+    .output(RpcOrgTownOutput)
+    .mutation(async ({ input, ctx }) => {
+      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      if (!membership || membership.role === 'billing_manager')
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      const stub = getGastownOrgStub(ctx.env, input.organizationId);
+      const town = await stub.createTown({
+        name: input.name,
+        owner_org_id: input.organizationId,
+        created_by_user_id: ctx.userId,
+      });
+
+      const townStub = getTownDOStub(ctx.env, town.id);
+      await townStub.setTownId(town.id);
+      await townStub.updateTownConfig({
+        owner_type: 'org',
+        owner_id: input.organizationId,
+        organization_id: input.organizationId,
+        created_by_user_id: ctx.userId,
+      });
+
+      return town;
+    }),
+
+  deleteOrgTown: gastownProcedure
+    .input(z.object({ organizationId: z.string(), townId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      if (!membership || membership.role !== 'owner') throw new TRPCError({ code: 'FORBIDDEN' });
+      const stub = getGastownOrgStub(ctx.env, input.organizationId);
+      const town = await stub.getTownAsync(input.townId);
+      if (!town) throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+
+      // Destroy the Town DO (handles all rigs, agents, and mayor cleanup)
+      try {
+        const townStub = getTownDOStub(ctx.env, input.townId);
+        await townStub.destroy();
+      } catch (err) {
+        console.error(
+          `[gastown-trpc] deleteOrgTown: failed to destroy Town DO for ${input.townId}:`,
+          err
+        );
+      }
+
+      await stub.deleteTown(input.townId);
+    }),
+
+  listOrgRigs: gastownProcedure
+    .input(z.object({ organizationId: z.string(), townId: z.string().uuid() }))
+    .output(z.array(RpcRigOutput))
+    .query(async ({ input, ctx }) => {
+      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      if (!membership || membership.role === 'billing_manager')
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      const stub = getGastownOrgStub(ctx.env, input.organizationId);
+      const town = await stub.getTownAsync(input.townId);
+      if (!town) throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+      return stub.listRigs(input.townId);
+    }),
+
+  createOrgRig: gastownProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        townId: z.string().uuid(),
+        name: z.string().min(1).max(64),
+        gitUrl: z.string().url(),
+        defaultBranch: z.string().default('main'),
+        platformIntegrationId: z.string().uuid().optional(),
+      })
+    )
+    .output(RpcRigOutput)
+    .mutation(async ({ input, ctx }) => {
+      const membership = await verifyOrgMembership(ctx.env, input.organizationId, ctx.userId);
+      if (!membership || membership.role === 'billing_manager')
+        throw new TRPCError({ code: 'FORBIDDEN' });
+
+      const orgStub = getGastownOrgStub(ctx.env, input.organizationId);
+      const town = await orgStub.getTownAsync(input.townId);
+      if (!town) throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+
+      // Generate kilocode token for agent LLM gateway auth
+      const user = userFromCtx(ctx);
+      const kilocodeToken = await mintKilocodeToken(ctx.env, user);
+
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.setTownId(input.townId);
+      await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
+
+      // Resolve git credentials before configureRig so the proactive clone has auth
+      try {
+        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, user.id);
+      } catch (err) {
+        console.warn('[gastown-trpc] createOrgRig: git credential refresh failed', err);
+      }
+
+      const rig = await orgStub.createRig({
+        town_id: input.townId,
+        name: input.name,
+        git_url: input.gitUrl,
+        default_branch: input.defaultBranch,
+        platform_integration_id: input.platformIntegrationId,
+      });
+
+      try {
+        await townStub.configureRig({
+          rigId: rig.id,
+          townId: input.townId,
+          gitUrl: input.gitUrl,
+          defaultBranch: input.defaultBranch,
+          userId: user.id,
+          kilocodeToken,
+          platformIntegrationId: input.platformIntegrationId,
+        });
+        await townStub.addRig({
+          rigId: rig.id,
+          name: input.name,
+          gitUrl: input.gitUrl,
+          defaultBranch: input.defaultBranch,
+        });
+      } catch (err) {
+        console.error(
+          `[gastown-trpc] createOrgRig: Town DO configure FAILED for rig ${rig.id}, rolling back:`,
+          err
+        );
+        try {
+          await orgStub.deleteRig(rig.id);
+        } catch {
+          /* best effort rollback */
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to configure rig' });
+      }
+
+      return rig;
     }),
 
   // ── Admin-only routes (bypass ownership checks) ──────────────────────

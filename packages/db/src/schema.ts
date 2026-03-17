@@ -754,11 +754,21 @@ export const editor_name = pgTable(
   table => [uniqueIndex('UQ_editor_name').on(table.editor_name)]
 );
 
+export const gatewayApiKindValues = [
+  'chat_completions',
+  'embeddings',
+  'fim_completions',
+  'messages',
+  'responses',
+] as const;
+
+export type GatewayApiKind = (typeof gatewayApiKindValues)[number];
+
 export const api_kind = pgTable(
   'api_kind',
   {
     api_kind_id: serial().notNull().primaryKey(),
-    api_kind: text().notNull(),
+    api_kind: text({ enum: gatewayApiKindValues }).notNull(),
   },
   table => [uniqueIndex('UQ_api_kind').on(table.api_kind)]
 );

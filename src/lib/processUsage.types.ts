@@ -1,5 +1,5 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import type { GatewayApiKind } from '@/lib/providers/openrouter/types';
+import type { GatewayApiKind } from '@kilocode/db';
 import type { ProviderId } from '@/lib/providers/provider-id';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 import type { MicrodollarUsage, Organization } from '@kilocode/db';

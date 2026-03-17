@@ -1,7 +1,7 @@
 import { getWorkerDb } from '@kilocode/db/client';
 import { organization_memberships } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { eq, and } from 'drizzle-orm';
+import { eq, ne, and } from 'drizzle-orm';
 
 export type OrgMembership = {
   organizationId: string;
@@ -54,7 +54,12 @@ export async function listUserOrgIds(env: Env, userId: string): Promise<string[]
       organizationId: organization_memberships.organization_id,
     })
     .from(organization_memberships)
-    .where(eq(organization_memberships.kilo_user_id, userId));
+    .where(
+      and(
+        eq(organization_memberships.kilo_user_id, userId),
+        ne(organization_memberships.role, 'billing_manager')
+      )
+    );
 
   return rows.map(r => r.organizationId);
 }

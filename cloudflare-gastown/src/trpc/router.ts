@@ -80,6 +80,79 @@ function userFromCtx(ctx: TRPCContext): { id: string; api_token_pepper: string |
 }
 
 /**
+ * Common interface for the rig/town management methods shared by
+ * GastownUserDO and GastownOrgDO stubs. Used to abstract over
+ * personal vs org ownership in tRPC procedures.
+ */
+type RigOwnerStub = {
+  listRigs(townId: string): Promise<UserRigRecord[]>;
+  createRig(input: {
+    town_id: string;
+    name: string;
+    git_url: string;
+    default_branch: string;
+    platform_integration_id?: string;
+  }): Promise<UserRigRecord>;
+  getRigAsync(rigId: string): Promise<UserRigRecord | null>;
+  deleteRig(rigId: string): Promise<boolean>;
+  deleteTown(townId: string): Promise<boolean>;
+};
+
+type UserRigRecord = {
+  id: string;
+  town_id: string;
+  name: string;
+  git_url: string;
+  default_branch: string;
+  platform_integration_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Resolve the DO stub that owns rigs for a given town. For personal towns
+ * this is GastownUserDO; for org towns it's GastownOrgDO.
+ *
+ * Also verifies the user has access (ownership or org membership).
+ * Returns the stub so callers can perform rig operations without
+ * knowing the ownership model.
+ */
+async function resolveRigOwnerStub(
+  env: Env,
+  userId: string,
+  townId: string
+): Promise<RigOwnerStub> {
+  // Fast path: check if user owns this town personally
+  const userStub = getGastownUserStub(env, userId);
+  const personalTown = await userStub.getTownAsync(townId);
+  if (personalTown) {
+    if (personalTown.owner_user_id !== userId) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+    }
+    return userStub;
+  }
+
+  // Slow path: check TownDO config for org ownership
+  const townStub = getTownDOStub(env, townId);
+  let config;
+  try {
+    config = await townStub.getTownConfig();
+  } catch {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+  }
+
+  if (config.owner_type === 'org' && config.organization_id) {
+    const membership = await verifyOrgMembership(env, config.organization_id, userId);
+    if (!membership || membership.role === 'billing_manager') {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Not an org member' });
+    }
+    return getGastownOrgStub(env, config.organization_id);
+  }
+
+  throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+}
+
+/**
  * Verify that a user has access to a town — either as the personal owner
  * or as a member of the owning org. Returns a record matching RpcTownOutput.
  *
@@ -209,7 +282,7 @@ export const gastownRouter = router({
   deleteTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx.userId, input.townId);
 
       // Destroy the Town DO (agents, container, alarms, storage).
       // Let failures propagate — if cleanup fails, don't delete the
@@ -218,8 +291,7 @@ export const gastownRouter = router({
       const townDOStub = getTownDOStub(ctx.env, input.townId);
       await townDOStub.destroy();
 
-      const userStub = getGastownUserStub(ctx.env, ctx.userId);
-      await userStub.deleteTown(input.townId);
+      await ownerStub.deleteTown(input.townId);
     }),
 
   // ── Rigs ────────────────────────────────────────────────────────────
@@ -237,7 +309,7 @@ export const gastownRouter = router({
     .output(RpcRigOutput)
     .mutation(async ({ ctx, input }) => {
       const user = userFromCtx(ctx);
-      await verifyTownOwnership(ctx.env, user.id, input.townId);
+      const ownerStub = await resolveRigOwnerStub(ctx.env, user.id, input.townId);
 
       // Generate kilocode token for agent LLM gateway auth
       const kilocodeToken = await mintKilocodeToken(ctx.env, user);
@@ -256,8 +328,7 @@ export const gastownRouter = router({
         console.warn('[gastown-trpc] createRig: git credential refresh failed', err);
       }
 
-      const userStub = getGastownUserStub(ctx.env, user.id);
-      const rig = await userStub.createRig({
+      const rig = await ownerStub.createRig({
         town_id: input.townId,
         name: input.name,
         git_url: input.gitUrl,
@@ -289,7 +360,7 @@ export const gastownRouter = router({
           err
         );
         try {
-          await userStub.deleteRig(rig.id);
+          await ownerStub.deleteRig(rig.id);
         } catch {
           /* best effort rollback */
         }
@@ -303,9 +374,8 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(z.array(RpcRigOutput))
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
-      const userStub = getGastownUserStub(ctx.env, ctx.userId);
-      return userStub.listRigs(input.townId);
+      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx.userId, input.townId);
+      return ownerStub.listRigs(input.townId);
     }),
 
   getRig: gastownProcedure
@@ -324,13 +394,13 @@ export const gastownRouter = router({
     .input(z.object({ rigId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId);
-      // Remove from Town DO first so the name is freed before the user
-      // record is deleted. If this fails the user record is still intact
+      // Remove from Town DO first so the name is freed before the owner
+      // record is deleted. If this fails the owner record is still intact
       // and the user can retry.
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.removeRig(input.rigId);
-      const userStub = getGastownUserStub(ctx.env, ctx.userId);
-      await userStub.deleteRig(input.rigId);
+      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx.userId, rig.town_id);
+      await ownerStub.deleteRig(input.rigId);
     }),
 
   // ── Beads ───────────────────────────────────────────────────────────
@@ -500,12 +570,11 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcMayorSendResultOutput)
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId);
+      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx.userId, input.townId);
 
       // Best-effort: refresh git credentials from the first rig with a GitHub URL
       try {
-        const userStub = getGastownUserStub(ctx.env, ctx.userId);
-        const rigList = await userStub.listRigs(input.townId);
+        const rigList = await ownerStub.listRigs(input.townId);
         for (const rig of rigList) {
           if (extractGithubRepo(rig.git_url)) {
             await refreshGitCredentials(ctx.env, input.townId, rig.git_url, ctx.userId);

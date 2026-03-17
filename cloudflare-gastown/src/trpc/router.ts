@@ -199,7 +199,7 @@ async function verifyTownOwnership(
   return {
     id: townId,
     name: orgTown?.name ?? townId,
-    owner_user_id: userId,
+    owner_user_id: orgTown?.created_by_user_id ?? userId,
     created_at: orgTown?.created_at ?? new Date().toISOString(),
     updated_at: orgTown?.updated_at ?? new Date().toISOString(),
   };
@@ -292,12 +292,19 @@ export const gastownRouter = router({
   deleteTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const ownerStub = await resolveRigOwnerStub(
+      const ownership = await resolveTownOwnership(
         ctx.env,
         ctx.userId,
         input.townId,
         ctx.orgMemberships
       );
+      if (ownership.type === 'org') {
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        if (!membership || membership.role !== 'owner') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Only org owners can delete towns' });
+        }
+      }
+      const ownerStub = ownership.stub;
 
       // Destroy the Town DO (agents, container, alarms, storage).
       // Let failures propagate — if cleanup fails, don't delete the
@@ -419,17 +426,24 @@ export const gastownRouter = router({
     .input(z.object({ rigId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
-      // Remove from Town DO first so the name is freed before the owner
-      // record is deleted. If this fails the owner record is still intact
-      // and the user can retry.
-      const townStub = getTownDOStub(ctx.env, rig.town_id);
-      await townStub.removeRig(input.rigId);
-      const ownerStub = await resolveRigOwnerStub(
+      const ownership = await resolveTownOwnership(
         ctx.env,
         ctx.userId,
         rig.town_id,
         ctx.orgMemberships
       );
+      if (ownership.type === 'org') {
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        if (!membership || membership.role !== 'owner') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Only org owners can delete rigs' });
+        }
+      }
+      // Remove from Town DO first so the name is freed before the owner
+      // record is deleted. If this fails the owner record is still intact
+      // and the user can retry.
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      await townStub.removeRig(input.rigId);
+      const ownerStub = ownership.stub;
       await ownerStub.deleteRig(input.rigId);
     }),
 

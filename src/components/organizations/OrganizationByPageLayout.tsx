@@ -10,6 +10,7 @@ import { OrganizationTrialWrapper } from './OrganizationTrialWrapper';
 export async function OrganizationByPageLayout({
   params,
   render,
+  fullBleed = false,
 }: {
   params: Promise<{ id: string }>;
   render: ({
@@ -21,6 +22,8 @@ export async function OrganizationByPageLayout({
     organization: Organization;
     isGlobalAdmin: boolean;
   }) => JSX.Element;
+  /** When true, skip the PageContainer wrapper (used by gastown fullscreen pages). */
+  fullBleed?: boolean;
 }) {
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
@@ -34,7 +37,7 @@ export async function OrganizationByPageLayout({
   const { user, organization } = result.data;
   const role = user.is_admin ? 'owner' : user.role;
   return (
-    <OrganizationTrialWrapper organizationId={organization.id}>
+    <OrganizationTrialWrapper organizationId={organization.id} fullBleed={fullBleed}>
       {render({ role, organization, isGlobalAdmin: user.is_admin })}
     </OrganizationTrialWrapper>
   );

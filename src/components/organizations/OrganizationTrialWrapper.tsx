@@ -18,11 +18,14 @@ import { PageContainer } from '@/components/layouts/PageContainer';
 type OrganizationTrialWrapperProps = {
   organizationId: string;
   children: React.ReactNode;
+  /** When true, render children directly without the PageContainer max-width wrapper. */
+  fullBleed?: boolean;
 };
 
 export function OrganizationTrialWrapper({
   organizationId,
   children,
+  fullBleed = false,
 }: OrganizationTrialWrapperProps) {
   const [softLockDismissed, setSoftLockDismissed] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
@@ -98,7 +101,7 @@ export function OrganizationTrialWrapper({
             />
           )}
 
-          <PageContainer>{children}</PageContainer>
+          {fullBleed ? children : <PageContainer>{children}</PageContainer>}
         </div>
       </LockableContainerProvider>
     </OrganizationUpgradeProvider>

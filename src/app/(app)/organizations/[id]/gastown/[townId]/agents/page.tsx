@@ -8,6 +8,10 @@ export default async function OrgAgentsPage({
 }) {
   const { townId } = await params;
   return (
-    <OrganizationByPageLayout params={params} render={() => <AgentsPageClient townId={townId} />} />
+    <OrganizationByPageLayout
+      params={params}
+      fullBleed
+      render={() => <AgentsPageClient townId={townId} />}
+    />
   );
 }

@@ -10,6 +10,7 @@ export default async function OrgRigDetailPage({
   return (
     <OrganizationByPageLayout
       params={params}
+      fullBleed
       render={() => <RigDetailPageClient townId={townId} rigId={rigId} />}
     />
   );

@@ -10,6 +10,7 @@ export default async function OrgTownSettingsPage({
   return (
     <OrganizationByPageLayout
       params={params}
+      fullBleed
       render={() => <TownSettingsPageClient townId={townId} />}
     />
   );

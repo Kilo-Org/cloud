@@ -8,6 +8,10 @@ export default async function OrgBeadsPage({
 }) {
   const { townId } = await params;
   return (
-    <OrganizationByPageLayout params={params} render={() => <BeadsPageClient townId={townId} />} />
+    <OrganizationByPageLayout
+      params={params}
+      fullBleed
+      render={() => <BeadsPageClient townId={townId} />}
+    />
   );
 }

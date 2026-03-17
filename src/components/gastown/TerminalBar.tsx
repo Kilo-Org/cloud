@@ -17,13 +17,16 @@ const EXPANDED_HEIGHT = 300;
 
 type TerminalBarProps = {
   townId: string;
+  /** Override base path for org-scoped routes (e.g. /organizations/[id]/gastown/[townId]) */
+  basePath?: string;
 };
 
 /**
  * Unified bottom terminal bar. Always shows a Mayor tab (non-closeable).
  * Agent terminal tabs are opened/closed via TerminalBarContext.
  */
-export function TerminalBar({ townId }: TerminalBarProps) {
+export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarProps) {
+  const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const { state: sidebarState, isMobile } = useSidebar();
   const {
     tabs: agentTabs,
@@ -81,11 +84,11 @@ export function TerminalBar({ townId }: TerminalBarProps) {
         case 'navigate':
           if (action.page) {
             const pageMap: Record<string, string> = {
-              'town-overview': `/gastown/${townId}`,
-              beads: `/gastown/${townId}/beads`,
-              agents: `/gastown/${townId}/agents`,
-              rigs: `/gastown/${townId}`,
-              settings: `/gastown/${townId}/settings`,
+              'town-overview': townBasePath,
+              beads: `${townBasePath}/beads`,
+              agents: `${townBasePath}/agents`,
+              rigs: townBasePath,
+              settings: `${townBasePath}/settings`,
             };
             const path = pageMap[action.page];
             if (path) {

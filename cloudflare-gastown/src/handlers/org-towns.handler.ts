@@ -71,6 +71,9 @@ export async function handleGetOrgTown(
 }
 
 export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId: string }) {
+  const userId = c.get('kiloUserId');
+  if (!userId) return c.json(resError('Authentication required'), 401);
+
   const parsed = CreateOrgRigBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     console.error(`${ORG_TOWNS_LOG} handleCreateOrgRig: invalid body`, parsed.error.issues);
@@ -99,7 +102,7 @@ export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId
       townId: parsed.data.town_id,
       gitUrl: parsed.data.git_url,
       defaultBranch: parsed.data.default_branch,
-      userId: c.get('kiloUserId') ?? '',
+      userId,
       kilocodeToken: parsed.data.kilocode_token,
       platformIntegrationId: parsed.data.platform_integration_id,
     });

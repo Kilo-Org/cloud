@@ -17,6 +17,7 @@ import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { TownConfigSchema, TownConfigUpdateSchema } from '../types';
+import type { UserRigRecord } from '../db/tables/user-rigs.table';
 import {
   RpcTownOutput,
   RpcRigOutput,
@@ -111,72 +112,29 @@ type RigOwnerStub = {
   deleteTown(townId: string): Promise<boolean>;
 };
 
-type UserRigRecord = {
-  id: string;
-  town_id: string;
-  name: string;
-  git_url: string;
-  default_branch: string;
-  platform_integration_id: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 /**
- * Resolve the DO stub that owns rigs for a given town. For personal towns
- * this is GastownUserDO; for org towns it's GastownOrgDO.
- *
- * Also verifies the user has access (ownership or org membership via JWT).
- * Returns the stub so callers can perform rig operations without
- * knowing the ownership model.
+ * Core ownership resolution shared by resolveRigOwnerStub and verifyTownOwnership.
+ * Returns the owning DO stub and, for personal towns, the town record.
  */
-async function resolveRigOwnerStub(
+async function resolveTownOwnership(
   env: Env,
   userId: string,
   townId: string,
   memberships: JwtOrgMembership[]
-): Promise<RigOwnerStub> {
-  // Fast path: check if user owns this town personally
-  const userStub = getGastownUserStub(env, userId);
-  const personalTown = await userStub.getTownAsync(townId);
-  if (personalTown) {
-    if (personalTown.owner_user_id !== userId) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
+): Promise<
+  | {
+      type: 'user';
+      stub: RigOwnerStub;
+      town: {
+        id: string;
+        name: string;
+        owner_user_id: string;
+        created_at: string;
+        updated_at: string;
+      };
     }
-    return userStub;
-  }
-
-  // Check TownDO config for org ownership, verify via JWT claims
-  const townStub = getTownDOStub(env, townId);
-  let config;
-  try {
-    config = await townStub.getTownConfig();
-  } catch {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
-  }
-
-  if (config.owner_type === 'org' && config.organization_id) {
-    const membership = getOrgMembership(memberships, config.organization_id);
-    if (!membership || membership.role === 'billing_manager') {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'Not an org member' });
-    }
-    return getGastownOrgStub(env, config.organization_id);
-  }
-
-  throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
-}
-
-/**
- * Verify that a user has access to a town — either as the personal owner
- * or as a member of the owning org (checked via JWT claims).
- * Returns a record matching RpcTownOutput.
- */
-async function verifyTownOwnership(
-  env: Env,
-  userId: string,
-  townId: string,
-  memberships: JwtOrgMembership[]
-) {
+  | { type: 'org'; stub: RigOwnerStub; orgId: string }
+> {
   // Fast path: personal town lookup
   const userStub = getGastownUserStub(env, userId);
   const personalTown = await userStub.getTownAsync(townId);
@@ -184,7 +142,7 @@ async function verifyTownOwnership(
     if (personalTown.owner_user_id !== userId) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
     }
-    return personalTown;
+    return { type: 'user', stub: userStub, town: personalTown };
   }
 
   // Check TownDO config for org ownership, verify via JWT claims
@@ -201,19 +159,50 @@ async function verifyTownOwnership(
     if (!membership || membership.role === 'billing_manager') {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not an org member' });
     }
-    // Fetch the org town record for name/timestamps
-    const orgStub = getGastownOrgStub(env, config.organization_id);
-    const orgTown = await orgStub.getTownAsync(townId);
     return {
-      id: townId,
-      name: orgTown?.name ?? townId,
-      owner_user_id: config.created_by_user_id ?? userId,
-      created_at: orgTown?.created_at ?? new Date().toISOString(),
-      updated_at: orgTown?.updated_at ?? new Date().toISOString(),
+      type: 'org',
+      stub: getGastownOrgStub(env, config.organization_id),
+      orgId: config.organization_id,
     };
   }
 
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+}
+
+/** Resolve the DO stub that owns rigs/towns. Verifies access via JWT claims. */
+async function resolveRigOwnerStub(
+  env: Env,
+  userId: string,
+  townId: string,
+  memberships: JwtOrgMembership[]
+): Promise<RigOwnerStub> {
+  const result = await resolveTownOwnership(env, userId, townId, memberships);
+  return result.stub;
+}
+
+/**
+ * Verify that a user has access to a town and return a record matching
+ * RpcTownOutput (used by the getTown procedure).
+ */
+async function verifyTownOwnership(
+  env: Env,
+  userId: string,
+  townId: string,
+  memberships: JwtOrgMembership[]
+) {
+  const result = await resolveTownOwnership(env, userId, townId, memberships);
+  if (result.type === 'user') return result.town;
+
+  // Fetch the org town record for name/timestamps
+  const orgStub = getGastownOrgStub(env, result.orgId);
+  const orgTown = await orgStub.getTownAsync(townId);
+  return {
+    id: townId,
+    name: orgTown?.name ?? townId,
+    owner_user_id: userId,
+    created_at: orgTown?.created_at ?? new Date().toISOString(),
+    updated_at: orgTown?.updated_at ?? new Date().toISOString(),
+  };
 }
 
 /**
@@ -231,10 +220,13 @@ async function verifyRigOwnership(
   const personalRig = await userStub.getRigAsync(rigId);
   if (personalRig) return personalRig;
 
-  // Check org DOs from JWT claims (billing_manager excluded)
-  for (const orgId of listAccessibleOrgIds(memberships)) {
-    const orgStub = getGastownOrgStub(env, orgId);
-    const orgRig = await orgStub.getRigAsync(rigId);
+  // Check org DOs in parallel (billing_manager excluded)
+  const orgIds = listAccessibleOrgIds(memberships);
+  if (orgIds.length > 0) {
+    const results = await Promise.all(
+      orgIds.map(orgId => getGastownOrgStub(env, orgId).getRigAsync(rigId))
+    );
+    const orgRig = results.find(r => r !== null);
     if (orgRig) return orgRig;
   }
 

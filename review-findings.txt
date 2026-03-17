@@ -1,0 +1,72 @@
+## Local Review for **branch diff**: `feat/gastown-org-towns` -> `origin/main`
+
+### Summary
+This PR adds organization-level Gastown towns and rigs alongside the existing personal (user-level) ones. It introduces a new `GastownOrgDO` Durable Object, org-scoped REST and tRPC endpoints, JWT-baked org memberships to eliminate DB round-trips for auth checks, and corresponding frontend pages/sidebar wiring. The architecture is clean — the org ownership model mirrors the existing user ownership model, and the JWT-baked membership approach is a sound optimization. There are a few issues worth addressing around a sequential DO fan-out in rig lookups, dead code, and a minor authorization gap in the REST layer.
+
+### Issues Found
+| Severity | File:Line | Issue |
+|----------|-----------|-------|
+| WARNING | cloudflare-gastown/src/trpc/router.ts:235 | `verifyRigOwnership` sequentially fans out across all org DOs — O(N) DO RPCs per rig lookup |
+| WARNING | cloudflare-gastown/src/handlers/org-towns.handler.ts:102 | `userId` falls back to empty string when `kiloUserId` is missing, masking auth failures |
+| WARNING | cloudflare-gastown/src/util/org-membership.util.ts:1 | Entire file is dead code — no imports anywhere in the codebase |
+| SUGGESTION | cloudflare-gastown/src/trpc/router.ts:93 | `RigOwnerStub` and `UserRigRecord` locally re-declare types that could be imported from DO modules |
+| SUGGESTION | cloudflare-gastown/src/trpc/router.ts:125 | `resolveRigOwnerStub` and `verifyTownOwnership` share nearly identical ownership resolution logic |
+| SUGGESTION | cloudflare-gastown/src/db/tables/org-towns.table.ts:5 | PK column named `id` — AGENTS.md says to encode entity name, but existing tables also use `id` |
+
+### Detailed Findings
+
+- **File:** `cloudflare-gastown/src/trpc/router.ts:235`
+- **Confidence:** 90%
+- **Problem:** `verifyRigOwnership` iterates over all accessible org IDs sequentially, issuing a DO RPC (`getRigAsync`) for each one. If a user is a member of, say, 5 orgs, and the rig doesn't exist or belongs to the last org checked, that's 6 sequential DO round-trips (1 personal + 5 orgs). This is the hot path for every rig-scoped tRPC call (listBeads, deleteBead, slingBead, listAgents, deleteAgent, etc.).
+- **Suggestion:** Use `Promise.all` to fan out org DO lookups in parallel, or better yet, resolve via the rig's `town_id` through TownDO config → `organization_id` to identify the owning org directly (like `resolveRigOwnerStub` already does for town-based lookups). Example:
+  ```ts
+  // Instead of sequential scan, parallelize:
+  const orgChecks = listAccessibleOrgIds(memberships).map(orgId =>
+    getGastownOrgStub(env, orgId).getRigAsync(rigId)
+  );
+  const results = await Promise.all(orgChecks);
+  const orgRig = results.find(r => r !== null);
+  if (orgRig) return orgRig;
+  ```
+
+---
+
+- **File:** `cloudflare-gastown/src/handlers/org-towns.handler.ts:102`
+- **Confidence:** 88%
+- **Problem:** `userId: c.get('kiloUserId') ?? ''` silently falls back to an empty string. While the org auth middleware should have already validated the user, in dev mode (where middleware is skipped) this means rig configuration could be set with an empty `userId`. This is inconsistent with `handleCreateOrgTown` (line 33-34) which correctly returns a 401 if `userId` is missing.
+- **Suggestion:** Return 401 consistently, as done in `handleCreateOrgTown`:
+  ```ts
+  const userId = c.get('kiloUserId');
+  if (!userId) return c.json(resError('Authentication required'), 401);
+  ```
+
+---
+
+- **File:** `cloudflare-gastown/src/util/org-membership.util.ts:1`
+- **Confidence:** 98%
+- **Problem:** This entire file (`verifyOrgMembership` and `listUserOrgIds`) is dead code — it was added in this PR but has zero imports anywhere in the codebase. The refactoring to bake memberships into JWTs replaced the need for these Hyperdrive-based DB lookups, but the file was left behind.
+- **Suggestion:** Delete the file. If it's kept intentionally as a fallback, add a comment explaining the intent and reference it from somewhere.
+
+---
+
+- **File:** `cloudflare-gastown/src/trpc/router.ts:93`
+- **Confidence:** 78%
+- **Problem:** `RigOwnerStub` and `UserRigRecord` are locally declared types in router.ts that duplicate the shapes exported by the DO modules (`UserRigRecord` from `../db/tables/user-rigs.table`). If the DO shapes change, these local types won't automatically stay in sync.
+- **Suggestion:** Import the `UserRigRecord` type from `../db/tables/user-rigs.table` and derive `RigOwnerStub` from the actual DO class types if possible, or at minimum add a comment noting the dependency.
+
+---
+
+- **File:** `cloudflare-gastown/src/trpc/router.ts:125`
+- **Confidence:** 76%
+- **Problem:** `resolveRigOwnerStub` (line 125) and `verifyTownOwnership` (line 174) both implement the same "check personal DO, then check TownDO config for org ownership, then verify JWT membership" flow. This is a near-duplicate pattern that increases the surface area for bugs.
+- **Suggestion:** Extract a shared `resolveTownOwnership(env, userId, townId, memberships)` that returns `{ ownerStub, config, orgMembership? }` and have both functions call it.
+
+---
+
+- **File:** `cloudflare-gastown/src/db/tables/org-towns.table.ts:5`
+- **Confidence:** 75%
+- **Problem:** AGENTS.md states: "Never name a primary key column just `id`. Encode the entity in the column name, e.g. `bead_id`, `town_id`." The `org_towns` table uses `id` as its PK. However, all other existing tables (`user_rigs`, `user_towns`, `rig_beads`, etc.) also use `id`, so this is consistent with the actual codebase even if it contradicts the documented convention.
+- **Suggestion:** Noting for awareness only. If you want to follow the convention going forward, rename to `org_town_id`, but that would be inconsistent with the rest of the codebase until a broader rename is done. Not blocking.
+
+### Recommendation
+**APPROVE WITH SUGGESTIONS** — The architecture is well-structured and the auth model is sound. The sequential org fan-out in `verifyRigOwnership` is the most impactful issue to address before this sees production traffic with users in multiple orgs. The dead code file should be cleaned up. The empty userId fallback is a minor safety concern.

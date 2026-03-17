@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { getTownDOStub } from '../dos/Town.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
+import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import {
@@ -91,9 +92,25 @@ function resolveUserId(c: Context<GastownEnv>): string | null {
 }
 
 /**
- * Verify that `rigId` belongs to `townId` by checking the user's rig
- * registry. Returns the rig record on success, or null if the rig
- * doesn't belong to this town (or doesn't exist).
+ * Resolve the DO stub that owns rigs for a given town. For personal towns
+ * this is GastownUserDO; for org towns it's GastownOrgDO.
+ */
+async function resolveRigOwnerForTown(env: Env, townId: string, userId: string) {
+  const townStub = getTownDOStub(env, townId);
+  try {
+    const config = await townStub.getTownConfig();
+    if (config.owner_type === 'org' && config.organization_id) {
+      return getGastownOrgStub(env, config.organization_id);
+    }
+  } catch {
+    // Fall through to user DO
+  }
+  return getGastownUserStub(env, userId);
+}
+
+/**
+ * Verify that `rigId` belongs to `townId` by checking the rig registry
+ * (user DO for personal towns, org DO for org towns).
  */
 async function verifyRigBelongsToTown(
   c: Context<GastownEnv>,
@@ -102,8 +119,8 @@ async function verifyRigBelongsToTown(
 ): Promise<boolean> {
   const userId = resolveUserId(c);
   if (!userId) return false;
-  const userDO = getGastownUserStub(c.env, userId);
-  const rig = await userDO.getRigAsync(rigId);
+  const ownerDO = await resolveRigOwnerForTown(c.env, townId, userId);
+  const rig = await ownerDO.getRigAsync(rigId);
   return rig !== null && rig.town_id === townId;
 }
 
@@ -158,8 +175,8 @@ export async function handleMayorListRigs(c: Context<GastownEnv>, params: { town
 
   console.log(`${HANDLER_LOG} handleMayorListRigs: townId=${params.townId} userId=${userId}`);
 
-  const userDO = getGastownUserStub(c.env, userId);
-  const rigs = await userDO.listRigs(params.townId);
+  const ownerDO = await resolveRigOwnerForTown(c.env, params.townId, userId);
+  const rigs = await ownerDO.listRigs(params.townId);
 
   return c.json(resSuccess(rigs));
 }

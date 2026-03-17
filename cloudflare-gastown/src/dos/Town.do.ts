@@ -1606,7 +1606,8 @@ export class TownDO extends DurableObject<Env> {
     const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
       townId,
       rigId: `mayor-${townId}`,
-      userId: townConfig.owner_user_id ?? rigConfig?.userId ?? '',
+      userId:
+        townConfig.owner_user_id ?? rigConfig?.userId ?? townConfig.created_by_user_id ?? townId,
       agentId: mayor.id,
       agentName: 'mayor',
       role: 'mayor',

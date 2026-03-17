@@ -46,6 +46,7 @@ export async function handleCreateOrgTown(c: Context<GastownEnv>, params: { orgI
   await townDOStub.updateTownConfig({
     owner_type: 'org',
     owner_id: params.orgId,
+    owner_user_id: userId,
     organization_id: params.orgId,
     created_by_user_id: userId,
   });

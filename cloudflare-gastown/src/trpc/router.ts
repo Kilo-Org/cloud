@@ -895,6 +895,7 @@ export const gastownRouter = router({
         kilocode_token: kilocodeToken,
         owner_type: 'org',
         owner_id: input.organizationId,
+        owner_user_id: ctx.userId,
         organization_id: input.organizationId,
         created_by_user_id: ctx.userId,
       });

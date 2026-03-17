@@ -29,6 +29,8 @@ export const StartAgentRequest = z.object({
   startPoint: z.string().optional(),
   /** Skip repo clone — use a lightweight git-init-only workspace (for reasoning-only agents like triage). */
   lightweight: z.boolean().optional(),
+  /** Organization ID — set for org-owned towns so agents bill to the correct team. */
+  organizationId: z.string().optional(),
   /** Rig list for mayor agents — used to set up browse worktrees on fresh containers. */
   rigs: z
     .array(

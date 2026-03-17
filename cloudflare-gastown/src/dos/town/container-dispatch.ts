@@ -402,6 +402,8 @@ export async function startAgentInContainer(
         // worktree includes all previously merged convoy work.
         startPoint: params.convoyFeatureBranch ? `origin/${params.convoyFeatureBranch}` : undefined,
         lightweight: params.lightweight,
+        // Org-owned towns: pass the organization ID so agents bill to the correct team
+        organizationId: params.townConfig.organization_id,
         rigs: params.rigs,
       }),
     });

@@ -35,17 +35,27 @@ const HEADLESS_PERMISSIONS = {
  * the Kilo LLM gateway. Both `model` and `smallModel` are OpenRouter-style
  * IDs (e.g. "anthropic/claude-sonnet-4.6") resolved from the town config.
  */
-function buildKiloConfigContent(kilocodeToken: string, model: string, smallModel: string): string {
+function buildKiloConfigContent(
+  kilocodeToken: string,
+  model: string,
+  smallModel: string,
+  organizationId?: string
+): string {
   const primaryModel = kiloModel(model);
   const smModel = kiloModel(smallModel);
+
+  const providerOptions: Record<string, string> = {
+    apiKey: kilocodeToken,
+    kilocodeToken,
+  };
+  if (organizationId) {
+    providerOptions.kilocodeOrganizationId = organizationId;
+  }
 
   return JSON.stringify({
     provider: {
       kilo: {
-        options: {
-          apiKey: kilocodeToken,
-          kilocodeToken,
-        },
+        options: providerOptions,
         // Register models so the kilo server doesn't reject them before
         // routing to the gateway.
         models: {
@@ -132,7 +142,8 @@ GASTOWN_TOWN_ID="${env.GASTOWN_TOWN_ID}"`);
     const configJson = buildKiloConfigContent(
       kilocodeToken,
       request.model,
-      request.smallModel ?? 'anthropic/claude-haiku-4.5'
+      request.smallModel ?? 'anthropic/claude-haiku-4.5',
+      request.organizationId
     );
     env.KILO_CONFIG_CONTENT = configJson;
     env.OPENCODE_CONFIG_CONTENT = configJson;

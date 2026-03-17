@@ -993,17 +993,23 @@ export const gastownRouter = router({
       const town = await orgStub.getTownAsync(input.townId);
       if (!town) throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
 
-      // Generate kilocode token for agent LLM gateway auth
-      const user = userFromCtx(ctx);
-      const kilocodeToken = await mintKilocodeToken(ctx.env, user);
-
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
+
+      // Mint kilocode token using the town owner's identity (not the calling member)
+      // so adding a rig doesn't rotate the town-wide credential.
+      const townConfig = await townStub.getTownConfig();
+      const ownerUserId = townConfig.owner_user_id ?? ctx.userId;
+      const ownerPepper = ownerUserId === ctx.userId ? ctx.apiTokenPepper : null;
+      const kilocodeToken = await mintKilocodeToken(ctx.env, {
+        id: ownerUserId,
+        api_token_pepper: ownerPepper,
+      });
       await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
 
       // Resolve git credentials before configureRig so the proactive clone has auth
       try {
-        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, user.id);
+        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, ownerUserId);
       } catch (err) {
         console.warn('[gastown-trpc] createOrgRig: git credential refresh failed', err);
       }
@@ -1022,7 +1028,7 @@ export const gastownRouter = router({
           townId: input.townId,
           gitUrl: input.gitUrl,
           defaultBranch: input.defaultBranch,
-          userId: user.id,
+          userId: ownerUserId,
           kilocodeToken,
           platformIntegrationId: input.platformIntegrationId,
         });

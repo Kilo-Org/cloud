@@ -399,29 +399,27 @@ app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
 
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
-// routes. Skip in development. Container→worker routes use the agent JWT
-// middleware instead (authMiddleware above).
+// routes. Container→worker routes use the agent JWT middleware instead
+// (authMiddleware above).
 
 app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+  kiloAuthMiddleware(c, next)
 );
 // Town routes: kilo auth + town ownership check (supports both personal and org-owned towns).
-// Skipped in dev mode.
-app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
-  if (c.env.ENVIRONMENT === 'development') return next();
-  return kiloAuthMiddleware(c, async () => {
+app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) =>
+  kiloAuthMiddleware(c, async () => {
     await townAuthMiddleware(c, next);
-  });
-});
+  })
+);
 
 // ── Org Auth ────────────────────────────────────────────────────────────
-// Kilo user auth + org membership check for all org routes. Skipped in dev.
+// Kilo user auth + org membership check for all org routes.
 
 app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+  kiloAuthMiddleware(c, next)
 );
 app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : orgAuthMiddleware(c, next)
+  orgAuthMiddleware(c, next)
 );
 
 // ── Org Towns & Rigs ─────────────────────────────────────────────────────
@@ -526,7 +524,7 @@ app.patch('/api/towns/:townId/config', c =>
 // ── Town Events ─────────────────────────────────────────────────────────
 
 app.use('/api/users/:userId/towns/:townId/events', async (c: Context<GastownEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : townAuthMiddleware(c, next)
+  townAuthMiddleware(c, next)
 );
 app.get('/api/users/:userId/towns/:townId/events', c =>
   instrumented(c, 'GET /api/users/:userId/towns/:townId/events', () =>

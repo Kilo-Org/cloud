@@ -128,6 +128,10 @@ export async function buildContainerConfig(
     small_model: resolveSmallModel(config),
     git_auth: config.git_auth,
     kilocode_token: config.kilocode_token,
+    github_cli_pat: config.github_cli_pat,
+    git_author_name: config.git_author_name,
+    git_author_email: config.git_author_email,
+    disable_ai_coauthor: config.disable_ai_coauthor,
     kilo_api_url: env.KILO_API_URL ?? '',
     gastown_api_url: env.GASTOWN_API_URL ?? '',
   };

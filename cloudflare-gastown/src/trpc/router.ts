@@ -810,7 +810,17 @@ export const gastownRouter = router({
       }
 
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.updateTownConfig(safeConfig);
+      const result = await townStub.updateTownConfig(safeConfig);
+
+      // Push updated env vars to the running container so changes
+      // take effect without a container restart
+      try {
+        await townStub.syncConfigToContainer();
+      } catch (err) {
+        console.warn('[gastown-trpc] updateTownConfig: syncConfigToContainer failed:', err);
+      }
+
+      return result;
     }),
 
   refreshContainerToken: gastownProcedure

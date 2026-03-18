@@ -499,6 +499,39 @@ export class TownDO extends DurableObject<Env> {
     this.lastContainerTokenRefreshAt = Date.now();
   }
 
+  /**
+   * Push config-derived env vars to the running container. Called after
+   * updateTownConfig so that settings changes take effect without a
+   * container restart. New agent processes inherit the updated values.
+   */
+  async syncConfigToContainer(): Promise<void> {
+    const townId = this.townId;
+    if (!townId) return;
+    const townConfig = await this.getTownConfig();
+    const container = getTownContainerStub(this.env, townId);
+
+    // Map config fields to their container env var equivalents
+    const envMapping: Array<[string, string | undefined]> = [
+      ['GIT_TOKEN', townConfig.git_auth?.github_token],
+      ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
+      ['GITLAB_INSTANCE_URL', townConfig.git_auth?.gitlab_instance_url],
+      ['GITHUB_CLI_PAT', townConfig.github_cli_pat],
+      ['GASTOWN_GIT_AUTHOR_NAME', townConfig.git_author_name],
+      ['GASTOWN_GIT_AUTHOR_EMAIL', townConfig.git_author_email],
+      ['GASTOWN_DISABLE_AI_COAUTHOR', townConfig.disable_ai_coauthor ? '1' : undefined],
+    ];
+
+    for (const [key, value] of envMapping) {
+      if (value) {
+        try {
+          await container.setEnvVar(key, value);
+        } catch (err) {
+          console.warn(`[Town.do] syncConfigToContainer: setEnvVar(${key}) failed:`, err);
+        }
+      }
+    }
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // Rig Registry
   // ══════════════════════════════════════════════════════════════════

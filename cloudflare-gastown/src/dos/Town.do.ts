@@ -510,7 +510,8 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const container = getTownContainerStub(this.env, townId);
 
-    // Map config fields to their container env var equivalents
+    // Map config fields to their container env var equivalents.
+    // When a value is set, push it; when cleared, remove it.
     const envMapping: Array<[string, string | undefined]> = [
       ['GIT_TOKEN', townConfig.git_auth?.github_token],
       ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
@@ -522,12 +523,14 @@ export class TownDO extends DurableObject<Env> {
     ];
 
     for (const [key, value] of envMapping) {
-      if (value) {
-        try {
+      try {
+        if (value) {
           await container.setEnvVar(key, value);
-        } catch (err) {
-          console.warn(`[Town.do] syncConfigToContainer: setEnvVar(${key}) failed:`, err);
+        } else {
+          await container.deleteEnvVar(key);
         }
+      } catch (err) {
+        console.warn(`[Town.do] syncConfigToContainer: ${key} sync failed:`, err);
       }
     }
   }

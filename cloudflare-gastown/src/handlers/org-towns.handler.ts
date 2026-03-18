@@ -17,7 +17,6 @@ const CreateOrgRigBody = z.object({
   name: z.string().min(1).max(64),
   git_url: z.string().url(),
   default_branch: z.string().min(1).default('main'),
-  kilocode_token: z.string().min(1).optional(),
   platform_integration_id: z.string().min(1).optional(),
 });
 
@@ -108,7 +107,9 @@ export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId
       gitUrl: parsed.data.git_url,
       defaultBranch: parsed.data.default_branch,
       userId,
-      kilocodeToken: parsed.data.kilocode_token,
+      // Never trust caller-supplied kilocode tokens for org rigs — the
+      // town's existing token (minted by the owner) is used instead.
+      kilocodeToken: undefined,
       platformIntegrationId: parsed.data.platform_integration_id,
     });
     // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC stub returns Rpc.Promisified

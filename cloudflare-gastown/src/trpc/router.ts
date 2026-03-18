@@ -767,9 +767,37 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcTownConfigSchema)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      const ownership = await resolveTownOwnership(
+        ctx.env,
+        ctx.userId,
+        input.townId,
+        ctx.orgMemberships
+      );
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.getTownConfig();
+      const config = await townStub.getTownConfig();
+
+      // Mask secrets for non-owner org members
+      if (ownership.type === 'org') {
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        if (membership?.role !== 'owner') {
+          const mask = (s?: string) => (s ? '****' + s.slice(-4) : undefined);
+          return {
+            ...config,
+            kilocode_token: mask(config.kilocode_token),
+            github_cli_pat: mask(config.github_cli_pat),
+            git_auth: {
+              ...config.git_auth,
+              github_token: mask(config.git_auth?.github_token),
+              gitlab_token: mask(config.git_auth?.gitlab_token),
+            },
+            env_vars: Object.fromEntries(
+              Object.entries(config.env_vars).map(([k, v]) => [k, '****' + v.slice(-4)])
+            ),
+          };
+        }
+      }
+
+      return config;
     }),
 
   updateTownConfig: gastownProcedure

@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-type Props = { townId: string };
+type Props = { townId: string; readOnly?: boolean };
 
 type EnvVarEntry = { key: string; value: string; isNew?: boolean };
 
@@ -81,7 +81,7 @@ function scrollToSection(id: string) {
   }
 }
 
-export function TownSettingsPageClient({ townId }: Props) {
+export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
 
@@ -232,16 +232,21 @@ export function TownSettingsPageClient({ townId }: Props) {
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Settings</h1>
           <span className="text-sm text-white/30">{townQuery.data?.name}</span>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={updateConfig.isPending}
-          variant="primary"
-          size="sm"
-          className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-        >
-          <Save className="size-3.5" />
-          {updateConfig.isPending ? 'Saving...' : 'Save'}
-        </Button>
+        {!readOnly && (
+          <Button
+            onClick={handleSave}
+            disabled={updateConfig.isPending}
+            variant="primary"
+            size="sm"
+            className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+          >
+            <Save className="size-3.5" />
+            {updateConfig.isPending ? 'Saving...' : 'Save'}
+          </Button>
+        )}
+        {readOnly && (
+          <span className="text-xs text-white/30">View only — only org owners can edit</span>
+        )}
       </div>
 
       {/* Two-column body — single scroll container so sticky works */}
@@ -642,18 +647,20 @@ export function TownSettingsPageClient({ townId }: Props) {
               </ul>
 
               {/* Save button mirrored in sidebar */}
-              <div className="mt-6 border-t border-white/[0.06] pt-4">
-                <Button
-                  onClick={handleSave}
-                  disabled={updateConfig.isPending}
-                  variant="primary"
-                  size="sm"
-                  className="w-full gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-                >
-                  <Save className="size-3" />
-                  {updateConfig.isPending ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
+              {!readOnly && (
+                <div className="mt-6 border-t border-white/[0.06] pt-4">
+                  <Button
+                    onClick={handleSave}
+                    disabled={updateConfig.isPending}
+                    variant="primary"
+                    size="sm"
+                    className="w-full gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+                  >
+                    <Save className="size-3" />
+                    {updateConfig.isPending ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              )}
             </nav>
           </div>
         </div>

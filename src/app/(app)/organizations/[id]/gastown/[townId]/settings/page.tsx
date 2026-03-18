@@ -11,7 +11,7 @@ export default async function OrgTownSettingsPage({
     <OrganizationByPageLayout
       params={params}
       fullBleed
-      render={() => <TownSettingsPageClient townId={townId} />}
+      render={({ role }) => <TownSettingsPageClient townId={townId} readOnly={role !== 'owner'} />}
     />
   );
 }

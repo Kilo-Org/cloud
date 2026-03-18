@@ -59,6 +59,14 @@ export class TownContainerDO extends Container<Env> {
     console.log(`${TC_LOG} setEnvVar: ${key} stored (${value.length} chars)`);
   }
 
+  async deleteEnvVar(key: string): Promise<void> {
+    const stored = (await this.ctx.storage.get<Record<string, string>>('container:envVars')) ?? {};
+    delete stored[key];
+    await this.ctx.storage.put('container:envVars', stored);
+    delete this.envVars[key];
+    console.log(`${TC_LOG} deleteEnvVar: ${key} removed`);
+  }
+
   override onStart(): void {
     console.log(`${TC_LOG} container started for DO id=${this.ctx.id.toString()}`);
   }

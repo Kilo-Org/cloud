@@ -1676,6 +1676,7 @@ export class TownDO extends DurableObject<Env> {
     body?: string;
     priority?: string;
     metadata?: Record<string, unknown>;
+    dependsOn?: string[];
   }): Promise<{ bead: Bead; agent: Agent }> {
     await this.ensureInitialized();
 
@@ -1688,6 +1689,15 @@ export class TownDO extends DurableObject<Env> {
       metadata: input.metadata,
     });
 
+    // Insert dependency rows before hooking/dispatching so the bead's
+    // blocker set is complete before any agent can start work on it.
+    // This is atomic within the DO's synchronous SQLite transaction.
+    if (input.dependsOn && input.dependsOn.length > 0) {
+      for (const depBeadId of input.dependsOn) {
+        beadOps.addBeadDependency(this.sql, createdBead.bead_id, depBeadId, 'blocks');
+      }
+    }
+
     const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
     agents.hookBead(this.sql, agent.id, createdBead.bead_id);
 
@@ -1696,7 +1706,8 @@ export class TownDO extends DurableObject<Env> {
     const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
 
     // Fire-and-forget dispatch so the sling call returns immediately.
-    // The alarm loop retries if this fails.
+    // The alarm loop retries if this fails. If depends_on was set, the bead
+    // will be blocked and dispatchAgent will hold it until blockers close.
     this.dispatchAgent(hookedAgent, bead).catch(err =>
       console.error(`${TOWN_LOG} slingBead: fire-and-forget dispatchAgent failed:`, err)
     );

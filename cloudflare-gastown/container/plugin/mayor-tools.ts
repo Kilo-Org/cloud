@@ -76,24 +76,15 @@ export function createMayorTools(client: MayorGastownClient) {
       },
       async execute(args) {
         const metadata = args.metadata ? parseJsonObject(args.metadata, 'metadata') : undefined;
+        // Pass depends_on directly to client.sling() so TownDO.slingBead()
+        // inserts the dependency rows atomically before arming dispatch.
         const result = await client.sling({
           rig_id: args.rig_id,
           title: args.title,
           body: args.body,
           metadata,
+          depends_on: args.depends_on,
         });
-
-        // Add dependency edges if depends_on was provided
-        if (args.depends_on && args.depends_on.length > 0) {
-          for (const depBeadId of args.depends_on) {
-            await client.addBeadDependency({
-              rig_id: args.rig_id,
-              bead_id: result.bead.bead_id,
-              depends_on_bead_id: depBeadId,
-              dependency_type: 'blocks',
-            });
-          }
-        }
 
         const lines = [
           `Task slung successfully.`,

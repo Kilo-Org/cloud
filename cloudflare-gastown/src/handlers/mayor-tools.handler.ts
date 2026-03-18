@@ -24,6 +24,7 @@ const MayorSlingBody = z.object({
   title: z.string().min(1),
   body: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  depends_on: z.array(z.string().min(1)).optional(),
 });
 
 const MayorSlingBatchBody = z
@@ -152,7 +153,10 @@ export async function handleMayorSling(c: Context<GastownEnv>, params: { townId:
   const town = getTownDOStub(c.env, params.townId);
   const result = await town.slingBead({
     rigId: parsed.data.rig_id,
-    ...parsed.data,
+    title: parsed.data.title,
+    body: parsed.data.body,
+    metadata: parsed.data.metadata,
+    dependsOn: parsed.data.depends_on,
   });
 
   console.log(

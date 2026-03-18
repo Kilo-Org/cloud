@@ -300,6 +300,7 @@ export class MayorGastownClient {
     title: string;
     body?: string;
     metadata?: Record<string, unknown>;
+    depends_on?: string[];
   }): Promise<SlingResult> {
     return this.request<SlingResult>(this.mayorPath('/sling'), {
       method: 'POST',

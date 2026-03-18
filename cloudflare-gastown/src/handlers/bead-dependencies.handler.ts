@@ -3,12 +3,15 @@ import { z } from 'zod';
 import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { DependencyType } from '../db/tables/bead-dependencies.table';
 import type { GastownEnv } from '../gastown.worker';
+
+// Only allow user-editable dependency types. 'tracks' is system-managed
+// (created by slingConvoy) and must not be creatable via the public API.
+const EditableDependencyType = z.enum(['blocks', 'parent-child']);
 
 const AddDependencyBody = z.object({
   depends_on_bead_id: z.string().min(1),
-  dependency_type: DependencyType.optional().default('blocks'),
+  dependency_type: EditableDependencyType.optional().default('blocks'),
 });
 
 /**
@@ -30,6 +33,11 @@ export async function handleAddBeadDependency(
   const town = getTownDOStub(c.env, params.townId);
   const bead = await town.getBeadAsync(params.beadId);
   if (!bead || bead.rig_id !== params.rigId) return c.json(resError('Bead not found'), 404);
+
+  const depBead = await town.getBeadAsync(parsed.data.depends_on_bead_id);
+  if (!depBead || depBead.rig_id !== params.rigId) {
+    return c.json(resError('Dependency bead not found in this rig'), 404);
+  }
 
   try {
     await town.addBeadDependency(
@@ -56,6 +64,11 @@ export async function handleRemoveBeadDependency(
   const town = getTownDOStub(c.env, params.townId);
   const bead = await town.getBeadAsync(params.beadId);
   if (!bead || bead.rig_id !== params.rigId) return c.json(resError('Bead not found'), 404);
+
+  const depBead = await town.getBeadAsync(params.dependsOnBeadId);
+  if (!depBead || depBead.rig_id !== params.rigId) {
+    return c.json(resError('Dependency bead not found in this rig'), 404);
+  }
 
   const deleted = await town.removeBeadDependency(params.beadId, params.dependsOnBeadId);
 

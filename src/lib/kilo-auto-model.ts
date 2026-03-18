@@ -199,7 +199,7 @@ export function resolveAutoModel(model: string, modeHeader: string | null): Reso
     return { model: minimax_m25_free_model.public_id };
   }
   if (mappedModel === KILO_AUTO_SMALL_MODEL.id) {
-    return { model: 'openai/gpt-5-nano' };
+    return { model: 'openai/gpt-5.4-nano' };
   }
   const mode = modeHeader?.trim().toLowerCase() ?? '';
   if (mappedModel === KILO_AUTO_BALANCED_MODEL.id) {

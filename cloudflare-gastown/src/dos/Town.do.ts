@@ -1705,12 +1705,18 @@ export class TownDO extends DurableObject<Env> {
     const bead = beadOps.getBead(this.sql, createdBead.bead_id) ?? createdBead;
     const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
 
-    // Fire-and-forget dispatch so the sling call returns immediately.
-    // The alarm loop retries if this fails. If depends_on was set, the bead
-    // will be blocked and dispatchAgent will hold it until blockers close.
-    this.dispatchAgent(hookedAgent, bead).catch(err =>
-      console.error(`${TOWN_LOG} slingBead: fire-and-forget dispatchAgent failed:`, err)
-    );
+    // Only dispatch if the bead has no unresolved blockers. Mirror the
+    // slingConvoy() guard so a bead with depends_on is not started before
+    // its blockers close.
+    if (!beadOps.hasUnresolvedBlockers(this.sql, bead.bead_id)) {
+      this.dispatchAgent(hookedAgent, bead).catch(err =>
+        console.error(`${TOWN_LOG} slingBead: fire-and-forget dispatchAgent failed:`, err)
+      );
+    } else {
+      console.log(
+        `${TOWN_LOG} slingBead: bead=${bead.bead_id} blocked, deferring dispatch until deps close`
+      );
+    }
     await this.armAlarmIfNeeded();
     return { bead, agent: hookedAgent };
   }

@@ -33,6 +33,7 @@ export const FEATURE_VALUES = [
   'direct-gateway',
   'embeddings',
   'openclaw-embedding',
+  'gastown',
 ] as const;
 
 const featureSchema = z.enum(FEATURE_VALUES);

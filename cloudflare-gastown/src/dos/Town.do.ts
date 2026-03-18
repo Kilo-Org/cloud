@@ -869,9 +869,9 @@ export class TownDO extends DurableObject<Env> {
         eventType: 'dependency_removed',
         metadata: { depends_on_bead_id: dependsOnBeadId },
       });
-      // Check if removing this dependency unblocked any beads
-      const unblockedIds = beadOps.getNewlyUnblockedBeads(this.sql, dependsOnBeadId);
-      if (unblockedIds.length > 0) {
+      // If beadId has no remaining unresolved blockers, arm the alarm so
+      // it gets dispatched promptly.
+      if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
         await this.ctx.storage.setAlarm(Date.now());
       }
     }

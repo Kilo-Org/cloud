@@ -17,7 +17,7 @@ const AddDependencyBody = z.object({
  */
 export async function handleAddBeadDependency(
   c: Context<GastownEnv>,
-  params: { townId: string; beadId: string }
+  params: { townId: string; rigId: string; beadId: string }
 ) {
   const parsed = AddDependencyBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
@@ -28,6 +28,9 @@ export async function handleAddBeadDependency(
   }
 
   const town = getTownDOStub(c.env, params.townId);
+  const bead = await town.getBeadAsync(params.beadId);
+  if (!bead || bead.rig_id !== params.rigId) return c.json(resError('Bead not found'), 404);
+
   try {
     await town.addBeadDependency(
       params.beadId,
@@ -48,9 +51,12 @@ export async function handleAddBeadDependency(
  */
 export async function handleRemoveBeadDependency(
   c: Context<GastownEnv>,
-  params: { townId: string; beadId: string; dependsOnBeadId: string }
+  params: { townId: string; rigId: string; beadId: string; dependsOnBeadId: string }
 ) {
   const town = getTownDOStub(c.env, params.townId);
+  const bead = await town.getBeadAsync(params.beadId);
+  if (!bead || bead.rig_id !== params.rigId) return c.json(resError('Bead not found'), 404);
+
   const deleted = await town.removeBeadDependency(params.beadId, params.dependsOnBeadId);
 
   return c.json(resSuccess({ ok: true, deleted }));

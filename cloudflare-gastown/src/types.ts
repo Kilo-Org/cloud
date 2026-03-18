@@ -257,6 +257,21 @@ export const TownConfigSchema = z.object({
 
   /** When true, all convoys are created as staged by default (agents not dispatched until started). */
   staged_convoys_default: z.boolean().default(false),
+
+  /** GitHub PAT used exclusively for `gh` CLI operations (PRs, issues, etc.).
+   *  Git clone/push still uses the integration token from git_auth. */
+  github_cli_pat: z.string().optional(),
+
+  /** Custom git commit author name. When set, the user becomes the primary author
+   *  and the AI agent is added as co-author (unless disable_ai_coauthor is true). */
+  git_author_name: z.string().optional(),
+
+  /** Custom git commit author email. Used alongside git_author_name. */
+  git_author_email: z.string().optional(),
+
+  /** When true, AI agent co-authorship trailer is omitted from commits.
+   *  Only takes effect when git_author_name is set. */
+  disable_ai_coauthor: z.boolean().default(false),
 });
 
 export type TownConfig = z.infer<typeof TownConfigSchema>;
@@ -302,6 +317,10 @@ export const TownConfigUpdateSchema = z.object({
     })
     .optional(),
   staged_convoys_default: z.boolean().optional(),
+  github_cli_pat: z.string().optional(),
+  git_author_name: z.string().optional(),
+  git_author_email: z.string().optional(),
+  disable_ai_coauthor: z.boolean().optional(),
 });
 export type TownConfigUpdate = z.infer<typeof TownConfigUpdateSchema>;
 

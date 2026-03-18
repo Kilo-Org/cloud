@@ -342,6 +342,23 @@ export async function startAgentInContainer(
       envVars.GITLAB_INSTANCE_URL = params.townConfig.git_auth.gitlab_instance_url;
     }
 
+    // GitHub CLI PAT — used exclusively for `gh` CLI operations (PRs, issues).
+    // Separate from GIT_TOKEN which is used for git clone/push.
+    if (params.townConfig.github_cli_pat) {
+      envVars.GITHUB_CLI_PAT = params.townConfig.github_cli_pat;
+    }
+
+    // Custom git commit identity
+    if (params.townConfig.git_author_name) {
+      envVars.GASTOWN_GIT_AUTHOR_NAME = params.townConfig.git_author_name;
+    }
+    if (params.townConfig.git_author_email) {
+      envVars.GASTOWN_GIT_AUTHOR_EMAIL = params.townConfig.git_author_email;
+    }
+    if (params.townConfig.disable_ai_coauthor) {
+      envVars.GASTOWN_DISABLE_AI_COAUTHOR = '1';
+    }
+
     // Container token is preferred (shared by all agents, refreshed by alarm).
     // Legacy per-agent JWT kept as fallback during rollout.
     if (containerToken) envVars.GASTOWN_CONTAINER_TOKEN = containerToken;

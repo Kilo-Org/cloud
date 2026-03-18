@@ -452,6 +452,10 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
             }
           | undefined;
         staged_convoys_default: boolean;
+        github_cli_pat?: string | undefined;
+        git_author_name?: string | undefined;
+        git_author_email?: string | undefined;
+        disable_ai_coauthor: boolean;
       };
       meta: object;
     }>;
@@ -489,6 +493,10 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               }
             | undefined;
           staged_convoys_default?: boolean | undefined;
+          github_cli_pat?: string | undefined;
+          git_author_name?: string | undefined;
+          git_author_email?: string | undefined;
+          disable_ai_coauthor?: boolean | undefined;
         };
       };
       output: {
@@ -1468,6 +1476,10 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                 }
               | undefined;
             staged_convoys_default: boolean;
+            github_cli_pat?: string | undefined;
+            git_author_name?: string | undefined;
+            git_author_email?: string | undefined;
+            disable_ai_coauthor: boolean;
           };
           meta: object;
         }>;
@@ -1505,6 +1517,10 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   }
                 | undefined;
               staged_convoys_default?: boolean | undefined;
+              github_cli_pat?: string | undefined;
+              git_author_name?: string | undefined;
+              git_author_email?: string | undefined;
+              disable_ai_coauthor?: boolean | undefined;
             };
           };
           output: {

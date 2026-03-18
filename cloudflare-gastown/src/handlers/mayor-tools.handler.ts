@@ -25,6 +25,7 @@ const MayorSlingBody = z.object({
   body: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   depends_on: z.array(z.string().min(1)).optional(),
+  convoy_id: z.string().min(1).optional(),
 });
 
 const MayorSlingBatchBody = z
@@ -157,6 +158,7 @@ export async function handleMayorSling(c: Context<GastownEnv>, params: { townId:
     body: parsed.data.body,
     metadata: parsed.data.metadata,
     dependsOn: parsed.data.depends_on,
+    convoyId: parsed.data.convoy_id,
   });
 
   console.log(
@@ -395,6 +397,7 @@ const BeadUpdateBody = z
     metadata: z.record(z.string(), z.unknown()).optional(),
     rig_id: z.string().min(1).nullable().optional(),
     parent_bead_id: z.string().min(1).nullable().optional(),
+    convoy_id: z.string().min(1).nullable().optional(),
   })
   .refine(
     data =>
@@ -405,7 +408,8 @@ const BeadUpdateBody = z
       data.status !== undefined ||
       data.metadata !== undefined ||
       data.rig_id !== undefined ||
-      data.parent_bead_id !== undefined,
+      data.parent_bead_id !== undefined ||
+      data.convoy_id !== undefined,
     { message: 'At least one field must be provided' }
   );
 
@@ -460,7 +464,24 @@ export async function handleMayorBeadUpdate(
     return c.json(resError('Bead does not belong to this rig'), 403);
   }
 
-  const bead = await town.updateBead(params.beadId, parsed.data, 'mayor');
+  // Handle convoy_id changes separately — convoy membership is managed
+  // via 'tracks' dependencies and counter updates, not plain field updates.
+  if (parsed.data.convoy_id !== undefined) {
+    // null → remove from current convoy; string → add to that convoy
+    if (parsed.data.convoy_id === null) {
+      await town.removeBeadFromConvoy(params.beadId);
+    } else {
+      await town.addBeadToConvoy(params.beadId, parsed.data.convoy_id);
+    }
+  }
+
+  // Forward remaining fields (excluding convoy_id) to the normal update path
+  const { convoy_id: _convoyId, ...fieldUpdates } = parsed.data;
+  const hasFieldUpdates = Object.values(fieldUpdates).some(v => v !== undefined);
+
+  const bead = hasFieldUpdates
+    ? await town.updateBead(params.beadId, fieldUpdates, 'mayor')
+    : await town.getBeadAsync(params.beadId);
 
   return c.json(resSuccess(bead));
 }

@@ -910,6 +910,153 @@ export function getConvoyFeatureBranch(sql: SqlStorage, convoyId: string): strin
   return z.object({ feature_branch: z.string().nullable() }).parse(rows[0]).feature_branch;
 }
 
+// ── Convoy Membership ───────────────────────────────────────────────
+
+/**
+ * Add a bead to an existing convoy. Creates the 'tracks' dependency,
+ * merges convoy_id + feature_branch into the bead's metadata, and
+ * increments the convoy's total_beads counter.
+ *
+ * No-ops if the bead already tracks this convoy.
+ */
+export function addBeadToConvoy(sql: SqlStorage, beadId: string, convoyId: string): void {
+  // Verify both exist
+  const bead = getBead(sql, beadId);
+  if (!bead) throw new Error(`Bead ${beadId} not found`);
+
+  const convoyBead = getBead(sql, convoyId);
+  if (!convoyBead) throw new Error(`Convoy ${convoyId} not found`);
+  if (convoyBead.type !== 'convoy') {
+    throw new Error(`Bead ${convoyId} is not a convoy (type: ${convoyBead.type})`);
+  }
+
+  // Check if already tracked
+  const existing = getConvoyForBead(sql, beadId);
+  if (existing === convoyId) return; // already a member
+  if (existing) {
+    throw new Error(
+      `Bead ${beadId} already belongs to convoy ${existing}. Remove it first before adding to a different convoy.`
+    );
+  }
+
+  // Insert 'tracks' dependency
+  query(
+    sql,
+    /* sql */ `
+      INSERT INTO ${bead_dependencies} (
+        ${bead_dependencies.columns.bead_id},
+        ${bead_dependencies.columns.depends_on_bead_id},
+        ${bead_dependencies.columns.dependency_type}
+      ) VALUES (?, ?, 'tracks')
+      ON CONFLICT DO NOTHING
+    `,
+    [beadId, convoyId]
+  );
+
+  // Merge convoy_id + feature_branch into bead metadata
+  const featureBranch = getConvoyFeatureBranch(sql, convoyId);
+  const timestamp = now();
+  const metadataPatch: Record<string, unknown> = { convoy_id: convoyId };
+  if (featureBranch) metadataPatch.feature_branch = featureBranch;
+
+  const existingMetadata: Record<string, unknown> =
+    typeof bead.metadata === 'string' ? JSON.parse(bead.metadata) : (bead.metadata ?? {});
+  const merged = { ...existingMetadata, ...metadataPatch };
+
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${beads}
+      SET ${beads.columns.metadata} = ?,
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.bead_id} = ?
+    `,
+    [JSON.stringify(merged), timestamp, beadId]
+  );
+
+  // Increment total_beads
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${convoy_metadata}
+      SET ${convoy_metadata.columns.total_beads} = ${convoy_metadata.columns.total_beads} + 1
+      WHERE ${convoy_metadata.bead_id} = ?
+    `,
+    [convoyId]
+  );
+}
+
+/**
+ * Remove a bead from its convoy. Deletes the 'tracks' dependency,
+ * strips convoy_id + feature_branch from metadata, and decrements
+ * the convoy's total_beads counter.
+ *
+ * No-ops if the bead is not in any convoy.
+ */
+export function removeBeadFromConvoy(sql: SqlStorage, beadId: string): string | null {
+  const convoyId = getConvoyForBead(sql, beadId);
+  if (!convoyId) return null;
+
+  // Remove 'tracks' dependency
+  query(
+    sql,
+    /* sql */ `
+      DELETE FROM ${bead_dependencies}
+      WHERE ${bead_dependencies.bead_id} = ?
+        AND ${bead_dependencies.depends_on_bead_id} = ?
+        AND ${bead_dependencies.dependency_type} = 'tracks'
+    `,
+    [beadId, convoyId]
+  );
+
+  // Strip convoy_id + feature_branch from metadata
+  const bead = getBead(sql, beadId);
+  if (bead) {
+    const existingMetadata: Record<string, unknown> =
+      typeof bead.metadata === 'string' ? JSON.parse(bead.metadata) : (bead.metadata ?? {});
+    delete existingMetadata.convoy_id;
+    delete existingMetadata.feature_branch;
+    const timestamp = now();
+
+    query(
+      sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.metadata} = ?,
+            ${beads.columns.updated_at} = ?
+        WHERE ${beads.bead_id} = ?
+      `,
+      [JSON.stringify(existingMetadata), timestamp, beadId]
+    );
+  }
+
+  // Decrement total_beads (floor at 0)
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${convoy_metadata}
+      SET ${convoy_metadata.columns.total_beads} = MAX(${convoy_metadata.columns.total_beads} - 1, 0)
+      WHERE ${convoy_metadata.bead_id} = ?
+    `,
+    [convoyId]
+  );
+
+  // If the bead was already closed/failed, also decrement closed_beads
+  if (bead && (bead.status === 'closed' || bead.status === 'failed')) {
+    query(
+      sql,
+      /* sql */ `
+        UPDATE ${convoy_metadata}
+        SET ${convoy_metadata.columns.closed_beads} = MAX(${convoy_metadata.columns.closed_beads} - 1, 0)
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
+      [convoyId]
+    );
+  }
+
+  return convoyId;
+}
+
 // ── Bead Dependency Editing ─────────────────────────────────────────
 
 /**

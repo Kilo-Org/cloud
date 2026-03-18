@@ -878,6 +878,27 @@ export class TownDO extends DurableObject<Env> {
     return deleted;
   }
 
+  // ── Convoy Membership ────────────────────────────────────────────────
+
+  /**
+   * Add a bead to an existing convoy. Creates the 'tracks' dependency,
+   * merges convoy metadata into the bead, and increments total_beads.
+   */
+  async addBeadToConvoy(beadId: string, convoyId: string): Promise<void> {
+    await this.ensureInitialized();
+    beadOps.addBeadToConvoy(this.sql, beadId, convoyId);
+  }
+
+  /**
+   * Remove a bead from its convoy. Deletes the 'tracks' dependency,
+   * strips convoy metadata, and decrements total_beads.
+   * Returns the convoy ID the bead was removed from, or null if not in a convoy.
+   */
+  async removeBeadFromConvoy(beadId: string): Promise<string | null> {
+    await this.ensureInitialized();
+    return beadOps.removeBeadFromConvoy(this.sql, beadId);
+  }
+
   /**
    * Force-reset an agent to idle, unhooking from its current bead if any.
    * Sets the bead status back to 'open' so it can be re-dispatched.
@@ -1677,6 +1698,7 @@ export class TownDO extends DurableObject<Env> {
     priority?: string;
     metadata?: Record<string, unknown>;
     dependsOn?: string[];
+    convoyId?: string;
   }): Promise<{ bead: Bead; agent: Agent }> {
     await this.ensureInitialized();
 
@@ -1688,6 +1710,11 @@ export class TownDO extends DurableObject<Env> {
       rig_id: input.rigId,
       metadata: input.metadata,
     });
+
+    // If a convoy_id was provided, add the bead to the convoy (tracks dep + metadata + counter)
+    if (input.convoyId) {
+      beadOps.addBeadToConvoy(this.sql, createdBead.bead_id, input.convoyId);
+    }
 
     // Insert dependency rows before hooking/dispatching so the bead's
     // blocker set is complete before any agent can start work on it.

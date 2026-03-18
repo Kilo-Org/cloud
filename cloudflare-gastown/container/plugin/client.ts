@@ -301,6 +301,7 @@ export class MayorGastownClient {
     body?: string;
     metadata?: Record<string, unknown>;
     depends_on?: string[];
+    convoy_id?: string;
   }): Promise<SlingResult> {
     return this.request<SlingResult>(this.mayorPath('/sling'), {
       method: 'POST',
@@ -428,6 +429,7 @@ export class MayorGastownClient {
       status?: 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed';
       priority?: 'low' | 'medium' | 'high' | 'critical';
       labels?: string[];
+      convoy_id?: string | null;
     }
   ): Promise<Bead> {
     return this.request<Bead>(this.mayorPath(`/rigs/${rigId}/beads/${beadId}`), {

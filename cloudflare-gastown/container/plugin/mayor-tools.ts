@@ -73,6 +73,12 @@ export function createMayorTools(client: MayorGastownClient) {
             'Optional list of bead IDs this task depends on. The new bead will not be dispatched until all listed beads are closed.'
           )
           .optional(),
+        convoy_id: tool.schema
+          .string()
+          .describe(
+            'Optional convoy ID to add this bead to. The bead will be tracked by the convoy and included in its progress.'
+          )
+          .optional(),
       },
       async execute(args) {
         const metadata = args.metadata ? parseJsonObject(args.metadata, 'metadata') : undefined;
@@ -84,6 +90,7 @@ export function createMayorTools(client: MayorGastownClient) {
           body: args.body,
           metadata,
           depends_on: args.depends_on,
+          convoy_id: args.convoy_id,
         });
 
         const lines = [
@@ -94,6 +101,9 @@ export function createMayorTools(client: MayorGastownClient) {
         ];
         if (args.depends_on && args.depends_on.length > 0) {
           lines.push(`Dependencies: blocked by ${args.depends_on.length} bead(s)`);
+        }
+        if (args.convoy_id) {
+          lines.push(`Convoy: added to ${args.convoy_id}`);
         }
         lines.push(`The polecat will be dispatched automatically by the alarm scheduler.`);
         return lines.join('\n');
@@ -318,7 +328,9 @@ export function createMayorTools(client: MayorGastownClient) {
     }),
 
     gt_bead_update: tool({
-      description: "Edit a bead's status, title, body, priority, or labels.",
+      description:
+        "Edit a bead's status, title, body, priority, labels, or convoy membership. " +
+        'Set convoy_id to add the bead to a convoy, or set it to null/empty to remove it.',
       args: {
         rig_id: tool.schema.string().describe('The UUID of the rig the bead belongs to'),
         bead_id: tool.schema.string().describe('The UUID of the bead to update'),
@@ -336,6 +348,13 @@ export function createMayorTools(client: MayorGastownClient) {
           .array(tool.schema.string())
           .describe('Replacement labels array for the bead')
           .optional(),
+        convoy_id: tool.schema
+          .string()
+          .describe(
+            'Set to a convoy UUID to add this bead to that convoy. ' +
+              'Set to an empty string to remove the bead from its current convoy.'
+          )
+          .optional(),
       },
       async execute(args) {
         const bead = await client.updateBead(args.rig_id, args.bead_id, {
@@ -344,6 +363,7 @@ export function createMayorTools(client: MayorGastownClient) {
           status: args.status,
           priority: args.priority,
           labels: args.labels,
+          convoy_id: args.convoy_id === '' ? null : args.convoy_id,
         });
         return `Bead ${bead.bead_id} updated. Status: ${bead.status}, Priority: ${bead.priority}, Title: "${bead.title}".`;
       },

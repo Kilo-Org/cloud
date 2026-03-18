@@ -14,7 +14,6 @@ import {
 import {
   bead_dependencies,
   BeadDependencyRecord,
-  DependencyType,
   createTableBeadDependencies,
   getIndexesBeadDependencies,
 } from '../../db/tables/bead-dependencies.table';
@@ -926,7 +925,7 @@ export function addBeadDependency(
   sql: SqlStorage,
   beadId: string,
   dependsOnBeadId: string,
-  type: z.infer<typeof DependencyType>
+  type: 'blocks' | 'tracks' | 'parent-child'
 ): void {
   if (beadId === dependsOnBeadId) {
     throw new Error('A bead cannot depend on itself');
@@ -988,7 +987,8 @@ export function addBeadDependency(
     const visited = new Set<string>();
     const stack = [dependsOnBeadId];
     while (stack.length > 0) {
-      const current = stack.pop()!;
+      const current = stack.pop();
+      if (current === undefined) break;
       if (current === beadId) {
         throw new Error(
           `Adding dependency would create a cycle: ${beadId} → ${dependsOnBeadId} → ... → ${beadId}`

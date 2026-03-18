@@ -253,14 +253,12 @@ app.post('/api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies', c =>
     handleAddBeadDependency(c, c.req.param())
   )
 );
-app.delete(
-  '/api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies/:dependsOnBeadId',
-  c =>
-    instrumented(
-      c,
-      'DELETE /api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies/:dependsOnBeadId',
-      () => handleRemoveBeadDependency(c, c.req.param())
-    )
+app.delete('/api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies/:dependsOnBeadId', c =>
+  instrumented(
+    c,
+    'DELETE /api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies/:dependsOnBeadId',
+    () => handleRemoveBeadDependency(c, c.req.param())
+  )
 );
 
 // ── Agents ──────────────────────────────────────────────────────────────

@@ -236,7 +236,7 @@ export function detectGUPPViolations(
             WHERE ${agent_nudges.agent_bead_id} = ?
               AND ${agent_nudges.source} = 'witness'
               AND ${agent_nudges.message} LIKE '%GUPP_ESCALATION%'
-              AND ${agent_nudges.delivered_at} IS NULL
+              AND (${agent_nudges.delivered_at} IS NULL OR ${agent_nudges.delivered_at} > datetime('now', '-60 minutes'))
             LIMIT 1
           `,
           [agent.bead_id]
@@ -276,7 +276,7 @@ export function detectGUPPViolations(
             WHERE ${agent_nudges.agent_bead_id} = ?
               AND ${agent_nudges.source} = 'witness'
               AND ${agent_nudges.message} LIKE '%GUPP_CHECK%'
-              AND ${agent_nudges.delivered_at} IS NULL
+              AND (${agent_nudges.delivered_at} IS NULL OR ${agent_nudges.delivered_at} > datetime('now', '-60 minutes'))
             LIMIT 1
           `,
           [agent.bead_id]
@@ -288,7 +288,9 @@ export function detectGUPPViolations(
           'GUPP_CHECK: You have had work hooked for 30+ minutes with no activity. Are you stuck? If so, call gt_escalate.',
           { mode: 'immediate', source: 'witness', priority: 'urgent' }
         ).catch(() => {});
-        console.log(`${LOG} GUPP warn: agent=${agent.bead_id} stale=${Math.round(staleMs / 60_000)}min`);
+        console.log(
+          `${LOG} GUPP warn: agent=${agent.bead_id} stale=${Math.round(staleMs / 60_000)}min`
+        );
       }
     }
   }

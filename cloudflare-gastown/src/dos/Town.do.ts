@@ -1083,7 +1083,12 @@ export class TownDO extends DurableObject<Env> {
 
     let expiresAt: string | null = null;
     if (mode === 'queue' && options?.ttlSeconds != null) {
-      expiresAt = new Date(Date.now() + options.ttlSeconds * 1000).toISOString();
+      // Use SQLite-compatible datetime format (space separator, no Z suffix) so
+      // comparisons against datetime('now') work correctly.
+      expiresAt = new Date(Date.now() + options.ttlSeconds * 1000)
+        .toISOString()
+        .replace('T', ' ')
+        .replace('Z', '');
     }
 
     query(
@@ -1467,7 +1472,10 @@ export class TownDO extends DurableObject<Env> {
                 'The triage system has flagged you as potentially stuck. Please report your status.',
               { mode: 'immediate', source: 'triage', priority: 'urgent' }
             ).catch(err =>
-              console.warn(`${TOWN_LOG} resolveTriage: nudge failed for agent=${targetAgentId}:`, err)
+              console.warn(
+                `${TOWN_LOG} resolveTriage: nudge failed for agent=${targetAgentId}:`,
+                err
+              )
             );
             this.emitEvent({
               event: 'nudge.queued',

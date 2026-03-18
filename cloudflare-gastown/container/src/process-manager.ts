@@ -241,9 +241,7 @@ async function fetchPendingNudges(
   agent: ManagedAgent
 ): Promise<z.infer<typeof PendingNudge>[] | null> {
   const authToken =
-    process.env.GASTOWN_CONTAINER_TOKEN ??
-    agent.gastownContainerToken ??
-    agent.gastownSessionToken;
+    process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? agent.gastownSessionToken;
   if (!agent.gastownApiUrl || !authToken || !agent.townId || !agent.rigId) return null;
 
   try {
@@ -265,7 +263,10 @@ async function fetchPendingNudges(
     const raw: unknown = await resp.json();
     const parsed = PendingNudgesResponse.safeParse(raw);
     if (!parsed.success) {
-      console.warn(`${MANAGER_LOG} fetchPendingNudges: unexpected response shape`, parsed.error.issues);
+      console.warn(
+        `${MANAGER_LOG} fetchPendingNudges: unexpected response shape`,
+        parsed.error.issues
+      );
       return null;
     }
     return parsed.data.data;
@@ -280,9 +281,7 @@ async function fetchPendingNudges(
  */
 async function markNudgeDelivered(agent: ManagedAgent, nudgeId: string): Promise<void> {
   const authToken =
-    process.env.GASTOWN_CONTAINER_TOKEN ??
-    agent.gastownContainerToken ??
-    agent.gastownSessionToken;
+    process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? agent.gastownSessionToken;
   if (!agent.gastownApiUrl || !authToken || !agent.townId || !agent.rigId) return;
 
   try {
@@ -326,10 +325,7 @@ function clearIdleTimer(agentId: string): void {
  * Returns true if the agent should continue (nudge injected or timer started),
  * false if the agent should exit immediately (injection failed unrecoverably).
  */
-async function handleIdleEvent(
-  agent: ManagedAgent,
-  onExit: () => void
-): Promise<void> {
+async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise<void> {
   const agentId = agent.agentId;
   console.log(`${MANAGER_LOG} handleIdleEvent: checking nudges for agent ${agentId}`);
 
@@ -337,7 +333,9 @@ async function handleIdleEvent(
 
   if (nudges === null) {
     // Error fetching — treat as no nudges, start idle timer
-    console.warn(`${MANAGER_LOG} handleIdleEvent: could not fetch nudges for ${agentId}, starting idle timer`);
+    console.warn(
+      `${MANAGER_LOG} handleIdleEvent: could not fetch nudges for ${agentId}, starting idle timer`
+    );
   } else if (nudges.length > 0 && agent.status === 'running') {
     // There is at least one pending nudge — inject the first (highest priority)
     const nudge = nudges[0];

@@ -440,7 +440,12 @@ app.post('/agents/:agentId/nudge-delivered', async c => {
   }
 
   const body: unknown = await c.req.json().catch(() => null);
-  if (!body || typeof body !== 'object' || !('nudge_id' in body) || typeof body.nudge_id !== 'string') {
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !('nudge_id' in body) ||
+    typeof body.nudge_id !== 'string'
+  ) {
     return c.json({ error: 'Missing or invalid nudge_id field' }, 400);
   }
 

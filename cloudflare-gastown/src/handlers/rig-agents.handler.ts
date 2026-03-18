@@ -313,7 +313,7 @@ export async function handleNudge(c: Context<GastownEnv>, params: { rigId: strin
  */
 export async function handleNudgeDelivered(
   c: Context<GastownEnv>,
-  params: { rigId: string; agentId: string }
+  _params: { rigId: string; agentId: string }
 ) {
   const parsed = NudgeDeliveredBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {

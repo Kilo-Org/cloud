@@ -450,7 +450,7 @@ export function createMayorTools(client: MayorGastownClient) {
     gt_nudge: tool({
       description:
         'Send a real-time nudge to a polecat agent in any rig. Unlike gt_mail_send (which queues ' +
-        'a formal persistent message), gt_nudge delivers immediately at the agent\'s next idle moment. ' +
+        "a formal persistent message), gt_nudge delivers immediately at the agent's next idle moment. " +
         'Use this for time-sensitive coordination: wake up an agent, request a status check, ' +
         'or notify of a blocking issue.',
       args: {

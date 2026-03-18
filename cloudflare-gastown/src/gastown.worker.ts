@@ -54,6 +54,10 @@ import {
 } from './handlers/rig-review-queue.handler';
 import { handleCreateEscalation } from './handlers/rig-escalations.handler';
 import { handleResolveTriage } from './handlers/rig-triage.handler';
+import {
+  handleAddBeadDependency,
+  handleRemoveBeadDependency,
+} from './handlers/bead-dependencies.handler';
 import { handleListBeadEvents } from './handlers/rig-bead-events.handler';
 import { handleListTownEvents } from './handlers/town-events.handler';
 import {
@@ -240,6 +244,23 @@ app.delete('/api/towns/:townId/rigs/:rigId/beads/:beadId', c =>
   instrumented(c, 'DELETE /api/towns/:townId/rigs/:rigId/beads/:beadId', () =>
     handleDeleteBead(c, c.req.param())
   )
+);
+
+// ── Bead Dependencies ──────────────────────────────────────────────────
+
+app.post('/api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies', () =>
+    handleAddBeadDependency(c, c.req.param())
+  )
+);
+app.delete(
+  '/api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies/:dependsOnBeadId',
+  c =>
+    instrumented(
+      c,
+      'DELETE /api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies/:dependsOnBeadId',
+      () => handleRemoveBeadDependency(c, c.req.param())
+    )
 );
 
 // ── Agents ──────────────────────────────────────────────────────────────

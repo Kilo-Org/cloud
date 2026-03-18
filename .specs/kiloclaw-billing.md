@@ -140,10 +140,17 @@ when access lapses, with email notifications at each stage.
    This is the same guard as Subscription Checkout rule 1.
 2. The system MUST allow credit enrollment when the existing
    subscription status is trialing or canceled.
-3. The system MUST verify that the user's credit balance is sufficient
-   to cover the first billing period before proceeding: 25,000,000
-   microdollars for the standard plan (one month) or 54,000,000
-   microdollars for the commit plan (six months paid upfront).
+3. The system MUST verify that the user's effective credit balance is
+   sufficient to cover the first billing period before proceeding:
+   25,000,000 microdollars for the standard plan (one month) or
+   54,000,000 microdollars for the commit plan (six months paid
+   upfront). The effective balance MUST be computed as the current
+   credit balance plus the projected bonus credits the user would earn
+   from the deduction. The projected bonus MUST be obtained by querying
+   the Kilo Pass entitlement system for the bonus that would result
+   from the deduction amount, without committing any credit award.
+   When the user has no Kilo Pass, the effective balance equals the
+   current credit balance.
 4. The system MUST check whether the user was previously suspended
    (has a non-null suspension timestamp) before mutating the
    subscription row.
@@ -158,22 +165,45 @@ when access lapses, with email notifications at each stage.
 6. The system MUST atomically decrement the user's acquired credit
    balance by the deducted amount in the same database transaction as
    the credit transaction insertion.
-7. The system MUST create or upsert the subscription record with
+7. After the credit deduction transaction commits (rules 5–6), the
+   system MUST trigger a bonus credit evaluation. This step determines
+   whether the user's cumulative spend now qualifies for additional
+   bonus credits under their Kilo Pass entitlement and, if so, awards
+   them. The user's acquired credit balance MAY be temporarily negative
+   between the deduction in rule 6 and the bonus award; other
+   balance-observing systems (monitoring, display, renewal sweeps)
+   MUST tolerate transient negative balances from this flow. When
+   the user has no Kilo Pass, this step is a no-op. If the bonus
+   evaluation fails or times out, the system MUST log the failure but
+   MUST still proceed to rule 8 (subscription upsert). The missed
+   bonus SHOULD be recovered by a subsequent reconciliation process;
+   this spec does not define that process.
+8. The system MUST create or upsert the subscription record with
    payment source set to `credits`, status set to active, the billing
    period set from the current time, the credit renewal timestamp set
    to the period end, and the payment provider subscription ID set to
    null.
-8. The subscription upsert MUST clear any prior suspension state:
+9. The subscription upsert MUST clear any prior suspension state:
    past-due-since, suspension timestamp, and destruction deadline MUST
    all be set to null.
-9. If the user was previously suspended (per rule 4), the system MUST
-   call the auto-resume procedure after the upsert to restart the
-   instance, clear suspension-cycle email log entries, and clear
-   suspension columns. This MUST happen after the subscription row is
-   in active state.
-10. For the commit plan, the system MUST record a commit-period end
+10. If the user was previously suspended (per rule 4), the system MUST
+    call the auto-resume procedure after the upsert to restart the
+    instance, clear suspension-cycle email log entries, and clear
+    suspension columns. This MUST happen after the subscription row is
+    in active state.
+11. For the commit plan, the system MUST record a commit-period end
     date six calendar months from enrollment, consistent with Commit
     Plan Lifecycle rule 2.
+
+> **Implementation note:** If the process crashes after the deduction
+> transaction commits (rule 6) but before the subscription upsert
+> (rule 8), the user is left with deducted credits and no active
+> subscription. The idempotency key (rule 5) blocks re-deduction on
+> retry, so the normal enrollment path cannot recover this state. This
+> gap is pre-existing (it applies with or without the bonus evaluation
+> step), but the bonus step widens the crash-vulnerability window.
+> Operational monitoring SHOULD detect deductions without corresponding
+> active subscriptions and alert for manual reconciliation.
 
 ### Commit Plan Lifecycle
 
@@ -307,11 +337,18 @@ when access lapses, with email notifications at each stage.
    be advanced; current-period-end retains its existing value.
    Subscription Period Expiry Enforcement rule 1 handles suspension
    once current-period-end has passed.
-6. When balance is sufficient and the deduction succeeds (one affected
-   row), the system MUST atomically decrement the user's acquired
-   credit balance and advance the subscription's billing period
-   (current-period-start, current-period-end, credit-renewal-
-   timestamp) within the same transaction.
+6. When the effective balance (as defined in Credit Enrollment rule 3)
+   is sufficient and the deduction succeeds (one affected row), the
+   system MUST atomically decrement the user's acquired credit balance
+   and advance the subscription's billing period (current-period-start,
+   current-period-end, credit-renewal-timestamp) within the same
+   transaction. After the transaction commits, the system MUST trigger
+   a bonus credit evaluation as described in Credit Enrollment rule 7.
+   The user's acquired credit balance MAY be temporarily negative
+   between the deduction and the bonus award. If the bonus evaluation
+   fails or times out, the system MUST log the failure and continue
+   processing the row; the missed bonus SHOULD be recovered by a
+   subsequent reconciliation process.
 7. When a commit-plan renewal succeeds and the commit-period end date
    has been reached, the system MUST extend the commit-period end date
    by six calendar months from the previous boundary.
@@ -327,17 +364,19 @@ when access lapses, with email notifications at each stage.
     system MUST call the auto-resume procedure to restart the instance,
     clear the suspension-cycle email log entries (including the
     credit-renewal-failed entry), and clear the suspension columns.
-11. When balance is insufficient, the system MUST first check whether
+11. When the effective balance (as defined in Credit Enrollment
+    rule 3) is insufficient, the system MUST first check whether
     the user has auto top-up enabled. If auto top-up is available,
     the system MUST trigger it and skip the row without changing any
     state (fire-and-skip). The next sweep run MUST re-evaluate the
     row after the top-up webhook has credited the balance.
-12. When balance is insufficient, auto top-up is not available or has
-    already been attempted and failed, the system MUST set the
+12. When the effective balance is still insufficient (per rule 11),
+    auto top-up is not available or has already been attempted and
+    failed, the system MUST set the
     subscription status to past-due and record a past-due-since
     timestamp (preserving any existing value). Past-Due Payment
     Enforcement rule 1 handles suspension after 14 days.
-13. When balance is insufficient and the system enters the past-due
+13. When the effective balance is insufficient and the system enters the past-due
     path (rule 12), the system MUST send a credit-renewal-failed
     notification, subject to the standard email idempotency rules.
     The notification MUST NOT be sent when the system takes the
@@ -370,14 +409,15 @@ when access lapses, with email notifications at each stage.
 2. When the sweep triggers auto top-up for a row, the sweep MUST skip
    that row entirely without setting past-due status, sending failure
    notifications, or advancing the billing period.
-3. On the next sweep run, if the auto top-up succeeded and balance is
-   now sufficient, the sweep MUST proceed with the normal deduction.
-   If balance is still insufficient, the sweep MUST enter the
-   insufficient-balance path (Credit Renewal rule 11).
+3. On the next sweep run, if the auto top-up succeeded and the
+   effective balance (as defined in Credit Enrollment rule 3) is now
+   sufficient, the sweep MUST proceed with the normal deduction. If
+   the effective balance is still insufficient, the sweep MUST enter
+   the insufficient-balance path (Credit Renewal rule 11).
 4. The system MUST enter the insufficient-balance path (not fire-and-
    skip) when auto top-up is not enabled, has been disabled due to a
-   prior card decline, or was triggered on a prior run and balance
-   remains insufficient.
+   prior card decline, or was triggered on a prior run and the
+   effective balance remains insufficient.
 
 ### Trial Expiry Warnings
 

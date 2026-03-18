@@ -13,6 +13,8 @@ import {
 } from '../../db/tables/bead-events.table';
 import {
   bead_dependencies,
+  BeadDependencyRecord,
+  DependencyType,
   createTableBeadDependencies,
   getIndexesBeadDependencies,
 } from '../../db/tables/bead-dependencies.table';
@@ -907,4 +909,138 @@ export function getConvoyFeatureBranch(sql: SqlStorage, convoyId: string): strin
   ];
   if (rows.length === 0) return null;
   return z.object({ feature_branch: z.string().nullable() }).parse(rows[0]).feature_branch;
+}
+
+// ── Bead Dependency Editing ─────────────────────────────────────────
+
+/**
+ * Add a dependency edge between two beads.
+ *
+ * - Validates self-reference (`beadId !== dependsOnBeadId`)
+ * - Checks both beads exist
+ * - Runs cycle detection for 'blocks' dependencies (DFS from `dependsOnBeadId`
+ *   — if you can reach `beadId`, adding the edge would create a cycle)
+ * - Uses `ON CONFLICT DO NOTHING` so duplicate adds are a no-op
+ */
+export function addBeadDependency(
+  sql: SqlStorage,
+  beadId: string,
+  dependsOnBeadId: string,
+  type: z.infer<typeof DependencyType>
+): void {
+  if (beadId === dependsOnBeadId) {
+    throw new Error('A bead cannot depend on itself');
+  }
+
+  // Verify both beads exist
+  const existCheck = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${beads.bead_id}
+        FROM ${beads}
+        WHERE ${beads.bead_id} IN (?, ?)
+      `,
+      [beadId, dependsOnBeadId]
+    ),
+  ];
+  const foundIds = new Set(
+    z
+      .object({ bead_id: z.string() })
+      .array()
+      .parse(existCheck)
+      .map(r => r.bead_id)
+  );
+  if (!foundIds.has(beadId)) throw new Error(`Bead ${beadId} not found`);
+  if (!foundIds.has(dependsOnBeadId)) throw new Error(`Bead ${dependsOnBeadId} not found`);
+
+  // Cycle detection for 'blocks' dependencies: DFS from dependsOnBeadId
+  // following existing 'blocks' edges. If we can reach beadId, adding
+  // this edge would create a cycle.
+  if (type === 'blocks') {
+    const adjacency = new Map<string, string[]>();
+    const edgeRows = [
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT ${bead_dependencies.bead_id}, ${bead_dependencies.depends_on_bead_id}
+          FROM ${bead_dependencies}
+          WHERE ${bead_dependencies.dependency_type} = 'blocks'
+        `,
+        []
+      ),
+    ];
+    const edges = BeadDependencyRecord.pick({ bead_id: true, depends_on_bead_id: true })
+      .array()
+      .parse(edgeRows);
+    for (const edge of edges) {
+      const neighbors = adjacency.get(edge.bead_id) ?? [];
+      neighbors.push(edge.depends_on_bead_id);
+      adjacency.set(edge.bead_id, neighbors);
+    }
+
+    // DFS from dependsOnBeadId following the direction: bead_id → depends_on_bead_id
+    // We want to check: can dependsOnBeadId reach beadId through existing edges?
+    // The graph direction is: beadId depends on dependsOnBeadId.
+    // A cycle means: dependsOnBeadId already (transitively) depends on beadId.
+    // So we follow edges from dependsOnBeadId: check dependsOnBeadId's own
+    // depends_on edges to see if beadId is reachable.
+    const visited = new Set<string>();
+    const stack = [dependsOnBeadId];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (current === beadId) {
+        throw new Error(
+          `Adding dependency would create a cycle: ${beadId} → ${dependsOnBeadId} → ... → ${beadId}`
+        );
+      }
+      if (visited.has(current)) continue;
+      visited.add(current);
+      const neighbors = adjacency.get(current);
+      if (neighbors) {
+        for (const neighbor of neighbors) {
+          if (!visited.has(neighbor)) stack.push(neighbor);
+        }
+      }
+    }
+  }
+
+  query(
+    sql,
+    /* sql */ `
+      INSERT INTO ${bead_dependencies} (
+        ${bead_dependencies.columns.bead_id},
+        ${bead_dependencies.columns.depends_on_bead_id},
+        ${bead_dependencies.columns.dependency_type}
+      ) VALUES (?, ?, ?)
+      ON CONFLICT DO NOTHING
+    `,
+    [beadId, dependsOnBeadId, type]
+  );
+}
+
+/**
+ * Remove a dependency edge between two beads.
+ * Does NOT allow removing 'tracks' dependencies (system-managed convoy edges).
+ * Returns true if a row was actually deleted, false otherwise.
+ */
+export function removeBeadDependency(
+  sql: SqlStorage,
+  beadId: string,
+  dependsOnBeadId: string
+): boolean {
+  const result = [
+    ...query(
+      sql,
+      /* sql */ `
+        DELETE FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.bead_id} = ?
+          AND ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} != 'tracks'
+        RETURNING ${bead_dependencies.bead_id}
+      `,
+      [beadId, dependsOnBeadId]
+    ),
+  ];
+  return result.length > 0;
 }

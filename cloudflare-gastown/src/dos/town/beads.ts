@@ -910,6 +910,48 @@ export function getConvoyFeatureBranch(sql: SqlStorage, convoyId: string): strin
   return z.object({ feature_branch: z.string().nullable() }).parse(rows[0]).feature_branch;
 }
 
+/**
+ * Recount closed_beads for a convoy using the same logic as
+ * updateConvoyProgress: a tracked bead counts as closed only when
+ * it is closed/failed AND has no pending merge_request child beads.
+ */
+function recountConvoyClosedBeads(sql: SqlStorage, convoyId: string): void {
+  const countRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT COUNT(1) AS count FROM ${bead_dependencies} AS tracked
+        INNER JOIN ${beads} AS tracked_bead
+          ON tracked.${bead_dependencies.columns.bead_id} = tracked_bead.${beads.columns.bead_id}
+        WHERE tracked.${bead_dependencies.columns.depends_on_bead_id} = ?
+          AND tracked.${bead_dependencies.columns.dependency_type} = 'tracks'
+          AND tracked_bead.${beads.columns.status} IN ('closed', 'failed')
+          AND NOT EXISTS (
+            SELECT 1 FROM ${bead_dependencies} AS mr_dep
+            INNER JOIN ${beads} AS mr_bead
+              ON mr_dep.${bead_dependencies.columns.bead_id} = mr_bead.${beads.columns.bead_id}
+            WHERE mr_dep.${bead_dependencies.columns.depends_on_bead_id} = tracked_bead.${beads.columns.bead_id}
+              AND mr_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+              AND mr_bead.${beads.columns.type} = 'merge_request'
+              AND mr_bead.${beads.columns.status} IN ('open', 'in_progress')
+          )
+      `,
+      [convoyId]
+    ),
+  ];
+  const closedCount = z.object({ count: z.number() }).parse(countRows[0]).count;
+
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${convoy_metadata}
+      SET ${convoy_metadata.columns.closed_beads} = ?
+      WHERE ${convoy_metadata.bead_id} = ?
+    `,
+    [closedCount, convoyId]
+  );
+}
+
 // ── Convoy Membership ───────────────────────────────────────────────
 
 /**
@@ -974,7 +1016,9 @@ export function addBeadToConvoy(sql: SqlStorage, beadId: string, convoyId: strin
     [JSON.stringify(merged), timestamp, beadId]
   );
 
-  // Increment total_beads
+  // Increment total_beads and recount closed_beads (the bead may already
+  // be closed/failed, so a naive +1 on total_beads alone would leave
+  // closed_beads stale).
   query(
     sql,
     /* sql */ `
@@ -984,6 +1028,23 @@ export function addBeadToConvoy(sql: SqlStorage, beadId: string, convoyId: strin
     `,
     [convoyId]
   );
+  recountConvoyClosedBeads(sql, convoyId);
+
+  // If the bead is still open, clear the ready_to_land flag on the convoy
+  // in case it was already set — a new open bead means the convoy is not
+  // complete and must not submit the final landing MR.
+  if (bead.status !== 'closed' && bead.status !== 'failed') {
+    query(
+      sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.ready_to_land'),
+            ${beads.columns.updated_at} = ?
+        WHERE ${beads.bead_id} = ?
+      `,
+      [timestamp, convoyId]
+    );
+  }
 }
 
 /**
@@ -1030,7 +1091,10 @@ export function removeBeadFromConvoy(sql: SqlStorage, beadId: string): string | 
     );
   }
 
-  // Decrement total_beads (floor at 0)
+  // Decrement total_beads and recount closed_beads. A naive decrement of
+  // closed_beads is unreliable because updateConvoyProgress excludes beads
+  // with pending MR children from the count — a bead that is closed but
+  // mid-review was never counted, so decrementing would undercount.
   query(
     sql,
     /* sql */ `
@@ -1040,19 +1104,7 @@ export function removeBeadFromConvoy(sql: SqlStorage, beadId: string): string | 
     `,
     [convoyId]
   );
-
-  // If the bead was already closed/failed, also decrement closed_beads
-  if (bead && (bead.status === 'closed' || bead.status === 'failed')) {
-    query(
-      sql,
-      /* sql */ `
-        UPDATE ${convoy_metadata}
-        SET ${convoy_metadata.columns.closed_beads} = MAX(${convoy_metadata.columns.closed_beads} - 1, 0)
-        WHERE ${convoy_metadata.bead_id} = ?
-      `,
-      [convoyId]
-    );
-  }
+  recountConvoyClosedBeads(sql, convoyId);
 
   return convoyId;
 }

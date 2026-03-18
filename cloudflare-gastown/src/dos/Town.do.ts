@@ -1702,6 +1702,16 @@ export class TownDO extends DurableObject<Env> {
   }): Promise<{ bead: Bead; agent: Agent }> {
     await this.ensureInitialized();
 
+    // Validate the convoy exists before creating the bead so a bad
+    // convoy_id doesn't leave behind an orphan bead row.
+    if (input.convoyId) {
+      const convoyBead = beadOps.getBead(this.sql, input.convoyId);
+      if (!convoyBead) throw new Error(`Convoy ${input.convoyId} not found`);
+      if (convoyBead.type !== 'convoy') {
+        throw new Error(`Bead ${input.convoyId} is not a convoy (type: ${convoyBead.type})`);
+      }
+    }
+
     const createdBead = beadOps.createBead(this.sql, {
       type: 'issue',
       title: input.title,
@@ -1711,7 +1721,8 @@ export class TownDO extends DurableObject<Env> {
       metadata: input.metadata,
     });
 
-    // If a convoy_id was provided, add the bead to the convoy (tracks dep + metadata + counter)
+    // If a convoy_id was provided, add the bead to the convoy (tracks dep + metadata + counter).
+    // The convoy was already validated above, so addBeadToConvoy won't throw for a missing convoy.
     if (input.convoyId) {
       beadOps.addBeadToConvoy(this.sql, createdBead.bead_id, input.convoyId);
     }

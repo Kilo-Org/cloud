@@ -183,14 +183,20 @@ when access lapses, with email notifications at each stage.
    period set from the current time, the credit renewal timestamp set
    to the period end, and the payment provider subscription ID set to
    null.
-9. The subscription upsert MUST clear any prior suspension state:
-   past-due-since, suspension timestamp, and destruction deadline MUST
-   all be set to null.
+9. The subscription upsert MUST clear the past-due-since timestamp
+   and set the status to active, but MUST NOT clear the suspension
+   timestamp or destruction deadline at this step. If the user was
+   previously suspended, those columns are needed as a signal for the
+   auto-resume procedure in rule 10.
 10. If the user was previously suspended (per rule 4), the system MUST
     call the auto-resume procedure after the upsert to restart the
     instance, clear suspension-cycle email log entries, and clear
-    suspension columns. This MUST happen after the subscription row is
-    in active state.
+    the suspension timestamp and destruction deadline. This MUST
+    happen after the subscription row is in active state. If the
+    process crashes before auto-resume completes, the non-null
+    suspension timestamp on an active subscription signals that
+    resume is still required; the next background job run MUST
+    detect this state and retry the auto-resume.
 11. For the commit plan, the system MUST record a commit-period end
     date six calendar months from enrollment, consistent with Commit
     Plan Lifecycle rule 2.
@@ -300,6 +306,10 @@ when access lapses, with email notifications at each stage.
 4. The credit renewal sweep MUST run before all other sweeps so that
    credit-funded subscriptions are renewed (or marked past-due, or
    canceled) before the existing sweeps evaluate expiry and suspension.
+5. The background job MUST detect credit-funded subscriptions in
+   active status that still have a non-null suspension timestamp
+   (indicating a prior auto-resume was interrupted) and retry the
+   auto-resume procedure for those subscriptions.
 
 ### Credit Renewal
 
@@ -366,16 +376,24 @@ when access lapses, with email notifications at each stage.
     credit-renewal-failed entry), and clear the suspension columns.
 11. When the effective balance (as defined in Credit Enrollment
     rule 3) is insufficient, the system MUST first check whether
-    the user has auto top-up enabled. If auto top-up is available,
-    the system MUST trigger it and skip the row without changing any
-    state (fire-and-skip). The next sweep run MUST re-evaluate the
-    row after the top-up webhook has credited the balance.
-12. When the effective balance is still insufficient (per rule 11),
-    auto top-up is not available or has already been attempted and
-    failed, the system MUST set the
-    subscription status to past-due and record a past-due-since
-    timestamp (preserving any existing value). Past-Due Payment
-    Enforcement rule 1 handles suspension after 14 days.
+    the user has auto top-up enabled and whether a top-up has
+    already been triggered for the current renewal period. If auto
+    top-up is available and has NOT yet been triggered for this
+    period, the system MUST trigger it, record a durable marker
+    (the credit renewal timestamp of the period being charged) on
+    the subscription row to indicate that a top-up has been
+    requested, and skip the row without changing any other state
+    (fire-and-skip). The next sweep run MUST re-evaluate the row
+    after the top-up webhook has credited the balance. The marker
+    MUST be cleared when the billing period advances (successful
+    deduction) or when the subscription is canceled.
+12. When the effective balance is still insufficient (per rule 11)
+    and auto top-up is not available, has been disabled due to a
+    prior card decline, or was already triggered for the current
+    period (marker present), the system MUST set the subscription
+    status to past-due and record a past-due-since timestamp
+    (preserving any existing value). Past-Due Payment Enforcement
+    rule 1 handles suspension after 14 days.
 13. When the effective balance is insufficient and the system enters the past-due
     path (rule 12), the system MUST send a credit-renewal-failed
     notification, subject to the standard email idempotency rules.
@@ -416,8 +434,10 @@ when access lapses, with email notifications at each stage.
    the insufficient-balance path (Credit Renewal rule 11).
 4. The system MUST enter the insufficient-balance path (not fire-and-
    skip) when auto top-up is not enabled, has been disabled due to a
-   prior card decline, or was triggered on a prior run and the
-   effective balance remains insufficient.
+   prior card decline, or was already triggered for the current
+   renewal period (as indicated by the durable marker described in
+   Credit Renewal rule 11) and the effective balance remains
+   insufficient.
 
 ### Trial Expiry Warnings
 

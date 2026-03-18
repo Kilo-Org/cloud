@@ -833,6 +833,51 @@ export class TownDO extends DurableObject<Env> {
     return bead;
   }
 
+  // ── Bead Dependency Editing ──────────────────────────────────────────
+
+  /**
+   * Add a dependency edge between two beads.
+   * Validates, detects cycles, and logs a bead event.
+   */
+  async addBeadDependency(
+    beadId: string,
+    dependsOnBeadId: string,
+    type: 'blocks' | 'tracks' | 'parent-child'
+  ): Promise<void> {
+    await this.ensureInitialized();
+    beadOps.addBeadDependency(this.sql, beadId, dependsOnBeadId, type);
+    beadOps.logBeadEvent(this.sql, {
+      beadId,
+      agentId: null,
+      eventType: 'dependency_added',
+      metadata: { depends_on_bead_id: dependsOnBeadId, dependency_type: type },
+    });
+  }
+
+  /**
+   * Remove a dependency edge between two beads.
+   * After removal, checks if any beads are now unblocked and arms the
+   * alarm so they get dispatched promptly.
+   */
+  async removeBeadDependency(beadId: string, dependsOnBeadId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const deleted = beadOps.removeBeadDependency(this.sql, beadId, dependsOnBeadId);
+    if (deleted) {
+      beadOps.logBeadEvent(this.sql, {
+        beadId,
+        agentId: null,
+        eventType: 'dependency_removed',
+        metadata: { depends_on_bead_id: dependsOnBeadId },
+      });
+      // Check if removing this dependency unblocked any beads
+      const unblockedIds = beadOps.getNewlyUnblockedBeads(this.sql, dependsOnBeadId);
+      if (unblockedIds.length > 0) {
+        await this.ctx.storage.setAlarm(Date.now());
+      }
+    }
+    return deleted;
+  }
+
   /**
    * Force-reset an agent to idle, unhooking from its current bead if any.
    * Sets the bead status back to 'open' so it can be re-dispatched.

@@ -154,62 +154,57 @@ when access lapses, with email notifications at each stage.
 4. The system MUST check whether the user was previously suspended
    (has a non-null suspension timestamp) before mutating the
    subscription row.
-5. The system MUST deduct the first period's cost as a negative credit
-   transaction. The deduction MUST use a period-encoded idempotency
-   key (see Credit Renewal rule 2) with conflict-safe insertion. The
-   key MUST distinguish the plan and billing period, for example
-   `kiloclaw-subscription:YYYY-MM` for standard or
-   `kiloclaw-subscription-commit:YYYY-MM` for commit. If the insertion
-   detects a duplicate, the system MUST abort the enrollment as a
-   duplicate attempt.
-6. The system MUST atomically decrement the user's acquired credit
-   balance by the deducted amount in the same database transaction as
-   the credit transaction insertion.
-7. After the credit deduction transaction commits (rules 5–6), the
-   system MUST trigger a bonus credit evaluation. This step determines
-   whether the user's cumulative spend now qualifies for additional
-   bonus credits under their Kilo Pass entitlement and, if so, awards
-   them. The user's acquired credit balance MAY be temporarily negative
-   between the deduction in rule 6 and the bonus award; other
+5. The credit deduction and subscription upsert MUST be performed in
+   a single database transaction so that a crash cannot
+   leave the user with deducted credits and no active subscription.
+   Within this transaction the system MUST:
+   a. Insert a negative credit transaction for the first period's cost.
+      The insertion MUST use a period-encoded idempotency key (see
+      Credit Renewal rule 2) with conflict-safe semantics. The key
+      MUST distinguish the plan and billing period, for example
+      `kiloclaw-subscription:YYYY-MM` for standard or
+      `kiloclaw-subscription-commit:YYYY-MM` for commit. If the
+      insertion detects a duplicate, the system MUST abort the
+      enrollment as a duplicate attempt.
+   b. Atomically decrement the user's acquired credit balance by the
+      deducted amount.
+   c. Create or upsert the subscription record with payment source set
+      to `credits`, status set to active, the billing period set from
+      the current time, the credit renewal timestamp set to the period
+      end, and the payment provider subscription ID set to null.
+   d. The subscription upsert MUST clear the past-due-since timestamp
+      and set the status to active, but MUST NOT clear the suspension
+      timestamp or destruction deadline at this step. If the user was
+      previously suspended, those columns are needed as a signal for
+      the auto-resume procedure in rule 7.
+   If the transaction is interrupted, the database MUST roll back all
+   operations so that a retry can re-attempt without the idempotency
+   key blocking it.
+6. After the enrollment transaction commits (rule 5), the system MUST
+   trigger a bonus credit evaluation. This step determines whether the
+   user's cumulative spend now qualifies for additional bonus credits
+   under their Kilo Pass entitlement and, if so, awards them. The
+   user's acquired credit balance MAY be temporarily negative between
+   the deduction in rule 5b and the bonus award; other
    balance-observing systems (monitoring, display, renewal sweeps)
-   MUST tolerate transient negative balances from this flow. When
-   the user has no Kilo Pass, this step is a no-op. If the bonus
+   MUST tolerate transient negative balances from this flow. When the
+   user has no Kilo Pass, this step is a no-op. If the bonus
    evaluation fails or times out, the system MUST log the failure but
-   MUST still proceed to rule 8 (subscription upsert). The missed
-   bonus SHOULD be recovered by a subsequent reconciliation process;
-   this spec does not define that process.
-8. The system MUST create or upsert the subscription record with
-   payment source set to `credits`, status set to active, the billing
-   period set from the current time, the credit renewal timestamp set
-   to the period end, and the payment provider subscription ID set to
-   null.
-9. The subscription upsert MUST clear the past-due-since timestamp
-   and set the status to active, but MUST NOT clear the suspension
-   timestamp or destruction deadline at this step. If the user was
-   previously suspended, those columns are needed as a signal for the
-   auto-resume procedure in rule 10.
-10. If the user was previously suspended (per rule 4), the system MUST
-    call the auto-resume procedure after the upsert to restart the
-    instance, clear suspension-cycle email log entries, and clear
-    the suspension timestamp and destruction deadline. This MUST
-    happen after the subscription row is in active state. If the
-    process crashes before auto-resume completes, the non-null
-    suspension timestamp on an active subscription signals that
-    resume is still required; the next background job run MUST
-    detect this state and retry the auto-resume.
-11. For the commit plan, the system MUST record a commit-period end
-    date six calendar months from enrollment, consistent with Commit
-    Plan Lifecycle rule 2.
-
-> **Implementation note:** If the process crashes after the deduction
-> transaction commits (rule 6) but before the subscription upsert
-> (rule 8), the user is left with deducted credits and no active
-> subscription. The idempotency key (rule 5) blocks re-deduction on
-> retry, so the normal enrollment path cannot recover this state. This
-> gap is pre-existing (it applies with or without the bonus evaluation
-> step), but the bonus step widens the crash-vulnerability window.
-> Operational monitoring SHOULD detect deductions without corresponding
-> active subscriptions and alert for manual reconciliation.
+   MUST NOT roll back the enrollment. The missed bonus SHOULD be
+   recovered by a subsequent reconciliation process; this spec does
+   not define that process.
+7. If the user was previously suspended (per rule 4), the system MUST
+   call the auto-resume procedure after the transaction commits to
+   restart the instance, clear suspension-cycle email log entries, and
+   clear the suspension timestamp and destruction deadline. This MUST
+   happen after the subscription row is in active state. If the
+   process crashes before auto-resume completes, the non-null
+   suspension timestamp on an active subscription signals that
+   resume is still required; the next background job run MUST
+   detect this state and retry the auto-resume.
+8. For the commit plan, the system MUST record a commit-period end
+   date six calendar months from enrollment, consistent with Commit
+   Plan Lifecycle rule 2.
 
 ### Commit Plan Lifecycle
 
@@ -353,7 +348,7 @@ when access lapses, with email notifications at each stage.
    and advance the subscription's billing period (current-period-start,
    current-period-end, credit-renewal-timestamp) within the same
    transaction. After the transaction commits, the system MUST trigger
-   a bonus credit evaluation as described in Credit Enrollment rule 7.
+   a bonus credit evaluation as described in Credit Enrollment rule 6.
    The user's acquired credit balance MAY be temporarily negative
    between the deduction and the bonus award. If the bonus evaluation
    fails or times out, the system MUST log the failure and continue
@@ -379,14 +374,23 @@ when access lapses, with email notifications at each stage.
     the user has auto top-up enabled and whether a top-up has
     already been triggered for the current renewal period. If auto
     top-up is available and has NOT yet been triggered for this
-    period, the system MUST trigger it, record a durable marker
-    (the credit renewal timestamp of the period being charged) on
-    the subscription row to indicate that a top-up has been
-    requested, and skip the row without changing any other state
-    (fire-and-skip). The next sweep run MUST re-evaluate the row
-    after the top-up webhook has credited the balance. The marker
-    MUST be cleared when the billing period advances (successful
-    deduction) or when the subscription is canceled.
+    period, the system MUST persist the durable marker (the credit
+    renewal timestamp of the period being charged) on the
+    subscription row BEFORE triggering the auto top-up call. This
+    ensures that if the process crashes after the payment-provider
+    invoice is created but before the marker write would otherwise
+    have committed, the marker already exists and prevents a
+    duplicate top-up on the next sweep. The auto top-up call MUST
+    include a deterministic idempotency key derived from the user ID
+    and the credit renewal timestamp of the period being charged, so
+    that the payment provider de-duplicates repeated requests for the
+    same renewal period. After the marker is persisted and the
+    top-up triggered, the system MUST skip the row without changing
+    any other state (fire-and-skip). The next sweep run MUST
+    re-evaluate the row after the top-up webhook has credited the
+    balance. The marker MUST be cleared when the billing period
+    advances (successful deduction) or when the subscription is
+    canceled.
 12. When the effective balance is still insufficient (per rule 11)
     and auto top-up is not available, has been disabled due to a
     prior card decline, or was already triggered for the current

@@ -381,6 +381,35 @@ export class MayorGastownClient {
     );
   }
 
+  async addBeadDependency(input: {
+    rig_id: string;
+    bead_id: string;
+    depends_on_bead_id: string;
+    dependency_type?: 'blocks' | 'tracks' | 'parent-child';
+  }): Promise<void> {
+    await this.request<{ ok: true }>(
+      `${this.baseUrl}/api/towns/${this.townId}/rigs/${input.rig_id}/beads/${input.bead_id}/dependencies`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          depends_on_bead_id: input.depends_on_bead_id,
+          dependency_type: input.dependency_type,
+        }),
+      }
+    );
+  }
+
+  async removeBeadDependency(input: {
+    rig_id: string;
+    bead_id: string;
+    depends_on_bead_id: string;
+  }): Promise<void> {
+    await this.request<{ ok: true; deleted: boolean }>(
+      `${this.baseUrl}/api/towns/${this.townId}/rigs/${input.rig_id}/beads/${input.bead_id}/dependencies/${input.depends_on_bead_id}`,
+      { method: 'DELETE' }
+    );
+  }
+
   async listConvoys(): Promise<Convoy[]> {
     return this.request<Convoy[]>(this.mayorPath('/convoys'));
   }

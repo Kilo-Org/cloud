@@ -14,7 +14,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN git lfs install
+RUN git lfs install --system
 
 # Install Kilo CLI globally via npm (needs real Node.js runtime).
 # npm's global install does not resolve optionalDependencies, so we must

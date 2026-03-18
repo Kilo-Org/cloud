@@ -52,13 +52,14 @@ async function refreshGitCredentials(
   env: Env,
   townId: string,
   gitUrl: string,
-  userId: string
+  userId: string,
+  orgId?: string
 ): Promise<void> {
   if (!env.GIT_TOKEN_SERVICE) return;
   const githubRepo = extractGithubRepo(gitUrl);
   if (!githubRepo) return;
 
-  const result = await env.GIT_TOKEN_SERVICE.getTokenForRepo({ githubRepo, userId });
+  const result = await env.GIT_TOKEN_SERVICE.getTokenForRepo({ githubRepo, userId, orgId });
   if (!result.success) {
     console.warn(`[gastown-trpc] git credential refresh failed: ${result.reason}`);
     return;
@@ -358,7 +359,13 @@ export const gastownRouter = router({
 
       // Resolve git credentials using the town owner's identity
       try {
-        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, credentialUserId);
+        await refreshGitCredentials(
+          ctx.env,
+          input.townId,
+          input.gitUrl,
+          credentialUserId,
+          townConfig.organization_id
+        );
       } catch (err) {
         console.warn('[gastown-trpc] createRig: git credential refresh failed', err);
       }
@@ -564,7 +571,13 @@ export const gastownRouter = router({
       const townConfig = await getTownDOStub(ctx.env, rig.town_id).getTownConfig();
       const credentialUserId = townConfig.owner_user_id ?? user.id;
       try {
-        await refreshGitCredentials(ctx.env, rig.town_id, rig.git_url, credentialUserId);
+        await refreshGitCredentials(
+          ctx.env,
+          rig.town_id,
+          rig.git_url,
+          credentialUserId,
+          townConfig.organization_id
+        );
       } catch (err) {
         console.warn('[gastown-trpc] sling: git credential refresh failed', err);
       }
@@ -638,7 +651,13 @@ export const gastownRouter = router({
         const rigList = await ownerStub.listRigs(input.townId);
         for (const rig of rigList) {
           if (extractGithubRepo(rig.git_url)) {
-            await refreshGitCredentials(ctx.env, input.townId, rig.git_url, credentialUserId);
+            await refreshGitCredentials(
+              ctx.env,
+              input.townId,
+              rig.git_url,
+              credentialUserId,
+              townConfig.organization_id
+            );
             break;
           }
         }
@@ -1021,7 +1040,13 @@ export const gastownRouter = router({
 
       // Resolve git credentials using the town owner's identity
       try {
-        await refreshGitCredentials(ctx.env, input.townId, input.gitUrl, credentialUserId);
+        await refreshGitCredentials(
+          ctx.env,
+          input.townId,
+          input.gitUrl,
+          credentialUserId,
+          townConfig.organization_id
+        );
       } catch (err) {
         console.warn('[gastown-trpc] createOrgRig: git credential refresh failed', err);
       }

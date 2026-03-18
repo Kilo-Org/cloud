@@ -67,6 +67,12 @@ export function createMayorTools(client: MayorGastownClient) {
           .string()
           .describe('JSON-encoded metadata object for additional context')
           .optional(),
+        depends_on: tool.schema
+          .array(tool.schema.string())
+          .describe(
+            'Optional list of bead IDs this task depends on. The new bead will not be dispatched until all listed beads are closed.'
+          )
+          .optional(),
       },
       async execute(args) {
         const metadata = args.metadata ? parseJsonObject(args.metadata, 'metadata') : undefined;
@@ -76,13 +82,30 @@ export function createMayorTools(client: MayorGastownClient) {
           body: args.body,
           metadata,
         });
-        return [
+
+        // Add dependency edges if depends_on was provided
+        if (args.depends_on && args.depends_on.length > 0) {
+          for (const depBeadId of args.depends_on) {
+            await client.addBeadDependency({
+              rig_id: args.rig_id,
+              bead_id: result.bead.bead_id,
+              depends_on_bead_id: depBeadId,
+              dependency_type: 'blocks',
+            });
+          }
+        }
+
+        const lines = [
           `Task slung successfully.`,
           `Bead: ${result.bead.bead_id} — "${result.bead.title}"`,
           `Assigned to: ${result.agent.name} (${result.agent.role}, id: ${result.agent.id})`,
           `Status: ${result.bead.status}`,
-          `The polecat will be dispatched automatically by the alarm scheduler.`,
-        ].join('\n');
+        ];
+        if (args.depends_on && args.depends_on.length > 0) {
+          lines.push(`Dependencies: blocked by ${args.depends_on.length} bead(s)`);
+        }
+        lines.push(`The polecat will be dispatched automatically by the alarm scheduler.`);
+        return lines.join('\n');
       },
     }),
 
@@ -473,6 +496,53 @@ export function createMayorTools(client: MayorGastownClient) {
           mode: args.mode ?? 'wait-idle',
         });
         return `Nudge queued: ${result.nudge_id} (mode: ${args.mode ?? 'wait-idle'})`;
+      },
+    }),
+
+    gt_bead_add_dependency: tool({
+      description:
+        'Add a dependency between two beads. The bead at bead_id will be blocked by depends_on_bead_id — ' +
+        'it will not be dispatched until the dependency is closed.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the beads belong to'),
+        bead_id: tool.schema.string().describe('The UUID of the bead that should be blocked'),
+        depends_on_bead_id: tool.schema
+          .string()
+          .describe('The UUID of the bead that must close first'),
+        dependency_type: tool.schema
+          .enum(['blocks', 'parent-child'])
+          .describe('Type of dependency (default: blocks)')
+          .optional(),
+      },
+      async execute(args) {
+        await client.addBeadDependency({
+          rig_id: args.rig_id,
+          bead_id: args.bead_id,
+          depends_on_bead_id: args.depends_on_bead_id,
+          dependency_type: args.dependency_type ?? 'blocks',
+        });
+        return `Dependency added: bead ${args.bead_id} now depends on ${args.depends_on_bead_id} (type: ${args.dependency_type ?? 'blocks'}).`;
+      },
+    }),
+
+    gt_bead_remove_dependency: tool({
+      description:
+        'Remove a dependency between two beads. If removing the dependency unblocks the bead, ' +
+        'it will be dispatched automatically.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the beads belong to'),
+        bead_id: tool.schema.string().describe('The UUID of the dependent bead'),
+        depends_on_bead_id: tool.schema
+          .string()
+          .describe('The UUID of the bead it currently depends on'),
+      },
+      async execute(args) {
+        await client.removeBeadDependency({
+          rig_id: args.rig_id,
+          bead_id: args.bead_id,
+          depends_on_bead_id: args.depends_on_bead_id,
+        });
+        return `Dependency removed: bead ${args.bead_id} no longer depends on ${args.depends_on_bead_id}. If this was the last blocker, the bead will be dispatched automatically.`;
       },
     }),
   };

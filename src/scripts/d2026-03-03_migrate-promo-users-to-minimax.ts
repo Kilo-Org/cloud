@@ -1,17 +1,17 @@
 /**
- * Migrates depleted promo users' code review model from Sonnet 4.6 to MiniMax M2.5 (free).
+ * Migrates depleted promo users' code review model from Sonnet 4.6 to MiniMax M2.7 (free).
  *
  * Background:
  *   The Sonnet 4.6 free code review promo (Feb 18–25, 2026) attracted ~960 users.
  *   Many now have < $1 balance, meaning their code reviews will start then fail
  *   mid-stream when the LLM gateway enforces the balance gate — a poor experience.
- *   This script switches their review model to MiniMax M2.5 (free) so reviews
+ *   This script switches their review model to MiniMax M2.7 (free) so reviews
  *   can still complete without cost.
  *
  * What it does:
  *   1. Finds agent_configs with agent_type='code_review' and model_slug=Sonnet 4.6
  *      whose owner has balance < $1
- *   2. Updates each matching config's model_slug to MiniMax M2.5
+ *   2. Updates each matching config's model_slug to MiniMax M2.7
  *
  * Usage:
  *   DRY RUN (default):
@@ -23,10 +23,10 @@
 import { db, closeAllDrizzleConnections, type DrizzleTransaction } from '@/lib/drizzle';
 import { agent_configs, kilocode_users, organizations } from '@kilocode/db/schema';
 import { sql, and, eq, inArray, lt } from 'drizzle-orm';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
+import { minimax_m27_free_model } from '@/lib/providers/minimax';
 import { REVIEW_PROMO_MODEL } from '@/lib/code-reviews/core/constants';
 
-const TARGET_MODEL = minimax_m25_free_model.public_id; // 'minimax/minimax-m2.5:free'
+const TARGET_MODEL = minimax_m27_free_model.public_id; // 'minimax/minimax-m2.7:free'
 const MIN_BALANCE_MUSD = 1_000_000; // $1 in microdollars
 const isDryRun = !process.argv.includes('--run-actually');
 

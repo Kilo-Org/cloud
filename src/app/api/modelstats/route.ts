@@ -26,7 +26,7 @@ export async function GET(): Promise<NextResponse> {
         costPerRequest: 0.000338961128634318,
       },
       {
-        model: 'minimax/minimax-m2.5',
+        model: 'minimax/minimax-m2.7',
         cost: 0.072531479863115,
         costPerRequest: 0.00359489406140943,
       },

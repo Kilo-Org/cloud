@@ -3,7 +3,7 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
+import { minimax_m27_free_model } from '@/lib/providers/minimax';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
@@ -45,8 +45,8 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
   description: 'Free with limited capability. No credits required.',
-  context_length: minimax_m25_free_model.context_length,
-  max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
+  context_length: minimax_m27_free_model.context_length,
+  max_completion_tokens: minimax_m27_free_model.max_completion_tokens,
   prompt_price: '0',
   completion_price: '0',
   supports_images: false,
@@ -151,14 +151,14 @@ const FRONTIER_MODE_TO_MODEL = new Map<string, ResolvedAutoModel>([
 
 const KIMI_K25_MODEL_ID = 'moonshotai/kimi-k2.5';
 
-const MINIMAX_M25_MODEL_ID = 'minimax/minimax-m2.5';
+const MINIMAX_M27_MODEL_ID = 'minimax/minimax-m2.7';
 
 const BALANCED_CODE_MODEL: ResolvedAutoModel = {
-  model: MINIMAX_M25_MODEL_ID,
+  model: MINIMAX_M27_MODEL_ID,
 };
 
 // Mode → model mappings for kilo-auto/balanced routing.
-// Uses Kimi K2.5 where Frontier uses Opus, Minimax M2.5 where Frontier uses Sonnet.
+// Uses Kimi K2.5 where Frontier uses Opus, Minimax M2.7 where Frontier uses Sonnet.
 const BALANCED_MODE_TO_MODEL = new Map<string, ResolvedAutoModel>([
   ['plan', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
   ['general', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
@@ -166,8 +166,8 @@ const BALANCED_MODE_TO_MODEL = new Map<string, ResolvedAutoModel>([
   ['orchestrator', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
   ['ask', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
   ['debug', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
-  ['build', { model: MINIMAX_M25_MODEL_ID }],
-  ['explore', { model: MINIMAX_M25_MODEL_ID }],
+  ['build', { model: MINIMAX_M27_MODEL_ID }],
+  ['explore', { model: MINIMAX_M27_MODEL_ID }],
   ['code', BALANCED_CODE_MODEL],
 ]);
 
@@ -196,7 +196,7 @@ export function deprecatedAutoModelsToPreventNewExtensionModelPickerFromGettingS
 export function resolveAutoModel(model: string, modeHeader: string | null): ResolvedAutoModel {
   const mappedModel = legacyMapping[model]?.id ?? model;
   if (mappedModel === KILO_AUTO_FREE_MODEL.id) {
-    return { model: minimax_m25_free_model.public_id };
+    return { model: minimax_m27_free_model.public_id };
   }
   if (mappedModel === KILO_AUTO_SMALL_MODEL.id) {
     return { model: 'openai/gpt-5-nano' };

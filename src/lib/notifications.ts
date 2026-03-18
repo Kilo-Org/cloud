@@ -45,7 +45,7 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //   id: 'feb-25-glm5-free-ended',
   //   title: 'GLM-5 Free Period Ended',
   //   message:
-  //     'The free period for GLM-5 has ended. Try another free model like MiniMax M2.5 or Trinity Large Preview!',
+  //     'The free period for GLM-5 has ended. Try another free model like MiniMax M2.7 or Trinity Large Preview!',
   //   showIn: ['extension', 'cli'],
   // },
   {

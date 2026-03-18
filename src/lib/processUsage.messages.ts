@@ -1,5 +1,3 @@
-// TODO review this file
-
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -16,7 +14,6 @@ import type { GatewayMessagesRequest } from '@/lib/providers/openrouter/types';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/processUsage.constants';
 import type Anthropic from '@anthropic-ai/sdk';
 
-// ref: https://docs.anthropic.com/en/api/messages
 // Anthropic usage combined with OpenRouter cost fields
 // ref: https://docs.anthropic.com/en/api/messages
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -126,15 +123,6 @@ export async function parseMessagesMicrodollarUsageFromStream(
         return;
       }
 
-      //if (json.type === 'error') {
-      //  reportedError = true;
-      //  captureException(new Error(`Messages API error: ${json.error.message}`), {
-      //    tags: { source: 'messages_sse_processing' },
-      //    extra: { json, event },
-      //  });
-      //  return;
-      //}
-
       if (json.type === 'message_start') {
         messageId = json.message.id;
         model = json.message.model;
@@ -215,8 +203,8 @@ export function parseMessagesMicrodollarUsageFromString(
 
   const responseContent =
     responseJson?.content
-      .filter(c => c.type === 'text')
-      .map(c => c.text ?? '')
+      .filter((c): c is Anthropic.Messages.TextBlock => c.type === 'text')
+      .map(c => c.text)
       .join('') ?? '';
 
   const coreProps = {

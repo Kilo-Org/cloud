@@ -41,6 +41,8 @@ type TownOverviewPageClientProps = {
   townId: string;
   /** Override base path for org-scoped routes (e.g. /organizations/[id]/gastown/[townId]) */
   basePath?: string;
+  /** When set, integration queries use org-scoped endpoints. */
+  organizationId?: string;
 };
 
 const ROLE_ICONS: Record<string, typeof Bot> = {
@@ -85,6 +87,7 @@ function bucketEventsOverTime(events: Array<{ created_at: string }>, windowMinut
 export function TownOverviewPageClient({
   townId,
   basePath: basePathOverride,
+  organizationId,
 }: TownOverviewPageClientProps) {
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const router = useRouter();
@@ -605,6 +608,7 @@ export function TownOverviewPageClient({
         townId={townId}
         isOpen={isCreateRigOpen}
         onClose={() => setIsCreateRigOpen(false)}
+        organizationId={organizationId}
       />
 
       {/* Drawers are rendered by the layout-level DrawerStackProvider */}

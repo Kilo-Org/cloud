@@ -12,7 +12,9 @@ export default async function OrgTownOverviewPage({
     <OrganizationByPageLayout
       params={params}
       fullBleed
-      render={() => <TownOverviewPageClient townId={townId} basePath={basePath} />}
+      render={() => (
+        <TownOverviewPageClient townId={townId} basePath={basePath} organizationId={id} />
+      )}
     />
   );
 }

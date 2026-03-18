@@ -20,11 +20,13 @@ type CreateRigDialogProps = {
   townId: string;
   isOpen: boolean;
   onClose: () => void;
+  /** When set, queries org-scoped integrations instead of personal ones. */
+  organizationId?: string;
 };
 
 type RepoMode = 'integration' | 'manual';
 
-export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProps) {
+export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: CreateRigDialogProps) {
   const [name, setName] = useState('');
   const [gitUrl, setGitUrl] = useState('');
   const [defaultBranch, setDefaultBranch] = useState('main');
@@ -35,14 +37,24 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
   const mainTrpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Fetch repos from integrations (via main tRPC — cloudAgent is not on the gastown router)
+  // Fetch repos from integrations — use org-scoped queries when organizationId is provided
   const githubReposQuery = useQuery({
-    ...mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false }),
+    ...(organizationId
+      ? mainTrpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+          organizationId,
+          forceRefresh: false,
+        })
+      : mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false })),
     enabled: isOpen && mode === 'integration',
   });
 
   const gitlabReposQuery = useQuery({
-    ...mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false }),
+    ...(organizationId
+      ? mainTrpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+          organizationId,
+          forceRefresh: false,
+        })
+      : mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false })),
     enabled: isOpen && mode === 'integration',
   });
 
@@ -108,7 +120,9 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
     if (mode === 'manual') return gitUrl.trim();
     if (!selectedRepo) return '';
     if (selectedPlatform === 'gitlab') {
-      const instanceUrl = gitlabReposQuery.data?.instanceUrl ?? 'https://gitlab.com';
+      const instanceUrl =
+        (gitlabReposQuery.data as { instanceUrl?: string } | undefined)?.instanceUrl ??
+        'https://gitlab.com';
       return `${instanceUrl.replace(/\/+$/, '')}/${selectedRepo}.git`;
     }
     return `https://github.com/${selectedRepo}.git`;
@@ -182,7 +196,14 @@ export function CreateRigDialog({ townId, isOpen, onClose }: CreateRigDialogProp
                 {!isLoadingRepos && !hasIntegrations ? (
                   <div className="rounded-md border border-white/10 bg-black/25 p-3 text-sm text-white/50">
                     No integrations connected.{' '}
-                    <a href="/integrations" className="text-white/70 underline">
+                    <a
+                      href={
+                        organizationId
+                          ? `/organizations/${organizationId}/integrations`
+                          : '/integrations'
+                      }
+                      className="text-white/70 underline"
+                    >
                       Connect GitHub or GitLab
                     </a>{' '}
                     first, or use Manual URL.

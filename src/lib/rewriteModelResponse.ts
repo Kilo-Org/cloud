@@ -6,6 +6,7 @@ import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
 import type OpenAI from 'openai';
+import type Anthropic from '@anthropic-ai/sdk';
 
 function convertReasoningToOpenRouterFormat(message: MessageWithReasoning) {
   if (!message.reasoning_content) {
@@ -112,6 +113,108 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
         const { done, value } = await reader.read();
         if (done) {
           controller.enqueue('data: [DONE]\n\n');
+          controller.close();
+          break;
+        }
+        parser.feed(decoder.decode(value, { stream: true }));
+      }
+    },
+  });
+
+  return new NextResponse(stream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+type MessagesApiUsage = Anthropic.Messages.Usage & {
+  cost?: number;
+  is_byok?: boolean | null;
+  cost_details?: { upstream_inference_cost: number };
+};
+
+type MessagesApiMessageStart = {
+  type: 'message_start';
+  message: Anthropic.Messages.Message & { usage: MessagesApiUsage };
+};
+
+type MessagesApiMessageDelta = {
+  type: 'message_delta';
+  usage: MessagesApiUsage;
+  delta: Anthropic.Messages.MessageDeltaEvent['delta'];
+};
+
+function rewriteMessagesUsage(usage: MessagesApiUsage) {
+  delete usage.cost;
+  delete usage.cost_details;
+  delete usage.is_byok;
+}
+
+export async function rewriteFreeModelResponse_Messages(response: Response, model: string) {
+  const headers = getOutputHeaders(response);
+
+  if (headers.get('content-type')?.includes('application/json')) {
+    const json = (await response.json()) as Anthropic.Messages.Message & {
+      usage?: MessagesApiUsage;
+    };
+    if (json.model) {
+      json.model = model;
+    }
+    if (json.usage) {
+      rewriteMessagesUsage(json.usage);
+    }
+    return NextResponse.json(json, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const reader = response.body?.getReader();
+      if (!reader) {
+        controller.close();
+        return;
+      }
+
+      const parser = createParser({
+        onEvent(event: EventSourceMessage) {
+          const json = JSON.parse(event.data) as
+            | MessagesApiMessageStart
+            | MessagesApiMessageDelta
+            | Anthropic.Messages.MessageStreamEvent;
+
+          if (json.type === 'message_start') {
+            const e = json as MessagesApiMessageStart;
+            if (e.message.model) {
+              e.message.model = model;
+            }
+            if (e.message.usage) {
+              rewriteMessagesUsage(e.message.usage);
+            }
+          }
+
+          if (json.type === 'message_delta') {
+            const e = json as MessagesApiMessageDelta;
+            if (e.usage) {
+              rewriteMessagesUsage(e.usage);
+            }
+          }
+
+          const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
+          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+        },
+        onComment() {
+          controller.enqueue(': KILO PROCESSING\n\n');
+        },
+      });
+
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
           controller.close();
           break;
         }

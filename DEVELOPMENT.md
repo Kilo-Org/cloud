@@ -168,7 +168,7 @@ All tests should pass against the local PostgreSQL database.
 | `pnpm typecheck`        | Run the TypeScript type checker                                                |
 | `pnpm lint`             | Lint all source files                                                          |
 | `pnpm lint:changed`     | Lint only files changed since `main`                                           |
-| `pnpm format`           | Format all files with Prettier                                                 |
+| `pnpm format`           | Format all supported files with oxfmt                                          |
 | `pnpm format:changed`   | Format only files changed since `main`                                         |
 | `pnpm validate`         | Run typecheck, lint changed, format changed, tests, and dependency cycle check |
 | `pnpm drizzle migrate`  | Apply pending database migrations                                              |
@@ -178,8 +178,8 @@ All tests should pass against the local PostgreSQL database.
 
 ## Git Workflow
 
-- Direct commits to `main` are blocked by a pre-commit hook. Always work on a feature branch.
-- The pre-commit hook runs `lint-staged`, which applies Prettier formatting and type-checks changed files.
+- Direct commits to `main` are blocked by a git hook. Always work on a feature branch.
+- The pre-push hook runs `pnpm format:check`, `pnpm lint`, and `pnpm typecheck`.
 
 ## Stripe Webhook Testing
 

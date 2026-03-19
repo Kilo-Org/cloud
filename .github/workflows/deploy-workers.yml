@@ -38,11 +38,11 @@ jobs:
   # ── Manual dispatch: deploy a single specified worker ──────────────────────
   deploy-manual:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     name: Deploy ${{ inputs.worker }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -68,12 +68,12 @@ jobs:
   # ── Push to main: detect changed workers, deploy each one ─────────────────
   detect-changes:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
         with:
           fetch-depth: 0
 
@@ -127,7 +127,7 @@ jobs:
   deploy-changed:
     needs: detect-changes
     if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -135,7 +135,7 @@ jobs:
     name: Deploy ${{ matrix.worker }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2

@@ -165,6 +165,67 @@ function kiloPassMetadata(params: {
   };
 }
 
+async function seedBaseIssuance(params: {
+  subscriptionId: string;
+  kiloUserId: string;
+  issueMonth: string;
+  amountUsd: number;
+}): Promise<void> {
+  const [creditTxn] = await db
+    .insert(credit_transactions)
+    .values({
+      id: randomUUID(),
+      kilo_user_id: params.kiloUserId,
+      amount_microdollars: params.amountUsd * 1_000_000,
+      is_free: false,
+      description: `seed-issuance-${params.issueMonth}`,
+    })
+    .returning({ id: credit_transactions.id });
+  if (!creditTxn) throw new Error('Failed to insert seed credit transaction');
+
+  const [issuance] = await db
+    .insert(kilo_pass_issuances)
+    .values({
+      kilo_pass_subscription_id: params.subscriptionId,
+      issue_month: params.issueMonth,
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripe_invoice_id: `in_seed_${params.issueMonth}_${Math.random()}`,
+    })
+    .returning({ id: kilo_pass_issuances.id });
+  if (!issuance) throw new Error(`Failed to insert seed issuance for ${params.issueMonth}`);
+
+  await db.insert(kilo_pass_issuance_items).values({
+    kilo_pass_issuance_id: issuance.id,
+    kind: KiloPassIssuanceItemKind.Base,
+    credit_transaction_id: creditTxn.id,
+    amount_usd: params.amountUsd,
+    bonus_percent_applied: null,
+  });
+}
+
+function makeInvoicesListMock(params: {
+  yearlyPeriodStartSeconds: number;
+  yearlyPeriodEndSeconds: number;
+}): ReturnType<typeof jest.fn> {
+  return jest.fn(async () => ({
+    data: [
+      {
+        id: `in_mock_yearly_${Math.random()}`,
+        lines: {
+          data: [
+            {
+              period: {
+                start: params.yearlyPeriodStartSeconds,
+                end: params.yearlyPeriodEndSeconds,
+              },
+            },
+          ],
+        },
+      },
+    ],
+  }));
+}
+
 beforeEach(async () => {
   ensureKiloPassStripePriceIdEnv();
   await cleanupDbForTest();
@@ -633,21 +694,36 @@ describe('handleKiloPassInvoicePaid', () => {
     const scheduledChangeId = randomUUID();
 
     const startedAt = '2024-01-01T00:00:00.000Z';
-    // 2025-04-01 is 15 months after 2024-01-01. Remaining months should be 12 - (15 % 12) = 9.
+    // Yearly cycle #2 started Jan 2025. By Apr 2025 (effectiveAt), 3 months of
+    // credits were issued (Jan, Feb, Mar). Remaining should be 12 - 3 = 9.
     const effectiveAt = '2025-04-01T00:00:00.000Z';
 
-    await db.insert(kilo_pass_subscriptions).values({
-      kilo_user_id: user.id,
-      stripe_subscription_id: stripeSubId,
-      tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Yearly,
-      status: 'active',
-      cancel_at_period_end: false,
-      started_at: startedAt,
-      ended_at: null,
-      current_streak_months: 0,
-      next_yearly_issue_at: '2024-02-01T00:00:00.000Z',
-    });
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: startedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: '2025-04-01T00:00:00.000Z',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!sub) throw new Error('Failed to insert subscription');
+
+    // Seed 3 monthly issuances in the current yearly cycle (Jan, Feb, Mar 2025)
+    for (const month of ['2025-01-01', '2025-02-01', '2025-03-01']) {
+      await seedBaseIssuance({
+        subscriptionId: sub.id,
+        kiloUserId: user.id,
+        issueMonth: month,
+        amountUsd: 19,
+      });
+    }
 
     await db.insert(kilo_pass_scheduled_changes).values({
       id: scheduledChangeId,
@@ -677,12 +753,20 @@ describe('handleKiloPassInvoicePaid', () => {
 
     const retrieve = jest.fn(async () => subscription);
     const release = jest.fn(async (_scheduleId: string) => ({}));
+    // Yearly cycle started Jan 1 2025 (second year of subscription).
+    const list = makeInvoicesListMock({
+      yearlyPeriodStartSeconds: 1_735_689_600, // 2025-01-01T00:00:00Z
+      yearlyPeriodEndSeconds: 1_767_225_600, // 2026-01-01T00:00:00Z
+    });
     const stripe = {
       subscriptions: {
         retrieve,
       },
       subscriptionSchedules: {
         release,
+      },
+      invoices: {
+        list,
       },
     };
 
@@ -735,6 +819,866 @@ describe('handleKiloPassInvoicePaid', () => {
         triggeringStripeInvoiceId: invoiceId,
         remainingMonths: 9,
       })
+    );
+  });
+
+  test('yearly: upgrade invoice appearing in invoices.list does not match as the billing cycle invoice (regression #1274)', async () => {
+    // Stripe returns invoices newest-first from invoices.list. When a yearly
+    // upgrade invoice is paid, Stripe may return it in the list alongside the
+    // original yearly invoice. The upgrade invoice's period also contains the
+    // effective date, so without filtering it out, the code would incorrectly
+    // use the upgrade invoice's period to compute months elapsed — yielding 0
+    // months used and over-issuing remaining credits.
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+
+    const stripeSubId = `sub_${Math.random()}`;
+    const stripeScheduleId = `sched_${Math.random()}`;
+    const scheduledChangeId = randomUUID();
+
+    const startedAt = '2024-01-01T00:00:00.000Z';
+    const effectiveAt = '2025-04-01T00:00:00.000Z';
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: startedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: '2025-04-01T00:00:00.000Z',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!sub) throw new Error('Failed to insert subscription');
+
+    for (const month of ['2025-01-01', '2025-02-01', '2025-03-01']) {
+      await seedBaseIssuance({
+        subscriptionId: sub.id,
+        kiloUserId: user.id,
+        issueMonth: month,
+        amountUsd: 19,
+      });
+    }
+
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier19,
+      from_cadence: KiloPassCadence.Yearly,
+      to_tier: KiloPassTier.Tier49,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: stripeScheduleId,
+      effective_at: effectiveAt,
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+      kiloPassScheduledChangeId: scheduledChangeId,
+    });
+
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_704_067_200, // 2024-01-01T00:00:00Z
+      metadata: meta,
+    });
+
+    const invoiceId = `inv_yearly_upgrade_regression_${Math.random()}`;
+
+    // Simulate real Stripe behavior: invoices.list returns the upgrade invoice
+    // (newest) BEFORE the original yearly invoice. Both periods contain the
+    // effective date.
+    const upgradeInvoicePeriodStart = 1_743_465_600; // 2025-04-01 (upgrade start)
+    const upgradeInvoicePeriodEnd = 1_775_001_600; // 2026-04-01
+    const originalYearlyPeriodStart = 1_735_689_600; // 2025-01-01
+    const originalYearlyPeriodEnd = 1_767_225_600; // 2026-01-01
+
+    const list = jest.fn(async () => ({
+      data: [
+        // Newest first — the upgrade invoice itself
+        {
+          id: invoiceId,
+          lines: {
+            data: [
+              {
+                period: {
+                  start: upgradeInvoicePeriodStart,
+                  end: upgradeInvoicePeriodEnd,
+                },
+              },
+            ],
+          },
+        },
+        // Original yearly invoice
+        {
+          id: `in_original_yearly_${Math.random()}`,
+          lines: {
+            data: [
+              {
+                period: {
+                  start: originalYearlyPeriodStart,
+                  end: originalYearlyPeriodEnd,
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }));
+
+    const retrieve = jest.fn(async () => subscription);
+    const release = jest.fn(async (_scheduleId: string) => ({}));
+    const stripe = {
+      subscriptions: { retrieve },
+      subscriptionSchedules: { release },
+      invoices: { list },
+    };
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 49_00 * 12,
+      period_start_seconds: upgradeInvoicePeriodStart,
+      created_seconds: upgradeInvoicePeriodStart,
+      paid_seconds: upgradeInvoicePeriodStart + 3600,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_test_yearly_upgrade_regression_1274',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
+    const remainingTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
+    });
+    expect(remainingTx).toBeTruthy();
+    // 3 months used (Jan, Feb, Mar). 9 remaining × $19 = $171.
+    // Without the fix, the upgrade invoice would match first, yielding 0 months
+    // elapsed and 12 remaining × $19 = $228 (wrong).
+    expect(remainingTx?.amount_microdollars).toBe(171_000_000);
+
+    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+      where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
+    });
+    expect(remainingAuditLog?.payload_json).toEqual(
+      expect.objectContaining({
+        remainingMonths: 9,
+      })
+    );
+  });
+
+  test('yearly: remaining credits use invoice billing period, not started_at, after a prior cadence change', async () => {
+    // Scenario: subscription started monthly on Mar 1, switched to yearly on Apr 1
+    // (billing_cycle_anchor: phase_start reset the billing cycle). Then user uptiers
+    // on May 1 — only 1 month into the yearly cycle. The handler should issue 11
+    // remaining months, not fewer (which would happen if it used started_at to compute
+    // months elapsed).
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+
+    const stripeSubId = `sub_${Math.random()}`;
+    const stripeScheduleId = `sched_${Math.random()}`;
+    const scheduledChangeId = randomUUID();
+
+    // started_at is the ORIGINAL subscription start (when it was monthly).
+    // The yearly billing cycle actually started Apr 1 (after cadence change with
+    // billing_cycle_anchor: phase_start).
+    const startedAt = '2025-03-01T00:00:00.000Z';
+    const effectiveAt = '2025-05-01T00:00:00.000Z';
+    // The yearly billing period runs Apr 1 2025 → Apr 1 2026.
+    const yearlyBillingPeriodStartSeconds = 1_743_465_600; // 2025-04-01T00:00:00Z
+    const yearlyBillingPeriodEndSeconds = 1_775_001_600; // 2026-04-01T00:00:00Z
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: startedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: '2025-05-01T00:00:00.000Z',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!sub) throw new Error('Failed to insert subscription');
+
+    // Seed 1 monthly issuance in the current yearly cycle (Apr 2025)
+    await seedBaseIssuance({
+      subscriptionId: sub.id,
+      kiloUserId: user.id,
+      issueMonth: '2025-04-01',
+      amountUsd: 19,
+    });
+
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier19,
+      from_cadence: KiloPassCadence.Yearly,
+      to_tier: KiloPassTier.Tier49,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: stripeScheduleId,
+      effective_at: effectiveAt,
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+      kiloPassScheduledChangeId: scheduledChangeId,
+    });
+
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_740_787_200, // 2025-03-01T00:00:00Z (original start)
+      metadata: meta,
+    });
+
+    const retrieve = jest.fn(async () => subscription);
+    const release = jest.fn(async (_scheduleId: string) => ({}));
+    // Yearly cycle started Apr 1 2025 (after cadence change from monthly).
+    const list = makeInvoicesListMock({
+      yearlyPeriodStartSeconds: yearlyBillingPeriodStartSeconds,
+      yearlyPeriodEndSeconds: yearlyBillingPeriodEndSeconds,
+    });
+    const stripe = {
+      subscriptions: { retrieve },
+      subscriptionSchedules: { release },
+      invoices: { list },
+    };
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    const invoiceId = `inv_yearly_upgrade_after_cadence_change_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 49_00 * 12,
+      period_start_seconds: yearlyBillingPeriodEndSeconds, // Stripe sets period_start to the new period
+      created_seconds: 1_746_057_600, // 2025-05-01T00:00:00Z
+      paid_seconds: 1_746_057_600,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_test_yearly_upgrade_after_cadence_change',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
+    const remainingTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
+    });
+    expect(remainingTx).toBeTruthy();
+    // Only 1 month was used (Apr). 11 remaining × $19 = $209.
+    expect(remainingTx?.amount_microdollars).toBe(209_000_000);
+
+    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+      where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
+    });
+    expect(remainingAuditLog?.payload_json).toEqual(
+      expect.objectContaining({
+        remainingMonths: 11,
+      })
+    );
+  });
+
+  test('yearly: prior monthly issuances outside the 12-month window do not inflate remaining credits', async () => {
+    // Scenario: user subscribes monthly for 2 months (Jan–Feb 2025), cancels,
+    // comes back 4 months later and subscribes yearly (Jul 2025). After 2 months
+    // of yearly credits (Jul, Aug), they uptier in Sep 2025.
+    // The old monthly issuances (Jan, Feb) should NOT count — only the 2 yearly
+    // issuances matter. Remaining = 12 - 2 = 10.
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+
+    const stripeSubId = `sub_${Math.random()}`;
+    const stripeScheduleId = `sched_${Math.random()}`;
+    const scheduledChangeId = randomUUID();
+
+    const startedAt = '2025-01-01T00:00:00.000Z';
+    const effectiveAt = '2025-09-01T00:00:00.000Z';
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: startedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: '2025-09-01T00:00:00.000Z',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!sub) throw new Error('Failed to insert subscription');
+
+    // Old monthly issuances from before the gap — should not affect remaining
+    // credits since the Stripe invoice period anchors the yearly cycle to Jul 2025.
+    for (const month of ['2025-01-01', '2025-02-01']) {
+      await seedBaseIssuance({
+        subscriptionId: sub.id,
+        kiloUserId: user.id,
+        issueMonth: month,
+        amountUsd: 19,
+      });
+    }
+
+    // Yearly issuances (Jul, Aug 2025)
+    for (const month of ['2025-07-01', '2025-08-01']) {
+      await seedBaseIssuance({
+        subscriptionId: sub.id,
+        kiloUserId: user.id,
+        issueMonth: month,
+        amountUsd: 19,
+      });
+    }
+
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier19,
+      from_cadence: KiloPassCadence.Yearly,
+      to_tier: KiloPassTier.Tier49,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: stripeScheduleId,
+      effective_at: effectiveAt,
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+      kiloPassScheduledChangeId: scheduledChangeId,
+    });
+
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_735_689_600, // 2025-01-01T00:00:00Z
+      metadata: meta,
+    });
+
+    const retrieve = jest.fn(async () => subscription);
+    const release = jest.fn(async (_scheduleId: string) => ({}));
+    // Yearly cycle started Jul 1 2025 (after gap and re-subscription).
+    const list = makeInvoicesListMock({
+      yearlyPeriodStartSeconds: 1_751_328_000, // 2025-07-01T00:00:00Z
+      yearlyPeriodEndSeconds: 1_782_864_000, // 2026-07-01T00:00:00Z
+    });
+    const stripe = {
+      subscriptions: { retrieve },
+      subscriptionSchedules: { release },
+      invoices: { list },
+    };
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    const invoiceId = `inv_yearly_upgrade_with_gap_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 49_00 * 12,
+      period_start_seconds: 1_756_684_800, // 2025-09-01T00:00:00Z
+      created_seconds: 1_756_684_800,
+      paid_seconds: 1_756_684_800,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_test_yearly_upgrade_with_gap',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
+    const remainingTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
+    });
+    expect(remainingTx).toBeTruthy();
+    // Only 2 yearly months used (Jul, Aug). 10 remaining × $19 = $190.
+    // The old monthly issuances (Jan, Feb) must NOT count.
+    expect(remainingTx?.amount_microdollars).toBe(190_000_000);
+
+    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+      where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
+    });
+    expect(remainingAuditLog?.payload_json).toEqual(
+      expect.objectContaining({
+        remainingMonths: 10,
+      })
+    );
+  });
+
+  test('yearly: upgrade at exactly month 12 (full year used) issues 0 remaining credits', async () => {
+    // User has used all 12 months of their yearly cycle. Upgrading at the cycle
+    // boundary should not issue any remaining credits.
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+
+    const stripeSubId = `sub_${Math.random()}`;
+    const stripeScheduleId = `sched_${Math.random()}`;
+    const scheduledChangeId = randomUUID();
+
+    const startedAt = '2024-01-01T00:00:00.000Z';
+    // effectiveAt = exactly 12 months after cycle start
+    const effectiveAt = '2025-01-01T00:00:00.000Z';
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: startedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: '2025-01-01T00:00:00.000Z',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!sub) throw new Error('Failed to insert subscription');
+
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier19,
+      from_cadence: KiloPassCadence.Yearly,
+      to_tier: KiloPassTier.Tier49,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: stripeScheduleId,
+      effective_at: effectiveAt,
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+      kiloPassScheduledChangeId: scheduledChangeId,
+    });
+
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_704_067_200, // 2024-01-01
+      metadata: meta,
+    });
+
+    const retrieve = jest.fn(async () => subscription);
+    const release = jest.fn(async (_scheduleId: string) => ({}));
+    // Yearly cycle ran Jan 2024 → Jan 2025. Effective = Jan 2025 = cycle end.
+    const list = makeInvoicesListMock({
+      yearlyPeriodStartSeconds: 1_704_067_200, // 2024-01-01
+      yearlyPeriodEndSeconds: 1_735_689_600, // 2025-01-01
+    });
+    const stripe = {
+      subscriptions: { retrieve },
+      subscriptionSchedules: { release },
+      invoices: { list },
+    };
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    const invoiceId = `inv_yearly_upgrade_at_boundary_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 49_00 * 12,
+      period_start_seconds: 1_735_689_600, // 2025-01-01
+      created_seconds: 1_735_689_600,
+      paid_seconds: 1_735_689_600,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_test_yearly_upgrade_at_boundary',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    // No remaining credits should be issued — full year was used.
+    const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
+    const remainingTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
+    });
+    expect(remainingTx).toBeUndefined();
+  });
+
+  test('yearly: upgrade at month 1 (just started yearly) issues 11 remaining months', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+
+    const stripeSubId = `sub_${Math.random()}`;
+    const stripeScheduleId = `sched_${Math.random()}`;
+    const scheduledChangeId = randomUUID();
+
+    const startedAt = '2025-01-01T00:00:00.000Z';
+    const effectiveAt = '2025-02-01T00:00:00.000Z';
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: startedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: effectiveAt,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!sub) throw new Error('Failed to insert subscription');
+
+    // 1 month of credits issued (Jan)
+    await seedBaseIssuance({
+      subscriptionId: sub.id,
+      kiloUserId: user.id,
+      issueMonth: '2025-01-01',
+      amountUsd: 19,
+    });
+
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier19,
+      from_cadence: KiloPassCadence.Yearly,
+      to_tier: KiloPassTier.Tier49,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: stripeScheduleId,
+      effective_at: effectiveAt,
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+      kiloPassScheduledChangeId: scheduledChangeId,
+    });
+
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_735_689_600, // 2025-01-01
+      metadata: meta,
+    });
+
+    const retrieve = jest.fn(async () => subscription);
+    const release = jest.fn(async (_scheduleId: string) => ({}));
+    const list = makeInvoicesListMock({
+      yearlyPeriodStartSeconds: 1_735_689_600, // 2025-01-01
+      yearlyPeriodEndSeconds: 1_767_225_600, // 2026-01-01
+    });
+    const stripe = {
+      subscriptions: { retrieve },
+      subscriptionSchedules: { release },
+      invoices: { list },
+    };
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    const invoiceId = `inv_yearly_upgrade_month1_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 49_00 * 12,
+      period_start_seconds: 1_738_368_000, // 2025-02-01
+      created_seconds: 1_738_368_000,
+      paid_seconds: 1_738_368_000,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_test_yearly_upgrade_month1',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
+    const remainingTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
+    });
+    expect(remainingTx).toBeTruthy();
+    // 1 month used, 11 remaining × $19 = $209
+    expect(remainingTx?.amount_microdollars).toBe(209_000_000);
+
+    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+      where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
+    });
+    expect(remainingAuditLog?.payload_json).toEqual(
+      expect.objectContaining({ remainingMonths: 11 })
+    );
+  });
+
+  test('yearly: falls back to effective_at - 12 months when no matching yearly Stripe invoice found', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+
+    const stripeSubId = `sub_${Math.random()}`;
+    const stripeScheduleId = `sched_${Math.random()}`;
+    const scheduledChangeId = randomUUID();
+
+    const startedAt = '2025-01-01T00:00:00.000Z';
+    const effectiveAt = '2025-04-01T00:00:00.000Z';
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: startedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: effectiveAt,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!sub) throw new Error('Failed to insert subscription');
+
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier19,
+      from_cadence: KiloPassCadence.Yearly,
+      to_tier: KiloPassTier.Tier49,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: stripeScheduleId,
+      effective_at: effectiveAt,
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+      kiloPassScheduledChangeId: scheduledChangeId,
+    });
+
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_735_689_600, // 2025-01-01
+      metadata: meta,
+    });
+
+    const retrieve = jest.fn(async () => subscription);
+    const release = jest.fn(async (_scheduleId: string) => ({}));
+    // Return empty invoice list — no matching yearly invoice
+    const list = jest.fn(async () => ({ data: [] }));
+    const stripe = {
+      subscriptions: { retrieve },
+      subscriptionSchedules: { release },
+      invoices: { list },
+    };
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    const invoiceId = `inv_yearly_upgrade_no_invoice_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 49_00 * 12,
+      period_start_seconds: 1_743_465_600, // 2025-04-01
+      created_seconds: 1_743_465_600,
+      paid_seconds: 1_743_465_600,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_test_yearly_upgrade_no_invoice',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    // Fallback: effective_at - 12 months = Apr 2024. diff(Apr 2025, Apr 2024) = 12.
+    // remaining = 0, so no credits issued.
+    // This is conservative — better to under-issue than over-issue in the fallback.
+    const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
+    const remainingTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
+    });
+    expect(remainingTx).toBeUndefined();
+  });
+
+  test('yearly: multiple upgrades in same year — second upgrade uses its own billing cycle', async () => {
+    // Scenario: yearly tier_19 (started Jan 2025), uptier to tier_49 at Mar 2025
+    // (billing_cycle_anchor resets, new cycle Mar 2025 → Mar 2026), then uptier
+    // again to tier_199 at May 2025. The second upgrade should see 2 months used
+    // in the tier_49 cycle (Mar, Apr), giving 10 remaining × $49.
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+
+    const stripeSubId = `sub_${Math.random()}`;
+    const stripeScheduleId = `sched_${Math.random()}`;
+    const scheduledChangeId = randomUUID();
+
+    const startedAt = '2025-01-01T00:00:00.000Z';
+    const effectiveAt = '2025-05-01T00:00:00.000Z';
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        // Already upgraded to tier_49 (first upgrade happened earlier)
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: startedAt,
+        ended_at: null,
+        current_streak_months: 0,
+        next_yearly_issue_at: effectiveAt,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    if (!sub) throw new Error('Failed to insert subscription');
+
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier49,
+      from_cadence: KiloPassCadence.Yearly,
+      to_tier: KiloPassTier.Tier199,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: stripeScheduleId,
+      effective_at: effectiveAt,
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier199,
+      cadence: KiloPassCadence.Yearly,
+      kiloPassScheduledChangeId: scheduledChangeId,
+    });
+
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_735_689_600, // 2025-01-01
+      metadata: meta,
+    });
+
+    const retrieve = jest.fn(async () => subscription);
+    const release = jest.fn(async (_scheduleId: string) => ({}));
+    // The tier_49 yearly cycle started Mar 2025 (after first uptier reset the anchor).
+    const list = makeInvoicesListMock({
+      yearlyPeriodStartSeconds: 1_740_787_200, // 2025-03-01
+      yearlyPeriodEndSeconds: 1_772_323_200, // 2026-03-01
+    });
+    const stripe = {
+      subscriptions: { retrieve },
+      subscriptionSchedules: { release },
+      invoices: { list },
+    };
+
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier199,
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    const invoiceId = `inv_yearly_double_upgrade_${Math.random()}`;
+    const invoice = makeStripeInvoice({
+      id: invoiceId,
+      amount_paid_cents: 199_00 * 12,
+      period_start_seconds: 1_746_057_600, // 2025-05-01
+      created_seconds: 1_746_057_600,
+      paid_seconds: 1_746_057_600,
+      priceId,
+      subscriptionIdOrExpanded: stripeSubId,
+      metadata: meta,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_test_yearly_double_upgrade',
+      invoice,
+      stripe: stripe as unknown as Stripe,
+    });
+
+    const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
+    const remainingTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
+    });
+    expect(remainingTx).toBeTruthy();
+    // 2 months used (Mar, Apr) in the tier_49 cycle. 10 remaining × $49 = $490.
+    expect(remainingTx?.amount_microdollars).toBe(490_000_000);
+
+    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+      where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
+    });
+    expect(remainingAuditLog?.payload_json).toEqual(
+      expect.objectContaining({ remainingMonths: 10 })
     );
   });
 

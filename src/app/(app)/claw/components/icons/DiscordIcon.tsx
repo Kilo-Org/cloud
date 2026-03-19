@@ -2,7 +2,7 @@ export function DiscordIcon({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 64 48"
-      fill="currentColor"
+      fill="#5865F2"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >

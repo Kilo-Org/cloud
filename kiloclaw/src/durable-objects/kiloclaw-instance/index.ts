@@ -1201,6 +1201,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.patchConfigOnMachine(this.s, this.env, patch);
   }
 
+  async patchOpenclawConfig(patch: Record<string, unknown>): Promise<{ ok: boolean }> {
+    await this.loadState();
+    return gateway.patchOpenclawConfig(this.s, this.env, patch);
+  }
+
   /** Returns null if the controller is too old to have the /_kilo/config/read endpoint. */
   async getOpenclawConfig(): Promise<{ config: Record<string, unknown>; etag?: string } | null> {
     await this.loadState();
@@ -1344,6 +1349,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       return { success: true };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[DO] restartMachine failed:', errorMessage, err);
       return { success: false, error: errorMessage };
     } finally {
       this.s.restartingAt = null;

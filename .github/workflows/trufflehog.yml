@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   trufflehog:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

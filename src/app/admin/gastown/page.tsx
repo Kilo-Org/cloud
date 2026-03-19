@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { format, parseISO } from 'date-fns';
 import AdminPage from '../components/AdminPage';
 import { BreadcrumbItem, BreadcrumbLink } from '@/components/ui/breadcrumb';
@@ -71,12 +71,22 @@ const DELIVERY_COLORS: Record<string, string> = {
   internal: '#ca8a04',
 };
 
-function formatHour(ts: string): string {
+function formatHour(ts: string | number | Date | undefined): string {
+  if (ts == null) return '';
+
   try {
-    return format(parseISO(ts), 'MM/dd HH:mm');
+    return format(parseISO(String(ts)), 'MM/dd HH:mm');
   } catch {
-    return ts;
+    return String(ts);
   }
+}
+
+function formatTooltipHour(label: ReactNode): string {
+  if (typeof label === 'string' || typeof label === 'number' || label instanceof Date) {
+    return formatHour(label);
+  }
+
+  return '';
 }
 
 function formatLatency(ms: number): string {
@@ -232,7 +242,7 @@ function EventsTimeseriesChart({ hours }: { hours: number }) {
             <XAxis dataKey="hour" tickFormatter={formatHour} className="text-xs" />
             <YAxis className="text-xs" />
             <Tooltip
-              labelFormatter={formatHour}
+              labelFormatter={formatTooltipHour}
               contentStyle={{
                 background: 'hsl(var(--card))',
                 border: '1px solid hsl(var(--border))',
@@ -336,7 +346,7 @@ function DeliveryBreakdownChart({ hours }: { hours: number }) {
             <XAxis dataKey="hour" tickFormatter={formatHour} className="text-xs" />
             <YAxis className="text-xs" />
             <Tooltip
-              labelFormatter={formatHour}
+              labelFormatter={formatTooltipHour}
               contentStyle={{
                 background: 'hsl(var(--card))',
                 border: '1px solid hsl(var(--border))',

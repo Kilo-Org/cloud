@@ -356,6 +356,20 @@ export class KiloClawInternalClient {
     );
   }
 
+  async patchOpenclawConfig(
+    userId: string,
+    patch: Record<string, unknown>
+  ): Promise<{ ok: boolean }> {
+    return this.request(
+      '/api/platform/openclaw-config',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, patch }),
+      },
+      { userId }
+    );
+  }
+
   async getFileTree(userId: string): Promise<{ tree: FileNode[] }> {
     const params = new URLSearchParams({ userId });
     return this.request(`/api/platform/files/tree?${params.toString()}`);

@@ -27,8 +27,8 @@ Cloudflare Worker that powers Kilocode Cloud Agents. It exposes a tRPC API for s
 
 - `pnpm run lint` - ESLint
 - `pnpm run lint:fix` - ESLint with auto-fix
-- `pnpm run format` - Prettier write (src only)
-- `pnpm run format:check` - Prettier check (src only)
+- `pnpm run format` - oxfmt write (src only)
+- `pnpm run format:check` - oxfmt check (src only)
 - `pnpm run typecheck` - TypeScript (tsgo) + wrapper typecheck
 
 ### Deployment

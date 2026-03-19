@@ -49,9 +49,12 @@ function loadDevVars() {
 const devVars = loadDevVars();
 
 const WORKER_URL = process.env.WORKER_URL ?? 'http://localhost:8795';
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET ?? devVars.INTERNAL_API_SECRET ?? 'dev-internal-secret';
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET ?? devVars.NEXTAUTH_SECRET ?? 'dev-secret-change-me';
-const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres';
+const INTERNAL_SECRET =
+  process.env.INTERNAL_SECRET ?? devVars.INTERNAL_API_SECRET ?? 'dev-internal-secret';
+const NEXTAUTH_SECRET =
+  process.env.NEXTAUTH_SECRET ?? devVars.NEXTAUTH_SECRET ?? 'dev-secret-change-me';
+const DATABASE_URL =
+  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres';
 const USER_ID = `test-google-setup-${Date.now()}`;
 const DOCKER_IMAGE = 'kilocode/google-setup';
 const DOCKER_CONTEXT = path.resolve(__dirname, '../google-setup');
@@ -67,9 +70,15 @@ const cleanupFns = [];
 // Helpers
 // ---------------------------------------------------------------------------
 
-function green(msg) { console.log(`\x1b[32m  ✓ ${msg}\x1b[0m`); }
-function red(msg) { console.log(`\x1b[31m  ✗ ${msg}\x1b[0m`); }
-function bold(msg) { console.log(`\n\x1b[1m${msg}\x1b[0m`); }
+function green(msg) {
+  console.log(`\x1b[32m  ✓ ${msg}\x1b[0m`);
+}
+function red(msg) {
+  console.log(`\x1b[31m  ✗ ${msg}\x1b[0m`);
+}
+function bold(msg) {
+  console.log(`\n\x1b[1m${msg}\x1b[0m`);
+}
 
 function sql(query) {
   return execSync('psql "$PGURL" -tAc "$PGQUERY"', {
@@ -107,7 +116,9 @@ async function internalDelete(urlPath) {
 function cleanup() {
   bold('Cleanup');
   for (const fn of cleanupFns) {
-    try { fn(); } catch {}
+    try {
+      fn();
+    } catch {}
   }
   green('Done');
 }
@@ -150,13 +161,21 @@ try {
 
 bold('Setup');
 
-sql(`INSERT INTO kilocode_users (id, google_user_email, google_user_name, google_user_image_url, stripe_customer_id, api_token_pepper) VALUES ('${USER_ID}', '${USER_ID}@test.local', 'Test User', '', 'cus_test_${USER_ID}', NULL) ON CONFLICT (id) DO NOTHING`);
-cleanupFns.push(() => { try { sql(`DELETE FROM kilocode_users WHERE id = '${USER_ID}'`); } catch {} });
+sql(
+  `INSERT INTO kilocode_users (id, google_user_email, google_user_name, google_user_image_url, stripe_customer_id, api_token_pepper) VALUES ('${USER_ID}', '${USER_ID}@test.local', 'Test User', '', 'cus_test_${USER_ID}', NULL) ON CONFLICT (id) DO NOTHING`
+);
+cleanupFns.push(() => {
+  try {
+    sql(`DELETE FROM kilocode_users WHERE id = '${USER_ID}'`);
+  } catch {}
+});
 green('Test user created (id=' + USER_ID + ')');
 
 // Fire off provision — Fly machine creation can be slow or flaky, but we only need
 // the DO to exist for credential storage. The machine start may time out on first try.
-cleanupFns.push(() => { internalPost('/api/platform/destroy', { userId: USER_ID }).catch(() => {}); });
+cleanupFns.push(() => {
+  internalPost('/api/platform/destroy', { userId: USER_ID }).catch(() => {});
+});
 
 const provisionController = new AbortController();
 const provisionPromise = fetch(`${WORKER_URL}/api/platform/provision`, {
@@ -230,17 +249,20 @@ console.log('  Complete the OAuth flow in your browser.');
 console.log('  The container will exit when done.\n');
 
 const dockerArgs = [
-  'run', '--rm', '-it',
-  '--network', 'host',
+  'run',
+  '--rm',
+  '-it',
+  '--network',
+  'host',
   DOCKER_IMAGE,
   `--token=${jwt}`,
   `--worker-url=${DOCKER_WORKER_URL}`,
 ];
 
-const exitCode = await new Promise((resolve) => {
+const exitCode = await new Promise(resolve => {
   const child = spawn('docker', dockerArgs, { stdio: 'inherit' });
   child.on('close', resolve);
-  child.on('error', (err) => {
+  child.on('error', err => {
     red('Failed to start Docker: ' + err.message);
     resolve(1);
   });

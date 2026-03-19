@@ -4,7 +4,14 @@ import { z } from 'zod';
 
 export const SecretCategorySchema = z.enum(['channel', 'tool', 'provider', 'custom']);
 
-export const SecretIconKeySchema = z.enum(['send', 'discord', 'slack', 'key', 'github']);
+export const SecretIconKeySchema = z.enum([
+  'send',
+  'discord',
+  'slack',
+  'key',
+  'github',
+  'credit-card',
+]);
 
 /**
  * How a secret is delivered to the OpenClaw process at runtime.

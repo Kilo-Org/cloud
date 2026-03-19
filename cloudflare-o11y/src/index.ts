@@ -15,17 +15,17 @@ registerApiMetricsRoutes(app);
 registerAlertingConfigRoutes(app);
 
 export default class extends WorkerEntrypoint<Env> {
-	async fetch(request: Request): Promise<Response> {
-		return app.fetch(request, this.env, this.ctx);
-	}
+  async fetch(request: Request): Promise<Response> {
+    return app.fetch(request, this.env, this.ctx);
+  }
 
-	async scheduled(_controller: ScheduledController): Promise<void> {
-		await evaluateAlerts(this.env);
-	}
+  async scheduled(_controller: ScheduledController): Promise<void> {
+    await evaluateAlerts(this.env);
+  }
 
-	/** RPC method called by session-ingest via service binding. */
-	async ingestSessionMetrics(params: SessionMetricsParams): Promise<void> {
-		const parsed = SessionMetricsParamsSchema.parse(params);
-		await writeSessionMetricsDataPoint(parsed, this.env);
-	}
+  /** RPC method called by session-ingest via service binding. */
+  async ingestSessionMetrics(params: SessionMetricsParams): Promise<void> {
+    const parsed = SessionMetricsParamsSchema.parse(params);
+    await writeSessionMetricsDataPoint(parsed, this.env);
+  }
 }

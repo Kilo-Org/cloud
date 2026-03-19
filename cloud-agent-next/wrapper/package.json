@@ -4,14 +4,15 @@
   "type": "module",
   "scripts": {
     "build": "bun run build.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit --incremental false"
   },
   "dependencies": {
     "@kilocode/sdk": "7.0.50"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.37",
+    "@typescript/native-preview": "catalog:",
     "typescript": "catalog:"
   }
 }

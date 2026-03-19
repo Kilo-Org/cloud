@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   playwright:
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
 
     services:
       postgres:
@@ -41,7 +41,7 @@ jobs:
       DOTENV_PRIVATE_KEY_DEVELOPMENT: ${{ secrets.DOTENV_PRIVATE_KEY_DEVELOPMENT }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
         with:
           lfs: true
           fetch-depth: 0
@@ -79,12 +79,12 @@ jobs:
 
   chromatic:
     needs: playwright
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     if: always() # Run even if playwright job fails
     continue-on-error: true # Make this check optional - don't block PR merges
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
         with:
           lfs: true
           fetch-depth: 0
@@ -134,6 +134,7 @@ jobs:
           pnpm build-storybook
 
       - name: Run Chromatic
+        id: chromatic
         uses: chromaui/action@latest
         continue-on-error: true
         with:

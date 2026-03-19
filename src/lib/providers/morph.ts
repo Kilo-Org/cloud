@@ -7,7 +7,7 @@ export const morph_warp_grep_free_model: KiloFreeModel = {
     'A code search subagent that finds relevant code in a separate context window — no embeddings, no indexing.',
   context_length: 256000,
   max_completion_tokens: 32000,
-  status: 'public',
+  status: 'hidden',
   flags: [],
   gateway: 'morph',
   internal_id: 'morph-warp-grep-v2',

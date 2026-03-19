@@ -673,6 +673,32 @@ platform.post('/openclaw-config', async c => {
   }
 });
 
+// PATCH /api/platform/openclaw-config
+// Deep-merge a JSON patch into the live openclaw.json on the running machine.
+const PatchOpenclawConfigSchema = z.object({
+  userId: z.string().min(1),
+  patch: z.record(z.string(), z.unknown()),
+});
+
+platform.patch('/openclaw-config', async c => {
+  const result = await parseBody(c, PatchOpenclawConfigSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, patch } = result.data;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.patchOpenclawConfig(patch),
+      'patchOpenclawConfig'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'openclaw-config patch');
+    return jsonError(message, status, code);
+  }
+});
+
 // GET /api/platform/files/tree?userId=...
 platform.get('/files/tree', async c => {
   const userId = c.req.query('userId');

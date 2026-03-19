@@ -5,6 +5,7 @@ dist/
 **/dist-types/
 out/
 .api/
+storybook/storybook-static/
 
 #approval tests
 src/tests/sample

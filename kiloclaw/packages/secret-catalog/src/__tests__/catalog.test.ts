@@ -37,7 +37,14 @@ describe('Secret Catalog', () => {
 
   describe('Icon validation', () => {
     it('all icon values are valid SecretIconKey members', () => {
-      const validIcons: Set<SecretIconKey> = new Set(['send', 'discord', 'slack', 'key', 'github']);
+      const validIcons: Set<SecretIconKey> = new Set([
+        'send',
+        'discord',
+        'slack',
+        'key',
+        'github',
+        'credit-card',
+      ]);
       for (const entry of SECRET_CATALOG) {
         expect(validIcons.has(entry.icon)).toBe(true);
       }
@@ -186,8 +193,9 @@ describe('Secret Catalog', () => {
 
     it('returns all tool entries sorted by order', () => {
       const tools = getEntriesByCategory('tool');
-      expect(tools.length).toBe(1);
+      expect(tools.length).toBe(2);
       expect(tools[0].id).toBe('github');
+      expect(tools[1].id).toBe('agentcard');
     });
 
     it('returns empty array for categories with no entries', () => {
@@ -211,7 +219,8 @@ describe('Secret Catalog', () => {
       expect(keys).toContain('githubToken');
       expect(keys).toContain('githubUsername');
       expect(keys).toContain('githubEmail');
-      expect(keys.size).toBe(3);
+      expect(keys).toContain('agentcardApiKey');
+      expect(keys.size).toBe(4);
     });
 
     it('returns empty set for categories with no entries', () => {
@@ -435,10 +444,11 @@ describe('Secret Catalog', () => {
   });
 
   describe('maxLength contract', () => {
-    it('all maxLength values are within the global 500 ceiling', () => {
+    it('all maxLength values are within the global ceiling', () => {
       for (const entry of SECRET_CATALOG) {
         for (const field of entry.fields) {
-          expect(field.maxLength).toBeLessThanOrEqual(500);
+          // JWT-based secrets (e.g. AgentCard) need up to 2000 chars
+          expect(field.maxLength).toBeLessThanOrEqual(2000);
         }
       }
     });

@@ -999,6 +999,17 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
+  patchOpenclawConfig: clawAccessProcedure
+    .input(z.object({ patch: z.record(z.string(), z.unknown()) }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const client = new KiloClawInternalClient();
+        return await client.patchOpenclawConfig(ctx.user.id, input.patch);
+      } catch (err) {
+        handleFileOperationError(err, 'patch openclaw config');
+      }
+    }),
+
   // ── Billing endpoints ────────────────────────────────────────────────
 
   getBillingStatus: baseProcedure.query(async ({ ctx }) => {

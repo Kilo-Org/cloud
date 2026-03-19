@@ -8,7 +8,7 @@ import {
 import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloModel } from '@/lib/providers/kilo-free-model';
-import { isRateLimitedToDeath } from '@/lib/rate-limited-models';
+import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
 import {
   getModelSettings,
   getOpenCodeSettings,
@@ -60,8 +60,7 @@ function enhancedModelList(models: OpenRouterModel[]) {
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
-        !kiloFreeModels.some(m => m.public_id === model.id && m.status !== 'disabled') &&
-        !isRateLimitedToDeath(model.id)
+        !kiloFreeModels.some(m => m.public_id === model.id) && !isForbiddenFreeModel(model.id)
     )
     .concat(
       kiloFreeModels.filter(m => m.status === 'public').map(model => convertFromKiloModel(model))

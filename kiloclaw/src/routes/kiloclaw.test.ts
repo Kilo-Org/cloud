@@ -11,7 +11,13 @@ describe('buildConfiguredSecrets', () => {
 
   it('returns all entries as false when no secrets are configured', () => {
     const result = buildConfiguredSecrets({});
-    expect(result).toEqual({ telegram: false, discord: false, slack: false, github: false });
+    expect(result).toEqual({
+      telegram: false,
+      discord: false,
+      slack: false,
+      github: false,
+      agentcard: false,
+    });
   });
 
   it('marks entry as configured when encryptedSecrets has the env var key', () => {
@@ -101,7 +107,7 @@ describe('buildConfiguredSecrets', () => {
     expect(keys).toContain('telegram');
     expect(keys).toContain('discord');
     expect(keys).toContain('slack');
-    expect(keys).toHaveLength(4);
+    expect(keys).toHaveLength(5);
   });
 
   it('treats null values as not configured', () => {

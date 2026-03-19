@@ -209,7 +209,7 @@ module.exports = {
 
     // moduleSystems: ['cjs', 'es6'],
 
-    /* 
+    /*
       false: don't look at JSDoc imports (the default)
       true: dependency-cruiser will detect dependencies in JSDoc-style
       import statements. Implies "parser": "tsc", so the dependency-cruiser
@@ -334,7 +334,7 @@ module.exports = {
       // aliasFields: ["browser"],
     },
 
-    /* skipAnalysisNotInRules will make dependency-cruiser execute 
+    /* skipAnalysisNotInRules will make dependency-cruiser execute
        analysis strictly necessary for checking the rule set only. 
 
        See https://github.com/sverweij/dependency-cruiser/blob/main/doc/options-reference.md#skipanalysisnotinrules

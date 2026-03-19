@@ -1,39 +1,39 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	// Test configuration - stripped down for vitest-pool-workers
-	"name": "cloudflare-webhook-agent-ingest-test",
-	"main": "src/index.ts",
-	"compatibility_date": "2025-09-27",
-	"compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration - stripped down for vitest-pool-workers
+  "name": "cloudflare-webhook-agent-ingest-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-27",
+  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
 
-	// Durable Objects
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "TRIGGER_DO",
-				"class_name": "TriggerDO"
-			}
-		]
-	},
+  // Durable Objects
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TRIGGER_DO",
+        "class_name": "TriggerDO",
+      },
+    ],
+  },
 
-	// DO migrations
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": ["TriggerDO"]
-		}
-	],
+  // DO migrations
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["TriggerDO"],
+    },
+  ],
 
-	// Queues - needed for captureRequest tests
-	"queues": {
-		"producers": [
-			{
-				"binding": "WEBHOOK_DELIVERY_QUEUE",
-				"queue": "webhook-delivery-queue-test"
-			}
-		]
-	}
+  // Queues - needed for captureRequest tests
+  "queues": {
+    "producers": [
+      {
+        "binding": "WEBHOOK_DELIVERY_QUEUE",
+        "queue": "webhook-delivery-queue-test",
+      },
+    ],
+  },
 
-	// Note: No service bindings or secrets for tests
-	// These are mocked/stubbed in the test environment
+  // Note: No service bindings or secrets for tests
+  // These are mocked/stubbed in the test environment
 }

@@ -1,3 +1,4 @@
+import { dirname } from 'node:path';
 import type {
   ExecutionSession,
   SandboxInstance,
@@ -1310,7 +1311,8 @@ export class SessionService {
       const escapedId = metadata.kiloSessionId.replaceAll("'", "'\\''");
       const escapedWorkspace = context.workspacePath.replaceAll("'", "'\\''");
       const restoreResult = await session.exec(
-        `bun /usr/local/bin/kilo-restore-session.js '${escapedId}' '${escapedWorkspace}'`
+        `bun /usr/local/bin/kilo-restore-session.js '${escapedId}' '${escapedWorkspace}'`,
+        { cwd: dirname(context.workspacePath) }
       );
 
       if (restoreResult.exitCode !== 0) {

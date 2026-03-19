@@ -144,7 +144,7 @@ Volumes are region-pinned. Once a user's volume is created in a region, their ma
 ```bash
 pnpm typecheck        # tsgo
 pnpm lint             # eslint v9 + typescript-eslint
-pnpm format           # prettier
+pnpm format           # oxfmt
 pnpm test             # vitest (node)
 pnpm types            # regenerate worker-configuration.d.ts (run after changing wrangler.jsonc)
 pnpm start            # wrangler dev

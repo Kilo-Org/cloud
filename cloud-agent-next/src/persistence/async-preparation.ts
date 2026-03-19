@@ -1,3 +1,4 @@
+import { dirname } from 'node:path';
 import { logger } from '../logger.js';
 import { SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
@@ -196,7 +197,8 @@ export async function executePreparationSteps(
     const escapedId = input.kiloSessionId.replaceAll("'", "'\\''");
     const escapedWorkspace = workspacePath.replaceAll("'", "'\\''");
     const restoreResult = await session.exec(
-      `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`
+      `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`,
+      { cwd: dirname(workspacePath) }
     );
     if (restoreResult.exitCode !== 0) {
       const stdout = restoreResult.stdout?.trim() ?? '';

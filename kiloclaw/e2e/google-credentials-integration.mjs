@@ -43,9 +43,12 @@ function loadDevVars() {
 const devVars = loadDevVars();
 
 const WORKER_URL = process.env.WORKER_URL ?? 'http://localhost:8795';
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET ?? devVars.INTERNAL_API_SECRET ?? 'dev-internal-secret';
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET ?? devVars.NEXTAUTH_SECRET ?? 'dev-secret-change-me';
-const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres';
+const INTERNAL_SECRET =
+  process.env.INTERNAL_SECRET ?? devVars.INTERNAL_API_SECRET ?? 'dev-internal-secret';
+const NEXTAUTH_SECRET =
+  process.env.NEXTAUTH_SECRET ?? devVars.NEXTAUTH_SECRET ?? 'dev-secret-change-me';
+const DATABASE_URL =
+  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres';
 const USER_ID = `test-google-creds-${Date.now()}`;
 
 let pass = 0;
@@ -57,9 +60,15 @@ const cleanupFns = [];
 // Helpers
 // ---------------------------------------------------------------------------
 
-function green(msg) { console.log(`\x1b[32m  ✓ ${msg}\x1b[0m`); }
-function red(msg) { console.log(`\x1b[31m  ✗ ${msg}\x1b[0m`); }
-function bold(msg) { console.log(`\n\x1b[1m${msg}\x1b[0m`); }
+function green(msg) {
+  console.log(`\x1b[32m  ✓ ${msg}\x1b[0m`);
+}
+function red(msg) {
+  console.log(`\x1b[31m  ✗ ${msg}\x1b[0m`);
+}
+function bold(msg) {
+  console.log(`\n\x1b[1m${msg}\x1b[0m`);
+}
 
 function assertEq(label, expected, actual) {
   if (expected === actual) {
@@ -134,7 +143,12 @@ async function jwtGet(path) {
 }
 
 const DUMMY_CREDS = {
-  gogConfigTarball: { encryptedData: 'dGVzdA==', encryptedDEK: 'dGVzdA==', algorithm: 'rsa-aes-256-gcm', version: 1 },
+  gogConfigTarball: {
+    encryptedData: 'dGVzdA==',
+    encryptedDEK: 'dGVzdA==',
+    algorithm: 'rsa-aes-256-gcm',
+    version: 1,
+  },
   email: 'test@example.com',
 };
 
@@ -152,9 +166,13 @@ function sql(query) {
 }
 
 function createTestUser() {
-  sql(`INSERT INTO kilocode_users (id, google_user_email, google_user_name, google_user_image_url, stripe_customer_id, api_token_pepper) VALUES ('${USER_ID}', '${USER_ID}@test.local', 'Test User', '', 'cus_test_${USER_ID}', NULL) ON CONFLICT (id) DO NOTHING`);
+  sql(
+    `INSERT INTO kilocode_users (id, google_user_email, google_user_name, google_user_image_url, stripe_customer_id, api_token_pepper) VALUES ('${USER_ID}', '${USER_ID}@test.local', 'Test User', '', 'cus_test_${USER_ID}', NULL) ON CONFLICT (id) DO NOTHING`
+  );
   cleanupFns.push(() => {
-    try { sql(`DELETE FROM kilocode_users WHERE id = '${USER_ID}'`); } catch {}
+    try {
+      sql(`DELETE FROM kilocode_users WHERE id = '${USER_ID}'`);
+    } catch {}
   });
 }
 
@@ -277,7 +295,11 @@ const { json: storeResult } = await internalPost('/api/platform/google-credentia
   userId: USER_ID,
   googleCredentials: DUMMY_CREDS,
 });
-assertEq('POST google-credentials returns googleConnected=true', true, storeResult?.googleConnected);
+assertEq(
+  'POST google-credentials returns googleConnected=true',
+  true,
+  storeResult?.googleConnected
+);
 
 const { json: statusAfterStore } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
 assertEq('GET status shows googleConnected=true', true, statusAfterStore?.googleConnected);
@@ -291,8 +313,14 @@ assertEq('GET debug-status shows googleConnected=true', true, debugAfterStore?.g
 
 bold('4. Platform API: clear Google credentials');
 
-const { json: clearResult } = await internalDelete(`/api/platform/google-credentials?userId=${USER_ID}`);
-assertEq('DELETE google-credentials returns googleConnected=false', false, clearResult?.googleConnected);
+const { json: clearResult } = await internalDelete(
+  `/api/platform/google-credentials?userId=${USER_ID}`
+);
+assertEq(
+  'DELETE google-credentials returns googleConnected=false',
+  false,
+  clearResult?.googleConnected
+);
 
 const { json: statusAfterClear } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
 assertEq('GET status shows googleConnected=false', false, statusAfterClear?.googleConnected);
@@ -313,20 +341,38 @@ if (dbConnected) {
   assertEq('Auth check returns googleConnected field', false, authJson?.googleConnected);
 
   // Store via user-facing route
-  const { json: storeJwt } = await jwtPost('/api/admin/google-credentials', { googleCredentials: DUMMY_CREDS });
-  assertEq('POST /api/admin/google-credentials returns googleConnected=true', true, storeJwt?.googleConnected);
+  const { json: storeJwt } = await jwtPost('/api/admin/google-credentials', {
+    googleCredentials: DUMMY_CREDS,
+  });
+  assertEq(
+    'POST /api/admin/google-credentials returns googleConnected=true',
+    true,
+    storeJwt?.googleConnected
+  );
 
   // Verify via platform status
   const { json: statusJwt } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
-  assertEq('Status confirms googleConnected=true after JWT store', true, statusJwt?.googleConnected);
+  assertEq(
+    'Status confirms googleConnected=true after JWT store',
+    true,
+    statusJwt?.googleConnected
+  );
 
   // Clear via user-facing route
   const { json: clearJwt } = await jwtDelete('/api/admin/google-credentials');
-  assertEq('DELETE /api/admin/google-credentials returns googleConnected=false', false, clearJwt?.googleConnected);
+  assertEq(
+    'DELETE /api/admin/google-credentials returns googleConnected=false',
+    false,
+    clearJwt?.googleConnected
+  );
 
   // Verify cleared
   const { json: statusJwt2 } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
-  assertEq('Status confirms googleConnected=false after JWT clear', false, statusJwt2?.googleConnected);
+  assertEq(
+    'Status confirms googleConnected=false after JWT clear',
+    false,
+    statusJwt2?.googleConnected
+  );
 } else {
   bold('5. User-facing routes (JWT auth) — SKIPPED (no DB)');
 }
@@ -339,7 +385,8 @@ bold('6. Validation: bad input rejected');
 
 // Missing googleCredentials field (internal API)
 const { status: badCode1 } = await internalPost('/api/platform/google-credentials', {
-  userId: USER_ID, wrong: 'field',
+  userId: USER_ID,
+  wrong: 'field',
 });
 assertEq('Rejects missing googleCredentials (400)', 400, badCode1);
 
@@ -382,14 +429,20 @@ if (dbConnected) {
 
 bold('7. Idempotency');
 
-await internalPost('/api/platform/google-credentials', { userId: USER_ID, googleCredentials: DUMMY_CREDS });
+await internalPost('/api/platform/google-credentials', {
+  userId: USER_ID,
+  googleCredentials: DUMMY_CREDS,
+});
 const { json: secondStore } = await internalPost('/api/platform/google-credentials', {
-  userId: USER_ID, googleCredentials: DUMMY_CREDS,
+  userId: USER_ID,
+  googleCredentials: DUMMY_CREDS,
 });
 assertEq('Double store still returns googleConnected=true', true, secondStore?.googleConnected);
 
 await internalDelete(`/api/platform/google-credentials?userId=${USER_ID}`);
-const { json: secondClear } = await internalDelete(`/api/platform/google-credentials?userId=${USER_ID}`);
+const { json: secondClear } = await internalDelete(
+  `/api/platform/google-credentials?userId=${USER_ID}`
+);
 assertEq('Double clear still returns googleConnected=false', false, secondClear?.googleConnected);
 
 // ---------------------------------------------------------------------------
@@ -401,7 +454,9 @@ await internalPost('/api/platform/destroy', { userId: USER_ID }).catch(() => {})
 green('Test instance destroyed');
 
 for (const fn of cleanupFns) {
-  try { fn(); } catch {}
+  try {
+    fn();
+  } catch {}
 }
 green('Test user removed from DB');
 

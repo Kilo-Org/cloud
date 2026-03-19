@@ -1,19 +1,23 @@
 {
   "name": "kiloclaw",
   "version": "1.0.0",
-  "type": "module",
   "private": true,
   "description": "Multi-tenant OpenClaw on Fly.io Machines",
+  "license": "Apache-2.0",
+  "author": "",
+  "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
     "start": "wrangler dev",
     "dev": "wrangler dev",
     "types": "wrangler types",
     "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
+    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
+    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json kiloclaw/src",
+    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
     "lint:fix": "eslint --config eslint.config.mjs --cache --fix 'src/**/*.ts'",
-    "format": "prettier --write 'src/**/*.ts'",
-    "format:check": "prettier --check 'src/**/*.ts'",
+    "format": "oxfmt src",
+    "format:check": "oxfmt --list-different src",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -25,20 +29,17 @@
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "jose": "^6.0.0",
+    "jose": "^6.2.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@kilocode/eslint-config": "workspace:*",
-    "@types/node": "^22.0.0",
-    "@typescript/native-preview": "7.0.0-dev.20251019.1",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@types/node": "^22.19.15",
+    "@typescript/native-preview": "catalog:",
+    "@vitest/coverage-v8": "^4.1.0",
     "eslint": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.0.18",
+    "vitest": "^4.1.0",
     "wrangler": "catalog:"
-  },
-  "author": "",
-  "license": "Apache-2.0"
+  }
 }

@@ -857,6 +857,10 @@ export const CustomLlmExtraBodySchema = z.record(z.string(), z.any());
 
 export type CustomLlmExtraBody = z.infer<typeof CustomLlmExtraBodySchema>;
 
+export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
+
+export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({

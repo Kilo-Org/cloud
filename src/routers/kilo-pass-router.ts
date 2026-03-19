@@ -815,12 +815,11 @@ export const kiloPassRouter = createTRPCRouter({
           proration_behavior: 'none',
         };
 
-        const yearlyTierUpgrade =
-          fromCadence === KiloPassCadence.Yearly &&
-          toCadence === KiloPassCadence.Yearly &&
-          toPrice > fromPrice;
-
-        if (yearlyTierUpgrade) {
+        // Cadence changes need a billing cycle reset so Stripe generates an invoice
+        // for the new cadence at the transition point. Yearly tier upgrades start a
+        // fresh billing cycle too — remaining credits at the old tier are issued via
+        // maybeIssueYearlyRemainingCredits when the new invoice is paid.
+        if (isCadenceChange || (isUptier && fromCadence === KiloPassCadence.Yearly)) {
           newPhase.billing_cycle_anchor = 'phase_start';
         }
 

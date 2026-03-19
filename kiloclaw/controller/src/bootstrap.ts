@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync as nodeExecFileSync } from 'node:child_process';
-import { generateBaseConfig, writeBaseConfig } from './config-writer';
+import { generateBaseConfig, writeBaseConfig, writeMcporterConfig } from './config-writer';
 import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
 
@@ -497,6 +497,9 @@ export async function bootstrap(
   await yieldToEventLoop();
 
   updateToolsMdGoogleSection(env, deps);
+
+  // Write mcporter config for MCP servers (AgentCard, etc.)
+  writeMcporterConfig(env);
 
   env.KILOCLAW_GATEWAY_ARGS = JSON.stringify(buildGatewayArgs(env));
 }

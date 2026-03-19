@@ -239,10 +239,7 @@ export function createMayorTools(client: MayorGastownClient) {
         });
 
         const beadLines = result.beads.map(
-          (
-            b: { bead: { title: string }; agent: { name: string; id: string } | null },
-            i: number
-          ) =>
+          (b: { bead: { title: string }; agent: { name: string; id: string } | null }, i: number) =>
             b.agent
               ? `  ${i + 1}. "${b.bead.title}" → ${b.agent.name} (${b.agent.id})`
               : `  ${i + 1}. "${b.bead.title}" (unassigned, pending gt_convoy_start)`

@@ -141,6 +141,12 @@ async function main() {
     failStartup(`Invalid agent session ID: ${agentSessionId}`);
   }
 
+  // The wrapper process is started with cwd outside the workspace.
+  // Switch into the workspace now so the kilo server (started in-process)
+  // sees the correct project root. This is an attempt to fix an issue where
+  // the bun process crashes in some repos but not others.
+  process.chdir(workspacePath);
+
   // Set log path if not already set
   if (!process.env.WRAPPER_LOG_PATH) {
     process.env.WRAPPER_LOG_PATH = `/tmp/kilocode-wrapper-${Date.now()}.log`;

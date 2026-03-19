@@ -873,7 +873,7 @@ describe('WrapperClient', () => {
         expect.stringMatching(
           /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
         ),
-        expect.objectContaining({ cwd: '/workspace/test' })
+        expect.objectContaining({ cwd: '/workspace' })
       );
     });
   });

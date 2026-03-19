@@ -1,6 +1,7 @@
 import tseslint from 'typescript-eslint';
 import eslint from '@eslint/js';
 import { defineConfig } from 'eslint/config';
+import oxlint from 'eslint-plugin-oxlint';
 
 /**
  * Shared ESLint base config for all packages.
@@ -8,6 +9,11 @@ import { defineConfig } from 'eslint/config';
  */
 export default function baseConfig(tsconfigRootDir) {
   return defineConfig([
+    {
+      linterOptions: {
+        reportUnusedDisableDirectives: 'off',
+      },
+    },
     {
       ignores: ['node_modules/**', 'dist/**', '.wrangler/**'],
     },
@@ -50,11 +56,12 @@ export default function baseConfig(tsconfigRootDir) {
         '@typescript-eslint/no-empty-object-type': 'error',
       },
     },
+    ...oxlint.configs['flat/eslint'],
+    ...oxlint.configs['flat/typescript'],
     {
       files: ['**/*.ts', '**/*.tsx'],
-      ignores: ['**/*.test.ts', '**/*.test.tsx'],
       rules: {
-        '@typescript-eslint/no-non-null-assertion': 'error',
+        '@typescript-eslint/no-empty-object-type': 'error',
       },
     },
   ]);

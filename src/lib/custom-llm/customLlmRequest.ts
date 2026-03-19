@@ -37,6 +37,7 @@ import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
 import { ReasoningFormat } from '@/lib/custom-llm/format';
 import {
   CustomLlmExtraBodySchema,
+  CustomLlmExtraHeadersSchema,
   InterleavedFormatSchema,
   ReasoningEffortSchema,
   VerbositySchema,
@@ -667,10 +668,12 @@ function convertGenerateResultToResponse(
 }
 
 function createModel(customLlm: CustomLlm) {
+  const extraHeaders = CustomLlmExtraHeadersSchema.safeParse(customLlm.extra_headers).data;
   if (customLlm.provider === 'anthropic') {
     const anthropic = createAnthropic({
       apiKey: customLlm.api_key,
       baseURL: customLlm.base_url,
+      headers: extraHeaders,
     });
     return anthropic(customLlm.internal_id);
   }
@@ -678,6 +681,7 @@ function createModel(customLlm: CustomLlm) {
     const openai = createOpenAI({
       apiKey: customLlm.api_key,
       baseURL: customLlm.base_url,
+      headers: extraHeaders,
     });
     return openai(customLlm.internal_id);
   }
@@ -689,6 +693,7 @@ function createModel(customLlm: CustomLlm) {
       name: 'openaiCompatible',
       apiKey: customLlm.api_key,
       baseURL: customLlm.base_url,
+      headers: extraHeaders,
       transformRequestBody: body => {
         let messages = (body as OpenAI.ChatCompletionCreateParams).messages ?? [];
         if (interleavedFormat === InterleavedFormatSchema.enum.think) {

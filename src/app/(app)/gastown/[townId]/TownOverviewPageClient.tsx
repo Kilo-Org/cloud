@@ -310,7 +310,10 @@ export function TownOverviewPageClient({
                         color: 'oklch(1 0 0 / 0.7)',
                       }}
                       labelFormatter={() => ''}
-                      formatter={(value: number) => [value, 'events']}
+                      formatter={value => {
+                        const displayValue = Array.isArray(value) ? value.join(', ') : (value ?? 0);
+                        return [displayValue, 'events'];
+                      }}
                     />
                     <Area
                       type="monotone"

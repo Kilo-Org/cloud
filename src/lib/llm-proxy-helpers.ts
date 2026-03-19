@@ -31,6 +31,7 @@ import type {
   PromptInfo,
 } from '@/lib/processUsage.types';
 import { getMaxTokens } from '@/lib/providers/openrouter/request-helpers';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -181,6 +182,11 @@ export function modelNotAllowedResponse() {
     },
     { status: 404 }
   );
+}
+
+export function forbiddenFreeModelResponse() {
+  const error = `This is not a free model. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
+  return NextResponse.json({ error, message: error }, { status: 404 });
 }
 
 export function modelDoesNotExistResponse() {

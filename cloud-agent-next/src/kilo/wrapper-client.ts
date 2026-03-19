@@ -5,6 +5,7 @@
  * running inside the sandbox container via HTTP.
  */
 
+import { dirname } from 'node:path';
 import type { ExecutionSession, SandboxInstance } from '../types.js';
 import { logger } from '../logger.js';
 import { findWrapperForSession, getWrapperSessionMarker } from './wrapper-manager.js';
@@ -350,7 +351,7 @@ export class WrapperClient {
 
     try {
       proc = await this.session.startProcess(command, {
-        cwd: workspacePath,
+        cwd: dirname(workspacePath),
       });
 
       // Wait for wrapper to become healthy via port check.

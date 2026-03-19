@@ -1,4 +1,4 @@
-import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
+import type { WorkerDb } from '@kilocode/db/client';
 import { platform_integrations, organization_memberships } from '@kilocode/db/schema';
 import { eq, and, isNotNull, or, sql } from 'drizzle-orm';
 
@@ -27,11 +27,12 @@ export class InstallationLookupService {
     return Boolean(this.env.HYPERDRIVE);
   }
 
-  private getDb(): WorkerDb {
+  private async getDb(): Promise<WorkerDb> {
     if (!this.db) {
       if (!this.env.HYPERDRIVE) {
         throw new Error('Hyperdrive not configured');
       }
+      const { getWorkerDb } = await import('@kilocode/db/client');
       this.db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
     }
     return this.db;
@@ -53,7 +54,7 @@ export class InstallationLookupService {
 
     const [repoOwner] = params.githubRepo.split('/');
 
-    const db = this.getDb();
+    const db = await this.getDb();
 
     const rows = await db
       .select({

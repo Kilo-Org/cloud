@@ -1299,7 +1299,7 @@ describe('kiloPassRouter', () => {
       expect(active[0]?.stripe_schedule_id).toBe(newScheduleId);
     });
 
-    it('yearly tier upgrade disables proration and anchors billing to phase start', async () => {
+    it('yearly tier upgrade resets billing cycle anchor and does not prorate (remaining credits issued separately)', async () => {
       const stripeMock = getStripeMock();
       const now = new Date('2026-01-01T00:00:00.000Z');
       const nextYearlyIssueAt = new Date('2027-01-01T00:00:00.000Z').toISOString();
@@ -1338,17 +1338,74 @@ describe('kiloPassRouter', () => {
         targetCadence: KiloPassCadence.Yearly,
       });
 
-      expect(stripeMock.subscriptionSchedules.update).toHaveBeenCalledWith(
-        scheduleId,
-        expect.objectContaining({
-          phases: expect.arrayContaining([
-            expect.objectContaining({
-              proration_behavior: 'none',
-              billing_cycle_anchor: 'phase_start',
-            }),
-          ]),
-        })
-      );
+      const updateCall = stripeMock.subscriptionSchedules.update.mock.calls[0];
+      const phases = updateCall?.[1]?.phases;
+      const newPhase = phases?.[1];
+
+      // Yearly tier upgrades should NOT prorate — remaining credits at the old tier
+      // are issued via maybeIssueYearlyRemainingCredits when the new invoice is paid.
+      expect(newPhase).toMatchObject({
+        proration_behavior: 'none',
+        billing_cycle_anchor: 'phase_start',
+      });
+    });
+
+    it('monthly-to-yearly cadence change anchors billing to phase start so Stripe generates an invoice', async () => {
+      const stripeMock = getStripeMock();
+      const now = new Date('2026-01-01T00:00:00.000Z');
+      const stripePeriodEndSeconds = 1_767_225_600; // 2026-01-01T00:00:00Z
+
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_schedule_change_monthly_to_yearly',
+        status: 'active',
+        items: {
+          data: [{ current_period_end: stripePeriodEndSeconds }],
+        },
+      });
+
+      const scheduleId = `sched_${Math.random()}`;
+      stripeMock.subscriptionSchedules.create.mockResolvedValue({
+        id: scheduleId,
+        phases: [{ start_date: stripePeriodEndSeconds - 2_592_000 }],
+        current_phase: { start_date: stripePeriodEndSeconds - 2_592_000 },
+      });
+      stripeMock.subscriptionSchedules.update.mockResolvedValue({
+        id: scheduleId,
+        status: KiloPassScheduledChangeStatus.NotStarted,
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-schedule-change-monthly-to-yearly@example.com',
+      });
+
+      await db.insert(kilo_pass_subscriptions).values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: 'sub_test_schedule_change_monthly_to_yearly',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancel_at_period_end: false,
+        current_streak_months: 3,
+        started_at: now.toISOString(),
+        ended_at: null,
+        next_yearly_issue_at: null,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await caller.kiloPass.scheduleChange({
+        targetTier: KiloPassTier.Tier19,
+        targetCadence: KiloPassCadence.Yearly,
+      });
+
+      const updateCall = stripeMock.subscriptionSchedules.update.mock.calls[0];
+      const phases = updateCall?.[1]?.phases;
+      const newPhase = phases?.[1];
+
+      // Cadence changes (monthly→yearly) must reset the billing anchor so Stripe
+      // generates an invoice for the new yearly subscription at the transition point.
+      expect(newPhase).toMatchObject({
+        billing_cycle_anchor: 'phase_start',
+      });
     });
   });
 

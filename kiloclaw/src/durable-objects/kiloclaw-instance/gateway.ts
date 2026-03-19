@@ -419,6 +419,25 @@ export async function patchConfigOnMachine(
 }
 
 /**
+ * Deep-merge a JSON patch into the live openclaw.json config.
+ * Unlike {@link patchConfigOnMachine}, this propagates errors to the caller.
+ */
+export async function patchOpenclawConfig(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  patch: Record<string, unknown>
+): Promise<{ ok: boolean }> {
+  return callGatewayController(
+    state,
+    env,
+    '/_kilo/config/patch',
+    'POST',
+    GatewayCommandResponseSchema,
+    patch
+  );
+}
+
+/**
  * Poll the gateway status endpoint until the OpenClaw gateway process
  * reports state === 'running'. On timeout, logs a warning but does NOT throw.
  */

@@ -48,11 +48,12 @@ import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled
 
 async function maybeIssueYearlyRemainingCredits(params: {
   tx: DrizzleTransaction;
+  stripe: Stripe;
   stripeEventId: string;
   stripeInvoiceId: string;
   scheduledChangeId: string;
 }): Promise<boolean> {
-  const { tx, stripeEventId, stripeInvoiceId, scheduledChangeId } = params;
+  const { tx, stripe, stripeEventId, stripeInvoiceId, scheduledChangeId } = params;
 
   const row = await tx.query.kilo_pass_scheduled_changes.findFirst({
     where: and(
@@ -75,25 +76,64 @@ async function maybeIssueYearlyRemainingCredits(params: {
   const subscription = await tx.query.kilo_pass_subscriptions.findFirst({
     columns: {
       id: true,
-      started_at: true,
     },
     where: eq(kilo_pass_subscriptions.stripe_subscription_id, row.stripe_subscription_id),
   });
 
   const subscriptionId = subscription?.id ?? null;
-  const startedAt = subscription?.started_at ?? null;
-  if (!subscriptionId || !startedAt) return false;
+  if (!subscriptionId) return false;
 
-  const startedAtUtc = dayjs(startedAt).utc();
   const effectiveAtUtc = dayjs(row.effective_at).utc();
-  if (!startedAtUtc.isValid() || !effectiveAtUtc.isValid()) return false;
+  if (!effectiveAtUtc.isValid()) return false;
 
-  // Stripe's `subscription.start_date` represents the *original* subscription start, even across renewals.
-  // We only want remaining months *within the current yearly cycle*, so we mod by 12.
-  const monthsElapsedTotal = effectiveAtUtc.diff(startedAtUtc, 'month');
-  const monthsElapsed = Math.max(0, Math.trunc(monthsElapsedTotal));
-  const monthsIntoCurrentYear = monthsElapsed % 12;
-  const remainingMonths = monthsIntoCurrentYear === 0 ? 0 : 12 - monthsIntoCurrentYear;
+  // Determine the start of the current yearly billing cycle from the most recent
+  // yearly invoice on this Stripe subscription. This is reliable across cadence
+  // changes (where billing_cycle_anchor: 'phase_start' resets the cycle) and
+  // subscription gaps, unlike computing from started_at.
+  const recentInvoices = await stripe.invoices.list({
+    subscription: row.stripe_subscription_id,
+    limit: 12,
+    status: 'paid',
+  });
+
+  // Find the invoice that started the current yearly billing cycle: the most recent
+  // paid invoice whose line item has a yearly interval and whose period contains
+  // the effective date.
+  let yearlyBillingCycleStartSeconds: number | null = null;
+  for (const inv of recentInvoices.data) {
+    // Skip the invoice that triggered this handler — we want the *previous*
+    // yearly invoice that started the billing cycle, not the upgrade invoice.
+    if (inv.id === stripeInvoiceId) continue;
+
+    const lineItem = inv.lines?.data?.[0];
+    if (!lineItem) continue;
+
+    const periodStart = lineItem.period?.start;
+    const periodEnd = lineItem.period?.end;
+    if (typeof periodStart !== 'number' || typeof periodEnd !== 'number') continue;
+
+    // Skip non-yearly invoices: yearly periods span ~365 days (340 allows
+    // for leap-year and Stripe timestamp rounding while staying well above
+    // the longest monthly period of ~31 days).
+    const periodDays = (periodEnd - periodStart) / 86400;
+    if (periodDays < 340) continue;
+
+    // The yearly invoice whose period contains the effective date
+    if (effectiveAtUtc.unix() >= periodStart && effectiveAtUtc.unix() <= periodEnd) {
+      yearlyBillingCycleStartSeconds = periodStart;
+      break;
+    }
+  }
+
+  if (yearlyBillingCycleStartSeconds === null) {
+    // Fallback: if no matching yearly invoice found, use the effective date
+    // minus 12 months (conservative — may slightly overcount).
+    yearlyBillingCycleStartSeconds = effectiveAtUtc.subtract(12, 'month').unix();
+  }
+
+  const cycleStartUtc = dayjs.unix(yearlyBillingCycleStartSeconds).utc();
+  const monthsElapsed = Math.max(0, effectiveAtUtc.diff(cycleStartUtc, 'month'));
+  const remainingMonths = monthsElapsed >= 12 ? 0 : 12 - monthsElapsed;
   const monthlyPriceUsd = KILO_PASS_TIER_CONFIG[row.from_tier].monthlyPriceUsd;
   const remainingBaseUsd = remainingMonths * monthlyPriceUsd;
 
@@ -208,6 +248,7 @@ export async function handleKiloPassInvoicePaid(params: {
       if (metadata.kiloPassScheduledChangeId) {
         const didIssueYearlyRemainingCredits = await maybeIssueYearlyRemainingCredits({
           tx,
+          stripe,
           stripeEventId: eventId,
           stripeInvoiceId: invoice.id,
           scheduledChangeId: metadata.kiloPassScheduledChangeId,

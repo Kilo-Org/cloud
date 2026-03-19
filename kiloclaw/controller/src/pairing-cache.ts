@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
+import path from 'node:path';
+import { z } from 'zod';
 
 const execFileAsync = promisify(execFile);
 
@@ -44,19 +46,31 @@ export type PairingCache = {
 
 type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
 
+export type ReadChannelPairingImpl = (channel: string) => Promise<unknown>;
+export type ReadDevicePairingImpl = () => Promise<unknown>;
+
 type PairingCacheOptions = {
   execImpl?: ExecImpl;
   readConfigImpl?: () => unknown;
   nowImpl?: () => string;
+  readChannelPairingImpl?: ReadChannelPairingImpl;
+  readDevicePairingImpl?: ReadDevicePairingImpl;
+  nowMsImpl?: () => number;
 };
 
 export const PERIODIC_INTERVAL_MS = 120_000;
 export const DEBOUNCE_DELAY_MS = 2_000;
-export const INITIAL_REFRESH_DELAY_MS = 120_000;
+
 export const FAILURE_RETRY_BASE_MS = 30_000;
 export const FAILURE_RETRY_MAX_MS = 300_000;
-export const CLI_TIMEOUT_MS = 45_000;
+export const APPROVE_TIMEOUT_MS = 45_000;
 export const CONFIG_PATH = '/root/.openclaw/openclaw.json';
+
+// TTL constants — exact matches to openclaw source
+// https://github.com/openclaw/openclaw/blob/d073ec42cd7fabd1004f6959628743817a4cb0e8/src/pairing/pairing-store.ts#L15 PAIRING_PENDING_TTL_MS
+export const CHANNEL_PAIRING_TTL_MS = 60 * 60 * 1000;
+// https://github.com/openclaw/openclaw/blob/d073ec42cd7fabd1004f6959628743817a4cb0e8/src/infra/device-pairing.ts#L98 PENDING_TTL_MS
+export const DEVICE_PAIRING_TTL_MS = 5 * 60 * 1000;
 
 const CHANNEL_RE = /^[a-z][a-z0-9_-]{0,63}$/;
 const CODE_RE = /^[A-Za-z0-9]{1,32}$/;
@@ -78,13 +92,36 @@ function approveFail(message: string, statusHint: 400 | 500): ApproveResult {
 
 export const OPENCLAW_BIN = '/usr/local/bin/openclaw';
 
+// Mirrors resolveStateDir() / resolveOAuthDir() in openclaw/src/config/paths.ts
+// Includes legacy CLAWDBOT_STATE_DIR fallback (openclaw paths.ts:65)
+// Note: openclaw's full resolveStateDir() also does filesystem-existence checks for
+// legacy .clawdbot dirs — those are omitted here because the container Dockerfile
+// always creates /root/.openclaw, making the existence check unreachable in practice.
+export function resolveOpenClawStateDir(): string {
+  return (
+    process.env.OPENCLAW_STATE_DIR?.trim() ||
+    process.env.CLAWDBOT_STATE_DIR?.trim() ||
+    '/root/.openclaw'
+  );
+}
+
+export function resolveCredentialsDir(): string {
+  return (
+    process.env.OPENCLAW_OAUTH_DIR?.trim() || path.join(resolveOpenClawStateDir(), 'credentials')
+  );
+}
+
+export function resolveDevicePendingPath(): string {
+  return path.join(resolveOpenClawStateDir(), 'devices', 'pending.json');
+}
+
 function defaultExecImpl(
   command: string,
   args: string[]
 ): Promise<{ stdout: string; stderr: string }> {
   return execFileAsync(command, args, {
     encoding: 'utf8',
-    timeout: CLI_TIMEOUT_MS,
+    timeout: APPROVE_TIMEOUT_MS,
     env: { ...process.env, HOME: '/root' },
   });
 }
@@ -93,13 +130,63 @@ function defaultReadConfigImpl(): unknown {
   return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+// Zod schemas for IO boundary parsing — .passthrough() keeps forward compatibility
+// when openclaw adds fields without breaking the controller.
+const channelPairingRequestSchema = z
+  .object({
+    code: z.string(),
+    id: z.string(),
+    meta: z.unknown().optional(),
+    createdAt: z.string().optional(),
+  })
+  .passthrough();
+
+const channelPairingFileSchema = z
+  .object({
+    requests: z.array(z.unknown()).catch([]),
+  })
+  .passthrough();
+
+// No .passthrough() — Zod's default strip behavior drops unknown fields (including
+// publicKey, which is sensitive and must not be forwarded to clients). This is
+// intentional and structurally enforced: only the fields listed below survive parsing.
+// See test: 'returns device requests with stripped publicKey'.
+const devicePendingEntrySchema = z.object({
+  requestId: z.string(),
+  deviceId: z.string(),
+  role: z.string().optional(),
+  platform: z.string().optional(),
+  clientId: z.string().optional(),
+  ts: z.number().optional(),
+});
+
+const devicePendingFileSchema = z.record(z.string(), z.unknown());
+
+// Collects entries from an iterable that pass the given schema, skipping malformed ones.
+// Keeps tolerant per-entry parsing — one bad entry never kills the whole list.
+function collectValidEntries<T extends z.ZodTypeAny>(
+  items: Iterable<unknown>,
+  schema: T
+): Array<z.infer<T>> {
+  const results: Array<z.infer<T>> = [];
+  for (const item of items) {
+    const parsed = schema.safeParse(item);
+    if (parsed.success) {
+      results.push(parsed.data);
+    }
+  }
+  return results;
 }
 
-function getArray(obj: Record<string, unknown>, key: string): unknown[] {
-  const val = obj[key];
-  return Array.isArray(val) ? val : [];
+// Mirrors pruneExpiredPending() in openclaw/src/infra/pairing-files.ts:
+// entries with missing ts are preserved (no expiry); entries with a ts are compared to TTL.
+function isUnexpiredDeviceRequest(req: DevicePairingRequest, nowMs: number): boolean {
+  if (req.ts === undefined) return true;
+  return nowMs - req.ts <= DEVICE_PAIRING_TTL_MS;
+}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function detectChannels(config: unknown): string[] {
@@ -120,6 +207,17 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
     execImpl = defaultExecImpl,
     readConfigImpl = defaultReadConfigImpl,
     nowImpl = () => new Date().toISOString(),
+    readChannelPairingImpl = async (channel: string) => {
+      // Path resolved at call time for testability
+      const filePath = path.join(resolveCredentialsDir(), `${channel}-pairing.json`);
+      return JSON.parse(await fs.promises.readFile(filePath, 'utf8')) as unknown;
+    },
+    readDevicePairingImpl = async () => {
+      // Path resolved at call time for testability
+      const filePath = resolveDevicePendingPath();
+      return JSON.parse(await fs.promises.readFile(filePath, 'utf8')) as unknown;
+    },
+    nowMsImpl = () => Date.now(),
   } = options ?? {};
 
   let channelCache: CacheEntry<ChannelPairingRequest> = { requests: [], lastUpdated: '' };
@@ -128,7 +226,6 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
   let started = false;
   let stopped = false;
   let periodicTimer: ReturnType<typeof setTimeout> | null = null;
-  let initialTimer: ReturnType<typeof setTimeout> | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let nextAllowedRefreshAt = 0;
   let hasCompletedInitialRefresh = false;
@@ -159,29 +256,34 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       return true;
     }
 
+    const nowMs = nowMsImpl();
     const results = await Promise.allSettled(
       channels.map(async channel => {
-        const { stdout } = await execImpl(OPENCLAW_BIN, ['pairing', 'list', channel, '--json']);
-        const parsed: unknown = JSON.parse(stdout.trim());
-        const data = isRecord(parsed) ? parsed : {};
-        const requests = getArray(data, 'requests');
-        return requests
-          .map((req): ChannelPairingRequest => {
-            const r = isRecord(req) ? req : {};
-            return {
-              code: String(r.code ?? ''),
-              id: String(r.id ?? ''),
-              channel,
-              ...('meta' in r ? { meta: r.meta } : {}),
-              ...('createdAt' in r ? { createdAt: String(r.createdAt) } : {}),
-            };
-          })
-          .filter(req => req.code !== '' && req.id !== '');
+        const parsed: unknown = await readChannelPairingImpl(channel);
+        const parsedFile = channelPairingFileSchema.safeParse(parsed);
+        const entries = parsedFile.success ? parsedFile.data.requests : [];
+        const filtered = collectValidEntries(entries, channelPairingRequestSchema)
+          .map((req): ChannelPairingRequest => ({ ...req, channel }))
+          .filter(req => req.code !== '' && req.id !== '')
+          .filter(req => {
+            // Mirrors pairing-store.ts isExpired() — PAIRING_PENDING_TTL_MS = 60 * 60 * 1000
+            // https://github.com/openclaw/openclaw/blob/d073ec42cd7fabd1004f6959628743817a4cb0e8/src/pairing/pairing-store.ts#L171
+            if (!req.createdAt) return false; // falsy (undefined, empty string) → expired
+            const createdAtMs = Date.parse(req.createdAt);
+            if (!Number.isFinite(createdAtMs)) return false; // garbage timestamp → expired
+            return nowMs - createdAtMs <= CHANNEL_PAIRING_TTL_MS;
+          });
+        console.log(
+          `[pairing-cache] channel ${channel}: read ok, ${filtered.length} request(s) after filtering`
+        );
+        return filtered;
       })
     );
 
     const allRequests: ChannelPairingRequest[] = [];
     let anySuccess = false;
+    let anyHadPriorData = false;
+    let anyUnexpectedColdFailure = false;
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.status === 'fulfilled') {
@@ -189,16 +291,18 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
         anySuccess = true;
       } else {
         const err = result.reason;
-        const msg =
-          err && typeof err === 'object' && 'stderr' in err
-            ? String(err.stderr).trim()
-            : String(err);
+        const msg = errorMessage(err);
         const priorRequests = channelCache.requests.filter(r => r.channel === channels[i]);
         if (priorRequests.length > 0) {
-          console.error(`[pairing-cache] WARNING: keeping stale data for ${channels[i]}: ${msg}`);
+          anyHadPriorData = true;
+          console.warn(`[pairing-cache] WARNING: keeping stale data for ${channels[i]}: ${msg}`);
           allRequests.push(...priorRequests);
+        } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          // Cold-start: file not written yet — silently ignore
         } else {
-          console.error(`[pairing-cache] ${channels[i]}: ${msg}`);
+          // Unexpected failure (permissions, corrupt JSON, etc.) with no prior data
+          anyUnexpectedColdFailure = true;
+          console.log(`[pairing-cache] channel ${channels[i]}: read failed: ${msg}`);
         }
       }
     }
@@ -208,40 +312,56 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
         channelCache = { requests: allRequests, lastUpdated: nowImpl() };
       }
       return true;
-    } else {
+    } else if (anyHadPriorData) {
+      // All channels failed but some had prior data — already warned per-channel above
       console.warn('[pairing-cache] channel refresh: all channels failed, cache not updated');
       return false;
+    } else if (anyUnexpectedColdFailure) {
+      // Non-ENOENT failures with no prior data — trigger backoff
+      return false;
     }
+    // else: all failures were cold-start ENOENT — stay silent
+    return true;
   };
 
   const refreshDevicePairingInternal = async (): Promise<boolean> => {
     if (stopped) return false;
     const gen = ++deviceGeneration;
     try {
-      const { stdout } = await execImpl(OPENCLAW_BIN, ['devices', 'list', '--json']);
-      const parsed: unknown = JSON.parse(stdout.trim());
-      const data = isRecord(parsed) ? parsed : {};
-      const pending = getArray(data, 'pending');
+      const parsed: unknown = await readDevicePairingImpl();
+      const parsedFile = devicePendingFileSchema.safeParse(parsed);
+      // Graceful fallback: if the file is valid JSON but not an object (e.g. [] or null),
+      // treat as empty rather than triggering backoff — matches the channel path pattern.
+      // This returns true (success), so the periodic timer stays at its normal 120s cadence
+      // and self-heals on the next refresh once openclaw rewrites the file correctly.
+      const entries = parsedFile.success ? Object.values(parsedFile.data) : [];
+      const nowMs = nowMsImpl();
 
-      const requests: DevicePairingRequest[] = pending
-        .map((req: unknown) => {
-          const r = isRecord(req) ? req : {};
-          return {
-            requestId: String(r.requestId ?? ''),
-            deviceId: String(r.deviceId ?? ''),
-            ...(r.role !== undefined ? { role: String(r.role) } : {}),
-            ...(r.platform !== undefined ? { platform: String(r.platform) } : {}),
-            ...(r.clientId !== undefined ? { clientId: String(r.clientId) } : {}),
-            ...(typeof r.ts === 'number' ? { ts: r.ts } : {}),
-          };
-        })
-        .filter(req => req.requestId !== '' && req.deviceId !== '');
+      const requests: DevicePairingRequest[] = collectValidEntries(
+        entries,
+        devicePendingEntrySchema
+      )
+        .filter(req => req.requestId !== '' && req.deviceId !== '')
+        // Mirrors pairing-files.ts pruneExpiredPending() — PENDING_TTL_MS = 5 * 60 * 1000
+        // https://github.com/openclaw/openclaw/blob/d073ec42cd7fabd1004f6959628743817a4cb0e8/src/infra/device-pairing.ts#L98
+        .filter(req => isUnexpiredDeviceRequest(req, nowMs))
+        // Mirrors listDevicePairing() sort — descending ts (newest first)
+        // https://github.com/openclaw/openclaw/blob/d073ec42cd7fabd1004f6959628743817a4cb0e8/src/infra/device-pairing.ts#L261
+        .sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
 
       if (gen === deviceGeneration) {
         deviceCache = { requests, lastUpdated: nowImpl() };
       }
+      console.log(`[pairing-cache] devices: read ok, ${requests.length} pending`);
       return true;
     } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        // File absent means no pending requests (e.g. last request was approved/expired).
+        if (gen === deviceGeneration) {
+          deviceCache = { requests: [], lastUpdated: nowImpl() };
+        }
+        return true;
+      }
       console.error(`[pairing-cache] device refresh failed: ${errorMessage(err)}`);
       return false;
     }
@@ -280,6 +400,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
 
   const runPeriodicRefresh = async (): Promise<void> => {
     if (stopped) return;
+    console.log('[pairing-cache] periodic refresh');
     const ok = await refreshAll();
     hasCompletedInitialRefresh = true;
     const now = Date.now();
@@ -289,7 +410,14 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
 
   const runDebouncedRefresh = async (): Promise<void> => {
     if (stopped) return;
-    if (Date.now() < nextAllowedRefreshAt) return;
+    const remaining = nextAllowedRefreshAt - Date.now();
+    if (remaining > 0) {
+      console.log(
+        `[pairing-cache] debounced refresh skipped (backoff, ${Math.ceil(remaining / 1000)}s remaining)`
+      );
+      return;
+    }
+    console.log('[pairing-cache] debounced refresh');
     const ok = await refreshAll();
     const now = Date.now();
     const delayMs = ok ? PERIODIC_INTERVAL_MS : Math.max(0, nextAllowedRefreshAt - now);
@@ -336,6 +464,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
 
     if (debounceTimer !== null) return;
 
+    console.log(`[pairing-cache] debounce armed: "${line.slice(0, 80)}"`);
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
       void runDebouncedRefresh();
@@ -354,10 +483,12 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
     if (started) return;
     started = true;
 
-    initialTimer = setTimeout(() => {
-      initialTimer = null;
-      void runPeriodicRefresh();
-    }, INITIAL_REFRESH_DELAY_MS);
+    // Fire-and-forget: do not await the initial refresh.  Awaiting here blocks
+    // server.listen() and delays the health endpoint past the DO's 60s startup probe.
+    // An empty cache during the brief warmup window is acceptable — the DO-side
+    // fallback chain (controller → KV → fly exec) handles it, and the cache
+    // self-heals quickly via the periodic timer and log-triggered debounce.
+    void runPeriodicRefresh();
   };
 
   const cleanup = (): void => {
@@ -365,10 +496,6 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
     if (periodicTimer !== null) {
       clearTimeout(periodicTimer);
       periodicTimer = null;
-    }
-    if (initialTimer !== null) {
-      clearTimeout(initialTimer);
-      initialTimer = null;
     }
     if (debounceTimer !== null) {
       clearTimeout(debounceTimer);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
+import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
@@ -35,9 +36,9 @@ function VerifyMagicLinkContent() {
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="text-center">
           <div className="mb-4 rounded-md bg-red-950 p-4 text-red-300">{error}</div>
-          <a href="/users/sign_in" className="text-muted-foreground text-sm hover:underline">
+          <Link href="/users/sign_in" className="text-muted-foreground text-sm hover:underline">
             ← Back to sign in
-          </a>
+          </Link>
         </div>
       </div>
     );

@@ -4,7 +4,6 @@ import '../lib/load-env';
 // get all folders in the src/scripts directory excluding './lib'
 import { readdirSync } from 'fs';
 import { join } from 'path';
-import { closeAllDrizzleConnections } from '@/lib/drizzle';
 
 // set this to true so other files can look & see if different config is needed
 // primarily used in the database file to configure database connections
@@ -16,6 +15,30 @@ const folders = readdirSync(scriptsDir, { withFileTypes: true })
   .map(dir => dir.name);
 
 const args = process.argv.slice(2);
+
+function isMissingDrizzleConfigError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return (
+    message.includes('POSTGRES_URL not configured') ||
+    message.includes('POSTGRES_CONNECT_TIMEOUT not configured') ||
+    message.includes('POSTGRES_MAX_QUERY_TIME not configured') ||
+    message.includes('POSTGRES_SCRIPT_URL must be set for scripts')
+  );
+}
+
+async function closeAllDrizzleConnectionsIfConfigured(): Promise<void> {
+  try {
+    const { closeAllDrizzleConnections } = await import('../lib/drizzle');
+    await closeAllDrizzleConnections();
+  } catch (error) {
+    if (isMissingDrizzleConfigError(error)) {
+      return;
+    }
+
+    throw error;
+  }
+}
 
 // if no arguments print out all available scripts by listing all folders
 // and each file in the folder
@@ -51,7 +74,7 @@ if (folders.includes(scriptFolder)) {
         }
         await res;
         // Close database pool after successful script completion
-        await closeAllDrizzleConnections();
+        await closeAllDrizzleConnectionsIfConfigured();
         process.exit(0);
       } else {
         console.error(`No run function found in ${scriptFile}`);
@@ -62,7 +85,7 @@ if (folders.includes(scriptFolder)) {
       console.error(`Error running script ${scriptFile}:`, err);
       // Close database pool even on error
       try {
-        await closeAllDrizzleConnections();
+        await closeAllDrizzleConnectionsIfConfigured();
       } catch (closeErr) {
         console.error('Error closing database connections:', closeErr);
       }

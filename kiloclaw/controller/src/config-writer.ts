@@ -293,6 +293,72 @@ export function generateBaseConfig(
   return config;
 }
 
+const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.json';
+
+/**
+ * Write mcporter.json with MCP server definitions derived from environment variables.
+ * MCPorter is the middleware layer that lets OpenClaw agents call MCP server tools
+ * via `mcporter call <server>.<tool>`. This bypasses openclaw.json's strict schema
+ * validation, which does not yet support `mcp.servers` (requires OpenClaw >= 2026.3.14).
+ *
+ * TODO: When the Dockerfile pins OpenClaw >= 2026.3.14, migrate MCP server config
+ * into generateBaseConfig() using `config.mcp.servers` in openclaw.json instead.
+ * The mcporter approach can then be removed. See PR #48611 in openclaw/openclaw.
+ */
+export function writeMcporterConfig(
+  env: EnvLike,
+  configPath = DEFAULT_MCPORTER_CONFIG_PATH,
+  deps: ConfigWriterDeps = defaultDeps
+): void {
+  // Read existing config to preserve user-added servers
+  let existing: Record<string, unknown> = {};
+  try {
+    const raw = deps.readFileSync(configPath, 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      existing = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // No existing config or unreadable — start fresh
+  }
+
+  const existingServers =
+    typeof existing.mcpServers === 'object' && existing.mcpServers !== null
+      ? { ...(existing.mcpServers as Record<string, unknown>) }
+      : {};
+
+  // Managed server keys — add when env var is set, remove when absent.
+  // This ensures credential removal on the dashboard actually revokes access
+  // even though mcporter.json persists on the volume across restarts.
+  if (env.AGENTCARD_API_KEY) {
+    existingServers['agentcard'] = {
+      url: 'https://mcp.agentcard.sh/mcp',
+      headers: { Authorization: 'Bearer ' + env.AGENTCARD_API_KEY },
+    };
+    console.log('AgentCard MCP server configured (via mcporter)');
+  } else {
+    if ('agentcard' in existingServers) {
+      delete existingServers['agentcard'];
+      console.log('AgentCard MCP server removed from mcporter config');
+    }
+  }
+
+  // Only write if there are servers to configure or we need to clean up
+  if (Object.keys(existingServers).length === 0 && !deps.existsSync(configPath)) {
+    return;
+  }
+
+  existing.mcpServers = existingServers;
+
+  const dir = path.dirname(configPath);
+  if (!deps.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  deps.writeFileSync(configPath, JSON.stringify(existing, null, 2));
+  console.log(`mcporter config written to ${configPath}`);
+}
+
 /**
  * Back up the existing config file and prune old backups.
  */

@@ -63,9 +63,9 @@ import type {
   OpenRouterModel,
   StripeSubscriptionStatus,
   OpenCodeSettings,
-  Tool,
   StoredModel,
   CustomLlmExtraBody,
+  CustomLlmExtraHeaders,
   CustomLlmProvider,
   InterleavedFormat,
   GatewayApiKind,
@@ -922,16 +922,11 @@ export const custom_llm = pgTable('custom_llm', {
   api_key: text().notNull(),
   organization_ids: jsonb().notNull().$type<string[]>(),
 
-  /** @deprecated */
-  included_tools: jsonb().$type<Tool[]>(),
-
-  /** @deprecated */
-  excluded_tools: jsonb().$type<Tool[]>(),
-
   supports_image_input: boolean(),
   force_reasoning: boolean(),
   opencode_settings: jsonb().$type<OpenCodeSettings>(),
   extra_body: jsonb().$type<CustomLlmExtraBody>(),
+  extra_headers: jsonb().$type<CustomLlmExtraHeaders>(),
   interleaved_format: text().$type<InterleavedFormat>(),
 });
 

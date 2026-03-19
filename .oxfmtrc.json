@@ -7,5 +7,7 @@
   "trailingComma": "es5",
   "bracketSpacing": true,
   "arrowParens": "avoid",
-  "endOfLine": "lf"
+  "endOfLine": "lf",
+  "sortPackageJson": false,
+  "ignorePatterns": []
 }

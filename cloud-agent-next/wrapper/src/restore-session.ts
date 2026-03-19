@@ -139,6 +139,7 @@ export async function restoreSession(
     const importProc = Bun.spawn(['kilo', 'import', tmpPath], {
       stdout: 'pipe',
       stderr: 'pipe',
+      cwd: workspacePath,
       env: process.env,
     });
     const exitCode = await importProc.exited;

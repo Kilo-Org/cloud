@@ -11,17 +11,17 @@
 export type AlertSeverity = 'page' | 'ticket';
 
 export type BurnRateWindow = {
-	severity: AlertSeverity;
-	longWindowMinutes: number;
-	shortWindowMinutes: number;
-	burnRate: number;
+  severity: AlertSeverity;
+  longWindowMinutes: number;
+  shortWindowMinutes: number;
+  burnRate: number;
 };
 
 // Multi-window burn-rate windows per the architecture doc
 export const BURN_RATE_WINDOWS: BurnRateWindow[] = [
-	{ severity: 'page', longWindowMinutes: 5, shortWindowMinutes: 1, burnRate: 14.4 },
-	{ severity: 'page', longWindowMinutes: 30, shortWindowMinutes: 3, burnRate: 6 },
-	{ severity: 'ticket', longWindowMinutes: 360, shortWindowMinutes: 30, burnRate: 1 },
+  { severity: 'page', longWindowMinutes: 5, shortWindowMinutes: 1, burnRate: 14.4 },
+  { severity: 'page', longWindowMinutes: 30, shortWindowMinutes: 3, burnRate: 6 },
+  { severity: 'ticket', longWindowMinutes: 360, shortWindowMinutes: 30, burnRate: 1 },
 ];
 
 // Alert dedup cooldowns

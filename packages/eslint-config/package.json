@@ -9,6 +9,7 @@
   "dependencies": {
     "@eslint/js": "catalog:",
     "eslint": "catalog:",
+    "eslint-plugin-oxlint": "^1.55.0",
     "typescript-eslint": "catalog:"
   }
 }

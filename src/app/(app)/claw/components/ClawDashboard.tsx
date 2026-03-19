@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Check, Loader2, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
   useKiloClawGatewayStatus,
@@ -19,8 +19,11 @@ import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
 import { OpenClawButton } from './OpenClawButton';
 import { SettingsTab } from './SettingsTab';
-import { ChangelogCard } from './ChangelogCard';
-import { PairingCard } from './PairingCard';
+import { ChangelogTab } from './ChangelogTab';
+import { ChannelSelectionStepView } from './ChannelSelectionStep';
+import { PermissionStep } from './PermissionStep';
+import { ProvisioningStep } from './ProvisioningStep';
+import type { ExecPreset } from './claw.types';
 import { BillingWrapper } from './billing/BillingWrapper';
 
 type PopulatedClawStatus = KiloClawDashboardStatus & {
@@ -60,6 +63,12 @@ export function ClawDashboard({
     instanceStatus.provisionedAt !== null &&
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
+
+  const [onboardingStep, setOnboardingStep] = useState<
+    'permissions' | 'channels' | 'provisioning' | 'done'
+  >('permissions');
+  const [selectedPreset, setSelectedPreset] = useState<ExecPreset | null>(null);
+  const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
 
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
 
@@ -139,9 +148,33 @@ export function ClawDashboard({
             mutations={mutations}
             onProvisionStart={() => onNewSetupChange(true)}
           />
-        ) : isNewSetup &&
-          (instanceStatus.status !== 'running' || gatewayStatus?.state !== 'running') ? (
-          <ProvisioningSpinner onViewDashboard={() => onNewSetupChange(false)} />
+        ) : isNewSetup && onboardingStep === 'permissions' ? (
+          <PermissionStep
+            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
+            onSelect={preset => {
+              setSelectedPreset(preset);
+              setOnboardingStep('channels');
+            }}
+          />
+        ) : isNewSetup && onboardingStep === 'channels' ? (
+          <ChannelSelectionStepView
+            onSelect={(_channelId, tokens) => {
+              setChannelTokens(tokens);
+              setOnboardingStep('provisioning');
+            }}
+            onSkip={() => {
+              setChannelTokens(null);
+              setOnboardingStep('provisioning');
+            }}
+          />
+        ) : isNewSetup && onboardingStep === 'provisioning' && selectedPreset ? (
+          <ProvisioningStep
+            preset={selectedPreset}
+            channelTokens={channelTokens}
+            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
+            mutations={mutations}
+            onComplete={() => setOnboardingStep('done')}
+          />
         ) : isNewSetup ? (
           <Card className="mt-6 overflow-hidden">
             <CardContent className="flex flex-col items-center justify-center gap-6 pt-12">
@@ -222,6 +255,12 @@ export function ClawDashboard({
                   >
                     Settings
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="changelog"
+                    className="text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                  >
+                    What&apos;s New <Sparkles className="ml-1 inline h-3 w-3 text-amber-400" />
+                  </TabsTrigger>
                 </TabsList>
               </div>
               <CardContent className="p-5">
@@ -241,50 +280,14 @@ export function ClawDashboard({
                     dirtySecrets={dirtySecrets}
                   />
                 </TabsContent>
+                <TabsContent value="changelog" className="mt-0">
+                  <ChangelogTab />
+                </TabsContent>
               </CardContent>
             </Tabs>
           </Card>
         )}
-
-        {instanceStatus?.status === 'running' && !isNewSetup && (
-          <PairingCard mutations={mutations} />
-        )}
       </BillingWrapper>
-
-      {instanceStatus && !isNewSetup && <ChangelogCard />}
     </div>
-  );
-}
-
-const SLOW_PROVISION_TIMEOUT_MS = 60_000;
-
-function ProvisioningSpinner({ onViewDashboard }: { onViewDashboard: () => void }) {
-  const [isSlow, setIsSlow] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsSlow(true), SLOW_PROVISION_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return (
-    <Card className="mt-6">
-      <CardContent className="flex flex-col items-center justify-center gap-4 py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-        <p className="text-muted-foreground text-sm">Setting up your KiloClaw instance...</p>
-        {isSlow && (
-          <p className="text-muted-foreground animate-in fade-in max-w-md text-center text-xs duration-500">
-            This is taking longer than expected. If you&apos;re stuck, please reach out to{' '}
-            <a href="mailto:hi@kilocode.ai" className="underline hover:opacity-80">
-              hi@kilocode.ai
-            </a>{' '}
-            for help, or{' '}
-            <button type="button" onClick={onViewDashboard} className="underline hover:opacity-80">
-              view the dashboard
-            </button>{' '}
-            for details.
-          </p>
-        )}
-      </CardContent>
-    </Card>
   );
 }

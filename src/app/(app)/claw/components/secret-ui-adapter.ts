@@ -1,16 +1,34 @@
 import type React from 'react';
 import type { SecretIconKey } from '@kilocode/kiloclaw-secret-catalog';
-import { Send, Slack, Key, Github } from 'lucide-react';
+import { Key } from 'lucide-react';
+import { TelegramIcon } from './icons/TelegramIcon';
 import { DiscordIcon } from './icons/DiscordIcon';
+import { SlackIcon } from './icons/SlackIcon';
+import { GitHubIcon } from './icons/GitHubIcon';
+import { AgentCardIcon } from './icons/AgentCardIcon';
 
 const ICON_MAP: Record<SecretIconKey, React.ComponentType<{ className?: string }>> = {
-  send: Send,
+  send: TelegramIcon,
   discord: DiscordIcon,
-  slack: Slack,
+  slack: SlackIcon,
   key: Key,
-  github: Github,
+  github: GitHubIcon,
+  'credit-card': AgentCardIcon,
 };
 
 export function getIcon(iconKey: SecretIconKey): React.ComponentType<{ className?: string }> {
   return ICON_MAP[iconKey];
+}
+
+/** Short descriptions for each secret entry, shown in the collapsed accordion header. */
+const DESCRIPTION_MAP: Record<string, string> = {
+  telegram: 'Connect your Telegram bot',
+  discord: 'Connect your Discord bot',
+  slack: 'Connect your Slack workspace',
+  github: 'Connect a GitHub account for code operations',
+  agentcard: 'Give your bot virtual debit cards for spending',
+};
+
+export function getDescription(entryId: string): string {
+  return DESCRIPTION_MAP[entryId] ?? '';
 }

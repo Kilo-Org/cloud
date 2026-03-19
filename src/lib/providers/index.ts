@@ -174,12 +174,11 @@ export async function getProvider(
         organization_ids: [],
         base_url: freeModelProvider.apiUrl,
         api_key: freeModelProvider.apiKey,
-        included_tools: null,
-        excluded_tools: null,
         supports_image_input: kiloFreeModel.flags.includes('vision'),
         force_reasoning: true,
         opencode_settings: null,
         extra_body: null,
+        extra_headers: null,
         interleaved_format: null,
       },
     };

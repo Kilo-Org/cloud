@@ -69,7 +69,7 @@ This prevents orphaning resources on transient Fly API errors.
 pnpm typecheck        # type checking via tsgo
 pnpm lint             # eslint
 pnpm test             # vitest
-pnpm format           # prettier
+pnpm format           # oxfmt
 pnpm start            # wrangler dev
 ```
 

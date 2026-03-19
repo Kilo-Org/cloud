@@ -10,12 +10,12 @@ concurrency:
 
 jobs:
   run-migrations:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     environment: production
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
         with:
           lfs: true
 
@@ -42,7 +42,7 @@ jobs:
         run: NODE_ENV=production pnpm run drizzle migrate
 
   deploy-app:
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     needs: run-migrations
     environment: production
 
@@ -52,7 +52,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
         with:
           lfs: true
 
@@ -97,7 +97,7 @@ jobs:
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-global-app:
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     needs: run-migrations
     environment: production
 
@@ -107,7 +107,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
         with:
           lfs: true
 
@@ -154,7 +154,7 @@ jobs:
   deploy-gateway:
     # Disabled: R2_ACCOUNT_ID env var is missing, causing deploy failures
     if: false
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     needs: run-migrations
     environment: production
 
@@ -164,7 +164,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
         with:
           lfs: true
 
@@ -209,12 +209,12 @@ jobs:
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   check-kiloclaw-changes:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     outputs:
       changed: ${{ steps.changes.outputs.kiloclaw }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: useblacksmith/checkout@v1
         with:
           fetch-depth: 0
 

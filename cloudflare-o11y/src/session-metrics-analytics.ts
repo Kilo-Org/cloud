@@ -23,54 +23,63 @@ import type { SessionMetricsParams } from './session-metrics-schema';
  *   double10 = autoCompactionCount
  *   double11 = ingestVersion
  */
-export async function writeSessionMetricsDataPoint(params: SessionMetricsParams, env: Env): Promise<void> {
-	const totalTokensSum =
-		params.totalTokens.input +
-		params.totalTokens.output +
-		params.totalTokens.reasoning +
-		params.totalTokens.cacheRead +
-		params.totalTokens.cacheWrite;
+export async function writeSessionMetricsDataPoint(
+  params: SessionMetricsParams,
+  env: Env
+): Promise<void> {
+  const totalTokensSum =
+    params.totalTokens.input +
+    params.totalTokens.output +
+    params.totalTokens.reasoning +
+    params.totalTokens.cacheRead +
+    params.totalTokens.cacheWrite;
 
-	env.O11Y_SESSION_METRICS.writeDataPoint({
-		indexes: [params.platform],
-		blobs: [params.terminationReason, params.platform, params.organizationId, params.kiloUserId, params.model],
-		doubles: [
-			params.sessionDurationMs,
-			params.timeToFirstResponseMs ?? -1,
-			params.totalTurns,
-			params.totalSteps,
-			params.totalErrors,
-			totalTokensSum,
-			params.totalCost,
-			params.compactionCount,
-			params.stuckToolCallCount,
-			params.autoCompactionCount,
-			params.ingestVersion,
-		],
-	});
+  env.O11Y_SESSION_METRICS.writeDataPoint({
+    indexes: [params.platform],
+    blobs: [
+      params.terminationReason,
+      params.platform,
+      params.organizationId,
+      params.kiloUserId,
+      params.model,
+    ],
+    doubles: [
+      params.sessionDurationMs,
+      params.timeToFirstResponseMs ?? -1,
+      params.totalTurns,
+      params.totalSteps,
+      params.totalErrors,
+      totalTokensSum,
+      params.totalCost,
+      params.compactionCount,
+      params.stuckToolCallCount,
+      params.autoCompactionCount,
+      params.ingestVersion,
+    ],
+  });
 
-	// Changing this schema? Stream schemas are immutable — run:
-	//   ./pipelines/recreate-stream.sh o11y_session_metrics_stream pipelines/session-metrics-schema.json \
-	//     o11y_session_metrics_pipeline o11y_session_metrics_sink
-	await env.SESSION_METRICS_STREAM.send([
-		{
-			platform: params.platform,
-			termination_reason: params.terminationReason,
-			organization_id: params.organizationId,
-			kilo_user_id: params.kiloUserId,
-			model: params.model,
-			session_duration_ms: params.sessionDurationMs,
-			time_to_first_response_ms: params.timeToFirstResponseMs ?? -1,
-			total_turns: params.totalTurns,
-			total_steps: params.totalSteps,
-			total_errors: params.totalErrors,
-			total_tokens: totalTokensSum,
-			total_cost: params.totalCost,
-			compaction_count: params.compactionCount,
-			stuck_tool_call_count: params.stuckToolCallCount,
-			auto_compaction_count: params.autoCompactionCount,
-			ingest_version: params.ingestVersion,
-			created_at: Date.now(),
-		},
-	]);
+  // Changing this schema? Stream schemas are immutable — run:
+  //   ./pipelines/recreate-stream.sh o11y_session_metrics_stream pipelines/session-metrics-schema.json \
+  //     o11y_session_metrics_pipeline o11y_session_metrics_sink
+  await env.SESSION_METRICS_STREAM.send([
+    {
+      platform: params.platform,
+      termination_reason: params.terminationReason,
+      organization_id: params.organizationId,
+      kilo_user_id: params.kiloUserId,
+      model: params.model,
+      session_duration_ms: params.sessionDurationMs,
+      time_to_first_response_ms: params.timeToFirstResponseMs ?? -1,
+      total_turns: params.totalTurns,
+      total_steps: params.totalSteps,
+      total_errors: params.totalErrors,
+      total_tokens: totalTokensSum,
+      total_cost: params.totalCost,
+      compaction_count: params.compactionCount,
+      stuck_tool_call_count: params.stuckToolCallCount,
+      auto_compaction_count: params.autoCompactionCount,
+      ingest_version: params.ingestVersion,
+      created_at: Date.now(),
+    },
+  ]);
 }

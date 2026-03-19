@@ -34,8 +34,6 @@
   },
   "include": [
     "src/**/*",
-    "packages/db/src/**/*",
-    "storybook/**/*",
     "tests/**/*",
     ".next/types/**/*.ts",
     "jest.config.ts",

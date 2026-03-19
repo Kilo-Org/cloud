@@ -133,6 +133,27 @@ const SECRET_CATALOG_RAW = [
     helpText: 'Manage your token from the GitHub developer settings.',
     helpUrl: 'https://github.com/settings/tokens?type=beta',
   },
+  {
+    id: 'agentcard',
+    label: 'AgentCard',
+    category: 'tool',
+    icon: 'credit-card',
+    order: 2,
+    fields: [
+      {
+        key: 'agentcardApiKey',
+        label: 'API Key (JWT)',
+        placeholder: 'eyJ...',
+        placeholderConfigured: 'Enter new JWT to replace',
+        envVar: 'AGENTCARD_API_KEY',
+        validationPattern: '^eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$',
+        validationMessage: 'Enter the JWT from ~/.agent-cards/config.json (starts with eyJ).',
+        maxLength: 2000,
+      },
+    ],
+    helpText: 'Virtual debit cards for autonomous agent spending. See setup guide for details.',
+    helpUrl: 'https://agentcard.sh',
+  },
 ] as const satisfies readonly SecretCatalogEntry[];
 
 // Runtime validation — fails fast at module load if catalog data is malformed

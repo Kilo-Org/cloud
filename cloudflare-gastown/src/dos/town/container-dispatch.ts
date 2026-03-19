@@ -437,12 +437,20 @@ export async function startAgentInContainer(
 
     if (!response.ok) {
       const text = await response.text().catch(() => '(unreadable)');
+      // "Already running" means a previous dispatch succeeded — the agent
+      // IS alive in the container. Treat as success so the DO marks the
+      // agent as working and stops retrying.
+      if (response.status === 500 && text.includes('already running')) {
+        console.log(
+          `${TOWN_LOG} startAgentInContainer: agent ${params.agentId} already running — treating as success`
+        );
+        return true;
+      }
       const errorMsg = `(${response.status}) ${text.slice(0, 300)}`;
       console.error(
         `${TOWN_LOG} startAgentInContainer: error response for ` +
           `agent=${params.agentId} role=${params.role}: ${errorMsg}`
       );
-      // Store error on a well-known key so the caller can read it
       lastStartError = errorMsg;
     }
     return response.ok;

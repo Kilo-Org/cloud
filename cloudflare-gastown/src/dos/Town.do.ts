@@ -3299,9 +3299,10 @@ export class TownDO extends DurableObject<Env> {
     // (entry.bead_id). The source bead stays closed with its original
     // polecat assignee preserved.
     // If the refinery is still hooked to a previous MR bead (agentCompleted
-    // preserves hooks for refineries), unhook first.
+    // preserves hooks for refineries), unhook first and clear stale checkpoint.
     if (refineryAgent.current_hook_bead_id && refineryAgent.current_hook_bead_id !== entry.id) {
       agents.unhookBead(this.sql, refineryAgent.id);
+      agents.writeCheckpoint(this.sql, refineryAgent.id, null);
     }
     agents.hookBead(this.sql, refineryAgent.id, entry.id);
 
@@ -3333,16 +3334,11 @@ export class TownDO extends DurableObject<Env> {
     });
 
     if (!started) {
-      // DON'T fail the MR bead — the container may have actually started
-      // the agent (timeout race: the fetch timed out but the container
-      // continued setting up the agent). Leave the MR bead in in_progress.
-      // If the agent truly failed, recoverStuckReviews will reset it to
-      // open after 30 min. If the agent succeeded, it will call gt_done
-      // and close the MR bead normally.
-      //
-      // Just unhook the refinery so processReviewQueue doesn't try to
-      // start a second instance on the next tick.
-      agents.unhookBead(this.sql, refineryAgent.id);
+      // Keep hook intact — the retry block at the top of processReviewQueue
+      // will re-dispatch on the next alarm tick. By preserving the hook,
+      // we prevent the cascade of popping new MRs when the container is
+      // temporarily unavailable. recoverStuckReviews clears after 30 min
+      // if retries never succeed.
       agents.updateAgentStatus(this.sql, refineryAgent.id, 'idle');
 
       const containerError = dispatch.getLastStartError() ?? 'unknown';

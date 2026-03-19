@@ -204,18 +204,10 @@ export function popReviewQueue(sql: SqlStorage): ReviewQueueEntry | null {
         ${REVIEW_JOIN}
         WHERE ${beads.status} = 'open'
           AND NOT EXISTS (
-            SELECT 1
-            FROM ${bead_dependencies} AS my_dep
-            INNER JOIN ${bead_dependencies} AS sib_dep
-              ON sib_dep.${bead_dependencies.columns.depends_on_bead_id} = my_dep.${bead_dependencies.columns.depends_on_bead_id}
-              AND sib_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
-            INNER JOIN ${beads} AS sibling
-              ON sibling.${beads.columns.bead_id} = sib_dep.${bead_dependencies.columns.bead_id}
-            WHERE my_dep.${bead_dependencies.columns.bead_id} = ${beads.bead_id}
-              AND my_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
-              AND sibling.${beads.columns.type} = 'merge_request'
-              AND sibling.${beads.columns.status} = 'in_progress'
-              AND sibling.${beads.columns.bead_id} != ${beads.bead_id}
+            SELECT 1 FROM ${beads} AS active_mr
+            WHERE active_mr.${beads.columns.type} = 'merge_request'
+              AND active_mr.${beads.columns.status} = 'in_progress'
+              AND active_mr.${beads.columns.rig_id} = ${beads.rig_id}
           )
         ORDER BY ${beads.created_at} ASC
         LIMIT 1

@@ -15,7 +15,7 @@ export const KILOCODE_CATALOG_IDS = new Set([
   'openai/gpt-5.2',
   'google/gemini-3-pro-preview',
   'google/gemini-3-flash-preview',
-  'a-ai/grok-code-fast-1',
+  'x-ai/grok-code-fast-1',
   'moonshotai/kimi-k2.5',
 ]);
 

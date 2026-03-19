@@ -3183,12 +3183,21 @@ export class TownDO extends DurableObject<Env> {
     await this.pollPendingPRs();
 
     // Cleanup: if the refinery is hooked to a terminal MR bead (closed/failed),
-    // unhook it so it's available for new work. This happens when gt_done or
-    // pollPendingPRs closes the MR while the refinery is still running.
+    // check if the container session has actually ended before making it
+    // available. The refinery may still be running (finishing its LLM turn
+    // after gt_done returned). If still running, skip — wait for
+    // agentCompleted to fire, then clean up on the next tick.
     const existingRefinery = agents.listAgents(this.sql, { role: 'refinery' })[0];
     if (existingRefinery?.current_hook_bead_id) {
       const hookedMr = beadOps.getBead(this.sql, existingRefinery.current_hook_bead_id);
       if (hookedMr && (hookedMr.status === 'closed' || hookedMr.status === 'failed')) {
+        const containerStatus = await dispatch.checkAgentContainerStatus(
+          this.env, this.townId, existingRefinery.id
+        );
+        if (containerStatus.status === 'running') {
+          // Session still active — don't unhook or pop new MR this tick
+          return;
+        }
         agents.unhookBead(this.sql, existingRefinery.id);
         agents.updateAgentStatus(this.sql, existingRefinery.id, 'idle');
         agents.writeCheckpoint(this.sql, existingRefinery.id, null);

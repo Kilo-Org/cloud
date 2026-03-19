@@ -3183,8 +3183,10 @@ export class TownDO extends DurableObject<Env> {
     await this.pollPendingPRs();
 
     // Retry: if the refinery is idle but still hooked to an in_progress
-    // MR bead, the previous dispatch failed (container not ready). Re-
-    // dispatch via dispatchAgent which handles the full startup flow.
+    // MR bead, either the previous dispatch failed (container not ready)
+    // or the dispatch succeeded but we got a false negative (timeout).
+    // Check the container first — if the agent is running, just restore
+    // the working status. If not, re-dispatch.
     const refineryForRetry = agents.listAgents(this.sql, { role: 'refinery' })[0];
     if (
       refineryForRetry?.status === 'idle' &&
@@ -3192,6 +3194,15 @@ export class TownDO extends DurableObject<Env> {
     ) {
       const hookedMr = beadOps.getBead(this.sql, refineryForRetry.current_hook_bead_id);
       if (hookedMr?.status === 'in_progress' && hookedMr.type === 'merge_request') {
+        const containerStatus = await dispatch.checkAgentContainerStatus(
+          this.env, this.townId, refineryForRetry.id
+        );
+        if (containerStatus.status === 'running') {
+          // Agent IS running — restore working status
+          agents.updateAgentStatus(this.sql, refineryForRetry.id, 'working');
+          return;
+        }
+        // Agent is NOT running — genuinely needs re-dispatch
         console.log(
           `${TOWN_LOG} processReviewQueue: retrying refinery dispatch for MR bead=${hookedMr.bead_id}`
         );

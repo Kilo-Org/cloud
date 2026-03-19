@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ChevronLeft } from 'lucide-react';
 import type { TownEvent } from './ActivityFeed';
+import { useTerminalBar, COLLAPSED_SIZE } from './TerminalBarContext';
 
 // ── Resource types ───────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ export function DrawerStackProvider({
   return (
     <DrawerStackContext.Provider value={{ stack, push, pop, closeAll, open }}>
       {children}
-      <DrawerStackRenderer
+      <DrawerStackRendererWithContext
         stack={stack}
         pop={pop}
         closeAll={closeAll}
@@ -99,12 +100,33 @@ const DEPTH_OFFSET = 40;
 /** Extra shift on hover */
 const HOVER_EXTRA = 24;
 
+/**
+ * Reads terminal bar context to compute right offset when the terminal
+ * is positioned on the right side of the viewport.
+ */
+function DrawerStackRendererWithContext(props: {
+  stack: DrawerStackEntry[];
+  pop: () => void;
+  closeAll: () => void;
+  push: (resource: ResourceRef) => void;
+  renderContent: (
+    resource: ResourceRef,
+    helpers: { push: (resource: ResourceRef) => void; close: () => void }
+  ) => ReactNode;
+}) {
+  const { position, size, collapsed } = useTerminalBar();
+  const rightOffset =
+    position === 'right' ? (collapsed ? COLLAPSED_SIZE : COLLAPSED_SIZE + size) : 0;
+  return <DrawerStackRenderer {...props} rightOffset={rightOffset} />;
+}
+
 function DrawerStackRenderer({
   stack,
   pop,
   closeAll,
   push,
   renderContent,
+  rightOffset = 0,
 }: {
   stack: DrawerStackEntry[];
   pop: () => void;
@@ -114,6 +136,7 @@ function DrawerStackRenderer({
     resource: ResourceRef,
     helpers: { push: (resource: ResourceRef) => void; close: () => void }
   ) => ReactNode;
+  rightOffset?: number;
 }) {
   const isOpen = stack.length > 0;
 
@@ -145,6 +168,7 @@ function DrawerStackRenderer({
                 isTop={isTop}
                 onClose={isTop ? pop : undefined}
                 onBack={index > 0 && isTop ? pop : undefined}
+                rightOffset={rightOffset}
               >
                 {renderContent(entry.resource, {
                   push,
@@ -167,6 +191,7 @@ function DrawerLayer({
   isTop,
   onClose,
   onBack,
+  rightOffset = 0,
   children,
 }: {
   depth: number;
@@ -174,13 +199,14 @@ function DrawerLayer({
   isTop: boolean;
   onClose?: () => void;
   onBack?: (() => void) | false;
+  rightOffset?: number;
   children: ReactNode;
 }) {
   const [hovered, setHovered] = useState(false);
 
   // Top layer: right: 0. Background layers: shift left by depth * offset.
   // On hover, background layers shift further left.
-  const rightOffset = isTop ? 0 : -(depth * DEPTH_OFFSET + (hovered ? HOVER_EXTRA : 0));
+  const layerShift = isTop ? 0 : -(depth * DEPTH_OFFSET + (hovered ? HOVER_EXTRA : 0));
   const scale = isTop ? 1 : 1 - depth * 0.015;
   const opacity = isTop ? 1 : 0.6 + (hovered ? 0.25 : 0);
 
@@ -188,7 +214,7 @@ function DrawerLayer({
     <motion.div
       initial={{ x: DRAWER_WIDTH + 20 }}
       animate={{
-        x: rightOffset,
+        x: layerShift,
         scale,
         opacity,
       }}
@@ -203,8 +229,9 @@ function DrawerLayer({
         if (!isTop) setHovered(true);
       }}
       onMouseLeave={() => setHovered(false)}
-      className="fixed top-0 right-0 bottom-0 z-[61] flex flex-col outline-none"
+      className="fixed top-0 bottom-0 z-[61] flex flex-col outline-none"
       style={{
+        right: rightOffset,
         width: DRAWER_WIDTH,
         maxWidth: '94vw',
         zIndex: 61 + (totalLayers - depth),

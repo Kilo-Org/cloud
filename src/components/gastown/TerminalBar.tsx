@@ -28,6 +28,7 @@ import {
   PanelTop,
   PanelLeft,
   PanelRight,
+  Bug,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -521,6 +522,19 @@ function TabBar({
           })}
         </AnimatePresence>
       </div>
+
+      {/* Bug report link */}
+      {horizontal && (
+        <a
+          href="https://github.com/Kilo-Org/cloud/issues/new?template=gastown-bug.yml&labels=gastown,bug"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mr-2 flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[10px] text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
+        >
+          <Bug className="size-3" />
+          <span className="hidden sm:inline">Report a Bug</span>
+        </a>
+      )}
 
       {/* Position picker */}
       <div ref={pickerRef}>

@@ -472,5 +472,170 @@ export function createMayorTools(client: MayorGastownClient) {
         return `Nudge queued: ${result.nudge_id} (mode: ${args.mode ?? 'wait-idle'})`;
       },
     }),
+
+    gt_report_bug: tool({
+      description:
+        'File a bug report on the Kilo-Org/cloud GitHub repo. ' +
+        'Searches existing issues first to avoid duplicates. ' +
+        'Use this when a user reports a bug or you encounter a repeating system error. ' +
+        'Do NOT file bugs for user errors, expected behavior, or issues you can resolve yourself ' +
+        '(e.g. re-slinging a failed bead). Do NOT file bugs about yourself being unable to start.',
+      args: {
+        title: tool.schema.string().describe('Concise bug title'),
+        description: tool.schema
+          .string()
+          .describe('What happened vs. what was expected. Include error messages if available.'),
+        area: tool.schema
+          .enum([
+            'Mayor / Chat',
+            'Terminal UI',
+            'Bead Board / Dashboard',
+            'Convoys',
+            'Merge Queue / Refinery',
+            'Agent Dispatch / Scheduling',
+            'Container / Git',
+            'Other',
+          ])
+          .describe('Which area of Gastown is affected'),
+        rig_id: tool.schema
+          .string()
+          .describe('The rig ID where the bug was observed, if applicable')
+          .optional(),
+        recent_errors: tool.schema
+          .string()
+          .describe('Recent error messages or log snippets for context')
+          .optional(),
+      },
+      async execute(args) {
+        const ghToken = process.env.GH_TOKEN;
+        if (!ghToken) {
+          return 'Cannot file bug report: GH_TOKEN is not available in this container. Ask the user to file manually at https://github.com/Kilo-Org/cloud/issues/new?template=gastown-bug.yml';
+        }
+
+        const repo = 'Kilo-Org/cloud';
+        const headers = {
+          Authorization: `Bearer ${ghToken}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
+        };
+
+        // Search for potential duplicates
+        const searchKeywords = args.title.split(/\s+/).slice(0, 5).join(' ');
+        const searchQuery = encodeURIComponent(
+          `repo:${repo} is:issue is:open label:gastown label:bug ${searchKeywords}`
+        );
+
+        let duplicates: Array<{ number: number; title: string; html_url: string }> = [];
+        try {
+          const searchRes = await fetch(
+            `https://api.github.com/search/issues?q=${searchQuery}&per_page=5`,
+            { headers }
+          );
+          if (searchRes.ok) {
+            const searchData = (await searchRes.json()) as {
+              items: Array<{ number: number; title: string; html_url: string }>;
+            };
+            duplicates = searchData.items;
+          }
+        } catch {
+          // Search failure is non-fatal — proceed to create
+        }
+
+        if (duplicates.length > 0) {
+          const list = duplicates
+            .map(d => `  - #${d.number}: ${d.title} (${d.html_url})`)
+            .join('\n');
+          return [
+            `Found ${duplicates.length} potentially related open issue(s):`,
+            list,
+            '',
+            'Review these before filing a new issue. If none match, call gt_report_bug again with a more specific title.',
+          ].join('\n');
+        }
+
+        // Build issue body with structured context
+        const townId = process.env.GASTOWN_TOWN_ID ?? 'unknown';
+        const agentId = process.env.GASTOWN_AGENT_ID ?? 'unknown';
+        const bodyParts = [
+          `## What happened?\n\n${args.description}`,
+          `## Area\n\n${args.area}`,
+          `## Context\n\n- **Town ID:** ${townId}\n- **Agent:** Mayor (${agentId})`,
+        ];
+        if (args.rig_id) {
+          bodyParts[bodyParts.length - 1] += `\n- **Rig ID:** ${args.rig_id}`;
+        }
+        if (args.recent_errors) {
+          bodyParts.push(`## Recent Errors\n\n\`\`\`\n${args.recent_errors}\n\`\`\``);
+        }
+        bodyParts.push('*Filed automatically by the Mayor via `gt_report_bug`.*');
+        const body = bodyParts.join('\n\n');
+
+        const createRes = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            title: `[Gastown] ${args.title}`,
+            body,
+            labels: ['gastown', 'bug', 'reported-by-mayor'],
+          }),
+        });
+
+        if (!createRes.ok) {
+          const errText = await createRes.text();
+          return `Failed to create issue (HTTP ${createRes.status}): ${errText}`;
+        }
+
+        const issue = (await createRes.json()) as { number: number; html_url: string };
+        return `Bug report filed: #${issue.number} — ${issue.html_url}`;
+      },
+    }),
+
+    gt_bead_add_dependency: tool({
+      description:
+        'Add a dependency between two beads. The bead at bead_id will be blocked by depends_on_bead_id — ' +
+        'it will not be dispatched until the dependency is closed.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the beads belong to'),
+        bead_id: tool.schema.string().describe('The UUID of the bead that should be blocked'),
+        depends_on_bead_id: tool.schema
+          .string()
+          .describe('The UUID of the bead that must close first'),
+        dependency_type: tool.schema
+          .enum(['blocks', 'parent-child'])
+          .describe('Type of dependency (default: blocks)')
+          .optional(),
+      },
+      async execute(args) {
+        await client.addBeadDependency({
+          rig_id: args.rig_id,
+          bead_id: args.bead_id,
+          depends_on_bead_id: args.depends_on_bead_id,
+          dependency_type: args.dependency_type ?? 'blocks',
+        });
+        return `Dependency added: bead ${args.bead_id} now depends on ${args.depends_on_bead_id} (type: ${args.dependency_type ?? 'blocks'}).`;
+      },
+    }),
+
+    gt_bead_remove_dependency: tool({
+      description:
+        'Remove a dependency between two beads. If removing the dependency unblocks the bead, ' +
+        'it will be dispatched automatically.',
+      args: {
+        rig_id: tool.schema.string().describe('The UUID of the rig the beads belong to'),
+        bead_id: tool.schema.string().describe('The UUID of the dependent bead'),
+        depends_on_bead_id: tool.schema
+          .string()
+          .describe('The UUID of the bead it currently depends on'),
+      },
+      async execute(args) {
+        await client.removeBeadDependency({
+          rig_id: args.rig_id,
+          bead_id: args.bead_id,
+          depends_on_bead_id: args.depends_on_bead_id,
+        });
+        return `Dependency removed: bead ${args.bead_id} no longer depends on ${args.depends_on_bead_id}. If this was the last blocker, the bead will be dispatched automatically.`;
+      },
+    }),
   };
 }

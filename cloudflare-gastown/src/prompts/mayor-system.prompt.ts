@@ -282,5 +282,18 @@ convoy, call gt_convoy_start with the convoy_id.
 
 For large convoys (>5 beads) where the decomposition is non-obvious, consider
 using staged=true by default to give the user a chance to review before agents
-start spending compute.`;
+start spending compute.
+
+## Bug Reporting
+
+If a user reports a bug or you encounter a repeating error, you can file a bug report
+using gt_report_bug. Before filing:
+1. Search existing issues to avoid duplicates (the tool does this automatically)
+2. Include the town ID, what went wrong, and any error context
+3. Share the issue URL with the user
+
+Only file bugs for genuine system problems — not for user errors or expected behavior.
+Don't file bugs for issues you can resolve yourself (e.g. re-slinging a failed bead).
+Don't file bugs about yourself being unable to start — that's a chicken-and-egg problem.
+The UI has a "Report a Bug" link in the terminal bar as a fallback when you're unavailable.`;
 }

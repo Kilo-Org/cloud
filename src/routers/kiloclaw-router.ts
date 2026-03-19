@@ -45,7 +45,10 @@ import { getStripePriceIdForClawPlan } from '@/lib/kiloclaw/stripe-price-ids.ser
 import {
   KILOCLAW_EARLYBIRD_EXPIRY_DATE,
   KILOCLAW_TRIAL_DURATION_DAYS,
+  KILOCLAW_STANDARD_MONTHLY_MICRODOLLARS,
+  KILOCLAW_COMMIT_SIXMONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/constants';
+import { enrollWithCredits } from '@/lib/kiloclaw/credit-billing';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 
 /**
@@ -1105,7 +1108,10 @@ export const kiloclawRouter = createTRPCRouter({
         : null;
 
     const subscriptionData =
-      sub && sub.plan !== 'trial' && sub.status !== 'trialing' && sub.stripe_subscription_id
+      sub &&
+      sub.plan !== 'trial' &&
+      sub.status !== 'trialing' &&
+      (sub.stripe_subscription_id || sub.payment_source === 'credits')
         ? {
             plan: sub.plan,
             status: sub.status,
@@ -1114,6 +1120,14 @@ export const kiloclawRouter = createTRPCRouter({
             commitEndsAt: sub.commit_ends_at,
             scheduledPlan: sub.scheduled_plan,
             scheduledBy: sub.scheduled_by,
+            paymentSource: sub.payment_source ?? null,
+            creditRenewalAt: sub.credit_renewal_at ?? null,
+            renewalCostMicrodollars:
+              sub.payment_source === 'credits'
+                ? sub.plan === 'commit'
+                  ? KILOCLAW_COMMIT_SIXMONTH_MICRODOLLARS
+                  : KILOCLAW_STANDARD_MONTHLY_MICRODOLLARS
+                : null,
           }
         : null;
 
@@ -1261,6 +1275,12 @@ export const kiloclawRouter = createTRPCRouter({
       return { url: typeof session.url === 'string' ? session.url : null };
     }),
 
+  enrollWithCredits: baseProcedure
+    .input(z.object({ plan: z.enum(['commit', 'standard']) }))
+    .mutation(async ({ ctx, input }) => {
+      await enrollWithCredits(ctx.user.id, input.plan);
+    }),
+
   cancelSubscription: baseProcedure.mutation(async ({ ctx }) => {
     const [sub] = await db
       .select()
@@ -1268,7 +1288,7 @@ export const kiloclawRouter = createTRPCRouter({
       .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
       .limit(1);
 
-    if (!sub?.stripe_subscription_id || sub.status !== 'active') {
+    if (!sub || sub.status !== 'active') {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to cancel.' });
     }
 
@@ -1277,6 +1297,23 @@ export const kiloclawRouter = createTRPCRouter({
         code: 'BAD_REQUEST',
         message: 'Subscription is already set to cancel.',
       });
+    }
+
+    // Credit-funded subscriptions: update local DB only, no Stripe calls.
+    if (sub.payment_source === 'credits') {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({
+          cancel_at_period_end: true,
+          ...(sub.scheduled_plan ? { scheduled_plan: null, scheduled_by: null } : {}),
+        })
+        .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+
+      return { success: true };
+    }
+
+    if (!sub.stripe_subscription_id) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to cancel.' });
     }
 
     // If there's a pending schedule, release it first.
@@ -1332,7 +1369,24 @@ export const kiloclawRouter = createTRPCRouter({
       .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
       .limit(1);
 
-    if (!sub?.stripe_subscription_id || !sub.cancel_at_period_end) {
+    if (!sub?.cancel_at_period_end) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'No pending cancellation to reactivate.',
+      });
+    }
+
+    // Credit-funded subscriptions: update local DB only, no Stripe calls.
+    if (sub.payment_source === 'credits') {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ cancel_at_period_end: false })
+        .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+
+      return { success: true };
+    }
+
+    if (!sub.stripe_subscription_id) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'No pending cancellation to reactivate.',
@@ -1357,7 +1411,7 @@ export const kiloclawRouter = createTRPCRouter({
         .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
         .limit(1);
 
-      if (!sub?.stripe_subscription_id || sub.status !== 'active') {
+      if (!sub || sub.status !== 'active') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to switch.' });
       }
 
@@ -1369,11 +1423,28 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cannot switch from a trial plan.' });
       }
 
-      if (sub.stripe_schedule_id) {
+      if (sub.scheduled_plan) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'A plan switch is already pending. Cancel it before requesting a new one.',
         });
+      }
+
+      // Credit-funded subscriptions: record schedule locally only, no Stripe calls.
+      if (sub.payment_source === 'credits') {
+        await db
+          .update(kiloclaw_subscriptions)
+          .set({
+            scheduled_plan: input.toPlan,
+            scheduled_by: 'user',
+          })
+          .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+
+        return { success: true };
+      }
+
+      if (!sub.stripe_subscription_id) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to switch.' });
       }
 
       const targetPriceId = getStripePriceIdForClawPlan(input.toPlan);
@@ -1431,7 +1502,7 @@ export const kiloclawRouter = createTRPCRouter({
       .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
       .limit(1);
 
-    if (!sub?.stripe_schedule_id) {
+    if (!sub?.scheduled_plan) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'No pending plan switch to cancel.' });
     }
 
@@ -1441,6 +1512,20 @@ export const kiloclawRouter = createTRPCRouter({
         code: 'BAD_REQUEST',
         message: 'No user-initiated plan switch to cancel.',
       });
+    }
+
+    // Credit-funded subscriptions: clear schedule locally only, no Stripe calls.
+    if (sub.payment_source === 'credits') {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ scheduled_plan: null, scheduled_by: null })
+        .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+
+      return { success: true };
+    }
+
+    if (!sub.stripe_schedule_id) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'No pending plan switch to cancel.' });
     }
 
     await stripe.subscriptionSchedules.release(sub.stripe_schedule_id);
@@ -1453,6 +1538,19 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   createBillingPortalSession: baseProcedure.mutation(async ({ ctx }) => {
+    const [creditSub] = await db
+      .select({ payment_source: kiloclaw_subscriptions.payment_source })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
+      .limit(1);
+
+    if (creditSub?.payment_source === 'credits') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Billing portal is not available for credit-funded subscriptions',
+      });
+    }
+
     const stripeCustomerId = ctx.user.stripe_customer_id;
     if (!stripeCustomerId) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer.' });

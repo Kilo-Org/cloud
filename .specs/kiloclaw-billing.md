@@ -159,24 +159,24 @@ when access lapses, with email notifications at each stage.
    leave the user with deducted credits and no active subscription.
    Within this transaction the system MUST:
    a. Insert a negative credit transaction for the first period's cost.
-      The insertion MUST use a period-encoded idempotency key (see
-      Credit Renewal rule 2) with conflict-safe semantics. The key
-      MUST distinguish the plan and billing period, for example
-      `kiloclaw-subscription:YYYY-MM` for standard or
-      `kiloclaw-subscription-commit:YYYY-MM` for commit. If the
-      insertion detects a duplicate, the system MUST abort the
-      enrollment as a duplicate attempt.
+   The insertion MUST use a period-encoded idempotency key (see
+   Credit Renewal rule 2) with conflict-safe semantics. The key
+   MUST distinguish the plan and billing period, for example
+   `kiloclaw-subscription:YYYY-MM` for standard or
+   `kiloclaw-subscription-commit:YYYY-MM` for commit. If the
+   insertion detects a duplicate, the system MUST abort the
+   enrollment as a duplicate attempt.
    b. Atomically decrement the user's acquired credit balance by the
-      deducted amount.
+   deducted amount.
    c. Create or upsert the subscription record with payment source set
-      to `credits`, status set to active, the billing period set from
-      the current time, the credit renewal timestamp set to the period
-      end, and the payment provider subscription ID set to null.
+   to `credits`, status set to active, the billing period set from
+   the current time, the credit renewal timestamp set to the period
+   end, and the payment provider subscription ID set to null.
    d. The subscription upsert MUST clear the past-due-since timestamp
-      and set the status to active, but MUST NOT clear the suspension
-      timestamp or destruction deadline at this step. If the user was
-      previously suspended, those columns are needed as a signal for
-      the auto-resume procedure in rule 7.
+   and set the status to active, but MUST NOT clear the suspension
+   timestamp or destruction deadline at this step. If the user was
+   previously suspended, those columns are needed as a signal for
+   the auto-resume procedure in rule 7.
    If the transaction is interrupted, the database MUST roll back all
    operations so that a retry can re-attempt without the idempotency
    key blocking it.

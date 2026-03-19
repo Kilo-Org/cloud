@@ -30,6 +30,9 @@ export type ClawBillingStatus = {
     commitEndsAt: string | null;
     scheduledPlan: 'commit' | 'standard' | null;
     scheduledBy: 'auto' | 'user' | null;
+    paymentSource: 'stripe' | 'credits' | null;
+    creditRenewalAt: string | null;
+    renewalCostMicrodollars: number | null;
   } | null;
 
   earlybird: {

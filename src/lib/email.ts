@@ -28,6 +28,7 @@ export const templates = {
   clawInstanceDestroyed: '28',
   clawEarlybirdEndingSoon: '29',
   clawEarlybirdExpiresTomorrow: '30',
+  clawCreditRenewalFailed: '31',
 } as const;
 
 export type TemplateName = keyof typeof templates;
@@ -55,6 +56,7 @@ export const subjects: Record<TemplateName, string> = {
   clawInstanceDestroyed: 'Your KiloClaw Instance Has Been Deleted',
   clawEarlybirdEndingSoon: 'Your KiloClaw Earlybird Access Ends Soon',
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
+  clawCreditRenewalFailed: 'Action Required: KiloClaw Credit Renewal Failed',
 };
 
 function escapeHtml(str: string): string {

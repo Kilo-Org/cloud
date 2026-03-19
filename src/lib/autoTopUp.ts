@@ -181,7 +181,8 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
  */
 async function performAutoTopUpForEntity(
   entity: AutoTopUpEntity,
-  traceId: string
+  traceId: string,
+  idempotencyKey?: string
 ): Promise<AutoTopUpResult> {
   const ownerColumn =
     entity.type === 'user'
@@ -263,12 +264,15 @@ async function performAutoTopUpForEntity(
         ? { type: 'auto-topup', kiloUserId: entity.user.id, traceId }
         : { type: 'org-auto-topup', organizationId: entity.organization.id, traceId };
 
-    const invoice = await client.invoices.create({
-      customer: stripe_customer_id,
-      auto_advance: false,
-      metadata: invoiceMetadata,
-      description: 'Kilo automatic top up',
-    });
+    const invoice = await client.invoices.create(
+      {
+        customer: stripe_customer_id,
+        auto_advance: false,
+        metadata: invoiceMetadata,
+        description: 'Kilo automatic top up',
+      },
+      idempotencyKey ? { idempotencyKey } : undefined
+    );
 
     // Attach the line item directly to this invoice.
     // (Creating a pending invoice item and then creating an invoice can produce a $0 invoice,
@@ -384,6 +388,45 @@ const failureReasonMessages = {
 } as const;
 
 type KnownFailureReason = keyof typeof failureReasonMessages;
+
+/**
+ * Trigger auto-top-up for a KiloClaw credit renewal.
+ *
+ * Called by the credit renewal sweep when a user's balance is insufficient for
+ * renewal but they have auto-top-up enabled. Unlike {@link maybePerformAutoTopUp},
+ * this skips the balance-threshold check (the caller already determined the
+ * balance is insufficient) and passes a deterministic idempotency key to the
+ * payment provider so that duplicate triggers for the same renewal period are
+ * de-duplicated at the Stripe level.
+ */
+export async function triggerAutoTopUpForKiloClaw(
+  userId: string,
+  renewalTimestamp: string
+): Promise<void> {
+  const [user] = await db
+    .select()
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .limit(1);
+  if (!user) return;
+
+  const idempotencyKey = `kiloclaw-renew:${userId}:${renewalTimestamp}`;
+  const traceId = idempotencyKey;
+
+  const result = await performAutoTopUpForEntity({ type: 'user', user }, traceId, idempotencyKey);
+
+  if (result.success) {
+    logExceptInTest(`KiloClaw auto-top-up successful for user ${userId}`, {
+      traceId,
+      stripe_id: result.stripe_id,
+    });
+  } else if (result.error !== 'concurrent_attempt_in_progress') {
+    sentryLogger('auto-topup', 'warning')(`KiloClaw auto-top-up failed for user ${userId}`, {
+      ...result,
+      traceId,
+    });
+  }
+}
 
 /**
  * Disable auto-top-up for an entity (user or organization).

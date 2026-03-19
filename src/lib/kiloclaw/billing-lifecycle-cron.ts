@@ -17,6 +17,7 @@ import type { TemplateName } from '@/lib/email';
 import { send as sendEmail } from '@/lib/email';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
+import { runCreditRenewalSweep, autoResumeIfSuspended } from '@/lib/kiloclaw/credit-billing';
 import { NEXTAUTH_URL, KILOCLAW_BILLING_ENFORCEMENT } from '@/lib/config.server';
 import { sentryLogger } from '@/lib/utils.server';
 
@@ -35,6 +36,13 @@ function formatDateForEmail(d: Date): string {
 }
 
 type CronSummary = {
+  credit_renewals: number;
+  credit_cancellations: number;
+  credit_past_due: number;
+  credit_auto_top_up_triggered: number;
+  credit_recoveries: number;
+  credit_plan_switches: number;
+  credit_auto_resumes: number;
   trial_warnings: number;
   earlybird_warnings: number;
   sweep1_trial_expiry: number;
@@ -97,6 +105,13 @@ export async function runKiloClawBillingLifecycleCron(
   database: PostgresJsDatabase<typeof schema>
 ): Promise<CronSummary> {
   const summary: CronSummary = {
+    credit_renewals: 0,
+    credit_cancellations: 0,
+    credit_past_due: 0,
+    credit_auto_top_up_triggered: 0,
+    credit_recoveries: 0,
+    credit_plan_switches: 0,
+    credit_auto_resumes: 0,
     trial_warnings: 0,
     earlybird_warnings: 0,
     sweep1_trial_expiry: 0,
@@ -117,6 +132,51 @@ export async function runKiloClawBillingLifecycleCron(
   const now = new Date().toISOString();
   const client = new KiloClawInternalClient();
   const clawUrl = `${NEXTAUTH_URL}/claw`;
+
+  // ── Credit Renewal Sweep (before all other sweeps) ─────────────────
+  try {
+    const creditSummary = await runCreditRenewalSweep(database);
+    summary.credit_renewals = creditSummary.renewals;
+    summary.credit_cancellations = creditSummary.cancellations;
+    summary.credit_past_due = creditSummary.past_due;
+    summary.credit_auto_top_up_triggered = creditSummary.auto_top_up_triggered;
+    summary.credit_recoveries = creditSummary.recoveries;
+    summary.credit_plan_switches = creditSummary.plan_switches;
+    summary.credit_auto_resumes = creditSummary.auto_resumes;
+    summary.errors += creditSummary.errors;
+  } catch (error) {
+    summary.errors++;
+    captureException(error);
+    logError('Credit renewal sweep failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // ── Interrupted auto-resume detection ──────────────────────────────
+  const interruptedAutoResumes = await database
+    .select({ user_id: kiloclaw_subscriptions.user_id })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        eq(kiloclaw_subscriptions.status, 'active'),
+        isNotNull(kiloclaw_subscriptions.suspended_at)
+      )
+    );
+
+  for (const row of interruptedAutoResumes) {
+    try {
+      await autoResumeIfSuspended(row.user_id);
+      summary.credit_auto_resumes++;
+    } catch (error) {
+      summary.errors++;
+      captureException(error);
+      logError('Interrupted auto-resume retry failed', {
+        user_id: row.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   // ── Sweep 0a: Trial ending-soon warning ─────────────────────────────
   const trialWarningCutoff = new Date(Date.now() + TRIAL_WARNING_DAYS * MS_PER_DAY).toISOString();

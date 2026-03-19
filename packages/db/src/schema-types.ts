@@ -164,6 +164,14 @@ export const KiloClawAdminAuditAction = z.enum([
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
 
+export const KiloClawPaymentSource = {
+  Stripe: 'stripe',
+  Credits: 'credits',
+} as const;
+
+export type KiloClawPaymentSource =
+  (typeof KiloClawPaymentSource)[keyof typeof KiloClawPaymentSource];
+
 // =============================================================================
 // B. Type-Only Definitions (used in $type<T>())
 // =============================================================================

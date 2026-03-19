@@ -1,23 +1,18 @@
 import 'server-only';
 
 import type Stripe from 'stripe';
-import { eq, and, isNull, inArray, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { addMonths } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
-import {
-  kiloclaw_subscriptions,
-  kiloclaw_instances,
-  kiloclaw_email_log,
-} from '@kilocode/db/schema';
+import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import { getClawPlanForStripePriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { sentryLogger } from '@/lib/utils.server';
-import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { autoResumeIfSuspended } from '@/lib/kiloclaw/credit-billing';
 
 const logInfo = sentryLogger('kiloclaw-stripe', 'info');
 const logWarning = sentryLogger('kiloclaw-stripe', 'warning');
-const logError = sentryLogger('kiloclaw-stripe', 'error');
 
 type KiloClawSubscriptionMetadata = {
   type: 'kiloclaw';
@@ -83,52 +78,6 @@ const STRIPE_TO_CLAW_STATUS: Record<string, KiloClawSubscriptionStatus> = {
 function mapStripeStatus(stripeStatus: string): KiloClawSubscriptionStatus {
   if (stripeStatus === 'trialing') return 'active';
   return STRIPE_TO_CLAW_STATUS[stripeStatus] ?? 'active';
-}
-
-/**
- * If the user was suspended, try to start their instance and clear suspension state.
- */
-async function autoResumeIfSuspended(kiloUserId: string): Promise<void> {
-  const [activeInstance] = await db
-    .select({ id: kiloclaw_instances.id })
-    .from(kiloclaw_instances)
-    .where(and(eq(kiloclaw_instances.user_id, kiloUserId), isNull(kiloclaw_instances.destroyed_at)))
-    .limit(1);
-
-  if (activeInstance) {
-    try {
-      const client = new KiloClawInternalClient();
-      await client.start(kiloUserId);
-    } catch (startError) {
-      logError('Failed to auto-resume instance', {
-        user_id: kiloUserId,
-        error: startError instanceof Error ? startError.message : String(startError),
-      });
-    }
-  }
-
-  // Clear suspension/destruction cycle emails so they can fire again in a future cycle.
-  // Trial and earlybird warnings are one-time events and must NOT be cleared.
-  const resettableEmailTypes = [
-    'claw_suspended_trial',
-    'claw_suspended_subscription',
-    'claw_suspended_payment',
-    'claw_destruction_warning',
-    'claw_instance_destroyed',
-  ];
-  await db
-    .delete(kiloclaw_email_log)
-    .where(
-      and(
-        eq(kiloclaw_email_log.user_id, kiloUserId),
-        inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
-      )
-    );
-
-  await db
-    .update(kiloclaw_subscriptions)
-    .set({ suspended_at: null, destruction_deadline: null })
-    .where(eq(kiloclaw_subscriptions.user_id, kiloUserId));
 }
 
 /**
@@ -227,6 +176,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
         stripe_subscription_id: subscription.id,
         plan,
         status,
+        payment_source: 'stripe',
         cancel_at_period_end: subscription.cancel_at_period_end,
         current_period_start: periods.current_period_start,
         current_period_end: periods.current_period_end,
@@ -238,6 +188,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
           stripe_subscription_id: subscription.id,
           plan,
           status,
+          payment_source: 'stripe',
           cancel_at_period_end: subscription.cancel_at_period_end,
           current_period_start: periods.current_period_start,
           current_period_end: periods.current_period_end,
@@ -310,6 +261,7 @@ export async function handleKiloClawSubscriptionUpdated(params: {
     .set({
       status,
       plan,
+      payment_source: 'stripe',
       cancel_at_period_end: subscription.cancel_at_period_end,
       current_period_start: periods.current_period_start,
       current_period_end: periods.current_period_end,

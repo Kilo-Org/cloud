@@ -438,10 +438,10 @@ function TabBar({
                   setActiveTabId(tab.id);
                   if (collapsed) setCollapsed(false);
                 }}
-                className={`group flex cursor-pointer items-center overflow-hidden whitespace-nowrap transition-colors ${
+                className={`group flex cursor-pointer items-center whitespace-nowrap transition-colors ${
                   horizontal
-                    ? `gap-1.5 rounded-t-md px-3 py-1 text-[11px]`
-                    : `justify-center rounded-md px-1 py-2`
+                    ? `gap-1.5 overflow-hidden rounded-t-md px-3 py-1 text-[11px]`
+                    : `relative justify-center overflow-visible rounded-md px-1 py-2`
                 } ${
                   isActive
                     ? 'bg-white/[0.06] text-white/80'
@@ -463,13 +463,15 @@ function TabBar({
                   <TerminalIcon className="size-3.5 shrink-0" />
                 )}
                 {horizontal && <span className="max-w-[120px] truncate">{tab.label}</span>}
-                {horizontal && !isMayor && tab.kind !== 'status' && (
+                {!isMayor && tab.kind !== 'status' && (
                   <button
                     onClick={e => {
                       e.stopPropagation();
                       closeTab(tab.id);
                     }}
-                    className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white/10"
+                    className={`shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white/10 ${
+                      horizontal ? '' : 'absolute -top-1 -right-1'
+                    }`}
                   >
                     <X className="size-2.5" />
                   </button>

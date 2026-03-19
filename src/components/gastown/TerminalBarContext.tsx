@@ -96,13 +96,22 @@ export function TerminalBarProvider({ children }: { children: ReactNode }) {
   const setPosition = useCallback((p: TerminalPosition) => {
     setPositionState(p);
     localStorage.setItem(LS_KEY_POSITION, p);
+    // Re-clamp size for the new orientation's constraints
+    setSizeState(prev => {
+      const clamped = clampSize(prev, p);
+      localStorage.setItem(LS_KEY_SIZE, String(clamped));
+      return clamped;
+    });
   }, []);
 
-  const setSize = useCallback((s: number) => {
-    const val = Math.max(MIN_SIZE_HORIZONTAL, s);
-    setSizeState(val);
-    localStorage.setItem(LS_KEY_SIZE, String(val));
-  }, []);
+  const setSize = useCallback(
+    (s: number, pos?: TerminalPosition) => {
+      const val = clampSize(s, pos ?? position);
+      setSizeState(val);
+      localStorage.setItem(LS_KEY_SIZE, String(val));
+    },
+    [position]
+  );
 
   const openAgentTab = useCallback((agentId: string, agentName: string) => {
     const tabId = `agent:${agentId}`;

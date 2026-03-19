@@ -18,6 +18,8 @@
 #                                tabs   — separate terminal tabs (default)
 #                                split  — single tab with split panes (requires iTerm2)
 #                                tmux   — tmux session "kiloclaw"
+#   --with-replica             Keep POSTGRES_REPLICA_EU_URL in .env.local.
+#                              By default it is commented out (unreachable locally).
 #
 # Config (highest priority wins):
 #   1. CLI flags
@@ -36,6 +38,7 @@ HAS_CONTROLLER_CHANGES=false
 TUNNEL_NAME=""
 TUNNEL_HOSTNAME=""
 DISPLAY_MODE="tabs"
+WITH_REPLICA=false
 
 # Source user config: project-local overrides user-global
 if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/kiloclaw/dev-start.conf" ]; then
@@ -62,9 +65,13 @@ while [[ $# -gt 0 ]]; do
       DISPLAY_MODE="$2"
       shift 2
       ;;
+    --with-replica)
+      WITH_REPLICA=true
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--has-controller-changes] [--tunnel-name <name>] [--display <mode>]"
+      echo "Usage: $0 [--has-controller-changes] [--tunnel-name <name>] [--display <mode>] [--with-replica]"
       echo "Display modes: tabs (default), split, tmux"
       exit 1
       ;;
@@ -83,75 +90,150 @@ esac
 
 # ---------- Pre-flight checks ----------
 
+# Verify required CLIs are available before doing any work
+missing_cli=false
+for cli in vercel pnpm docker cloudflared; do
+  if ! command -v "$cli" &>/dev/null; then
+    echo "ERROR: '$cli' CLI not found."
+    missing_cli=true
+  fi
+done
+if [ "$missing_cli" = true ]; then
+  echo ""
+  echo "Install missing tools before running this script."
+  echo "  vercel:      npm i -g vercel"
+  echo "  pnpm:        corepack enable && corepack prepare pnpm@latest --activate"
+  echo "  docker:      https://docs.docker.com/get-docker/"
+  echo "  cloudflared: brew install cloudflare/cloudflare/cloudflared"
+  exit 1
+fi
+
 if [ ! -f "$KILOCLAW_DIR/.dev.vars" ]; then
   echo "==> Creating .dev.vars from .dev.vars.example..."
   cp "$KILOCLAW_DIR/.dev.vars.example" "$KILOCLAW_DIR/.dev.vars"
 fi
 
-# Sync AGENT_ENV_VARS_PRIVATE_KEY from config into .dev.vars
-if [ -n "${AGENT_ENV_VARS_PRIVATE_KEY:-}" ]; then
-  echo "==> Syncing AGENT_ENV_VARS_PRIVATE_KEY from config into .dev.vars..."
-  if grep -q '^AGENT_ENV_VARS_PRIVATE_KEY=' "$KILOCLAW_DIR/.dev.vars"; then
-    sed "s|^AGENT_ENV_VARS_PRIVATE_KEY=.*|AGENT_ENV_VARS_PRIVATE_KEY=$AGENT_ENV_VARS_PRIVATE_KEY|" \
-      "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
-    mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
-  else
-    echo "AGENT_ENV_VARS_PRIVATE_KEY=$AGENT_ENV_VARS_PRIVATE_KEY" >> "$KILOCLAW_DIR/.dev.vars"
+# ---------- Link & pull dev environment from Vercel ----------
+
+if [ ! -d "$MONOREPO_ROOT/.vercel" ] || [ ! -f "$MONOREPO_ROOT/.vercel/project.json" ]; then
+  echo "==> Vercel project not linked. Linking to kilocode-app..."
+  if ! (cd "$MONOREPO_ROOT" && vercel link --project=kilocode-app --scope=kilocode --yes); then
+    echo ""
+    echo "ERROR: 'vercel link' failed."
+    echo "You may need to log in first: vercel login"
+    exit 1
   fi
 fi
 
-# Check AGENT_ENV_VARS_PRIVATE_KEY is configured
-AGENT_KEY="$(grep '^AGENT_ENV_VARS_PRIVATE_KEY=' "$KILOCLAW_DIR/.dev.vars" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//')"
-if [ -z "$AGENT_KEY" ] || [ "$AGENT_KEY" = "..." ]; then
-  echo "ERROR: AGENT_ENV_VARS_PRIVATE_KEY is not configured in .dev.vars."
-  echo "Get the dev version from 1Password (engineering vault) and set it in"
-  echo "  $KILOCLAW_DIR/.dev.vars"
-  exit 1
-fi
-
-# ---------- Pull dev environment from Vercel ----------
-
-if [ ! -d "$MONOREPO_ROOT/.vercel" ] || [ ! -f "$MONOREPO_ROOT/.vercel/project.json" ]; then
-  echo "ERROR: Vercel project not linked."
-  echo "Run 'vercel link' in $MONOREPO_ROOT first."
-  exit 1
-fi
-
 echo "==> Pulling development environment from Vercel..."
-(cd "$MONOREPO_ROOT" && vercel env pull --environment=development)
+if ! (cd "$MONOREPO_ROOT" && vercel env pull --environment=development); then
+  echo ""
+  echo "ERROR: 'vercel env pull' failed."
+  echo "Check your Vercel authentication: vercel login"
+  echo "Then retry this script."
+  exit 1
+fi
+
+# Comment out POSTGRES_REPLICA_EU_URL unless --with-replica is passed.
+# In local dev this connection string is unreachable and causes startup hangs.
+if [ "$WITH_REPLICA" = false ]; then
+  if grep -q '^POSTGRES_REPLICA_EU_URL=' "$MONOREPO_ROOT/.env.local"; then
+    echo "==> Commenting out POSTGRES_REPLICA_EU_URL in .env.local (pass --with-replica to keep it)"
+    sed 's/^POSTGRES_REPLICA_EU_URL=/# POSTGRES_REPLICA_EU_URL=/' \
+      "$MONOREPO_ROOT/.env.local" > "$MONOREPO_ROOT/.env.local.tmp"
+    mv "$MONOREPO_ROOT/.env.local.tmp" "$MONOREPO_ROOT/.env.local"
+  fi
+fi
 
 # ---------- Sync shared secrets from .env.local into .dev.vars ----------
 
 ENV_LOCAL="$MONOREPO_ROOT/.env.local"
-if [ -f "$ENV_LOCAL" ]; then
-  echo "==> Syncing secrets from .env.local into .dev.vars..."
+if [ ! -f "$ENV_LOCAL" ]; then
+  echo ""
+  echo "ERROR: .env.local not found after 'vercel env pull'."
+  echo "This usually means the Vercel project has no development environment variables."
+  echo "Check the kilocode-app project at https://vercel.com and ensure development"
+  echo "environment variables are configured."
+  exit 1
+fi
 
-  # Extract a value from .env.local, stripping surrounding quotes
-  env_local_val() {
-    grep "^$1=" "$ENV_LOCAL" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//'
-  }
+echo "==> Syncing secrets from .env.local into .dev.vars..."
 
-  # NEXTAUTH_SECRET → NEXTAUTH_SECRET
-  NEXTAUTH_SECRET_VAL="$(env_local_val NEXTAUTH_SECRET)"
-  if [ -n "$NEXTAUTH_SECRET_VAL" ]; then
-    sed "s|^NEXTAUTH_SECRET=.*|NEXTAUTH_SECRET=$NEXTAUTH_SECRET_VAL|" \
-      "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
-    mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
-  fi
+# Extract a value from .env.local, stripping surrounding quotes
+env_local_val() {
+  grep "^$1=" "$ENV_LOCAL" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true
+}
 
-  # KILOCLAW_INTERNAL_API_SECRET → INTERNAL_API_SECRET
-  INTERNAL_SECRET_VAL="$(env_local_val KILOCLAW_INTERNAL_API_SECRET)"
-  if [ -n "$INTERNAL_SECRET_VAL" ]; then
-    sed "s|^INTERNAL_API_SECRET=.*|INTERNAL_API_SECRET=$INTERNAL_SECRET_VAL|" \
-      "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
-    mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
-  fi
+SYNC_WARNINGS=0
+
+# NEXTAUTH_SECRET → NEXTAUTH_SECRET
+NEXTAUTH_SECRET_VAL="$(env_local_val NEXTAUTH_SECRET)"
+if [ -n "$NEXTAUTH_SECRET_VAL" ]; then
+  sed "s|^NEXTAUTH_SECRET=.*|NEXTAUTH_SECRET=$NEXTAUTH_SECRET_VAL|" \
+    "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
+  mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
+else
+  echo "    WARNING: NEXTAUTH_SECRET not found in .env.local — JWT auth will fail"
+  SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
+fi
+
+# KILOCLAW_INTERNAL_API_SECRET → INTERNAL_API_SECRET
+INTERNAL_SECRET_VAL="$(env_local_val KILOCLAW_INTERNAL_API_SECRET)"
+if [ -n "$INTERNAL_SECRET_VAL" ]; then
+  sed "s|^INTERNAL_API_SECRET=.*|INTERNAL_API_SECRET=$INTERNAL_SECRET_VAL|" \
+    "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
+  mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
+else
+  echo "    WARNING: KILOCLAW_INTERNAL_API_SECRET not found in .env.local — platform API auth will fail"
+  SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
+fi
+
+if [ "$SYNC_WARNINGS" -gt 0 ]; then
+  echo ""
+  echo "    $SYNC_WARNINGS secret(s) missing from .env.local."
+  echo "    The worker will start but auth will not work correctly."
+  echo "    Check that development environment variables are set in Vercel."
+  echo ""
+fi
+
+# ---------- Sync config secrets into .dev.vars ----------
+
+# Sync AGENT_ENV_VARS_PRIVATE_KEY from config into .dev.vars.
+# The value is a multiline PEM key, so sed can't handle it — strip existing
+# lines (including continuation lines of a quoted multiline value) then append.
+if [ -n "${AGENT_ENV_VARS_PRIVATE_KEY:-}" ]; then
+  echo "==> Syncing AGENT_ENV_VARS_PRIVATE_KEY from config into .dev.vars..."
+  # Remove existing AGENT_ENV_VARS_PRIVATE_KEY block (single or multiline quoted value)
+  awk '
+    /^AGENT_ENV_VARS_PRIVATE_KEY=/ {
+      # If the line has an opening quote without a closing quote, skip until end-quote
+      if ($0 ~ /="/ && $0 !~ /"$/) { skip=1 }
+      next
+    }
+    skip && /"$/ { skip=0; next }
+    skip { next }
+    { print }
+  ' "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
+  mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
+  # Append the key (printf to preserve embedded newlines)
+  printf 'AGENT_ENV_VARS_PRIVATE_KEY="%s"\n' "$AGENT_ENV_VARS_PRIVATE_KEY" >> "$KILOCLAW_DIR/.dev.vars"
+fi
+
+# Check AGENT_ENV_VARS_PRIVATE_KEY is configured (first line only for validation)
+AGENT_KEY="$(grep '^AGENT_ENV_VARS_PRIVATE_KEY=' "$KILOCLAW_DIR/.dev.vars" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
+if [ -z "$AGENT_KEY" ] || [ "$AGENT_KEY" = "..." ]; then
+  echo "ERROR: AGENT_ENV_VARS_PRIVATE_KEY is not configured in .dev.vars."
+  echo "Set it in your config file or in .dev.vars directly."
+  echo "  Config: ${XDG_CONFIG_HOME:-$HOME/.config}/kiloclaw/dev-start.conf"
+  echo "  Direct: $KILOCLAW_DIR/.dev.vars"
+  echo "Get the dev version from 1Password (engineering vault)."
+  exit 1
 fi
 
 # ---------- Validate / refresh Fly API token ----------
 
 # Read FLY_ORG_SLUG from .dev.vars (defaults to kilo-dev in .dev.vars.example)
-FLY_ORG="$(grep '^FLY_ORG_SLUG=' "$KILOCLAW_DIR/.dev.vars" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//')"
+FLY_ORG="$(grep '^FLY_ORG_SLUG=' "$KILOCLAW_DIR/.dev.vars" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
 if [ -z "$FLY_ORG" ]; then
   FLY_ORG="kilo-dev"
 fi
@@ -175,7 +257,7 @@ refresh_fly_token() {
   echo "    Token saved to .dev.vars."
 }
 
-FLY_TOKEN="$(grep '^FLY_API_TOKEN=' "$KILOCLAW_DIR/.dev.vars" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//')"
+FLY_TOKEN="$(grep '^FLY_API_TOKEN=' "$KILOCLAW_DIR/.dev.vars" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
 
 if [ -z "$FLY_TOKEN" ] || [ "$FLY_TOKEN" = "fo1_..." ]; then
   refresh_fly_token
@@ -205,15 +287,38 @@ echo "    Fly API token is valid."
 # ---------- Install dependencies ----------
 
 echo "==> Installing dependencies..."
-(cd "$MONOREPO_ROOT" && pnpm install)
+if ! (cd "$MONOREPO_ROOT" && pnpm install); then
+  echo ""
+  echo "ERROR: 'pnpm install' failed."
+  echo "Try deleting node_modules and pnpm-lock.yaml, then retry."
+  exit 1
+fi
 
 # ---------- Start database and run migrations ----------
 
 echo "==> Starting local database..."
-(cd "$MONOREPO_ROOT" && docker compose -f dev/docker-compose.yml up -d)
+if ! docker info &>/dev/null; then
+  echo ""
+  echo "ERROR: Docker daemon is not running."
+  echo "Start Docker Desktop (or 'dockerd') and retry."
+  exit 1
+fi
+if ! (cd "$MONOREPO_ROOT" && docker compose -f dev/docker-compose.yml up -d); then
+  echo ""
+  echo "ERROR: 'docker compose up' failed."
+  echo "Check 'docker compose -f dev/docker-compose.yml logs' for details."
+  exit 1
+fi
 
 echo "==> Running database migrations..."
-(cd "$MONOREPO_ROOT" && pnpm drizzle migrate)
+if ! (cd "$MONOREPO_ROOT" && pnpm drizzle migrate); then
+  echo ""
+  echo "ERROR: Database migrations failed."
+  echo "The database container may not be ready yet. Check:"
+  echo "  docker compose -f dev/docker-compose.yml ps"
+  echo "  docker compose -f dev/docker-compose.yml logs"
+  exit 1
+fi
 
 # ---------- Controller image push (optional) ----------
 

@@ -75,6 +75,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     className?: string;
   }> = [
     {
+      title: 'KiloClaw',
+      icon: KiloCrabIcon,
+      url: '/claw',
+    },
+    {
       title: 'App Builder',
       icon: Plus,
       url: '/app-builder',
@@ -139,11 +144,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
-    {
-      title: 'Claw',
-      icon: KiloCrabIcon,
-      url: '/claw',
-    },
   ];
 
   // Account group

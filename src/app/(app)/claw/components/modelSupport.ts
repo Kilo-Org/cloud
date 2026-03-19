@@ -9,12 +9,12 @@ import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
  */
 export const KILOCODE_CATALOG_IDS = new Set([
   'anthropic/claude-opus-4.6',
-  'z-ai/glm-5:free',
-  'minimax/minimax-m2.5:free',
-  'anthropic/claude-sonnet-4.5',
-  'openai/gpt-5.2',
-  'google/gemini-3-pro-preview',
-  'google/gemini-3-flash-preview',
+  'z-ai/glm-5',
+  'minimax/minimax-m2.7',
+  'anthropic/claude-sonnet-4.6',
+  'openai/gpt-5.4',
+  'google/gemini-3.1-pro-preview',
+  'google/gemini-3.1-flash-image-preview',
   'x-ai/grok-code-fast-1',
   'moonshotai/kimi-k2.5',
 ]);

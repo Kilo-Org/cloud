@@ -558,7 +558,7 @@ export function recoverStuckReviews(sql: SqlStorage): void {
       ...query(
         sql,
         /* sql */ `
-          SELECT ${beads.bead_id}
+           SELECT ${beads.bead_id}
           FROM ${beads}
           WHERE ${beads.type} = 'merge_request'
             AND ${beads.status} = 'in_progress'
@@ -566,6 +566,11 @@ export function recoverStuckReviews(sql: SqlStorage): void {
             AND NOT EXISTS (
               SELECT 1 FROM ${agent_metadata}
               WHERE ${agent_metadata.current_hook_bead_id} = ${beads.bead_id}
+            )
+            AND ${beads.bead_id} NOT IN (
+              SELECT ${review_metadata.bead_id}
+              FROM ${review_metadata}
+              WHERE ${review_metadata.pr_url} IS NOT NULL
             )
         `,
         [abandonedCutoff]
@@ -635,9 +640,16 @@ export function closeOrphanedReviewBeads(sql: SqlStorage): void {
       .object({ bead_id: z.string(), assignee_agent_bead_id: z.string().nullable() })
       .parse(row);
     try {
-      closeBead(sql, parsed.bead_id, parsed.assignee_agent_bead_id ?? 'system');
+      // Use completeReviewWithResult instead of closeBead so the source
+      // bead is also transitioned (closeBead only closes the MR bead
+      // itself, leaving the source stuck in in_review).
+      completeReviewWithResult(sql, {
+        entry_id: parsed.bead_id,
+        status: 'failed',
+        message: 'PR review orphaned — agent died and polling could not resolve',
+      });
       console.log(
-        `[review-queue] closeOrphanedReviewBeads: closed orphaned MR bead=${parsed.bead_id}`
+        `[review-queue] closeOrphanedReviewBeads: failed orphaned MR bead=${parsed.bead_id}`
       );
     } catch (err) {
       console.warn(

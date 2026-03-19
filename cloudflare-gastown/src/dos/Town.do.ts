@@ -3568,14 +3568,16 @@ export class TownDO extends DurableObject<Env> {
         if (!status) continue;
 
         if (status === 'merged') {
-          reviewQueue.completeReviewWithResult(this.sql, {
+          // Use the TownDO wrapper (not the module function directly)
+          // so dispatchUnblockedBeads fires and events are emitted.
+          await this.completeReviewWithResult({
             entry_id: review.bead_id,
             status: 'merged',
             message: 'PR merged externally',
           });
           console.log(`${TOWN_LOG} pollPendingPRs: PR merged for entry=${review.bead_id}`);
         } else if (status === 'closed') {
-          reviewQueue.completeReviewWithResult(this.sql, {
+          await this.completeReviewWithResult({
             entry_id: review.bead_id,
             status: 'failed',
             message: 'PR closed without merge',

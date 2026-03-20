@@ -26,13 +26,18 @@ import * as config from './town/config';
 import * as rigs from './town/rigs';
 import * as dispatch from './town/container-dispatch';
 import * as patrol from './town/patrol';
+import * as scheduling from './town/scheduling';
+import * as events from './town/events';
+import * as reconciler from './town/reconciler';
+import { applyAction } from './town/actions';
+import type { ApplyActionContext } from './town/actions';
+import { buildRefinerySystemPrompt } from '../prompts/refinery-system.prompt';
 import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../util/platform-pr.util';
 
 // Table imports for beads-centric operations
 import {
   beads,
   BeadRecord,
-  AgentBeadRecord,
   EscalationBeadRecord,
   ConvoyBeadRecord,
 } from '../db/tables/beads.table';
@@ -115,8 +120,6 @@ function formatEventMessage(row: Record<string, unknown>): string {
 // Alarm intervals
 const ACTIVE_ALARM_INTERVAL_MS = 5_000; // 5s when agents are active
 const IDLE_ALARM_INTERVAL_MS = 1 * 60_000; // 1m when idle
-const DISPATCH_COOLDOWN_MS = 2 * 60_000; // 2 min — skip agents with recent dispatch activity
-const MAX_DISPATCH_ATTEMPTS = 5;
 
 // Escalation constants
 const STALE_ESCALATION_THRESHOLD_MS = 4 * 60 * 60 * 1000;
@@ -240,6 +243,80 @@ export class TownDO extends DurableObject<Env> {
     writeEvent(this.env, { ...data, delivery: 'internal', userId: this._ownerUserId });
   }
 
+  /** Build the context object used by the scheduling sub-module. */
+  private get schedulingCtx(): Parameters<typeof scheduling.dispatchAgent>[0] {
+    return {
+      sql: this.sql,
+      env: this.env,
+      storage: this.ctx.storage,
+      townId: this.townId,
+      getTownConfig: () => this.getTownConfig(),
+      getRigConfig: (rigId: string) => this.getRigConfig(rigId),
+      resolveKilocodeToken: () => this.resolveKilocodeToken(),
+      emitEvent: data => this.emitEvent(data),
+    };
+  }
+
+  /** Build the context object used by the reconciler's applyAction. */
+  private get applyActionCtx(): ApplyActionContext {
+    const schedulingCtx = this.schedulingCtx;
+    return {
+      sql: this.sql,
+      townId: this.townId,
+      dispatchAgent: async (agentId, beadId, rigId) => {
+        const agent = agents.getAgent(this.sql, agentId);
+        const bead = beadOps.getBead(this.sql, beadId);
+        if (!agent || !bead) return false;
+
+        // Build refinery-specific system prompt with branch/target info
+        let systemPromptOverride: string | undefined;
+        if (agent.role === 'refinery' && bead.type === 'merge_request') {
+          const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
+          const sourceBeadId =
+            typeof bead.metadata?.source_bead_id === 'string' ? bead.metadata.source_bead_id : null;
+          const townConfig = await this.getTownConfig();
+          systemPromptOverride = buildRefinerySystemPrompt({
+            identity: agent.identity,
+            rigId,
+            townId: this.townId,
+            gates: townConfig.refinery?.gates ?? [],
+            branch: reviewMeta?.branch ?? 'unknown',
+            targetBranch: reviewMeta?.target_branch ?? 'main',
+            polecatAgentId:
+              typeof bead.metadata?.source_agent_id === 'string'
+                ? bead.metadata.source_agent_id
+                : 'unknown',
+            mergeStrategy: townConfig.merge_strategy ?? 'direct',
+          });
+        }
+
+        return scheduling.dispatchAgent(schedulingCtx, agent, bead, { systemPromptOverride });
+      },
+      stopAgent: async agentId => {
+        await dispatch.stopAgentInContainer(this.env, this.townId, agentId);
+      },
+      checkPRStatus: async prUrl => {
+        const townConfig = await this.getTownConfig();
+        return this.checkPRStatus(prUrl, townConfig);
+      },
+      queueNudge: async (agentId, message, _tier) => {
+        await this.queueNudge(agentId, message, {
+          mode: 'immediate',
+          priority: 'urgent',
+          source: 'reconciler',
+        });
+      },
+      insertEvent: (eventType, params) => {
+        events.insertEvent(this.sql, eventType as Parameters<typeof events.insertEvent>[1], params);
+      },
+      emitEvent: data => {
+        if (typeof data.event === 'string') {
+          this.emitEvent(data as Parameters<typeof this.emitEvent>[0]);
+        }
+      },
+    };
+  }
+
   // ── WebSocket: status broadcast ──────────────────────────────────────
 
   /**
@@ -252,7 +329,6 @@ export class TownDO extends DurableObject<Env> {
       url.pathname.endsWith('/status/ws') &&
       request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
     ) {
-      await this.ensureInitialized();
       const pair = new WebSocketPair();
       const [client, server] = [pair[0], pair[1]];
       this.ctx.acceptWebSocket(server, ['status']);
@@ -393,7 +469,6 @@ export class TownDO extends DurableObject<Env> {
    * Called by the mayor via the /mayor/ui-action HTTP route.
    */
   async broadcastUiAction(action: UiAction): Promise<void> {
-    await this.ensureInitialized();
     const sockets = this.ctx.getWebSockets('status');
     if (sockets.length === 0) return;
     const frame = JSON.stringify({ channel: 'ui_action', action, ts: now() });
@@ -443,6 +518,9 @@ export class TownDO extends DurableObject<Env> {
       query(this.sql, idx, []);
     }
 
+    // Reconciler event log
+    events.initTownEventsTable(this.sql);
+
     // Ensure the alarm loop is running. After a deploy/restart, the
     // Cloudflare runtime normally delivers missed alarms, but if the alarm
     // was never set or was deleted by destroy(), the loop is dead. Re-arm
@@ -452,6 +530,7 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private _townId: string | null = null;
+  private _lastReconcilerMetrics: reconciler.ReconcilerMetrics | null = null;
   private _dashboardContext: string | null = null;
 
   private get townId(): string {
@@ -557,12 +636,10 @@ export class TownDO extends DurableObject<Env> {
     gitUrl: string;
     defaultBranch: string;
   }): Promise<rigs.RigRecord> {
-    await this.ensureInitialized();
     return rigs.addRig(this.sql, input);
   }
 
   async removeRig(rigId: string): Promise<void> {
-    await this.ensureInitialized();
     rigs.removeRig(this.sql, rigId);
     await this.ctx.storage.delete(`rig:${rigId}:config`);
     // Delete all beads belonging to this rig (cascades to satellite tables via deleteBead)
@@ -581,12 +658,10 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async listRigs(): Promise<rigs.RigRecord[]> {
-    await this.ensureInitialized();
     return rigs.listRigs(this.sql);
   }
 
   async getRigAsync(rigId: string): Promise<rigs.RigRecord | null> {
-    await this.ensureInitialized();
     return rigs.getRig(this.sql, rigId);
   }
 
@@ -596,9 +671,6 @@ export class TownDO extends DurableObject<Env> {
     console.log(
       `${TOWN_LOG} configureRig: rigId=${rigConfig.rigId} hasKilocodeToken=${!!rigConfig.kilocodeToken}`
     );
-    if (rigConfig.townId) {
-      await this.setTownId(rigConfig.townId);
-    }
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
 
     if (rigConfig.kilocodeToken) {
@@ -696,7 +768,6 @@ export class TownDO extends DurableObject<Env> {
   // ══════════════════════════════════════════════════════════════════
 
   async createBead(input: CreateBeadInput): Promise<Bead> {
-    await this.ensureInitialized();
     const bead = beadOps.createBead(this.sql, input);
     this.emitEvent({
       event: 'bead.created',
@@ -716,17 +787,23 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async getBeadAsync(beadId: string): Promise<Bead | null> {
-    await this.ensureInitialized();
     return beadOps.getBead(this.sql, beadId);
   }
 
   async listBeads(filter: BeadFilter): Promise<Bead[]> {
-    await this.ensureInitialized();
     return beadOps.listBeads(this.sql, filter);
   }
 
   async updateBeadStatus(beadId: string, status: string, agentId: string): Promise<Bead> {
-    await this.ensureInitialized();
+    // Record terminal transitions as bead_cancelled events for the reconciler.
+    // Non-terminal transitions are normal lifecycle changes, not cancellations.
+    if (status === 'closed' || status === 'failed') {
+      events.insertEvent(this.sql, 'bead_cancelled', {
+        bead_id: beadId,
+        payload: { cancel_status: status },
+      });
+    }
+
     // Convoy progress is updated automatically inside beadOps.updateBeadStatus
     // when the bead reaches a terminal status (closed/failed).
     const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId);
@@ -792,7 +869,6 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async deleteBead(beadId: string): Promise<void> {
-    await this.ensureInitialized();
     beadOps.deleteBead(this.sql, beadId);
   }
 
@@ -801,7 +877,6 @@ export class TownDO extends DurableObject<Env> {
     since?: string;
     limit?: number;
   }): Promise<BeadEventRecord[]> {
-    await this.ensureInitialized();
     return beadOps.listBeadEvents(this.sql, options);
   }
 
@@ -822,7 +897,6 @@ export class TownDO extends DurableObject<Env> {
     }>,
     actorId: string
   ): Promise<Bead> {
-    await this.ensureInitialized();
     const bead = beadOps.updateBeadFields(this.sql, beadId, fields, actorId);
 
     // When a bead closes via field update, check for newly unblocked beads
@@ -833,80 +907,12 @@ export class TownDO extends DurableObject<Env> {
     return bead;
   }
 
-  // ── Bead Dependency Editing ──────────────────────────────────────────
-
-  /**
-   * Add a dependency edge between two beads.
-   * Validates, detects cycles, and logs a bead event.
-   */
-  async addBeadDependency(
-    beadId: string,
-    dependsOnBeadId: string,
-    type: 'blocks' | 'tracks' | 'parent-child'
-  ): Promise<void> {
-    await this.ensureInitialized();
-    beadOps.addBeadDependency(this.sql, beadId, dependsOnBeadId, type);
-    beadOps.logBeadEvent(this.sql, {
-      beadId,
-      agentId: null,
-      eventType: 'dependency_added',
-      metadata: { depends_on_bead_id: dependsOnBeadId, dependency_type: type },
-    });
-  }
-
-  /**
-   * Remove a dependency edge between two beads.
-   * After removal, checks if any beads are now unblocked and arms the
-   * alarm so they get dispatched promptly.
-   */
-  async removeBeadDependency(beadId: string, dependsOnBeadId: string): Promise<boolean> {
-    await this.ensureInitialized();
-    const deleted = beadOps.removeBeadDependency(this.sql, beadId, dependsOnBeadId);
-    if (deleted) {
-      beadOps.logBeadEvent(this.sql, {
-        beadId,
-        agentId: null,
-        eventType: 'dependency_removed',
-        metadata: { depends_on_bead_id: dependsOnBeadId },
-      });
-      // If beadId has no remaining unresolved blockers, arm the alarm so
-      // it gets dispatched promptly.
-      if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
-        await this.ctx.storage.setAlarm(Date.now());
-      }
-    }
-    return deleted;
-  }
-
-  // ── Convoy Membership ────────────────────────────────────────────────
-
-  /**
-   * Add a bead to an existing convoy. Creates the 'tracks' dependency,
-   * merges convoy metadata into the bead, and increments total_beads.
-   */
-  async addBeadToConvoy(beadId: string, convoyId: string): Promise<void> {
-    await this.ensureInitialized();
-    beadOps.addBeadToConvoy(this.sql, beadId, convoyId);
-  }
-
-  /**
-   * Remove a bead from its convoy. Deletes the 'tracks' dependency,
-   * strips convoy metadata, and decrements total_beads.
-   * Returns the convoy ID the bead was removed from, or null if not in a convoy.
-   */
-  async removeBeadFromConvoy(beadId: string): Promise<string | null> {
-    await this.ensureInitialized();
-    return beadOps.removeBeadFromConvoy(this.sql, beadId);
-  }
-
   /**
    * Force-reset an agent to idle, unhooking from its current bead if any.
    * Sets the bead status back to 'open' so it can be re-dispatched.
    * Writes a bead_event for auditability.
    */
   async resetAgent(agentId: string): Promise<void> {
-    await this.ensureInitialized();
-
     const agent = agents.getAgent(this.sql, agentId);
     if (!agent) throw new Error(`Agent ${agentId} not found`);
 
@@ -945,8 +951,6 @@ export class TownDO extends DurableObject<Env> {
     convoyId: string,
     fields: Partial<{ merge_mode: ConvoyMergeMode; feature_branch: string }>
   ): Promise<ConvoyEntry | null> {
-    await this.ensureInitialized();
-
     const convoy = this.getConvoy(convoyId);
     if (!convoy) return null;
 
@@ -991,32 +995,26 @@ export class TownDO extends DurableObject<Env> {
   // ══════════════════════════════════════════════════════════════════
 
   async registerAgent(input: RegisterAgentInput): Promise<Agent> {
-    await this.ensureInitialized();
     return agents.registerAgent(this.sql, input);
   }
 
   async getAgentAsync(agentId: string): Promise<Agent | null> {
-    await this.ensureInitialized();
     return agents.getAgent(this.sql, agentId);
   }
 
   async getAgentByIdentity(identity: string): Promise<Agent | null> {
-    await this.ensureInitialized();
     return agents.getAgentByIdentity(this.sql, identity);
   }
 
   async listAgents(filter?: AgentFilter): Promise<Agent[]> {
-    await this.ensureInitialized();
     return agents.listAgents(this.sql, filter);
   }
 
   async updateAgentStatus(agentId: string, status: string): Promise<void> {
-    await this.ensureInitialized();
     agents.updateAgentStatus(this.sql, agentId, status);
   }
 
   async deleteAgent(agentId: string): Promise<void> {
-    await this.ensureInitialized();
     agents.deleteAgent(this.sql, agentId);
     try {
       const agentDO = getAgentDOStub(this.env, agentId);
@@ -1027,23 +1025,19 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async hookBead(agentId: string, beadId: string): Promise<void> {
-    await this.ensureInitialized();
     agents.hookBead(this.sql, agentId, beadId);
     await this.armAlarmIfNeeded();
   }
 
   async unhookBead(agentId: string): Promise<void> {
-    await this.ensureInitialized();
     agents.unhookBead(this.sql, agentId);
   }
 
   async getHookedBead(agentId: string): Promise<Bead | null> {
-    await this.ensureInitialized();
     return agents.getHookedBead(this.sql, agentId);
   }
 
   async getOrCreateAgent(role: AgentRole, rigId: string): Promise<Agent> {
-    await this.ensureInitialized();
     return agents.getOrCreateAgent(this.sql, role, rigId, this.townId);
   }
 
@@ -1062,30 +1056,32 @@ export class TownDO extends DurableObject<Env> {
   // ── Prime & Checkpoint ────────────────────────────────────────────
 
   async prime(agentId: string): Promise<PrimeContext> {
-    await this.ensureInitialized();
     return agents.prime(this.sql, agentId);
   }
 
   async writeCheckpoint(agentId: string, data: unknown): Promise<void> {
-    await this.ensureInitialized();
     agents.writeCheckpoint(this.sql, agentId, data);
   }
 
   async readCheckpoint(agentId: string): Promise<unknown> {
-    await this.ensureInitialized();
     return agents.readCheckpoint(this.sql, agentId);
   }
 
   // ── Heartbeat ─────────────────────────────────────────────────────
 
-  async touchAgentHeartbeat(agentId: string): Promise<void> {
-    await this.ensureInitialized();
-    agents.touchAgent(this.sql, agentId);
+  async touchAgentHeartbeat(
+    agentId: string,
+    watermark?: {
+      lastEventType?: string | null;
+      lastEventAt?: string | null;
+      activeTools?: string[];
+    }
+  ): Promise<void> {
+    agents.touchAgent(this.sql, agentId, watermark);
     await this.armAlarmIfNeeded();
   }
 
   async updateAgentStatusMessage(agentId: string, message: string): Promise<void> {
-    await this.ensureInitialized();
     agents.updateAgentStatusMessage(this.sql, agentId, message);
     const agent = agents.getAgent(this.sql, agentId);
     if (agent?.current_hook_bead_id) {
@@ -1112,12 +1108,10 @@ export class TownDO extends DurableObject<Env> {
   // ══════════════════════════════════════════════════════════════════
 
   async sendMail(input: SendMailInput): Promise<void> {
-    await this.ensureInitialized();
     mail.sendMail(this.sql, input);
   }
 
   async checkMail(agentId: string): Promise<Mail[]> {
-    await this.ensureInitialized();
     return mail.checkMail(this.sql, agentId);
   }
 
@@ -1140,8 +1134,6 @@ export class TownDO extends DurableObject<Env> {
       ttlSeconds?: number;
     }
   ): Promise<string> {
-    await this.ensureInitialized();
-
     const nudgeId = crypto.randomUUID();
     const mode = options?.mode ?? 'wait-idle';
     const priority = options?.priority ?? 'normal';
@@ -1209,8 +1201,6 @@ export class TownDO extends DurableObject<Env> {
   ): Promise<
     { nudge_id: string; message: string; mode: string; priority: string; source: string }[]
   > {
-    await this.ensureInitialized();
-
     const rows = [
       ...query(
         this.sql,
@@ -1246,8 +1236,6 @@ export class TownDO extends DurableObject<Env> {
 
   /** Mark a nudge as delivered. */
   async markNudgeDelivered(nudgeId: string): Promise<void> {
-    await this.ensureInitialized();
-
     query(
       this.sql,
       /* sql */ `
@@ -1264,8 +1252,6 @@ export class TownDO extends DurableObject<Env> {
    * Called from the alarm loop. Returns the count of nudges expired.
    */
   async expireStaleNudges(): Promise<number> {
-    await this.ensureInitialized();
-
     const result = [
       ...query(
         this.sql,
@@ -1289,7 +1275,6 @@ export class TownDO extends DurableObject<Env> {
   // ══════════════════════════════════════════════════════════════════
 
   async submitToReviewQueue(input: ReviewQueueInput): Promise<void> {
-    await this.ensureInitialized();
     reviewQueue.submitToReviewQueue(this.sql, input);
     this.emitEvent({
       event: 'review.submitted',
@@ -1301,12 +1286,10 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async popReviewQueue(): Promise<ReviewQueueEntry | null> {
-    await this.ensureInitialized();
     return reviewQueue.popReviewQueue(this.sql);
   }
 
   async completeReview(entryId: string, status: 'merged' | 'failed'): Promise<void> {
-    await this.ensureInitialized();
     reviewQueue.completeReview(this.sql, entryId, status);
   }
 
@@ -1316,8 +1299,6 @@ export class TownDO extends DurableObject<Env> {
     message?: string;
     commit_sha?: string;
   }): Promise<void> {
-    await this.ensureInitialized();
-
     // Resolve the source bead ID before completing the review, so we can
     // trigger dispatchUnblockedBeads for it after the MR closes.
     const mrBead = beadOps.getBead(this.sql, input.entry_id);
@@ -1346,40 +1327,25 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    // When a review fails or conflicts (rework), the source bead was
-    // returned to in_progress. Re-hook a polecat and re-dispatch so the
-    // rework starts automatically. The original polecat may already be
-    // working on something else, so fall back to getOrCreateAgent.
-    if ((input.status === 'failed' || input.status === 'conflict') && sourceBeadId) {
-      const sourceBead = beadOps.getBead(this.sql, sourceBeadId);
-      if (sourceBead?.rig_id) {
-        try {
-          const reworkAgent = agents.getOrCreateAgent(
-            this.sql,
-            'polecat',
-            sourceBead.rig_id,
-            this.townId
-          );
-          agents.hookBead(this.sql, reworkAgent.id, sourceBeadId);
-          this.dispatchAgent(reworkAgent, sourceBead).catch(err =>
-            console.error(
-              `${TOWN_LOG} completeReviewWithResult: fire-and-forget rework dispatch failed for bead=${sourceBeadId}`,
-              err
-            )
-          );
-        } catch (err) {
-          console.warn(
-            `${TOWN_LOG} completeReviewWithResult: could not dispatch rework for bead=${sourceBeadId}:`,
-            err
-          );
-        }
-      }
-    }
+    // Rework is handled by the normal scheduling path: the failed/conflict
+    // path in completeReviewWithResult sets the source bead to 'open' with
+    // assignee cleared. feedStrandedConvoys or rehookOrphanedBeads will
+    // hook a polecat, and schedulePendingWork will dispatch it.
   }
 
   async agentDone(agentId: string, input: AgentDoneInput): Promise<void> {
-    await this.ensureInitialized();
-    reviewQueue.agentDone(this.sql, agentId, input);
+    // Event-only: record the fact. The alarm's Phase 0 drains and
+    // applies all pending events before reconciliation runs. DO RPCs
+    // are serialized, so agentCompleted can't race with this — it
+    // waits for agentDone to finish before executing.
+    events.insertEvent(this.sql, 'agent_done', {
+      agent_id: agentId,
+      payload: {
+        branch: input.branch,
+        ...(input.pr_url ? { pr_url: input.pr_url } : {}),
+        ...(input.summary ? { summary: input.summary } : {}),
+      },
+    });
     await this.armAlarmIfNeeded();
   }
 
@@ -1387,14 +1353,26 @@ export class TownDO extends DurableObject<Env> {
     agentId: string,
     input: { status: 'completed' | 'failed'; reason?: string }
   ): Promise<void> {
-    await this.ensureInitialized();
+    // Resolve empty agentId to mayor (backwards compat with container callback)
     let resolvedAgentId = agentId;
     if (!resolvedAgentId) {
       const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
       if (mayor) resolvedAgentId = mayor.id;
     }
+
+    // Event-only: record the fact. The alarm's Phase 0 drains and
+    // applies all pending events. DO RPCs are serialized so there's
+    // no race with agentDone.
+    events.insertEvent(this.sql, 'agent_completed', {
+      agent_id: resolvedAgentId || agentId,
+      payload: {
+        status: input.status,
+        ...(input.reason ? { reason: input.reason } : {}),
+      },
+    });
+
+    // Emit analytics event (not part of reconciler — UI/observability concern)
     if (resolvedAgentId) {
-      const result = reviewQueue.agentCompleted(this.sql, resolvedAgentId, input);
       const agent = agents.getAgent(this.sql, resolvedAgentId);
       this.emitEvent({
         event: 'agent.exited',
@@ -1402,36 +1380,79 @@ export class TownDO extends DurableObject<Env> {
         agentId: resolvedAgentId,
         role: agent?.role,
       });
-
-      // If the refinery exited without merging (rework), dispatch a
-      // polecat to re-work the source bead. This mirrors the rework
-      // dispatch in completeReviewWithResult.
-      if (result.reworkSourceBeadId) {
-        const sourceBead = beadOps.getBead(this.sql, result.reworkSourceBeadId);
-        if (sourceBead?.rig_id) {
-          try {
-            const reworkAgent = agents.getOrCreateAgent(
-              this.sql,
-              'polecat',
-              sourceBead.rig_id,
-              this.townId
-            );
-            agents.hookBead(this.sql, reworkAgent.id, result.reworkSourceBeadId);
-            this.dispatchAgent(reworkAgent, sourceBead).catch(err =>
-              console.error(
-                `${TOWN_LOG} agentCompleted: rework dispatch failed for bead=${result.reworkSourceBeadId}`,
-                err
-              )
-            );
-          } catch (err) {
-            console.warn(
-              `${TOWN_LOG} agentCompleted: could not dispatch rework for bead=${result.reworkSourceBeadId}:`,
-              err
-            );
-          }
-        }
-      }
     }
+    await this.armAlarmIfNeeded();
+    // Rework dispatch is handled by the reconciler's reconcileBeads Rule 1:
+    // open beads with no assignee get agents on the next alarm tick.
+  }
+
+  /**
+   * Refinery requests changes on an in-progress MR bead. Creates a rework
+   * bead that blocks the MR bead. The refinery should call gt_done after
+   * this to release its session. The reconciler assigns a polecat to the
+   * rework bead; when it closes, the MR unblocks and the refinery re-reviews.
+   */
+  async requestChanges(
+    agentId: string,
+    input: { feedback: string; files?: string[] }
+  ): Promise<{ rework_bead_id: string }> {
+    const agent = agents.getAgent(this.sql, agentId);
+    if (!agent) throw new Error(`Agent ${agentId} not found`);
+    if (agent.role !== 'refinery') throw new Error(`Only refineries can request changes`);
+    if (!agent.current_hook_bead_id) throw new Error(`Agent ${agentId} is not hooked to a bead`);
+
+    const mrBead = beadOps.getBead(this.sql, agent.current_hook_bead_id);
+    if (!mrBead || mrBead.type !== 'merge_request') {
+      throw new Error(`Agent ${agentId} is not hooked to a merge_request bead`);
+    }
+
+    // Find the source bead (the original issue the polecat worked on)
+    const sourceBeadId =
+      typeof mrBead.metadata?.source_bead_id === 'string' ? mrBead.metadata.source_bead_id : null;
+    const sourceBead = sourceBeadId ? beadOps.getBead(this.sql, sourceBeadId) : null;
+
+    // Get branch info from review_metadata
+    const reviewMeta = reviewQueue.getReviewMetadata(this.sql, mrBead.bead_id);
+
+    const reworkBead = beadOps.createBead(this.sql, {
+      type: 'issue',
+      title: `Rework: ${sourceBead?.title ?? mrBead.title}`,
+      body: input.feedback,
+      priority: sourceBead?.priority ?? 'medium',
+      rig_id: mrBead.rig_id ?? undefined,
+      labels: ['gt:rework'],
+      metadata: {
+        rework_for: sourceBeadId,
+        mr_bead_id: mrBead.bead_id,
+        branch: reviewMeta?.branch ?? null,
+        target_branch: reviewMeta?.target_branch ?? null,
+        files: input.files ?? [],
+      },
+    });
+
+    // Rework bead blocks the MR bead — MR can't proceed until rework is done
+    beadOps.insertDependency(this.sql, mrBead.bead_id, reworkBead.bead_id, 'blocks');
+
+    // Record event so the reconciler picks up the rework bead
+    events.insertEvent(this.sql, 'bead_created', {
+      bead_id: reworkBead.bead_id,
+      payload: { bead_type: 'issue', rig_id: mrBead.rig_id },
+    });
+
+    beadOps.logBeadEvent(this.sql, {
+      beadId: mrBead.bead_id,
+      agentId,
+      eventType: 'rework_requested',
+      newValue: reworkBead.bead_id,
+      metadata: { feedback: input.feedback.slice(0, 500), files: input.files },
+    });
+
+    console.log(
+      `${TOWN_LOG} requestChanges: refinery=${agentId} mr=${mrBead.bead_id} rework=${reworkBead.bead_id}`
+    );
+
+    await this.armAlarmIfNeeded();
+    return { rework_bead_id: reworkBead.bead_id };
   }
 
   /**
@@ -1445,7 +1466,6 @@ export class TownDO extends DurableObject<Env> {
     action: string;
     resolution_notes: string;
   }): Promise<Bead> {
-    await this.ensureInitialized();
     const triageBead = beadOps.getBead(this.sql, input.triage_request_bead_id);
     if (!triageBead)
       throw new Error(`Triage request bead ${input.triage_request_bead_id} not found`);
@@ -1671,19 +1691,16 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async createMolecule(beadId: string, formula: unknown): Promise<Molecule> {
-    await this.ensureInitialized();
     return reviewQueue.createMolecule(this.sql, beadId, formula);
   }
 
   async getMoleculeCurrentStep(
     agentId: string
   ): Promise<{ molecule: Molecule; step: unknown } | null> {
-    await this.ensureInitialized();
     return reviewQueue.getMoleculeCurrentStep(this.sql, agentId);
   }
 
   async advanceMoleculeStep(agentId: string, summary: string): Promise<Molecule | null> {
-    await this.ensureInitialized();
     return reviewQueue.advanceMoleculeStep(this.sql, agentId, summary);
   }
 
@@ -1697,21 +1714,7 @@ export class TownDO extends DurableObject<Env> {
     body?: string;
     priority?: string;
     metadata?: Record<string, unknown>;
-    dependsOn?: string[];
-    convoyId?: string;
   }): Promise<{ bead: Bead; agent: Agent }> {
-    await this.ensureInitialized();
-
-    // Validate the convoy exists before creating the bead so a bad
-    // convoy_id doesn't leave behind an orphan bead row.
-    if (input.convoyId) {
-      const convoyBead = beadOps.getBead(this.sql, input.convoyId);
-      if (!convoyBead) throw new Error(`Convoy ${input.convoyId} not found`);
-      if (convoyBead.type !== 'convoy') {
-        throw new Error(`Bead ${input.convoyId} is not a convoy (type: ${convoyBead.type})`);
-      }
-    }
-
     const createdBead = beadOps.createBead(this.sql, {
       type: 'issue',
       title: input.title,
@@ -1721,21 +1724,14 @@ export class TownDO extends DurableObject<Env> {
       metadata: input.metadata,
     });
 
-    // If a convoy_id was provided, add the bead to the convoy (tracks dep + metadata + counter).
-    // The convoy was already validated above, so addBeadToConvoy won't throw for a missing convoy.
-    if (input.convoyId) {
-      beadOps.addBeadToConvoy(this.sql, createdBead.bead_id, input.convoyId);
-    }
+    events.insertEvent(this.sql, 'bead_created', {
+      bead_id: createdBead.bead_id,
+      payload: { bead_type: 'issue', rig_id: input.rigId, has_blockers: false },
+    });
 
-    // Insert dependency rows before hooking/dispatching so the bead's
-    // blocker set is complete before any agent can start work on it.
-    // This is atomic within the DO's synchronous SQLite transaction.
-    if (input.dependsOn && input.dependsOn.length > 0) {
-      for (const depBeadId of input.dependsOn) {
-        beadOps.addBeadDependency(this.sql, createdBead.bead_id, depBeadId, 'blocks');
-      }
-    }
-
+    // Fast path: assign agent immediately for UX ("Toast is on it!")
+    // rather than waiting for the next alarm tick. Uses the same
+    // getOrCreateAgent + hookBead path the reconciler would use.
     const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
     agents.hookBead(this.sql, agent.id, createdBead.bead_id);
 
@@ -1743,18 +1739,11 @@ export class TownDO extends DurableObject<Env> {
     const bead = beadOps.getBead(this.sql, createdBead.bead_id) ?? createdBead;
     const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
 
-    // Only dispatch if the bead has no unresolved blockers. Mirror the
-    // slingConvoy() guard so a bead with depends_on is not started before
-    // its blockers close.
-    if (!beadOps.hasUnresolvedBlockers(this.sql, bead.bead_id)) {
-      this.dispatchAgent(hookedAgent, bead).catch(err =>
-        console.error(`${TOWN_LOG} slingBead: fire-and-forget dispatchAgent failed:`, err)
-      );
-    } else {
-      console.log(
-        `${TOWN_LOG} slingBead: bead=${bead.bead_id} blocked, deferring dispatch until deps close`
-      );
-    }
+    // Fire-and-forget dispatch so the sling call returns immediately.
+    // The alarm loop retries if this fails.
+    this.dispatchAgent(hookedAgent, bead).catch(err =>
+      console.error(`${TOWN_LOG} slingBead: fire-and-forget dispatchAgent failed:`, err)
+    );
     await this.armAlarmIfNeeded();
     return { bead, agent: hookedAgent };
   }
@@ -1786,7 +1775,6 @@ export class TownDO extends DurableObject<Env> {
     _model?: string,
     uiContext?: string
   ): Promise<{ agentId: string; sessionStatus: 'idle' | 'active' | 'starting' }> {
-    await this.ensureInitialized();
     const townId = this.townId;
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
@@ -1871,7 +1859,6 @@ export class TownDO extends DurableObject<Env> {
    * without requiring the user to send a message first.
    */
   async ensureMayor(): Promise<{ agentId: string; sessionStatus: 'idle' | 'active' | 'starting' }> {
-    await this.ensureInitialized();
     const townId = this.townId;
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
@@ -1955,7 +1942,6 @@ export class TownDO extends DurableObject<Env> {
       lastActivityAt: string;
     } | null;
   }> {
-    await this.ensureInitialized();
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
 
     const mapStatus = (agentStatus: string): 'idle' | 'active' | 'starting' => {
@@ -2014,7 +2000,6 @@ export class TownDO extends DurableObject<Env> {
     beads: Array<{ bead_id: string; rig_id: string }>;
     created_by?: string;
   }): Promise<ConvoyEntry> {
-    await this.ensureInitialized();
     const parsed = z
       .object({
         title: z.string().min(1),
@@ -2096,8 +2081,6 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async onBeadClosed(input: { convoyId: string; beadId: string }): Promise<ConvoyEntry | null> {
-    await this.ensureInitialized();
-
     // Count closed tracked beads
     const closedRows = [
       ...query(
@@ -2163,8 +2146,6 @@ export class TownDO extends DurableObject<Env> {
    * still assigned to those beads so they return to the idle pool.
    */
   async closeConvoy(convoyId: string): Promise<ConvoyEntry | null> {
-    await this.ensureInitialized();
-
     const convoy = this.getConvoy(convoyId);
     if (!convoy) return null;
 
@@ -2252,8 +2233,6 @@ export class TownDO extends DurableObject<Env> {
     merge_mode?: 'review-then-land' | 'review-and-merge';
     staged?: boolean;
   }): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent | null }> }> {
-    await this.ensureInitialized();
-
     // Resolve staged: explicit request wins, otherwise fall back to town config default.
     const townConfig = await this.getTownConfig();
     const isStaged = input.staged ?? townConfig.staged_convoys_default;
@@ -2411,38 +2390,31 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    if (isStaged) {
-      // Staged mode: collect beads without hooking agents or dispatching.
-      for (const beadId of beadIds) {
-        const bead = beadOps.getBead(this.sql, beadId);
-        if (!bead) continue;
-        results.push({ bead, agent: null });
-      }
-    } else {
-      // 4. For each bead: assign a polecat, but only dispatch if unblocked
-      for (let i = 0; i < beadIds.length; i++) {
-        const beadId = beadIds[i];
-        const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
-        agents.hookBead(this.sql, agent.id, beadId);
+    // Record bead_created events for reconciler (dual-write, no behavior change)
+    for (let i = 0; i < beadIds.length; i++) {
+      const hasBlockers = (input.tasks[i].depends_on ?? []).length > 0;
+      events.insertEvent(this.sql, 'bead_created', {
+        bead_id: beadIds[i],
+        payload: {
+          bead_type: 'issue',
+          rig_id: input.rigId,
+          convoy_id: convoyId,
+          has_blockers: hasBlockers,
+        },
+      });
+    }
 
-        const bead = beadOps.getBead(this.sql, beadId);
-        const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
-        if (!bead) continue;
+    // Lazy assignment: beads are created with no assignee. The reconciler's
+    // reconcileBeads Rule 1 assigns agents to unblocked beads on the next
+    // alarm tick. This avoids creating N polecats upfront for a convoy
+    // where only 1-3 beads are unblocked initially (#1249).
+    for (const beadId of beadIds) {
+      const bead = beadOps.getBead(this.sql, beadId);
+      if (!bead) continue;
+      results.push({ bead, agent: null });
+    }
 
-        // Only dispatch beads with no unresolved blockers
-        if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
-          this.dispatchAgent(hookedAgent, bead).catch(err =>
-            console.error(`${TOWN_LOG} slingConvoy: fire-and-forget dispatchAgent failed:`, err)
-          );
-        } else {
-          console.log(
-            `${TOWN_LOG} slingConvoy: bead=${beadId} blocked, deferring dispatch until deps close`
-          );
-        }
-
-        results.push({ bead, agent: hookedAgent });
-      }
-
+    if (!isStaged) {
       await this.armAlarmIfNeeded();
     }
 
@@ -2461,9 +2433,7 @@ export class TownDO extends DurableObject<Env> {
    */
   async startConvoy(
     convoyId: string
-  ): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent }> }> {
-    await this.ensureInitialized();
-
+  ): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent | null }> }> {
     const convoy = this.getConvoy(convoyId);
     if (!convoy) throw new Error(`Convoy not found: ${convoyId}`);
     if (!convoy.staged) throw new Error(`Convoy is not staged: ${convoyId}`);
@@ -2487,51 +2457,17 @@ export class TownDO extends DurableObject<Env> {
       .parse(trackedRows)
       .map(r => r.bead_id);
 
-    const results: Array<{ bead: Bead; agent: Agent }> = [];
+    const results: Array<{ bead: Bead; agent: Agent | null }> = [];
 
+    // Lazy assignment: just collect beads. The reconciler's reconcileBeads
+    // Rule 1 assigns agents to unblocked beads on the next alarm tick.
     for (const beadId of trackedBeadIds) {
       const bead = beadOps.getBead(this.sql, beadId);
       if (!bead) continue;
-
-      const rigId = bead.rig_id;
-      if (!rigId) continue;
-
-      // Skip beads already hooked from a prior partial attempt (retry-safe).
-      let hookedAgent: Agent;
-      if (bead.assignee_agent_bead_id) {
-        const existing = agents.getAgent(this.sql, bead.assignee_agent_bead_id);
-        if (existing) {
-          hookedAgent = existing;
-        } else {
-          // Orphaned assignee reference — re-hook with a fresh agent
-          const agent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
-          agents.hookBead(this.sql, agent.id, beadId);
-          hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
-        }
-      } else {
-        const agent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
-        agents.hookBead(this.sql, agent.id, beadId);
-        hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
-      }
-
-      // Re-read bead after potential hookBead so assignee_agent_bead_id is up to date
-      const updatedBead = beadOps.getBead(this.sql, beadId) ?? bead;
-
-      if (!beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
-        this.dispatchAgent(hookedAgent, updatedBead).catch(err =>
-          console.error(`${TOWN_LOG} startConvoy: fire-and-forget dispatchAgent failed:`, err)
-        );
-      } else {
-        console.log(
-          `${TOWN_LOG} startConvoy: bead=${beadId} blocked, deferring dispatch until deps close`
-        );
-      }
-
-      results.push({ bead: updatedBead, agent: hookedAgent });
+      results.push({ bead, agent: null });
     }
 
-    // Clear the staged flag only after all agents are successfully hooked.
-    // If the loop above throws, the convoy stays staged so the caller can retry.
+    // Clear the staged flag so the reconciler sees these beads as active.
     query(
       this.sql,
       /* sql */ `
@@ -2541,6 +2477,10 @@ export class TownDO extends DurableObject<Env> {
       `,
       [convoyId]
     );
+
+    events.insertEvent(this.sql, 'convoy_started', {
+      payload: { convoy_id: convoyId },
+    });
 
     await this.armAlarmIfNeeded();
 
@@ -2558,7 +2498,6 @@ export class TownDO extends DurableObject<Env> {
    * List active convoys with progress counts.
    */
   async listConvoys(): Promise<ConvoyEntry[]> {
-    await this.ensureInitialized();
     const rows = [
       ...query(
         this.sql,
@@ -2592,7 +2531,6 @@ export class TownDO extends DurableObject<Env> {
       }
     >
   > {
-    await this.ensureInitialized();
     const convoys = await this.listConvoys();
     const detailed = [];
     for (const convoy of convoys) {
@@ -2621,7 +2559,6 @@ export class TownDO extends DurableObject<Env> {
       })
     | null
   > {
-    await this.ensureInitialized();
     const convoy = this.getConvoy(convoyId);
     if (!convoy) return null;
 
@@ -2679,7 +2616,6 @@ export class TownDO extends DurableObject<Env> {
   // ══════════════════════════════════════════════════════════════════
 
   async acknowledgeEscalation(escalationId: string): Promise<EscalationEntry | null> {
-    await this.ensureInitialized();
     query(
       this.sql,
       /* sql */ `
@@ -2706,7 +2642,6 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async listEscalations(filter?: { acknowledged?: boolean }): Promise<EscalationEntry[]> {
-    await this.ensureInitialized();
     const rows =
       filter?.acknowledged !== undefined
         ? [
@@ -2734,7 +2669,6 @@ export class TownDO extends DurableObject<Env> {
     category?: string;
     message: string;
   }): Promise<EscalationEntry> {
-    await this.ensureInitialized();
     const beadId = generateId();
     const timestamp = now();
 
@@ -2887,7 +2821,6 @@ export class TownDO extends DurableObject<Env> {
       return;
     }
 
-    await this.ensureInitialized();
     const townId = this.townId;
     console.log(`${TOWN_LOG} alarm: fired for town=${townId}`);
 
@@ -2912,59 +2845,172 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    // Process reviews FIRST so the refinery gets assigned before the
-    // scheduler dispatches new polecats. This prevents downstream beads
-    // from starting before upstream reviews are merged.
+    // ── Pre-phase: Observe container status for working agents ────────
+    // Replaces witnessPatrol's zombie detection. Poll the container for
+    // each working/stalled agent and emit container_status events. These
+    // are drained in Phase 0 and applied before reconciliation.
     try {
-      await this.processReviewQueue();
+      const workingAgentRows = z
+        .object({ bead_id: z.string() })
+        .array()
+        .parse([
+          ...query(
+            this.sql,
+            /* sql */ `
+            SELECT ${agent_metadata.bead_id}
+            FROM ${agent_metadata}
+            WHERE ${agent_metadata.status} IN ('working', 'stalled')
+          `,
+            []
+          ),
+        ]);
+
+      if (workingAgentRows.length > 0) {
+        const statusChecks = workingAgentRows.map(async row => {
+          try {
+            const containerInfo = await dispatch.checkAgentContainerStatus(
+              this.env,
+              townId,
+              row.bead_id
+            );
+            events.upsertContainerStatus(this.sql, row.bead_id, {
+              status: containerInfo.status,
+              exit_reason: containerInfo.exitReason,
+            });
+          } catch (err) {
+            console.warn(
+              `${TOWN_LOG} alarm: container status check failed for agent=${row.bead_id}`,
+              err
+            );
+          }
+        });
+        await Promise.allSettled(statusChecks);
+      }
     } catch (err) {
-      console.error(`${TOWN_LOG} alarm: processReviewQueue failed`, err);
+      console.error(`${TOWN_LOG} alarm: container observation failed`, err);
+    }
+
+    // ── Reconciler loop (Phase 0-2) with metrics ─────────────────────
+    const reconcilerStart = Date.now();
+    const metrics: reconciler.ReconcilerMetrics = {
+      eventsDrained: 0,
+      actionsEmitted: 0,
+      actionsByType: {},
+      sideEffectsAttempted: 0,
+      sideEffectsSucceeded: 0,
+      sideEffectsFailed: 0,
+      invariantViolations: 0,
+      wallClockMs: 0,
+      pendingEventCount: 0,
+    };
+
+    // Phase 0: Drain events and apply state transitions
+    try {
+      const pending = events.drainEvents(this.sql);
+      metrics.eventsDrained = pending.length;
+      if (pending.length > 0) {
+        console.log(`${TOWN_LOG} [reconciler] town=${townId} draining ${pending.length} event(s)`);
+      }
+      for (const event of pending) {
+        try {
+          reconciler.applyEvent(this.sql, event);
+          events.markProcessed(this.sql, event.event_id);
+        } catch (err) {
+          console.error(
+            `${TOWN_LOG} [reconciler] town=${townId} applyEvent failed: event=${event.event_id} type=${event.event_type}`,
+            err
+          );
+          // Event stays unprocessed — will be retried on the next alarm tick.
+          // Mark it processed anyway after 3 consecutive failures to prevent
+          // a poison event from blocking the entire queue forever.
+          // For now, we skip it and let the next tick retry.
+        }
+      }
+    } catch (err) {
+      console.error(`${TOWN_LOG} [reconciler] town=${townId} event drain failed`, err);
       Sentry.captureException(err);
     }
+
+    // Phase 1: Reconcile — compute desired state vs actual state
+    const sideEffects: Array<() => Promise<void>> = [];
     try {
-      await this.processConvoyLandings();
+      const actions = reconciler.reconcile(this.sql);
+      metrics.actionsEmitted = actions.length;
+      for (const a of actions) {
+        metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;
+      }
+      if (actions.length > 0) {
+        console.log(
+          `${TOWN_LOG} [reconciler] town=${townId} actions=${actions.length} types=${[...new Set(actions.map(a => a.type))].join(',')}`
+        );
+      }
+      const ctx = this.applyActionCtx;
+      for (const action of actions) {
+        try {
+          const effect = applyAction(ctx, action);
+          if (effect) sideEffects.push(effect);
+        } catch (err) {
+          console.error(
+            `${TOWN_LOG} [reconciler] town=${townId} applyAction failed: type=${action.type}`,
+            err
+          );
+        }
+      }
     } catch (err) {
-      console.error(`${TOWN_LOG} alarm: processConvoyLandings failed`, err);
+      console.error(`${TOWN_LOG} [reconciler] town=${townId} reconcile failed`, err);
       Sentry.captureException(err);
     }
-    try {
-      await this.schedulePendingWork();
-    } catch (err) {
-      console.error(`${TOWN_LOG} alarm: schedulePendingWork failed`, err);
-      Sentry.captureException(err);
+
+    // Phase 2: Execute side effects (async, best-effort)
+    metrics.sideEffectsAttempted = sideEffects.length;
+    if (sideEffects.length > 0) {
+      const results = await Promise.allSettled(sideEffects.map(fn => fn()));
+      for (const r of results) {
+        if (r.status === 'fulfilled') metrics.sideEffectsSucceeded++;
+        else metrics.sideEffectsFailed++;
+      }
     }
+
+    // Post-reconcile: Invariant checker
     try {
-      await this.witnessPatrol();
+      const violations = reconciler.checkInvariants(this.sql);
+      metrics.invariantViolations = violations.length;
+      if (violations.length > 0) {
+        console.error(
+          `${TOWN_LOG} [reconciler:invariants] town=${townId} ${violations.length} violation(s): ${JSON.stringify(violations)}`
+        );
+      }
     } catch (err) {
-      console.error(`${TOWN_LOG} alarm: witnessPatrol failed`, err);
-      Sentry.captureException(err);
+      console.warn(`${TOWN_LOG} [reconciler:invariants] town=${townId} check failed`, err);
     }
-    try {
-      this.deaconPatrol();
-    } catch (err) {
-      console.error(`${TOWN_LOG} alarm: deaconPatrol failed`, err);
-      Sentry.captureException(err);
-    }
-    try {
-      await this.deliverPendingMail();
-    } catch (err) {
-      console.warn(`${TOWN_LOG} alarm: deliverPendingMail failed`, err);
-    }
-    try {
-      await this.expireStaleNudges();
-    } catch (err) {
-      console.warn(`${TOWN_LOG} alarm: expireStaleNudges failed`, err);
-    }
-    try {
-      await this.reEscalateStaleEscalations();
-    } catch (err) {
-      console.warn(`${TOWN_LOG} alarm: reEscalation failed`, err);
-    }
-    try {
-      await this.maybeDispatchTriageAgent();
-    } catch (err) {
-      console.warn(`${TOWN_LOG} alarm: maybeDispatchTriageAgent failed`, err);
-    }
+
+    metrics.wallClockMs = Date.now() - reconcilerStart;
+    metrics.pendingEventCount = events.pendingEventCount(this.sql);
+    this._lastReconcilerMetrics = metrics;
+
+    // ── Phase 3: Housekeeping (independent, all parallelizable) ────
+    await Promise.allSettled([
+      this.deliverPendingMail().catch(err =>
+        console.warn(`${TOWN_LOG} alarm: deliverPendingMail failed`, err)
+      ),
+      this.expireStaleNudges().catch(err =>
+        console.warn(`${TOWN_LOG} alarm: expireStaleNudges failed`, err)
+      ),
+      this.reEscalateStaleEscalations().catch(err =>
+        console.warn(`${TOWN_LOG} alarm: reEscalation failed`, err)
+      ),
+      this.maybeDispatchTriageAgent().catch(err =>
+        console.warn(`${TOWN_LOG} alarm: maybeDispatchTriageAgent failed`, err)
+      ),
+      // Prune processed reconciler events older than 7 days
+      Promise.resolve().then(() => {
+        try {
+          events.pruneOldEvents(this.sql, 7 * 24 * 60 * 60 * 1000);
+        } catch (err) {
+          console.warn(`${TOWN_LOG} alarm: event pruning failed`, err);
+        }
+      }),
+    ]);
     // Re-arm: fast when active, slow when idle
     const active = this.hasActiveWork();
     const interval = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
@@ -3002,431 +3048,21 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private hasActiveWork(): boolean {
-    const activeAgentRows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.status} IN ('working', 'stalled')`,
-        []
-      ),
-    ];
-    const pendingBeadRows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.status} = 'idle' AND ${agent_metadata.current_hook_bead_id} IS NOT NULL`,
-        []
-      ),
-    ];
-    const pendingReviewRows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.type} = 'merge_request' AND ${beads.status} IN ('open', 'in_progress')`,
-        []
-      ),
-    ];
-    const pendingTriageRows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.type} = 'issue' AND ${beads.labels} LIKE ? AND ${beads.status} = 'open'`,
-        [patrol.TRIAGE_LABEL_LIKE]
-      ),
-    ];
-    return (
-      Number(activeAgentRows[0]?.cnt ?? 0) > 0 ||
-      Number(pendingBeadRows[0]?.cnt ?? 0) > 0 ||
-      Number(pendingReviewRows[0]?.cnt ?? 0) > 0 ||
-      Number(pendingTriageRows[0]?.cnt ?? 0) > 0
-    );
+    return scheduling.hasActiveWork(this.sql);
   }
 
-  /**
-   * Dispatch a single agent to the container. Used for eager dispatch from
-   * slingBead (so agents start immediately) and from schedulePendingWork
-   * (periodic recovery). Returns true if the agent was started.
-   */
-  private async dispatchAgent(agent: Agent, bead: Bead): Promise<boolean> {
-    try {
-      const rigId = agent.rig_id ?? rigs.listRigs(this.sql)[0]?.id ?? '';
-      const rigConfig = rigId ? await this.getRigConfig(rigId) : null;
-      if (!rigConfig) {
-        console.warn(`${TOWN_LOG} dispatchAgent: no rig config for agent=${agent.id} rig=${rigId}`);
-        return false;
-      }
-
-      const townConfig = await this.getTownConfig();
-      const kilocodeToken = await this.resolveKilocodeToken();
-
-      // Check if this bead belongs to a convoy and resolve its feature branch.
-      // Convoy beads branch from the feature branch, not from defaultBranch.
-      const convoyId = beadOps.getConvoyForBead(this.sql, bead.bead_id);
-      const convoyFeatureBranch = convoyId
-        ? beadOps.getConvoyFeatureBranch(this.sql, convoyId)
-        : null;
-
-      // Transition the bead to in_progress BEFORE starting the container.
-      // This must happen synchronously within the DO's I/O gate — the
-      // fire-and-forget pattern used by slingBead/slingConvoy means the
-      // calling RPC may return before startAgentInContainer completes,
-      // closing the I/O gate and preventing further SQL writes.
-      const currentBead = beadOps.getBead(this.sql, bead.bead_id);
-      if (
-        currentBead &&
-        currentBead.status !== 'in_progress' &&
-        currentBead.status !== 'closed' &&
-        currentBead.status !== 'failed'
-      ) {
-        beadOps.updateBeadStatus(this.sql, bead.bead_id, 'in_progress', agent.id);
-      }
-
-      // Set status to 'working' BEFORE the async container start. This
-      // must happen synchronously so the SQL write executes while the I/O
-      // gate is still open. When dispatchAgent is called fire-and-forget
-      // (from slingBead, slingConvoy, dispatchUnblockedBeads), any SQL
-      // writes after the first `await` may be silently dropped because
-      // the DO's RPC response closes the I/O gate. If the container fails
-      // to start, we roll back to 'idle'.
-      const timestamp = now();
-      query(
-        this.sql,
-        /* sql */ `
-          UPDATE ${agent_metadata}
-          SET ${agent_metadata.columns.status} = 'working',
-              ${agent_metadata.columns.dispatch_attempts} = ${agent_metadata.columns.dispatch_attempts} + 1,
-              ${agent_metadata.columns.last_activity_at} = ?
-          WHERE ${agent_metadata.bead_id} = ?
-        `,
-        [timestamp, agent.id]
-      );
-
-      const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-        townId: this.townId,
-        rigId,
-        userId: rigConfig.userId,
-        agentId: agent.id,
-        agentName: agent.name,
-        role: agent.role,
-        identity: agent.identity,
-        beadId: bead.bead_id,
-        beadTitle: bead.title,
-        beadBody: bead.body ?? '',
-        checkpoint: agent.checkpoint,
-        gitUrl: rigConfig.gitUrl,
-        defaultBranch: rigConfig.defaultBranch,
-        kilocodeToken,
-        townConfig,
-        platformIntegrationId: rigConfig.platformIntegrationId,
-        convoyFeatureBranch: convoyFeatureBranch ?? undefined,
-      });
-
-      if (started) {
-        // Reset dispatch_attempts on success (best-effort — may be
-        // dropped if the I/O gate is already closed, but that's fine
-        // because the agent is already 'working').
-        query(
-          this.sql,
-          /* sql */ `
-            UPDATE ${agent_metadata}
-            SET ${agent_metadata.columns.dispatch_attempts} = 0
-            WHERE ${agent_metadata.bead_id} = ?
-          `,
-          [agent.id]
-        );
-        console.log(`${TOWN_LOG} dispatchAgent: started agent=${agent.name}(${agent.id})`);
-        this.emitEvent({
-          event: 'agent.spawned',
-          townId: this.townId,
-          rigId,
-          agentId: agent.id,
-          beadId: bead.bead_id,
-          role: agent.role,
-        });
-      } else {
-        // Container failed to start — roll back to idle
-        query(
-          this.sql,
-          /* sql */ `
-            UPDATE ${agent_metadata}
-            SET ${agent_metadata.columns.status} = 'idle'
-            WHERE ${agent_metadata.bead_id} = ?
-          `,
-          [agent.id]
-        );
-        this.emitEvent({
-          event: 'agent.dispatch_failed',
-          townId: this.townId,
-          rigId,
-          agentId: agent.id,
-          beadId: bead.bead_id,
-          role: agent.role,
-        });
-      }
-      return started;
-    } catch (err) {
-      console.error(`${TOWN_LOG} dispatchAgent: failed for agent=${agent.id}:`, err);
-      Sentry.captureException(err, { extra: { agentId: agent.id, beadId: bead.bead_id } });
-      // Roll back agent and bead to prevent them from being stuck in
-      // working/in_progress state when the container call throws.
-      try {
-        query(
-          this.sql,
-          /* sql */ `
-            UPDATE ${agent_metadata}
-            SET ${agent_metadata.columns.status} = 'idle'
-            WHERE ${agent_metadata.bead_id} = ?
-          `,
-          [agent.id]
-        );
-        if (agent.current_hook_bead_id) {
-          beadOps.updateBeadStatus(this.sql, agent.current_hook_bead_id, 'open', agent.id);
-        }
-      } catch (rollbackErr) {
-        console.error(`${TOWN_LOG} dispatchAgent: rollback also failed:`, rollbackErr);
-      }
-      this.emitEvent({
-        event: 'agent.dispatch_failed',
-        townId: this.townId,
-        agentId: agent.id,
-        beadId: bead.bead_id,
-        role: agent.role,
-      });
-      return false;
-    }
+  /** Dispatch a single agent to the container. Delegates to scheduling module. */
+  private dispatchAgent(
+    agent: Agent,
+    bead: Bead,
+    options?: { systemPromptOverride?: string }
+  ): Promise<boolean> {
+    return scheduling.dispatchAgent(this.schedulingCtx, agent, bead, options);
   }
 
-  /**
-   * When a bead closes, find beads that were blocked by it and are now
-   * fully unblocked (all 'blocks' dependencies resolved). Dispatch their
-   * assigned agents.
-   */
+  /** When a bead closes, dispatch any beads it was blocking. */
   private dispatchUnblockedBeads(closedBeadId: string): void {
-    const unblockedIds = beadOps.getNewlyUnblockedBeads(this.sql, closedBeadId);
-    if (unblockedIds.length === 0) return;
-
-    console.log(
-      `${TOWN_LOG} dispatchUnblockedBeads: ${unblockedIds.length} beads unblocked by ${closedBeadId}`
-    );
-
-    for (const beadId of unblockedIds) {
-      const bead = beadOps.getBead(this.sql, beadId);
-      if (!bead || bead.status === 'closed' || bead.status === 'failed') continue;
-
-      // Find the agent hooked to this bead
-      if (!bead.assignee_agent_bead_id) continue;
-      const agent = agents.getAgent(this.sql, bead.assignee_agent_bead_id);
-      if (!agent || agent.status !== 'idle') continue;
-
-      this.dispatchAgent(agent, bead).catch(err =>
-        console.error(
-          `${TOWN_LOG} dispatchUnblockedBeads: fire-and-forget dispatch failed for bead=${beadId}`,
-          err
-        )
-      );
-    }
-  }
-
-  /**
-   * Find idle agents with hooked beads and dispatch them to the container.
-   * Agents whose last_activity_at is within the dispatch cooldown are
-   * skipped — they have a fire-and-forget dispatch already in flight.
-   */
-  private async schedulePendingWork(): Promise<void> {
-    const cooldownCutoff = new Date(Date.now() - DISPATCH_COOLDOWN_MS).toISOString();
-    const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `
-          SELECT ${beads}.*,
-                 ${agent_metadata.role}, ${agent_metadata.identity},
-                 ${agent_metadata.container_process_id},
-                 ${agent_metadata.status} AS status,
-                 ${agent_metadata.current_hook_bead_id},
-                 ${agent_metadata.dispatch_attempts}, ${agent_metadata.last_activity_at},
-                 ${agent_metadata.checkpoint},
-                 ${agent_metadata.agent_status_message}, ${agent_metadata.agent_status_updated_at}
-          FROM ${beads}
-          INNER JOIN ${agent_metadata} ON ${beads.bead_id} = ${agent_metadata.bead_id}
-          WHERE ${agent_metadata.status} = 'idle'
-            AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
-            AND (${agent_metadata.last_activity_at} IS NULL OR ${agent_metadata.last_activity_at} < ?)
-        `,
-        [cooldownCutoff]
-      ),
-    ];
-    const pendingAgents: Agent[] = AgentBeadRecord.array()
-      .parse(rows)
-      .map(row => ({
-        id: row.bead_id,
-        rig_id: row.rig_id,
-        role: row.role,
-        name: row.title,
-        identity: row.identity,
-        status: row.status,
-        current_hook_bead_id: row.current_hook_bead_id,
-        dispatch_attempts: row.dispatch_attempts,
-        last_activity_at: row.last_activity_at,
-        checkpoint: row.checkpoint,
-        created_at: row.created_at,
-        agent_status_message: row.agent_status_message,
-        agent_status_updated_at: row.agent_status_updated_at,
-      }));
-
-    console.log(`${TOWN_LOG} schedulePendingWork: found ${pendingAgents.length} pending agents`);
-    if (pendingAgents.length === 0) return;
-
-    const dispatchTasks: Array<() => Promise<void>> = [];
-
-    for (const agent of pendingAgents) {
-      const beadId = agent.current_hook_bead_id;
-      if (!beadId) continue;
-      const bead = beadOps.getBead(this.sql, beadId);
-      if (!bead) continue;
-
-      if (agent.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
-        beadOps.updateBeadStatus(this.sql, beadId, 'failed', agent.id);
-        agents.unhookBead(this.sql, agent.id);
-        continue;
-      }
-
-      // Skip beads that still have unresolved 'blocks' dependencies —
-      // they'll be dispatched by dispatchUnblockedBeads when their
-      // blockers close.
-      if (beadOps.hasUnresolvedBlockers(this.sql, beadId)) {
-        continue;
-      }
-
-      dispatchTasks.push(async () => {
-        await this.dispatchAgent(agent, bead);
-      });
-    }
-
-    if (dispatchTasks.length > 0) {
-      await Promise.allSettled(dispatchTasks.map(fn => fn()));
-    }
-  }
-
-  /**
-   * Witness patrol: detect dead/stale agents, GUPP violations with
-   * tiered escalation, orphaned work, agent GC, per-bead timeouts.
-   *
-   * Mechanical checks run as deterministic code. Ambiguous situations
-   * produce triage_request beads for the on-demand triage agent.
-   * See #442.
-   */
-  private async witnessPatrol(): Promise<void> {
-    const townId = this.townId;
-
-    // ── Zombie detection (container status reconciliation) ──────────
-    const WorkingAgentRow = AgentMetadataRecord.pick({
-      bead_id: true,
-      current_hook_bead_id: true,
-      last_activity_at: true,
-    });
-    const workingAgents = WorkingAgentRow.array().parse([
-      ...query(
-        this.sql,
-        /* sql */ `
-          SELECT ${agent_metadata.bead_id}, ${agent_metadata.current_hook_bead_id}, ${agent_metadata.last_activity_at}
-          FROM ${agent_metadata}
-          WHERE ${agent_metadata.status} IN ('working', 'stalled')
-        `,
-        []
-      ),
-    ]);
-
-    for (const working of workingAgents) {
-      const agentId = working.bead_id;
-
-      const containerInfo = await dispatch.checkAgentContainerStatus(this.env, townId, agentId);
-
-      if (containerInfo.status === 'not_found' || containerInfo.status === 'exited') {
-        if (containerInfo.exitReason === 'completed') {
-          reviewQueue.agentCompleted(this.sql, agentId, { status: 'completed' });
-          continue;
-        }
-        query(
-          this.sql,
-          /* sql */ `
-            UPDATE ${agent_metadata}
-            SET ${agent_metadata.columns.status} = 'idle',
-                ${agent_metadata.columns.last_activity_at} = ?
-            WHERE ${agent_metadata.bead_id} = ?
-          `,
-          [now(), agentId]
-        );
-        continue;
-      }
-    }
-
-    // ── Tiered GUPP violation handling ──────────────────────────────
-    // Re-query to get the current set of working agents (some may have
-    // been reset to idle by zombie detection above).
-    const currentWorking = WorkingAgentRow.array().parse([
-      ...query(
-        this.sql,
-        /* sql */ `
-          SELECT ${agent_metadata.bead_id}, ${agent_metadata.current_hook_bead_id}, ${agent_metadata.last_activity_at}
-          FROM ${agent_metadata}
-          WHERE ${agent_metadata.status} IN ('working', 'stalled')
-        `,
-        []
-      ),
-    ]);
-
-    const forceStopIds = patrol.detectGUPPViolations(
-      this.sql,
-      currentWorking,
-      (agentId, message, opts) => this.queueNudge(agentId, message, opts)
-    );
-
-    // Force-stop agents in the container (best-effort)
-    for (const agentId of forceStopIds) {
-      dispatch
-        .stopAgentInContainer(this.env, townId, agentId)
-        .catch(err =>
-          console.warn(`${TOWN_LOG} witnessPatrol: force-stop failed for agent=${agentId}`, err)
-        );
-    }
-
-    // ── Orphaned work detection ────────────────────────────────────
-    patrol.detectOrphanedWork(this.sql);
-
-    // ── Agent garbage collection ───────────────────────────────────
-    const gcCount = patrol.agentGC(this.sql);
-    if (gcCount > 0) {
-      // Clean up AgentDO storage for GC'd agents (best-effort)
-      console.log(`${TOWN_LOG} witnessPatrol: GC'd ${gcCount} agent(s)`);
-    }
-
-    // ── Per-bead timeout enforcement ───────────────────────────────
-    const timedOut = patrol.checkTimerGates(this.sql);
-    for (const { agentId } of timedOut) {
-      if (agentId) {
-        dispatch
-          .stopAgentInContainer(this.env, townId, agentId)
-          .catch(err =>
-            console.warn(
-              `${TOWN_LOG} witnessPatrol: failed to stop timed-out agent=${agentId}`,
-              err
-            )
-          );
-      }
-    }
-  }
-
-  /**
-   * Deacon patrol: stale hook detection, stranded convoy feeding,
-   * crash loop detection.
-   *
-   * Mechanical checks that complement the witness patrol. See #442.
-   */
-  private deaconPatrol(): void {
-    // ── Stale hook detection ───────────────────────────────────────
-    patrol.detectStaleHooks(this.sql);
-
-    // ── Stranded convoy feeding ────────────────────────────────────
-    patrol.feedStrandedConvoys(this.sql, this.townId);
-
-    // ── Crash loop detection ───────────────────────────────────────
-    patrol.detectCrashLoops(this.sql);
+    scheduling.dispatchUnblockedBeads(this.schedulingCtx, closedBeadId);
   }
 
   /**
@@ -3447,7 +3083,7 @@ export class TownDO extends DurableObject<Env> {
       patrol.TRIAGE_REQUEST_LABEL,
       patrol.TRIAGE_BATCH_LABEL
     );
-    const cooldownCutoff = new Date(Date.now() - DISPATCH_COOLDOWN_MS).toISOString();
+    const cooldownCutoff = new Date(Date.now() - scheduling.DISPATCH_COOLDOWN_MS).toISOString();
     const existingBatch = [
       ...query(
         this.sql,
@@ -3596,358 +3232,6 @@ export class TownDO extends DurableObject<Env> {
     });
 
     await Promise.allSettled(deliveries);
-  }
-
-  /**
-   * Process the review queue: pop pending entries and trigger merge.
-   */
-  private async processReviewQueue(): Promise<void> {
-    reviewQueue.recoverStuckReviews(this.sql);
-    reviewQueue.closeOrphanedReviewBeads(this.sql);
-
-    // Poll open PRs created by the 'pr' strategy
-    await this.pollPendingPRs();
-
-    const entry = reviewQueue.popReviewQueue(this.sql);
-    if (!entry) return;
-
-    // Resolve rig from the merge_request bead — not rigList[0] which would
-    // pick the wrong rig in multi-rig towns.
-    const rigId = entry.rig_id;
-    if (!rigId) {
-      console.error(`${TOWN_LOG} processReviewQueue: entry ${entry.id} has no rig_id, skipping`);
-      reviewQueue.completeReview(this.sql, entry.id, 'failed');
-      return;
-    }
-    const rigConfig = await this.getRigConfig(rigId);
-    if (!rigConfig) {
-      reviewQueue.completeReview(this.sql, entry.id, 'failed');
-      return;
-    }
-
-    const townConfig = await this.getTownConfig();
-    const mergeStrategy = config.resolveMergeStrategy(townConfig, rigConfig.merge_strategy);
-    const gates = townConfig.refinery?.gates ?? [];
-
-    // Resolve the target branch from review_metadata. For convoy beads
-    // this will be the convoy's feature branch; for standalone beads it's
-    // the rig's default branch. For convoy landing MRs it's back to default.
-    const targetBranchRows = z
-      .object({ target_branch: z.string() })
-      .array()
-      .parse([
-        ...query(
-          this.sql,
-          /* sql */ `
-            SELECT ${review_metadata.target_branch}
-            FROM ${review_metadata}
-            WHERE ${review_metadata.bead_id} = ?
-          `,
-          [entry.id]
-        ),
-      ]);
-    const targetBranch = targetBranchRows[0]?.target_branch ?? rigConfig.defaultBranch;
-
-    // Check if this MR belongs to a convoy and what the merge mode is.
-    // For 'review-then-land' convoys, the refinery only reviews and merges
-    // into the feature branch (using direct strategy regardless of town config),
-    // because the final land to main happens once ALL beads are done.
-    // For 'review-and-merge' convoys (and standalone beads), use the normal strategy.
-    const sourceBeadId = typeof entry.bead_id === 'string' ? entry.bead_id : null;
-    const convoyId = sourceBeadId ? beadOps.getConvoyForBead(this.sql, sourceBeadId) : null;
-    const convoyMergeMode = convoyId ? beadOps.getConvoyMergeMode(this.sql, convoyId) : null;
-
-    // For review-then-land convoys targeting the feature branch, always use
-    // direct merge strategy (the refinery merges the polecat's work into the
-    // feature branch directly, no PR needed for intermediate steps).
-    const isConvoyIntermediateMerge =
-      convoyMergeMode === 'review-then-land' && targetBranch !== rigConfig.defaultBranch;
-    const effectiveMergeStrategy = isConvoyIntermediateMerge ? 'direct' : mergeStrategy;
-
-    console.log(
-      `${TOWN_LOG} processReviewQueue: entry=${entry.id} branch=${entry.branch} ` +
-        `targetBranch=${targetBranch} mergeStrategy=${effectiveMergeStrategy} ` +
-        `convoyMode=${convoyMergeMode ?? 'standalone'} gates=${gates.length}`
-    );
-
-    // Get or create the per-rig refinery. If it already exists and is busy
-    // (processing another review), put the entry back to 'open' so it gets
-    // retried on the next alarm cycle.
-    const refineryAgent = agents.getOrCreateAgent(this.sql, 'refinery', rigId, this.townId);
-    if (refineryAgent.status !== 'idle') {
-      console.log(
-        `${TOWN_LOG} processReviewQueue: refinery for rig=${rigId} is ${refineryAgent.status}, re-queuing entry=${entry.id}`
-      );
-      beadOps.updateBeadStatus(this.sql, entry.id, 'open', 'system');
-      return;
-    }
-
-    const { buildRefinerySystemPrompt } = await import('../prompts/refinery-system.prompt');
-    const systemPrompt = buildRefinerySystemPrompt({
-      identity: refineryAgent.identity,
-      rigId,
-      townId: this.townId,
-      gates,
-      branch: entry.branch,
-      targetBranch,
-      polecatAgentId: entry.agent_id,
-      mergeStrategy: effectiveMergeStrategy,
-      convoyContext: convoyMergeMode
-        ? {
-            mergeMode: convoyMergeMode,
-            isIntermediateStep: isConvoyIntermediateMerge,
-          }
-        : undefined,
-    });
-
-    // Hook the refinery to the MR bead (entry.id), not the source bead
-    // (entry.bead_id). The source bead stays closed with its original
-    // polecat assignee preserved.
-    agents.hookBead(this.sql, refineryAgent.id, entry.id);
-
-    // Mark as working before the async container start (same I/O gate
-    // rationale as dispatchAgent — see comment there).
-    agents.updateAgentStatus(this.sql, refineryAgent.id, 'working');
-
-    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-      townId: this.townId,
-      rigId,
-      userId: rigConfig.userId,
-      agentId: refineryAgent.id,
-      agentName: refineryAgent.name,
-      role: 'refinery',
-      identity: refineryAgent.identity,
-      beadId: entry.id,
-      beadTitle: `Review merge: ${entry.branch} → ${targetBranch}`,
-      beadBody: entry.summary ?? '',
-      checkpoint: null,
-      gitUrl: rigConfig.gitUrl,
-      // Always clone from the rig's real default branch. The targetBranch
-      // may be a convoy feature branch that doesn't exist on the remote yet.
-      // The refinery's system prompt tells it which branch to merge into.
-      defaultBranch: rigConfig.defaultBranch,
-      kilocodeToken: rigConfig.kilocodeToken,
-      townConfig,
-      systemPromptOverride: systemPrompt,
-      platformIntegrationId: rigConfig.platformIntegrationId,
-    });
-
-    if (!started) {
-      agents.unhookBead(this.sql, refineryAgent.id);
-      agents.updateAgentStatus(this.sql, refineryAgent.id, 'idle');
-      console.error(
-        `${TOWN_LOG} processReviewQueue: refinery agent failed to start for entry=${entry.id}`
-      );
-      reviewQueue.completeReview(this.sql, entry.id, 'failed');
-    }
-  }
-
-  /**
-   * Process convoys whose tracked beads are all closed and that have a
-   * feature branch waiting to be landed. Creates a final merge_request bead
-   * to merge the convoy's feature branch into the default branch.
-   */
-  private async processConvoyLandings(): Promise<void> {
-    // Find convoys with ready_to_land flag in metadata that are still open
-    const ReadyConvoyRow = z.object({
-      bead_id: z.string(),
-      metadata: z
-        .string()
-        .transform(v => {
-          try {
-            return JSON.parse(v) as Record<string, unknown>;
-          } catch {
-            return {};
-          }
-        })
-        .pipe(z.record(z.string(), z.any())),
-    });
-    const readyRows = ReadyConvoyRow.array().parse([
-      ...query(
-        this.sql,
-        /* sql */ `
-          SELECT ${beads.bead_id}, ${beads.metadata}
-          FROM ${beads}
-          WHERE ${beads.type} = 'convoy'
-            AND ${beads.status} = 'open'
-            AND json_extract(${beads.metadata}, '$.ready_to_land') = 1
-        `,
-        []
-      ),
-    ]);
-
-    for (const row of readyRows) {
-      const convoyId = row.bead_id;
-      const featureBranch = beadOps.getConvoyFeatureBranch(this.sql, convoyId);
-      if (!featureBranch) continue;
-
-      // Check if there's already a pending landing MR for this convoy
-      const existingLanding = [
-        ...query(
-          this.sql,
-          /* sql */ `
-            SELECT ${beads.bead_id}
-            FROM ${beads}
-            WHERE ${beads.type} = 'merge_request'
-              AND ${beads.status} IN ('open', 'in_progress')
-              AND json_extract(${beads.metadata}, '$.convoy_landing') = 1
-              AND json_extract(${beads.metadata}, '$.convoy_id') = ?
-            LIMIT 1
-          `,
-          [convoyId]
-        ),
-      ];
-      if (existingLanding.length > 0) continue;
-
-      // Find which rig this convoy's beads belong to
-      const rigRow = z
-        .object({ rig_id: z.string().nullable() })
-        .array()
-        .parse([
-          ...query(
-            this.sql,
-            /* sql */ `
-              SELECT ${beads.rig_id}
-              FROM ${bead_dependencies}
-              INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
-              WHERE ${bead_dependencies.depends_on_bead_id} = ?
-                AND ${bead_dependencies.dependency_type} = 'tracks'
-                AND ${beads.rig_id} IS NOT NULL
-              LIMIT 1
-            `,
-            [convoyId]
-          ),
-        ]);
-      const rigId = rigRow[0]?.rig_id;
-      if (!rigId) continue;
-
-      const rigConfig = await this.getRigConfig(rigId);
-      if (!rigConfig) continue;
-
-      console.log(
-        `${TOWN_LOG} processConvoyLandings: creating landing MR for convoy=${convoyId} branch=${featureBranch} → ${rigConfig.defaultBranch}`
-      );
-
-      // Submit a landing MR: feature branch → defaultBranch
-      reviewQueue.submitToReviewQueue(this.sql, {
-        agent_id: 'system',
-        bead_id: convoyId,
-        rig_id: rigId,
-        branch: featureBranch,
-        summary: `Landing convoy: merge ${featureBranch} → ${rigConfig.defaultBranch}`,
-      });
-
-      // Patch the just-created MR bead's metadata to mark it as a convoy landing
-      // and set the target_branch to the default branch (not the convoy feature branch).
-      const mrRows = z
-        .object({ bead_id: z.string() })
-        .array()
-        .parse([
-          ...query(
-            this.sql,
-            /* sql */ `
-              SELECT ${beads.bead_id}
-              FROM ${beads}
-              WHERE ${beads.type} = 'merge_request'
-                AND ${beads.created_by} = 'system'
-                AND json_extract(${beads.metadata}, '$.source_bead_id') = ?
-              ORDER BY ${beads.created_at} DESC
-              LIMIT 1
-            `,
-            [convoyId]
-          ),
-        ]);
-      if (mrRows.length > 0) {
-        const mrBeadId = mrRows[0].bead_id;
-        query(
-          this.sql,
-          /* sql */ `
-            UPDATE ${beads}
-            SET ${beads.columns.metadata} = json_set(
-              COALESCE(${beads.metadata}, '{}'),
-              '$.convoy_landing', 1,
-              '$.convoy_id', ?
-            )
-            WHERE ${beads.bead_id} = ?
-          `,
-          [convoyId, mrBeadId]
-        );
-        // Override the target_branch to the default branch for the landing MR
-        query(
-          this.sql,
-          /* sql */ `
-            UPDATE ${review_metadata}
-            SET ${review_metadata.columns.target_branch} = ?
-            WHERE ${review_metadata.bead_id} = ?
-          `,
-          [rigConfig.defaultBranch, mrBeadId]
-        );
-      }
-
-      // Clear the ready_to_land flag
-      query(
-        this.sql,
-        /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.ready_to_land'),
-              ${beads.columns.updated_at} = ?
-          WHERE ${beads.bead_id} = ?
-        `,
-        [now(), convoyId]
-      );
-    }
-  }
-
-  /**
-   * Poll external PRs created by the 'pr' merge strategy.
-   * Checks if PRs have been merged or closed and updates the MR bead status.
-   */
-  private async pollPendingPRs(): Promise<void> {
-    const pendingReviews = reviewQueue.listPendingPRReviews(this.sql);
-    if (pendingReviews.length === 0) return;
-
-    console.log(`${TOWN_LOG} pollPendingPRs: checking ${pendingReviews.length} pending PR(s)`);
-
-    const townConfig = await this.getTownConfig();
-
-    // Cap the number of PRs polled per alarm tick to avoid exhausting
-    // GitHub/GitLab API rate limits when many PRs are pending.
-    const MAX_POLLS_PER_TICK = 10;
-    for (const review of pendingReviews.slice(0, MAX_POLLS_PER_TICK)) {
-      const prUrl = review.pr_url;
-      if (!prUrl) continue;
-      // review.bead_id is the MR bead's own ID (not the source bead).
-      // MergeRequestBeadRecord.bead_id == the merge_request bead PK.
-
-      try {
-        const status = await this.checkPRStatus(prUrl, townConfig);
-        console.log(
-          `${TOWN_LOG} pollPendingPRs: entry=${review.bead_id} url=${prUrl} status=${status ?? 'null (could not determine)'}`
-        );
-        if (!status) continue;
-
-        if (status === 'merged') {
-          reviewQueue.completeReviewWithResult(this.sql, {
-            entry_id: review.bead_id,
-            status: 'merged',
-            message: 'PR merged externally',
-          });
-          console.log(`${TOWN_LOG} pollPendingPRs: PR merged for entry=${review.bead_id}`);
-        } else if (status === 'closed') {
-          reviewQueue.completeReviewWithResult(this.sql, {
-            entry_id: review.bead_id,
-            status: 'failed',
-            message: 'PR closed without merge',
-          });
-          console.log(
-            `${TOWN_LOG} pollPendingPRs: PR closed without merge for entry=${review.bead_id}`
-          );
-        }
-        // 'open' — still waiting, do nothing
-      } catch (err) {
-        console.warn(`${TOWN_LOG} pollPendingPRs: failed to check PR status for ${prUrl}:`, err);
-      }
-    }
   }
 
   /**
@@ -4127,7 +3411,9 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
-      await container.fetch('http://container/health');
+      await container.fetch('http://container/health', {
+        signal: AbortSignal.timeout(5_000),
+      });
     } catch {
       // Container is starting up or unavailable — alarm will retry
     }
@@ -4162,7 +3448,6 @@ export class TownDO extends DurableObject<Env> {
     activeAgents: number;
     pendingBeads: number;
   }> {
-    await this.ensureInitialized();
     const townId = this.townId;
 
     // Check if alarm is set
@@ -4228,14 +3513,13 @@ export class TownDO extends DurableObject<Env> {
       stalledAgents: number;
       orphanedHooks: number;
     };
+    reconciler: reconciler.ReconcilerMetrics | null;
     recentEvents: Array<{
       time: string;
       type: string;
       message: string;
     }>;
   }> {
-    await this.ensureInitialized();
-
     const currentAlarm = await this.ctx.storage.getAlarm();
     const active = this.hasActiveWork();
     const intervalMs = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
@@ -4377,8 +3661,50 @@ export class TownDO extends DurableObject<Env> {
         stalledAgents,
         orphanedHooks,
       },
+      reconciler: this._lastReconcilerMetrics,
       recentEvents,
     };
+  }
+
+  // DEBUG: concise non-terminal bead summary — remove after debugging
+  async debugBeadSummary(): Promise<unknown[]> {
+    return [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${beads.bead_id},
+                 ${beads.type},
+                 ${beads.status},
+                 ${beads.title},
+                 ${beads.assignee_agent_bead_id},
+                 ${beads.updated_at}
+          FROM ${beads}
+          WHERE ${beads.status} NOT IN ('closed', 'failed')
+            AND ${beads.type} != 'agent'
+          ORDER BY ${beads.type}, ${beads.status}
+        `,
+        []
+      ),
+    ];
+  }
+
+  // DEBUG: raw agent_metadata dump — remove after debugging
+  async debugAgentMetadata(): Promise<unknown[]> {
+    return [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${agent_metadata.bead_id},
+                 ${agent_metadata.role},
+                 ${agent_metadata.status},
+                 ${agent_metadata.current_hook_bead_id},
+                 ${agent_metadata.dispatch_attempts},
+                 ${agent_metadata.last_activity_at}
+          FROM ${agent_metadata}
+        `,
+        []
+      ),
+    ];
   }
 
   async destroy(): Promise<void> {

@@ -100,7 +100,6 @@ export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId
   // If this fails, roll back the rig creation to avoid an orphaned record.
   try {
     const townDOStub = getTownDOStub(c.env, parsed.data.town_id);
-    await townDOStub.setTownId(parsed.data.town_id);
     await townDOStub.configureRig({
       rigId: rig.id,
       townId: parsed.data.town_id,

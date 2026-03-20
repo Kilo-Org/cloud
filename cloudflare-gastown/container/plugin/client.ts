@@ -116,6 +116,16 @@ export class GastownClient {
     });
   }
 
+  async requestChanges(input: {
+    feedback: string;
+    files?: string[];
+  }): Promise<{ rework_bead_id: string }> {
+    return this.request<{ rework_bead_id: string }>(this.agentPath('/request-changes'), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
   async checkMail(): Promise<Mail[]> {
     return this.request<Mail[]>(this.agentPath('/mail'));
   }
@@ -300,8 +310,6 @@ export class MayorGastownClient {
     title: string;
     body?: string;
     metadata?: Record<string, unknown>;
-    depends_on?: string[];
-    convoy_id?: string;
   }): Promise<SlingResult> {
     return this.request<SlingResult>(this.mayorPath('/sling'), {
       method: 'POST',
@@ -383,35 +391,6 @@ export class MayorGastownClient {
     );
   }
 
-  async addBeadDependency(input: {
-    rig_id: string;
-    bead_id: string;
-    depends_on_bead_id: string;
-    dependency_type?: 'blocks' | 'tracks' | 'parent-child';
-  }): Promise<void> {
-    await this.request<{ ok: true }>(
-      `${this.baseUrl}/api/towns/${this.townId}/rigs/${input.rig_id}/beads/${input.bead_id}/dependencies`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          depends_on_bead_id: input.depends_on_bead_id,
-          dependency_type: input.dependency_type,
-        }),
-      }
-    );
-  }
-
-  async removeBeadDependency(input: {
-    rig_id: string;
-    bead_id: string;
-    depends_on_bead_id: string;
-  }): Promise<void> {
-    await this.request<{ ok: true; deleted: boolean }>(
-      `${this.baseUrl}/api/towns/${this.townId}/rigs/${input.rig_id}/beads/${input.bead_id}/dependencies/${input.depends_on_bead_id}`,
-      { method: 'DELETE' }
-    );
-  }
-
   async listConvoys(): Promise<Convoy[]> {
     return this.request<Convoy[]>(this.mayorPath('/convoys'));
   }
@@ -429,7 +408,6 @@ export class MayorGastownClient {
       status?: 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed';
       priority?: 'low' | 'medium' | 'high' | 'critical';
       labels?: string[];
-      convoy_id?: string | null;
     }
   ): Promise<Bead> {
     return this.request<Bead>(this.mayorPath(`/rigs/${rigId}/beads/${beadId}`), {

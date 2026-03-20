@@ -12,6 +12,13 @@ import { buildContainerConfig, resolveModel, resolveSmallModel } from './config'
 
 const TOWN_LOG = '[Town.do]';
 
+// Module-level diagnostic: stores the last container start error so
+// callers can surface it via the admin API. Reset on each call.
+let lastStartError: string | null = null;
+export function getLastStartError(): string | null {
+  return lastStartError;
+}
+
 /**
  * Resolve the GASTOWN_JWT_SECRET binding to a string.
  */
@@ -101,6 +108,7 @@ export async function ensureContainerToken(
   try {
     const resp = await container.fetch('http://container/refresh-token', {
       method: 'POST',
+      signal: AbortSignal.timeout(10_000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     });
@@ -303,6 +311,7 @@ export async function startAgentInContainer(
     }>;
   }
 ): Promise<boolean> {
+  lastStartError = null;
   console.log(
     `${TOWN_LOG} startAgentInContainer: agentId=${params.agentId} role=${params.role} name=${params.agentName}`
   );
@@ -376,6 +385,7 @@ export async function startAgentInContainer(
 
     const response = await container.fetch('http://container/agents/start', {
       method: 'POST',
+      signal: AbortSignal.timeout(60_000),
       headers: {
         'Content-Type': 'application/json',
         'X-Town-Config': JSON.stringify(containerConfig),
@@ -427,11 +437,27 @@ export async function startAgentInContainer(
 
     if (!response.ok) {
       const text = await response.text().catch(() => '(unreadable)');
-      console.error(`${TOWN_LOG} startAgentInContainer: error response: ${text.slice(0, 500)}`);
+      // "Already running" means a previous dispatch succeeded — the agent
+      // IS alive in the container. Treat as success so the DO marks the
+      // agent as working and stops retrying.
+      if (response.status === 500 && text.includes('already running')) {
+        console.log(
+          `${TOWN_LOG} startAgentInContainer: agent ${params.agentId} already running — treating as success`
+        );
+        return true;
+      }
+      const errorMsg = `(${response.status}) ${text.slice(0, 300)}`;
+      console.error(
+        `${TOWN_LOG} startAgentInContainer: error response for ` +
+          `agent=${params.agentId} role=${params.role}: ${errorMsg}`
+      );
+      lastStartError = errorMsg;
     }
     return response.ok;
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error(`${TOWN_LOG} startAgentInContainer: EXCEPTION for agent ${params.agentId}:`, err);
+    lastStartError = `EXCEPTION: ${message.slice(0, 300)}`;
     return false;
   }
 }
@@ -533,13 +559,17 @@ export async function checkAgentContainerStatus(
 ): Promise<{ status: string; exitReason?: string }> {
   try {
     const container = getTownContainerStub(env, townId);
-    // TODO: Generally you should use containerFetch which waits for ports to be available
-    const response = await container.fetch(`http://container/agents/${agentId}/status`);
+    const response = await container.fetch(`http://container/agents/${agentId}/status`, {
+      signal: AbortSignal.timeout(10_000),
+    });
     // 404 means the container is running but has no record of this agent
     // (e.g. after container eviction). Report as 'not_found' so
     // witnessPatrol can immediately reset and redispatch the agent
     // instead of waiting for the 2-hour GUPP timeout.
     if (response.status === 404) return { status: 'not_found' };
+    // Non-OK but not 404 — container is having issues but may still
+    // have the agent running. Return 'unknown' so witnessPatrol doesn't
+    // falsely reset a working agent.
     if (!response.ok) return { status: 'unknown' };
     const data: unknown = await response.json();
     if (typeof data === 'object' && data !== null && 'status' in data) {
@@ -553,6 +583,10 @@ export async function checkAgentContainerStatus(
     }
     return { status: 'unknown' };
   } catch {
+    // Timeout, network error, or container starting up — return
+    // 'unknown' so witnessPatrol doesn't falsely reset working agents.
+    // True zombies will be caught after repeated 'unknown' results
+    // once the GIPP/heartbeat timeout expires.
     return { status: 'unknown' };
   }
 }

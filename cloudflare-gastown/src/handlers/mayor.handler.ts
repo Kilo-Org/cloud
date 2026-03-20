@@ -50,9 +50,6 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
   );
 
   const town = getTownDOStub(c.env, params.townId);
-  // Ensure the TownDO knows its real UUID (ctx.id.name is unreliable in local dev)
-  // TODO: This should only be done on town creation. Why are we doing it here?
-  await town.setTownId(params.townId);
   const result = await town.sendMayorMessage(
     parsed.data.message,
     parsed.data.model,
@@ -67,7 +64,6 @@ export async function handleSendMayorMessage(c: Context<GastownEnv>, params: { t
  */
 export async function handleGetMayorStatus(c: Context<GastownEnv>, params: { townId: string }) {
   const town = getTownDOStub(c.env, params.townId);
-  await town.setTownId(params.townId);
   const status = await town.getMayorStatus();
   return c.json(resSuccess(status), 200);
 }
@@ -80,7 +76,6 @@ export async function handleGetMayorStatus(c: Context<GastownEnv>, params: { tow
 export async function handleEnsureMayor(c: Context<GastownEnv>, params: { townId: string }) {
   console.log(`${MAYOR_HANDLER_LOG} handleEnsureMayor: townId=${params.townId}`);
   const town = getTownDOStub(c.env, params.townId);
-  await town.setTownId(params.townId);
   const result = await town.ensureMayor();
   return c.json(resSuccess(result), 200);
 }
@@ -156,7 +151,6 @@ export async function handleSetDashboardContext(
   }
 
   const town = getTownDOStub(c.env, params.townId);
-  await town.setTownId(params.townId);
   await town.setDashboardContext(parsed.data.context);
   return c.json(resSuccess({ stored: true }), 200);
 }
@@ -184,7 +178,6 @@ export async function handleBroadcastUiAction(c: Context<GastownEnv>, params: { 
   const action = normalizeUiAction(parsed.data.action, params.townId);
 
   const town = getTownDOStub(c.env, params.townId);
-  await town.setTownId(params.townId);
 
   // Validate that the referenced rig belongs to this town
   const rigId = uiActionRigId(action);

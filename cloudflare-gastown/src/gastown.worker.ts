@@ -35,6 +35,7 @@ import {
   handleUnhookBead,
   handlePrime,
   handleAgentDone,
+  handleRequestChanges,
   handleAgentCompleted,
   handleWriteCheckpoint,
   handleCheckMail,
@@ -54,10 +55,6 @@ import {
 } from './handlers/rig-review-queue.handler';
 import { handleCreateEscalation } from './handlers/rig-escalations.handler';
 import { handleResolveTriage } from './handlers/rig-triage.handler';
-import {
-  handleAddBeadDependency,
-  handleRemoveBeadDependency,
-} from './handlers/bead-dependencies.handler';
 import { handleListBeadEvents } from './handlers/rig-bead-events.handler';
 import { handleListTownEvents } from './handlers/town-events.handler';
 import {
@@ -197,6 +194,18 @@ app.get('/', c => c.html(dashboardHtml()));
 
 app.get('/health', c => c.json({ status: 'ok' }));
 
+// ── DEBUG: unauthenticated town introspection — REMOVE after debugging ──
+app.get('/debug/towns/:townId/status', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  const alarmStatus = await town.getAlarmStatus();
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const agentMeta = await town.debugAgentMetadata();
+  // eslint-disable-next-line @typescript-eslint/await-thenable
+  const beadSummary = await town.debugBeadSummary();
+  return c.json({ alarmStatus, agentMeta, beadSummary });
+});
+
 // ── Town ID + Auth ──────────────────────────────────────────────────────
 // All rig routes live under /api/towns/:townId/rigs/:rigId so the townId
 // is always available from the URL path.
@@ -243,21 +252,6 @@ app.post('/api/towns/:townId/rigs/:rigId/sling', c =>
 app.delete('/api/towns/:townId/rigs/:rigId/beads/:beadId', c =>
   instrumented(c, 'DELETE /api/towns/:townId/rigs/:rigId/beads/:beadId', () =>
     handleDeleteBead(c, c.req.param())
-  )
-);
-
-// ── Bead Dependencies ──────────────────────────────────────────────────
-
-app.post('/api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies', c =>
-  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies', () =>
-    handleAddBeadDependency(c, c.req.param())
-  )
-);
-app.delete('/api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies/:dependsOnBeadId', c =>
-  instrumented(
-    c,
-    'DELETE /api/towns/:townId/rigs/:rigId/beads/:beadId/dependencies/:dependsOnBeadId',
-    () => handleRemoveBeadDependency(c, c.req.param())
   )
 );
 
@@ -321,6 +315,11 @@ app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/prime', c =>
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/done', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/done', () =>
     handleAgentDone(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/request-changes', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/request-changes', () =>
+    handleRequestChanges(c, c.req.param())
   )
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/completed', c =>

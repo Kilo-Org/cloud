@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env, runDurableObjectAlarm } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 function getTownStub(name = 'test-town') {
@@ -8,9 +8,13 @@ function getTownStub(name = 'test-town') {
 
 describe('Convoy DAG and Feature Branches', () => {
   let town: ReturnType<typeof getTownStub>;
+  let townName: string;
 
-  beforeEach(() => {
-    town = getTownStub(`convoy-dag-${crypto.randomUUID()}`);
+  beforeEach(async () => {
+    townName = `convoy-dag-${crypto.randomUUID()}`;
+    town = getTownStub(townName);
+    // Set town ID so the alarm loop doesn't bail out
+    await town.setTownId(townName);
   });
 
   // ── Feature Branch ─────────────────────────────────────────────────
@@ -190,19 +194,21 @@ describe('Convoy DAG and Feature Branches', () => {
         ],
       });
 
-      // The first bead should be open (ready to dispatch) or in_progress
-      // The second and third should remain open (blocked)
+      // Run alarm to trigger reconciler assignment (lazy assignment).
+      // Only unblocked beads get agents assigned.
+      await runDurableObjectAlarm(town);
+
       const bead0 = await town.getBeadAsync(result.beads[0].bead.bead_id);
       const bead1 = await town.getBeadAsync(result.beads[1].bead.bead_id);
       const bead2 = await town.getBeadAsync(result.beads[2].bead.bead_id);
 
-      // First bead should have an agent hooked and be ready for dispatch
+      // First bead is unblocked — reconciler assigned an agent
       expect(bead0?.assignee_agent_bead_id).toBeTruthy();
 
-      // Second and third are blocked but still have agents hooked
-      // (they'll be dispatched when unblocked)
-      expect(bead1?.assignee_agent_bead_id).toBeTruthy();
-      expect(bead2?.assignee_agent_bead_id).toBeTruthy();
+      // Second and third are blocked — reconciler does NOT assign agents
+      // (lazy assignment only assigns unblocked beads)
+      expect(bead1?.assignee_agent_bead_id).toBeNull();
+      expect(bead2?.assignee_agent_bead_id).toBeNull();
     });
 
     it('should unblock next bead when blocker closes', async () => {
@@ -219,20 +225,27 @@ describe('Convoy DAG and Feature Branches', () => {
         tasks: [{ title: 'Step 1' }, { title: 'Step 2', depends_on: [0] }],
       });
 
+      // Run alarm to trigger reconciler assignment of unblocked beads
+      await runDurableObjectAlarm(town);
+
       const beadIds = result.beads.map(b => b.bead.bead_id);
-      const agentIds = result.beads.map(b => b.agent.id);
+      const bead0 = await town.getBeadAsync(beadIds[0]);
+      const agent0Id = bead0!.assignee_agent_bead_id!;
+      expect(agent0Id).toBeTruthy();
 
       // Close the first bead — this should unblock the second
-      await town.updateBeadStatus(beadIds[0], 'closed', agentIds[0]);
+      await town.updateBeadStatus(beadIds[0], 'closed', agent0Id);
+
+      // Run alarm again so reconciler assigns agent to the now-unblocked bead
+      await runDurableObjectAlarm(town);
 
       // After closing, check convoy progress
       const status = await town.getConvoyStatus(result.convoy.id);
       expect(status?.closed_beads).toBe(1);
 
-      // The second bead should still be open/in_progress (it was unblocked)
+      // The second bead should be assigned and in_progress (unblocked by bead 0)
       const bead1 = await town.getBeadAsync(beadIds[1]);
       expect(bead1?.status).not.toBe('closed');
-      // Its agent should still be hooked
       expect(bead1?.assignee_agent_bead_id).toBeTruthy();
     });
 
@@ -251,17 +264,21 @@ describe('Convoy DAG and Feature Branches', () => {
         tasks: [{ title: 'Task A' }, { title: 'Task B' }, { title: 'Task C', depends_on: [0, 1] }],
       });
 
+      // Run alarm to trigger reconciler assignment of unblocked beads (A and B)
+      await runDurableObjectAlarm(town);
+
       const beadIds = result.beads.map(b => b.bead.bead_id);
-      const agentIds = result.beads.map(b => b.agent.id);
+      const beadA = await town.getBeadAsync(beadIds[0]);
+      const beadB = await town.getBeadAsync(beadIds[1]);
 
       // Close task A — task C should still be blocked (B is open)
-      await town.updateBeadStatus(beadIds[0], 'closed', agentIds[0]);
+      await town.updateBeadStatus(beadIds[0], 'closed', beadA!.assignee_agent_bead_id!);
 
       const status1 = await town.getConvoyStatus(result.convoy.id);
       expect(status1?.closed_beads).toBe(1);
 
       // Close task B — task C should now be unblocked
-      await town.updateBeadStatus(beadIds[1], 'closed', agentIds[1]);
+      await town.updateBeadStatus(beadIds[1], 'closed', beadB!.assignee_agent_bead_id!);
 
       const status2 = await town.getConvoyStatus(result.convoy.id);
       expect(status2?.closed_beads).toBe(2);
@@ -290,16 +307,18 @@ describe('Convoy DAG and Feature Branches', () => {
       expect(status?.closed_beads).toBe(0);
       expect(status?.total_beads).toBe(3);
 
+      // Run alarm to trigger reconciler assignment
+      await runDurableObjectAlarm(town);
+
       // Close one bead
       const beadIds = result.beads.map(b => b.bead.bead_id);
-      const agentIds = result.beads.map(b => b.agent.id);
-      await town.updateBeadStatus(beadIds[0], 'closed', agentIds[0]);
+      await town.updateBeadStatus(beadIds[0], 'closed', 'system');
 
       status = await town.getConvoyStatus(result.convoy.id);
       expect(status?.closed_beads).toBe(1);
 
       // Close second
-      await town.updateBeadStatus(beadIds[1], 'closed', agentIds[1]);
+      await town.updateBeadStatus(beadIds[1], 'closed', 'system');
 
       status = await town.getConvoyStatus(result.convoy.id);
       expect(status?.closed_beads).toBe(2);
@@ -323,10 +342,9 @@ describe('Convoy DAG and Feature Branches', () => {
       expect(result.convoy.feature_branch).toBeTruthy();
 
       const beadId = result.beads[0].bead.bead_id;
-      const agentId = result.beads[0].agent.id;
 
       // Close the only bead
-      await town.updateBeadStatus(beadId, 'closed', agentId);
+      await town.updateBeadStatus(beadId, 'closed', 'system');
 
       // Convoy should NOT auto-close (it has a feature branch that needs landing)
       const status = await town.getConvoyStatus(result.convoy.id);
@@ -349,11 +367,10 @@ describe('Convoy DAG and Feature Branches', () => {
       });
 
       const beadIds = result.beads.map(b => b.bead.bead_id);
-      const agentIds = result.beads.map(b => b.agent.id);
 
       // Fail one bead, close the other
-      await town.updateBeadStatus(beadIds[0], 'failed', agentIds[0]);
-      await town.updateBeadStatus(beadIds[1], 'closed', agentIds[1]);
+      await town.updateBeadStatus(beadIds[0], 'failed', 'system');
+      await town.updateBeadStatus(beadIds[1], 'closed', 'system');
 
       const status = await town.getConvoyStatus(result.convoy.id);
       // Both failed and closed count toward progress
@@ -531,8 +548,13 @@ describe('Convoy DAG and Feature Branches', () => {
         merge_mode: 'review-then-land',
       });
 
+      // Run alarm to trigger reconciler assignment
+      await runDurableObjectAlarm(town);
+
       const beadId = result.beads[0].bead.bead_id;
-      const agentId = result.beads[0].agent.id;
+      const bead0 = await town.getBeadAsync(beadId);
+      const agentId = bead0!.assignee_agent_bead_id!;
+      expect(agentId).toBeTruthy();
 
       // Simulate agent completing work
       await town.agentDone(agentId, {
@@ -540,9 +562,12 @@ describe('Convoy DAG and Feature Branches', () => {
         summary: 'Done with task',
       });
 
-      // Verify the source bead was closed and a review entry was created
+      // agentDone is event-only — run alarm to drain events and apply
+      await runDurableObjectAlarm(town);
+
+      // Verify the source bead was transitioned to in_review
       const bead = await town.getBeadAsync(beadId);
-      expect(bead?.status).toBe('closed');
+      expect(bead?.status).toBe('in_review');
 
       // Check that the MR bead exists with convoy metadata
       const allBeads = await town.listBeads({ type: 'merge_request' });

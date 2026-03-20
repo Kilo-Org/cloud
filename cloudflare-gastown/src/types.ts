@@ -162,6 +162,15 @@ export type PrimeContext = {
   hooked_bead: Bead | null;
   undelivered_mail: Mail[];
   open_beads: Bead[];
+  /** Present when the hooked bead is a rework request (gt:rework label). */
+  rework_context: {
+    feedback: string;
+    branch: string | null;
+    target_branch: string | null;
+    files: string[];
+    original_bead_title: string | null;
+    mr_bead_id: string | null;
+  } | null;
 };
 
 // -- Agent done --

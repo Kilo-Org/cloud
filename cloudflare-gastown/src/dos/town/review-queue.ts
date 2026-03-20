@@ -28,8 +28,11 @@ import { getAgent, unhookBead } from './agents';
 import { getRig } from './rigs';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
 
-// Review entries stuck in 'running' past this timeout are reset to 'pending'
-const REVIEW_RUNNING_TIMEOUT_MS = 5 * 60 * 1000;
+// Review entries stuck in 'running' past this timeout are reset to 'pending'.
+// Only applies when no agent (working or idle) is hooked to the MR bead.
+// Set to 30 min — reviews can legitimately take 10-15 min for clone + build
+// + test + merge, and the refinery hook guard is the primary protection.
+const REVIEW_RUNNING_TIMEOUT_MS = 30 * 60 * 1000;
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -186,12 +189,26 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
 }
 
 export function popReviewQueue(sql: SqlStorage): ReviewQueueEntry | null {
+  // Pop the oldest open MR bead, but skip any whose source bead already
+  // has another MR in_progress (i.e. a refinery is already reviewing it).
+  // This prevents popping stale MR beads and triggering failReviewWithRework
+  // while an active review is in flight for the same source.
+  //
+  // The source bead is linked via bead_dependencies (dependency_type='tracks'):
+  //   bead_dependencies.bead_id = MR bead
+  //   bead_dependencies.depends_on_bead_id = source bead
   const rows = [
     ...query(
       sql,
       /* sql */ `
         ${REVIEW_JOIN}
         WHERE ${beads.status} = 'open'
+          AND NOT EXISTS (
+            SELECT 1 FROM ${beads} AS active_mr
+            WHERE active_mr.${beads.columns.type} = 'merge_request'
+              AND active_mr.${beads.columns.status} = 'in_progress'
+              AND active_mr.${beads.columns.rig_id} = ${beads.rig_id}
+          )
         ORDER BY ${beads.created_at} ASC
         LIMIT 1
       `,
@@ -223,6 +240,16 @@ export function completeReview(
   entryId: string,
   status: 'merged' | 'failed'
 ): void {
+  // Guard: don't overwrite terminal states (closed MR bead that was
+  // already merged should never be set to 'failed' by a stale call)
+  const current = getBead(sql, entryId);
+  if (current && (current.status === 'closed' || current.status === 'failed')) {
+    console.warn(
+      `[review-queue] completeReview: bead ${entryId} already ${current.status}, skipping`
+    );
+    return;
+  }
+
   const beadStatus = status === 'merged' ? 'closed' : 'failed';
   const timestamp = now();
   query(
@@ -275,7 +302,37 @@ export function completeReviewWithResult(
 
   if (input.status === 'merged') {
     const mergeTimestamp = now();
+    console.log(
+      `[review-queue] completeReviewWithResult MERGED: entry_id=${input.entry_id} ` +
+        `entry.bead_id (source)=${entry.bead_id} entry.id (MR)=${entry.id} — ` +
+        `calling closeBead on source`
+    );
     closeBead(sql, entry.bead_id, entry.agent_id);
+
+    // Close ALL other open/in_progress/failed MR beads for the same
+    // source bead. During rework cycles, multiple MR beads accumulate.
+    // Without this cleanup, stale MR beads trigger failReviewWithRework
+    // on the next alarm tick, reopening the source bead that was just
+    // closed by this merge.
+    query(
+      sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.status} = 'closed',
+            ${beads.columns.updated_at} = ?,
+            ${beads.columns.closed_at} = ?
+        WHERE ${beads.type} = 'merge_request'
+          AND ${beads.bead_id} != ?
+          AND ${beads.status} NOT IN ('closed')
+          AND ${beads.bead_id} IN (
+            SELECT dep.${bead_dependencies.columns.bead_id}
+            FROM ${bead_dependencies} AS dep
+            WHERE dep.${bead_dependencies.columns.depends_on_bead_id} = ?
+              AND dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+          )
+      `,
+      [mergeTimestamp, mergeTimestamp, input.entry_id, entry.bead_id]
+    );
 
     // closeBead → updateBeadStatus short-circuits when completeReview already
     // set the status to 'closed' via direct SQL, so updateConvoyProgress is
@@ -310,13 +367,45 @@ export function completeReviewWithResult(
         conflict: true,
       },
     });
-    // Return source bead to in_progress so the polecat can be re-dispatched
-    // to resolve the conflict (in_review → in_progress rework flow).
-    updateBeadStatus(sql, entry.bead_id, 'in_progress', entry.agent_id);
+    // Return source bead to open so the normal scheduling path handles
+    // rework. Clear assignee so feedStrandedConvoys can match.
+    const conflictSourceBead = getBead(sql, entry.bead_id);
+    if (
+      conflictSourceBead &&
+      conflictSourceBead.status !== 'closed' &&
+      conflictSourceBead.status !== 'failed'
+    ) {
+      updateBeadStatus(sql, entry.bead_id, 'open', entry.agent_id);
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.assignee_agent_bead_id} = NULL
+          WHERE ${beads.bead_id} = ?
+        `,
+        [entry.bead_id]
+      );
+    }
   } else if (input.status === 'failed') {
-    // Review failed (rework requested): return source bead to in_progress
-    // so it can be re-dispatched (in_review → in_progress rework flow).
-    updateBeadStatus(sql, entry.bead_id, 'in_progress', entry.agent_id);
+    // Review failed (rework requested): return source bead to open so
+    // the normal scheduling path (feedStrandedConvoys → hookBead →
+    // schedulePendingWork → dispatch) handles rework. Clear the stale
+    // assignee so feedStrandedConvoys can match (requires assignee IS NULL).
+    // This avoids the fire-and-forget rework dispatch race in TownDO
+    // where the dispatch fails and rehookOrphanedBeads churn.
+    const sourceBead = getBead(sql, entry.bead_id);
+    if (sourceBead && sourceBead.status !== 'closed' && sourceBead.status !== 'failed') {
+      updateBeadStatus(sql, entry.bead_id, 'open', entry.agent_id);
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.assignee_agent_bead_id} = NULL
+          WHERE ${beads.bead_id} = ?
+        `,
+        [entry.bead_id]
+      );
+    }
   }
 }
 
@@ -326,6 +415,34 @@ export function completeReviewWithResult(
  * Writes to both review_metadata.pr_url (for query) and beads.metadata.pr_url
  * (so the URL is available via the standard bead list endpoint).
  */
+/** Get review_metadata for an MR bead. */
+export function getReviewMetadata(
+  sql: SqlStorage,
+  mrBeadId: string
+): { branch: string; target_branch: string; pr_url: string | null } | null {
+  const rows = z
+    .object({
+      branch: z.string(),
+      target_branch: z.string(),
+      pr_url: z.string().nullable(),
+    })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+        SELECT ${review_metadata.columns.branch} as branch,
+               ${review_metadata.columns.target_branch} as target_branch,
+               ${review_metadata.columns.pr_url} as pr_url
+        FROM ${review_metadata}
+        WHERE ${review_metadata.bead_id} = ?
+      `,
+        [mrBeadId]
+      ),
+    ]);
+  return rows[0] ?? null;
+}
+
 export function setReviewPrUrl(sql: SqlStorage, entryId: string, prUrl: string): boolean {
   // Reject non-HTTPS URLs to prevent storing garbage from LLM output.
   // Invalid URLs would cause pollPendingPRs to poll indefinitely.
@@ -373,111 +490,68 @@ export function markReviewInReview(sql: SqlStorage, entryId: string): void {
   );
 }
 
-/**
- * List MR beads that are in_progress and have a pr_url (PR-strategy merges
- * waiting for external review). Used by the alarm to poll PR status.
- */
-export function listPendingPRReviews(sql: SqlStorage): MergeRequestBeadRecord[] {
-  const rows = [
-    ...query(
-      sql,
-      /* sql */ `
-        ${REVIEW_JOIN}
-        WHERE ${beads.status} = 'in_progress'
-          AND ${review_metadata.pr_url} IS NOT NULL
-      `,
-      []
-    ),
-  ];
-  return MergeRequestBeadRecord.array().parse(rows);
-}
-
-/**
- * Reset MR beads stuck in 'in_progress' back to 'open' so they can be
- * re-processed. Excludes beads that have a pr_url set — those are
- * legitimately waiting for external human review (PR strategy) and may
- * take hours or days.
- */
-export function recoverStuckReviews(sql: SqlStorage): void {
-  const timeout = new Date(Date.now() - REVIEW_RUNNING_TIMEOUT_MS).toISOString();
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${beads}
-      SET ${beads.columns.status} = 'open',
-          ${beads.columns.updated_at} = ?
-      WHERE ${beads.type} = 'merge_request'
-        AND ${beads.status} = 'in_progress'
-        AND ${beads.updated_at} < ?
-        AND ${beads.bead_id} NOT IN (
-          SELECT ${review_metadata.bead_id}
-          FROM ${review_metadata}
-          WHERE ${review_metadata.pr_url} IS NOT NULL
-        )
-    `,
-    [now(), timeout]
-  );
-}
-
-/**
- * Close MR beads that are stuck waiting for a PR review but whose assigned
- * agent is no longer active. After a container restart, agents lose their
- * in-memory state — the PR review will never complete. Close these beads
- * so they don't block convoy progress indefinitely.
- *
- * Only affects beads with a pr_url (excluded by recoverStuckReviews) that
- * are stale (>30 min) and whose agent is idle/dead/missing.
- */
-const ORPHAN_REVIEW_TIMEOUT_MS = 30 * 60 * 1000;
-
-export function closeOrphanedReviewBeads(sql: SqlStorage): void {
-  const cutoff = new Date(Date.now() - ORPHAN_REVIEW_TIMEOUT_MS).toISOString();
-
-  const orphanRows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT ${beads.bead_id}, ${beads.assignee_agent_bead_id}
-        FROM ${beads}
-        INNER JOIN ${review_metadata} ON ${beads.bead_id} = ${review_metadata.bead_id}
-        LEFT JOIN ${agent_metadata} ON ${beads.assignee_agent_bead_id} = ${agent_metadata.bead_id}
-        WHERE ${beads.type} = 'merge_request'
-          AND ${beads.status} = 'open'
-          AND ${review_metadata.pr_url} IS NOT NULL
-          AND ${beads.updated_at} < ?
-          AND (
-            ${agent_metadata.bead_id} IS NULL
-            OR ${agent_metadata.status} IN ('idle', 'dead')
-          )
-      `,
-      [cutoff]
-    ),
-  ];
-
-  for (const row of orphanRows) {
-    const parsed = z
-      .object({ bead_id: z.string(), assignee_agent_bead_id: z.string().nullable() })
-      .parse(row);
-    try {
-      closeBead(sql, parsed.bead_id, parsed.assignee_agent_bead_id ?? 'system');
-      console.log(
-        `[review-queue] closeOrphanedReviewBeads: closed orphaned MR bead=${parsed.bead_id}`
-      );
-    } catch (err) {
-      console.warn(
-        `[review-queue] closeOrphanedReviewBeads: failed to close bead=${parsed.bead_id}`,
-        err
-      );
-    }
-  }
-}
-
 // ── Agent Done ──────────────────────────────────────────────────────
 
 export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInput): void {
   const agent = getAgent(sql, agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
-  if (!agent.current_hook_bead_id) throw new Error(`Agent ${agentId} has no hooked bead`);
+  if (!agent.current_hook_bead_id) {
+    // The agent was unhooked by a recovery path (witnessPatrol,
+    // rehookOrphanedBeads) between when the agent finished work and
+    // when it called gt_done.
+    //
+    // For refineries, this is critical: the refinery successfully merged
+    // but the hook was cleared by zombie detection. We MUST still complete
+    // the review — otherwise the source bead stays open forever. Find the
+    // most recent non-closed MR bead assigned to this agent and complete it.
+    if (agent.role === 'refinery') {
+      const recentMrRows = [
+        ...query(
+          sql,
+          /* sql */ `
+            SELECT ${beads.bead_id}
+            FROM ${beads}
+            WHERE ${beads.type} = 'merge_request'
+              AND ${beads.assignee_agent_bead_id} = ?
+              AND ${beads.status} NOT IN ('closed', 'failed')
+            ORDER BY ${beads.updated_at} DESC
+            LIMIT 1
+          `,
+          [agentId]
+        ),
+      ];
+      if (recentMrRows.length > 0) {
+        const mrBeadId = z.object({ bead_id: z.string() }).parse(recentMrRows[0]).bead_id;
+        console.log(
+          `[review-queue] agentDone: unhooked refinery ${agentId} — recovering MR bead ${mrBeadId}`
+        );
+        if (input.pr_url) {
+          const stored = setReviewPrUrl(sql, mrBeadId, input.pr_url);
+          if (stored) {
+            markReviewInReview(sql, mrBeadId);
+          } else {
+            completeReviewWithResult(sql, {
+              entry_id: mrBeadId,
+              status: 'failed',
+              message: `Refinery provided invalid pr_url: ${input.pr_url}`,
+            });
+          }
+        } else {
+          completeReviewWithResult(sql, {
+            entry_id: mrBeadId,
+            status: 'merged',
+            message: input.summary ?? 'Merged by refinery agent (recovered from unhook)',
+          });
+        }
+        return;
+      }
+    }
+
+    console.warn(
+      `[review-queue] agentDone: agent ${agentId} (role=${agent.role}) has no hooked bead — ignoring`
+    );
+    return;
+  }
 
   // Triage batch beads don't produce code — close and unhook without
   // submitting to the review queue. Only applies to system-created triage
@@ -485,6 +559,19 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
   // the gt:triage label go through normal review flow.
   const hookedBead = getBead(sql, agent.current_hook_bead_id);
   if (hookedBead?.labels.includes('gt:triage') && hookedBead.created_by === 'patrol') {
+    closeBead(sql, agent.current_hook_bead_id, agentId);
+    unhookBead(sql, agentId);
+    return;
+  }
+
+  // Rework beads skip the review queue entirely. The polecat pushed commits
+  // to an existing branch (the one the refinery already reviewed). Closing
+  // the rework bead unblocks the MR bead, and the reconciler re-dispatches
+  // the refinery to re-review.
+  if (hookedBead?.labels.includes('gt:rework')) {
+    console.log(
+      `[review-queue] agentDone: rework bead ${agent.current_hook_bead_id} — closing directly (skip review)`
+    );
     closeBead(sql, agent.current_hook_bead_id, agentId);
     unhookBead(sql, agentId);
     return;
@@ -596,32 +683,41 @@ export function agentCompleted(
   if (!agent) return result;
 
   if (agent.current_hook_bead_id) {
-    // When a refinery exits with 'completed' but the MR bead is still
-    // in_progress (not closed/merged), it means the refinery requested
-    // rework. Route through completeReviewWithResult so the source bead
-    // is returned to in_progress for re-dispatch.
-    if (agent.role === 'refinery' && input.status === 'completed') {
-      const mrBead = getBead(sql, agent.current_hook_bead_id);
-      if (mrBead && mrBead.status !== 'closed') {
-        const sourceBeadId =
-          typeof mrBead.metadata?.source_bead_id === 'string'
-            ? mrBead.metadata.source_bead_id
-            : null;
-        completeReviewWithResult(sql, {
-          entry_id: agent.current_hook_bead_id,
-          status: 'failed',
-          message: input.reason ?? 'Refinery exited without merge — rework needed',
-        });
-        result.reworkSourceBeadId = sourceBeadId;
-        unhookBead(sql, agentId);
-        // Mark agent idle (below)
-      } else {
-        // MR was already closed (merged) — normal completion
-        unhookBead(sql, agentId);
-      }
+    if (agent.role === 'refinery') {
+      // NEVER fail or unhook a refinery from agentCompleted.
+      // agentCompleted races with gt_done: the process exits, the
+      // container sends /completed, but gt_done's HTTP request may
+      // still be in flight. If we unhook here, recoverStuckReviews
+      // can fire between agentCompleted and gt_done, resetting the
+      // MR bead that's about to be closed by gt_done.
+      //
+      // Leave the hook intact. gt_done will close + unhook if the
+      // merge succeeded. recoverStuckReviews (which checks for
+      // status='working') handles the case where gt_done never arrives.
+      //
+      // No-op for the bead — just fall through to mark agent idle.
     } else {
-      const beadStatus = input.status === 'completed' ? 'closed' : 'failed';
-      updateBeadStatus(sql, agent.current_hook_bead_id, beadStatus, agentId);
+      // For non-refineries: if the agent exited with 'failed', fail the bead.
+      // If it exited with 'completed', check whether gt_done already ran:
+      //  - If the bead is in_review/closed/failed → gt_done already handled it, no-op on bead
+      //  - If the bead is still in_progress → agent was killed (idle timer, OOM, etc.)
+      //    before calling gt_done. Don't close the bead — just unhook. The reconciler's
+      //    Rule 3 will reset it to open after the staleness timeout.
+      const hookedBead = getBead(sql, agent.current_hook_bead_id);
+      if (input.status === 'failed') {
+        updateBeadStatus(sql, agent.current_hook_bead_id, 'failed', agentId);
+      } else if (hookedBead && hookedBead.status === 'in_progress') {
+        // Agent exited 'completed' but bead is still in_progress — gt_done was never called.
+        // Don't close the bead. Rule 3 will handle rework.
+        console.log(
+          `[review-queue] agentCompleted: polecat ${agentId} exited without gt_done — ` +
+            `bead ${agent.current_hook_bead_id} stays in_progress (Rule 3 will recover)`
+        );
+      } else if (hookedBead && hookedBead.status === 'open') {
+        // Bead is open (wasn't dispatched yet or was already reset). No-op.
+      } else {
+        // Bead is in_review, closed, or failed — gt_done already ran. No-op on bead.
+      }
       unhookBead(sql, agentId);
     }
   }

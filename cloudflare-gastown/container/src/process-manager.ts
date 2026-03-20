@@ -62,7 +62,12 @@ export function unregisterEventSink(
 // ── Event buffer for HTTP polling ─────────────────────────────────────
 // The TownContainerDO polls GET /agents/:id/events?after=N to get events
 // because containerFetch doesn't support WebSocket upgrades.
-type BufferedEvent = { id: number; event: string; data: unknown; timestamp: string };
+type BufferedEvent = {
+  id: number;
+  event: string;
+  data: unknown;
+  timestamp: string;
+};
 const MAX_BUFFERED_EVENTS = 2000;
 const agentEventBuffers = new Map<string, BufferedEvent[]>();
 let nextEventId = 1;
@@ -73,7 +78,12 @@ function bufferAgentEvent(agentId: string, event: string, data: unknown): void {
     buf = [];
     agentEventBuffers.set(agentId, buf);
   }
-  buf.push({ id: nextEventId++, event, data, timestamp: new Date().toISOString() });
+  buf.push({
+    id: nextEventId++,
+    event,
+    data,
+    timestamp: new Date().toISOString(),
+  });
   if (buf.length > MAX_BUFFERED_EVENTS) {
     buf.splice(0, buf.length - MAX_BUFFERED_EVENTS);
   }
@@ -449,6 +459,8 @@ async function subscribeToEvents(
       if (sessionID && sessionID !== agent.sessionId) continue;
 
       agent.lastActivityAt = new Date().toISOString();
+      agent.lastEventType = event.type ?? 'unknown';
+      agent.lastEventAt = new Date().toISOString();
 
       // Track active tool calls
       if (event.properties && 'activeTools' in event.properties) {
@@ -487,7 +499,9 @@ async function subscribeToEvents(
         clearIdleTimer(agent.agentId);
         agent.status = 'failed';
         agent.exitReason = 'Event stream error';
-        broadcastEvent(agent.agentId, 'agent.exited', { reason: 'stream error' });
+        broadcastEvent(agent.agentId, 'agent.exited', {
+          reason: 'stream error',
+        });
         void reportAgentCompleted(agent, 'failed', 'Event stream error');
 
         // Release SDK session on stream error (same cleanup as normal completion)
@@ -518,7 +532,17 @@ export async function startAgent(
 ): Promise<ManagedAgent> {
   const existing = agents.get(request.agentId);
   if (existing && (existing.status === 'running' || existing.status === 'starting')) {
-    throw new Error(`Agent ${request.agentId} is already running`);
+    // Agent has a live session (probably idle after gt_done, waiting for
+    // the idle timer). Stop it so the new dispatch can proceed.
+    console.log(
+      `${MANAGER_LOG} startAgent: stopping existing session for ${request.agentId} (status=${existing.status})`
+    );
+    await stopAgent(request.agentId).catch(err => {
+      console.warn(
+        `${MANAGER_LOG} startAgent: failed to stop existing session for ${request.agentId}`,
+        err
+      );
+    });
   }
 
   const now = new Date().toISOString();
@@ -534,6 +558,8 @@ export async function startAgent(
     workdir,
     startedAt: now,
     lastActivityAt: now,
+    lastEventType: null,
+    lastEventAt: null,
     activeTools: [],
     messageCount: 0,
     exitReason: null,
@@ -741,7 +767,9 @@ export async function stopAll(): Promise<void> {
       try {
         const instance = sdkInstances.get(agent.workdir);
         if (instance) {
-          await instance.client.session.abort({ path: { id: agent.sessionId } });
+          await instance.client.session.abort({
+            path: { id: agent.sessionId },
+          });
         }
       } catch {
         // Best-effort

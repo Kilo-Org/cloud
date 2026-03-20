@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env, runDurableObjectAlarm } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 function getTownStub(name = 'test-town') {
@@ -29,7 +29,7 @@ describe('TownDO', () => {
         metadata: { source: 'test' },
       });
 
-      expect(bead.id).toBeDefined();
+      expect(bead.bead_id).toBeDefined();
       expect(bead.type).toBe('issue');
       expect(bead.status).toBe('open');
       expect(bead.title).toBe('Fix the widget');
@@ -37,11 +37,11 @@ describe('TownDO', () => {
       expect(bead.priority).toBe('high');
       expect(bead.labels).toEqual(['bug']);
       expect(bead.metadata).toEqual({ source: 'test' });
-      expect(bead.assignee_agent_id).toBeNull();
+      expect(bead.assignee_agent_bead_id).toBeNull();
       expect(bead.closed_at).toBeNull();
 
-      const retrieved = await town.getBeadAsync(bead.id);
-      expect(retrieved).toMatchObject({ id: bead.id, title: 'Fix the widget' });
+      const retrieved = await town.getBeadAsync(bead.bead_id);
+      expect(retrieved).toMatchObject({ bead_id: bead.bead_id, title: 'Fix the widget' });
     });
 
     it('should return null for non-existent bead', async () => {
@@ -189,18 +189,18 @@ describe('TownDO', () => {
       });
       const bead = await town.createBead({ type: 'issue', title: 'Hook target' });
 
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       const hookedAgent = await town.getAgentAsync(agent.id);
-      expect(hookedAgent?.current_hook_bead_id).toBe(bead.id);
+      expect(hookedAgent?.current_hook_bead_id).toBe(bead.bead_id);
       expect(hookedAgent?.status).toBe('idle');
 
-      const hookedBead = await town.getBeadAsync(bead.id);
+      const hookedBead = await town.getBeadAsync(bead.bead_id);
       expect(hookedBead?.status).toBe('in_progress');
-      expect(hookedBead?.assignee_agent_id).toBe(agent.id);
+      expect(hookedBead?.assignee_agent_bead_id).toBe(agent.id);
 
       const retrieved = await town.getHookedBead(agent.id);
-      expect(retrieved?.id).toBe(bead.id);
+      expect(retrieved?.bead_id).toBe(bead.bead_id);
 
       await town.unhookBead(agent.id);
 
@@ -217,12 +217,12 @@ describe('TownDO', () => {
       });
       const bead = await town.createBead({ type: 'issue', title: 'Bead 1' });
 
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
       // Re-hooking the same bead should succeed (idempotent)
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       const hookedBead = await town.getHookedBead(agent.id);
-      expect(hookedBead?.id).toBe(bead.id);
+      expect(hookedBead?.bead_id).toBe(bead.bead_id);
     });
 
     it('should return null for unhooked agent', async () => {
@@ -248,7 +248,7 @@ describe('TownDO', () => {
       });
       const bead = await town.createBead({ type: 'issue', title: 'Status test' });
 
-      const updated = await town.updateBeadStatus(bead.id, 'in_progress', agent.id);
+      const updated = await town.updateBeadStatus(bead.bead_id, 'in_progress', agent.id);
       expect(updated.status).toBe('in_progress');
       expect(updated.closed_at).toBeNull();
     });
@@ -261,7 +261,7 @@ describe('TownDO', () => {
       });
       const bead = await town.createBead({ type: 'issue', title: 'Close test' });
 
-      const closed = await town.closeBead(bead.id, agent.id);
+      const closed = await town.closeBead(bead.bead_id, agent.id);
       expect(closed.status).toBe('closed');
       expect(closed.closed_at).toBeDefined();
     });
@@ -274,7 +274,7 @@ describe('TownDO', () => {
       });
       await town.createBead({ type: 'issue', title: 'Open bead' });
       const beadToClose = await town.createBead({ type: 'issue', title: 'Closed bead' });
-      await town.closeBead(beadToClose.id, agent.id);
+      await town.closeBead(beadToClose.bead_id, agent.id);
 
       const openBeads = await town.listBeads({ status: 'open' });
       expect(openBeads).toHaveLength(1);
@@ -366,7 +366,7 @@ describe('TownDO', () => {
 
       await town.submitToReviewQueue({
         agent_id: agent.id,
-        bead_id: bead.id,
+        bead_id: bead.bead_id,
         rig_id: 'test-rig',
         branch: 'feature/fix-widget',
         pr_url: 'https://github.com/org/repo/pull/1',
@@ -394,7 +394,7 @@ describe('TownDO', () => {
 
       await town.submitToReviewQueue({
         agent_id: agent.id,
-        bead_id: bead.id,
+        bead_id: bead.bead_id,
         rig_id: 'test-rig',
         branch: 'feature/fix',
       });
@@ -419,7 +419,7 @@ describe('TownDO', () => {
 
       await town.submitToReviewQueue({
         agent_id: agent.id,
-        bead_id: bead.id,
+        bead_id: bead.bead_id,
         rig_id: 'test-rig',
         branch: 'feature/merge-test',
       });
@@ -435,7 +435,7 @@ describe('TownDO', () => {
       });
 
       // Bead should be closed
-      const updatedBead = await town.getBeadAsync(bead.id);
+      const updatedBead = await town.getBeadAsync(bead.bead_id);
       expect(updatedBead?.status).toBe('closed');
       expect(updatedBead?.closed_at).toBeDefined();
 
@@ -454,7 +454,7 @@ describe('TownDO', () => {
 
       await town.submitToReviewQueue({
         agent_id: agent.id,
-        bead_id: bead.id,
+        bead_id: bead.bead_id,
         rig_id: 'test-rig',
         branch: 'feature/conflict-test',
       });
@@ -469,7 +469,7 @@ describe('TownDO', () => {
       });
 
       // Original bead should NOT be closed (conflict means it stays as-is)
-      const updatedBead = await town.getBeadAsync(bead.id);
+      const updatedBead = await town.getBeadAsync(bead.bead_id);
       expect(updatedBead?.status).not.toBe('closed');
 
       // An escalation bead should have been created
@@ -479,7 +479,7 @@ describe('TownDO', () => {
       expect(escalations[0].priority).toBe('high');
       expect(escalations[0].body).toContain('CONFLICT (content)');
       expect(escalations[0].metadata).toMatchObject({
-        source_bead_id: bead.id,
+        source_bead_id: bead.bead_id,
         source_branch: 'feature/conflict-test',
         agent_id: agent.id,
       });
@@ -510,7 +510,7 @@ describe('TownDO', () => {
         title: 'Work on this',
         assignee_agent_id: agent.id,
       });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
       await town.sendMail({
         from_agent_id: sender.id,
@@ -522,7 +522,7 @@ describe('TownDO', () => {
       const context = await town.prime(agent.id);
 
       expect(context.agent.id).toBe(agent.id);
-      expect(context.hooked_bead?.id).toBe(bead.id);
+      expect(context.hooked_bead?.bead_id).toBe(bead.bead_id);
       expect(context.undelivered_mail).toHaveLength(1);
       expect(context.undelivered_mail[0].subject).toBe('Priority update');
       expect(context.open_beads).toHaveLength(1);
@@ -591,7 +591,10 @@ describe('TownDO', () => {
         identity: `done-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Done test' });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
+
+      // agentDone is event-only — need to set townId and run alarm to drain
+      await town.setTownId(townName);
 
       await town.agentDone(agent.id, {
         branch: 'feature/done',
@@ -599,16 +602,18 @@ describe('TownDO', () => {
         summary: 'Completed the work',
       });
 
+      // Drain the agent_done event
+      await runDurableObjectAlarm(town);
+
       // Agent should be unhooked
       const updatedAgent = await town.getAgentAsync(agent.id);
       expect(updatedAgent?.current_hook_bead_id).toBeNull();
       expect(updatedAgent?.status).toBe('idle');
 
-      // Review queue should have an entry
-      const entry = await town.popReviewQueue();
-      expect(entry).toBeDefined();
-      expect(entry?.branch).toBe('feature/done');
-      expect(entry?.bead_id).toBe(bead.id);
+      // Review queue should have an entry (MR bead created by applyEvent)
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      expect(mrBeads.length).toBeGreaterThan(0);
+      expect(mrBeads[0].metadata?.source_bead_id).toBe(bead.bead_id);
     });
   });
 
@@ -651,10 +656,10 @@ describe('TownDO', () => {
   describe('bead events', () => {
     it('should write events on createBead', async () => {
       const bead = await town.createBead({ type: 'issue', title: 'Event test' });
-      const events = await town.listBeadEvents({ beadId: bead.id });
+      const events = await town.listBeadEvents({ beadId: bead.bead_id });
       expect(events).toHaveLength(1);
       expect(events[0].event_type).toBe('created');
-      expect(events[0].bead_id).toBe(bead.id);
+      expect(events[0].bead_id).toBe(bead.bead_id);
       expect(events[0].metadata).toMatchObject({ title: 'Event test' });
     });
 
@@ -665,15 +670,16 @@ describe('TownDO', () => {
         identity: `evt-hook-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Hook event test' });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
 
-      const events = await town.listBeadEvents({ beadId: bead.id });
-      // created + hooked
-      expect(events).toHaveLength(2);
+      const events = await town.listBeadEvents({ beadId: bead.bead_id });
+      // created + status_changed(open→in_progress) + hooked
+      expect(events).toHaveLength(3);
       expect(events[0].event_type).toBe('created');
-      expect(events[1].event_type).toBe('hooked');
-      expect(events[1].agent_id).toBe(agent.id);
-      expect(events[1].new_value).toBe(agent.id);
+      expect(events[1].event_type).toBe('status_changed');
+      expect(events[2].event_type).toBe('hooked');
+      expect(events[2].agent_id).toBe(agent.id);
+      expect(events[2].new_value).toBe(agent.id);
     });
 
     it('should write events on unhookBead', async () => {
@@ -683,13 +689,13 @@ describe('TownDO', () => {
         identity: `evt-unhook-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Unhook event test' });
-      await town.hookBead(agent.id, bead.id);
+      await town.hookBead(agent.id, bead.bead_id);
       await town.unhookBead(agent.id);
 
-      const events = await town.listBeadEvents({ beadId: bead.id });
-      // created + hooked + unhooked
-      expect(events).toHaveLength(3);
-      expect(events[2].event_type).toBe('unhooked');
+      const events = await town.listBeadEvents({ beadId: bead.bead_id });
+      // created + status_changed + hooked + unhooked
+      expect(events).toHaveLength(4);
+      expect(events[3].event_type).toBe('unhooked');
     });
 
     it('should write events on updateBeadStatus', async () => {
@@ -699,9 +705,9 @@ describe('TownDO', () => {
         identity: `evt-status-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Status event test' });
-      await town.updateBeadStatus(bead.id, 'in_progress', agent.id);
+      await town.updateBeadStatus(bead.bead_id, 'in_progress', agent.id);
 
-      const events = await town.listBeadEvents({ beadId: bead.id });
+      const events = await town.listBeadEvents({ beadId: bead.bead_id });
       // created + status_changed
       expect(events).toHaveLength(2);
       expect(events[1].event_type).toBe('status_changed');
@@ -716,9 +722,9 @@ describe('TownDO', () => {
         identity: `evt-close-${townName}`,
       });
       const bead = await town.createBead({ type: 'issue', title: 'Close event test' });
-      await town.closeBead(bead.id, agent.id);
+      await town.closeBead(bead.bead_id, agent.id);
 
-      const events = await town.listBeadEvents({ beadId: bead.id });
+      const events = await town.listBeadEvents({ beadId: bead.bead_id });
       // created + closed
       expect(events).toHaveLength(2);
       expect(events[1].event_type).toBe('closed');
@@ -726,12 +732,12 @@ describe('TownDO', () => {
 
     it('should filter events by since timestamp', async () => {
       const bead = await town.createBead({ type: 'issue', title: 'Since filter test' });
-      const events = await town.listBeadEvents({ beadId: bead.id });
+      const events = await town.listBeadEvents({ beadId: bead.bead_id });
       expect(events).toHaveLength(1);
 
       // Query with a future timestamp should return nothing
       const futureEvents = await town.listBeadEvents({
-        beadId: bead.id,
+        beadId: bead.bead_id,
         since: '2099-01-01T00:00:00.000Z',
       });
       expect(futureEvents).toHaveLength(0);
@@ -754,12 +760,12 @@ describe('TownDO', () => {
       const bead = await town.createBead({ type: 'issue', title: 'Review event test' });
       await town.submitToReviewQueue({
         agent_id: agent.id,
-        bead_id: bead.id,
+        bead_id: bead.bead_id,
         rig_id: 'test-rig',
         branch: 'feature/test',
       });
 
-      const events = await town.listBeadEvents({ beadId: bead.id });
+      const events = await town.listBeadEvents({ beadId: bead.bead_id });
       const reviewEvents = events.filter(e => e.event_type === 'review_submitted');
       expect(reviewEvents).toHaveLength(1);
       expect(reviewEvents[0].new_value).toBe('feature/test');

@@ -103,6 +103,10 @@ export type ManagedAgent = {
   workdir: string;
   startedAt: string;
   lastActivityAt: string;
+  /** Event type of the most recent SDK event (e.g. 'message_part.updated') */
+  lastEventType: string | null;
+  /** ISO 8601 timestamp of the most recent SDK event */
+  lastEventAt: string | null;
   /** Last known active tool calls (populated from SSE events) */
   activeTools: string[];
   /** Total messages sent to this agent */
@@ -299,6 +303,11 @@ export type HeartbeatPayload = {
   townId: string;
   status: AgentStatus;
   timestamp: string;
+  // SDK activity watermark
+  lastEventType: string | null;
+  lastEventAt: string | null;
+  activeTools: string[];
+  messageCount: number;
 };
 
 // ── Stream ticket (for WebSocket streaming) ─────────────────────────────

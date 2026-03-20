@@ -1,4 +1,4 @@
-import { mkdir, realpath, rm, stat } from 'node:fs/promises';
+import { mkdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { CloneOptions, WorktreeOptions } from './types';
 
@@ -106,6 +106,49 @@ function authenticateGitUrl(gitUrl: string, envVars?: Record<string, string>): s
 }
 
 /**
+ * Configure a credential-store helper on the bare repo so that worktree
+ * operations (checkout, reset, lfs smudge) can resolve credentials
+ * through the standard git credential chain.
+ *
+ * Without this, git-lfs smudge filters triggered by `git worktree add`
+ * or `git reset --hard` fail with "Smudge error" because the LFS batch
+ * API request has no credentials. The token is embedded in the remote
+ * URL, but some git-lfs versions require the credential helper for the
+ * LFS batch endpoint (which uses a different URL path).
+ */
+async function configureRepoCredentials(
+  repoDir: string,
+  gitUrl: string,
+  envVars?: Record<string, string>
+): Promise<void> {
+  if (!envVars) return;
+
+  const token = envVars.GIT_TOKEN ?? envVars.GITHUB_TOKEN;
+  const gitlabToken = envVars.GITLAB_TOKEN;
+  if (!token && !gitlabToken) return;
+
+  try {
+    const url = new URL(gitUrl);
+    const credentialLine =
+      gitlabToken && (url.hostname.includes('gitlab') || envVars.GITLAB_INSTANCE_URL)
+        ? `https://oauth2:${gitlabToken}@${url.hostname}`
+        : token
+          ? `https://x-access-token:${token}@${url.hostname}`
+          : null;
+
+    if (!credentialLine) return;
+
+    // Write to a per-repo credential file outside the repo itself
+    const credFile = `/tmp/.git-credentials-repo-${repoDir.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    await writeFile(credFile, credentialLine + '\n', { mode: 0o600 });
+
+    await exec('git', ['config', 'credential.helper', `store --file=${credFile}`], repoDir);
+  } catch (err) {
+    console.warn(`Failed to configure repo credentials for ${repoDir}:`, err);
+  }
+}
+
+/**
  * Validate a branch name — block control characters and shell metacharacters.
  */
 function validateBranchName(branch: string, label: string): void {
@@ -148,6 +191,11 @@ async function exec(cmd: string, args: string[], cwd?: string): Promise<string> 
       // Public repos clone without auth; private repos fail fast with
       // a clear error instead of hanging on a username prompt.
       GIT_TERMINAL_PROMPT: '0',
+      // Skip LFS smudge filter during checkout/worktree operations.
+      // Agents don't need binary assets (videos, images, etc.) and
+      // LFS downloads can fail when the credential helper doesn't
+      // cover the LFS batch endpoint, blocking worktree creation.
+      GIT_LFS_SKIP_SMUDGE: '1',
     },
   });
 
@@ -211,6 +259,7 @@ async function cloneRepoInner(
     await exec('git', ['remote', 'set-url', 'origin', authUrl], dir).catch(err => {
       console.warn(`Failed to update remote URL for rig ${options.rigId}:`, err);
     });
+    await configureRepoCredentials(dir, options.gitUrl, options.envVars);
     await exec('git', ['fetch', '--all', '--prune'], dir);
     console.log(`Fetched latest for rig ${options.rigId}`);
     return dir;
@@ -228,6 +277,7 @@ async function cloneRepoInner(
 
   await mkdir(dir, { recursive: true });
   await exec('git', ['clone', '--no-checkout', '--branch', options.defaultBranch, authUrl, dir]);
+  await configureRepoCredentials(dir, options.gitUrl, options.envVars);
   console.log(`Cloned repo for rig ${options.rigId}`);
   return dir;
 }

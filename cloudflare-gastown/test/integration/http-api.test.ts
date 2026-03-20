@@ -40,6 +40,7 @@ function api(path: string): string {
 }
 
 describe('HTTP API', () => {
+  const townId = 'test-town-http-api';
   const rigId = () => `rig-${crypto.randomUUID()}`;
 
   // ── Dashboard ──────────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ describe('HTTP API', () => {
   describe('beads', () => {
     it('should create a bead', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({
@@ -106,7 +107,7 @@ describe('HTTP API', () => {
 
     it('should validate required fields', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue' }),
@@ -119,18 +120,18 @@ describe('HTTP API', () => {
     it('should list beads', async () => {
       const id = rigId();
       // Create two beads
-      await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Bead 1' }),
       });
-      await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'message', title: 'Bead 2' }),
       });
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         headers: headers(),
       });
       expect(res.status).toBe(200);
@@ -141,18 +142,18 @@ describe('HTTP API', () => {
 
     it('should filter beads by type', async () => {
       const id = rigId();
-      await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Issue' }),
       });
-      await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'message', title: 'Message' }),
       });
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads?type=issue`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads?type=issue`), {
         headers: headers(),
       });
       const body = await res.json();
@@ -162,26 +163,26 @@ describe('HTTP API', () => {
 
     it('should get a single bead', async () => {
       const id = rigId();
-      const createRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const createRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Get me' }),
       });
       const created = await createRes.json();
-      const beadId = created.data.id;
+      const beadId = created.data.bead_id;
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads/${beadId}`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads/${beadId}`), {
         headers: headers(),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.data.id).toBe(beadId);
+      expect(body.data.bead_id).toBe(beadId);
       expect(body.data.title).toBe('Get me');
     });
 
     it('should return 404 for non-existent bead', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads/nonexistent`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads/nonexistent`), {
         headers: headers(),
       });
       expect(res.status).toBe(404);
@@ -190,25 +191,28 @@ describe('HTTP API', () => {
     it('should update bead status', async () => {
       const id = rigId();
       // Create bead and agent
-      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const beadRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Status test' }),
       });
       const bead = (await beadRes.json()).data;
 
-      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `p1-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads/${bead.id}/status`), {
-        method: 'PATCH',
-        headers: headers(),
-        body: JSON.stringify({ status: 'in_progress', agent_id: agent.id }),
-      });
+      const res = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/beads/${bead.bead_id}/status`),
+        {
+          method: 'PATCH',
+          headers: headers(),
+          body: JSON.stringify({ status: 'in_progress', agent_id: agent.id }),
+        }
+      );
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.status).toBe('in_progress');
@@ -216,25 +220,28 @@ describe('HTTP API', () => {
 
     it('should close a bead', async () => {
       const id = rigId();
-      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const beadRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Close me' }),
       });
       const bead = (await beadRes.json()).data;
 
-      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `close-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads/${bead.id}/close`), {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify({ agent_id: agent.id }),
-      });
+      const res = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/beads/${bead.bead_id}/close`),
+        {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ agent_id: agent.id }),
+        }
+      );
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.status).toBe('closed');
@@ -247,7 +254,7 @@ describe('HTTP API', () => {
   describe('agents', () => {
     it('should register an agent', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'Polecat-1', identity: `p-${id}` }),
@@ -261,18 +268,18 @@ describe('HTTP API', () => {
 
     it('should list agents', async () => {
       const id = rigId();
-      await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `p1-${id}` }),
       });
-      await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'refinery', name: 'R1', identity: `r1-${id}` }),
       });
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         headers: headers(),
       });
       const body = await res.json();
@@ -281,14 +288,14 @@ describe('HTTP API', () => {
 
     it('should get agent by id', async () => {
       const id = rigId();
-      const createRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const createRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `get-${id}` }),
       });
       const agent = (await createRes.json()).data;
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`), {
         headers: headers(),
       });
       expect(res.status).toBe(200);
@@ -298,7 +305,7 @@ describe('HTTP API', () => {
 
     it('should return 404 for non-existent agent', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/agents/nonexistent`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents/nonexistent`), {
         headers: headers(),
       });
       expect(res.status).toBe(404);
@@ -311,14 +318,14 @@ describe('HTTP API', () => {
     it('should hook and unhook a bead', async () => {
       const id = rigId();
       // Create agent and bead
-      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `hook-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const beadRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Hook target' }),
@@ -326,42 +333,51 @@ describe('HTTP API', () => {
       const bead = (await beadRes.json()).data;
 
       // Hook
-      const hookRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/hook`), {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify({ bead_id: bead.id }),
-      });
+      const hookRes = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`),
+        {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ bead_id: bead.bead_id }),
+        }
+      );
       expect(hookRes.status).toBe(200);
       const hookBody = await hookRes.json();
       expect(hookBody.data.hooked).toBe(true);
 
       // Verify agent has hooked bead (stays idle until alarm dispatches to container)
-      const agentCheck = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}`), {
-        headers: headers(),
-      });
+      const agentCheck = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`),
+        {
+          headers: headers(),
+        }
+      );
       const agentState = (await agentCheck.json()).data;
       expect(agentState.status).toBe('idle');
-      expect(agentState.current_hook_bead_id).toBe(bead.id);
+      expect(agentState.current_hook_bead_id).toBe(bead.bead_id);
 
       // Unhook
-      const unhookRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/hook`), {
-        method: 'DELETE',
-        headers: headers(),
-      });
+      const unhookRes = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`),
+        {
+          method: 'DELETE',
+          headers: headers(),
+        }
+      );
       expect(unhookRes.status).toBe(200);
     });
 
     it('should hook via agent JWT auth', async () => {
       const id = rigId();
       // Create agent and bead
-      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `jwt-hook-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const beadRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'JWT hook target' }),
@@ -370,11 +386,14 @@ describe('HTTP API', () => {
 
       // Hook via agent JWT
       const jwtHeaders = agentHeaders({ agentId: agent.id, rigId: id });
-      const hookRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/hook`), {
-        method: 'POST',
-        headers: jwtHeaders,
-        body: JSON.stringify({ bead_id: bead.id }),
-      });
+      const hookRes = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`),
+        {
+          method: 'POST',
+          headers: jwtHeaders,
+          body: JSON.stringify({ bead_id: bead.bead_id }),
+        }
+      );
       expect(hookRes.status).toBe(200);
     });
   });
@@ -384,16 +403,19 @@ describe('HTTP API', () => {
   describe('prime', () => {
     it('should return prime context', async () => {
       const id = rigId();
-      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `prime-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/prime`), {
-        headers: headers(),
-      });
+      const res = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/prime`),
+        {
+          headers: headers(),
+        }
+      );
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data.agent.id).toBe(agent.id);
@@ -408,14 +430,14 @@ describe('HTTP API', () => {
   describe('agent done', () => {
     it('should mark agent done and submit to review queue', async () => {
       const id = rigId();
-      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `done-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const beadRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Done test' }),
@@ -423,14 +445,14 @@ describe('HTTP API', () => {
       const bead = (await beadRes.json()).data;
 
       // Hook the bead
-      await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/hook`), {
+      await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`), {
         method: 'POST',
         headers: headers(),
-        body: JSON.stringify({ bead_id: bead.id }),
+        body: JSON.stringify({ bead_id: bead.bead_id }),
       });
 
       // Mark done
-      const res = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/done`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/done`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({
@@ -444,9 +466,12 @@ describe('HTTP API', () => {
       expect(body.data.done).toBe(true);
 
       // Verify agent is idle
-      const agentCheck = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}`), {
-        headers: headers(),
-      });
+      const agentCheck = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`),
+        {
+          headers: headers(),
+        }
+      );
       const agentState = (await agentCheck.json()).data;
       expect(agentState.status).toBe('idle');
       expect(agentState.current_hook_bead_id).toBeNull();
@@ -458,24 +483,30 @@ describe('HTTP API', () => {
   describe('checkpoint', () => {
     it('should write and read checkpoint', async () => {
       const id = rigId();
-      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `cp-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const writeRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}/checkpoint`), {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify({ data: { step: 5, notes: 'halfway' } }),
-      });
+      const writeRes = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/checkpoint`),
+        {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ data: { step: 5, notes: 'halfway' } }),
+        }
+      );
       expect(writeRes.status).toBe(200);
 
       // Read checkpoint via agent get (checkpoint is on the agent record)
-      const agentCheck = await SELF.fetch(api(`/api/rigs/${id}/agents/${agent.id}`), {
-        headers: headers(),
-      });
+      const agentCheck = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`),
+        {
+          headers: headers(),
+        }
+      );
       const agentState = (await agentCheck.json()).data;
       expect(agentState.checkpoint).toEqual({ step: 5, notes: 'halfway' });
     });
@@ -487,14 +518,14 @@ describe('HTTP API', () => {
     it('should send and check mail', async () => {
       const id = rigId();
       // Create sender and receiver
-      const senderRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const senderRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'Sender', identity: `sender-${id}` }),
       });
       const sender = (await senderRes.json()).data;
 
-      const receiverRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const receiverRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'Receiver', identity: `receiver-${id}` }),
@@ -502,7 +533,7 @@ describe('HTTP API', () => {
       const receiver = (await receiverRes.json()).data;
 
       // Send mail
-      const sendRes = await SELF.fetch(api(`/api/rigs/${id}/mail`), {
+      const sendRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/mail`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({
@@ -515,18 +546,24 @@ describe('HTTP API', () => {
       expect(sendRes.status).toBe(201);
 
       // Check mail
-      const mailRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${receiver.id}/mail`), {
-        headers: headers(),
-      });
+      const mailRes = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${receiver.id}/mail`),
+        {
+          headers: headers(),
+        }
+      );
       expect(mailRes.status).toBe(200);
       const mailBody = await mailRes.json();
       expect(mailBody.data).toHaveLength(1);
       expect(mailBody.data[0].subject).toBe('Hello');
 
       // Check mail again — should be empty (delivered)
-      const mailRes2 = await SELF.fetch(api(`/api/rigs/${id}/agents/${receiver.id}/mail`), {
-        headers: headers(),
-      });
+      const mailRes2 = await SELF.fetch(
+        api(`/api/towns/${townId}/rigs/${id}/agents/${receiver.id}/mail`),
+        {
+          headers: headers(),
+        }
+      );
       const mailBody2 = await mailRes2.json();
       expect(mailBody2.data).toHaveLength(0);
     });
@@ -537,26 +574,26 @@ describe('HTTP API', () => {
   describe('review queue', () => {
     it('should submit to review queue', async () => {
       const id = rigId();
-      const agentRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
+      const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ role: 'polecat', name: 'P1', identity: `rq-${id}` }),
       });
       const agent = (await agentRes.json()).data;
 
-      const beadRes = await SELF.fetch(api(`/api/rigs/${id}/beads`), {
+      const beadRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ type: 'issue', title: 'Review me' }),
       });
       const bead = (await beadRes.json()).data;
 
-      const res = await SELF.fetch(api(`/api/rigs/${id}/review-queue`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/review-queue`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({
           agent_id: agent.id,
-          bead_id: bead.id,
+          bead_id: bead.bead_id,
           branch: 'feature/review',
           pr_url: 'https://github.com/org/repo/pull/3',
         }),
@@ -572,7 +609,7 @@ describe('HTTP API', () => {
   describe('escalations', () => {
     it('should create an escalation bead', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/escalations`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/escalations`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({
@@ -599,7 +636,7 @@ describe('HTTP API', () => {
   describe('query param validation', () => {
     it('should reject non-numeric limit', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads?limit=abc`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads?limit=abc`), {
         headers: headers(),
       });
       expect(res.status).toBe(400);
@@ -609,7 +646,7 @@ describe('HTTP API', () => {
 
     it('should reject negative offset', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads?offset=-1`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads?offset=-1`), {
         headers: headers(),
       });
       expect(res.status).toBe(400);
@@ -617,7 +654,7 @@ describe('HTTP API', () => {
 
     it('should accept valid limit and offset', async () => {
       const id = rigId();
-      const res = await SELF.fetch(api(`/api/rigs/${id}/beads?limit=10&offset=0`), {
+      const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads?limit=10&offset=0`), {
         headers: headers(),
       });
       expect(res.status).toBe(200);

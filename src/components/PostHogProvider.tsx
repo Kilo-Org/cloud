@@ -16,23 +16,18 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Use a fake token for non-production environments as recommended by PostHog
-    const token = isProduction ? key : 'fake-token';
+    if (!isProduction) {
+      window.posthog = posthog;
+      console.log('PostHog disabled in non-production environment');
+      return;
+    }
 
-    posthog.init(token, {
+    posthog.init(key, {
       api_host: '/ingest',
       ui_host: 'https://us.posthog.com',
       disable_web_experiments: false,
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
-      loaded: function (ph) {
-        if (!isProduction) {
-          // Opt out of capturing in non-production environments
-          ph.opt_out_capturing();
-          ph.set_config({ disable_session_recording: true });
-          console.log('PostHog capturing disabled in non-production environment');
-        }
-      },
     });
     window.posthog = posthog; // Reveal PostHog object globally
     if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {

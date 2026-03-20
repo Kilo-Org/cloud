@@ -52,6 +52,12 @@ export function isUSRegion(): boolean {
  * - Falls back to primary if no replica URL is configured for the region
  */
 function getReplicaUrl(): string {
+  // Only use read replicas in production deployments. Local dev and preview
+  // should stay on the primary URL to avoid depending on remote Supabase hosts.
+  if (VERCEL_ENV !== 'production') {
+    return postgresUrl;
+  }
+
   if (isUSRegion()) {
     const usReplica = getEnvVariable('POSTGRES_REPLICA_US_URL');
     if (usReplica) return usReplica;

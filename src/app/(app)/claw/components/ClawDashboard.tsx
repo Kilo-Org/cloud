@@ -97,22 +97,17 @@ export function ClawDashboard({
       {isServiceDegraded && (
         <Alert variant="warning">
           <TriangleAlert className="size-4" />
-          <AlertDescription className="flex flex-col">
-            <span>
-              KiloClaw is really popular today. We&apos;re working on getting additional
-              capacity. If you have trouble starting a machine, please try again in a few minutes.
-            </span>
-            <span className="mt-2 flex flex-row gap-1">
-              <span>You can also</span>
-              <a
-                href="https://status.kilo.ai/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:opacity-80"
-              >
-                check our status page for live updates
-              </a>
-            </span>
+          <AlertDescription>
+            KiloClaw is really popular today. If you run into issues, check our{' '}
+            <a
+              href="https://status.kilo.ai/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:opacity-80"
+            >
+              status page
+            </a>{' '}
+            for live updates.
           </AlertDescription>
         </Alert>
       )}

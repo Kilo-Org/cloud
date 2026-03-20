@@ -368,12 +368,20 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
     return;
   }
 
-  // No nudges (or fetch error) — (re)start the idle timeout
+  // No nudges (or fetch error) — (re)start the idle timeout.
+  // Refineries get a longer timeout because their workflow is multi-step
+  // (diff → analyze → decide → merge/rework). The 2-min default kills the
+  // session between LLM turns when the refinery responds with text before
+  // issuing a tool call. See #1342.
   clearIdleTimer(agentId);
   const timeoutMs =
-    process.env.AGENT_IDLE_TIMEOUT_MS !== undefined
-      ? Number(process.env.AGENT_IDLE_TIMEOUT_MS)
-      : 120_000;
+    agent.role === 'refinery'
+      ? process.env.REFINERY_IDLE_TIMEOUT_MS !== undefined
+        ? Number(process.env.REFINERY_IDLE_TIMEOUT_MS)
+        : 600_000
+      : process.env.AGENT_IDLE_TIMEOUT_MS !== undefined
+        ? Number(process.env.AGENT_IDLE_TIMEOUT_MS)
+        : 120_000;
 
   console.log(
     `${MANAGER_LOG} handleIdleEvent: no nudges for ${agentId}, idle timeout in ${timeoutMs}ms`

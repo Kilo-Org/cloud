@@ -214,6 +214,67 @@ describe('Reconciler', () => {
     });
   });
 
+  // ── reconcileReviewQueue Rule 6: Refinery re-dispatch limits (#1342) ─
+
+  describe('reconcileReviewQueue Rule 6: refinery re-dispatch limits', () => {
+    it('should fail MR bead after refinery exceeds max dispatch attempts', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Rule 6 limit test',
+        tasks: [{ title: 'Dispatch limit test' }],
+      });
+
+      const beadId = result.beads[0].bead.bead_id;
+
+      // Assign agent and dispatch
+      await runDurableObjectAlarm(town);
+
+      const assigned = await town.getBeadAsync(beadId);
+      const agentId = assigned?.assignee_agent_bead_id!;
+      expect(agentId).toBeTruthy();
+
+      // Agent finishes work → creates MR bead
+      await town.agentDone(agentId, {
+        branch: 'gt/polecat/test-rule6',
+        summary: 'Ready for review',
+      });
+      await runDurableObjectAlarm(town);
+
+      // Find the MR bead and its refinery
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      const mrBead = mrBeads.find(b => b.metadata?.source_bead_id === beadId);
+      expect(mrBead).toBeTruthy();
+
+      // Run alarm to dispatch the refinery
+      await runDurableObjectAlarm(town);
+
+      const refineries = await town.listAgents({ role: 'refinery' });
+      expect(refineries.length).toBeGreaterThan(0);
+      const refinery = refineries[0];
+
+      // Simulate repeated idle→re-dispatch cycles by setting dispatch_attempts
+      // past the limit (MAX_DISPATCH_ATTEMPTS = 20) and backdating last_activity_at
+      // so the DISPATCH_COOLDOWN_MS check passes.
+      const pastTimestamp = new Date(Date.now() - 5 * 60_000).toISOString();
+      await town.setAgentDispatchAttempts(refinery.id, 25, pastTimestamp);
+
+      // Set agent to idle (simulating agentCompleted) and ensure MR is in_progress
+      await town.updateAgentStatus(refinery.id, 'idle');
+      const mrBefore = await town.getBeadAsync(mrBead!.bead_id);
+      expect(mrBefore?.status).toBe('in_progress');
+
+      // Run alarm — Rule 6 should see dispatch_attempts >= 20 and fail the MR bead
+      await runDurableObjectAlarm(town);
+
+      const mrAfter = await town.getBeadAsync(mrBead!.bead_id);
+      expect(mrAfter?.status).toBe('failed');
+
+      // Refinery should be unhooked
+      const refineryAfter = await town.getAgentAsync(refinery.id);
+      expect(refineryAfter?.current_hook_bead_id).toBeNull();
+    });
+  });
+
   // ── reconcileConvoys: Auto-close ────────────────────────────────────
 
   describe('reconcileConvoys: progress and auto-close', () => {

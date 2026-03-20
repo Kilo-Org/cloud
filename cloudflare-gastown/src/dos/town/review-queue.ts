@@ -722,13 +722,20 @@ export function agentCompleted(
     }
   }
 
-  // Mark agent idle
+  // Mark agent idle.
+  // For refineries, preserve dispatch_attempts so Rule 6's circuit-breaker
+  // can track cumulative re-dispatch attempts across idle→dispatch cycles.
+  // Resetting to 0 here was enabling infinite loops (#1342). Non-refineries
+  // reset to 0 because they unhook above and get a fresh counter on hookBead.
   query(
     sql,
     /* sql */ `
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.status} = 'idle',
-          ${agent_metadata.columns.dispatch_attempts} = 0
+          ${agent_metadata.columns.dispatch_attempts} = CASE
+            WHEN ${agent_metadata.columns.role} = 'refinery' THEN ${agent_metadata.columns.dispatch_attempts}
+            ELSE 0
+          END
       WHERE ${agent_metadata.bead_id} = ?
     `,
     [agentId]

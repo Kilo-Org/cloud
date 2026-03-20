@@ -969,6 +969,27 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
   for (const ref of idleRefineries) {
     if (!ref.current_hook_bead_id) continue;
 
+    // Cooldown: skip if last activity is too recent (#1342)
+    if (!staleMs(ref.last_activity_at, DISPATCH_COOLDOWN_MS)) continue;
+
+    // Circuit-breaker: fail the MR bead after too many attempts (#1342)
+    if (ref.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+      actions.push({
+        type: 'transition_bead',
+        bead_id: ref.current_hook_bead_id,
+        from: null,
+        to: 'failed',
+        reason: 'refinery max dispatch attempts exceeded',
+        actor: 'system',
+      });
+      actions.push({
+        type: 'unhook_agent',
+        agent_id: ref.bead_id,
+        reason: 'max dispatch attempts',
+      });
+      continue;
+    }
+
     const mrRows = z
       .object({ status: z.string(), type: z.string(), rig_id: z.string().nullable() })
       .array()

@@ -133,16 +133,21 @@ export async function dispatchAgent(
     });
 
     if (started) {
-      // Best-effort: may be dropped if I/O gate is closed
-      query(
-        ctx.sql,
-        /* sql */ `
-          UPDATE ${agent_metadata}
-          SET ${agent_metadata.columns.dispatch_attempts} = 0
-          WHERE ${agent_metadata.bead_id} = ?
-        `,
-        [agent.id]
-      );
+      // Reset dispatch_attempts on successful start — but NOT for refineries.
+      // Refineries can loop (idle-timeout → re-dispatch) many times on the
+      // same MR bead, so we keep the counter monotonically increasing until
+      // the bead is closed or the agent hooks a new bead (#1342).
+      if (agent.role !== 'refinery') {
+        query(
+          ctx.sql,
+          /* sql */ `
+            UPDATE ${agent_metadata}
+            SET ${agent_metadata.columns.dispatch_attempts} = 0
+            WHERE ${agent_metadata.bead_id} = ?
+          `,
+          [agent.id]
+        );
+      }
       console.log(`${LOG} dispatchAgent: started agent=${agent.name}(${agent.id})`);
       ctx.emitEvent({
         event: 'agent.spawned',

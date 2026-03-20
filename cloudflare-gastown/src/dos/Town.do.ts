@@ -1103,6 +1103,24 @@ export class TownDO extends DurableObject<Env> {
     this.broadcastAgentStatus(agentId, message);
   }
 
+  /** Test-only: directly set dispatch_attempts (and optionally last_activity_at) for an agent. */
+  async setAgentDispatchAttempts(
+    agentId: string,
+    attempts: number,
+    lastActivityAt?: string
+  ): Promise<void> {
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agent_metadata}
+        SET ${agent_metadata.columns.dispatch_attempts} = ?,
+            ${agent_metadata.columns.last_activity_at} = COALESCE(?, ${agent_metadata.columns.last_activity_at})
+        WHERE ${agent_metadata.bead_id} = ?
+      `,
+      [attempts, lastActivityAt ?? null, agentId]
+    );
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // Mail
   // ══════════════════════════════════════════════════════════════════

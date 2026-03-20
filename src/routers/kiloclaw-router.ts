@@ -1197,7 +1197,7 @@ export const kiloclawRouter = createTRPCRouter({
         mode: 'subscription',
         customer: stripeCustomerId,
         ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
-        allow_promotion_codes: input.plan === 'standard',
+        allow_promotion_codes: true,
         billing_address_collection: 'required',
         line_items: [{ price: priceId, quantity: 1 }],
         customer_update: { name: 'auto', address: 'auto' },

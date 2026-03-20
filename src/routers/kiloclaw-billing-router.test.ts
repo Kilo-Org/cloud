@@ -251,7 +251,7 @@ describe('createSubscriptionCheckout', () => {
     );
   });
 
-  it('sets allow_promotion_codes false for commit plan', async () => {
+  it('sets allow_promotion_codes true for commit plan', async () => {
     stripeMock.checkout.sessions.create.mockResolvedValue({
       url: 'https://checkout.stripe.com/test',
     });
@@ -260,7 +260,7 @@ describe('createSubscriptionCheckout', () => {
     await caller.kiloclaw.createSubscriptionCheckout({ plan: 'commit' });
 
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
-      expect.objectContaining({ allow_promotion_codes: false })
+      expect.objectContaining({ allow_promotion_codes: true })
     );
   });
 

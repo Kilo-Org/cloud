@@ -22,8 +22,9 @@ export async function envCheck(root: string) {
     ui.warn('Vercel project not linked — run: vercel link --project kilocode-app');
   }
 
+  let allGood = envLocalExists && vercelLinked;
+
   const servicesWithEnv = services.filter(s => s.envFile);
-  let allGood = true;
 
   for (const svc of servicesWithEnv) {
     const examplePath = join(root, svc.dir, svc.envFile!);

@@ -218,4 +218,4 @@ When this happens, GitHub receives deployment signals from both projects, which 
 - Confirm that only the intended Enterprise Vercel project remains connected.
 - Verify that new PRs no longer trigger duplicate Vercel notifications or `MaxDuration` errors.
 
-Last Updated: 2026-03-19 23:48:27 UTC
+Last Updated: 2026-03-20 02:43:24 UTC

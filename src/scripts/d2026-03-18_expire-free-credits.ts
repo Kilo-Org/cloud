@@ -291,7 +291,25 @@ async function processUser(
   if (execute && creditsToExpire.length > 0) {
     const idsToExpire = creditsToExpire.map(t => t.id);
 
-    // Log mutations before writing so we can revert if needed
+    await db.transaction(async tx => {
+      await tx
+        .update(credit_transactions)
+        .set({
+          expiry_date: EXPIRY_DATE,
+          expiration_baseline_microdollars_used: sql`COALESCE(${credit_transactions.original_baseline_microdollars_used}, 0)`,
+        })
+        .where(inArray(credit_transactions.id, idsToExpire));
+
+      // COALESCE needed because LEAST(NULL, x) returns NULL in PostgreSQL
+      await tx
+        .update(kilocode_users)
+        .set({
+          next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${EXPIRY_DATE}), ${EXPIRY_DATE})`,
+        })
+        .where(eq(kilocode_users.id, user.id));
+    });
+
+    // Log mutations after commit so rollbacks don't leave phantom entries
     for (const credit of creditsToExpire) {
       mutationLog.write(
         JSON.stringify({
@@ -316,30 +334,11 @@ async function processUser(
         old: {
           next_credit_expiration_at: user.next_credit_expiration_at,
         },
-        // Actual new value is computed by LEAST in DB; record what we know
         new: {
           next_credit_expiration_at_input: EXPIRY_DATE,
         },
       }) + '\n'
     );
-
-    await db.transaction(async tx => {
-      await tx
-        .update(credit_transactions)
-        .set({
-          expiry_date: EXPIRY_DATE,
-          expiration_baseline_microdollars_used: sql`COALESCE(${credit_transactions.original_baseline_microdollars_used}, 0)`,
-        })
-        .where(inArray(credit_transactions.id, idsToExpire));
-
-      // COALESCE needed because LEAST(NULL, x) returns NULL in PostgreSQL
-      await tx
-        .update(kilocode_users)
-        .set({
-          next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${EXPIRY_DATE}), ${EXPIRY_DATE})`,
-        })
-        .where(eq(kilocode_users.id, user.id));
-    });
   }
 
   // 9. Return total projected expiration only for the credits we actually tagged

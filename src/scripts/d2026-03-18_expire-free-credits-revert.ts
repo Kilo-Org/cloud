@@ -20,7 +20,7 @@ import { createInterface } from 'node:readline';
 import pLimit from 'p-limit';
 import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
-import { and, eq, isNull, isNotNull, inArray } from 'drizzle-orm';
+import { and, eq, isNull, isNotNull } from 'drizzle-orm';
 
 type CreditMutation = {
   type: 'credit_transaction';
@@ -55,7 +55,9 @@ async function main() {
   const execute = args.includes('--execute');
 
   if (!mutationsFile) {
-    console.error('Usage: pnpm script src/scripts/d2026-03-18_expire-free-credits-revert.ts <mutations-file> [--execute]');
+    console.error(
+      'Usage: pnpm script src/scripts/d2026-03-18_expire-free-credits-revert.ts <mutations-file> [--execute]'
+    );
     process.exit(1);
   }
 
@@ -84,23 +86,21 @@ async function main() {
     return;
   }
 
-  // Revert credit transactions in batches
-  const BATCH_SIZE = 500;
+  // Revert credit transactions using their logged old values
   let reverted = 0;
-  for (let i = 0; i < creditMutations.length; i += BATCH_SIZE) {
-    const batch = creditMutations.slice(i, i + BATCH_SIZE);
-    const ids = batch.map(m => m.id);
-
+  for (const mutation of creditMutations) {
     await db
       .update(credit_transactions)
       .set({
-        expiry_date: null,
-        expiration_baseline_microdollars_used: null,
+        expiry_date: mutation.old.expiry_date,
+        expiration_baseline_microdollars_used: mutation.old.expiration_baseline_microdollars_used,
       })
-      .where(inArray(credit_transactions.id, ids));
+      .where(eq(credit_transactions.id, mutation.id));
 
-    reverted += batch.length;
-    console.log(`  Reverted ${reverted}/${creditMutations.length} credit transactions`);
+    reverted++;
+    if (reverted % 500 === 0 || reverted === creditMutations.length) {
+      console.log(`  Reverted ${reverted}/${creditMutations.length} credit transactions`);
+    }
   }
 
   // Recompute next_credit_expiration_at for each affected user

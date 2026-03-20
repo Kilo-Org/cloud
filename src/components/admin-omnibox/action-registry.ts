@@ -5,7 +5,7 @@
  * Actions are organized into groups and can be conditionally shown based on context.
  */
 
-import { Shield, User, Users, Building2, ExternalLink } from 'lucide-react';
+import { Shield, User, Users, ExternalLink } from 'lucide-react';
 import type {
   OmniboxActionRegistry,
   OmniboxActionGroup,
@@ -78,8 +78,8 @@ export const createRoleTestingGroup = (
 export const createAdminLinks = (): OmniboxAdminLink[] => [
   {
     label: 'Admin Panel',
-    href: '/admin/organizations',
-    icon: Building2,
+    href: '/admin/users',
+    icon: Users,
   },
   {
     label: 'Organization Admin',

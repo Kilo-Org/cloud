@@ -167,7 +167,8 @@ async function processUser(
   userId: string,
   affectedCredits: (typeof credit_transactions.$inferSelect)[],
   execute: boolean,
-  output: ReturnType<typeof createWriteStream>
+  output: ReturnType<typeof createWriteStream>,
+  mutationLog: ReturnType<typeof createWriteStream>
 ): Promise<{ creditsAffected: number; creditsSkipped: number; projectedExpiration: number }> {
   // 1. Fetch user info
   const [user] = await db
@@ -238,11 +239,6 @@ async function processUser(
   );
 
   const currentBalance = user.total_microdollars_acquired - user.microdollars_used;
-  const totalExpiredAll = newTransactions.reduce(
-    (sum, t) => sum + Math.abs(t.amount_microdollars ?? 0),
-    0
-  );
-  const projectedBalance = currentBalance - totalExpiredAll;
 
   // 5a. Floor at zero: if setting expiry on these credits would push the user's
   //     balance negative (e.g. because Orb already clawed back spend via
@@ -294,6 +290,39 @@ async function processUser(
   // 8. Execute mode: write DB changes (only for credits that fit within headroom)
   if (execute && creditsToExpire.length > 0) {
     const idsToExpire = creditsToExpire.map(t => t.id);
+
+    // Log mutations before writing so we can revert if needed
+    for (const credit of creditsToExpire) {
+      mutationLog.write(
+        JSON.stringify({
+          type: 'credit_transaction',
+          id: credit.id,
+          user_id: userId,
+          old: {
+            expiry_date: credit.expiry_date,
+            expiration_baseline_microdollars_used: credit.expiration_baseline_microdollars_used,
+          },
+          new: {
+            expiry_date: EXPIRY_DATE,
+            expiration_baseline_microdollars_used: credit.original_baseline_microdollars_used ?? 0,
+          },
+        }) + '\n'
+      );
+    }
+    mutationLog.write(
+      JSON.stringify({
+        type: 'kilocode_user',
+        id: userId,
+        old: {
+          next_credit_expiration_at: user.next_credit_expiration_at,
+        },
+        // Actual new value is computed by LEAST in DB; record what we know
+        new: {
+          next_credit_expiration_at_input: EXPIRY_DATE,
+        },
+      }) + '\n'
+    );
+
     await db.transaction(async tx => {
       await tx
         .update(credit_transactions)
@@ -360,10 +389,13 @@ async function main() {
   const timestamp = new Date().toISOString().replace(/:/g, '-');
   const outputFile = `expire-free-credits-${timestamp}.jsonl`;
   const errorsFile = `expire-free-credits-${timestamp}.errors.jsonl`;
+  const mutationsFile = `expire-free-credits-${timestamp}.mutations.jsonl`;
   const output = createWriteStream(path.join(outputDir, outputFile));
   const errorLog = createWriteStream(path.join(outputDir, errorsFile));
-  console.log(`Output:  ${path.join(outputDir, outputFile)}`);
-  console.log(`Errors:  ${path.join(outputDir, errorsFile)}\n`);
+  const mutationLog = createWriteStream(path.join(outputDir, mutationsFile));
+  console.log(`Output:     ${path.join(outputDir, outputFile)}`);
+  console.log(`Mutations:  ${path.join(outputDir, mutationsFile)}`);
+  console.log(`Errors:     ${path.join(outputDir, errorsFile)}\n`);
 
   const limit = pLimit(concurrency);
 
@@ -442,7 +474,7 @@ async function main() {
     const results = await Promise.allSettled(
       [...byUser.entries()].map(([userId, credits]) =>
         limit(async () => {
-          const result = await processUser(userId, credits, execute, output);
+          const result = await processUser(userId, credits, execute, output, mutationLog);
           return { userId, result };
         })
       )
@@ -469,6 +501,7 @@ async function main() {
 
   output.end();
   errorLog.end();
+  mutationLog.end();
 
   const fmt = (microdollars: number) =>
     `$${(microdollars / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

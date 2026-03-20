@@ -28,12 +28,7 @@ const USER_UNSPENT = `${TEST_PREFIX}-unspent`;
 const USER_FULLY_SPENT = `${TEST_PREFIX}-fully-spent`;
 const USER_EXISTING_EXPIRY = `${TEST_PREFIX}-existing-expiry`;
 
-const ALL_USER_IDS = [
-  USER_PARTIALLY_SPENT,
-  USER_UNSPENT,
-  USER_FULLY_SPENT,
-  USER_EXISTING_EXPIRY,
-];
+const ALL_USER_IDS = [USER_PARTIALLY_SPENT, USER_UNSPENT, USER_FULLY_SPENT, USER_EXISTING_EXPIRY];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

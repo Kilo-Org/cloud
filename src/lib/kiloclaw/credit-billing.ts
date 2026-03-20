@@ -455,7 +455,7 @@ export async function runCreditRenewalSweep(
             updateSet.scheduled_plan = null;
             updateSet.scheduled_by = null;
             if (effectivePlan === 'commit') {
-              updateSet.commit_ends_at = addMonths(new Date(Date.now()), 6).toISOString();
+              updateSet.commit_ends_at = addMonths(new Date(newPeriodStart), 6).toISOString();
             } else {
               updateSet.commit_ends_at = null;
             }

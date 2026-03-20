@@ -142,8 +142,8 @@ when access lapses, with email notifications at each stage.
    subscription status is trialing or canceled.
 3. The system MUST verify that the user's effective credit balance is
    sufficient to cover the first billing period before proceeding:
-   25,000,000 microdollars for the standard plan (one month) or
-   54,000,000 microdollars for the commit plan (six months paid
+   9,000,000 microdollars for the standard plan (one month) or
+   48,000,000 microdollars for the commit plan (six months paid
    upfront). The effective balance MUST be computed as the current
    credit balance plus the projected bonus credits the user would earn
    from the deduction. The projected bonus MUST be obtained by querying

@@ -308,8 +308,11 @@ async function processUser(
         })
         .where(eq(kilocode_users.id, user.id));
     });
+  }
 
-    // Log mutations after commit so rollbacks don't leave phantom entries
+  // 9. Log mutations (both dry run and execute — after commit in execute mode
+  //    so rollbacks don't leave phantom entries)
+  if (creditsToExpire.length > 0) {
     for (const credit of creditsToExpire) {
       mutationLog.write(
         JSON.stringify({

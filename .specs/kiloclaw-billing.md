@@ -409,10 +409,13 @@ when access lapses, with email notifications at each stage.
     suspended recovery (status past-due, suspended). Separate sweeps
     are not needed.
 15. When a credit-funded subscription has a scheduled plan change and
-    the current period has ended, the renewal sweep MUST apply the
-    plan change before computing the next period's cost, deriving the
-    idempotency key, and deducting the new period's charge. Applying
-    the plan change MUST:
+    the current period has ended, the renewal sweep MUST determine
+    the effective plan and cost before the deduction, but MUST apply
+    the plan mutation inside the same database transaction as the
+    credit deduction and period advancement (rule 3). This ensures
+    that a crash between the plan switch and the charge cannot leave
+    the subscription on the new plan without a corresponding
+    deduction. Applying the plan change MUST:
     - Update the subscription's plan to the scheduled plan value.
     - Clear the scheduled-plan and scheduled-by fields.
     - If switching to commit: set the commit-period end date to six
@@ -533,10 +536,13 @@ when access lapses, with email notifications at each stage.
    past-due subscription with a non-null suspension timestamp is
    successfully renewed.
 2. If the instance start attempt fails, the system MUST log the failure
-   but MUST still proceed with clearing the suspension state. The system
-   does not retry the instance start.
+   and MUST NOT clear the suspension timestamp or destruction deadline.
+   Leaving these fields intact allows the background job (Billing
+   Lifecycle Background Job rule 5) to detect the incomplete
+   auto-resume and retry on the next sweep.
 3. The system MUST clear the suspension timestamp and destruction
-   deadline.
+   deadline only after a successful instance start (or when no instance
+   exists to restart).
 4. The system MUST clear email log entries for suspension, destruction,
    and credit-renewal-failed notifications so they can fire again in a
    future suspension cycle.

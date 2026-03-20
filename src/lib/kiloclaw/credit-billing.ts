@@ -219,17 +219,26 @@ export async function autoResumeIfSuspended(kiloUserId: string): Promise<void> {
     .where(and(eq(kiloclaw_instances.user_id, kiloUserId), isNull(kiloclaw_instances.destroyed_at)))
     .limit(1);
 
+  let startSucceeded = true;
   if (activeInstance) {
     try {
       const client = new KiloClawInternalClient();
       await client.start(kiloUserId);
     } catch (startError) {
+      startSucceeded = false;
       logError('Failed to auto-resume instance', {
         user_id: kiloUserId,
         error: startError instanceof Error ? startError.message : String(startError),
       });
     }
   }
+
+  // Only clear suspension state and email log if the instance restart
+  // succeeded (or there was no instance to restart). When the start call
+  // fails, leaving suspended_at intact lets the background job
+  // (billing-lifecycle-cron rule 5) detect the incomplete auto-resume and
+  // retry on the next sweep.
+  if (!startSucceeded) return;
 
   // Clear suspension/destruction cycle emails + credit renewal failed.
   // Trial and earlybird warnings are one-time events and must NOT be cleared.
@@ -366,27 +375,14 @@ export async function runCreditRenewalSweep(
         continue;
       }
 
-      // Apply scheduled plan change if current period has ended
+      // Determine effective plan (apply scheduled switch if period ended)
       let effectivePlan: 'commit' | 'standard' = row.plan === 'commit' ? 'commit' : 'standard';
+      let hasPlanSwitch = false;
       if (row.scheduled_plan && row.current_period_end) {
         const periodEndTime = new Date(row.current_period_end).getTime();
         if (periodEndTime <= Date.now()) {
           effectivePlan = row.scheduled_plan;
-          const planUpdateFields: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
-            plan: effectivePlan,
-            scheduled_plan: null,
-            scheduled_by: null,
-          };
-          if (effectivePlan === 'commit') {
-            planUpdateFields.commit_ends_at = addMonths(new Date(Date.now()), 6).toISOString();
-          } else {
-            planUpdateFields.commit_ends_at = null;
-          }
-          await database
-            .update(kiloclaw_subscriptions)
-            .set(planUpdateFields)
-            .where(eq(kiloclaw_subscriptions.user_id, row.user_id));
-          summary.plan_switches++;
+          hasPlanSwitch = true;
         }
       }
 
@@ -417,7 +413,7 @@ export async function runCreditRenewalSweep(
         const wasPastDue = row.status === 'past_due';
         const wasSuspended = !!row.suspended_at;
 
-        // Transaction — deduction + period advance
+        // Transaction — plan switch + deduction + period advance (atomic)
         let deductionSucceeded = false;
         await database.transaction(async (tx: DrizzleTransaction) => {
           const insertResult = await tx
@@ -453,6 +449,18 @@ export async function runCreditRenewalSweep(
             auto_top_up_triggered_for_period: null,
           };
 
+          // Apply plan switch atomically with the deduction
+          if (hasPlanSwitch) {
+            updateSet.plan = effectivePlan;
+            updateSet.scheduled_plan = null;
+            updateSet.scheduled_by = null;
+            if (effectivePlan === 'commit') {
+              updateSet.commit_ends_at = addMonths(new Date(Date.now()), 6).toISOString();
+            } else {
+              updateSet.commit_ends_at = null;
+            }
+          }
+
           // Clear past_due on recovery
           if (wasPastDue) {
             updateSet.status = 'active';
@@ -476,6 +484,7 @@ export async function runCreditRenewalSweep(
         if (!deductionSucceeded) continue; // Duplicate, no-op
 
         summary.renewals++;
+        if (hasPlanSwitch) summary.plan_switches++;
 
         // Post-commit: Kilo Pass bonus evaluation
         try {

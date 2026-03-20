@@ -525,6 +525,35 @@ describe('enrollWithCredits', () => {
       Date.now = realNow;
     }
   });
+
+  it('preserves suspended_at when auto-resume start fails', async () => {
+    const realNow = Date.now;
+    Date.now = () => NOW;
+    try {
+      mockStart.mockRejectedValueOnce(new Error('instance unreachable'));
+
+      const suspendedTime = new Date(NOW - 86_400_000 * 3).toISOString();
+      await insertSubscription(user.id, {
+        status: 'canceled',
+        suspended_at: suspendedTime,
+        destruction_deadline: new Date(NOW + 86_400_000 * 4).toISOString(),
+      });
+      await db.insert(kiloclaw_instances).values({
+        user_id: user.id,
+        sandbox_id: 'test-sandbox',
+      });
+
+      await enrollWithCredits(user.id, 'standard');
+
+      expect(mockStart).toHaveBeenCalledWith(user.id);
+      const sub = await getSubscription(user.id);
+      // Suspension state preserved so background job can retry
+      expect(sub.suspended_at).not.toBeNull();
+      expect(sub.destruction_deadline).not.toBeNull();
+    } finally {
+      Date.now = realNow;
+    }
+  });
 });
 
 // ── Credit Renewal Sweep ───────────────────────────────────────────────────

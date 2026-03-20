@@ -16,20 +16,23 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (!isProduction) {
-      window.posthog = posthog;
-      console.log('PostHog disabled in non-production environment');
-      return;
-    }
+    const token = isProduction ? key : 'fake-token';
 
-    posthog.init(key, {
+    posthog.init(token, {
       api_host: '/ingest',
       ui_host: 'https://us.posthog.com',
       disable_web_experiments: false,
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
+      disable_session_recording: !isProduction,
+      opt_out_capturing_by_default: !isProduction,
+      advanced_disable_flags: !isProduction,
+      internal_or_test_user_hostname: 'localhost',
     });
     window.posthog = posthog; // Reveal PostHog object globally
+    if (!isProduction) {
+      console.log('PostHog network disabled in non-production environment');
+    }
     if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
       posthog.debug(true);
     } else if (localStorage.getItem('ph_debug')) {
@@ -52,6 +55,8 @@ function PostHogPageView() {
   const posthog = usePostHog();
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') return;
+
     if (pathname && posthog) {
       let url = window.origin + pathname;
       const search = searchParams.toString();
@@ -79,6 +84,8 @@ function IdentifyUser() {
   const previousStatusRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') return;
+
     // Check if posthog is loaded before using it
     if (!posthog || !posthog.__loaded) return;
 

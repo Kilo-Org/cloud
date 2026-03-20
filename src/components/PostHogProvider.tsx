@@ -25,9 +25,14 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       disable_web_experiments: false,
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
-      disable_session_recording: !isProduction,
-      opt_out_capturing_by_default: !isProduction,
-      advanced_disable_flags: !isProduction,
+      loaded: function (ph) {
+        if (!isProduction) {
+          // Opt out of capturing in non-production environments
+          ph.opt_out_capturing();
+          ph.set_config({ disable_session_recording: true });
+          console.log('PostHog capturing disabled in non-production environment');
+        }
+      },
     });
     window.posthog = posthog; // Reveal PostHog object globally
     if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {

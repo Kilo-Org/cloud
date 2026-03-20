@@ -113,6 +113,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
+  KiloClawPaymentSource,
 } as const;
 
 export const credit_transactions = pgTable(

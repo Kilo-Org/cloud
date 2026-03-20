@@ -264,15 +264,15 @@ async function performAutoTopUpForEntity(
         ? { type: 'auto-topup', kiloUserId: entity.user.id, traceId }
         : { type: 'org-auto-topup', organizationId: entity.organization.id, traceId };
 
-    const invoice = await client.invoices.create(
-      {
-        customer: stripe_customer_id,
-        auto_advance: false,
-        metadata: invoiceMetadata,
-        description: 'Kilo automatic top up',
-      },
-      idempotencyKey ? { idempotencyKey } : undefined
-    );
+    const invoiceParams = {
+      customer: stripe_customer_id,
+      auto_advance: false,
+      metadata: invoiceMetadata,
+      description: 'Kilo automatic top up',
+    } as const;
+    const invoice = idempotencyKey
+      ? await client.invoices.create(invoiceParams, { idempotencyKey })
+      : await client.invoices.create(invoiceParams);
 
     // Attach the line item directly to this invoice.
     // (Creating a pending invoice item and then creating an invoice can produce a $0 invoice,

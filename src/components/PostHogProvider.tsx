@@ -16,6 +16,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Use a fake token for non-production environments as recommended by PostHog
     const token = isProduction ? key : 'fake-token';
 
     posthog.init(token, {
@@ -27,12 +28,8 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       disable_session_recording: !isProduction,
       opt_out_capturing_by_default: !isProduction,
       advanced_disable_flags: !isProduction,
-      internal_or_test_user_hostname: 'localhost',
     });
     window.posthog = posthog; // Reveal PostHog object globally
-    if (!isProduction) {
-      console.log('PostHog network disabled in non-production environment');
-    }
     if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
       posthog.debug(true);
     } else if (localStorage.getItem('ph_debug')) {
@@ -55,8 +52,6 @@ function PostHogPageView() {
   const posthog = usePostHog();
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') return;
-
     if (pathname && posthog) {
       let url = window.origin + pathname;
       const search = searchParams.toString();
@@ -84,8 +79,6 @@ function IdentifyUser() {
   const previousStatusRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') return;
-
     // Check if posthog is loaded before using it
     if (!posthog || !posthog.__loaded) return;
 

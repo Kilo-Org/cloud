@@ -28,7 +28,8 @@ type AutoModel = {
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   id: 'kilo-auto/frontier',
   name: 'Kilo Auto Frontier',
-  description: 'Highest performance and capability for any task.',
+  description:
+    'Highest capability. Routes to Claude Opus 4.6 with extended thinking for planning, architecture, debugging, and general tasks; Claude Sonnet 4.6 with extended thinking for coding and exploration.',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   prompt_price: '0.000005',
@@ -44,7 +45,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: 'Free with limited capability. No credits required.',
+  description: 'Powered by Minimax M2.5. No credits required.',
   context_length: minimax_m25_free_model.context_length,
   max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
   prompt_price: '0',
@@ -60,7 +61,8 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
-  description: 'Great balance of price and capability.',
+  description:
+    'Great balance of price and capability. Routes to Kimi K2.5 with reasoning for planning, architecture, debugging, and general tasks; Minimax M2.5 for coding and exploration.',
   context_length: 204800,
   max_completion_tokens: 131072,
   prompt_price: '0.0000006',
@@ -76,7 +78,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   id: 'kilo-auto/small',
   name: 'Kilo Auto Small',
-  description: 'Automatically routes your request to a small model.',
+  description: 'Powered by GPT-5 Nano. Fast and lightweight for simple tasks.',
   context_length: 400_000,
   max_completion_tokens: 128_000,
   prompt_price: '0.00000005',

@@ -78,7 +78,7 @@ export const createRoleTestingGroup = (
 export const createAdminLinks = (): OmniboxAdminLink[] => [
   {
     label: 'Admin Panel',
-    href: '/admin/organizations',
+    href: '/admin/users',
     icon: Building2,
   },
   {

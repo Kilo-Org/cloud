@@ -272,12 +272,20 @@ async function processUser(
     projected_expired_amount_microdollars: expiredByOriginalId.get(t.id) ?? 0,
   }));
 
+  const projectedNoScript = currentBalance - existingExpiredTotal;
+  const scriptExpiredTotal = creditsToExpire.reduce(
+    (sum, t) => sum + (expiredByOriginalId.get(t.id) ?? 0),
+    0
+  );
+  const projectedAfterScript = projectedNoScript - scriptExpiredTotal;
+
   // 7. Write JSONL line
   const logLine = JSON.stringify({
     user_id: user.id,
     next_credit_expiration_at: user.next_credit_expiration_at,
     current_balance_microdollars: currentBalance,
-    projected_balance_microdollars: projectedBalance,
+    projected_no_script_microdollars: projectedNoScript,
+    projected_after_script_microdollars: projectedAfterScript,
     credits_affected: creditsAffectedWithProjection,
     credits_skipped: creditsSkipped.length > 0 ? creditsSkipped.map(c => c.id) : undefined,
   });

@@ -29,7 +29,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   id: 'kilo-auto/frontier',
   name: 'Kilo Auto Frontier',
   description:
-    'Highest capability. Routes to Claude Opus 4.6 with extended thinking for planning, architecture, debugging, and general tasks; Claude Sonnet 4.6 with extended thinking for coding and exploration.',
+    'Highest capability. Plan, architect, orchestrator, ask, debug → Claude Opus 4.6 with extended thinking (high effort); general → Claude Opus 4.6 with extended thinking (medium effort); build, explore → Claude Sonnet 4.6 with extended thinking (medium effort); code → Claude Sonnet 4.6 with extended thinking (low effort).',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   prompt_price: '0.000005',
@@ -62,7 +62,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
   description:
-    'Great balance of price and capability. Routes to Kimi K2.5 with reasoning for planning, architecture, debugging, and general tasks; Minimax M2.5 for coding and exploration.',
+    'Great balance of price and capability. Plan, architect, orchestrator, ask, debug, general → Kimi K2.5 with reasoning; build, explore, code → Minimax M2.5.',
   context_length: 204800,
   max_completion_tokens: 131072,
   prompt_price: '0.0000006',

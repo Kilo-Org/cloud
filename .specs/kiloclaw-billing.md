@@ -1,9 +1,21 @@
 # KiloClaw Billing
 
+## Role of This Document
+
+This spec defines the business rules and invariants for KiloClaw
+billing. It is the source of truth for _what_ the system must
+guarantee — valid states, ownership boundaries, correctness
+properties, and user-facing behavior. It deliberately does not
+prescribe _how_ to implement those guarantees: handler names, column
+layouts, conflict-resolution strategies, null-safety patterns, and
+other implementation choices belong in plan documents and code, not
+here.
+
 ## Status
 
 Draft -- generated from branch `jdp/kiloclaw-billing` on 2026-03-13.
 Updated 2026-03-19 -- pricing and trial duration changes.
+Updated 2026-03-20 -- Stripe-to-credits hybrid billing model.
 
 ## Conventions
 
@@ -13,6 +25,30 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
 BCP 14 [RFC 2119] [RFC 8174] when, and only when, they appear in all
 capitals, as shown here.
 
+## Definitions
+
+- **Legacy Stripe subscription**: A subscription with payment source
+  `stripe` and a non-null payment provider subscription ID. The
+  payment provider owns all state.
+- **Hybrid subscription**: A subscription with payment source
+  `credits` and a non-null payment provider subscription ID. The
+  payment provider collects payment; the local billing engine tracks
+  the period via credits.
+- **Pure credit subscription**: A subscription with payment source
+  `credits` and a null payment provider subscription ID. The local
+  credit renewal sweep owns all state.
+- **Stripe-funded subscription**: Any subscription with a non-null
+  payment provider subscription ID (legacy Stripe or hybrid). Used
+  throughout this spec to mean "has Stripe billing infrastructure"
+  regardless of payment source.
+- **Invoice settlement**: The process triggered by a paid KiloClaw
+  invoice from the payment provider that converts the payment into
+  balanced credit ledger entries and advances the subscription
+  period. Defined in Stripe-Funded Credit Settlement.
+- **Dunning state**: A non-active payment failure status reported by
+  the payment provider (past-due, unpaid, or defensive terminal
+  fallback).
+
 ## Overview
 
 KiloClaw Billing manages the subscription lifecycle for KiloClaw hosted
@@ -20,13 +56,18 @@ instances. Users access the service through one of two subscription
 plans: a discounted six-month commit plan or a month-to-month standard
 plan. Each plan can be funded either through the external payment
 provider (Stripe) or by deducting from the user's KiloPass credit
-balance. The commit plan auto-renews for successive six-month periods
-at the same price; users may switch between plans at any time. New
-users who provision an instance without subscribing first automatically
-receive a 7-day free trial. A legacy earlybird purchase also grants
-access until a fixed expiry date. A periodic background job enforces
-expiry, credit renewal, suspension, and eventual instance destruction
-when access lapses, with email notifications at each stage.
+balance. Stripe-funded subscriptions are lazily converted to a hybrid
+state on their first settled invoice: the system records the payment
+source as `credits` while preserving the payment provider subscription
+ID, allowing Stripe to continue collecting payment while the local
+billing engine tracks the period via credits. The commit plan
+auto-renews for successive six-month periods at the same price; users
+may switch between plans at any time. New users who provision an
+instance without subscribing first automatically receive a 7-day free
+trial. A legacy earlybird purchase also grants access until a fixed
+expiry date. A periodic background job enforces expiry, credit
+renewal, suspension, and eventual instance destruction when access
+lapses, with email notifications at each stage.
 
 ## Rules
 
@@ -58,18 +99,73 @@ when access lapses, with email notifications at each stage.
 
 1. The system MUST record a payment source for each subscription. The
    value MUST be either `stripe` or `credits`.
-2. A subscription with payment source `stripe` MUST have a non-null
+2. The system MUST enforce exactly three valid combinations of payment
+   source and payment provider subscription ID:
+
+   | State         | payment_source | provider subscription ID |
+   | ------------- | -------------- | ------------------------ |
+   | Legacy Stripe | `stripe`       | non-null                 |
+   | Hybrid        | `credits`      | non-null                 |
+   | Pure credit   | `credits`      | null                     |
+
+   A subscription with payment source `stripe` MUST have a non-null
    payment provider subscription ID. A subscription with payment source
-   `credits` MUST have a null payment provider subscription ID.
+   `credits` MAY have a non-null payment provider subscription ID
+   (hybrid) or a null one (pure credit). No other combination is
+   valid.
+
 3. A subscription with payment source `credits` MUST record a credit
    renewal timestamp indicating when the next credit deduction is due.
 4. At most one subscription record per user is allowed regardless of
    payment source (see Plans rule 5).
-5. The system MUST NOT allow a user to hold simultaneous subscriptions
-   with different payment sources. Switching between payment sources
-   is deferred to a future phase; users who wish to change payment
-   source MUST cancel their current subscription and re-enroll after
-   the billing period ends.
+5. User-initiated switching between payment sources is not supported.
+   Users MUST NOT be able to manually change a subscription's payment
+   source; they MUST cancel and re-enroll to change funding method.
+   System-initiated conversion from legacy Stripe to hybrid (`stripe`
+   to `credits` with the provider subscription ID preserved) occurs
+   automatically when a KiloClaw invoice is settled (see
+   Stripe-Funded Credit Settlement). This is a one-way lazy
+   migration, not a user action.
+
+### Hybrid Subscription Ownership
+
+When a subscription is in the hybrid state, multiple events may
+attempt to mutate the same subscription. The following ownership
+rules resolve conflicts.
+
+1. Invoice settlement MUST be the sole authority for hybrid-row
+   successful payment: advancing the billing period, mutating the
+   plan, updating the credit renewal timestamp, updating the
+   commitment end date, and recovering the subscription to active
+   status. No other event or background process MAY perform these
+   operations on a hybrid row.
+2. Subscription status-change events from the payment provider for
+   hybrid rows MUST be limited to propagating cancel intent and
+   dunning states. They MUST NOT overwrite the payment source,
+   plan, billing period, credit renewal timestamp, or commitment end
+   date. They MUST NOT recover hybrid rows to active status, clear
+   suspension state, or trigger auto-resume.
+3. Subscription creation events from the payment provider MUST NOT
+   revert an already-hybrid row's converted state. The hybrid row's
+   payment source, plan, billing period, credit renewal timestamp,
+   and commitment end date MUST be preserved. Payment provider
+   metadata (subscription ID, cancel intent) MUST still be updated.
+4. Schedule lifecycle events (completion, release) for hybrid rows
+   MUST clear schedule tracking state but MUST NOT mutate the plan
+   or commitment end date. Plan mutation is owned by invoice
+   settlement (rule 1). Schedule events and settled invoices may
+   arrive in either order; the system MUST tolerate both orderings.
+5. The credit renewal sweep MUST NOT select hybrid rows (see Credit
+   Renewal rule 1). Hybrid-row renewal is owned entirely by invoice
+   settlement.
+6. The interrupted auto-resume retry in the billing lifecycle
+   background job MUST include hybrid rows. A hybrid row can need
+   retry if auto-resume was interrupted after invoice settlement
+   recovered it to active (see Billing Lifecycle Background Job
+   rule 5).
+7. For non-hybrid rows (legacy Stripe or pure credit), all existing
+   event-handling and sweep behaviors MUST remain unchanged. The
+   ownership rules in this section apply ONLY to hybrid rows.
 
 ### Trial Eligibility and Creation
 
@@ -132,6 +228,12 @@ when access lapses, with email notifications at each stage.
    sessions from concurrent requests are tolerable because each requires
    independent user action to complete, and rule 3 prevents duplicate
    subscriptions.
+10. After a Stripe checkout completes, the subscription MUST NOT be
+    reported as fully activated until invoice settlement has completed
+    (see Stripe-Funded Credit Settlement). Subscription creation from
+    the payment provider is an intermediate state; the system MUST
+    treat a subscription as fully activated only after settlement has
+    converted it to the hybrid state.
 
 ### Credit Enrollment
 
@@ -206,6 +308,60 @@ when access lapses, with email notifications at each stage.
    date six calendar months from enrollment, consistent with Commit
    Plan Lifecycle rule 2.
 
+### Stripe-Funded Credit Settlement
+
+When the payment provider reports a paid invoice for a KiloClaw
+subscription, the system converts the payment into credit-accounted
+settlement. This is the mechanism by which legacy Stripe rows become
+hybrid rows (see Payment Sources rule 2) and by which existing hybrid
+rows renew.
+
+1. The system MUST identify KiloClaw invoices by matching a line
+   item's price against the configured KiloClaw price identifiers.
+   Invoices with no matching line item MUST NOT be processed by
+   this flow. If required invoice data (charge identifier,
+   subscription identifier, matching line item, or period
+   boundaries) is absent, the system MUST log a warning and skip
+   the invoice.
+2. The settled plan and billing period boundaries MUST be derived
+   from the invoice, not from local subscription state or
+   wall-clock time. The invoice is authoritative because local
+   schedule tracking may have been cleared before the invoice
+   arrives (see Hybrid Subscription Ownership rule 4).
+3. Settlement MUST be balance-neutral: the system MUST record a
+   positive credit entry and a matching negative credit deduction
+   in a single atomic operation. The user's visible credit balance
+   MUST NOT change as a result.
+4. The deduction amount MUST equal the settled invoice amount. The
+   system MUST NOT substitute locally defined plan cost constants.
+   Payment-provider-side adjustments (first-month discounts,
+   prorations) flow through as-is.
+5. Settlement MUST be idempotent. Processing the same invoice twice
+   MUST NOT produce duplicate credits or duplicate deductions.
+6. On successful settlement the system MUST:
+   a. Set payment source to `credits`, preserving the payment
+   provider subscription ID (converting a legacy Stripe row to
+   hybrid, or no-op for an already-hybrid row).
+   b. Set subscription status to active.
+   c. Advance the billing period and credit renewal timestamp to
+   the invoice-derived boundaries.
+   d. For commit plans, update the commitment end date to the
+   invoice's period end. For standard plans, clear it.
+   e. Clear past-due state and any auto-top-up marker for the
+   prior period.
+7. If a scheduled plan change matches the settled invoice's plan,
+   the system MUST clear the schedule tracking state atomically
+   with settlement. If the invoice plan differs from the current
+   plan and there is no matching scheduled change, the system MUST
+   treat the settled invoice as authoritative and log a warning.
+8. If the subscription was past-due or suspended before settlement,
+   the system MUST trigger the auto-resume procedure after the
+   settlement transaction commits (see Auto-Resume on Payment
+   Recovery).
+9. After the settlement transaction commits, the system MUST
+   trigger a bonus credit evaluation as described in Credit
+   Enrollment rule 6.
+
 ### Commit Plan Lifecycle
 
 1. A commit subscription MUST remain on the commit price in the payment
@@ -216,10 +372,14 @@ when access lapses, with email notifications at each stage.
    When a delayed-billing period is configured, the six months MUST
    start from the delayed-billing end date, not from subscription
    creation.
-3. When a subscription update is received and the commit-period end
-   date is in the past, the system MUST extend it by six calendar
-   months from the previous boundary, keeping the subscription on the
-   commit plan.
+3. For legacy Stripe rows, when a subscription update is received and
+   the commit-period end date is in the past, the system MUST extend
+   it by six calendar months from the previous boundary, keeping the
+   subscription on the commit plan. For hybrid rows, commit-period
+   extension is handled by invoice settlement (see Stripe-Funded
+   Credit Settlement rule 6d); subscription status-change events
+   MUST NOT extend the commit-period end date (see Hybrid
+   Subscription Ownership rule 2).
 4. When a user-initiated plan-switch schedule completes or is
    released/canceled, the system MUST apply or clear the schedule
    tracking fields as appropriate (see Plan Switching).
@@ -239,35 +399,42 @@ when access lapses, with email notifications at each stage.
 5. For a standard-to-commit switch, the recorded scheduled-plan MUST
    be commit.
 6. When a plan-switch schedule reaches a terminal status (completed or
-   released) and the local schedule tracking fields still reference
-   the schedule, the system MUST apply the scheduled plan and update
-   the commit-period end date accordingly. Intentional releases
+   released) and the local schedule tracking state still references
+   the schedule: for legacy Stripe rows the system MUST apply the
+   scheduled plan and update the commit-period end date accordingly;
+   for hybrid rows the system MUST clear the schedule tracking state
+   but MUST NOT mutate the plan or commitment end date (see Hybrid
+   Subscription Ownership rule 4). Plan mutation for hybrid rows
+   occurs when the corresponding invoice is settled (see
+   Stripe-Funded Credit Settlement rule 7). Intentional releases
    (cancellation or cancel-plan-switch) clear the local schedule
-   reference before the webhook fires, so the schedule event handler
-   MUST NOT match those rows.
+   reference before the event fires, so the schedule event MUST NOT
+   match those rows.
 7. When a standard-to-commit switch takes effect, the system MUST set
    the commit-period end date to six calendar months from the
    transition date.
 8. The system MUST allow cancellation of user-initiated plan switches.
-9. For credit-funded subscriptions, a plan switch MUST NOT create a
+9. For pure credit subscriptions, a plan switch MUST NOT create a
    payment-provider schedule. The system MUST record the scheduled
-   plan locally and apply it at the next period boundary during
-   the credit renewal sweep.
-10. For credit-funded subscriptions, canceling a plan switch MUST clear
+   plan locally and apply it at the next period boundary during the
+   credit renewal sweep.
+10. For pure credit subscriptions, canceling a plan switch MUST clear
     the locally recorded scheduled plan. No payment-provider API call
     is needed.
-11. Cross-payment-source switching (credits to Stripe or vice versa) is
-    NOT RECOMMENDED in v1. Users who wish to change payment source
-    MUST cancel their current subscription and re-enroll after the
-    billing period ends.
+11. User-initiated cross-payment-source switching (credits to Stripe or
+    vice versa) is NOT RECOMMENDED. Users who wish to change payment
+    source MUST cancel their current subscription and re-enroll after
+    the billing period ends. System-initiated conversion from legacy
+    Stripe to hybrid via invoice settlement (see Payment Sources
+    rule 5 and Stripe-Funded Credit Settlement) is not governed by
+    this rule.
 
 ### Cancellation and Reactivation
 
 1. The system MUST reject a cancellation request if no active
-   subscription exists. For Stripe-funded subscriptions, the payment
-   provider subscription ID MUST be present. For credit-funded
-   subscriptions, the payment source MUST be `credits` and status
-   MUST be active.
+   subscription exists. For Stripe-funded subscriptions, the provider
+   subscription ID MUST be present. For pure credit subscriptions,
+   the payment source MUST be `credits` and status MUST be active.
 2. The system MUST reject a cancellation request if cancellation is
    already pending.
 3. When canceling a Stripe-funded subscription that has a pending
@@ -278,7 +445,7 @@ when access lapses, with email notifications at each stage.
 5. For Stripe-funded subscriptions, the system MUST set the
    cancel-at-period-end flag on both the payment provider and in the
    local database.
-6. For credit-funded subscriptions, the system MUST set the
+6. For pure credit subscriptions, the system MUST set the
    cancel-at-period-end flag in the local database only. No payment
    provider API call is needed. The credit renewal sweep handles the
    period-end transition (see Credit Renewal rule 5).
@@ -287,7 +454,7 @@ when access lapses, with email notifications at each stage.
 8. On reactivation of a Stripe-funded subscription, the system MUST
    clear the cancel-at-period-end flag on both the payment provider
    and in the local database.
-9. On reactivation of a credit-funded subscription, the system MUST
+9. On reactivation of a pure credit subscription, the system MUST
    clear the cancel-at-period-end flag in the local database only.
 
 ### Billing Lifecycle Background Job
@@ -299,18 +466,27 @@ when access lapses, with email notifications at each stage.
    a failure for one user MUST NOT prevent processing of other users.
 3. All errors during sweep processing MUST be captured for monitoring.
 4. The credit renewal sweep MUST run before all other sweeps so that
-   credit-funded subscriptions are renewed (or marked past-due, or
+   pure credit subscriptions are renewed (or marked past-due, or
    canceled) before the existing sweeps evaluate expiry and suspension.
-5. The background job MUST detect credit-funded subscriptions in
-   active status that still have a non-null suspension timestamp
-   (indicating a prior auto-resume was interrupted) and retry the
-   auto-resume procedure for those subscriptions.
+   Hybrid rows are excluded from the credit renewal sweep (see Credit
+   Renewal rule 1); their renewal is handled by invoice settlement.
+5. The background job MUST detect subscriptions with payment source
+   `credits` (both hybrid and pure credit) in active status that
+   still have a non-null suspension timestamp (indicating a prior
+   auto-resume was interrupted) and retry the auto-resume procedure
+   for those subscriptions. This MUST include hybrid rows; a hybrid
+   row can need retry if auto-resume was interrupted after invoice
+   settlement recovered it to active.
 
 ### Credit Renewal
 
-1. The credit renewal sweep MUST select all subscriptions where
-   payment source is `credits`, status is active or past-due, and
-   the credit renewal timestamp is at or before the current time.
+1. The credit renewal sweep MUST select only pure credit subscriptions
+   where status is active or past-due and the credit renewal timestamp
+   is at or before the current time. Hybrid subscriptions MUST NOT be
+   selected; their renewal is owned by invoice settlement (see
+   Stripe-Funded Credit Settlement). The payment provider's dunning
+   process handles payment failure for hybrid subscriptions;
+   status-change events propagate past-due state to the local row.
 2. Each credit deduction MUST use a period-encoded category key
    with a uniqueness constraint. The key MUST be derived from the
    subscription's credit renewal timestamp (the period boundary being
@@ -408,7 +584,7 @@ when access lapses, with email notifications at each stage.
     grace-period recovery (status past-due, not suspended), and
     suspended recovery (status past-due, suspended). Separate sweeps
     are not needed.
-15. When a credit-funded subscription has a scheduled plan change and
+15. When a pure credit subscription has a scheduled plan change and
     the current period has ended, the renewal sweep MUST determine
     the effective plan and cost before the deduction, but MUST apply
     the plan mutation inside the same database transaction as the
@@ -424,6 +600,8 @@ when access lapses, with email notifications at each stage.
     - If switching to standard: clear the commit-period end date.
       After the plan change is applied, subsequent sweeps MUST NOT
       reapply it (the cleared scheduled-plan field prevents this).
+      This rule does not apply to hybrid rows; hybrid plan switching
+      is handled by Stripe-Funded Credit Settlement rule 10.
 
 ### Auto Top-Up Integration with Credit Renewal
 
@@ -508,9 +686,11 @@ when access lapses, with email notifications at each stage.
 3. The system MUST send a payment-suspended notification.
 4. The 14-day threshold MUST be measured from the time the subscription
    first entered past-due status, not from the last database update.
-   For credit-funded subscriptions, past-due status is set by the
-   credit renewal sweep; for Stripe-funded subscriptions, it is set
-   by the payment provider webhook.
+   For pure credit subscriptions, past-due status is set by the credit
+   renewal sweep. For legacy Stripe subscriptions, it is set by the
+   payment provider status-change event. For hybrid subscriptions, it
+   is set by the payment provider's dunning state propagation (see
+   Hybrid Subscription Ownership rule 2).
 
 ### Email Notifications
 
@@ -530,11 +710,15 @@ when access lapses, with email notifications at each stage.
 
 1. When a subscription transitions to active while the user is
    suspended, the system MUST attempt to start the user's instance.
-   For Stripe-funded subscriptions, this transition is detected by
-   the payment provider webhook. For credit-funded subscriptions,
-   this transition is detected by the credit renewal sweep when a
-   past-due subscription with a non-null suspension timestamp is
-   successfully renewed.
+   For legacy Stripe subscriptions, this transition is detected by a
+   payment provider status-change event. For pure credit
+   subscriptions, this transition is detected by the credit renewal
+   sweep when a past-due subscription with a non-null suspension
+   timestamp is successfully renewed. For hybrid subscriptions, this
+   transition is detected by the invoice settlement path (see
+   Stripe-Funded Credit Settlement rule 8); payment provider
+   status-change events MUST NOT trigger auto-resume for hybrid rows
+   (see Hybrid Subscription Ownership rule 2).
 2. If the instance start attempt fails, the system MUST log the failure
    and MUST NOT clear the suspension timestamp or destruction deadline.
    Leaving these fields intact allows the background job (Billing
@@ -557,10 +741,17 @@ when access lapses, with email notifications at each stage.
 2. When the payment provider reports "incomplete" or "paused" status,
    the system MUST map these to terminal statuses (unpaid or canceled
    respectively).
-3. Credit-funded subscriptions have no payment provider status. Their
+3. Pure credit subscriptions have no payment provider status. Their
    status MUST be managed entirely by the credit renewal sweep and
-   the billing lifecycle sweeps. Payment provider status mapping rules
-   MUST NOT apply to credit-funded subscriptions.
+   the billing lifecycle sweeps. Payment provider status mapping
+   rules MUST NOT apply to pure credit subscriptions.
+4. Hybrid subscriptions receive limited payment provider status
+   mapping. Only dunning states MUST be propagated from payment
+   provider status changes. Recovery to active status, plan changes,
+   period advancement, and clearing of suspension state MUST NOT
+   be applied from status-change events for hybrid subscriptions;
+   these are owned by invoice settlement (see Hybrid Subscription
+   Ownership rules 1-2).
 
 ### Billing Status Reporting
 
@@ -582,10 +773,18 @@ when access lapses, with email notifications at each stage.
 5. When the payment source is `credits`, the billing status MUST also
    include the credit renewal timestamp and the renewal cost for the
    next billing period so the frontend can display the next renewal
-   date and amount due.
-6. The billing status MUST include earlybird data (expiry date, days
+   date and amount due. For hybrid subscriptions, the renewal cost is
+   Stripe-determined; the system MUST report a plan-based
+   approximation or indicate that renewal is billed via Stripe.
+6. The billing status MUST include a Stripe-funding indicator that is
+   true for Stripe-funded subscriptions and false for pure credit
+   subscriptions. The frontend MUST use this indicator — not payment
+   source alone — to determine whether to show Stripe portal access,
+   payment method management, or credit-specific UI such as the
+   top-up flow.
+7. The billing status MUST include earlybird data (expiry date, days
    remaining) when the user has an earlybird purchase.
-7. The billing status MUST include instance data (whether an
+8. The billing status MUST include instance data (whether an
    undestroyed instance exists, suspension timestamp, destruction
    deadline, and destroyed flag) when any instance record exists.
 
@@ -596,10 +795,12 @@ when access lapses, with email notifications at each stage.
    methods.
 2. The billing portal session MUST redirect the user back to the
    dashboard upon completion.
-3. The billing portal MUST NOT be offered for credit-funded
-   subscriptions. The frontend MUST NOT call the billing portal
-   endpoint when the user's payment source is `credits`; it MUST
-   direct the user to the credit top-up flow instead.
+3. The billing portal MUST NOT be offered for pure credit
+   subscriptions. The frontend MUST use the Stripe-funding indicator
+   (see Billing Status Reporting rule 6), not payment source alone,
+   to determine portal eligibility. Hybrid subscriptions MUST have
+   portal access for Stripe payment method management. Pure credit
+   users MUST be directed to the credit top-up flow instead.
 
 ### User Data Deletion
 
@@ -613,6 +814,25 @@ when access lapses, with email notifications at each stage.
    requirements on credit transaction records.
 
 ### Changelog
+
+#### 2026-03-20 -- Stripe-to-credits hybrid billing model
+
+- Introduced the hybrid subscription state: `payment_source='credits'`
+  with a non-null payment provider subscription ID. Legacy Stripe rows
+  lazily convert to hybrid on their next settled invoice.
+- Added Stripe-Funded Credit Settlement section defining the invoice
+  settlement path.
+- Added Hybrid Subscription Ownership section defining which events
+  own which mutations for hybrid rows.
+- Changed discriminants throughout the spec from payment source to
+  payment provider subscription ID presence for: plan switching,
+  cancellation, reactivation, billing portal, and renewal sweep scope.
+- Credit renewal sweep now excludes hybrid rows; hybrid renewal is
+  owned by invoice settlement.
+- Payment provider status mapping now includes a limited hybrid path:
+  non-active dunning states only.
+- Billing status now includes a Stripe-funding indicator.
+- Checkout success activation now requires invoice settlement.
 
 #### 2026-03-19 -- Pricing and trial changes
 

@@ -98,6 +98,17 @@ function makeCredit(
   };
 }
 
+const EXPECTED_LOCAL_DB_URL = 'postgres://postgres:postgres@localhost:5432/postgres';
+
+function assertLocalDatabase() {
+  const dbUrl = process.env.POSTGRES_SCRIPT_URL ?? process.env.POSTGRES_URL ?? '';
+  if (dbUrl !== EXPECTED_LOCAL_DB_URL) {
+    console.error(`ABORT: Expected local database URL but got: ${dbUrl}`);
+    console.error(`Expected: ${EXPECTED_LOCAL_DB_URL}`);
+    process.exit(1);
+  }
+}
+
 let insertedCreditIds: string[] = [];
 
 async function setup() {
@@ -632,11 +643,12 @@ async function runAssertions(): Promise<AssertionResult[]> {
 
 async function main() {
   try {
+    assertLocalDatabase();
     await setup();
 
     console.log('Running expire-free-credits script with --execute...\n');
     const output = execSync(
-      'pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --execute --batch-size=1',
+      'pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --execute --yes --batch-size=1',
       {
         cwd: process.cwd(),
         encoding: 'utf-8',

@@ -100,6 +100,17 @@ async function takeSnapshot(): Promise<Snapshot> {
   };
 }
 
+const EXPECTED_LOCAL_DB_URL = 'postgres://postgres:postgres@localhost:5432/postgres';
+
+function assertLocalDatabase() {
+  const dbUrl = process.env.POSTGRES_SCRIPT_URL ?? process.env.POSTGRES_URL ?? '';
+  if (dbUrl !== EXPECTED_LOCAL_DB_URL) {
+    console.error(`ABORT: Expected local database URL but got: ${dbUrl}`);
+    console.error(`Expected: ${EXPECTED_LOCAL_DB_URL}`);
+    process.exit(1);
+  }
+}
+
 let insertedCreditIds: string[] = [];
 
 async function setup() {
@@ -163,6 +174,7 @@ type AssertionResult = { name: string; passed: boolean; detail?: string };
 
 async function main() {
   try {
+    assertLocalDatabase();
     await setup();
 
     // 1. Take snapshot of original state
@@ -171,7 +183,7 @@ async function main() {
     // 2. Run the expire script
     console.log('Running expire-free-credits script with --execute...\n');
     const expireOutput = execSync(
-      'pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --execute --batch-size=1',
+      'pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --execute --yes --batch-size=1',
       { cwd: process.cwd(), encoding: 'utf-8', env: { ...process.env }, timeout: 120_000 }
     );
     console.log(expireOutput);
@@ -189,7 +201,7 @@ async function main() {
     const mutationsFile = findLatestMutationsFile();
     console.log(`Running revert script with mutations file: ${mutationsFile}\n`);
     const revertOutput = execSync(
-      `pnpm script src/scripts/d2026-03-18_expire-free-credits-revert.ts ${mutationsFile} --execute`,
+      `pnpm script src/scripts/d2026-03-18_expire-free-credits-revert.ts ${mutationsFile} --execute --yes`,
       { cwd: process.cwd(), encoding: 'utf-8', env: { ...process.env }, timeout: 120_000 }
     );
     console.log(revertOutput);

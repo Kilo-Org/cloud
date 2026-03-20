@@ -29,6 +29,7 @@ import '../lib/load-env';
 import { createWriteStream } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { createInterface } from 'node:readline';
 import pLimit from 'p-limit';
 import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
@@ -130,17 +131,21 @@ function parseCreditCategoryRows(): CreditCategoryRow[] {
 
 function parseArgs(): {
   execute: boolean;
+  yes: boolean;
   batchSize: number;
   concurrency: number;
 } {
   const args = process.argv.slice(2);
   let execute = false;
+  let yes = false;
   let batchSize = 10_000;
   let concurrency = 50;
 
   for (const arg of args) {
     if (arg === '--execute') {
       execute = true;
+    } else if (arg === '--yes' || arg === '-y') {
+      yes = true;
     } else if (arg.startsWith('--batch-size=')) {
       const value = parseInt(arg.split('=')[1], 10);
       if (isNaN(value) || value <= 0) {
@@ -158,7 +163,7 @@ function parseArgs(): {
     }
   }
 
-  return { execute, batchSize, concurrency };
+  return { execute, yes, batchSize, concurrency };
 }
 
 // ── Process a single user ────────────────────────────────────────────────────
@@ -360,7 +365,7 @@ async function processUser(
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { execute, batchSize, concurrency } = parseArgs();
+  const { execute, yes, batchSize, concurrency } = parseArgs();
   const rows = parseCreditCategoryRows();
 
   console.log(`Mode: ${execute ? 'EXECUTE' : 'DRY RUN'}`);
@@ -371,6 +376,29 @@ async function main() {
 
   for (const row of rows) {
     console.log(`  ${row.category} | ${row.description ?? '(any)'}`);
+  }
+  console.log();
+
+  // Show DB target and ask for confirmation
+  const dbUrl = process.env.POSTGRES_SCRIPT_URL ?? process.env.POSTGRES_URL ?? '(unknown)';
+  const dbHost = (() => {
+    try {
+      return new URL(dbUrl).hostname;
+    } catch {
+      return dbUrl;
+    }
+  })();
+  console.log(`Database: ${dbHost}`);
+  if (!yes) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise<string>(resolve => {
+      rl.question(`\nProceed? (y/N) `, resolve);
+    });
+    rl.close();
+    if (answer.trim().toLowerCase() !== 'y') {
+      console.log('Aborted.');
+      return;
+    }
   }
   console.log();
 

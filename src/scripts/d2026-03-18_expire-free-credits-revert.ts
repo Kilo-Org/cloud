@@ -53,16 +53,27 @@ async function main() {
   const args = process.argv.slice(2);
   const mutationsFile = args.find(a => !a.startsWith('--'));
   const execute = args.includes('--execute');
+  const yes = args.includes('--yes') || args.includes('-y');
 
   if (!mutationsFile) {
     console.error(
-      'Usage: pnpm script src/scripts/d2026-03-18_expire-free-credits-revert.ts <mutations-file> [--execute]'
+      'Usage: pnpm script src/scripts/d2026-03-18_expire-free-credits-revert.ts <mutations-file> [--execute] [--yes]'
     );
     process.exit(1);
   }
 
   console.log(`Mode: ${execute ? 'EXECUTE' : 'DRY RUN'}`);
-  console.log(`Mutations file: ${mutationsFile}\n`);
+  console.log(`Mutations file: ${mutationsFile}`);
+
+  const dbUrl = process.env.POSTGRES_SCRIPT_URL ?? process.env.POSTGRES_URL ?? '(unknown)';
+  const dbHost = (() => {
+    try {
+      return new URL(dbUrl).hostname;
+    } catch {
+      return dbUrl;
+    }
+  })();
+  console.log(`Database: ${dbHost}\n`);
 
   // Parse mutations
   const creditMutations: CreditMutation[] = [];
@@ -84,6 +95,19 @@ async function main() {
   if (!execute) {
     console.log('Run with --execute to apply changes.');
     return;
+  }
+
+  if (!yes) {
+    const confirmRl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise<string>(resolve => {
+      confirmRl.question('Proceed? (y/N) ', resolve);
+    });
+    confirmRl.close();
+    if (answer.trim().toLowerCase() !== 'y') {
+      console.log('Aborted.');
+      return;
+    }
+    console.log();
   }
 
   // Revert credit transactions using their logged old values

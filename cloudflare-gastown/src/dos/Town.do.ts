@@ -2891,10 +2891,16 @@ export class TownDO extends DurableObject<Env> {
               townId,
               row.bead_id
             );
-            events.upsertContainerStatus(this.sql, row.bead_id, {
-              status: containerInfo.status,
-              exit_reason: containerInfo.exitReason,
-            });
+            // Skip inserting events for 'running' — it's the steady-state and
+            // a no-op in applyEvent, so recording it just bloats the event table
+            // (~720 events/hour/agent). Non-running statuses (stopped, error,
+            // unknown) still get inserted so the reconciler can detect and handle them.
+            if (containerInfo.status !== 'running') {
+              events.upsertContainerStatus(this.sql, row.bead_id, {
+                status: containerInfo.status,
+                exit_reason: containerInfo.exitReason,
+              });
+            }
           } catch (err) {
             console.warn(
               `${TOWN_LOG} alarm: container status check failed for agent=${row.bead_id}`,

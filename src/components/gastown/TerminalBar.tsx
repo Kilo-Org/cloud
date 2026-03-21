@@ -235,18 +235,16 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
     left: 'border-r',
   }[position];
 
-  // Resize handle position
-  const resizeHandleClass = (() => {
-    const common = 'absolute z-10 group/resize';
-    if (position === 'bottom')
-      return `${common} top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-white/10`;
-    if (position === 'top')
-      return `${common} bottom-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-white/10`;
-    if (position === 'right')
-      return `${common} top-0 left-0 bottom-0 w-1 cursor-ew-resize hover:bg-white/10`;
-    // left
-    return `${common} top-0 right-0 bottom-0 w-1 cursor-ew-resize hover:bg-white/10`;
-  })();
+  // Resize handle — rendered as a flex child so it naturally sits at the correct edge
+  // and doesn't compete with content stacking contexts for pointer events.
+  const isVerticalHandle = !horizontal;
+  const resizeHandleClass = [
+    'group/resize shrink-0 flex items-center justify-center',
+    isVerticalHandle ? 'h-full w-2 cursor-ew-resize' : 'w-full h-2 cursor-ns-resize',
+  ].join(' ');
+  const resizeHandleIndicator = isVerticalHandle
+    ? 'h-8 w-0.5 rounded-full bg-white/0 group-hover/resize:bg-white/25 transition-colors'
+    : 'w-8 h-0.5 rounded-full bg-white/0 group-hover/resize:bg-white/25 transition-colors';
 
   // ── Collapse chevron direction ─────────────────────────────────────
   const CollapseIcon = (() => {
@@ -269,39 +267,17 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
 
   return (
     <div
-      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left,width] duration-200 ease-linear`}
+      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear`}
       style={containerStyle}
     >
-      {/* Resize handle */}
-      {!collapsed && <div className={resizeHandleClass} onPointerDown={onResizePointerDown} />}
-
       <div className={`flex h-full w-full ${horizontal ? 'flex-col' : 'flex-row'}`}>
-        {/* Tab bar */}
-        {position === 'top' ? (
+        {position === 'bottom' && (
           <>
-            <TerminalContent
-              activeTab={activeTab}
-              collapsed={collapsed}
-              horizontal={horizontal}
-              size={size}
-              townId={townId}
-              alarmWs={alarmWs}
-            />
-            <TabBar
-              allTabs={allTabs}
-              effectiveActiveId={effectiveActiveId}
-              collapsed={collapsed}
-              horizontal={horizontal}
-              position={position}
-              CollapseIcon={CollapseIcon}
-              setActiveTabId={setActiveTabId}
-              setCollapsed={setCollapsed}
-              setPosition={setPosition}
-              closeTab={closeTab}
-            />
-          </>
-        ) : position === 'left' ? (
-          <>
+            {!collapsed && (
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+                <div className={resizeHandleIndicator} />
+              </div>
+            )}
             <TabBar
               allTabs={allTabs}
               effectiveActiveId={effectiveActiveId}
@@ -323,7 +299,66 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               alarmWs={alarmWs}
             />
           </>
-        ) : (
+        )}
+        {position === 'top' && (
+          <>
+            <TerminalContent
+              activeTab={activeTab}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              size={size}
+              townId={townId}
+              alarmWs={alarmWs}
+            />
+            <TabBar
+              allTabs={allTabs}
+              effectiveActiveId={effectiveActiveId}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              position={position}
+              CollapseIcon={CollapseIcon}
+              setActiveTabId={setActiveTabId}
+              setCollapsed={setCollapsed}
+              setPosition={setPosition}
+              closeTab={closeTab}
+            />
+            {!collapsed && (
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+                <div className={resizeHandleIndicator} />
+              </div>
+            )}
+          </>
+        )}
+        {position === 'right' && (
+          <>
+            {!collapsed && (
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+                <div className={resizeHandleIndicator} />
+              </div>
+            )}
+            <TabBar
+              allTabs={allTabs}
+              effectiveActiveId={effectiveActiveId}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              position={position}
+              CollapseIcon={CollapseIcon}
+              setActiveTabId={setActiveTabId}
+              setCollapsed={setCollapsed}
+              setPosition={setPosition}
+              closeTab={closeTab}
+            />
+            <TerminalContent
+              activeTab={activeTab}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              size={size}
+              townId={townId}
+              alarmWs={alarmWs}
+            />
+          </>
+        )}
+        {position === 'left' && (
           <>
             <TabBar
               allTabs={allTabs}
@@ -345,6 +380,11 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               townId={townId}
               alarmWs={alarmWs}
             />
+            {!collapsed && (
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+                <div className={resizeHandleIndicator} />
+              </div>
+            )}
           </>
         )}
       </div>
@@ -483,7 +523,7 @@ function TabBar({
       </div>
 
       {/* Position picker */}
-      <div className="relative" ref={pickerRef}>
+      <div ref={pickerRef}>
         <button
           onClick={() => setShowPositionPicker(p => !p)}
           className={`flex items-center justify-center text-white/30 transition-colors hover:text-white/50 ${
@@ -503,7 +543,8 @@ function TabBar({
               setPosition(p);
               setShowPositionPicker(false);
             }}
-            horizontal={horizontal}
+            position={position}
+            triggerRef={pickerRef}
           />
         )}
       </div>
@@ -523,27 +564,65 @@ const POSITION_OPTIONS: { value: TerminalPosition; label: string; Icon: typeof P
 function PositionPicker({
   current,
   onSelect,
-  horizontal,
+  position,
+  triggerRef,
 }: {
   current: TerminalPosition;
   onSelect: (p: TerminalPosition) => void;
-  horizontal: boolean;
+  position: TerminalPosition;
+  triggerRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
+
+  useEffect(() => {
+    const trigger = triggerRef.current;
+    const popover = popoverRef.current;
+    if (!trigger || !popover) return;
+    const tr = trigger.getBoundingClientRect();
+    const pr = popover.getBoundingClientRect();
+    const gap = 4;
+
+    let top: number;
+    let left: number;
+
+    if (position === 'bottom') {
+      top = tr.top - pr.height - gap;
+      left = tr.right - pr.width;
+    } else if (position === 'top') {
+      top = tr.bottom + gap;
+      left = tr.right - pr.width;
+    } else if (position === 'left') {
+      top = tr.top;
+      left = tr.right + gap;
+    } else {
+      // right
+      top = tr.top;
+      left = tr.left - pr.width - gap;
+    }
+
+    // Clamp to viewport
+    top = Math.max(4, Math.min(top, window.innerHeight - pr.height - 4));
+    left = Math.max(4, Math.min(left, window.innerWidth - pr.width - 4));
+
+    setStyle({ top, left, opacity: 1 });
+  }, [position, triggerRef]);
+
   return (
     <div
-      className={`absolute z-[60] rounded-lg border border-white/[0.1] bg-[#1a1a1a] p-1 shadow-xl ${
-        horizontal ? 'right-0 bottom-full mb-1' : 'top-0 left-full ml-1'
-      }`}
+      ref={popoverRef}
+      className="fixed z-[60] w-max rounded-lg border border-white/[0.15] bg-[#1e1e1e] p-1.5 shadow-2xl backdrop-blur-sm"
+      style={style}
     >
-      <div className="grid grid-cols-2 gap-0.5">
+      <div className="grid grid-cols-2 gap-1">
         {POSITION_OPTIONS.map(({ value, label, Icon }) => (
           <button
             key={value}
             onClick={() => onSelect(value)}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] transition-colors ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] whitespace-nowrap transition-colors ${
               current === value
-                ? 'bg-white/[0.1] text-white/80'
-                : 'text-white/40 hover:bg-white/[0.05] hover:text-white/60'
+                ? 'bg-white/[0.12] text-white/90'
+                : 'text-white/50 hover:bg-white/[0.07] hover:text-white/70'
             }`}
           >
             <Icon className="size-3.5" />

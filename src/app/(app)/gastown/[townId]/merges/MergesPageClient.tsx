@@ -1,15 +1,36 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
-import { GitMerge, AlertCircle, Loader2 } from 'lucide-react';
+import { GitMerge, AlertCircle, Loader2, Activity, Server } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { NeedsAttention } from './NeedsAttention';
+import { RefineryActivityLog } from './RefineryActivityLog';
+
+const ALL_RIGS = '__all__';
 
 export function MergesPageClient({ townId }: { townId: string }) {
   const trpc = useGastownTRPC();
+  const [selectedRigId, setSelectedRigId] = useState(ALL_RIGS);
+
+  const rigIdParam = selectedRigId === ALL_RIGS ? undefined : selectedRigId;
+
+  const rigsQuery = useQuery(trpc.gastown.listRigs.queryOptions({ townId }));
+  const rigs = rigsQuery.data ?? [];
 
   const mergeQueueQuery = useQuery({
-    ...trpc.gastown.getMergeQueueData.queryOptions({ townId }),
+    ...trpc.gastown.getMergeQueueData.queryOptions({
+      townId,
+      rigId: rigIdParam,
+      limit: 200,
+    }),
     refetchInterval: 5_000,
   });
 
@@ -32,6 +53,27 @@ export function MergesPageClient({ townId }: { townId: string }) {
               {totalAttention}
             </span>
           )}
+        </div>
+
+        {/* Rig filter */}
+        <div className="flex items-center gap-2">
+          <Server className="size-3.5 text-white/25" />
+          <Select value={selectedRigId} onValueChange={setSelectedRigId}>
+            <SelectTrigger
+              size="sm"
+              className="h-7 min-w-[140px] border-white/10 bg-white/[0.04] text-xs text-white/60"
+            >
+              <SelectValue placeholder="All Rigs" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_RIGS}>All Rigs</SelectItem>
+              {rigs.map(rig => (
+                <SelectItem key={rig.id} value={rig.id}>
+                  {rig.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -60,11 +102,33 @@ export function MergesPageClient({ townId }: { townId: string }) {
             <section>
               <div className="mb-3 flex items-center gap-2">
                 <AlertCircle className="size-3.5 text-white/30" />
-                <span className="text-[11px] font-medium uppercase tracking-wide text-white/40">
+                <h2 className="text-[11px] font-medium uppercase tracking-wide text-white/40">
                   Needs Your Attention
-                </span>
+                </h2>
+                {totalAttention > 0 && (
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] text-amber-400/70">
+                    {totalAttention}
+                  </span>
+                )}
               </div>
               <NeedsAttention data={needsAttention} townId={townId} />
+            </section>
+          )}
+
+          {/* Refinery Activity Log section */}
+          {mergeQueueQuery.data && (
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <Activity className="size-3.5 text-white/30" />
+                <h2 className="text-[11px] font-medium uppercase tracking-wide text-white/40">
+                  Refinery Activity Log
+                </h2>
+              </div>
+              <RefineryActivityLog
+                activityLog={mergeQueueQuery.data.activityLog}
+                isLoading={false}
+                townId={townId}
+              />
             </section>
           )}
         </div>

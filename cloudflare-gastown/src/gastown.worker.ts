@@ -206,6 +206,14 @@ app.get('/debug/towns/:townId/status', async c => {
   return c.json({ alarmStatus, agentMeta, beadSummary });
 });
 
+app.post('/debug/towns/:townId/reconcile-dry-run', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const result = await town.debugDryRun();
+  return c.json(result);
+});
+
 // ── Town ID + Auth ──────────────────────────────────────────────────────
 // All rig routes live under /api/towns/:townId/rigs/:rigId so the townId
 // is always available from the URL path.

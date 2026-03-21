@@ -792,6 +792,18 @@ const MrBeadRow = z.object({
   agent_role: z.string().nullable(),
   // rig name
   rig_name: z.string().nullable(),
+  // failure event metadata (correlated subquery for failed MR beads)
+  failure_event_metadata: z
+    .string()
+    .nullable()
+    .transform((v): Record<string, unknown> | null => {
+      if (!v) return null;
+      try {
+        return JSON.parse(v) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    }),
 });
 
 /** Zod schema for an enriched activity log event row. */
@@ -830,6 +842,10 @@ const ActivityLogRow = z.object({
   agent_role: z.string().nullable(),
   // rig info
   rig_name: z.string().nullable(),
+  // source bead (resolved via bead_dependencies tracks join)
+  source_bead_id: z.string().nullable(),
+  source_bead_title: z.string().nullable(),
+  source_bead_status: z.string().nullable(),
   // review metadata
   rm_branch: z.string().nullable(),
   rm_target_branch: z.string().nullable(),
@@ -989,7 +1005,13 @@ export function getMergeQueueData(sql: SqlStorage, params: MergeQueueParams): Me
           am.${agent_metadata.columns.bead_id} AS agent_id,
           agent_bead.${beads.columns.title} AS agent_name,
           am.${agent_metadata.columns.role} AS agent_role,
-          rig.name AS rig_name
+          rig.name AS rig_name,
+          (SELECT ${bead_events.metadata}
+           FROM ${bead_events}
+           WHERE ${bead_events.bead_id} = ${beads.bead_id}
+             AND ${bead_events.event_type} IN ('review_completed', 'pr_creation_failed')
+           ORDER BY ${bead_events.created_at} DESC
+           LIMIT 1) AS failure_event_metadata
         FROM ${beads}
         INNER JOIN ${review_metadata}
           ON ${beads.bead_id} = ${review_metadata.bead_id}
@@ -1066,6 +1088,9 @@ export function getMergeQueueData(sql: SqlStorage, params: MergeQueueParams): Me
           agent_bead.${beads.columns.title} AS agent_name,
           am.${agent_metadata.columns.role} AS agent_role,
           rig.name AS rig_name,
+          src.${beads.columns.bead_id} AS source_bead_id,
+          src.${beads.columns.title} AS source_bead_title,
+          src.${beads.columns.status} AS source_bead_status,
           rm.${review_metadata.columns.branch} AS rm_branch,
           rm.${review_metadata.columns.target_branch} AS rm_target_branch,
           rm.${review_metadata.columns.merge_commit} AS rm_merge_commit,
@@ -1083,6 +1108,11 @@ export function getMergeQueueData(sql: SqlStorage, params: MergeQueueParams): Me
           ON am.${agent_metadata.columns.bead_id} = ${bead_events.agent_id}
         LEFT JOIN ${beads} AS agent_bead
           ON agent_bead.${beads.columns.bead_id} = ${bead_events.agent_id}
+        LEFT JOIN ${bead_dependencies} AS dep
+          ON dep.${bead_dependencies.columns.bead_id} = b.${beads.columns.bead_id}
+          AND dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+        LEFT JOIN ${beads} AS src
+          ON src.${beads.columns.bead_id} = dep.${bead_dependencies.columns.depends_on_bead_id}
         LEFT JOIN ${review_metadata} AS rm
           ON rm.${review_metadata.columns.bead_id} = ${bead_events.bead_id}
         LEFT JOIN ${convoy_metadata} AS cm
@@ -1160,14 +1190,38 @@ function mrBeadRowToItem(row: z.output<typeof MrBeadRow>): MergeQueueItem {
       : null,
     rigName: row.rig_name,
     staleSince: null,
-    failureReason: null,
+    failureReason:
+      row.status === 'failed' && row.failure_event_metadata
+        ? typeof row.failure_event_metadata.message === 'string'
+          ? row.failure_event_metadata.message
+          : null
+        : null,
   };
 }
 
 function eventRowToEntry(row: z.output<typeof ActivityLogRow>): ActivityLogEntry {
-  // Try to find the source bead from the event's bead metadata
-  const sourceBeadId =
-    typeof row.bead_metadata?.source_bead_id === 'string' ? row.bead_metadata.source_bead_id : null;
+  // Source bead resolution:
+  // - Events on MR beads (pr_created, pr_creation_failed, rework_requested):
+  //   resolved via bead_dependencies LEFT JOIN (source_bead_id/title/status columns)
+  // - Events on source beads (review_submitted, review_completed):
+  //   the event's bead IS the source bead — use the bead columns directly
+  const isMrBeadEvent = row.bead_type === 'merge_request';
+
+  const resolvedSourceBead = isMrBeadEvent
+    ? row.source_bead_id
+      ? {
+          bead_id: row.source_bead_id,
+          title: row.source_bead_title ?? '',
+          status: row.source_bead_status ?? '',
+        }
+      : null
+    : row.bead_title
+      ? {
+          bead_id: row.bead_id,
+          title: row.bead_title,
+          status: row.bead_status ?? '',
+        }
+      : null;
 
   return {
     event: {
@@ -1190,16 +1244,7 @@ function eventRowToEntry(row: z.output<typeof ActivityLogRow>): ActivityLogEntry
           metadata: row.bead_metadata,
         }
       : null,
-    sourceBead: sourceBeadId
-      ? {
-          bead_id: sourceBeadId,
-          title:
-            typeof row.bead_metadata?.source_bead_title === 'string'
-              ? row.bead_metadata.source_bead_title
-              : '',
-          status: '',
-        }
-      : null,
+    sourceBead: resolvedSourceBead,
     convoy: row.convoy_id
       ? {
           convoy_id: row.convoy_id,

@@ -3691,28 +3691,49 @@ export class TownDO extends DurableObject<Env> {
   }
 
   // DEBUG: dry-run the reconciler against current state, returning actions
-  // it would emit without applying them. Side-effect-free — reconcile()
-  // only reads SQLite state; applyAction() is never called.
+  // it would emit without applying them. Drains pending events first (same
+  // as the real alarm loop) inside a savepoint that is rolled back, so the
+  // endpoint remains fully side-effect-free.
   async debugDryRun(): Promise<{
     actions: Action[];
     metrics: Pick<
       reconciler.ReconcilerMetrics,
-      'actionsEmitted' | 'actionsByType' | 'pendingEventCount'
+      'actionsEmitted' | 'actionsByType' | 'pendingEventCount' | 'eventsDrained'
     >;
   }> {
-    const actions = reconciler.reconcile(this.sql);
-    const actionsByType: Record<string, number> = {};
-    for (const a of actions) {
-      actionsByType[a.type] = (actionsByType[a.type] ?? 0) + 1;
+    // Use a savepoint so we can drain events (which mutates state)
+    // then roll back without permanent side effects
+    this.sql.exec('SAVEPOINT debug_dry_run');
+    try {
+      // Phase 0: Drain and apply pending events (same as real alarm loop)
+      const pending = events.drainEvents(this.sql);
+      for (const event of pending) {
+        reconciler.applyEvent(this.sql, event);
+        events.markProcessed(this.sql, event.event_id);
+      }
+
+      // Phase 1: Reconcile against now-current state
+      const actions = reconciler.reconcile(this.sql);
+      const pendingEventCount = events.pendingEventCount(this.sql);
+      const actionsByType: Record<string, number> = {};
+      for (const a of actions) {
+        actionsByType[a.type] = (actionsByType[a.type] ?? 0) + 1;
+      }
+
+      return {
+        actions,
+        metrics: {
+          actionsEmitted: actions.length,
+          actionsByType,
+          pendingEventCount,
+          eventsDrained: pending.length,
+        },
+      };
+    } finally {
+      // Roll back all state mutations — this is a dry run
+      this.sql.exec('ROLLBACK TO SAVEPOINT debug_dry_run');
+      this.sql.exec('RELEASE SAVEPOINT debug_dry_run');
     }
-    return {
-      actions,
-      metrics: {
-        actionsEmitted: actions.length,
-        actionsByType,
-        pendingEventCount: events.pendingEventCount(this.sql),
-      },
-    };
   }
 
   // DEBUG: concise non-terminal bead summary — remove after debugging

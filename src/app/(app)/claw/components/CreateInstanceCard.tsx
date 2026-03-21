@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { usePostHog } from 'posthog-js/react';
+import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -25,6 +25,9 @@ export function CreateInstanceCard({
   mutations: ClawMutations;
   onProvisionStart?: () => void;
 }) {
+  // Evaluate the landing-page experiment flag so PostHog attaches
+  // $feature/button-vs-card to events fired in this component.
+  useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
   const trpc = useTRPC();
   const { data: billingStatus } = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());

@@ -599,18 +599,24 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
   for (const bead of staleInProgress) {
     if (!staleMs(bead.updated_at, STALE_IN_PROGRESS_TIMEOUT_MS)) continue;
 
-    // Check if any agent is hooked AND working/stalled
+    // Check if any agent is hooked AND (working/stalled OR has a recent
+    // heartbeat). The heartbeat check is defense-in-depth for #1358: if
+    // the agent's status is wrong (e.g. stuck on 'idle' due to a dispatch
+    // timeout race), a fresh heartbeat proves the agent is alive.
     const hookedAgent = z
-      .object({ status: z.string() })
+      .object({ status: z.string(), last_activity_at: z.string().nullable() })
       .array()
       .parse([
         ...query(
           sql,
           /* sql */ `
-          SELECT ${agent_metadata.status}
+          SELECT ${agent_metadata.status}, ${agent_metadata.last_activity_at}
           FROM ${agent_metadata}
           WHERE ${agent_metadata.current_hook_bead_id} = ?
-            AND ${agent_metadata.status} IN ('working', 'stalled')
+            AND (
+              ${agent_metadata.status} IN ('working', 'stalled')
+              OR ${agent_metadata.last_activity_at} > datetime('now', '-90 seconds')
+            )
         `,
           [bead.bead_id]
         ),
@@ -991,7 +997,11 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     }
 
     const mrRows = z
-      .object({ status: z.string(), type: z.string(), rig_id: z.string().nullable() })
+      .object({
+        status: z.string(),
+        type: z.string(),
+        rig_id: z.string().nullable(),
+      })
       .array()
       .parse([
         ...query(

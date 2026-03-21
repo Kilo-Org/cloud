@@ -14,18 +14,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
-import { extractPrUrl } from '@/components/gastown/ActivityFeed';
 
-type TownEvent = GastownOutputs['gastown']['getTownEvents'][number];
-
-// Refinery-related event types we display in the activity log
-const REFINERY_EVENT_TYPES = new Set([
-  'review_submitted',
-  'review_completed',
-  'pr_created',
-  'pr_creation_failed',
-  'rework_requested',
-]);
+type MergeQueueData = GastownOutputs['gastown']['getMergeQueueData'];
+type ActivityLogEntry = MergeQueueData['activityLog'][number];
 
 type ActionType =
   | 'merged'
@@ -35,11 +26,12 @@ type ActionType =
   | 'rework_requested'
   | 'review_submitted';
 
-function resolveActionType(event: TownEvent): ActionType {
-  if (event.event_type === 'review_completed') {
-    return event.new_value === 'merged' ? 'merged' : 'failed';
+function resolveActionType(entry: ActivityLogEntry): ActionType {
+  const eventType = entry.event.event_type;
+  if (eventType === 'review_completed') {
+    return entry.event.new_value === 'merged' ? 'merged' : 'failed';
   }
-  return event.event_type as ActionType;
+  return eventType as ActionType;
 }
 
 const ACTION_CONFIG: Record<
@@ -48,78 +40,39 @@ const ACTION_CONFIG: Record<
     icon: typeof GitMerge;
     dotColor: string;
     lineColor: string;
-    label: string;
   }
 > = {
   merged: {
     icon: GitMerge,
     dotColor: 'bg-emerald-400',
     lineColor: 'border-emerald-500/30',
-    label: 'Merged',
   },
   failed: {
     icon: XCircle,
     dotColor: 'bg-red-400',
     lineColor: 'border-red-500/30',
-    label: 'Failed',
   },
   pr_created: {
     icon: GitPullRequest,
     dotColor: 'bg-sky-400',
     lineColor: 'border-sky-500/30',
-    label: 'PR Created',
   },
   pr_creation_failed: {
     icon: AlertTriangle,
     dotColor: 'bg-red-400',
     lineColor: 'border-red-500/30',
-    label: 'PR Failed',
   },
   rework_requested: {
     icon: RotateCcw,
     dotColor: 'bg-amber-400',
     lineColor: 'border-amber-500/30',
-    label: 'Rework',
   },
   review_submitted: {
     icon: Send,
     dotColor: 'bg-indigo-400',
     lineColor: 'border-indigo-500/30',
-    label: 'Submitted',
   },
 };
-
-function extractAgentName(event: TownEvent): string {
-  const meta = event.metadata;
-  if (typeof meta.agent_name === 'string') return meta.agent_name;
-  if (typeof meta.completedBy === 'string') return meta.completedBy;
-  return 'an agent';
-}
-
-function extractBeadTitle(event: TownEvent): string {
-  const meta = event.metadata;
-  if (typeof meta.title === 'string') return meta.title;
-  if (typeof meta.bead_title === 'string') return meta.bead_title;
-  // Fall back to new_value for review_submitted which stores the branch
-  return event.new_value ?? 'untitled bead';
-}
-
-function extractBranch(event: TownEvent): string | null {
-  const meta = event.metadata;
-  if (typeof meta.branch === 'string') return meta.branch;
-  if (typeof meta.target_branch === 'string') return meta.target_branch;
-  // review_submitted stores branch in new_value
-  if (event.event_type === 'review_submitted' && typeof event.new_value === 'string') {
-    return event.new_value;
-  }
-  return null;
-}
-
-function extractCommitSha(event: TownEvent): string | null {
-  const meta = event.metadata;
-  if (typeof meta.commit_sha === 'string') return meta.commit_sha;
-  return null;
-}
 
 function extractPrNumber(prUrl: string | null): string | null {
   if (!prUrl) return null;
@@ -127,55 +80,40 @@ function extractPrNumber(prUrl: string | null): string | null {
   return match ? match[1] : null;
 }
 
-function extractRetryCount(event: TownEvent): number {
-  const meta = event.metadata;
-  if (typeof meta.retry_count === 'number') return meta.retry_count;
-  return 0;
-}
-
-function extractConvoyInfo(event: TownEvent): {
-  convoyTitle: string;
-  convoyId?: string;
-  progress?: string;
-} | null {
-  const meta = event.metadata;
-  if (typeof meta.convoy_title === 'string') {
-    return {
-      convoyTitle: meta.convoy_title,
-      convoyId: typeof meta.convoy_id === 'string' ? meta.convoy_id : undefined,
-      progress: typeof meta.convoy_progress === 'string' ? meta.convoy_progress : undefined,
-    };
-  }
-  return null;
-}
-
-function extractMessage(event: TownEvent): string | null {
-  const meta = event.metadata;
+function extractMessage(entry: ActivityLogEntry): string | null {
+  const meta = entry.event.metadata;
   if (typeof meta.message === 'string') return meta.message;
   if (typeof meta.feedback === 'string') return meta.feedback;
   if (typeof meta.reason === 'string') return meta.reason;
   return null;
 }
 
-/** Build the main natural-language description line for an event. */
-function buildDescription(event: TownEvent): {
+/** Build the main natural-language description line for an activity log entry. */
+function buildDescription(entry: ActivityLogEntry): {
   prefix: string;
   beadTitle: string;
   suffix: string;
 } {
-  const action = resolveActionType(event);
-  const agentName = extractAgentName(event);
-  const beadTitle = extractBeadTitle(event);
-  const branch = extractBranch(event);
+  const action = resolveActionType(entry);
+  const agentName = entry.agent?.name ?? 'an agent';
+  const beadTitle = entry.sourceBead?.title ?? entry.mrBead?.title ?? 'untitled bead';
+  const targetBranch = entry.reviewMetadata?.target_branch;
 
-  const branchSuffix = branch ? (branch === 'main' ? ' into main' : ` into ${branch}`) : '';
+  const branchSuffix = targetBranch
+    ? targetBranch === 'main'
+      ? ' into main'
+      : ` into ${targetBranch}`
+    : '';
+
+  // Add convoy context to branch suffix
+  const convoySuffix = entry.convoy && branchSuffix ? ` (convoy: ${entry.convoy.title})` : '';
 
   switch (action) {
     case 'merged':
       return {
         prefix: `Refinery merged ${agentName}\u2019s `,
         beadTitle: `\u201c${beadTitle}\u201d`,
-        suffix: branchSuffix,
+        suffix: `${branchSuffix}${convoySuffix}`,
       };
     case 'failed':
       return {
@@ -184,7 +122,7 @@ function buildDescription(event: TownEvent): {
         suffix: '',
       };
     case 'pr_created': {
-      const prUrl = extractPrUrl(event.metadata);
+      const prUrl = entry.reviewMetadata?.pr_url ?? null;
       const prNum = extractPrNumber(prUrl);
       const prLabel = prNum ? `PR #${prNum}` : 'a PR';
       return {
@@ -217,17 +155,15 @@ function buildDescription(event: TownEvent): {
 const PAGE_SIZE = 20;
 
 export function RefineryActivityLog({
-  events,
+  activityLog,
   isLoading,
 }: {
-  events: TownEvent[] | undefined;
+  activityLog: ActivityLogEntry[] | undefined;
   isLoading: boolean;
 }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const refineryEvents = (events ?? [])
-    .filter(e => REFINERY_EVENT_TYPES.has(e.event_type))
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const entries = activityLog ?? [];
 
   if (isLoading) {
     return (
@@ -255,7 +191,7 @@ export function RefineryActivityLog({
     );
   }
 
-  if (refineryEvents.length === 0) {
+  if (entries.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -271,16 +207,16 @@ export function RefineryActivityLog({
     );
   }
 
-  const visible = refineryEvents.slice(0, visibleCount);
-  const hasMore = visibleCount < refineryEvents.length;
+  const visible = entries.slice(0, visibleCount);
+  const hasMore = visibleCount < entries.length;
 
   return (
     <div className="px-6 py-4">
       <AnimatePresence initial={false}>
-        {visible.map((event, i) => (
-          <ActivityLogEntry
-            key={event.bead_event_id}
-            event={event}
+        {visible.map((entry, i) => (
+          <TimelineEntry
+            key={entry.event.bead_event_id}
+            entry={entry}
             isLast={i === visible.length - 1 && !hasMore}
             delay={i * 0.03}
           />
@@ -293,7 +229,7 @@ export function RefineryActivityLog({
         >
           Show more
           <span className="font-mono text-[10px] text-white/20">
-            {refineryEvents.length - visibleCount} remaining
+            {entries.length - visibleCount} remaining
           </span>
         </button>
       )}
@@ -301,32 +237,33 @@ export function RefineryActivityLog({
   );
 }
 
-function ActivityLogEntry({
-  event,
+function TimelineEntry({
+  entry,
   isLast,
   delay,
 }: {
-  event: TownEvent;
+  entry: ActivityLogEntry;
   isLast: boolean;
   delay: number;
 }) {
   const { open } = useDrawerStack();
-  const action = resolveActionType(event);
+  const action = resolveActionType(entry);
   const config = ACTION_CONFIG[action];
   const Icon = config.icon;
-  const description = buildDescription(event);
-  const message = extractMessage(event);
-  const commitSha = extractCommitSha(event);
-  const prUrl = extractPrUrl(event.metadata);
+  const description = buildDescription(entry);
+  const message = extractMessage(entry);
+  const commitSha = entry.reviewMetadata?.merge_commit ?? null;
+  const prUrl = entry.reviewMetadata?.pr_url ?? null;
   const prNumber = extractPrNumber(prUrl);
-  const retryCount = extractRetryCount(event);
-  const convoyInfo = extractConvoyInfo(event);
-  const rigId = event.rig_id;
-  const rigName = event.rig_name ?? (rigId ? `Rig ${rigId.slice(0, 6)}` : null);
+  const rigName = entry.rigName;
+  const rigId = entry.mrBead?.rig_id;
+  const convoy = entry.convoy;
 
   function handleBeadClick() {
-    if (event.bead_id && rigId) {
-      open({ type: 'bead', beadId: event.bead_id, rigId });
+    // Open the source bead if available, falling back to MR bead
+    const beadId = entry.sourceBead?.bead_id ?? entry.mrBead?.bead_id;
+    if (beadId && rigId) {
+      open({ type: 'bead', beadId, rigId });
     }
   }
 
@@ -353,7 +290,7 @@ function ActivityLogEntry({
         <div className="flex items-center gap-2 text-[11px] text-white/30">
           {rigName && <span>{rigName}</span>}
           {rigName && <span className="text-white/15">&middot;</span>}
-          <span>{formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}</span>
+          <span>{formatDistanceToNow(new Date(entry.event.created_at), { addSuffix: true })}</span>
           <Icon className="ml-auto size-3 text-white/15" />
         </div>
 
@@ -400,16 +337,11 @@ function ActivityLogEntry({
               View PR
             </a>
           )}
-          {retryCount > 0 && (
+          {convoy && (
             <span>
-              {retryCount} {retryCount === 1 ? 'retry' : 'retries'}
-            </span>
-          )}
-          {convoyInfo && (
-            <span>
-              {convoyInfo.progress
-                ? `Intermediate merge \u2014 ${convoyInfo.progress}`
-                : `convoy: ${convoyInfo.convoyTitle}`}
+              {convoy.closed_beads > 0 && convoy.closed_beads < convoy.total_beads
+                ? `Intermediate merge \u2014 ${convoy.closed_beads}/${convoy.total_beads} convoy beads reviewed`
+                : `convoy: ${convoy.title}`}
             </span>
           )}
         </div>

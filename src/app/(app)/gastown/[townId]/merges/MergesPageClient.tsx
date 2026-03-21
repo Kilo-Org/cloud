@@ -8,8 +8,8 @@ import { RefineryActivityLog } from './RefineryActivityLog';
 export function MergesPageClient({ townId }: { townId: string }) {
   const trpc = useGastownTRPC();
 
-  const eventsQuery = useQuery({
-    ...trpc.gastown.getTownEvents.queryOptions({ townId, limit: 200 }),
+  const mergeQueueQuery = useQuery({
+    ...trpc.gastown.getMergeQueueData.queryOptions({ townId, limit: 200 }),
     refetchInterval: 5_000,
   });
 
@@ -28,7 +28,10 @@ export function MergesPageClient({ townId }: { townId: string }) {
           <div className="flex items-center gap-2 px-6 pt-5 pb-2">
             <h2 className="text-sm font-medium text-white/50">Refinery Activity Log</h2>
           </div>
-          <RefineryActivityLog events={eventsQuery.data} isLoading={eventsQuery.isLoading} />
+          <RefineryActivityLog
+            activityLog={mergeQueueQuery.data?.activityLog}
+            isLoading={mergeQueueQuery.isLoading}
+          />
         </div>
       </div>
     </div>

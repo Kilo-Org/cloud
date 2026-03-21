@@ -231,8 +231,36 @@ export function RefineryActivityLog({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const entries = activityLog ?? [];
 
+  // Groups are sorted by most recent activity (latestTimestamp descending)
   const { convoyGroups, standalone } = useMemo(() => groupActivityByConvoy(entries), [entries]);
 
+  // Paginate by convoy groups (keeps whole convoys together on a page).
+  // Each convoy group counts as its entry count toward the page budget;
+  // standalone entries fill the remaining budget after convoy groups.
+  const { visibleConvoyGroups, visibleStandalone, totalEntryCount, hasMore } = useMemo(() => {
+    const visibleConvoys: ConvoyActivityGroup[] = [];
+    let budget = visibleCount;
+
+    for (const group of convoyGroups) {
+      if (budget <= 0) break;
+      visibleConvoys.push(group);
+      budget -= group.entries.length;
+    }
+
+    // Fill remaining budget with standalone entries (already sorted by recency from the query)
+    const standaloneSlice = budget > 0 ? standalone.slice(0, budget) : [];
+
+    const total = convoyGroups.reduce((sum, g) => sum + g.entries.length, 0) + standalone.length;
+
+    return {
+      visibleConvoyGroups: visibleConvoys,
+      visibleStandalone: standaloneSlice,
+      totalEntryCount: total,
+      hasMore: visibleCount < total,
+    };
+  }, [convoyGroups, standalone, visibleCount]);
+
+  // All hooks are above — early returns below
   if (isLoading) {
     return (
       <div className="space-y-4 py-4">
@@ -275,64 +303,33 @@ export function RefineryActivityLog({
     );
   }
 
-  // Flatten all entries for pagination: convoy groups first, then standalone
-  const allGroupedEntries = useMemo(() => {
-    const result: Array<{ entry: ActivityLogEntry; convoyId: string | null }> = [];
-    for (const group of convoyGroups) {
-      for (const entry of group.entries) {
-        result.push({ entry, convoyId: group.convoy.convoy_id });
-      }
-    }
-    for (const entry of standalone) {
-      result.push({ entry, convoyId: null });
-    }
-    return result;
-  }, [convoyGroups, standalone]);
-
-  const visibleGrouped = allGroupedEntries.slice(0, visibleCount);
-  const hasMore = visibleCount < allGroupedEntries.length;
-
-  // Determine which convoy groups have visible entries
-  const visibleConvoyGroups = useMemo(() => {
-    const visibleConvoyIds = new Set<string>();
-    for (const { convoyId } of visibleGrouped) {
-      if (convoyId) visibleConvoyIds.add(convoyId);
-    }
-    return convoyGroups.filter(g => visibleConvoyIds.has(g.convoy.convoy_id));
-  }, [visibleGrouped, convoyGroups]);
-
   return (
     <div className="py-4">
       <div className="space-y-4">
-        {/* Convoy grouped entries */}
+        {/* Convoy grouped entries — sorted by most recent activity */}
         <AnimatePresence initial={false}>
-          {visibleConvoyGroups.map(group => {
-            const groupEntries = visibleGrouped.filter(v => v.convoyId === group.convoy.convoy_id);
-            return (
-              <ConvoyActivityGroupCard
-                key={group.convoy.convoy_id}
-                convoy={group.convoy}
-                entries={groupEntries.map(g => g.entry)}
-                townId={townId}
-              />
-            );
-          })}
+          {visibleConvoyGroups.map(group => (
+            <ConvoyActivityGroupCard
+              key={group.convoy.convoy_id}
+              convoy={group.convoy}
+              entries={group.entries}
+              townId={townId}
+            />
+          ))}
         </AnimatePresence>
 
         {/* Standalone entries */}
-        {visibleGrouped.some(v => !v.convoyId) && (
+        {visibleStandalone.length > 0 && (
           <div>
             <AnimatePresence initial={false}>
-              {visibleGrouped
-                .filter(v => !v.convoyId)
-                .map((v, i, arr) => (
-                  <TimelineEntry
-                    key={v.entry.event.bead_event_id}
-                    entry={v.entry}
-                    isLast={i === arr.length - 1 && !hasMore}
-                    delay={i * 0.03}
-                  />
-                ))}
+              {visibleStandalone.map((entry, i, arr) => (
+                <TimelineEntry
+                  key={entry.event.bead_event_id}
+                  entry={entry}
+                  isLast={i === arr.length - 1 && !hasMore}
+                  delay={i * 0.03}
+                />
+              ))}
             </AnimatePresence>
           </div>
         )}
@@ -345,7 +342,7 @@ export function RefineryActivityLog({
         >
           Show more
           <span className="font-mono text-[10px] text-white/20">
-            {allGroupedEntries.length - visibleCount} remaining
+            {totalEntryCount - visibleCount} remaining
           </span>
         </button>
       )}

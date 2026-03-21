@@ -15,6 +15,7 @@ import {
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
   SecretsPatchSchema,
+  MachineSizeSchema,
 } from '../schemas/instance-config';
 import {
   ImageVersionEntrySchema,
@@ -286,6 +287,31 @@ platform.patch('/exec-preset', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'exec-preset patch');
+    return jsonError(message, status);
+  }
+});
+
+// PATCH /api/platform/machine-size
+const MachineSizePatchSchema = z.object({
+  userId: z.string().min(1),
+  machineSize: MachineSizeSchema.nullable(),
+});
+
+platform.patch('/machine-size', async c => {
+  const result = await parseBody(c, MachineSizePatchSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, machineSize } = result.data;
+
+  try {
+    const updated = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.updateMachineSize(userId, machineSize),
+      'updateMachineSize'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'machine-size patch');
     return jsonError(message, status);
   }
 });

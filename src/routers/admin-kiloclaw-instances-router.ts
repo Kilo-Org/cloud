@@ -511,6 +511,30 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
+  updateMachineSize: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        machineSize: z
+          .object({
+            cpus: z.number().int().min(1).max(8),
+            memory_mb: z.number().int().min(256).max(16384),
+            cpu_kind: z.enum(['shared', 'performance']).optional(),
+          })
+          .nullable(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to update machine size';
+      try {
+        const client = new KiloClawInternalClient();
+        return await client.updateMachineSize(input.userId, input.machineSize);
+      } catch (err) {
+        console.error('Failed to update machine size for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
   machineStart: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
     const fallbackMessage = 'Failed to start machine';
     try {

@@ -77,6 +77,35 @@ function formatEpochTime(epoch: number | null): string {
   return new Date(epoch).toLocaleString();
 }
 
+const FLY_CPU_OPTIONS: Record<'shared' | 'performance', number[]> = {
+  shared: [2, 4, 6, 8],
+  performance: [1, 2, 4, 6, 8],
+};
+
+function getValidMemoryOptions(cpuKind: 'shared' | 'performance', cpus: number): number[] {
+  const step = cpuKind === 'shared' ? 256 : 2048;
+  const flyMin = step * cpus;
+  const flyMax = (cpuKind === 'shared' ? 2048 : 8192) * cpus;
+  const floorMin = Math.max(3072, flyMin);
+  const effectiveMin = Math.ceil(floorMin / step) * step;
+  const presets = [3072, 4096, 6144, 8192, 12288, 16384, 24576, 32768, 49152, 65536];
+  return presets.filter(s => s >= effectiveMin && s <= flyMax && s % step === 0);
+}
+
+function formatMemory(mb: number): string {
+  return mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`;
+}
+
+function formatMachineSizeLabel(
+  ms: { cpus: number; memory_mb: number; cpu_kind?: string } | null
+): string {
+  if (!ms) return 'Default (shared-cpu-2x / 3 GB)';
+  const kind = ms.cpu_kind ?? 'shared';
+  const preset =
+    kind === 'shared' ? `shared-cpu-${ms.cpus}x` : `performance-${ms.cpus}x`;
+  return `${preset} / ${formatMemory(ms.memory_mb)}`;
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -1018,6 +1047,24 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  const [editingMachineSize, setEditingMachineSize] = useState(false);
+  const [machineSizeCpus, setMachineSizeCpus] = useState('2');
+  const [machineSizeMemory, setMachineSizeMemory] = useState('3072');
+  const [machineSizeCpuKind, setMachineSizeCpuKind] = useState<'shared' | 'performance'>('shared');
+
+  const { mutateAsync: updateMachineSize, isPending: isUpdatingMachineSize } = useMutation(
+    trpc.admin.kiloclawInstances.updateMachineSize.mutationOptions({
+      onSuccess: () => {
+        toast.success('Machine size updated. Takes effect on next restart.');
+        invalidateMachineQueries();
+        setEditingMachineSize(false);
+      },
+      onError: err => {
+        toast.error(`Failed to update machine size: ${err.message}`);
+      },
+    })
+  );
+
   const { mutateAsync: gatewayStart, isPending: isGatewayStarting } = useMutation(
     trpc.admin.kiloclawInstances.gatewayStart.mutationOptions({
       onSuccess: () => {
@@ -1415,6 +1462,163 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <DetailField label="Next Alarm">
                   {formatEpochTime(data.workerStatus.alarmScheduledAt)}
                 </DetailField>
+
+                <div className="col-span-full border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Machine Size</p>
+                      <p className="text-muted-foreground text-sm">
+                        {formatMachineSizeLabel(data.workerStatus.machineSize)}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const ms = data.workerStatus?.machineSize;
+                          setMachineSizeCpus(String(ms?.cpus ?? 2));
+                          setMachineSizeMemory(String(ms?.memory_mb ?? 3072));
+                          setMachineSizeCpuKind(ms?.cpu_kind ?? 'shared');
+                          setEditingMachineSize(true);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+
+                  {editingMachineSize && (
+                    <div className="mt-3 space-y-3 rounded-md border p-3">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-xs">
+                            CPU Kind
+                          </label>
+                          <Select
+                            value={machineSizeCpuKind}
+                            onValueChange={v => {
+                              const kind = v as 'shared' | 'performance';
+                              setMachineSizeCpuKind(kind);
+                              const cpuOpts = FLY_CPU_OPTIONS[kind];
+                              const currentCpus = Number(machineSizeCpus);
+                              const newCpus = cpuOpts.includes(currentCpus)
+                                ? currentCpus
+                                : cpuOpts[0]!;
+                              setMachineSizeCpus(String(newCpus));
+                              const memOpts = getValidMemoryOptions(kind, newCpus);
+                              if (!memOpts.includes(Number(machineSizeMemory))) {
+                                setMachineSizeMemory(String(memOpts[0]));
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="shared">Shared</SelectItem>
+                              <SelectItem value="performance">Performance</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-xs">CPUs</label>
+                          <Select
+                            value={machineSizeCpus}
+                            onValueChange={v => {
+                              setMachineSizeCpus(v);
+                              const memOpts = getValidMemoryOptions(
+                                machineSizeCpuKind,
+                                Number(v)
+                              );
+                              if (!memOpts.includes(Number(machineSizeMemory))) {
+                                setMachineSizeMemory(String(memOpts[0]));
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {FLY_CPU_OPTIONS[machineSizeCpuKind].map(v => (
+                                <SelectItem key={v} value={String(v)}>
+                                  {machineSizeCpuKind === 'shared'
+                                    ? `shared-cpu-${v}x`
+                                    : `performance-${v}x`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-xs">
+                            Memory
+                          </label>
+                          <Select value={machineSizeMemory} onValueChange={setMachineSizeMemory}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getValidMemoryOptions(
+                                machineSizeCpuKind,
+                                Number(machineSizeCpus)
+                              ).map(v => (
+                                <SelectItem key={v} value={String(v)}>
+                                  {formatMemory(v)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        Takes effect on next restart.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={isUpdatingMachineSize}
+                          onClick={() =>
+                            void updateMachineSize({
+                              userId: data.user_id,
+                              machineSize: {
+                                cpus: Number(machineSizeCpus),
+                                memory_mb: Number(machineSizeMemory),
+                                cpu_kind: machineSizeCpuKind,
+                              },
+                            })
+                          }
+                        >
+                          {isUpdatingMachineSize && (
+                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                          )}
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isUpdatingMachineSize}
+                          onClick={() =>
+                            void updateMachineSize({
+                              userId: data.user_id,
+                              machineSize: null,
+                            })
+                          }
+                        >
+                          Reset to Default
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={isUpdatingMachineSize}
+                          onClick={() => setEditingMachineSize(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : !data.workerStatusError ? (
               <p className="text-muted-foreground text-sm">No worker status available</p>

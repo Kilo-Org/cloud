@@ -28,6 +28,7 @@ import type {
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  MachineSize,
 } from './types';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
@@ -194,6 +195,20 @@ export class KiloClawInternalClient {
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...input }),
+      },
+      { userId }
+    );
+  }
+
+  async updateMachineSize(
+    userId: string,
+    machineSize: MachineSize | null
+  ): Promise<{ machineSize: MachineSize | null }> {
+    return this.request(
+      '/api/platform/machine-size',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, machineSize }),
       },
       { userId }
     );

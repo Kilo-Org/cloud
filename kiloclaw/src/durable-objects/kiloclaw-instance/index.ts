@@ -342,6 +342,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
+  async updateMachineSize(
+    userId: string,
+    machineSize: MachineSize | null
+  ): Promise<{ machineSize: MachineSize | null }> {
+    await this.loadState();
+
+    if (this.s.status === 'unprovisioned') {
+      throw new Error('Instance is not provisioned');
+    }
+    if (this.s.userId !== userId) {
+      throw new Error('User ID mismatch');
+    }
+
+    this.s.machineSize = machineSize;
+    await this.persist({ machineSize });
+
+    return { machineSize: this.s.machineSize };
+  }
+
   async updateExecPreset(patch: {
     security?: string;
     ask?: string;

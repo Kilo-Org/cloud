@@ -369,6 +369,9 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
   ]);
 
   for (const agent of workingAgents) {
+    // Mayors are always working with no hook — skip them
+    if (agent.role === "mayor") continue;
+
     if (!agent.last_activity_at) {
       // No heartbeat ever received — container may have failed to start
       actions.push({
@@ -385,6 +388,18 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
         from: "working",
         to: "idle",
         reason: "heartbeat lost (3 missed cycles)",
+      });
+    } else if (!agent.current_hook_bead_id) {
+      // Agent is working with fresh heartbeat but no hook — it's running
+      // in the container but has no bead to work on (gt_done already ran,
+      // or the hook was cleared by another code path). Set to idle so
+      // processReviewQueue / schedulePendingWork can use it.
+      actions.push({
+        type: "transition_agent",
+        agent_id: agent.bead_id,
+        from: "working",
+        to: "idle",
+        reason: "working agent has no hook (gt_done already completed)",
       });
     }
   }

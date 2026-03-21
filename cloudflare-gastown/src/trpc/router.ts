@@ -33,6 +33,7 @@ import {
   RpcConvoyDetailOutput,
   RpcAlarmStatusOutput,
   RpcOrgTownOutput,
+  RpcMergeQueueDataOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 
@@ -895,6 +896,26 @@ export const gastownRouter = router({
       return townStub.listBeadEvents({
         since: input.since,
         limit: input.limit,
+      });
+    }),
+
+  getMergeQueueData: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        rigId: z.string().uuid().optional(),
+        limit: z.number().int().positive().max(500).default(50),
+        since: z.string().optional(),
+      })
+    )
+    .output(RpcMergeQueueDataOutput)
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.getMergeQueueData({
+        rigId: input.rigId,
+        limit: input.limit,
+        since: input.since,
       });
     }),
 

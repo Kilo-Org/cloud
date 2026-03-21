@@ -1722,6 +1722,14 @@ export class TownDO extends DurableObject<Env> {
     return reviewQueue.advanceMoleculeStep(this.sql, agentId, summary);
   }
 
+  async getMergeQueueData(params: {
+    rigId?: string;
+    limit?: number;
+    since?: string;
+  }): Promise<reviewQueue.MergeQueueData> {
+    return reviewQueue.getMergeQueueData(this.sql, params);
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // Atomic Sling (create bead + agent + hook)
   // ══════════════════════════════════════════════════════════════════

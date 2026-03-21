@@ -580,6 +580,187 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       }[];
       meta: object;
     }>;
+    getMergeQueueData: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+        rigId?: string | undefined;
+        limit?: number | undefined;
+        since?: string | undefined;
+      };
+      output: {
+        needsAttention: {
+          openPRs: {
+            mrBead: {
+              bead_id: string;
+              status: string;
+              title: string;
+              body: string | null;
+              rig_id: string | null;
+              created_at: string;
+              updated_at: string;
+              metadata: Record<string, unknown>;
+            };
+            reviewMetadata: {
+              branch: string;
+              target_branch: string;
+              merge_commit: string | null;
+              pr_url: string | null;
+              retry_count: number;
+            };
+            sourceBead: {
+              bead_id: string;
+              title: string;
+              status: string;
+              body: string | null;
+            } | null;
+            convoy: {
+              convoy_id: string;
+              title: string;
+              total_beads: number;
+              closed_beads: number;
+              feature_branch: string | null;
+              merge_mode: string | null;
+            } | null;
+            agent: {
+              agent_id: string;
+              name: string;
+              role: string;
+            } | null;
+            rigName: string | null;
+            staleSince: string | null;
+            failureReason: string | null;
+          }[];
+          failedReviews: {
+            mrBead: {
+              bead_id: string;
+              status: string;
+              title: string;
+              body: string | null;
+              rig_id: string | null;
+              created_at: string;
+              updated_at: string;
+              metadata: Record<string, unknown>;
+            };
+            reviewMetadata: {
+              branch: string;
+              target_branch: string;
+              merge_commit: string | null;
+              pr_url: string | null;
+              retry_count: number;
+            };
+            sourceBead: {
+              bead_id: string;
+              title: string;
+              status: string;
+              body: string | null;
+            } | null;
+            convoy: {
+              convoy_id: string;
+              title: string;
+              total_beads: number;
+              closed_beads: number;
+              feature_branch: string | null;
+              merge_mode: string | null;
+            } | null;
+            agent: {
+              agent_id: string;
+              name: string;
+              role: string;
+            } | null;
+            rigName: string | null;
+            staleSince: string | null;
+            failureReason: string | null;
+          }[];
+          stalePRs: {
+            mrBead: {
+              bead_id: string;
+              status: string;
+              title: string;
+              body: string | null;
+              rig_id: string | null;
+              created_at: string;
+              updated_at: string;
+              metadata: Record<string, unknown>;
+            };
+            reviewMetadata: {
+              branch: string;
+              target_branch: string;
+              merge_commit: string | null;
+              pr_url: string | null;
+              retry_count: number;
+            };
+            sourceBead: {
+              bead_id: string;
+              title: string;
+              status: string;
+              body: string | null;
+            } | null;
+            convoy: {
+              convoy_id: string;
+              title: string;
+              total_beads: number;
+              closed_beads: number;
+              feature_branch: string | null;
+              merge_mode: string | null;
+            } | null;
+            agent: {
+              agent_id: string;
+              name: string;
+              role: string;
+            } | null;
+            rigName: string | null;
+            staleSince: string | null;
+            failureReason: string | null;
+          }[];
+        };
+        activityLog: {
+          event: {
+            bead_event_id: string;
+            bead_id: string;
+            agent_id: string | null;
+            event_type: string;
+            old_value: string | null;
+            new_value: string | null;
+            metadata: Record<string, unknown>;
+            created_at: string;
+          };
+          mrBead: {
+            bead_id: string;
+            title: string;
+            type: string;
+            status: string;
+            rig_id: string | null;
+            metadata: Record<string, unknown>;
+          } | null;
+          sourceBead: {
+            bead_id: string;
+            title: string;
+            status: string;
+          } | null;
+          convoy: {
+            convoy_id: string;
+            title: string;
+            total_beads: number;
+            closed_beads: number;
+            feature_branch: string | null;
+            merge_mode: string | null;
+          } | null;
+          agent: {
+            agent_id: string;
+            name: string;
+            role: string;
+          } | null;
+          rigName: string | null;
+          reviewMetadata: {
+            pr_url: string | null;
+            branch: string | null;
+            target_branch: string | null;
+            merge_commit: string | null;
+          } | null;
+        }[];
+      };
+      meta: object;
+    }>;
     listConvoys: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         townId: string;
@@ -1603,6 +1784,187 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             rig_id?: string | undefined;
             rig_name?: string | undefined;
           }[];
+          meta: object;
+        }>;
+        getMergeQueueData: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+            rigId?: string | undefined;
+            limit?: number | undefined;
+            since?: string | undefined;
+          };
+          output: {
+            needsAttention: {
+              openPRs: {
+                mrBead: {
+                  bead_id: string;
+                  status: string;
+                  title: string;
+                  body: string | null;
+                  rig_id: string | null;
+                  created_at: string;
+                  updated_at: string;
+                  metadata: Record<string, unknown>;
+                };
+                reviewMetadata: {
+                  branch: string;
+                  target_branch: string;
+                  merge_commit: string | null;
+                  pr_url: string | null;
+                  retry_count: number;
+                };
+                sourceBead: {
+                  bead_id: string;
+                  title: string;
+                  status: string;
+                  body: string | null;
+                } | null;
+                convoy: {
+                  convoy_id: string;
+                  title: string;
+                  total_beads: number;
+                  closed_beads: number;
+                  feature_branch: string | null;
+                  merge_mode: string | null;
+                } | null;
+                agent: {
+                  agent_id: string;
+                  name: string;
+                  role: string;
+                } | null;
+                rigName: string | null;
+                staleSince: string | null;
+                failureReason: string | null;
+              }[];
+              failedReviews: {
+                mrBead: {
+                  bead_id: string;
+                  status: string;
+                  title: string;
+                  body: string | null;
+                  rig_id: string | null;
+                  created_at: string;
+                  updated_at: string;
+                  metadata: Record<string, unknown>;
+                };
+                reviewMetadata: {
+                  branch: string;
+                  target_branch: string;
+                  merge_commit: string | null;
+                  pr_url: string | null;
+                  retry_count: number;
+                };
+                sourceBead: {
+                  bead_id: string;
+                  title: string;
+                  status: string;
+                  body: string | null;
+                } | null;
+                convoy: {
+                  convoy_id: string;
+                  title: string;
+                  total_beads: number;
+                  closed_beads: number;
+                  feature_branch: string | null;
+                  merge_mode: string | null;
+                } | null;
+                agent: {
+                  agent_id: string;
+                  name: string;
+                  role: string;
+                } | null;
+                rigName: string | null;
+                staleSince: string | null;
+                failureReason: string | null;
+              }[];
+              stalePRs: {
+                mrBead: {
+                  bead_id: string;
+                  status: string;
+                  title: string;
+                  body: string | null;
+                  rig_id: string | null;
+                  created_at: string;
+                  updated_at: string;
+                  metadata: Record<string, unknown>;
+                };
+                reviewMetadata: {
+                  branch: string;
+                  target_branch: string;
+                  merge_commit: string | null;
+                  pr_url: string | null;
+                  retry_count: number;
+                };
+                sourceBead: {
+                  bead_id: string;
+                  title: string;
+                  status: string;
+                  body: string | null;
+                } | null;
+                convoy: {
+                  convoy_id: string;
+                  title: string;
+                  total_beads: number;
+                  closed_beads: number;
+                  feature_branch: string | null;
+                  merge_mode: string | null;
+                } | null;
+                agent: {
+                  agent_id: string;
+                  name: string;
+                  role: string;
+                } | null;
+                rigName: string | null;
+                staleSince: string | null;
+                failureReason: string | null;
+              }[];
+            };
+            activityLog: {
+              event: {
+                bead_event_id: string;
+                bead_id: string;
+                agent_id: string | null;
+                event_type: string;
+                old_value: string | null;
+                new_value: string | null;
+                metadata: Record<string, unknown>;
+                created_at: string;
+              };
+              mrBead: {
+                bead_id: string;
+                title: string;
+                type: string;
+                status: string;
+                rig_id: string | null;
+                metadata: Record<string, unknown>;
+              } | null;
+              sourceBead: {
+                bead_id: string;
+                title: string;
+                status: string;
+              } | null;
+              convoy: {
+                convoy_id: string;
+                title: string;
+                total_beads: number;
+                closed_beads: number;
+                feature_branch: string | null;
+                merge_mode: string | null;
+              } | null;
+              agent: {
+                agent_id: string;
+                name: string;
+                role: string;
+              } | null;
+              rigName: string | null;
+              reviewMetadata: {
+                pr_url: string | null;
+                branch: string | null;
+                target_branch: string | null;
+                merge_commit: string | null;
+              } | null;
+            }[];
+          };
           meta: object;
         }>;
         listConvoys: import('@trpc/server').TRPCQueryProcedure<{

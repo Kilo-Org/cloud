@@ -213,3 +213,20 @@
     animation: pulse-glow 0.6s ease-out;
   }
 }
+
+/* Toast enlargement — 50% larger than default sonner sizing */
+[data-sonner-toast].toast-enlarged {
+  --width: 546px; /* default 364px × 1.5 */
+  padding: 24px; /* default 16px × 1.5 */
+  font-size: 1.05rem; /* bump from default ~0.875rem */
+  border-width: 2px;
+  border-style: solid;
+}
+
+[data-sonner-toast].toast-enlarged [data-title] {
+  font-size: 1.125rem;
+}
+
+[data-sonner-toast].toast-enlarged [data-description] {
+  font-size: 1rem;
+}

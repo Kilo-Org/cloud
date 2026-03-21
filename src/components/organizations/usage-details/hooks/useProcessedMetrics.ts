@@ -30,14 +30,14 @@ export function useProcessedMetrics(
           avg_cost_per_req: [],
           tokens: [],
           active_users: [],
-        } as ProcessedMetricsData,
+        } satisfies ProcessedMetricsData,
         metricsTotals: {
           cost: 0,
           requests: 0,
           avg_cost_per_req: 0,
           tokens: 0,
           active_users: 0,
-        } as MetricsTotals,
+        } satisfies MetricsTotals,
         metricsLoading: timeseriesLoading
           ? ['cost', 'requests', 'avg_cost_per_req', 'tokens', 'active_users']
           : [],
@@ -105,14 +105,13 @@ export function useProcessedMetrics(
     const allUniqueUsers = new Set(timeseries.filter(p => p.requestCount > 0).map(p => p.email))
       .size;
 
+    const totalCostAll = processedData.cost.reduce((sum, p) => sum + p.value, 0);
+    const totalRequestsAll = processedData.requests.reduce((sum, p) => sum + p.value, 0);
+
     const totals: MetricsTotals = {
-      cost: processedData.cost.reduce((sum, p) => sum + p.value, 0),
-      requests: processedData.requests.reduce((sum, p) => sum + p.value, 0),
-      avg_cost_per_req:
-        processedData.avg_cost_per_req.length > 0
-          ? processedData.avg_cost_per_req.reduce((sum, p) => sum + p.value, 0) /
-            processedData.avg_cost_per_req.length
-          : 0,
+      cost: totalCostAll,
+      requests: totalRequestsAll,
+      avg_cost_per_req: totalRequestsAll > 0 ? totalCostAll / totalRequestsAll : 0,
       tokens: processedData.tokens.reduce((sum, p) => sum + p.value, 0),
       active_users: allUniqueUsers,
     };

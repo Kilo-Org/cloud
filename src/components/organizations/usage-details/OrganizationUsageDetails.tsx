@@ -296,7 +296,6 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
                 activeFilters={activeFilters}
                 onFilter={handleFilter}
                 onExclude={handleExclude}
-                className=""
               />
             </div>
           )}

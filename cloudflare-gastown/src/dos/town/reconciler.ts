@@ -11,30 +11,39 @@
  * See reconciliation-spec.md §5.3.
  */
 
-import { z } from 'zod';
-import { beads, BeadRecord } from '../../db/tables/beads.table';
-import { agent_metadata, AgentMetadataRecord } from '../../db/tables/agent-metadata.table';
-import { review_metadata, ReviewMetadataRecord } from '../../db/tables/review-metadata.table';
-import { convoy_metadata, ConvoyMetadataRecord } from '../../db/tables/convoy-metadata.table';
-import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
-import { agent_nudges } from '../../db/tables/agent-nudges.table';
-import { query } from '../../util/query.util';
+import { z } from "zod";
+import { beads, BeadRecord } from "../../db/tables/beads.table";
+import {
+  agent_metadata,
+  AgentMetadataRecord,
+} from "../../db/tables/agent-metadata.table";
+import {
+  review_metadata,
+  ReviewMetadataRecord,
+} from "../../db/tables/review-metadata.table";
+import {
+  convoy_metadata,
+  ConvoyMetadataRecord,
+} from "../../db/tables/convoy-metadata.table";
+import { bead_dependencies } from "../../db/tables/bead-dependencies.table";
+import { agent_nudges } from "../../db/tables/agent-nudges.table";
+import { query } from "../../util/query.util";
 import {
   GUPP_WARN_MS,
   GUPP_ESCALATE_MS,
   GUPP_FORCE_STOP_MS,
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
-} from './patrol';
-import { DISPATCH_COOLDOWN_MS, MAX_DISPATCH_ATTEMPTS } from './scheduling';
-import * as reviewQueue from './review-queue';
-import * as agents from './agents';
-import * as beadOps from './beads';
-import { getRig } from './rigs';
-import type { Action } from './actions';
-import type { TownEventRecord } from '../../db/tables/town-events.table';
+} from "./patrol";
+import { DISPATCH_COOLDOWN_MS, MAX_DISPATCH_ATTEMPTS } from "./scheduling";
+import * as reviewQueue from "./review-queue";
+import * as agents from "./agents";
+import * as beadOps from "./beads";
+import { getRig } from "./rigs";
+import type { Action } from "./actions";
+import type { TownEventRecord } from "../../db/tables/town-events.table";
 
-const LOG = '[reconciler]';
+const LOG = "[reconciler]";
 
 // ── Timeouts (from spec §7) ─────────────────────────────────────────
 
@@ -137,71 +146,76 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
   const payload = event.payload;
 
   switch (event.event_type) {
-    case 'agent_done': {
+    case "agent_done": {
       if (!event.agent_id) {
         console.warn(`${LOG} applyEvent: agent_done missing agent_id`);
         return;
       }
-      const branch = typeof payload.branch === 'string' ? payload.branch : '';
-      const pr_url = typeof payload.pr_url === 'string' ? payload.pr_url : undefined;
-      const summary = typeof payload.summary === 'string' ? payload.summary : undefined;
+      const branch = typeof payload.branch === "string" ? payload.branch : "";
+      const pr_url =
+        typeof payload.pr_url === "string" ? payload.pr_url : undefined;
+      const summary =
+        typeof payload.summary === "string" ? payload.summary : undefined;
 
       reviewQueue.agentDone(sql, event.agent_id, { branch, pr_url, summary });
       return;
     }
 
-    case 'agent_completed': {
+    case "agent_completed": {
       if (!event.agent_id) {
         console.warn(`${LOG} applyEvent: agent_completed missing agent_id`);
         return;
       }
       const status =
-        payload.status === 'completed' || payload.status === 'failed' ? payload.status : 'failed';
-      const reason = typeof payload.reason === 'string' ? payload.reason : undefined;
+        payload.status === "completed" || payload.status === "failed"
+          ? payload.status
+          : "failed";
+      const reason =
+        typeof payload.reason === "string" ? payload.reason : undefined;
 
       reviewQueue.agentCompleted(sql, event.agent_id, { status, reason });
       return;
     }
 
-    case 'pr_status_changed': {
+    case "pr_status_changed": {
       if (!event.bead_id) {
         console.warn(`${LOG} applyEvent: pr_status_changed missing bead_id`);
         return;
       }
       const pr_state = payload.pr_state;
-      if (pr_state === 'merged') {
+      if (pr_state === "merged") {
         reviewQueue.completeReviewWithResult(sql, {
           entry_id: event.bead_id,
-          status: 'merged',
-          message: 'PR merged (detected by polling)',
+          status: "merged",
+          message: "PR merged (detected by polling)",
         });
-      } else if (pr_state === 'closed') {
+      } else if (pr_state === "closed") {
         reviewQueue.completeReviewWithResult(sql, {
           entry_id: event.bead_id,
-          status: 'failed',
-          message: 'PR closed without merge',
+          status: "failed",
+          message: "PR closed without merge",
         });
       }
       return;
     }
 
-    case 'bead_created': {
+    case "bead_created": {
       // No state change needed — bead already exists in DB.
       // Reconciler will pick it up as unassigned on next pass.
       return;
     }
 
-    case 'bead_cancelled': {
+    case "bead_cancelled": {
       if (!event.bead_id) {
         console.warn(`${LOG} applyEvent: bead_cancelled missing bead_id`);
         return;
       }
       const cancelStatus =
-        payload.cancel_status === 'closed' || payload.cancel_status === 'failed'
+        payload.cancel_status === "closed" || payload.cancel_status === "failed"
           ? payload.cancel_status
-          : 'failed';
+          : "failed";
 
-      beadOps.updateBeadStatus(sql, event.bead_id, cancelStatus, 'system');
+      beadOps.updateBeadStatus(sql, event.bead_id, cancelStatus, "system");
 
       // Unhook any agent hooked to this bead
       const hookedAgentRows = z
@@ -215,7 +229,7 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
             FROM ${agent_metadata}
             WHERE ${agent_metadata.current_hook_bead_id} = ?
           `,
-            [event.bead_id]
+            [event.bead_id],
           ),
         ]);
       for (const row of hookedAgentRows) {
@@ -224,8 +238,9 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       return;
     }
 
-    case 'convoy_started': {
-      const convoyId = typeof payload.convoy_id === 'string' ? payload.convoy_id : null;
+    case "convoy_started": {
+      const convoyId =
+        typeof payload.convoy_id === "string" ? payload.convoy_id : null;
       if (!convoyId) {
         console.warn(`${LOG} applyEvent: convoy_started missing convoy_id`);
         return;
@@ -237,12 +252,12 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
           SET ${convoy_metadata.columns.staged} = 0
           WHERE ${convoy_metadata.columns.bead_id} = ?
         `,
-        [convoyId]
+        [convoyId],
       );
       return;
     }
 
-    case 'container_status': {
+    case "container_status": {
       if (!event.agent_id) return;
 
       const containerStatus = payload.status as string;
@@ -256,49 +271,52 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       // The 3-minute grace period covers the 60s HTTP timeout plus
       // typical cold start time (git clone + worktree). Truly dead
       // agents are caught by reconcileAgents after 90s of no heartbeats.
-      if (containerStatus === 'not_found' && agent.last_activity_at) {
-        const ageSec = (Date.now() - new Date(agent.last_activity_at).getTime()) / 1000;
+      if (containerStatus === "not_found" && agent.last_activity_at) {
+        const ageSec =
+          (Date.now() - new Date(agent.last_activity_at).getTime()) / 1000;
         if (ageSec < 180) return; // 3-minute grace for cold starts
       }
 
       if (
-        (agent.status === 'working' || agent.status === 'stalled') &&
-        (containerStatus === 'exited' || containerStatus === 'not_found')
+        (agent.status === "working" || agent.status === "stalled") &&
+        (containerStatus === "exited" || containerStatus === "not_found")
       ) {
-        if (agent.role === 'refinery') {
+        if (agent.role === "refinery") {
           // Check if gt_done already completed the MR
           if (agent.current_hook_bead_id) {
             const mr = beadOps.getBead(sql, agent.current_hook_bead_id);
-            if (mr && (mr.status === 'closed' || mr.status === 'failed')) {
+            if (mr && (mr.status === "closed" || mr.status === "failed")) {
               // MR already terminal — clean up the refinery
               agents.unhookBead(sql, event.agent_id);
-              agents.updateAgentStatus(sql, event.agent_id, 'idle');
+              agents.updateAgentStatus(sql, event.agent_id, "idle");
               agents.writeCheckpoint(sql, event.agent_id, null);
             } else {
               // Refinery died without completing — set idle, keep hook.
               // reconcileReviewQueue Rule 6 will retry dispatch.
-              agents.updateAgentStatus(sql, event.agent_id, 'idle');
+              agents.updateAgentStatus(sql, event.agent_id, "idle");
             }
           } else {
-            agents.updateAgentStatus(sql, event.agent_id, 'idle');
+            agents.updateAgentStatus(sql, event.agent_id, "idle");
           }
         } else {
           // Non-refinery died — set idle. Bead stays in_progress.
           // reconcileBeads Rule 3 will reset it to open after 5 min.
-          agents.updateAgentStatus(sql, event.agent_id, 'idle');
+          agents.updateAgentStatus(sql, event.agent_id, "idle");
         }
       }
       return;
     }
 
-    case 'nudge_timeout': {
+    case "nudge_timeout": {
       // GUPP violations are handled by reconcileGUPP on the next pass.
       // The event just records the fact for audit trail.
       return;
     }
 
     default: {
-      console.warn(`${LOG} applyEvent: unknown event type: ${event.event_type}`);
+      console.warn(
+        `${LOG} applyEvent: unknown event type: ${event.event_type}`,
+      );
     }
   }
 }
@@ -346,7 +364,7 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
         LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
         WHERE ${agent_metadata.status} = 'working'
       `,
-      []
+      [],
     ),
   ]);
 
@@ -354,19 +372,19 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
     if (!agent.last_activity_at) {
       // No heartbeat ever received — container may have failed to start
       actions.push({
-        type: 'transition_agent',
+        type: "transition_agent",
         agent_id: agent.bead_id,
-        from: 'working',
-        to: 'idle',
-        reason: 'no heartbeat received since dispatch',
+        from: "working",
+        to: "idle",
+        reason: "no heartbeat received since dispatch",
       });
     } else if (staleMs(agent.last_activity_at, 90_000)) {
       actions.push({
-        type: 'transition_agent',
+        type: "transition_agent",
         agent_id: agent.bead_id,
-        from: 'working',
-        to: 'idle',
-        reason: 'heartbeat lost (3 missed cycles)',
+        from: "working",
+        to: "idle",
+        reason: "heartbeat lost (3 missed cycles)",
       });
     }
   }
@@ -386,7 +404,7 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
         WHERE ${agent_metadata.status} = 'idle'
           AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
       `,
-      []
+      [],
     ),
   ]);
 
@@ -404,33 +422,33 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
           FROM ${beads}
           WHERE ${beads.bead_id} = ?
         `,
-          [agent.current_hook_bead_id]
+          [agent.current_hook_bead_id],
         ),
       ]);
 
     if (hookedRows.length === 0) {
       // Hooked bead doesn't exist — stale reference
       actions.push({
-        type: 'unhook_agent',
+        type: "unhook_agent",
         agent_id: agent.bead_id,
-        reason: 'hooked bead does not exist',
+        reason: "hooked bead does not exist",
       });
       actions.push({
-        type: 'clear_agent_checkpoint',
+        type: "clear_agent_checkpoint",
         agent_id: agent.bead_id,
       });
       continue;
     }
 
     const hookedStatus = hookedRows[0].status;
-    if (hookedStatus === 'closed' || hookedStatus === 'failed') {
+    if (hookedStatus === "closed" || hookedStatus === "failed") {
       actions.push({
-        type: 'unhook_agent',
+        type: "unhook_agent",
         agent_id: agent.bead_id,
-        reason: 'hooked bead is terminal',
+        reason: "hooked bead is terminal",
       });
       actions.push({
-        type: 'clear_agent_checkpoint',
+        type: "clear_agent_checkpoint",
         agent_id: agent.bead_id,
       });
     }
@@ -478,7 +496,7 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
               AND cm.${convoy_metadata.columns.staged} = 1
           )
       `,
-      [TRIAGE_LABEL_LIKE]
+      [TRIAGE_LABEL_LIKE],
     ),
   ]);
 
@@ -488,8 +506,8 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
     // that a hook_agent + dispatch_agent is needed.
     // The action includes rig_id so Phase 3's applyAction can resolve the agent.
     actions.push({
-      type: 'dispatch_agent',
-      agent_id: '', // resolved at apply time
+      type: "dispatch_agent",
+      agent_id: "", // resolved at apply time
       bead_id: bead.bead_id,
       rig_id: bead.rig_id,
     });
@@ -511,7 +529,7 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
           AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
           AND ${agent_metadata.columns.role} != 'refinery'
       `,
-      []
+      [],
     ),
   ]);
 
@@ -524,17 +542,17 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
     // Check max dispatch attempts
     if (agent.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
       actions.push({
-        type: 'transition_bead',
+        type: "transition_bead",
         bead_id: agent.current_hook_bead_id,
         from: null,
-        to: 'failed',
-        reason: 'max dispatch attempts exceeded',
-        actor: 'system',
+        to: "failed",
+        reason: "max dispatch attempts exceeded",
+        actor: "system",
       });
       actions.push({
-        type: 'unhook_agent',
+        type: "unhook_agent",
         agent_id: agent.bead_id,
-        reason: 'max dispatch attempts',
+        reason: "max dispatch attempts",
       });
       continue;
     }
@@ -551,13 +569,13 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
           FROM ${beads}
           WHERE ${beads.bead_id} = ?
         `,
-          [agent.current_hook_bead_id]
+          [agent.current_hook_bead_id],
         ),
       ]);
 
     if (hookedRows.length === 0) continue;
     const hooked = hookedRows[0];
-    if (hooked.status !== 'open') continue;
+    if (hooked.status !== "open") continue;
 
     // Check blockers
     const blockerCount = z
@@ -574,17 +592,17 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
             AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
             AND blocker.${beads.columns.status} NOT IN ('closed', 'failed')
         `,
-          [agent.current_hook_bead_id]
+          [agent.current_hook_bead_id],
         ),
       ]);
 
     if (blockerCount[0]?.cnt > 0) continue;
 
     actions.push({
-      type: 'dispatch_agent',
+      type: "dispatch_agent",
       agent_id: agent.bead_id,
       bead_id: agent.current_hook_bead_id,
-      rig_id: hooked.rig_id ?? agent.rig_id ?? '',
+      rig_id: hooked.rig_id ?? agent.rig_id ?? "",
     });
   }
 
@@ -603,7 +621,7 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
         WHERE b.${beads.columns.type} = 'issue'
           AND b.${beads.columns.status} = 'in_progress'
       `,
-      []
+      [],
     ),
   ]);
 
@@ -626,25 +644,25 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
           WHERE ${agent_metadata.current_hook_bead_id} = ?
             AND (
               ${agent_metadata.status} IN ('working', 'stalled')
-              OR ${agent_metadata.last_activity_at} > datetime('now', '-90 seconds')
+              OR ${agent_metadata.last_activity_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 seconds')
             )
         `,
-          [bead.bead_id]
+          [bead.bead_id],
         ),
       ]);
 
     if (hookedAgent.length > 0) continue;
 
     actions.push({
-      type: 'transition_bead',
+      type: "transition_bead",
       bead_id: bead.bead_id,
-      from: 'in_progress',
-      to: 'open',
-      reason: 'agent lost',
-      actor: 'system',
+      from: "in_progress",
+      to: "open",
+      reason: "agent lost",
+      actor: "system",
     });
     actions.push({
-      type: 'clear_bead_assignee',
+      type: "clear_bead_assignee",
       bead_id: bead.bead_id,
     });
   }
@@ -664,7 +682,7 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
         WHERE b.${beads.columns.type} = 'issue'
           AND b.${beads.columns.status} = 'in_review'
       `,
-      []
+      [],
     ),
   ]);
 
@@ -686,36 +704,38 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
             AND bd.${bead_dependencies.columns.dependency_type} = 'tracks'
             AND mr.${beads.columns.type} = 'merge_request'
         `,
-          [bead.bead_id]
+          [bead.bead_id],
         ),
       ]);
 
     if (mrBeads.length === 0) continue;
-    const allTerminal = mrBeads.every(mr => mr.status === 'closed' || mr.status === 'failed');
+    const allTerminal = mrBeads.every(
+      (mr) => mr.status === "closed" || mr.status === "failed",
+    );
     if (!allTerminal) continue;
 
-    const anyMerged = mrBeads.some(mr => mr.status === 'closed');
+    const anyMerged = mrBeads.some((mr) => mr.status === "closed");
 
     if (anyMerged) {
       actions.push({
-        type: 'transition_bead',
+        type: "transition_bead",
         bead_id: bead.bead_id,
-        from: 'in_review',
-        to: 'closed',
-        reason: 'MR merged (reconciler safety net)',
-        actor: 'system',
+        from: "in_review",
+        to: "closed",
+        reason: "MR merged (reconciler safety net)",
+        actor: "system",
       });
     } else {
       actions.push({
-        type: 'transition_bead',
+        type: "transition_bead",
         bead_id: bead.bead_id,
-        from: 'in_review',
-        to: 'open',
-        reason: 'all reviews failed',
-        actor: 'system',
+        from: "in_review",
+        to: "open",
+        reason: "all reviews failed",
+        actor: "system",
       });
       actions.push({
-        type: 'clear_bead_assignee',
+        type: "clear_bead_assignee",
         bead_id: bead.bead_id,
       });
     }
@@ -746,15 +766,15 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
         WHERE b.${beads.columns.type} = 'merge_request'
           AND b.${beads.columns.status} IN ('open', 'in_progress')
       `,
-      []
+      [],
     ),
   ]);
 
   for (const mr of mrBeads) {
     // Rule 1: PR-strategy MR beads in_progress need polling
-    if (mr.status === 'in_progress' && mr.pr_url) {
+    if (mr.status === "in_progress" && mr.pr_url) {
       actions.push({
-        type: 'poll_pr',
+        type: "poll_pr",
         bead_id: mr.bead_id,
         pr_url: mr.pr_url,
       });
@@ -764,7 +784,7 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     // Skip MR beads with unresolved rework blockers — they're waiting for
     // a polecat to finish rework, which is a normal in-flight state.
     if (
-      mr.status === 'in_progress' &&
+      mr.status === "in_progress" &&
       !mr.pr_url &&
       staleMs(mr.updated_at, STUCK_REVIEW_TIMEOUT_MS)
     ) {
@@ -772,20 +792,20 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
       const workingAgent = hasWorkingAgentHooked(sql, mr.bead_id);
       if (!workingAgent) {
         actions.push({
-          type: 'transition_bead',
+          type: "transition_bead",
           bead_id: mr.bead_id,
-          from: 'in_progress',
-          to: 'open',
-          reason: 'stuck review, no working agent',
-          actor: 'system',
+          from: "in_progress",
+          to: "open",
+          reason: "stuck review, no working agent",
+          actor: "system",
         });
         // Unhook any idle agent still pointing at this MR
         const idleAgent = getIdleAgentHookedTo(sql, mr.bead_id);
         if (idleAgent) {
           actions.push({
-            type: 'unhook_agent',
+            type: "unhook_agent",
             agent_id: idleAgent,
-            reason: 'stuck review cleanup',
+            reason: "stuck review cleanup",
           });
         }
       }
@@ -794,7 +814,7 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     // Rule 3: Abandoned MR beads in_progress, no PR, no agent hooked, stale >2min
     // Skip MR beads with rework blockers (same reasoning as Rule 2).
     if (
-      mr.status === 'in_progress' &&
+      mr.status === "in_progress" &&
       !mr.pr_url &&
       staleMs(mr.updated_at, ABANDONED_MR_TIMEOUT_MS)
     ) {
@@ -802,12 +822,12 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
       const anyAgent = hasAnyAgentHooked(sql, mr.bead_id);
       if (!anyAgent) {
         actions.push({
-          type: 'transition_bead',
+          type: "transition_bead",
           bead_id: mr.bead_id,
-          from: 'in_progress',
-          to: 'open',
-          reason: 'abandoned, no agent hooked',
-          actor: 'system',
+          from: "in_progress",
+          to: "open",
+          reason: "abandoned, no agent hooked",
+          actor: "system",
         });
       }
     }
@@ -815,19 +835,19 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     // Rule 4: PR-strategy MR beads orphaned (refinery dispatched then died, stale >30min)
     // Only in_progress — open beads are just waiting for the refinery to pop them.
     if (
-      mr.status === 'in_progress' &&
+      mr.status === "in_progress" &&
       mr.pr_url &&
       staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
     ) {
       const workingAgent = hasWorkingAgentHooked(sql, mr.bead_id);
       if (!workingAgent) {
         actions.push({
-          type: 'transition_bead',
+          type: "transition_bead",
           bead_id: mr.bead_id,
           from: mr.status,
-          to: 'failed',
-          reason: 'PR review orphaned',
-          actor: 'system',
+          to: "failed",
+          reason: "PR review orphaned",
+          actor: "system",
         });
       }
     }
@@ -848,7 +868,7 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
           AND b.${beads.columns.status} = 'open'
           AND b.${beads.columns.rig_id} IS NOT NULL
       `,
-        []
+        [],
       ),
     ]);
 
@@ -872,7 +892,7 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
             AND b.${beads.columns.rig_id} = ?
             AND rm.${review_metadata.columns.pr_url} IS NULL
         `,
-          [rig_id]
+          [rig_id],
         ),
       ]);
     if ((inProgressCount[0]?.cnt ?? 0) > 0) continue;
@@ -893,7 +913,7 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
             AND b.${beads.columns.rig_id} = ?
           LIMIT 1
         `,
-        [rig_id]
+        [rig_id],
       ),
     ]);
 
@@ -913,7 +933,7 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
           ORDER BY ${beads.columns.created_at} ASC
           LIMIT 1
         `,
-          [rig_id]
+          [rig_id],
         ),
       ]);
 
@@ -923,16 +943,16 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     // agent_id — applyAction will create the refinery via getOrCreateAgent.
     if (refinery.length === 0) {
       actions.push({
-        type: 'transition_bead',
+        type: "transition_bead",
         bead_id: oldestMr[0].bead_id,
-        from: 'open',
-        to: 'in_progress',
-        reason: 'popped for review (creating refinery)',
-        actor: 'system',
+        from: "open",
+        to: "in_progress",
+        reason: "popped for review (creating refinery)",
+        actor: "system",
       });
       actions.push({
-        type: 'dispatch_agent',
-        agent_id: '',
+        type: "dispatch_agent",
+        agent_id: "",
         bead_id: oldestMr[0].bead_id,
         rig_id,
       });
@@ -940,23 +960,23 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     }
 
     const ref = refinery[0];
-    if (ref.status !== 'idle' || ref.current_hook_bead_id) continue;
+    if (ref.status !== "idle" || ref.current_hook_bead_id) continue;
 
     actions.push({
-      type: 'transition_bead',
+      type: "transition_bead",
       bead_id: oldestMr[0].bead_id,
-      from: 'open',
-      to: 'in_progress',
-      reason: 'popped for review',
-      actor: 'system',
+      from: "open",
+      to: "in_progress",
+      reason: "popped for review",
+      actor: "system",
     });
     actions.push({
-      type: 'hook_agent',
+      type: "hook_agent",
       agent_id: ref.bead_id,
       bead_id: oldestMr[0].bead_id,
     });
     actions.push({
-      type: 'dispatch_agent',
+      type: "dispatch_agent",
       agent_id: ref.bead_id,
       bead_id: oldestMr[0].bead_id,
       rig_id,
@@ -979,7 +999,7 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
           AND ${agent_metadata.status} = 'idle'
           AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
       `,
-      []
+      [],
     ),
   ]);
 
@@ -992,17 +1012,17 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     // Circuit-breaker: fail the MR bead after too many attempts (#1342)
     if (ref.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
       actions.push({
-        type: 'transition_bead',
+        type: "transition_bead",
         bead_id: ref.current_hook_bead_id,
         from: null,
-        to: 'failed',
-        reason: 'refinery max dispatch attempts exceeded',
-        actor: 'system',
+        to: "failed",
+        reason: "refinery max dispatch attempts exceeded",
+        actor: "system",
       });
       actions.push({
-        type: 'unhook_agent',
+        type: "unhook_agent",
         agent_id: ref.bead_id,
-        reason: 'max dispatch attempts',
+        reason: "max dispatch attempts",
       });
       continue;
     }
@@ -1022,21 +1042,21 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
           FROM ${beads}
           WHERE ${beads.bead_id} = ?
         `,
-          [ref.current_hook_bead_id]
+          [ref.current_hook_bead_id],
         ),
       ]);
 
     if (mrRows.length === 0) continue;
     const mr = mrRows[0];
-    if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
+    if (mr.type !== "merge_request" || mr.status !== "in_progress") continue;
 
     // Container status is checked at apply time (async). In shadow mode,
     // we just note that a dispatch is needed.
     actions.push({
-      type: 'dispatch_agent',
+      type: "dispatch_agent",
       agent_id: ref.bead_id,
       bead_id: ref.current_hook_bead_id,
-      rig_id: mr.rig_id ?? ref.rig_id ?? '',
+      rig_id: mr.rig_id ?? ref.rig_id ?? "",
     });
   }
 
@@ -1066,7 +1086,7 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
         WHERE b.${beads.columns.type} = 'convoy'
           AND b.${beads.columns.status} = 'open'
       `,
-      []
+      [],
     ),
   ]);
 
@@ -1088,7 +1108,7 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
             AND bd.${bead_dependencies.columns.dependency_type} = 'tracks'
             AND tracked.${beads.columns.type} = 'issue'
         `,
-          [convoy.bead_id]
+          [convoy.bead_id],
         ),
       ]);
 
@@ -1098,7 +1118,7 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
     // Update progress if stale
     if (closed_count !== convoy.closed_beads) {
       actions.push({
-        type: 'update_convoy_progress',
+        type: "update_convoy_progress",
         convoy_id: convoy.bead_id,
         closed_beads: closed_count,
       });
@@ -1124,7 +1144,7 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
             AND mr.${beads.columns.type} = 'merge_request'
             AND mr.${beads.columns.status} IN ('open', 'in_progress')
         `,
-          [convoy.bead_id]
+          [convoy.bead_id],
         ),
       ]);
 
@@ -1139,10 +1159,10 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
         /* ignore */
       }
 
-      if (convoy.merge_mode === 'review-then-land' && convoy.feature_branch) {
+      if (convoy.merge_mode === "review-then-land" && convoy.feature_branch) {
         if (!parsedMeta.ready_to_land) {
           actions.push({
-            type: 'set_convoy_ready_to_land',
+            type: "set_convoy_ready_to_land",
             convoy_id: convoy.bead_id,
           });
         }
@@ -1163,15 +1183,17 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
                   AND bd.${bead_dependencies.columns.dependency_type} = 'tracks'
                   AND mr.${beads.columns.type} = 'merge_request'
               `,
-                [convoy.bead_id]
+                [convoy.bead_id],
               ),
             ]);
 
           // If a landing MR was already merged (closed), close the convoy
-          const hasMergedLanding = landingMrs.some(mr => mr.status === 'closed');
+          const hasMergedLanding = landingMrs.some(
+            (mr) => mr.status === "closed",
+          );
           if (hasMergedLanding) {
             actions.push({
-              type: 'close_convoy',
+              type: "close_convoy",
               convoy_id: convoy.bead_id,
             });
             continue;
@@ -1179,7 +1201,7 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
 
           // If a landing MR is active (open or in_progress), wait for it
           const hasActiveLanding = landingMrs.some(
-            mr => mr.status === 'open' || mr.status === 'in_progress'
+            (mr) => mr.status === "open" || mr.status === "in_progress",
           );
           if (hasActiveLanding) continue;
 
@@ -1201,18 +1223,18 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
                     AND tracked.${beads.columns.rig_id} IS NOT NULL
                   LIMIT 1
                 `,
-                  [convoy.bead_id]
+                  [convoy.bead_id],
                 ),
               ]);
 
             if (rigRows.length > 0) {
               const rig = getRig(sql, rigRows[0].rig_id);
               actions.push({
-                type: 'create_landing_mr',
+                type: "create_landing_mr",
                 convoy_id: convoy.bead_id,
                 rig_id: rigRows[0].rig_id,
                 feature_branch: convoy.feature_branch,
-                target_branch: rig?.default_branch ?? 'main',
+                target_branch: rig?.default_branch ?? "main",
               });
             }
           }
@@ -1220,7 +1242,7 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
       } else {
         // review-and-merge or no feature branch — auto-close
         actions.push({
-          type: 'close_convoy',
+          type: "close_convoy",
           convoy_id: convoy.bead_id,
         });
       }
@@ -1253,7 +1275,7 @@ export function reconcileGUPP(sql: SqlStorage): Action[] {
         LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
         WHERE ${agent_metadata.status} IN ('working', 'stalled')
       `,
-      []
+      [],
     ),
   ]);
 
@@ -1269,37 +1291,37 @@ export function reconcileGUPP(sql: SqlStorage): Action[] {
 
     if (elapsed > GUPP_FORCE_STOP_MS) {
       actions.push({
-        type: 'transition_agent',
+        type: "transition_agent",
         agent_id: agent.bead_id,
         from: agent.status,
-        to: 'stalled',
-        reason: 'GUPP force stop — no SDK activity for 2h',
+        to: "stalled",
+        reason: "GUPP force stop — no SDK activity for 2h",
       });
       actions.push({
-        type: 'stop_agent',
+        type: "stop_agent",
         agent_id: agent.bead_id,
-        reason: 'exceeded 2h GUPP limit',
+        reason: "exceeded 2h GUPP limit",
       });
       actions.push({
-        type: 'create_triage_request',
+        type: "create_triage_request",
         agent_id: agent.bead_id,
-        triage_type: 'stuck_agent',
-        reason: 'GUPP force stop',
+        triage_type: "stuck_agent",
+        reason: "GUPP force stop",
       });
     } else if (elapsed > GUPP_ESCALATE_MS) {
-      if (!hasRecentNudge(sql, agent.bead_id, 'escalate')) {
+      if (!hasRecentNudge(sql, agent.bead_id, "escalate")) {
         actions.push({
-          type: 'send_nudge',
+          type: "send_nudge",
           agent_id: agent.bead_id,
           message:
-            'You have been working for over 1 hour without completing your task. Please wrap up or report if you are stuck.',
-          tier: 'escalate',
+            "You have been working for over 1 hour without completing your task. Please wrap up or report if you are stuck.",
+          tier: "escalate",
         });
         actions.push({
-          type: 'create_triage_request',
+          type: "create_triage_request",
           agent_id: agent.bead_id,
-          triage_type: 'stuck_agent',
-          reason: 'GUPP escalation',
+          triage_type: "stuck_agent",
+          reason: "GUPP escalation",
         });
       }
     } else if (elapsed > 15 * 60_000) {
@@ -1307,18 +1329,18 @@ export function reconcileGUPP(sql: SqlStorage): Action[] {
       // Skip if agent is mid-tool-call — long-running tools like git clone are normal.
       let tools: string[] = [];
       try {
-        tools = JSON.parse(agent.active_tools ?? '[]') as string[];
+        tools = JSON.parse(agent.active_tools ?? "[]") as string[];
       } catch {
         /* ignore */
       }
 
-      if (tools.length === 0 && !hasRecentNudge(sql, agent.bead_id, 'warn')) {
+      if (tools.length === 0 && !hasRecentNudge(sql, agent.bead_id, "warn")) {
         actions.push({
-          type: 'send_nudge',
+          type: "send_nudge",
           agent_id: agent.bead_id,
           message:
-            'You have been idle for 15 minutes with no tool activity. Please check your progress.',
-          tier: 'warn',
+            "You have been idle for 15 minutes with no tool activity. Please check your progress.",
+          tier: "warn",
         });
       }
     }
@@ -1349,16 +1371,16 @@ export function reconcileGC(sql: SqlStorage): Action[] {
           AND ${agent_metadata.columns.role} IN ('polecat', 'refinery')
           AND ${agent_metadata.current_hook_bead_id} IS NULL
       `,
-      []
+      [],
     ),
   ]);
 
   for (const agent of gcCandidates) {
     if (staleMs(agent.last_activity_at, AGENT_GC_RETENTION_MS)) {
       actions.push({
-        type: 'delete_agent',
+        type: "delete_agent",
         agent_id: agent.bead_id,
-        reason: 'GC: idle > 24h',
+        reason: "GC: idle > 24h",
       });
     }
   }
@@ -1369,7 +1391,10 @@ export function reconcileGC(sql: SqlStorage): Action[] {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 /** Check if an MR bead has open rework beads blocking it. */
-function hasUnresolvedReworkBlockers(sql: SqlStorage, mrBeadId: string): boolean {
+function hasUnresolvedReworkBlockers(
+  sql: SqlStorage,
+  mrBeadId: string,
+): boolean {
   const rows = [
     ...query(
       sql,
@@ -1381,7 +1406,7 @@ function hasUnresolvedReworkBlockers(sql: SqlStorage, mrBeadId: string): boolean
           AND rework.${beads.columns.status} NOT IN ('closed', 'failed')
         LIMIT 1
       `,
-      [mrBeadId]
+      [mrBeadId],
     ),
   ];
   return rows.length > 0;
@@ -1397,7 +1422,7 @@ function hasWorkingAgentHooked(sql: SqlStorage, beadId: string): boolean {
           AND ${agent_metadata.status} IN ('working', 'stalled')
         LIMIT 1
       `,
-      [beadId]
+      [beadId],
     ),
   ];
   return rows.length > 0;
@@ -1412,7 +1437,7 @@ function hasAnyAgentHooked(sql: SqlStorage, beadId: string): boolean {
         WHERE ${agent_metadata.current_hook_bead_id} = ?
         LIMIT 1
       `,
-      [beadId]
+      [beadId],
     ),
   ];
   return rows.length > 0;
@@ -1432,13 +1457,17 @@ function getIdleAgentHookedTo(sql: SqlStorage, beadId: string): string | null {
           AND ${agent_metadata.status} = 'idle'
         LIMIT 1
       `,
-        [beadId]
+        [beadId],
       ),
     ]);
   return rows.length > 0 ? rows[0].bead_id : null;
 }
 
-function hasRecentNudge(sql: SqlStorage, agentId: string, tier: string): boolean {
+function hasRecentNudge(
+  sql: SqlStorage,
+  agentId: string,
+  tier: string,
+): boolean {
   // Check if a nudge with this exact tier source was created in the last 60 min.
   // The source is set to `reconciler:${tier}` by applyAction('send_nudge').
   const cutoff = new Date(Date.now() - 60 * 60_000).toISOString();
@@ -1452,7 +1481,7 @@ function hasRecentNudge(sql: SqlStorage, agentId: string, tier: string): boolean
           AND ${agent_nudges.created_at} > ?
         LIMIT 1
       `,
-      [agentId, `reconciler:${tier}`, cutoff]
+      [agentId, `reconciler:${tier}`, cutoff],
     ),
   ];
   return rows.length > 0;
@@ -1489,7 +1518,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
         WHERE ${agent_metadata.status} = 'working'
           AND ${agent_metadata.current_hook_bead_id} IS NULL
       `,
-        []
+        [],
       ),
     ]);
   for (const a of unhookedWorkers) {
@@ -1512,7 +1541,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
         WHERE ${beads.type} = 'convoy'
           AND ${beads.status} = 'in_progress'
       `,
-        []
+        [],
       ),
     ]);
   for (const c of inProgressConvoys) {
@@ -1538,7 +1567,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
         GROUP BY ${beads.rig_id}
         HAVING count(*) > 1
       `,
-        []
+        [],
       ),
     ]);
   for (const r of duplicateMrPerRig) {
@@ -1562,7 +1591,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
         GROUP BY ${agent_metadata.current_hook_bead_id}
         HAVING count(*) > 1
       `,
-        []
+        [],
       ),
     ]);
   for (const m of multiHooked) {
@@ -1594,7 +1623,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
               AND mr.${beads.columns.status} IN ('open', 'in_progress')
           )
       `,
-        []
+        [],
       ),
     ]);
   for (const b of orphanedInReview) {

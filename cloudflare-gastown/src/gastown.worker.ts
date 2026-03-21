@@ -214,6 +214,26 @@ app.post('/debug/towns/:townId/reconcile-dry-run', async c => {
   return c.json(result);
 });
 
+app.post('/debug/towns/:townId/replay-events', async c => {
+  const townId = c.req.param('townId');
+  const body = (await c.req.json()) as { from?: string; to?: string };
+  if (!body.from || !body.to) {
+    return c.json({ error: 'Missing required fields: from, to (ISO timestamps)' }, 400);
+  }
+  const fromDate = new Date(body.from);
+  const toDate = new Date(body.to);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return c.json({ error: 'Invalid date format. Use ISO 8601 timestamps.' }, 400);
+  }
+  if (fromDate > toDate) {
+    return c.json({ error: '"from" must be before or equal to "to"' }, 400);
+  }
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const result = await town.debugReplayEvents(body.from, body.to);
+  return c.json(result);
+});
+
 // ── Town ID + Auth ──────────────────────────────────────────────────────
 // All rig routes live under /api/towns/:townId/rigs/:rigId so the townId
 // is always available from the URL path.

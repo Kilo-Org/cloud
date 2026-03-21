@@ -46,6 +46,7 @@ import { review_metadata } from '../db/tables/review-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
+import { town_events, TownEventRecord } from '../db/tables/town-events.table';
 import {
   agent_nudges,
   AgentNudgeRecord,
@@ -3688,6 +3689,98 @@ export class TownDO extends DurableObject<Env> {
       reconciler: this._lastReconcilerMetrics,
       recentEvents,
     };
+  }
+
+  // DEBUG: replay events from a time range, apply them to state, run the
+  // reconciler, and return computed actions. Uses a savepoint + rollback so
+  // no state is permanently modified.
+  async debugReplayEvents(
+    from: string,
+    to: string
+  ): Promise<{
+    eventsReplayed: number;
+    actions: Action[];
+    stateSnapshot: {
+      agents: unknown[];
+      nonTerminalBeads: unknown[];
+    };
+  }> {
+    this.sql.exec('SAVEPOINT debug_replay_events');
+    try {
+      // Query ALL events in the time range regardless of processed_at
+      const rangeEvents = TownEventRecord.array().parse([
+        ...query(
+          this.sql,
+          /* sql */ `
+            SELECT ${town_events.event_id}, ${town_events.event_type},
+                   ${town_events.agent_id}, ${town_events.bead_id},
+                   ${town_events.payload}, ${town_events.created_at},
+                   ${town_events.processed_at}
+            FROM ${town_events}
+            WHERE ${town_events.created_at} >= ?
+              AND ${town_events.created_at} <= ?
+            ORDER BY ${town_events.created_at} ASC
+          `,
+          [from, to]
+        ),
+      ]);
+
+      // Apply each event to reconstruct state transitions
+      for (const event of rangeEvents) {
+        reconciler.applyEvent(this.sql, event);
+      }
+
+      // Run reconciler against the resulting state
+      const actions = reconciler.reconcile(this.sql);
+
+      // Capture a state snapshot before rollback
+      const agentSnapshot = [
+        ...query(
+          this.sql,
+          /* sql */ `
+            SELECT ${agent_metadata.bead_id},
+                   ${agent_metadata.role},
+                   ${agent_metadata.status},
+                   ${agent_metadata.current_hook_bead_id},
+                   ${agent_metadata.dispatch_attempts},
+                   ${agent_metadata.last_activity_at}
+            FROM ${agent_metadata}
+          `,
+          []
+        ),
+      ];
+
+      const beadSnapshot = [
+        ...query(
+          this.sql,
+          /* sql */ `
+            SELECT ${beads.bead_id},
+                   ${beads.type},
+                   ${beads.status},
+                   ${beads.title},
+                   ${beads.assignee_agent_bead_id},
+                   ${beads.updated_at}
+            FROM ${beads}
+            WHERE ${beads.status} NOT IN ('closed', 'failed')
+              AND ${beads.type} != 'agent'
+            ORDER BY ${beads.type}, ${beads.status}
+          `,
+          []
+        ),
+      ];
+
+      return {
+        eventsReplayed: rangeEvents.length,
+        actions,
+        stateSnapshot: {
+          agents: agentSnapshot,
+          nonTerminalBeads: beadSnapshot,
+        },
+      };
+    } finally {
+      this.sql.exec('ROLLBACK TO SAVEPOINT debug_replay_events');
+      this.sql.exec('RELEASE SAVEPOINT debug_replay_events');
+    }
   }
 
   // DEBUG: dry-run the reconciler against current state, returning actions

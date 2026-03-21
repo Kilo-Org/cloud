@@ -1445,6 +1445,7 @@ function hasRecentNudge(sql: SqlStorage, agentId: string, tier: string): boolean
 export type Violation = {
   invariant: number;
   message: string;
+  context?: Record<string, string>; // structured data for auto-recovery
 };
 
 /**
@@ -1475,6 +1476,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
     violations.push({
       invariant: 7,
       message: `Working agent ${a.bead_id} has no hook`,
+      context: { agent_id: a.bead_id },
     });
   }
 

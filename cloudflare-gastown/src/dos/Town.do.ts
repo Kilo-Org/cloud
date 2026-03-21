@@ -2997,6 +2997,39 @@ export class TownDO extends DurableObject<Env> {
         console.error(
           `${TOWN_LOG} [reconciler:invariants] town=${townId} ${violations.length} violation(s): ${JSON.stringify(violations)}`
         );
+
+        for (const v of violations) {
+          Sentry.captureMessage(`Invariant #${v.invariant} violated: ${v.message}`, {
+            level: 'error',
+            extra: {
+              invariant: v.invariant,
+              message: v.message,
+              townId,
+            },
+          });
+
+          // Auto-recovery: transition working agents with no hook back to idle
+          if (v.invariant === 7 && v.context?.agent_id) {
+            try {
+              // transition_agent returns null — no return value to handle
+              applyAction(this.applyActionCtx, {
+                type: 'transition_agent',
+                agent_id: v.context.agent_id,
+                from: 'working',
+                to: 'idle',
+                reason: 'invariant #7 auto-recovery: working agent with no hook',
+              });
+              console.log(
+                `${TOWN_LOG} [reconciler:invariants] town=${townId} auto-recovered agent ${v.context.agent_id} (invariant #7 → idle)`
+              );
+            } catch (recoveryErr) {
+              console.warn(
+                `${TOWN_LOG} [reconciler:invariants] town=${townId} auto-recovery failed for agent ${v.context.agent_id}`,
+                recoveryErr
+              );
+            }
+          }
+        }
       }
     } catch (err) {
       console.warn(`${TOWN_LOG} [reconciler:invariants] town=${townId} check failed`, err);

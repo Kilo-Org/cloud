@@ -249,7 +249,18 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       const agent = agents.getAgent(sql, event.agent_id);
       if (!agent) return;
 
-      // Only act on working/stalled agents whose container has stopped
+      // Only act on working/stalled agents whose container has stopped.
+      // For 'not_found': skip if the agent was dispatched recently (#1358).
+      // During a cold start the container may 404 on /agents/:id/status
+      // because the agent hasn't registered in the process manager yet.
+      // The 3-minute grace period covers the 60s HTTP timeout plus
+      // typical cold start time (git clone + worktree). Truly dead
+      // agents are caught by reconcileAgents after 90s of no heartbeats.
+      if (containerStatus === 'not_found' && agent.last_activity_at) {
+        const ageSec = (Date.now() - new Date(agent.last_activity_at).getTime()) / 1000;
+        if (ageSec < 180) return; // 3-minute grace for cold starts
+      }
+
       if (
         (agent.status === 'working' || agent.status === 'stalled') &&
         (containerStatus === 'exited' || containerStatus === 'not_found')

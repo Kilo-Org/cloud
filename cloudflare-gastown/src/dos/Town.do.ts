@@ -30,7 +30,7 @@ import * as scheduling from './town/scheduling';
 import * as events from './town/events';
 import * as reconciler from './town/reconciler';
 import { applyAction } from './town/actions';
-import type { ApplyActionContext } from './town/actions';
+import type { Action, ApplyActionContext } from './town/actions';
 import { buildRefinerySystemPrompt } from '../prompts/refinery-system.prompt';
 import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../util/platform-pr.util';
 
@@ -3681,6 +3681,31 @@ export class TownDO extends DurableObject<Env> {
       },
       reconciler: this._lastReconcilerMetrics,
       recentEvents,
+    };
+  }
+
+  // DEBUG: dry-run the reconciler against current state, returning actions
+  // it would emit without applying them. Side-effect-free — reconcile()
+  // only reads SQLite state; applyAction() is never called.
+  async debugDryRun(): Promise<{
+    actions: Action[];
+    metrics: Pick<
+      reconciler.ReconcilerMetrics,
+      'actionsEmitted' | 'actionsByType' | 'pendingEventCount'
+    >;
+  }> {
+    const actions = reconciler.reconcile(this.sql);
+    const actionsByType: Record<string, number> = {};
+    for (const a of actions) {
+      actionsByType[a.type] = (actionsByType[a.type] ?? 0) + 1;
+    }
+    return {
+      actions,
+      metrics: {
+        actionsEmitted: actions.length,
+        actionsByType,
+        pendingEventCount: events.pendingEventCount(this.sql),
+      },
     };
   }
 

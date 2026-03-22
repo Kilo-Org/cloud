@@ -22,9 +22,18 @@ import { type RigAgentEventRecord } from '../db/tables/rig-agent-events.table';
 
 // ── Output type ────────────────────────────────────────────────────────────
 
+export type ToolCallSummary = {
+  tool: string;
+  status: string;
+  /** Truncated one-liner describing the call (e.g. "bash: git status → ok") */
+  summary: string;
+};
+
 export type ConversationTurn = {
   role: 'user' | 'assistant';
   content: string;
+  /** Tool calls made during this assistant turn (empty for user turns). */
+  toolCalls: ToolCallSummary[];
 };
 
 // ── Zod schemas for the event data payloads ────────────────────────────────
@@ -75,12 +84,33 @@ const TextPartData = z
   })
   .passthrough();
 
-// Minimal Part schema — we only care about TextPart; everything else is
-// parsed as an unknown part so we can skip it gracefully.
+// ToolPart from message_part.updated — captures the tool name and execution state
+// so we can summarize what the agent did (not just what it said).
+const ToolStateData = z
+  .object({
+    status: z.string().optional(),
+    input: z.unknown().optional(),
+    output: z.unknown().optional(),
+    title: z.string().optional(),
+  })
+  .passthrough();
+
+const ToolPartData = z
+  .object({
+    id: z.string(),
+    messageID: z.string(),
+    type: z.literal('tool'),
+    tool: z.string().optional(),
+    state: ToolStateData.optional(),
+  })
+  .passthrough();
+
+// Minimal Part schema — we care about TextPart and ToolPart; everything else
+// is parsed as an unknown part so we can skip it gracefully.
 const PartData = z.discriminatedUnion('type', [
   TextPartData,
+  ToolPartData,
   z.object({ type: z.literal('reasoning'), messageID: z.string() }).passthrough(),
-  z.object({ type: z.literal('tool'), messageID: z.string() }).passthrough(),
   z.object({ type: z.literal('file'), messageID: z.string() }).passthrough(),
   z.object({ type: z.literal('step-start'), messageID: z.string() }).passthrough(),
   z.object({ type: z.literal('step-finish'), messageID: z.string() }).passthrough(),
@@ -110,6 +140,8 @@ type MessageAccumulator = {
   info: UserInfo | AssistantInfo | null;
   // Text parts keyed by part id; stored in insertion order
   textParts: Map<string, string>;
+  // Tool call summaries keyed by part id; stored in insertion order
+  toolCalls: Map<string, ToolCallSummary>;
   // Whether this message had any non-text parts (tool calls, etc.)
   hasNonTextParts: boolean;
 };
@@ -148,6 +180,7 @@ export function reconstructConversation(
           role: info.role,
           info,
           textParts: new Map(),
+          toolCalls: new Map(),
           hasNonTextParts: false,
         };
         messages.set(info.id, acc);
@@ -172,6 +205,7 @@ export function reconstructConversation(
           role: 'assistant', // default; corrected when message info arrives
           info: null,
           textParts: new Map(),
+          toolCalls: new Map(),
           hasNonTextParts: false,
         };
         messages.set(messageId, acc);
@@ -181,6 +215,9 @@ export function reconstructConversation(
         // Skip synthetic / ignored parts (used for internal context injection)
         if (part.synthetic || part.ignored) continue;
         acc.textParts.set(part.id, part.text);
+      } else if (part.type === 'tool') {
+        acc.hasNonTextParts = true;
+        acc.toolCalls.set(part.id, summarizeToolCall(part));
       } else {
         acc.hasNonTextParts = true;
       }
@@ -193,8 +230,9 @@ export function reconstructConversation(
 
   for (const acc of messages.values()) {
     const content = buildContent(acc);
-    if (content === null) continue; // skip tool-only or empty turns
-    turns.push({ role: acc.role, content });
+    if (content === null) continue; // skip empty turns
+    const toolCalls = [...acc.toolCalls.values()];
+    turns.push({ role: acc.role, content, toolCalls });
   }
 
   // ── Truncate ─────────────────────────────────────────────────────────────
@@ -232,12 +270,14 @@ function buildAssistantContent(acc: MessageAccumulator): string | null {
   const fromParts = joinTextParts(acc.textParts);
   if (fromParts !== '') return fromParts;
 
-  // Assistant messages with only tool calls (no text) are tool-only turns.
-  // These are not meaningful for a human-readable transcript.
-  if (acc.hasNonTextParts) return null;
+  // Tool-only turns: include them if we captured tool call summaries,
+  // since they describe work the agent performed (file edits, commands).
+  if (acc.toolCalls.size > 0) {
+    return [...acc.toolCalls.values()].map(tc => tc.summary).join('; ');
+  }
 
   // No content at all (e.g. message was created but never had parts — perhaps
-  // due to a crash mid-stream). Skip.
+  // due to a crash mid-stream, or had only non-tool non-text parts). Skip.
   return null;
 }
 
@@ -251,4 +291,73 @@ function extractSummaryBody(info: UserInfo | AssistantInfo | null): string | nul
   const parsed = UserMessageSummary.safeParse(info.summary);
   if (!parsed.success) return null;
   return parsed.data.body ?? null;
+}
+
+type ToolPartFields = z.infer<typeof ToolPartData>;
+
+function summarizeToolCall(part: ToolPartFields): ToolCallSummary {
+  const toolName = part.tool ?? 'unknown';
+  const status = part.state?.status ?? 'unknown';
+  const title = part.state?.title;
+
+  // Build a one-liner: "bash: git status → ok" or "edit: src/foo.ts → completed"
+  const inputBrief = title ?? truncateValue(part.state?.input, 60);
+  const outputBrief = truncateValue(part.state?.output, 60);
+
+  let summary = toolName;
+  if (inputBrief) summary += `: ${inputBrief}`;
+  if (outputBrief) summary += ` → ${outputBrief}`;
+  else if (status !== 'unknown') summary += ` → ${status}`;
+
+  return { tool: toolName, status, summary };
+}
+
+/** Truncate a value to a brief string for summaries. */
+function truncateValue(value: unknown, maxLen: number): string {
+  if (value === undefined || value === null) return '';
+  const str = typeof value === 'string' ? value : JSON.stringify(value);
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen - 3) + '...';
+}
+
+// ── Formatting for re-dispatch ────────────────────────────────────────────
+
+/**
+ * Format a reconstructed conversation transcript into a condensed string
+ * suitable for injection into a re-dispatch prompt. Includes text content
+ * and tool call summaries so the re-dispatched agent knows what it did.
+ *
+ * @param turns  Output of `reconstructConversation()`.
+ * @param maxChars  Approximate character budget. Older turns are dropped
+ *                  to fit. Defaults to 30_000 (~7.5k tokens).
+ */
+export function formatTranscriptForRedispatch(
+  turns: ConversationTurn[],
+  maxChars = 30_000
+): string {
+  // Build formatted lines from most recent to oldest, stopping when the budget is hit.
+  const lines: string[] = [];
+  let charCount = 0;
+
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const turn = turns[i]!;
+    const formatted = formatTurn(turn);
+    if (charCount + formatted.length > maxChars && lines.length > 0) break;
+    lines.unshift(formatted);
+    charCount += formatted.length;
+  }
+
+  return lines.join('\n\n');
+}
+
+function formatTurn(turn: ConversationTurn): string {
+  const label = turn.role === 'user' ? 'User' : 'Assistant';
+  let result = `[${label}]: ${turn.content}`;
+
+  if (turn.toolCalls.length > 0) {
+    const toolLines = turn.toolCalls.map(tc => `  - ${tc.summary}`);
+    result += `\n[Tool calls]:\n${toolLines.join('\n')}`;
+  }
+
+  return result;
 }

@@ -52,7 +52,10 @@ import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
-import { reconstructConversation } from '../util/reconstruct-conversation.util';
+import {
+  reconstructConversation,
+  formatTranscriptForRedispatch,
+} from '../util/reconstruct-conversation.util';
 import { RigAgentEventRecord } from '../db/tables/rig-agent-events.table';
 import { BeadPriority } from '../types';
 import type {
@@ -1841,11 +1844,7 @@ export class TownDO extends DurableObject<Env> {
       const priorEvents = RigAgentEventRecord.array().safeParse(rawEvents);
       const priorTurns = priorEvents.success ? reconstructConversation(priorEvents.data) : [];
       const priorTranscript =
-        priorTurns.length > 0
-          ? priorTurns
-              .map(t => `[${t.role === 'user' ? 'User' : 'Assistant'}]: ${t.content}`)
-              .join('\n\n')
-          : '';
+        priorTurns.length > 0 ? formatTranscriptForRedispatch(priorTurns) : '';
 
       const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
         townId,
@@ -1857,7 +1856,9 @@ export class TownDO extends DurableObject<Env> {
         identity: mayor.identity,
         beadId: '',
         beadTitle: message,
-        beadBody: priorTranscript ? `Prior conversation:\n\n${priorTranscript}` : '',
+        beadBody: priorTranscript
+          ? `Prior session transcript (container restarted):\n\n${priorTranscript}`
+          : '',
         checkpoint: mayor.checkpoint,
         gitUrl: rigConfig?.gitUrl ?? '',
         defaultBranch: rigConfig?.defaultBranch ?? 'main',
@@ -3118,10 +3119,13 @@ export class TownDO extends DurableObject<Env> {
       const priorTurns = priorEvents.success ? reconstructConversation(priorEvents.data) : [];
       let beadBody = bead.body ?? '';
       if (priorTurns.length > 0) {
-        const priorTranscript = priorTurns
-          .map(t => `[${t.role === 'user' ? 'User' : 'Assistant'}]: ${t.content}`)
-          .join('\n\n');
-        beadBody = `Prior conversation:\n\n${priorTranscript}`;
+        const priorTranscript = formatTranscriptForRedispatch(priorTurns);
+        // Prepend the original bead body so the agent retains the task
+        // description alongside the prior session context.
+        const originalBody = bead.body ?? '';
+        beadBody = originalBody
+          ? `${originalBody}\n\n---\n\nPrior session transcript (container restarted):\n\n${priorTranscript}`
+          : `Prior session transcript (container restarted):\n\n${priorTranscript}`;
       }
 
       const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {

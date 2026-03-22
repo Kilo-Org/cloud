@@ -340,7 +340,8 @@ export function formatTranscriptForRedispatch(
   let charCount = 0;
 
   for (let i = turns.length - 1; i >= 0; i--) {
-    const turn = turns[i]!;
+    const turn = turns[i];
+    if (!turn) continue;
     const formatted = formatTurn(turn);
     if (charCount + formatted.length > maxChars && lines.length > 0) break;
     lines.unshift(formatted);

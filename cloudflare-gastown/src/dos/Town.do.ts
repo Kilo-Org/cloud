@@ -3120,11 +3120,8 @@ export class TownDO extends DurableObject<Env> {
       let beadBody = bead.body ?? '';
       if (priorTurns.length > 0) {
         const priorTranscript = formatTranscriptForRedispatch(priorTurns);
-        // Prepend the original bead body so the agent retains the task
-        // description alongside the prior session context.
-        const originalBody = bead.body ?? '';
-        beadBody = originalBody
-          ? `${originalBody}\n\n---\n\nPrior session transcript (container restarted):\n\n${priorTranscript}`
+        beadBody = beadBody
+          ? `${beadBody}\n\n---\n\nPrior session transcript (container restarted):\n\n${priorTranscript}`
           : `Prior session transcript (container restarted):\n\n${priorTranscript}`;
       }
 

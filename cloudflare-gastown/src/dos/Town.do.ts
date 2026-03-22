@@ -13,29 +13,26 @@
  * AgentDOs to stay within the 10GB DO SQLite limit.
  */
 
-import { DurableObject } from "cloudflare:workers";
-import * as Sentry from "@sentry/cloudflare";
-import { z } from "zod";
+import { DurableObject } from 'cloudflare:workers';
+import * as Sentry from '@sentry/cloudflare';
+import { z } from 'zod';
 
 // Sub-modules (plain functions, not classes — per coding style)
-import * as beadOps from "./town/beads";
-import * as agents from "./town/agents";
-import * as mail from "./town/mail";
-import * as reviewQueue from "./town/review-queue";
-import * as config from "./town/config";
-import * as rigs from "./town/rigs";
-import * as dispatch from "./town/container-dispatch";
-import * as patrol from "./town/patrol";
-import * as scheduling from "./town/scheduling";
-import * as events from "./town/events";
-import * as reconciler from "./town/reconciler";
-import { applyAction } from "./town/actions";
-import type { ApplyActionContext } from "./town/actions";
-import { buildRefinerySystemPrompt } from "../prompts/refinery-system.prompt";
-import {
-  GitHubPRStatusSchema,
-  GitLabMRStatusSchema,
-} from "../util/platform-pr.util";
+import * as beadOps from './town/beads';
+import * as agents from './town/agents';
+import * as mail from './town/mail';
+import * as reviewQueue from './town/review-queue';
+import * as config from './town/config';
+import * as rigs from './town/rigs';
+import * as dispatch from './town/container-dispatch';
+import * as patrol from './town/patrol';
+import * as scheduling from './town/scheduling';
+import * as events from './town/events';
+import * as reconciler from './town/reconciler';
+import { applyAction } from './town/actions';
+import type { ApplyActionContext } from './town/actions';
+import { buildRefinerySystemPrompt } from '../prompts/refinery-system.prompt';
+import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../util/platform-pr.util';
 
 // Table imports for beads-centric operations
 import {
@@ -43,27 +40,24 @@ import {
   BeadRecord,
   EscalationBeadRecord,
   ConvoyBeadRecord,
-} from "../db/tables/beads.table";
-import {
-  agent_metadata,
-  AgentMetadataRecord,
-} from "../db/tables/agent-metadata.table";
-import { review_metadata } from "../db/tables/review-metadata.table";
-import { escalation_metadata } from "../db/tables/escalation-metadata.table";
-import { convoy_metadata } from "../db/tables/convoy-metadata.table";
-import { bead_dependencies } from "../db/tables/bead-dependencies.table";
+} from '../db/tables/beads.table';
+import { agent_metadata, AgentMetadataRecord } from '../db/tables/agent-metadata.table';
+import { review_metadata } from '../db/tables/review-metadata.table';
+import { escalation_metadata } from '../db/tables/escalation-metadata.table';
+import { convoy_metadata } from '../db/tables/convoy-metadata.table';
+import { bead_dependencies } from '../db/tables/bead-dependencies.table';
 import {
   agent_nudges,
   AgentNudgeRecord,
   createTableAgentNudges,
   getIndexesAgentNudges,
-} from "../db/tables/agent-nudges.table";
-import { query } from "../util/query.util";
-import { getAgentDOStub } from "./Agent.do";
-import { getTownContainerStub } from "./TownContainer.do";
+} from '../db/tables/agent-nudges.table';
+import { query } from '../util/query.util';
+import { getAgentDOStub } from './Agent.do';
+import { getTownContainerStub } from './TownContainer.do';
 
-import { writeEvent, type GastownEventData } from "../util/analytics.util";
-import { BeadPriority } from "../types";
+import { writeEvent, type GastownEventData } from '../util/analytics.util';
+import { BeadPriority } from '../types';
 import type {
   TownConfig,
   TownConfigUpdate,
@@ -87,41 +81,37 @@ import type {
   MergeStrategy,
   ConvoyMergeMode,
   UiAction,
-} from "../types";
+} from '../types';
 
-const TOWN_LOG = "[Town.do]";
+const TOWN_LOG = '[Town.do]';
 
 /** Format a bead_events row into a human-readable message for the status feed. */
 function formatEventMessage(row: Record<string, unknown>): string {
-  const s = (v: unknown) => (v == null ? "" : `${v as string}`);
+  const s = (v: unknown) => (v == null ? '' : `${v as string}`);
   const eventType = s(row.event_type);
   const beadTitle = row.bead_title ? s(row.bead_title) : null;
   const newValue = row.new_value ? s(row.new_value) : null;
   const agentId = row.agent_id ? s(row.agent_id).slice(0, 8) : null;
   const beadId = row.bead_id ? s(row.bead_id).slice(0, 8) : null;
 
-  const target = beadTitle
-    ? `"${beadTitle}"`
-    : beadId
-      ? `bead ${beadId}…`
-      : "unknown";
-  const actor = agentId ? `agent ${agentId}…` : "system";
+  const target = beadTitle ? `"${beadTitle}"` : beadId ? `bead ${beadId}…` : 'unknown';
+  const actor = agentId ? `agent ${agentId}…` : 'system';
 
   switch (eventType) {
-    case "status_changed":
-      return `${target} → ${newValue ?? "?"} (by ${actor})`;
-    case "assigned":
+    case 'status_changed':
+      return `${target} → ${newValue ?? '?'} (by ${actor})`;
+    case 'assigned':
       return `${target} assigned to ${actor}`;
-    case "pr_created":
+    case 'pr_created':
       return `PR created for ${target}`;
-    case "pr_merged":
+    case 'pr_merged':
       return `PR merged for ${target}`;
-    case "pr_creation_failed":
+    case 'pr_creation_failed':
       return `PR creation failed for ${target}`;
-    case "escalation_created":
+    case 'escalation_created':
       return `Escalation created: ${target}`;
-    case "agent_status":
-      return `${actor}: ${newValue ?? "status update"}`;
+    case 'agent_status':
+      return `${actor}: ${newValue ?? 'status update'}`;
     default:
       return `${eventType}: ${target}`;
   }
@@ -134,7 +124,7 @@ const IDLE_ALARM_INTERVAL_MS = 1 * 60_000; // 1m when idle
 // Escalation constants
 const STALE_ESCALATION_THRESHOLD_MS = 4 * 60 * 60 * 1000;
 const MAX_RE_ESCALATIONS = 3;
-const SEVERITY_ORDER = ["low", "medium", "high", "critical"] as const;
+const SEVERITY_ORDER = ['low', 'medium', 'high', 'critical'] as const;
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -162,7 +152,7 @@ type EscalationEntry = {
   id: string;
   source_rig_id: string;
   source_agent_id: string | null;
-  severity: "low" | "medium" | "high" | "critical";
+  severity: 'low' | 'medium' | 'high' | 'critical';
   category: string | null;
   message: string;
   acknowledged: number;
@@ -174,7 +164,7 @@ type EscalationEntry = {
 function toEscalation(row: EscalationBeadRecord): EscalationEntry {
   return {
     id: row.bead_id,
-    source_rig_id: row.rig_id ?? "",
+    source_rig_id: row.rig_id ?? '',
     source_agent_id: row.created_by,
     severity: row.severity,
     category: row.category,
@@ -190,7 +180,7 @@ function toEscalation(row: EscalationBeadRecord): EscalationEntry {
 type ConvoyEntry = {
   id: string;
   title: string;
-  status: "active" | "landed";
+  status: 'active' | 'landed';
   staged: boolean;
   total_beads: number;
   closed_beads: number;
@@ -205,7 +195,7 @@ function toConvoy(row: ConvoyBeadRecord): ConvoyEntry {
   return {
     id: row.bead_id,
     title: row.title,
-    status: row.status === "closed" ? "landed" : "active",
+    status: row.status === 'closed' ? 'landed' : 'active',
     staged: row.staged === 1,
     total_beads: row.total_beads,
     closed_beads: row.closed_beads,
@@ -249,10 +239,10 @@ export class TownDO extends DurableObject<Env> {
     });
   }
 
-  private emitEvent(data: Omit<GastownEventData, "userId" | "delivery">): void {
+  private emitEvent(data: Omit<GastownEventData, 'userId' | 'delivery'>): void {
     writeEvent(this.env, {
       ...data,
-      delivery: "internal",
+      delivery: 'internal',
       userId: this._ownerUserId,
     });
   }
@@ -267,7 +257,7 @@ export class TownDO extends DurableObject<Env> {
       getTownConfig: () => this.getTownConfig(),
       getRigConfig: (rigId: string) => this.getRigConfig(rigId),
       resolveKilocodeToken: () => this.resolveKilocodeToken(),
-      emitEvent: (data) => this.emitEvent(data),
+      emitEvent: data => this.emitEvent(data),
     };
   }
 
@@ -284,25 +274,23 @@ export class TownDO extends DurableObject<Env> {
 
         // Build refinery-specific system prompt with branch/target info
         let systemPromptOverride: string | undefined;
-        if (agent.role === "refinery" && bead.type === "merge_request") {
+        if (agent.role === 'refinery' && bead.type === 'merge_request') {
           const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
           const sourceBeadId =
-            typeof bead.metadata?.source_bead_id === "string"
-              ? bead.metadata.source_bead_id
-              : null;
+            typeof bead.metadata?.source_bead_id === 'string' ? bead.metadata.source_bead_id : null;
           const townConfig = await this.getTownConfig();
           systemPromptOverride = buildRefinerySystemPrompt({
             identity: agent.identity,
             rigId,
             townId: this.townId,
             gates: townConfig.refinery?.gates ?? [],
-            branch: reviewMeta?.branch ?? "unknown",
-            targetBranch: reviewMeta?.target_branch ?? "main",
+            branch: reviewMeta?.branch ?? 'unknown',
+            targetBranch: reviewMeta?.target_branch ?? 'main',
             polecatAgentId:
-              typeof bead.metadata?.source_agent_id === "string"
+              typeof bead.metadata?.source_agent_id === 'string'
                 ? bead.metadata.source_agent_id
-                : "unknown",
-            mergeStrategy: townConfig.merge_strategy ?? "direct",
+                : 'unknown',
+            mergeStrategy: townConfig.merge_strategy ?? 'direct',
           });
         }
 
@@ -310,29 +298,25 @@ export class TownDO extends DurableObject<Env> {
           systemPromptOverride,
         });
       },
-      stopAgent: async (agentId) => {
+      stopAgent: async agentId => {
         await dispatch.stopAgentInContainer(this.env, this.townId, agentId);
       },
-      checkPRStatus: async (prUrl) => {
+      checkPRStatus: async prUrl => {
         const townConfig = await this.getTownConfig();
         return this.checkPRStatus(prUrl, townConfig);
       },
       queueNudge: async (agentId, message, _tier) => {
         await this.queueNudge(agentId, message, {
-          mode: "immediate",
-          priority: "urgent",
-          source: "reconciler",
+          mode: 'immediate',
+          priority: 'urgent',
+          source: 'reconciler',
         });
       },
       insertEvent: (eventType, params) => {
-        events.insertEvent(
-          this.sql,
-          eventType as Parameters<typeof events.insertEvent>[1],
-          params,
-        );
+        events.insertEvent(this.sql, eventType as Parameters<typeof events.insertEvent>[1], params);
       },
-      emitEvent: (data) => {
-        if (typeof data.event === "string") {
+      emitEvent: data => {
+        if (typeof data.event === 'string') {
           this.emitEvent(data as Parameters<typeof this.emitEvent>[0]);
         }
       },
@@ -348,12 +332,12 @@ export class TownDO extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (
-      url.pathname.endsWith("/status/ws") &&
-      request.headers.get("Upgrade")?.toLowerCase() === "websocket"
+      url.pathname.endsWith('/status/ws') &&
+      request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
     ) {
       const pair = new WebSocketPair();
       const [client, server] = [pair[0], pair[1]];
-      this.ctx.acceptWebSocket(server, ["status"]);
+      this.ctx.acceptWebSocket(server, ['status']);
 
       // Send an initial snapshot immediately so the client doesn't
       // wait for the next alarm tick.
@@ -367,14 +351,11 @@ export class TownDO extends DurableObject<Env> {
       return new Response(null, { status: 101, webSocket: client });
     }
 
-    return new Response("Not found", { status: 404 });
+    return new Response('Not found', { status: 404 });
   }
 
   /** Called by the runtime when a hibernated WebSocket receives a message. */
-  async webSocketMessage(
-    _ws: WebSocket,
-    _message: string | ArrayBuffer,
-  ): Promise<void> {
+  async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer): Promise<void> {
     // Status WebSocket is server-push only — ignore client messages.
   }
 
@@ -383,7 +364,7 @@ export class TownDO extends DurableObject<Env> {
     ws: WebSocket,
     _code: number,
     _reason: string,
-    _wasClean: boolean,
+    _wasClean: boolean
   ): Promise<void> {
     try {
       ws.close();
@@ -395,7 +376,7 @@ export class TownDO extends DurableObject<Env> {
   /** Called by the runtime when a hibernated WebSocket errors. */
   async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
     try {
-      ws.close(1011, "WebSocket error");
+      ws.close(1011, 'WebSocket error');
     } catch {
       // Already closed
     }
@@ -405,10 +386,8 @@ export class TownDO extends DurableObject<Env> {
    * Broadcast the alarm status snapshot to all connected status WebSocket
    * clients. Called at the end of each alarm tick.
    */
-  private broadcastAlarmStatus(
-    snapshot: Awaited<ReturnType<TownDO["getAlarmStatus"]>>,
-  ): void {
-    const sockets = this.ctx.getWebSockets("status");
+  private broadcastAlarmStatus(snapshot: Awaited<ReturnType<TownDO['getAlarmStatus']>>): void {
+    const sockets = this.ctx.getWebSockets('status');
     if (sockets.length === 0) return;
 
     const payload = JSON.stringify(snapshot);
@@ -426,11 +405,11 @@ export class TownDO extends DurableObject<Env> {
    * WebSocket clients. Called whenever an agent updates its status message.
    */
   private broadcastAgentStatus(agentId: string, message: string): void {
-    const sockets = this.ctx.getWebSockets("status");
+    const sockets = this.ctx.getWebSockets('status');
     if (sockets.length === 0) return;
 
     const payload = JSON.stringify({
-      type: "agent_status",
+      type: 'agent_status',
       agentId,
       message,
       timestamp: now(),
@@ -449,20 +428,16 @@ export class TownDO extends DurableObject<Env> {
    * WebSocket clients. Called after bead create/update/close operations.
    */
   private broadcastBeadEvent(event: {
-    type:
-      | "bead.created"
-      | "bead.status_changed"
-      | "bead.closed"
-      | "bead.failed";
+    type: 'bead.created' | 'bead.status_changed' | 'bead.closed' | 'bead.failed';
     beadId: string;
     title?: string;
     status?: string;
     rigId?: string;
     convoyId?: string;
   }): void {
-    const sockets = this.ctx.getWebSockets("status");
+    const sockets = this.ctx.getWebSockets('status');
     if (sockets.length === 0) return;
-    const frame = JSON.stringify({ channel: "bead", ...event, ts: now() });
+    const frame = JSON.stringify({ channel: 'bead', ...event, ts: now() });
     for (const ws of sockets) {
       try {
         ws.send(frame);
@@ -476,15 +451,11 @@ export class TownDO extends DurableObject<Env> {
    * Broadcast convoy progress to all connected status WebSocket clients.
    * Called from onBeadClosed() after updating closed_beads count.
    */
-  private broadcastConvoyProgress(
-    convoyId: string,
-    totalBeads: number,
-    closedBeads: number,
-  ): void {
-    const sockets = this.ctx.getWebSockets("status");
+  private broadcastConvoyProgress(convoyId: string, totalBeads: number, closedBeads: number): void {
+    const sockets = this.ctx.getWebSockets('status');
     if (sockets.length === 0) return;
     const frame = JSON.stringify({
-      channel: "convoy",
+      channel: 'convoy',
       convoyId,
       totalBeads,
       closedBeads,
@@ -504,9 +475,9 @@ export class TownDO extends DurableObject<Env> {
    * Called by the mayor via the /mayor/ui-action HTTP route.
    */
   async broadcastUiAction(action: UiAction): Promise<void> {
-    const sockets = this.ctx.getWebSockets("status");
+    const sockets = this.ctx.getWebSockets('status');
     if (sockets.length === 0) return;
-    const frame = JSON.stringify({ channel: "ui_action", action, ts: now() });
+    const frame = JSON.stringify({ channel: 'ui_action', action, ts: now() });
     for (const ws of sockets) {
       try {
         ws.send(frame);
@@ -527,7 +498,7 @@ export class TownDO extends DurableObject<Env> {
 
   private async initializeDatabase(): Promise<void> {
     // Load persisted town ID if available
-    const storedId = await this.ctx.storage.get<string>("town:id");
+    const storedId = await this.ctx.storage.get<string>('town:id');
     if (storedId) this._townId = storedId;
 
     // Cache owner_user_id for analytics events
@@ -579,7 +550,7 @@ export class TownDO extends DurableObject<Env> {
    */
   async setTownId(townId: string): Promise<void> {
     this._townId = townId;
-    await this.ctx.storage.put("town:id", townId);
+    await this.ctx.storage.put('town:id', townId);
   }
 
   async setDashboardContext(context: string): Promise<void> {
@@ -618,7 +589,7 @@ export class TownDO extends DurableObject<Env> {
    */
   async forceRefreshContainerToken(): Promise<void> {
     const townId = this.townId;
-    if (!townId) throw new Error("townId not set");
+    if (!townId) throw new Error('townId not set');
     const townConfig = await this.getTownConfig();
     const userId = townConfig.owner_user_id ?? townId;
     await dispatch.forceRefreshContainerToken(this.env, townId, userId);
@@ -639,16 +610,13 @@ export class TownDO extends DurableObject<Env> {
     // Map config fields to their container env var equivalents.
     // When a value is set, push it; when cleared, remove it.
     const envMapping: Array<[string, string | undefined]> = [
-      ["GIT_TOKEN", townConfig.git_auth?.github_token],
-      ["GITLAB_TOKEN", townConfig.git_auth?.gitlab_token],
-      ["GITLAB_INSTANCE_URL", townConfig.git_auth?.gitlab_instance_url],
-      ["GITHUB_CLI_PAT", townConfig.github_cli_pat],
-      ["GASTOWN_GIT_AUTHOR_NAME", townConfig.git_author_name],
-      ["GASTOWN_GIT_AUTHOR_EMAIL", townConfig.git_author_email],
-      [
-        "GASTOWN_DISABLE_AI_COAUTHOR",
-        townConfig.disable_ai_coauthor ? "1" : undefined,
-      ],
+      ['GIT_TOKEN', townConfig.git_auth?.github_token],
+      ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
+      ['GITLAB_INSTANCE_URL', townConfig.git_auth?.gitlab_instance_url],
+      ['GITHUB_CLI_PAT', townConfig.github_cli_pat],
+      ['GASTOWN_GIT_AUTHOR_NAME', townConfig.git_author_name],
+      ['GASTOWN_GIT_AUTHOR_EMAIL', townConfig.git_author_email],
+      ['GASTOWN_DISABLE_AI_COAUTHOR', townConfig.disable_ai_coauthor ? '1' : undefined],
     ];
 
     for (const [key, value] of envMapping) {
@@ -659,10 +627,7 @@ export class TownDO extends DurableObject<Env> {
           await container.deleteEnvVar(key);
         }
       } catch (err) {
-        console.warn(
-          `[Town.do] syncConfigToContainer: ${key} sync failed:`,
-          err,
-        );
+        console.warn(`[Town.do] syncConfigToContainer: ${key} sync failed:`, err);
       }
     }
   }
@@ -690,7 +655,7 @@ export class TownDO extends DurableObject<Env> {
         ...query(
           this.sql,
           /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.rig_id} = ?`,
-          [rigId],
+          [rigId]
         ),
       ]);
     for (const { bead_id } of rigBeads) {
@@ -710,39 +675,28 @@ export class TownDO extends DurableObject<Env> {
 
   async configureRig(rigConfig: RigConfig): Promise<void> {
     console.log(
-      `${TOWN_LOG} configureRig: rigId=${rigConfig.rigId} hasKilocodeToken=${!!rigConfig.kilocodeToken}`,
+      `${TOWN_LOG} configureRig: rigId=${rigConfig.rigId} hasKilocodeToken=${!!rigConfig.kilocodeToken}`
     );
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
 
     if (rigConfig.kilocodeToken) {
       const townConfig = await this.getTownConfig();
-      if (
-        !townConfig.kilocode_token ||
-        townConfig.kilocode_token !== rigConfig.kilocodeToken
-      ) {
-        console.log(
-          `${TOWN_LOG} configureRig: propagating kilocodeToken to town config`,
-        );
+      if (!townConfig.kilocode_token || townConfig.kilocode_token !== rigConfig.kilocodeToken) {
+        console.log(`${TOWN_LOG} configureRig: propagating kilocodeToken to town config`);
         await this.updateTownConfig({
           kilocode_token: rigConfig.kilocodeToken,
         });
       }
     }
 
-    const token =
-      rigConfig.kilocodeToken ?? (await this.resolveKilocodeToken());
+    const token = rigConfig.kilocodeToken ?? (await this.resolveKilocodeToken());
     if (token) {
       try {
         const container = getTownContainerStub(this.env, this.townId);
-        await container.setEnvVar("KILOCODE_TOKEN", token);
-        console.log(
-          `${TOWN_LOG} configureRig: stored KILOCODE_TOKEN on TownContainerDO`,
-        );
+        await container.setEnvVar('KILOCODE_TOKEN', token);
+        console.log(`${TOWN_LOG} configureRig: stored KILOCODE_TOKEN on TownContainerDO`);
       } catch (err) {
-        console.warn(
-          `${TOWN_LOG} configureRig: failed to store token on container DO:`,
-          err,
-        );
+        console.warn(`${TOWN_LOG} configureRig: failed to store token on container DO:`, err);
       }
     }
 
@@ -750,7 +704,7 @@ export class TownDO extends DurableObject<Env> {
     await this.armAlarmIfNeeded();
     try {
       const container = getTownContainerStub(this.env, this.townId);
-      await container.fetch("http://container/health");
+      await container.fetch('http://container/health');
     } catch {
       // Container may take a moment to start — the alarm will retry
     }
@@ -758,11 +712,8 @@ export class TownDO extends DurableObject<Env> {
     // Proactively clone the rig's repo and create a browse worktree so
     // the mayor has immediate access to the codebase without waiting for
     // the first agent dispatch.
-    this.setupRigRepoInContainer(rigConfig).catch((err) =>
-      console.warn(
-        `${TOWN_LOG} configureRig: background repo setup failed:`,
-        err,
-      ),
+    this.setupRigRepoInContainer(rigConfig).catch(err =>
+      console.warn(`${TOWN_LOG} configureRig: background repo setup failed:`, err)
     );
   }
 
@@ -789,16 +740,13 @@ export class TownDO extends DurableObject<Env> {
       envVars.KILOCODE_TOKEN = kilocodeToken;
     }
 
-    const containerConfig = await config.buildContainerConfig(
-      this.ctx.storage,
-      this.env,
-    );
+    const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
     const container = getTownContainerStub(this.env, this.townId);
-    const response = await container.fetch("http://container/repos/setup", {
-      method: "POST",
+    const response = await container.fetch('http://container/repos/setup', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "X-Town-Config": JSON.stringify(containerConfig),
+        'Content-Type': 'application/json',
+        'X-Town-Config': JSON.stringify(containerConfig),
       },
       body: JSON.stringify({
         rigId: rigConfig.rigId,
@@ -810,21 +758,17 @@ export class TownDO extends DurableObject<Env> {
     });
 
     if (!response.ok) {
-      const text = await response.text().catch(() => "(unreadable)");
+      const text = await response.text().catch(() => '(unreadable)');
       console.warn(
-        `${TOWN_LOG} setupRigRepoInContainer: failed for rig=${rigConfig.rigId}: ${response.status} ${text.slice(0, 200)}`,
+        `${TOWN_LOG} setupRigRepoInContainer: failed for rig=${rigConfig.rigId}: ${response.status} ${text.slice(0, 200)}`
       );
     } else {
-      console.log(
-        `${TOWN_LOG} setupRigRepoInContainer: accepted for rig=${rigConfig.rigId}`,
-      );
+      console.log(`${TOWN_LOG} setupRigRepoInContainer: accepted for rig=${rigConfig.rigId}`);
     }
   }
 
   async getRigConfig(rigId: string): Promise<RigConfig | null> {
-    return (
-      (await this.ctx.storage.get<RigConfig>(`rig:${rigId}:config`)) ?? null
-    );
+    return (await this.ctx.storage.get<RigConfig>(`rig:${rigId}:config`)) ?? null;
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -834,14 +778,14 @@ export class TownDO extends DurableObject<Env> {
   async createBead(input: CreateBeadInput): Promise<Bead> {
     const bead = beadOps.createBead(this.sql, input);
     this.emitEvent({
-      event: "bead.created",
+      event: 'bead.created',
       townId: this.townId,
       rigId: input.rig_id,
       beadId: bead.bead_id,
       beadType: input.type,
     });
     this.broadcastBeadEvent({
-      type: "bead.created",
+      type: 'bead.created',
       beadId: bead.bead_id,
       title: bead.title,
       status: bead.status,
@@ -858,15 +802,11 @@ export class TownDO extends DurableObject<Env> {
     return beadOps.listBeads(this.sql, filter);
   }
 
-  async updateBeadStatus(
-    beadId: string,
-    status: string,
-    agentId: string,
-  ): Promise<Bead> {
+  async updateBeadStatus(beadId: string, status: string, agentId: string): Promise<Bead> {
     // Record terminal transitions as bead_cancelled events for the reconciler.
     // Non-terminal transitions are normal lifecycle changes, not cancellations.
-    if (status === "closed" || status === "failed") {
-      events.insertEvent(this.sql, "bead_cancelled", {
+    if (status === 'closed' || status === 'failed') {
+      events.insertEvent(this.sql, 'bead_cancelled', {
         bead_id: beadId,
         payload: { cancel_status: status },
       });
@@ -876,10 +816,10 @@ export class TownDO extends DurableObject<Env> {
     // when the bead reaches a terminal status (closed/failed).
     const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId);
 
-    if (status === "closed") {
+    if (status === 'closed') {
       const durationMs = Date.now() - new Date(bead.created_at).getTime();
       this.emitEvent({
-        event: "bead.closed",
+        event: 'bead.closed',
         townId: this.townId,
         rigId: bead.rig_id ?? undefined,
         beadId,
@@ -887,33 +827,33 @@ export class TownDO extends DurableObject<Env> {
         durationMs,
       });
       this.broadcastBeadEvent({
-        type: "bead.closed",
+        type: 'bead.closed',
         beadId,
         title: bead.title,
-        status: "closed",
+        status: 'closed',
         rigId: bead.rig_id ?? undefined,
       });
       // When a bead closes, check if any blocked beads are now unblocked and dispatch them.
       this.dispatchUnblockedBeads(beadId);
-    } else if (status === "failed") {
+    } else if (status === 'failed') {
       this.emitEvent({
-        event: "bead.failed",
+        event: 'bead.failed',
         townId: this.townId,
         rigId: bead.rig_id ?? undefined,
         beadId,
         beadType: bead.type,
       });
       this.broadcastBeadEvent({
-        type: "bead.failed",
+        type: 'bead.failed',
         beadId,
         title: bead.title,
-        status: "failed",
+        status: 'failed',
         rigId: bead.rig_id ?? undefined,
       });
       this.dispatchUnblockedBeads(beadId);
     } else {
       this.emitEvent({
-        event: "bead.status_changed",
+        event: 'bead.status_changed',
         townId: this.townId,
         rigId: bead.rig_id ?? undefined,
         beadId,
@@ -921,7 +861,7 @@ export class TownDO extends DurableObject<Env> {
         label: status,
       });
       this.broadcastBeadEvent({
-        type: "bead.status_changed",
+        type: 'bead.status_changed',
         beadId,
         title: bead.title,
         status,
@@ -933,7 +873,7 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async closeBead(beadId: string, agentId: string): Promise<Bead> {
-    return this.updateBeadStatus(beadId, "closed", agentId);
+    return this.updateBeadStatus(beadId, 'closed', agentId);
   }
 
   async deleteBead(beadId: string): Promise<void> {
@@ -963,12 +903,12 @@ export class TownDO extends DurableObject<Env> {
       status: BeadStatus;
       metadata: Record<string, unknown>;
     }>,
-    actorId: string,
+    actorId: string
   ): Promise<Bead> {
     const bead = beadOps.updateBeadFields(this.sql, beadId, fields, actorId);
 
     // When a bead closes via field update, check for newly unblocked beads
-    if (fields.status === "closed" || fields.status === "failed") {
+    if (fields.status === 'closed' || fields.status === 'failed') {
       this.dispatchUnblockedBeads(beadId);
     }
 
@@ -989,25 +929,25 @@ export class TownDO extends DurableObject<Env> {
     if (hookedBeadId) {
       // Return the bead to 'open' so the scheduler can re-assign it
       const bead = beadOps.getBead(this.sql, hookedBeadId);
-      if (bead && bead.status !== "closed" && bead.status !== "failed") {
-        beadOps.updateBeadStatus(this.sql, hookedBeadId, "open", agentId);
+      if (bead && bead.status !== 'closed' && bead.status !== 'failed') {
+        beadOps.updateBeadStatus(this.sql, hookedBeadId, 'open', agentId);
       }
 
       beadOps.logBeadEvent(this.sql, {
         beadId: hookedBeadId,
         agentId,
-        eventType: "unhooked",
-        newValue: "open",
-        metadata: { reason: "agent_reset", actor: "mayor" },
+        eventType: 'unhooked',
+        newValue: 'open',
+        metadata: { reason: 'agent_reset', actor: 'mayor' },
       });
 
       agents.unhookBead(this.sql, agentId);
     }
 
-    agents.updateAgentStatus(this.sql, agentId, "idle");
+    agents.updateAgentStatus(this.sql, agentId, 'idle');
 
     console.log(
-      `${TOWN_LOG} resetAgent: reset agent=${agentId} hookedBead=${hookedBeadId ?? "none"}`,
+      `${TOWN_LOG} resetAgent: reset agent=${agentId} hookedBead=${hookedBeadId ?? 'none'}`
     );
   }
 
@@ -1017,7 +957,7 @@ export class TownDO extends DurableObject<Env> {
    */
   async updateConvoy(
     convoyId: string,
-    fields: Partial<{ merge_mode: ConvoyMergeMode; feature_branch: string }>,
+    fields: Partial<{ merge_mode: ConvoyMergeMode; feature_branch: string }>
   ): Promise<ConvoyEntry | null> {
     const convoy = this.getConvoy(convoyId);
     if (!convoy) return null;
@@ -1039,8 +979,8 @@ export class TownDO extends DurableObject<Env> {
       // Dynamic SET clause — query() can't statically verify param count here,
       // so use sql.exec() directly. The guard above guarantees values is non-empty.
       this.sql.exec(
-        /* sql */ `UPDATE ${convoy_metadata} SET ${setClauses.join(", ")} WHERE ${convoy_metadata.bead_id} = ?`,
-        ...values,
+        /* sql */ `UPDATE ${convoy_metadata} SET ${setClauses.join(', ')} WHERE ${convoy_metadata.bead_id} = ?`,
+        ...values
       );
 
       // Also update the convoy bead's updated_at
@@ -1051,7 +991,7 @@ export class TownDO extends DurableObject<Env> {
           SET ${beads.columns.updated_at} = ?
           WHERE ${beads.bead_id} = ?
         `,
-        [now(), convoyId],
+        [now(), convoyId]
       );
     }
 
@@ -1111,20 +1051,12 @@ export class TownDO extends DurableObject<Env> {
 
   // ── Agent Events (delegated to AgentDO) ───────────────────────────
 
-  async appendAgentEvent(
-    agentId: string,
-    eventType: string,
-    data: unknown,
-  ): Promise<number> {
+  async appendAgentEvent(agentId: string, eventType: string, data: unknown): Promise<number> {
     const agentDO = getAgentDOStub(this.env, agentId);
     return agentDO.appendEvent(eventType, data);
   }
 
-  async getAgentEvents(
-    agentId: string,
-    afterId?: number,
-    limit?: number,
-  ): Promise<unknown[]> {
+  async getAgentEvents(agentId: string, afterId?: number, limit?: number): Promise<unknown[]> {
     const agentDO = getAgentDOStub(this.env, agentId);
     return agentDO.getEvents(afterId, limit);
   }
@@ -1151,16 +1083,13 @@ export class TownDO extends DurableObject<Env> {
       lastEventType?: string | null;
       lastEventAt?: string | null;
       activeTools?: string[];
-    },
+    }
   ): Promise<void> {
     agents.touchAgent(this.sql, agentId, watermark);
     await this.armAlarmIfNeeded();
   }
 
-  async updateAgentStatusMessage(
-    agentId: string,
-    message: string,
-  ): Promise<void> {
+  async updateAgentStatusMessage(agentId: string, message: string): Promise<void> {
     agents.updateAgentStatusMessage(this.sql, agentId, message);
     const agent = agents.getAgent(this.sql, agentId);
     if (agent?.current_hook_bead_id) {
@@ -1168,7 +1097,7 @@ export class TownDO extends DurableObject<Env> {
       beadOps.logBeadEvent(this.sql, {
         beadId: agent.current_hook_bead_id,
         agentId,
-        eventType: "agent_status",
+        eventType: 'agent_status',
         newValue: message,
         metadata: {
           agentId,
@@ -1186,7 +1115,7 @@ export class TownDO extends DurableObject<Env> {
   async setAgentDispatchAttempts(
     agentId: string,
     attempts: number,
-    lastActivityAt?: string,
+    lastActivityAt?: string
   ): Promise<void> {
     query(
       this.sql,
@@ -1196,7 +1125,7 @@ export class TownDO extends DurableObject<Env> {
             ${agent_metadata.columns.last_activity_at} = COALESCE(?, ${agent_metadata.columns.last_activity_at})
         WHERE ${agent_metadata.bead_id} = ?
       `,
-      [attempts, lastActivityAt ?? null, agentId],
+      [attempts, lastActivityAt ?? null, agentId]
     );
   }
 
@@ -1225,25 +1154,25 @@ export class TownDO extends DurableObject<Env> {
     agentId: string,
     message: string,
     options?: {
-      mode?: "wait-idle" | "immediate" | "queue";
-      priority?: "normal" | "urgent";
+      mode?: 'wait-idle' | 'immediate' | 'queue';
+      priority?: 'normal' | 'urgent';
       source?: string;
       ttlSeconds?: number;
-    },
+    }
   ): Promise<string> {
     const nudgeId = crypto.randomUUID();
-    const mode = options?.mode ?? "wait-idle";
-    const priority = options?.priority ?? "normal";
-    const source = options?.source ?? "system";
+    const mode = options?.mode ?? 'wait-idle';
+    const priority = options?.priority ?? 'normal';
+    const source = options?.source ?? 'system';
 
     let expiresAt: string | null = null;
-    if (mode === "queue" && options?.ttlSeconds != null) {
+    if (mode === 'queue' && options?.ttlSeconds != null) {
       // Use SQLite-compatible datetime format (space separator, no Z suffix) so
       // comparisons against datetime('now') work correctly.
       expiresAt = new Date(Date.now() + options.ttlSeconds * 1000)
         .toISOString()
-        .replace("T", " ")
-        .replace("Z", "");
+        .replace('T', ' ')
+        .replace('Z', '');
     }
 
     query(
@@ -1259,20 +1188,15 @@ export class TownDO extends DurableObject<Env> {
           ${agent_nudges.columns.expires_at}
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      [nudgeId, agentId, message, mode, priority, source, expiresAt],
+      [nudgeId, agentId, message, mode, priority, source, expiresAt]
     );
 
     console.log(
-      `${TOWN_LOG} queueNudge: nudge_id=${nudgeId} agent=${agentId} mode=${mode} priority=${priority} source=${source}`,
+      `${TOWN_LOG} queueNudge: nudge_id=${nudgeId} agent=${agentId} mode=${mode} priority=${priority} source=${source}`
     );
 
-    if (mode === "immediate") {
-      const sent = await dispatch.sendMessageToAgent(
-        this.env,
-        this.townId,
-        agentId,
-        message,
-      );
+    if (mode === 'immediate') {
+      const sent = await dispatch.sendMessageToAgent(this.env, this.townId, agentId, message);
       if (sent) {
         query(
           this.sql,
@@ -1281,14 +1205,12 @@ export class TownDO extends DurableObject<Env> {
             SET ${agent_nudges.columns.delivered_at} = datetime('now')
             WHERE ${agent_nudges.nudge_id} = ?
           `,
-          [nudgeId],
+          [nudgeId]
         );
-        console.log(
-          `${TOWN_LOG} queueNudge: immediate nudge delivered to agent=${agentId}`,
-        );
+        console.log(`${TOWN_LOG} queueNudge: immediate nudge delivered to agent=${agentId}`);
       } else {
         console.warn(
-          `${TOWN_LOG} queueNudge: immediate delivery failed for agent=${agentId}, nudge queued for retry`,
+          `${TOWN_LOG} queueNudge: immediate delivery failed for agent=${agentId}, nudge queued for retry`
         );
       }
     }
@@ -1327,7 +1249,7 @@ export class TownDO extends DurableObject<Env> {
             CASE ${agent_nudges.priority} WHEN 'urgent' THEN 0 ELSE 1 END ASC,
             ${agent_nudges.created_at} ASC
         `,
-        [agentId],
+        [agentId]
       ),
     ];
 
@@ -1351,7 +1273,7 @@ export class TownDO extends DurableObject<Env> {
         SET ${agent_nudges.columns.delivered_at} = datetime('now')
         WHERE ${agent_nudges.nudge_id} = ?
       `,
-      [nudgeId],
+      [nudgeId]
     );
   }
 
@@ -1371,7 +1293,7 @@ export class TownDO extends DurableObject<Env> {
             AND ${agent_nudges.delivered_at} IS NULL
           RETURNING ${agent_nudges.nudge_id}
         `,
-        [],
+        []
       ),
     ];
 
@@ -1385,7 +1307,7 @@ export class TownDO extends DurableObject<Env> {
   async submitToReviewQueue(input: ReviewQueueInput): Promise<void> {
     reviewQueue.submitToReviewQueue(this.sql, input);
     this.emitEvent({
-      event: "review.submitted",
+      event: 'review.submitted',
       townId: this.townId,
       rigId: input.rig_id,
       beadId: input.bead_id,
@@ -1397,16 +1319,13 @@ export class TownDO extends DurableObject<Env> {
     return reviewQueue.popReviewQueue(this.sql);
   }
 
-  async completeReview(
-    entryId: string,
-    status: "merged" | "failed",
-  ): Promise<void> {
+  async completeReview(entryId: string, status: 'merged' | 'failed'): Promise<void> {
     reviewQueue.completeReview(this.sql, entryId, status);
   }
 
   async completeReviewWithResult(input: {
     entry_id: string;
-    status: "merged" | "failed" | "conflict";
+    status: 'merged' | 'failed' | 'conflict';
     message?: string;
     commit_sha?: string;
   }): Promise<void> {
@@ -1414,15 +1333,13 @@ export class TownDO extends DurableObject<Env> {
     // trigger dispatchUnblockedBeads for it after the MR closes.
     const mrBead = beadOps.getBead(this.sql, input.entry_id);
     const sourceBeadId =
-      typeof mrBead?.metadata?.source_bead_id === "string"
-        ? mrBead.metadata.source_bead_id
-        : null;
+      typeof mrBead?.metadata?.source_bead_id === 'string' ? mrBead.metadata.source_bead_id : null;
 
     reviewQueue.completeReviewWithResult(this.sql, input);
 
-    if (input.status === "merged") {
+    if (input.status === 'merged') {
       this.emitEvent({
-        event: "review.completed",
+        event: 'review.completed',
         townId: this.townId,
         beadId: input.entry_id,
       });
@@ -1432,9 +1349,9 @@ export class TownDO extends DurableObject<Env> {
       if (sourceBeadId) {
         this.dispatchUnblockedBeads(sourceBeadId);
       }
-    } else if (input.status === "failed" || input.status === "conflict") {
+    } else if (input.status === 'failed' || input.status === 'conflict') {
       this.emitEvent({
-        event: "review.failed",
+        event: 'review.failed',
         townId: this.townId,
         beadId: input.entry_id,
       });
@@ -1451,7 +1368,7 @@ export class TownDO extends DurableObject<Env> {
     // applies all pending events before reconciliation runs. DO RPCs
     // are serialized, so agentCompleted can't race with this — it
     // waits for agentDone to finish before executing.
-    events.insertEvent(this.sql, "agent_done", {
+    events.insertEvent(this.sql, 'agent_done', {
       agent_id: agentId,
       payload: {
         branch: input.branch,
@@ -1464,19 +1381,19 @@ export class TownDO extends DurableObject<Env> {
 
   async agentCompleted(
     agentId: string,
-    input: { status: "completed" | "failed"; reason?: string },
+    input: { status: 'completed' | 'failed'; reason?: string }
   ): Promise<void> {
     // Resolve empty agentId to mayor (backwards compat with container callback)
     let resolvedAgentId = agentId;
     if (!resolvedAgentId) {
-      const mayor = agents.listAgents(this.sql, { role: "mayor" })[0];
+      const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
       if (mayor) resolvedAgentId = mayor.id;
     }
 
     // Event-only: record the fact. The alarm's Phase 0 drains and
     // applies all pending events. DO RPCs are serialized so there's
     // no race with agentDone.
-    events.insertEvent(this.sql, "agent_completed", {
+    events.insertEvent(this.sql, 'agent_completed', {
       agent_id: resolvedAgentId || agentId,
       payload: {
         status: input.status,
@@ -1488,7 +1405,7 @@ export class TownDO extends DurableObject<Env> {
     if (resolvedAgentId) {
       const agent = agents.getAgent(this.sql, resolvedAgentId);
       this.emitEvent({
-        event: "agent.exited",
+        event: 'agent.exited',
         townId: this.townId,
         agentId: resolvedAgentId,
         role: agent?.role,
@@ -1507,39 +1424,33 @@ export class TownDO extends DurableObject<Env> {
    */
   async requestChanges(
     agentId: string,
-    input: { feedback: string; files?: string[] },
+    input: { feedback: string; files?: string[] }
   ): Promise<{ rework_bead_id: string }> {
     const agent = agents.getAgent(this.sql, agentId);
     if (!agent) throw new Error(`Agent ${agentId} not found`);
-    if (agent.role !== "refinery")
-      throw new Error(`Only refineries can request changes`);
-    if (!agent.current_hook_bead_id)
-      throw new Error(`Agent ${agentId} is not hooked to a bead`);
+    if (agent.role !== 'refinery') throw new Error(`Only refineries can request changes`);
+    if (!agent.current_hook_bead_id) throw new Error(`Agent ${agentId} is not hooked to a bead`);
 
     const mrBead = beadOps.getBead(this.sql, agent.current_hook_bead_id);
-    if (!mrBead || mrBead.type !== "merge_request") {
+    if (!mrBead || mrBead.type !== 'merge_request') {
       throw new Error(`Agent ${agentId} is not hooked to a merge_request bead`);
     }
 
     // Find the source bead (the original issue the polecat worked on)
     const sourceBeadId =
-      typeof mrBead.metadata?.source_bead_id === "string"
-        ? mrBead.metadata.source_bead_id
-        : null;
-    const sourceBead = sourceBeadId
-      ? beadOps.getBead(this.sql, sourceBeadId)
-      : null;
+      typeof mrBead.metadata?.source_bead_id === 'string' ? mrBead.metadata.source_bead_id : null;
+    const sourceBead = sourceBeadId ? beadOps.getBead(this.sql, sourceBeadId) : null;
 
     // Get branch info from review_metadata
     const reviewMeta = reviewQueue.getReviewMetadata(this.sql, mrBead.bead_id);
 
     const reworkBead = beadOps.createBead(this.sql, {
-      type: "issue",
+      type: 'issue',
       title: `Rework: ${sourceBead?.title ?? mrBead.title}`,
       body: input.feedback,
-      priority: sourceBead?.priority ?? "medium",
+      priority: sourceBead?.priority ?? 'medium',
       rig_id: mrBead.rig_id ?? undefined,
-      labels: ["gt:rework"],
+      labels: ['gt:rework'],
       metadata: {
         rework_for: sourceBeadId,
         mr_bead_id: mrBead.bead_id,
@@ -1550,29 +1461,24 @@ export class TownDO extends DurableObject<Env> {
     });
 
     // Rework bead blocks the MR bead — MR can't proceed until rework is done
-    beadOps.insertDependency(
-      this.sql,
-      mrBead.bead_id,
-      reworkBead.bead_id,
-      "blocks",
-    );
+    beadOps.insertDependency(this.sql, mrBead.bead_id, reworkBead.bead_id, 'blocks');
 
     // Record event so the reconciler picks up the rework bead
-    events.insertEvent(this.sql, "bead_created", {
+    events.insertEvent(this.sql, 'bead_created', {
       bead_id: reworkBead.bead_id,
-      payload: { bead_type: "issue", rig_id: mrBead.rig_id },
+      payload: { bead_type: 'issue', rig_id: mrBead.rig_id },
     });
 
     beadOps.logBeadEvent(this.sql, {
       beadId: mrBead.bead_id,
       agentId,
-      eventType: "rework_requested",
+      eventType: 'rework_requested',
       newValue: reworkBead.bead_id,
       metadata: { feedback: input.feedback.slice(0, 500), files: input.files },
     });
 
     console.log(
-      `${TOWN_LOG} requestChanges: refinery=${agentId} mr=${mrBead.bead_id} rework=${reworkBead.bead_id}`,
+      `${TOWN_LOG} requestChanges: refinery=${agentId} mr=${mrBead.bead_id} rework=${reworkBead.bead_id}`
     );
 
     await this.armAlarmIfNeeded();
@@ -1592,29 +1498,25 @@ export class TownDO extends DurableObject<Env> {
   }): Promise<Bead> {
     const triageBead = beadOps.getBead(this.sql, input.triage_request_bead_id);
     if (!triageBead)
-      throw new Error(
-        `Triage request bead ${input.triage_request_bead_id} not found`,
-      );
+      throw new Error(`Triage request bead ${input.triage_request_bead_id} not found`);
     if (!triageBead.labels.includes(patrol.TRIAGE_REQUEST_LABEL)) {
-      throw new Error(
-        `Bead ${input.triage_request_bead_id} is not a triage request`,
-      );
+      throw new Error(`Bead ${input.triage_request_bead_id} is not a triage request`);
     }
-    if (triageBead.status !== "open") {
+    if (triageBead.status !== 'open') {
       throw new Error(
-        `Triage request ${input.triage_request_bead_id} is already ${triageBead.status} — cannot resolve again`,
+        `Triage request ${input.triage_request_bead_id} is already ${triageBead.status} — cannot resolve again`
       );
     }
 
     // ── Apply the chosen action ────────────────────────────────────
     const targetAgentId =
-      typeof triageBead.metadata?.agent_bead_id === "string"
+      typeof triageBead.metadata?.agent_bead_id === 'string'
         ? triageBead.metadata.agent_bead_id
         : null;
     // Use the hooked bead ID captured when the triage request was created,
     // not the agent's current hook (which may have changed since then).
     const snapshotHookedBeadId =
-      typeof triageBead.metadata?.hooked_bead_id === "string"
+      typeof triageBead.metadata?.hooked_bead_id === 'string'
         ? triageBead.metadata.hooked_bead_id
         : null;
     const action = input.action.toUpperCase();
@@ -1623,24 +1525,19 @@ export class TownDO extends DurableObject<Env> {
       const targetAgent = agents.getAgent(this.sql, targetAgentId);
 
       switch (action) {
-        case "RESTART":
-        case "RESTART_WITH_BACKOFF": {
+        case 'RESTART':
+        case 'RESTART_WITH_BACKOFF': {
           // Stop the agent in the container, reset to idle so the
           // scheduler picks it up again on the next alarm cycle.
-          if (
-            targetAgent?.status === "working" ||
-            targetAgent?.status === "stalled"
-          ) {
-            dispatch
-              .stopAgentInContainer(this.env, this.townId, targetAgentId)
-              .catch(() => {});
+          if (targetAgent?.status === 'working' || targetAgent?.status === 'stalled') {
+            dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
           }
           if (targetAgent) {
             // RESTART clears last_activity_at so the scheduler picks it
             // up immediately. RESTART_WITH_BACKOFF sets it to now() so
             // the dispatch cooldown (DISPATCH_COOLDOWN_MS) delays the
             // next attempt, preventing immediate restart of crash loops.
-            const activityAt = action === "RESTART_WITH_BACKOFF" ? now() : null;
+            const activityAt = action === 'RESTART_WITH_BACKOFF' ? now() : null;
             query(
               this.sql,
               /* sql */ `
@@ -1649,93 +1546,72 @@ export class TownDO extends DurableObject<Env> {
                     ${agent_metadata.columns.last_activity_at} = ?
                 WHERE ${agent_metadata.bead_id} = ?
               `,
-              [activityAt, targetAgentId],
+              [activityAt, targetAgentId]
             );
           }
           break;
         }
-        case "CLOSE_BEAD": {
+        case 'CLOSE_BEAD': {
           // Fail the bead that was hooked when the triage request was
           // created (not the agent's current hook, which may differ).
-          const beadToClose =
-            snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
+          const beadToClose = snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
           if (beadToClose) {
-            beadOps.updateBeadStatus(
-              this.sql,
-              beadToClose,
-              "failed",
-              input.agent_id,
-            );
+            beadOps.updateBeadStatus(this.sql, beadToClose, 'failed', input.agent_id);
             // Only stop and unhook if the agent is still working on this
             // specific bead. If the agent has moved on, stopping it would
             // abort unrelated work.
             if (targetAgent?.current_hook_bead_id === beadToClose) {
-              if (
-                targetAgent.status === "working" ||
-                targetAgent.status === "stalled"
-              ) {
-                dispatch
-                  .stopAgentInContainer(this.env, this.townId, targetAgentId)
-                  .catch(() => {});
+              if (targetAgent.status === 'working' || targetAgent.status === 'stalled') {
+                dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
               }
               agents.unhookBead(this.sql, targetAgentId);
             }
           }
           break;
         }
-        case "ESCALATE_TO_MAYOR":
-        case "ESCALATE": {
-          const message =
-            input.resolution_notes || triageBead.title || "Triage escalation";
+        case 'ESCALATE_TO_MAYOR':
+        case 'ESCALATE': {
+          const message = input.resolution_notes || triageBead.title || 'Triage escalation';
           this.sendMayorMessage(
-            `[Triage Escalation] ${message}\n\nAgent: ${targetAgentId ?? "unknown"}\nBead: ${snapshotHookedBeadId ?? "unknown"}`,
-          ).catch((err) =>
-            console.warn(
-              `${TOWN_LOG} resolveTriage: mayor notification failed:`,
-              err,
-            ),
+            `[Triage Escalation] ${message}\n\nAgent: ${targetAgentId ?? 'unknown'}\nBead: ${snapshotHookedBeadId ?? 'unknown'}`
+          ).catch(err =>
+            console.warn(`${TOWN_LOG} resolveTriage: mayor notification failed:`, err)
           );
           break;
         }
-        case "NUDGE": {
+        case 'NUDGE': {
           // Nudge the stuck agent — time-sensitive, deliver immediately
           if (targetAgent && targetAgentId) {
             this.queueNudge(
               targetAgentId,
               input.resolution_notes ||
-                "The triage system has flagged you as potentially stuck. Please report your status.",
-              { mode: "immediate", source: "triage", priority: "urgent" },
-            ).catch((err) =>
+                'The triage system has flagged you as potentially stuck. Please report your status.',
+              { mode: 'immediate', source: 'triage', priority: 'urgent' }
+            ).catch(err =>
               console.warn(
                 `${TOWN_LOG} resolveTriage: nudge failed for agent=${targetAgentId}:`,
-                err,
-              ),
+                err
+              )
             );
             this.emitEvent({
-              event: "nudge.queued",
+              event: 'nudge.queued',
               townId: this.townId,
               agentId: targetAgentId,
-              label: "triage_nudge",
+              label: 'triage_nudge',
             });
           }
           break;
         }
-        case "REASSIGN_BEAD": {
+        case 'REASSIGN_BEAD': {
           // Target the bead from the triage snapshot, not the agent's current hook.
-          const beadToReassign =
-            snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
+          const beadToReassign = snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
           if (beadToReassign) {
             // Only stop and unhook if the agent is still working on this
             // specific bead. If the agent has moved on, stopping it would
             // abort unrelated work.
             if (targetAgent?.current_hook_bead_id === beadToReassign) {
-              if (
-                targetAgent.status === "working" ||
-                targetAgent.status === "stalled"
-              ) {
-                dispatch
-                  .stopAgentInContainer(this.env, this.townId, targetAgentId)
-                  .catch(() => {});
+              if (targetAgent.status === 'working' || targetAgent.status === 'stalled') {
+                dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
               }
               agents.unhookBead(this.sql, targetAgentId);
             }
@@ -1751,7 +1627,7 @@ export class TownDO extends DurableObject<Env> {
                   AND ${beads.status} != 'closed'
                   AND ${beads.status} != 'failed'
               `,
-              [now(), beadToReassign],
+              [now(), beadToReassign]
             );
           }
           break;
@@ -1788,15 +1664,15 @@ export class TownDO extends DurableObject<Env> {
         input.resolution_notes,
         input.agent_id,
         input.triage_request_bead_id,
-      ],
+      ]
     );
 
     beadOps.logBeadEvent(this.sql, {
       beadId: input.triage_request_bead_id,
       agentId: input.agent_id,
-      eventType: "status_changed",
+      eventType: 'status_changed',
       oldValue: triageBead.status,
-      newValue: "closed",
+      newValue: 'closed',
       metadata: {
         action: input.action,
         resolution_notes: input.resolution_notes,
@@ -1810,7 +1686,7 @@ export class TownDO extends DurableObject<Env> {
       beadOps.logBeadEvent(this.sql, {
         beadId: targetBeadId,
         agentId: input.agent_id,
-        eventType: "triage_resolved",
+        eventType: 'triage_resolved',
         newValue: action,
         metadata: {
           action,
@@ -1826,29 +1702,21 @@ export class TownDO extends DurableObject<Env> {
     // The escalation_bead_id is nested under metadata.context (set by
     // createTriageRequest's TriageRequestMetadata structure).
     const ctx =
-      typeof triageBead.metadata?.context === "object" &&
-      triageBead.metadata.context !== null
+      typeof triageBead.metadata?.context === 'object' && triageBead.metadata.context !== null
         ? (triageBead.metadata.context as Record<string, unknown>)
         : null;
     const escalationBeadId =
-      typeof ctx?.escalation_bead_id === "string"
-        ? ctx.escalation_bead_id
-        : null;
+      typeof ctx?.escalation_bead_id === 'string' ? ctx.escalation_bead_id : null;
     if (escalationBeadId) {
-      beadOps.updateBeadStatus(
-        this.sql,
-        escalationBeadId,
-        "closed",
-        input.agent_id,
-      );
+      beadOps.updateBeadStatus(this.sql, escalationBeadId, 'closed', input.agent_id);
     }
 
     console.log(
-      `${TOWN_LOG} resolveTriage: bead=${input.triage_request_bead_id} action=${input.action}`,
+      `${TOWN_LOG} resolveTriage: bead=${input.triage_request_bead_id} action=${input.action}`
     );
 
     const updated = beadOps.getBead(this.sql, input.triage_request_bead_id);
-    if (!updated) throw new Error("Triage bead not found after update");
+    if (!updated) throw new Error('Triage bead not found after update');
     return updated;
   }
 
@@ -1857,15 +1725,12 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async getMoleculeCurrentStep(
-    agentId: string,
+    agentId: string
   ): Promise<{ molecule: Molecule; step: unknown } | null> {
     return reviewQueue.getMoleculeCurrentStep(this.sql, agentId);
   }
 
-  async advanceMoleculeStep(
-    agentId: string,
-    summary: string,
-  ): Promise<Molecule | null> {
+  async advanceMoleculeStep(agentId: string, summary: string): Promise<Molecule | null> {
     return reviewQueue.advanceMoleculeStep(this.sql, agentId, summary);
   }
 
@@ -1881,28 +1746,23 @@ export class TownDO extends DurableObject<Env> {
     metadata?: Record<string, unknown>;
   }): Promise<{ bead: Bead; agent: Agent }> {
     const createdBead = beadOps.createBead(this.sql, {
-      type: "issue",
+      type: 'issue',
       title: input.title,
       body: input.body,
-      priority: BeadPriority.catch("medium").parse(input.priority ?? "medium"),
+      priority: BeadPriority.catch('medium').parse(input.priority ?? 'medium'),
       rig_id: input.rigId,
       metadata: input.metadata,
     });
 
-    events.insertEvent(this.sql, "bead_created", {
+    events.insertEvent(this.sql, 'bead_created', {
       bead_id: createdBead.bead_id,
-      payload: { bead_type: "issue", rig_id: input.rigId, has_blockers: false },
+      payload: { bead_type: 'issue', rig_id: input.rigId, has_blockers: false },
     });
 
     // Fast path: assign agent immediately for UX ("Toast is on it!")
     // rather than waiting for the next alarm tick. Uses the same
     // getOrCreateAgent + hookBead path the reconciler would use.
-    const agent = agents.getOrCreateAgent(
-      this.sql,
-      "polecat",
-      input.rigId,
-      this.townId,
-    );
+    const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
     agents.hookBead(this.sql, agent.id, createdBead.bead_id);
 
     // Re-read bead and agent after hook (hookBead updates both)
@@ -1911,11 +1771,8 @@ export class TownDO extends DurableObject<Env> {
 
     // Fire-and-forget dispatch so the sling call returns immediately.
     // The alarm loop retries if this fails.
-    this.dispatchAgent(hookedAgent, bead).catch((err) =>
-      console.error(
-        `${TOWN_LOG} slingBead: fire-and-forget dispatchAgent failed:`,
-        err,
-      ),
+    this.dispatchAgent(hookedAgent, bead).catch(err =>
+      console.error(`${TOWN_LOG} slingBead: fire-and-forget dispatchAgent failed:`, err)
     );
     await this.armAlarmIfNeeded();
     return { bead, agent: hookedAgent };
@@ -1932,7 +1789,7 @@ export class TownDO extends DurableObject<Env> {
   > {
     const rigRecords = rigs.listRigs(this.sql);
     return Promise.all(
-      rigRecords.map(async (r) => {
+      rigRecords.map(async r => {
         const rc = await this.getRigConfig(r.id);
         return {
           rigId: r.id,
@@ -1940,7 +1797,7 @@ export class TownDO extends DurableObject<Env> {
           defaultBranch: r.default_branch,
           platformIntegrationId: rc?.platformIntegrationId,
         };
-      }),
+      })
     );
   }
 
@@ -1951,34 +1808,28 @@ export class TownDO extends DurableObject<Env> {
   async sendMayorMessage(
     message: string,
     _model?: string,
-    uiContext?: string,
+    uiContext?: string
   ): Promise<{
     agentId: string;
-    sessionStatus: "idle" | "active" | "starting";
+    sessionStatus: 'idle' | 'active' | 'starting';
   }> {
     const townId = this.townId;
 
-    let mayor = agents.listAgents(this.sql, { role: "mayor" })[0] ?? null;
+    let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
     if (!mayor) {
       const identity = `mayor-${townId.slice(0, 8)}`;
       mayor = agents.registerAgent(this.sql, {
-        role: "mayor",
-        name: "mayor",
+        role: 'mayor',
+        name: 'mayor',
         identity,
       });
     }
 
-    const containerStatus = await dispatch.checkAgentContainerStatus(
-      this.env,
-      townId,
-      mayor.id,
-    );
-    const isAlive =
-      containerStatus.status === "running" ||
-      containerStatus.status === "starting";
+    const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
+    const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     console.log(
-      `${TOWN_LOG} sendMayorMessage: townId=${townId} mayorId=${mayor.id} containerStatus=${containerStatus.status} isAlive=${isAlive}`,
+      `${TOWN_LOG} sendMayorMessage: townId=${townId} mayorId=${mayor.id} containerStatus=${containerStatus.status} isAlive=${isAlive}`
     );
 
     const effectiveContext = uiContext ?? this._dashboardContext;
@@ -1986,62 +1837,53 @@ export class TownDO extends DurableObject<Env> {
       ? `<system-reminder>\n${effectiveContext}\n</system-reminder>\n\n${message}`
       : message;
 
-    let sessionStatus: "idle" | "active" | "starting";
+    let sessionStatus: 'idle' | 'active' | 'starting';
 
     if (isAlive) {
-      const sent = await dispatch.sendMessageToAgent(
-        this.env,
-        townId,
-        mayor.id,
-        combinedMessage,
-      );
-      sessionStatus = sent ? "active" : "idle";
+      const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, combinedMessage);
+      sessionStatus = sent ? 'active' : 'idle';
     } else {
       const townConfig = await this.getTownConfig();
       const rigConfig = await this.getMayorRigConfig();
       const kilocodeToken = await this.resolveKilocodeToken();
 
       console.log(
-        `${TOWN_LOG} sendMayorMessage: townId=${townId} hasRigConfig=${!!rigConfig} hasKilocodeToken=${!!kilocodeToken} townConfigToken=${!!townConfig.kilocode_token} rigConfigToken=${!!rigConfig?.kilocodeToken}`,
+        `${TOWN_LOG} sendMayorMessage: townId=${townId} hasRigConfig=${!!rigConfig} hasKilocodeToken=${!!kilocodeToken} townConfigToken=${!!townConfig.kilocode_token} rigConfigToken=${!!rigConfig?.kilocodeToken}`
       );
 
       if (kilocodeToken) {
         try {
           const containerStub = getTownContainerStub(this.env, townId);
-          await containerStub.setEnvVar("KILOCODE_TOKEN", kilocodeToken);
+          await containerStub.setEnvVar('KILOCODE_TOKEN', kilocodeToken);
         } catch {
           // Best effort
         }
       }
 
-      const started = await dispatch.startAgentInContainer(
-        this.env,
-        this.ctx.storage,
-        {
-          townId,
-          rigId: `mayor-${townId}`,
-          userId: townConfig.owner_user_id ?? rigConfig?.userId ?? townId,
-          agentId: mayor.id,
-          agentName: "mayor",
-          role: "mayor",
-          identity: mayor.identity,
-          beadId: "",
-          beadTitle: message,
-          beadBody: "",
-          checkpoint: null,
-          gitUrl: rigConfig?.gitUrl ?? "",
-          defaultBranch: rigConfig?.defaultBranch ?? "main",
-          kilocodeToken,
-          townConfig,
-          rigs: await this.rigListForMayor(),
-        },
-      );
+      const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
+        townId,
+        rigId: `mayor-${townId}`,
+        userId: townConfig.owner_user_id ?? rigConfig?.userId ?? townId,
+        agentId: mayor.id,
+        agentName: 'mayor',
+        role: 'mayor',
+        identity: mayor.identity,
+        beadId: '',
+        beadTitle: message,
+        beadBody: '',
+        checkpoint: null,
+        gitUrl: rigConfig?.gitUrl ?? '',
+        defaultBranch: rigConfig?.defaultBranch ?? 'main',
+        kilocodeToken,
+        townConfig,
+        rigs: await this.rigListForMayor(),
+      });
 
       if (started) {
-        agents.updateAgentStatus(this.sql, mayor.id, "working");
-        sessionStatus = "starting";
+        agents.updateAgentStatus(this.sql, mayor.id, 'working');
+        sessionStatus = 'starting';
       } else {
-        sessionStatus = "idle";
+        sessionStatus = 'idle';
       }
     }
 
@@ -2056,36 +1898,27 @@ export class TownDO extends DurableObject<Env> {
    */
   async ensureMayor(): Promise<{
     agentId: string;
-    sessionStatus: "idle" | "active" | "starting";
+    sessionStatus: 'idle' | 'active' | 'starting';
   }> {
     const townId = this.townId;
 
-    let mayor = agents.listAgents(this.sql, { role: "mayor" })[0] ?? null;
+    let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
     if (!mayor) {
       const identity = `mayor-${townId.slice(0, 8)}`;
       mayor = agents.registerAgent(this.sql, {
-        role: "mayor",
-        name: "mayor",
+        role: 'mayor',
+        name: 'mayor',
         identity,
       });
       console.log(`${TOWN_LOG} ensureMayor: created mayor agent ${mayor.id}`);
     }
 
     // Check if the container is already running
-    const containerStatus = await dispatch.checkAgentContainerStatus(
-      this.env,
-      townId,
-      mayor.id,
-    );
-    const isAlive =
-      containerStatus.status === "running" ||
-      containerStatus.status === "starting";
+    const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
+    const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     if (isAlive) {
-      const status =
-        mayor.status === "working" || mayor.status === "stalled"
-          ? "active"
-          : "idle";
+      const status = mayor.status === 'working' || mayor.status === 'stalled' ? 'active' : 'idle';
       return { agentId: mayor.id, sessionStatus: status };
     }
 
@@ -2099,54 +1932,45 @@ export class TownDO extends DurableObject<Env> {
     // will retry via status polling once a rig is created and the token
     // becomes available.
     if (!kilocodeToken) {
-      console.warn(
-        `${TOWN_LOG} ensureMayor: no kilocodeToken available, deferring start`,
-      );
-      return { agentId: mayor.id, sessionStatus: "idle" };
+      console.warn(`${TOWN_LOG} ensureMayor: no kilocodeToken available, deferring start`);
+      return { agentId: mayor.id, sessionStatus: 'idle' };
     }
 
     try {
       const containerStub = getTownContainerStub(this.env, townId);
-      await containerStub.setEnvVar("KILOCODE_TOKEN", kilocodeToken);
+      await containerStub.setEnvVar('KILOCODE_TOKEN', kilocodeToken);
     } catch {
       // Best effort
     }
 
     // Start with an empty prompt — the mayor will be idle but its container
     // and SDK server will be running, ready for PTY connections.
-    const started = await dispatch.startAgentInContainer(
-      this.env,
-      this.ctx.storage,
-      {
-        townId,
-        rigId: `mayor-${townId}`,
-        userId:
-          townConfig.owner_user_id ??
-          rigConfig?.userId ??
-          townConfig.created_by_user_id ??
-          townId,
-        agentId: mayor.id,
-        agentName: "mayor",
-        role: "mayor",
-        identity: mayor.identity,
-        beadId: "",
-        beadTitle: "Mayor ready. Waiting for instructions.",
-        beadBody: "",
-        checkpoint: null,
-        gitUrl: rigConfig?.gitUrl ?? "",
-        defaultBranch: rigConfig?.defaultBranch ?? "main",
-        kilocodeToken,
-        townConfig,
-        rigs: await this.rigListForMayor(),
-      },
-    );
+    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
+      townId,
+      rigId: `mayor-${townId}`,
+      userId:
+        townConfig.owner_user_id ?? rigConfig?.userId ?? townConfig.created_by_user_id ?? townId,
+      agentId: mayor.id,
+      agentName: 'mayor',
+      role: 'mayor',
+      identity: mayor.identity,
+      beadId: '',
+      beadTitle: 'Mayor ready. Waiting for instructions.',
+      beadBody: '',
+      checkpoint: null,
+      gitUrl: rigConfig?.gitUrl ?? '',
+      defaultBranch: rigConfig?.defaultBranch ?? 'main',
+      kilocodeToken,
+      townConfig,
+      rigs: await this.rigListForMayor(),
+    });
 
     if (started) {
-      agents.updateAgentStatus(this.sql, mayor.id, "working");
-      return { agentId: mayor.id, sessionStatus: "starting" };
+      agents.updateAgentStatus(this.sql, mayor.id, 'working');
+      return { agentId: mayor.id, sessionStatus: 'starting' };
     }
 
-    return { agentId: mayor.id, sessionStatus: "idle" };
+    return { agentId: mayor.id, sessionStatus: 'idle' };
   }
 
   async getMayorStatus(): Promise<{
@@ -2155,20 +1979,20 @@ export class TownDO extends DurableObject<Env> {
     session: {
       agentId: string;
       sessionId: string;
-      status: "idle" | "active" | "starting";
+      status: 'idle' | 'active' | 'starting';
       lastActivityAt: string;
     } | null;
   }> {
-    const mayor = agents.listAgents(this.sql, { role: "mayor" })[0] ?? null;
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
 
-    const mapStatus = (agentStatus: string): "idle" | "active" | "starting" => {
+    const mapStatus = (agentStatus: string): 'idle' | 'active' | 'starting' => {
       switch (agentStatus) {
-        case "working":
-          return "active";
-        case "stalled":
-          return "active";
+        case 'working':
+          return 'active';
+        case 'stalled':
+          return 'active';
         default:
-          return "idle";
+          return 'idle';
       }
     };
 
@@ -2220,11 +2044,7 @@ export class TownDO extends DurableObject<Env> {
     const parsed = z
       .object({
         title: z.string().min(1),
-        beads: z
-          .array(
-            z.object({ bead_id: z.string().min(1), rig_id: z.string().min(1) }),
-          )
-          .min(1),
+        beads: z.array(z.object({ bead_id: z.string().min(1), rig_id: z.string().min(1) })).min(1),
         created_by: z.string().min(1).optional(),
       })
       .parse(input);
@@ -2247,21 +2067,21 @@ export class TownDO extends DurableObject<Env> {
       `,
       [
         convoyId,
-        "convoy",
-        "open",
+        'convoy',
+        'open',
         parsed.title,
         null,
         null,
         null,
         null,
-        "medium",
-        JSON.stringify(["gt:convoy"]),
-        "{}",
+        'medium',
+        JSON.stringify(['gt:convoy']),
+        '{}',
         parsed.created_by ?? null,
         timestamp,
         timestamp,
         null,
-      ],
+      ]
     );
 
     // Create convoy_metadata
@@ -2273,7 +2093,7 @@ export class TownDO extends DurableObject<Env> {
           ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at}
         ) VALUES (?, ?, ?, ?)
       `,
-      [convoyId, parsed.beads.length, 0, null],
+      [convoyId, parsed.beads.length, 0, null]
     );
 
     // Track beads via bead_dependencies
@@ -2287,24 +2107,21 @@ export class TownDO extends DurableObject<Env> {
             ${bead_dependencies.columns.dependency_type}
           ) VALUES (?, ?, ?)
         `,
-        [bead.bead_id, convoyId, "tracks"],
+        [bead.bead_id, convoyId, 'tracks']
       );
     }
 
     const convoy = this.getConvoy(convoyId);
-    if (!convoy) throw new Error("Failed to create convoy");
+    if (!convoy) throw new Error('Failed to create convoy');
     this.emitEvent({
-      event: "convoy.created",
+      event: 'convoy.created',
       townId: this.townId,
       convoyId,
     });
     return convoy;
   }
 
-  async onBeadClosed(input: {
-    convoyId: string;
-    beadId: string;
-  }): Promise<ConvoyEntry | null> {
+  async onBeadClosed(input: { convoyId: string; beadId: string }): Promise<ConvoyEntry | null> {
     // Count closed tracked beads
     const closedRows = [
       ...query(
@@ -2316,12 +2133,10 @@ export class TownDO extends DurableObject<Env> {
             AND ${bead_dependencies.dependency_type} = 'tracks'
             AND ${beads.status} = 'closed'
         `,
-        [input.convoyId],
+        [input.convoyId]
       ),
     ];
-    const closedCount = z
-      .object({ count: z.number() })
-      .parse(closedRows[0] ?? { count: 0 }).count;
+    const closedCount = z.object({ count: z.number() }).parse(closedRows[0] ?? { count: 0 }).count;
 
     query(
       this.sql,
@@ -2330,22 +2145,14 @@ export class TownDO extends DurableObject<Env> {
         SET ${convoy_metadata.columns.closed_beads} = ?
         WHERE ${convoy_metadata.bead_id} = ?
       `,
-      [closedCount, input.convoyId],
+      [closedCount, input.convoyId]
     );
 
     const convoy = this.getConvoy(input.convoyId);
     if (convoy) {
-      this.broadcastConvoyProgress(
-        input.convoyId,
-        convoy.total_beads,
-        convoy.closed_beads,
-      );
+      this.broadcastConvoyProgress(input.convoyId, convoy.total_beads, convoy.closed_beads);
     }
-    if (
-      convoy &&
-      convoy.status === "active" &&
-      convoy.closed_beads >= convoy.total_beads
-    ) {
+    if (convoy && convoy.status === 'active' && convoy.closed_beads >= convoy.total_beads) {
       const timestamp = now();
       query(
         this.sql,
@@ -2354,7 +2161,7 @@ export class TownDO extends DurableObject<Env> {
           SET ${beads.columns.status} = 'closed', ${beads.columns.closed_at} = ?, ${beads.columns.updated_at} = ?
           WHERE ${beads.bead_id} = ?
         `,
-        [timestamp, timestamp, input.convoyId],
+        [timestamp, timestamp, input.convoyId]
       );
       query(
         this.sql,
@@ -2363,10 +2170,10 @@ export class TownDO extends DurableObject<Env> {
           SET ${convoy_metadata.columns.landed_at} = ?
           WHERE ${convoy_metadata.bead_id} = ?
         `,
-        [timestamp, input.convoyId],
+        [timestamp, input.convoyId]
       );
       this.emitEvent({
-        event: "convoy.landed",
+        event: 'convoy.landed',
         townId: this.townId,
         convoyId: input.convoyId,
       });
@@ -2396,7 +2203,7 @@ export class TownDO extends DurableObject<Env> {
           WHERE ${bead_dependencies.depends_on_bead_id} = ?
             AND ${bead_dependencies.dependency_type} = 'tracks'
         `,
-        [convoyId],
+        [convoyId]
       ),
     ];
 
@@ -2408,7 +2215,7 @@ export class TownDO extends DurableObject<Env> {
 
     for (const raw of trackedRows) {
       const row = TrackedRow.parse(raw);
-      if (row.status === "closed" || row.status === "failed") continue;
+      if (row.status === 'closed' || row.status === 'failed') continue;
 
       // Unhook agent if still assigned
       if (row.assignee_agent_bead_id) {
@@ -2417,18 +2224,18 @@ export class TownDO extends DurableObject<Env> {
         } catch (err) {
           console.warn(
             `${TOWN_LOG} closeConvoy: unhookBead failed for agent=${row.assignee_agent_bead_id}`,
-            err,
+            err
           );
         }
       }
 
-      beadOps.updateBeadStatus(this.sql, row.bead_id, "closed", "system");
+      beadOps.updateBeadStatus(this.sql, row.bead_id, 'closed', 'system');
     }
 
     // Close the convoy bead itself if not already auto-landed by
     // updateConvoyProgress (which fires when the last tracked bead closes).
     const current = this.getConvoy(convoyId);
-    if (current && current.status !== "landed") {
+    if (current && current.status !== 'landed') {
       query(
         this.sql,
         /* sql */ `
@@ -2438,7 +2245,7 @@ export class TownDO extends DurableObject<Env> {
               ${beads.columns.updated_at} = ?
           WHERE ${beads.bead_id} = ?
         `,
-        [timestamp, timestamp, convoyId],
+        [timestamp, timestamp, convoyId]
       );
       query(
         this.sql,
@@ -2448,7 +2255,7 @@ export class TownDO extends DurableObject<Env> {
               ${convoy_metadata.columns.landed_at} = ?
           WHERE ${convoy_metadata.bead_id} = ?
         `,
-        [timestamp, convoyId],
+        [timestamp, convoyId]
       );
     }
 
@@ -2464,7 +2271,7 @@ export class TownDO extends DurableObject<Env> {
     rigId: string;
     convoyTitle: string;
     tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
-    merge_mode?: "review-then-land" | "review-and-merge";
+    merge_mode?: 'review-then-land' | 'review-and-merge';
     staged?: boolean;
   }): Promise<{
     convoy: ConvoyEntry;
@@ -2486,9 +2293,9 @@ export class TownDO extends DurableObject<Env> {
     const convoySlug =
       input.convoyTitle
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "")
-        .slice(0, 40) || "convoy";
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 40) || 'convoy';
     const featureBranch = `convoy/${convoySlug}/${convoyId.slice(0, 8)}/head`;
 
     // 1. Validate the dependency graph has no cycles BEFORE persisting anything.
@@ -2502,8 +2309,7 @@ export class TownDO extends DurableObject<Env> {
       }
       for (let i = 0; i < input.tasks.length; i++) {
         for (const depIdx of input.tasks[i].depends_on ?? []) {
-          if (depIdx < 0 || depIdx >= input.tasks.length || depIdx === i)
-            continue;
+          if (depIdx < 0 || depIdx >= input.tasks.length || depIdx === i) continue;
           (adj.get(depIdx) ?? []).push(i);
           inDegree.set(i, (inDegree.get(i) ?? 0) + 1);
         }
@@ -2525,7 +2331,7 @@ export class TownDO extends DurableObject<Env> {
       }
       if (visited < input.tasks.length) {
         throw new Error(
-          `Convoy dependency graph contains a cycle — ${input.tasks.length - visited} tasks are involved in circular dependencies`,
+          `Convoy dependency graph contains a cycle — ${input.tasks.length - visited} tasks are involved in circular dependencies`
         );
       }
     }
@@ -2545,24 +2351,24 @@ export class TownDO extends DurableObject<Env> {
       `,
       [
         convoyId,
-        "convoy",
-        "open",
+        'convoy',
+        'open',
         input.convoyTitle,
         null, // body
         null, // rig_id — intentionally null; a convoy is a town-level grouping that can span multiple rigs
         null, // parent_bead_id
         null, // assignee_agent_bead_id
-        "medium",
-        JSON.stringify(["gt:convoy"]),
+        'medium',
+        JSON.stringify(['gt:convoy']),
         JSON.stringify({ feature_branch: featureBranch }),
         null,
         timestamp,
         timestamp,
         null,
-      ],
+      ]
     );
 
-    const mergeMode = input.merge_mode ?? "review-then-land";
+    const mergeMode = input.merge_mode ?? 'review-then-land';
 
     const stagedValue = isStaged ? 1 : 0;
 
@@ -2576,15 +2382,7 @@ export class TownDO extends DurableObject<Env> {
           ${convoy_metadata.columns.staged}
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      [
-        convoyId,
-        input.tasks.length,
-        0,
-        null,
-        featureBranch,
-        mergeMode,
-        stagedValue,
-      ],
+      [convoyId, input.tasks.length, 0, null, featureBranch, mergeMode, stagedValue]
     );
 
     // 2. Create all beads and track their IDs (needed for depends_on resolution)
@@ -2593,10 +2391,10 @@ export class TownDO extends DurableObject<Env> {
 
     for (const task of input.tasks) {
       const createdBead = beadOps.createBead(this.sql, {
-        type: "issue",
+        type: 'issue',
         title: task.title,
         body: task.body,
-        priority: "medium",
+        priority: 'medium',
         rig_id: input.rigId,
         metadata: { convoy_id: convoyId, feature_branch: featureBranch },
       });
@@ -2612,7 +2410,7 @@ export class TownDO extends DurableObject<Env> {
             ${bead_dependencies.columns.dependency_type}
           ) VALUES (?, ?, ?)
         `,
-        [createdBead.bead_id, convoyId, "tracks"],
+        [createdBead.bead_id, convoyId, 'tracks']
       );
     }
 
@@ -2631,7 +2429,7 @@ export class TownDO extends DurableObject<Env> {
               ${bead_dependencies.columns.dependency_type}
             ) VALUES (?, ?, ?)
           `,
-          [beadIds[i], beadIds[depIdx], "blocks"],
+          [beadIds[i], beadIds[depIdx], 'blocks']
         );
       }
     }
@@ -2639,10 +2437,10 @@ export class TownDO extends DurableObject<Env> {
     // Record bead_created events for reconciler (dual-write, no behavior change)
     for (let i = 0; i < beadIds.length; i++) {
       const hasBlockers = (input.tasks[i].depends_on ?? []).length > 0;
-      events.insertEvent(this.sql, "bead_created", {
+      events.insertEvent(this.sql, 'bead_created', {
         bead_id: beadIds[i],
         payload: {
-          bead_type: "issue",
+          bead_type: 'issue',
           rig_id: input.rigId,
           convoy_id: convoyId,
           has_blockers: hasBlockers,
@@ -2665,9 +2463,9 @@ export class TownDO extends DurableObject<Env> {
     }
 
     const convoy = this.getConvoy(convoyId);
-    if (!convoy) throw new Error("Failed to create convoy");
+    if (!convoy) throw new Error('Failed to create convoy');
     this.emitEvent({
-      event: "convoy.created",
+      event: 'convoy.created',
       townId: this.townId,
       convoyId,
     });
@@ -2695,14 +2493,14 @@ export class TownDO extends DurableObject<Env> {
           WHERE ${bead_dependencies.depends_on_bead_id} = ?
             AND ${bead_dependencies.dependency_type} = 'tracks'
         `,
-        [convoyId],
+        [convoyId]
       ),
     ];
 
     const BeadIdRow = z.object({ bead_id: z.string() });
     const trackedBeadIds = BeadIdRow.array()
       .parse(trackedRows)
-      .map((r) => r.bead_id);
+      .map(r => r.bead_id);
 
     const results: Array<{ bead: Bead; agent: Agent | null }> = [];
 
@@ -2722,20 +2520,19 @@ export class TownDO extends DurableObject<Env> {
         SET ${convoy_metadata.columns.staged} = 0
         WHERE ${convoy_metadata.bead_id} = ?
       `,
-      [convoyId],
+      [convoyId]
     );
 
-    events.insertEvent(this.sql, "convoy_started", {
+    events.insertEvent(this.sql, 'convoy_started', {
       payload: { convoy_id: convoyId },
     });
 
     await this.armAlarmIfNeeded();
 
     const updatedConvoy = this.getConvoy(convoyId);
-    if (!updatedConvoy)
-      throw new Error(`Failed to re-fetch convoy after start: ${convoyId}`);
+    if (!updatedConvoy) throw new Error(`Failed to re-fetch convoy after start: ${convoyId}`);
     this.emitEvent({
-      event: "convoy.started",
+      event: 'convoy.started',
       townId: this.townId,
       convoyId,
     });
@@ -2752,10 +2549,10 @@ export class TownDO extends DurableObject<Env> {
         /* sql */ `${CONVOY_JOIN}
           WHERE ${beads.status} != 'closed'
           ORDER BY ${beads.created_at} DESC`,
-        [],
+        []
       ),
     ];
-    return rows.map((row) => toConvoy(ConvoyBeadRecord.parse(row)));
+    return rows.map(row => toConvoy(ConvoyBeadRecord.parse(row)));
   }
 
   /**
@@ -2829,7 +2626,7 @@ export class TownDO extends DurableObject<Env> {
             AND ${bead_dependencies.dependency_type} = 'tracks'
           ORDER BY ${beads.created_at} ASC
         `,
-        [convoyId],
+        [convoyId]
       ),
     ];
 
@@ -2842,25 +2639,18 @@ export class TownDO extends DurableObject<Env> {
     });
 
     // Get DAG edges (blocks dependencies) between tracked beads
-    const dependencyEdges = beadOps.getConvoyDependencyEdges(
-      this.sql,
-      convoyId,
-    );
+    const dependencyEdges = beadOps.getConvoyDependencyEdges(this.sql, convoyId);
 
     return {
       ...convoy,
-      beads: trackedRows.map((row) => TrackedBeadRow.parse(row)),
+      beads: trackedRows.map(row => TrackedBeadRow.parse(row)),
       dependency_edges: dependencyEdges,
     };
   }
 
   private getConvoy(convoyId: string): ConvoyEntry | null {
     const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `${CONVOY_JOIN} WHERE ${beads.bead_id} = ?`,
-        [convoyId],
-      ),
+      ...query(this.sql, /* sql */ `${CONVOY_JOIN} WHERE ${beads.bead_id} = ?`, [convoyId]),
     ];
     if (rows.length === 0) return null;
     return toConvoy(ConvoyBeadRecord.parse(rows[0]));
@@ -2870,9 +2660,7 @@ export class TownDO extends DurableObject<Env> {
   // Escalations (beads with type='escalation' + escalation_metadata)
   // ══════════════════════════════════════════════════════════════════
 
-  async acknowledgeEscalation(
-    escalationId: string,
-  ): Promise<EscalationEntry | null> {
+  async acknowledgeEscalation(escalationId: string): Promise<EscalationEntry | null> {
     query(
       this.sql,
       /* sql */ `
@@ -2880,41 +2668,39 @@ export class TownDO extends DurableObject<Env> {
         SET ${escalation_metadata.columns.acknowledged} = 1, ${escalation_metadata.columns.acknowledged_at} = ?
         WHERE ${escalation_metadata.bead_id} = ? AND ${escalation_metadata.acknowledged} = 0
       `,
-      [now(), escalationId],
+      [now(), escalationId]
     );
     // Acknowledging an escalation also closes it — the mayor has seen
     // the issue and doesn't need it sitting open in the queue.
     // Guard with getBead so stale/duplicate acknowledge calls remain
     // idempotent instead of throwing on a missing bead.
     const escalationBead = beadOps.getBead(this.sql, escalationId);
-    if (escalationBead && escalationBead.status !== "closed") {
-      beadOps.updateBeadStatus(this.sql, escalationId, "closed", null);
+    if (escalationBead && escalationBead.status !== 'closed') {
+      beadOps.updateBeadStatus(this.sql, escalationId, 'closed', null);
     }
     this.emitEvent({
-      event: "escalation.acknowledged",
+      event: 'escalation.acknowledged',
       townId: this.townId,
       beadId: escalationId,
     });
     return this.getEscalation(escalationId);
   }
 
-  async listEscalations(filter?: {
-    acknowledged?: boolean;
-  }): Promise<EscalationEntry[]> {
+  async listEscalations(filter?: { acknowledged?: boolean }): Promise<EscalationEntry[]> {
     const rows =
       filter?.acknowledged !== undefined
         ? [
             ...query(
               this.sql,
               /* sql */ `${ESCALATION_JOIN} WHERE ${escalation_metadata.acknowledged} = ? ORDER BY ${beads.created_at} DESC LIMIT 100`,
-              [filter.acknowledged ? 1 : 0],
+              [filter.acknowledged ? 1 : 0]
             ),
           ]
         : [
             ...query(
               this.sql,
               /* sql */ `${ESCALATION_JOIN} ORDER BY ${beads.created_at} DESC LIMIT 100`,
-              [],
+              []
             ),
           ];
     return EscalationBeadRecord.array().parse(rows).map(toEscalation);
@@ -2924,7 +2710,7 @@ export class TownDO extends DurableObject<Env> {
     townId: string;
     source_rig_id: string;
     source_agent_id?: string;
-    severity: "low" | "medium" | "high" | "critical";
+    severity: 'low' | 'medium' | 'high' | 'critical';
     category?: string;
     message: string;
   }): Promise<EscalationEntry> {
@@ -2963,25 +2749,21 @@ export class TownDO extends DurableObject<Env> {
       `,
       [
         beadId,
-        "escalation",
-        "open",
+        'escalation',
+        'open',
         `Escalation: ${input.message.slice(0, 100)}`,
         input.message,
         input.source_rig_id,
         null,
         null,
-        input.severity === "critical"
-          ? "critical"
-          : input.severity === "high"
-            ? "high"
-            : "medium",
-        JSON.stringify(["gt:escalation", `severity:${input.severity}`]),
+        input.severity === 'critical' ? 'critical' : input.severity === 'high' ? 'high' : 'medium',
+        JSON.stringify(['gt:escalation', `severity:${input.severity}`]),
         JSON.stringify(metadata),
         input.source_agent_id ?? null,
         timestamp,
         timestamp,
         null,
-      ],
+      ]
     );
 
     // Create escalation_metadata
@@ -2994,14 +2776,14 @@ export class TownDO extends DurableObject<Env> {
           ${escalation_metadata.columns.re_escalation_count}, ${escalation_metadata.columns.acknowledged_at}
         ) VALUES (?, ?, ?, ?, ?, ?)
       `,
-      [beadId, input.severity, input.category ?? null, 0, 0, null],
+      [beadId, input.severity, input.category ?? null, 0, 0, null]
     );
 
     const escalation = this.getEscalation(beadId);
-    if (!escalation) throw new Error("Failed to create escalation");
+    if (!escalation) throw new Error('Failed to create escalation');
 
     this.emitEvent({
-      event: "escalation.created",
+      event: 'escalation.created',
       townId: this.townId,
       rigId: input.source_rig_id,
       agentId: input.source_agent_id,
@@ -3013,7 +2795,7 @@ export class TownDO extends DurableObject<Env> {
     // act on the escalation. Without this, escalation beads sit open
     // with no assignee and no automated follow-up.
     patrol.createTriageRequest(this.sql, {
-      triageType: "escalation",
+      triageType: 'escalation',
       agentBeadId: input.source_agent_id ?? null,
       title: `Escalation (${input.severity}): ${input.message.slice(0, 80)}`,
       context: {
@@ -3025,28 +2807,25 @@ export class TownDO extends DurableObject<Env> {
         source_bead_id: sourceBeadId,
       },
       options:
-        input.severity === "low"
-          ? ["NUDGE", "CLOSE_BEAD", "PROVIDE_GUIDANCE"]
-          : ["ESCALATE_TO_MAYOR", "RESTART", "CLOSE_BEAD", "REASSIGN_BEAD"],
+        input.severity === 'low'
+          ? ['NUDGE', 'CLOSE_BEAD', 'PROVIDE_GUIDANCE']
+          : ['ESCALATE_TO_MAYOR', 'RESTART', 'CLOSE_BEAD', 'REASSIGN_BEAD'],
       rigId: input.source_rig_id,
     });
 
     // Notify mayor directly for medium+ severity (in addition to triage)
-    if (input.severity !== "low") {
+    if (input.severity !== 'low') {
       this.sendMayorMessage(
-        `[Escalation:${input.severity}] rig=${input.source_rig_id} ${input.message}`,
-      ).catch((err) => {
-        console.warn(
-          `${TOWN_LOG} routeEscalation: failed to notify mayor:`,
-          err,
-        );
+        `[Escalation:${input.severity}] rig=${input.source_rig_id} ${input.message}`
+      ).catch(err => {
+        console.warn(`${TOWN_LOG} routeEscalation: failed to notify mayor:`, err);
         try {
           beadOps.logBeadEvent(this.sql, {
             beadId,
             agentId: input.source_agent_id ?? null,
-            eventType: "notification_failed",
+            eventType: 'notification_failed',
             metadata: {
-              target: "mayor",
+              target: 'mayor',
               reason: err instanceof Error ? err.message : String(err),
               severity: input.severity,
             },
@@ -3054,7 +2833,7 @@ export class TownDO extends DurableObject<Env> {
         } catch (logErr) {
           console.error(
             `${TOWN_LOG} routeEscalation: failed to log notification_failed event:`,
-            logErr,
+            logErr
           );
         }
       });
@@ -3065,11 +2844,7 @@ export class TownDO extends DurableObject<Env> {
 
   private getEscalation(escalationId: string): EscalationEntry | null {
     const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `${ESCALATION_JOIN} WHERE ${beads.bead_id} = ?`,
-        [escalationId],
-      ),
+      ...query(this.sql, /* sql */ `${ESCALATION_JOIN} WHERE ${beads.bead_id} = ?`, [escalationId]),
     ];
     if (rows.length === 0) return null;
     return toEscalation(EscalationBeadRecord.parse(rows[0]));
@@ -3084,11 +2859,9 @@ export class TownDO extends DurableObject<Env> {
     // After destroy(), deleteAll() wipes storage but may not clear
     // the alarm (compat date < 2026-02-24). A resurrected alarm
     // will find no town:id — stop the loop immediately.
-    const storedId = await this.ctx.storage.get<string>("town:id");
+    const storedId = await this.ctx.storage.get<string>('town:id');
     if (!storedId) {
-      console.log(
-        `${TOWN_LOG} alarm: no town:id — town was destroyed, not re-arming`,
-      );
+      console.log(`${TOWN_LOG} alarm: no town:id — town was destroyed, not re-arming`);
       await this.ctx.storage.deleteAlarm();
       return;
     }
@@ -3133,17 +2906,17 @@ export class TownDO extends DurableObject<Env> {
             FROM ${agent_metadata}
             WHERE ${agent_metadata.status} IN ('working', 'stalled')
           `,
-            [],
+            []
           ),
         ]);
 
       if (workingAgentRows.length > 0) {
-        const statusChecks = workingAgentRows.map(async (row) => {
+        const statusChecks = workingAgentRows.map(async row => {
           try {
             const containerInfo = await dispatch.checkAgentContainerStatus(
               this.env,
               townId,
-              row.bead_id,
+              row.bead_id
             );
             events.upsertContainerStatus(this.sql, row.bead_id, {
               status: containerInfo.status,
@@ -3152,7 +2925,7 @@ export class TownDO extends DurableObject<Env> {
           } catch (err) {
             console.warn(
               `${TOWN_LOG} alarm: container status check failed for agent=${row.bead_id}`,
-              err,
+              err
             );
           }
         });
@@ -3181,9 +2954,7 @@ export class TownDO extends DurableObject<Env> {
       const pending = events.drainEvents(this.sql);
       metrics.eventsDrained = pending.length;
       if (pending.length > 0) {
-        console.log(
-          `${TOWN_LOG} [reconciler] town=${townId} draining ${pending.length} event(s)`,
-        );
+        console.log(`${TOWN_LOG} [reconciler] town=${townId} draining ${pending.length} event(s)`);
       }
       for (const event of pending) {
         try {
@@ -3192,7 +2963,7 @@ export class TownDO extends DurableObject<Env> {
         } catch (err) {
           console.error(
             `${TOWN_LOG} [reconciler] town=${townId} applyEvent failed: event=${event.event_id} type=${event.event_type}`,
-            err,
+            err
           );
           // Event stays unprocessed — will be retried on the next alarm tick.
           // Mark it processed anyway after 3 consecutive failures to prevent
@@ -3201,10 +2972,7 @@ export class TownDO extends DurableObject<Env> {
         }
       }
     } catch (err) {
-      console.error(
-        `${TOWN_LOG} [reconciler] town=${townId} event drain failed`,
-        err,
-      );
+      console.error(`${TOWN_LOG} [reconciler] town=${townId} event drain failed`, err);
       Sentry.captureException(err);
     }
 
@@ -3214,12 +2982,11 @@ export class TownDO extends DurableObject<Env> {
       const actions = reconciler.reconcile(this.sql);
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
-        metrics.actionsByType[a.type] =
-          (metrics.actionsByType[a.type] ?? 0) + 1;
+        metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;
       }
       if (actions.length > 0) {
         console.log(
-          `${TOWN_LOG} [reconciler] town=${townId} actions=${actions.length} types=${[...new Set(actions.map((a) => a.type))].join(",")}`,
+          `${TOWN_LOG} [reconciler] town=${townId} actions=${actions.length} types=${[...new Set(actions.map(a => a.type))].join(',')}`
         );
       }
       const ctx = this.applyActionCtx;
@@ -3230,24 +2997,21 @@ export class TownDO extends DurableObject<Env> {
         } catch (err) {
           console.error(
             `${TOWN_LOG} [reconciler] town=${townId} applyAction failed: type=${action.type}`,
-            err,
+            err
           );
         }
       }
     } catch (err) {
-      console.error(
-        `${TOWN_LOG} [reconciler] town=${townId} reconcile failed`,
-        err,
-      );
+      console.error(`${TOWN_LOG} [reconciler] town=${townId} reconcile failed`, err);
       Sentry.captureException(err);
     }
 
     // Phase 2: Execute side effects (async, best-effort)
     metrics.sideEffectsAttempted = sideEffects.length;
     if (sideEffects.length > 0) {
-      const results = await Promise.allSettled(sideEffects.map((fn) => fn()));
+      const results = await Promise.allSettled(sideEffects.map(fn => fn()));
       for (const r of results) {
-        if (r.status === "fulfilled") metrics.sideEffectsSucceeded++;
+        if (r.status === 'fulfilled') metrics.sideEffectsSucceeded++;
         else metrics.sideEffectsFailed++;
       }
     }
@@ -3260,19 +3024,14 @@ export class TownDO extends DurableObject<Env> {
         // Emit as an analytics event for observability dashboards instead
         // of console.error (which spams Workers logs every 5s per town).
         this.emitEvent({
-          event: "reconciler.invariant_violations",
+          event: 'reconciler.invariant_violations',
           townId,
-          label: violations
-            .map((v) => `[${v.invariant}] ${v.message}`)
-            .join("; "),
+          label: violations.map(v => `[${v.invariant}] ${v.message}`).join('; '),
           value: violations.length,
         });
       }
     } catch (err) {
-      console.warn(
-        `${TOWN_LOG} [reconciler:invariants] town=${townId} check failed`,
-        err,
-      );
+      console.warn(`${TOWN_LOG} [reconciler:invariants] town=${townId} check failed`, err);
     }
 
     metrics.wallClockMs = Date.now() - reconcilerStart;
@@ -3281,17 +3040,17 @@ export class TownDO extends DurableObject<Env> {
 
     // ── Phase 3: Housekeeping (independent, all parallelizable) ────
     await Promise.allSettled([
-      this.deliverPendingMail().catch((err) =>
-        console.warn(`${TOWN_LOG} alarm: deliverPendingMail failed`, err),
+      this.deliverPendingMail().catch(err =>
+        console.warn(`${TOWN_LOG} alarm: deliverPendingMail failed`, err)
       ),
-      this.expireStaleNudges().catch((err) =>
-        console.warn(`${TOWN_LOG} alarm: expireStaleNudges failed`, err),
+      this.expireStaleNudges().catch(err =>
+        console.warn(`${TOWN_LOG} alarm: expireStaleNudges failed`, err)
       ),
-      this.reEscalateStaleEscalations().catch((err) =>
-        console.warn(`${TOWN_LOG} alarm: reEscalation failed`, err),
+      this.reEscalateStaleEscalations().catch(err =>
+        console.warn(`${TOWN_LOG} alarm: reEscalation failed`, err)
       ),
-      this.maybeDispatchTriageAgent().catch((err) =>
-        console.warn(`${TOWN_LOG} alarm: maybeDispatchTriageAgent failed`, err),
+      this.maybeDispatchTriageAgent().catch(err =>
+        console.warn(`${TOWN_LOG} alarm: maybeDispatchTriageAgent failed`, err)
       ),
       // Prune processed reconciler events older than 7 days
       Promise.resolve().then(() => {
@@ -3326,8 +3085,7 @@ export class TownDO extends DurableObject<Env> {
   private async refreshContainerToken(): Promise<void> {
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
     const now = Date.now();
-    if (now - this.lastContainerTokenRefreshAt < TOKEN_REFRESH_INTERVAL_MS)
-      return;
+    if (now - this.lastContainerTokenRefreshAt < TOKEN_REFRESH_INTERVAL_MS) return;
 
     const townId = this.townId;
     if (!townId) return;
@@ -3347,7 +3105,7 @@ export class TownDO extends DurableObject<Env> {
   private dispatchAgent(
     agent: Agent,
     bead: Bead,
-    options?: { systemPromptOverride?: string },
+    options?: { systemPromptOverride?: string }
   ): Promise<boolean> {
     return scheduling.dispatchAgent(this.schedulingCtx, agent, bead, options);
   }
@@ -3373,11 +3131,9 @@ export class TownDO extends DurableObject<Env> {
     // rapid retry loops). Skip dispatch in either case.
     const triageBatchLike = patrol.TRIAGE_LABEL_LIKE.replace(
       patrol.TRIAGE_REQUEST_LABEL,
-      patrol.TRIAGE_BATCH_LABEL,
+      patrol.TRIAGE_BATCH_LABEL
     );
-    const cooldownCutoff = new Date(
-      Date.now() - scheduling.DISPATCH_COOLDOWN_MS,
-    ).toISOString();
+    const cooldownCutoff = new Date(Date.now() - scheduling.DISPATCH_COOLDOWN_MS).toISOString();
     const existingBatch = [
       ...query(
         this.sql,
@@ -3392,12 +3148,12 @@ export class TownDO extends DurableObject<Env> {
             )
           LIMIT 1
         `,
-        [triageBatchLike, cooldownCutoff],
+        [triageBatchLike, cooldownCutoff]
       ),
     ];
     if (existingBatch.length > 0) {
       console.log(
-        `${TOWN_LOG} maybeDispatchTriageAgent: triage batch bead active or in cooldown, skipping (${pendingCount} pending)`,
+        `${TOWN_LOG} maybeDispatchTriageAgent: triage batch bead active or in cooldown, skipping (${pendingCount} pending)`
       );
       return;
     }
@@ -3406,23 +3162,19 @@ export class TownDO extends DurableObject<Env> {
     // leaked phantom issue beads on early-return paths.
     const rigList = rigs.listRigs(this.sql);
     if (rigList.length === 0) {
-      console.warn(
-        `${TOWN_LOG} maybeDispatchTriageAgent: no rigs available, skipping`,
-      );
+      console.warn(`${TOWN_LOG} maybeDispatchTriageAgent: no rigs available, skipping`);
       return;
     }
     const rigId = rigList[0].id;
 
     const rigConfig = await this.getRigConfig(rigId);
     if (!rigConfig) {
-      console.warn(
-        `${TOWN_LOG} maybeDispatchTriageAgent: no rig config for rig=${rigId}`,
-      );
+      console.warn(`${TOWN_LOG} maybeDispatchTriageAgent: no rig config for rig=${rigId}`);
       return;
     }
 
     console.log(
-      `${TOWN_LOG} maybeDispatchTriageAgent: ${pendingCount} pending triage request(s), dispatching agent`,
+      `${TOWN_LOG} maybeDispatchTriageAgent: ${pendingCount} pending triage request(s), dispatching agent`
     );
 
     const townConfig = await this.getTownConfig();
@@ -3430,71 +3182,54 @@ export class TownDO extends DurableObject<Env> {
 
     // Build the triage prompt from pending requests
     const pendingRequests = patrol.listPendingTriageRequests(this.sql);
-    const { buildTriageSystemPrompt } =
-      await import("../prompts/triage-system.prompt");
+    const { buildTriageSystemPrompt } = await import('../prompts/triage-system.prompt');
     const systemPrompt = buildTriageSystemPrompt(pendingRequests);
 
     // Only now create the synthetic bead — preconditions are verified.
     const triageBead = beadOps.createBead(this.sql, {
-      type: "issue",
+      type: 'issue',
       title: `Triage batch: ${pendingCount} request(s)`,
-      body: "Process all pending triage request beads and resolve each one.",
-      priority: "high",
+      body: 'Process all pending triage request beads and resolve each one.',
+      priority: 'high',
       labels: [patrol.TRIAGE_BATCH_LABEL],
-      created_by: "patrol",
+      created_by: 'patrol',
     });
 
-    const triageAgent = agents.getOrCreateAgent(
-      this.sql,
-      "polecat",
-      rigId,
-      this.townId,
-    );
+    const triageAgent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
     agents.hookBead(this.sql, triageAgent.id, triageBead.bead_id);
 
-    const started = await dispatch.startAgentInContainer(
-      this.env,
-      this.ctx.storage,
-      {
-        townId: this.townId,
-        rigId,
-        userId: rigConfig.userId,
-        agentId: triageAgent.id,
-        agentName: triageAgent.name,
-        role: "polecat",
-        identity: triageAgent.identity,
-        beadId: triageBead.bead_id,
-        beadTitle: triageBead.title,
-        beadBody: triageBead.body ?? "",
-        checkpoint: null,
-        gitUrl: rigConfig.gitUrl,
-        defaultBranch: rigConfig.defaultBranch,
-        kilocodeToken,
-        townConfig,
-        systemPromptOverride: systemPrompt,
-        platformIntegrationId: rigConfig.platformIntegrationId,
-        lightweight: true,
-      },
-    );
+    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
+      townId: this.townId,
+      rigId,
+      userId: rigConfig.userId,
+      agentId: triageAgent.id,
+      agentName: triageAgent.name,
+      role: 'polecat',
+      identity: triageAgent.identity,
+      beadId: triageBead.bead_id,
+      beadTitle: triageBead.title,
+      beadBody: triageBead.body ?? '',
+      checkpoint: null,
+      gitUrl: rigConfig.gitUrl,
+      defaultBranch: rigConfig.defaultBranch,
+      kilocodeToken,
+      townConfig,
+      systemPromptOverride: systemPrompt,
+      platformIntegrationId: rigConfig.platformIntegrationId,
+      lightweight: true,
+    });
 
     if (started) {
       // Mark the agent as working so the duplicate-guard on the next
       // alarm tick sees it and skips dispatch.
-      agents.updateAgentStatus(this.sql, triageAgent.id, "working");
+      agents.updateAgentStatus(this.sql, triageAgent.id, 'working');
     } else {
       agents.unhookBead(this.sql, triageAgent.id);
       // Failing the batch bead triggers cooldown: the guard at the top of
       // this method skips dispatch while a failed batch bead's updated_at
       // is within DISPATCH_COOLDOWN_MS.
-      beadOps.updateBeadStatus(
-        this.sql,
-        triageBead.bead_id,
-        "failed",
-        triageAgent.id,
-      );
-      console.error(
-        `${TOWN_LOG} maybeDispatchTriageAgent: triage agent failed to start`,
-      );
+      beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'failed', triageAgent.id);
+      console.error(`${TOWN_LOG} maybeDispatchTriageAgent: triage agent failed to start`);
     }
   }
 
@@ -3510,50 +3245,41 @@ export class TownDO extends DurableObject<Env> {
     if (pendingByAgent.size === 0) return;
 
     console.log(
-      `${TOWN_LOG} deliverPendingMail: ${pendingByAgent.size} agent(s) with pending mail`,
+      `${TOWN_LOG} deliverPendingMail: ${pendingByAgent.size} agent(s) with pending mail`
     );
 
-    const deliveries = [...pendingByAgent.entries()].map(
-      async ([agentId, messages]) => {
-        const lines = messages.map(
-          (m) => `[MAIL from ${m.from_agent_id}] ${m.subject}\n${m.body}`,
-        );
-        const prompt = `You have ${messages.length} new mail message(s):\n\n${lines.join("\n\n---\n\n")}`;
+    const deliveries = [...pendingByAgent.entries()].map(async ([agentId, messages]) => {
+      const lines = messages.map(m => `[MAIL from ${m.from_agent_id}] ${m.subject}\n${m.body}`);
+      const prompt = `You have ${messages.length} new mail message(s):\n\n${lines.join('\n\n---\n\n')}`;
 
-        const sent = await dispatch.sendMessageToAgent(
-          this.env,
-          this.townId,
-          agentId,
-          prompt,
-        );
+      const sent = await dispatch.sendMessageToAgent(this.env, this.townId, agentId, prompt);
 
-        if (sent) {
-          // Mark delivered only after the container accepted the message
-          mail.readAndDeliverMail(this.sql, agentId);
-          if (
-            messages.some(
-              (m) =>
-                m.subject === "TRIAGE_NUDGE" ||
-                m.subject === "GUPP_ESCALATION" ||
-                m.subject === "GUPP_CHECK",
-            )
-          ) {
-            this.emitEvent({
-              event: "nudge.delivered",
-              townId: this.townId,
-              agentId,
-            });
-          }
-          console.log(
-            `${TOWN_LOG} deliverPendingMail: delivered ${messages.length} message(s) to agent=${agentId}`,
-          );
-        } else {
-          console.warn(
-            `${TOWN_LOG} deliverPendingMail: failed to push mail to agent=${agentId}, will retry next tick`,
-          );
+      if (sent) {
+        // Mark delivered only after the container accepted the message
+        mail.readAndDeliverMail(this.sql, agentId);
+        if (
+          messages.some(
+            m =>
+              m.subject === 'TRIAGE_NUDGE' ||
+              m.subject === 'GUPP_ESCALATION' ||
+              m.subject === 'GUPP_CHECK'
+          )
+        ) {
+          this.emitEvent({
+            event: 'nudge.delivered',
+            townId: this.townId,
+            agentId,
+          });
         }
-      },
-    );
+        console.log(
+          `${TOWN_LOG} deliverPendingMail: delivered ${messages.length} message(s) to agent=${agentId}`
+        );
+      } else {
+        console.warn(
+          `${TOWN_LOG} deliverPendingMail: failed to push mail to agent=${agentId}, will retry next tick`
+        );
+      }
+    });
 
     await Promise.allSettled(deliveries);
   }
@@ -3564,19 +3290,15 @@ export class TownDO extends DurableObject<Env> {
    */
   private async checkPRStatus(
     prUrl: string,
-    townConfig: TownConfig,
-  ): Promise<"open" | "merged" | "closed" | null> {
+    townConfig: TownConfig
+  ): Promise<'open' | 'merged' | 'closed' | null> {
     // GitHub PR URL format: https://github.com/{owner}/{repo}/pull/{number}
-    const ghMatch = prUrl.match(
-      /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/,
-    );
+    const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
     if (ghMatch) {
       const [, owner, repo, numberStr] = ghMatch;
       const token = townConfig.git_auth.github_token;
       if (!token) {
-        console.warn(
-          `${TOWN_LOG} checkPRStatus: no github_token configured, cannot poll ${prUrl}`,
-        );
+        console.warn(`${TOWN_LOG} checkPRStatus: no github_token configured, cannot poll ${prUrl}`);
         return null;
       }
 
@@ -3585,14 +3307,14 @@ export class TownDO extends DurableObject<Env> {
         {
           headers: {
             Authorization: `token ${token}`,
-            Accept: "application/vnd.github.v3+json",
-            "User-Agent": "Gastown-Refinery/1.0",
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'Gastown-Refinery/1.0',
           },
-        },
+        }
       );
       if (!response.ok) {
         console.warn(
-          `${TOWN_LOG} checkPRStatus: GitHub API returned ${response.status} for ${prUrl}`,
+          `${TOWN_LOG} checkPRStatus: GitHub API returned ${response.status} for ${prUrl}`
         );
         return null;
       }
@@ -3602,22 +3324,18 @@ export class TownDO extends DurableObject<Env> {
       const data = GitHubPRStatusSchema.safeParse(json);
       if (!data.success) return null;
 
-      if (data.data.merged) return "merged";
-      if (data.data.state === "closed") return "closed";
-      return "open";
+      if (data.data.merged) return 'merged';
+      if (data.data.state === 'closed') return 'closed';
+      return 'open';
     }
 
     // GitLab MR URL format: https://{host}/{path}/-/merge_requests/{iid}
-    const glMatch = prUrl.match(
-      /^(https:\/\/[^/]+)\/(.+)\/-\/merge_requests\/(\d+)/,
-    );
+    const glMatch = prUrl.match(/^(https:\/\/[^/]+)\/(.+)\/-\/merge_requests\/(\d+)/);
     if (glMatch) {
       const [, instanceUrl, projectPath, iidStr] = glMatch;
       const token = townConfig.git_auth.gitlab_token;
       if (!token) {
-        console.warn(
-          `${TOWN_LOG} checkPRStatus: no gitlab_token configured, cannot poll ${prUrl}`,
-        );
+        console.warn(`${TOWN_LOG} checkPRStatus: no gitlab_token configured, cannot poll ${prUrl}`);
         return null;
       }
 
@@ -3627,9 +3345,9 @@ export class TownDO extends DurableObject<Env> {
       const configuredHost = townConfig.git_auth.gitlab_instance_url
         ? new URL(townConfig.git_auth.gitlab_instance_url).hostname
         : null;
-      if (prHost !== "gitlab.com" && prHost !== configuredHost) {
+      if (prHost !== 'gitlab.com' && prHost !== configuredHost) {
         console.warn(
-          `${TOWN_LOG} checkPRStatus: refusing to send gitlab_token to unknown host: ${prHost}`,
+          `${TOWN_LOG} checkPRStatus: refusing to send gitlab_token to unknown host: ${prHost}`
         );
         return null;
       }
@@ -3638,12 +3356,12 @@ export class TownDO extends DurableObject<Env> {
       const response = await fetch(
         `${instanceUrl}/api/v4/projects/${encodedPath}/merge_requests/${iidStr}`,
         {
-          headers: { "PRIVATE-TOKEN": token },
-        },
+          headers: { 'PRIVATE-TOKEN': token },
+        }
       );
       if (!response.ok) {
         console.warn(
-          `${TOWN_LOG} checkPRStatus: GitLab API returned ${response.status} for ${prUrl}`,
+          `${TOWN_LOG} checkPRStatus: GitLab API returned ${response.status} for ${prUrl}`
         );
         return null;
       }
@@ -3653,14 +3371,12 @@ export class TownDO extends DurableObject<Env> {
       const data = GitLabMRStatusSchema.safeParse(glJson);
       if (!data.success) return null;
 
-      if (data.data.state === "merged") return "merged";
-      if (data.data.state === "closed") return "closed";
-      return "open";
+      if (data.data.state === 'merged') return 'merged';
+      if (data.data.state === 'closed') return 'closed';
+      return 'open';
     }
 
-    console.warn(
-      `${TOWN_LOG} checkPRStatus: unrecognized PR URL format: ${prUrl}`,
-    );
+    console.warn(`${TOWN_LOG} checkPRStatus: unrecognized PR URL format: ${prUrl}`);
     return null;
   }
 
@@ -3672,15 +3388,14 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `${ESCALATION_JOIN} WHERE ${escalation_metadata.acknowledged} = 0 AND ${escalation_metadata.re_escalation_count} < ?`,
-        [MAX_RE_ESCALATIONS],
+        [MAX_RE_ESCALATIONS]
       ),
-    ].map((r) => toEscalation(EscalationBeadRecord.parse(r)));
+    ].map(r => toEscalation(EscalationBeadRecord.parse(r)));
 
     const nowMs = Date.now();
     for (const esc of candidates) {
       const ageMs = nowMs - new Date(esc.created_at).getTime();
-      const requiredAgeMs =
-        (esc.re_escalation_count + 1) * STALE_ESCALATION_THRESHOLD_MS;
+      const requiredAgeMs = (esc.re_escalation_count + 1) * STALE_ESCALATION_THRESHOLD_MS;
       if (ageMs < requiredAgeMs) continue;
 
       const currentIdx = SEVERITY_ORDER.indexOf(esc.severity);
@@ -3695,24 +3410,21 @@ export class TownDO extends DurableObject<Env> {
               ${escalation_metadata.columns.re_escalation_count} = ${escalation_metadata.columns.re_escalation_count} + 1
           WHERE ${escalation_metadata.bead_id} = ?
         `,
-        [newSeverity, esc.id],
+        [newSeverity, esc.id]
       );
 
-      if (newSeverity !== "low") {
+      if (newSeverity !== 'low') {
         this.sendMayorMessage(
-          `[Re-Escalation:${newSeverity}] rig=${esc.source_rig_id} ${esc.message}`,
-        ).catch((err) => {
-          console.warn(
-            `${TOWN_LOG} re-escalation: failed to notify mayor:`,
-            err,
-          );
+          `[Re-Escalation:${newSeverity}] rig=${esc.source_rig_id} ${esc.message}`
+        ).catch(err => {
+          console.warn(`${TOWN_LOG} re-escalation: failed to notify mayor:`, err);
           try {
             beadOps.logBeadEvent(this.sql, {
               beadId: esc.id,
               agentId: null,
-              eventType: "notification_failed",
+              eventType: 'notification_failed',
               metadata: {
-                target: "mayor",
+                target: 'mayor',
                 reason: err instanceof Error ? err.message : String(err),
                 severity: newSeverity,
                 re_escalation: true,
@@ -3721,7 +3433,7 @@ export class TownDO extends DurableObject<Env> {
           } catch (logErr) {
             console.error(
               `${TOWN_LOG} re-escalation: failed to log notification_failed event:`,
-              logErr,
+              logErr
             );
           }
         });
@@ -3749,7 +3461,7 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
-      await container.fetch("http://container/health", {
+      await container.fetch('http://container/health', {
         signal: AbortSignal.timeout(5_000),
       });
     } catch {
@@ -3762,7 +3474,7 @@ export class TownDO extends DurableObject<Env> {
   private async armAlarmIfNeeded(): Promise<void> {
     // Don't resurrect the alarm on a destroyed DO. After destroy(),
     // town:id is wiped — if it's missing, the town was deleted.
-    const storedId = await this.ctx.storage.get<string>("town:id");
+    const storedId = await this.ctx.storage.get<string>('town:id');
     if (!storedId) return;
 
     const current = await this.ctx.storage.getAlarm();
@@ -3794,9 +3506,7 @@ export class TownDO extends DurableObject<Env> {
 
     // Re-arm if missing — this is the whole point of the watchdog
     if (!alarmSet) {
-      console.warn(
-        `${TOWN_LOG} healthCheck: alarm not set for town=${townId}, re-arming`,
-      );
+      console.warn(`${TOWN_LOG} healthCheck: alarm not set for town=${townId}, re-arming`);
       await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
     }
 
@@ -3805,9 +3515,9 @@ export class TownDO extends DurableObject<Env> {
         ...query(
           this.sql,
           /* sql */ `SELECT COUNT(*) AS cnt FROM ${agent_metadata} WHERE ${agent_metadata.status} IN ('working', 'stalled')`,
-          [],
+          []
         ),
-      ][0]?.cnt ?? 0,
+      ][0]?.cnt ?? 0
     );
 
     const pendingBeads = Number(
@@ -3815,9 +3525,9 @@ export class TownDO extends DurableObject<Env> {
         ...query(
           this.sql,
           /* sql */ `SELECT COUNT(*) AS cnt FROM ${beads} WHERE ${beads.status} IN ('open', 'in_progress', 'in_review') AND ${beads.type} NOT IN ('agent', 'message')`,
-          [],
+          []
         ),
-      ][0]?.cnt ?? 0,
+      ][0]?.cnt ?? 0
     );
 
     return { townId, alarmSet, activeAgents, pendingBeads };
@@ -3862,9 +3572,7 @@ export class TownDO extends DurableObject<Env> {
   }> {
     const currentAlarm = await this.ctx.storage.getAlarm();
     const active = this.hasActiveWork();
-    const intervalMs = active
-      ? ACTIVE_ALARM_INTERVAL_MS
-      : IDLE_ALARM_INTERVAL_MS;
+    const intervalMs = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
 
     // Agent counts by status
     const agentRows = [
@@ -3875,7 +3583,7 @@ export class TownDO extends DurableObject<Env> {
           FROM ${agent_metadata}
           GROUP BY ${agent_metadata.status}
         `,
-        [],
+        []
       ),
     ];
     const agentCounts = { working: 0, idle: 0, stalled: 0, dead: 0, total: 0 };
@@ -3896,7 +3604,7 @@ export class TownDO extends DurableObject<Env> {
           WHERE ${beads.type} NOT IN ('agent', 'message')
           GROUP BY ${beads.status}
         `,
-        [],
+        []
       ),
     ];
     const beadCounts = {
@@ -3909,10 +3617,10 @@ export class TownDO extends DurableObject<Env> {
     for (const row of beadRows) {
       const s = `${row.status as string}`;
       const c = Number(row.cnt);
-      if (s === "open") beadCounts.open = c;
-      else if (s === "in_progress") beadCounts.inProgress = c;
-      else if (s === "in_review") beadCounts.inReview = c;
-      else if (s === "failed") beadCounts.failed = c;
+      if (s === 'open') beadCounts.open = c;
+      else if (s === 'in_progress') beadCounts.inProgress = c;
+      else if (s === 'in_review') beadCounts.inReview = c;
+      else if (s === 'failed') beadCounts.failed = c;
     }
 
     // Triage request count (issue beads with gt:triage-request label)
@@ -3929,9 +3637,9 @@ export class TownDO extends DurableObject<Env> {
               AND ${beads.title} = 'GUPP_CHECK'
               AND ${beads.status} = 'open'
           `,
-          [],
+          []
         ),
-      ][0]?.cnt ?? 0,
+      ][0]?.cnt ?? 0
     );
 
     const guppEscalations = Number(
@@ -3944,9 +3652,9 @@ export class TownDO extends DurableObject<Env> {
               AND ${beads.title} = 'GUPP_ESCALATION'
               AND ${beads.status} = 'open'
           `,
-          [],
+          []
         ),
-      ][0]?.cnt ?? 0,
+      ][0]?.cnt ?? 0
     );
 
     const stalledAgents = agentCounts.stalled;
@@ -3968,9 +3676,9 @@ export class TownDO extends DurableObject<Env> {
                 OR ${agent_metadata.last_activity_at} < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 minutes')
               )
           `,
-          [],
+          []
         ),
-      ][0]?.cnt ?? 0,
+      ][0]?.cnt ?? 0
     );
 
     // Recent bead events (last 20) for the activity feed
@@ -3985,11 +3693,11 @@ export class TownDO extends DurableObject<Env> {
           ORDER BY be.created_at DESC
           LIMIT 20
         `,
-        [],
+        []
       ),
     ];
 
-    const recentEvents = recentRows.map((row) => ({
+    const recentEvents = recentRows.map(row => ({
       time: `${row.created_at as string}`,
       type: `${row.event_type as string}`,
       message: formatEventMessage(row),
@@ -3997,11 +3705,9 @@ export class TownDO extends DurableObject<Env> {
 
     return {
       alarm: {
-        nextFireAt: currentAlarm
-          ? new Date(Number(currentAlarm)).toISOString()
-          : null,
+        nextFireAt: currentAlarm ? new Date(Number(currentAlarm)).toISOString() : null,
         intervalMs,
-        intervalLabel: active ? "active (5s)" : "idle (60s)",
+        intervalLabel: active ? 'active (5s)' : 'idle (60s)',
       },
       agents: agentCounts,
       beads: beadCounts,
@@ -4033,7 +3739,7 @@ export class TownDO extends DurableObject<Env> {
             AND ${beads.type} != 'agent'
           ORDER BY ${beads.type}, ${beads.status}
         `,
-        [],
+        []
       ),
     ];
   }
@@ -4052,7 +3758,7 @@ export class TownDO extends DurableObject<Env> {
                  ${agent_metadata.last_activity_at}
           FROM ${agent_metadata}
         `,
-        [],
+        []
       ),
     ];
   }
@@ -4064,7 +3770,7 @@ export class TownDO extends DurableObject<Env> {
     try {
       const allAgents = agents.listAgents(this.sql);
       await Promise.allSettled(
-        allAgents.map((agent) => getAgentDOStub(this.env, agent.id).destroy()),
+        allAgents.map(agent => getAgentDOStub(this.env, agent.id).destroy())
       );
     } catch (err) {
       console.warn(`${TOWN_LOG} destroy: agent cleanup failed`, err);

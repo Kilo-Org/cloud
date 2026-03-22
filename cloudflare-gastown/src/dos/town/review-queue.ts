@@ -6,13 +6,17 @@
  * - Molecules are parent beads with type='molecule' + child step beads
  */
 
-import { z } from 'zod';
-import { beads, BeadRecord, MergeRequestBeadRecord } from '../../db/tables/beads.table';
-import { review_metadata } from '../../db/tables/review-metadata.table';
-import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
-import { agent_metadata } from '../../db/tables/agent-metadata.table';
-import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
-import { query } from '../../util/query.util';
+import { z } from "zod";
+import {
+  beads,
+  BeadRecord,
+  MergeRequestBeadRecord,
+} from "../../db/tables/beads.table";
+import { review_metadata } from "../../db/tables/review-metadata.table";
+import { bead_dependencies } from "../../db/tables/bead-dependencies.table";
+import { agent_metadata } from "../../db/tables/agent-metadata.table";
+import { convoy_metadata } from "../../db/tables/convoy-metadata.table";
+import { query } from "../../util/query.util";
 import {
   logBeadEvent,
   getBead,
@@ -23,10 +27,15 @@ import {
   getConvoyForBead,
   getConvoyFeatureBranch,
   getConvoyMergeMode,
-} from './beads';
-import { getAgent, unhookBead, updateAgentStatus } from './agents';
-import { getRig } from './rigs';
-import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
+} from "./beads";
+import { getAgent, unhookBead, updateAgentStatus } from "./agents";
+import { getRig } from "./rigs";
+import type {
+  ReviewQueueInput,
+  ReviewQueueEntry,
+  AgentDoneInput,
+  Molecule,
+} from "../../types";
 
 // Review entries stuck in 'running' past this timeout are reset to 'pending'.
 // Only applies when no agent (working or idle) is hooked to the MR bead.
@@ -65,29 +74,34 @@ function toReviewQueueEntry(row: MergeRequestBeadRecord): ReviewQueueEntry {
     // The polecat that submitted the review — stored in metadata (not assignee,
     // which is set to the refinery when it claims the MR bead via hookBead).
     agent_id:
-      typeof row.metadata?.source_agent_id === 'string'
+      typeof row.metadata?.source_agent_id === "string"
         ? row.metadata.source_agent_id
-        : (row.created_by ?? ''),
+        : (row.created_by ?? ""),
     bead_id:
-      typeof row.metadata?.source_bead_id === 'string' ? row.metadata.source_bead_id : row.bead_id,
-    rig_id: row.rig_id ?? '',
+      typeof row.metadata?.source_bead_id === "string"
+        ? row.metadata.source_bead_id
+        : row.bead_id,
+    rig_id: row.rig_id ?? "",
     branch: row.branch,
     pr_url: row.pr_url,
     status:
-      row.status === 'open'
-        ? 'pending'
-        : row.status === 'in_progress'
-          ? 'running'
-          : row.status === 'closed'
-            ? 'merged'
-            : 'failed',
+      row.status === "open"
+        ? "pending"
+        : row.status === "in_progress"
+          ? "running"
+          : row.status === "closed"
+            ? "merged"
+            : "failed",
     summary: row.body,
     created_at: row.created_at,
     processed_at: row.updated_at === row.created_at ? null : row.updated_at,
   };
 }
 
-export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): void {
+export function submitToReviewQueue(
+  sql: SqlStorage,
+  input: ReviewQueueInput,
+): void {
   const id = generateId();
   const timestamp = now();
 
@@ -107,12 +121,14 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
   // - For standalone beads → rig's default branch
   // We pass defaultBranch from the caller so we don't hardcode 'main'.
   const convoyId = getConvoyForBead(sql, input.bead_id);
-  const convoyFeatureBranch = convoyId ? getConvoyFeatureBranch(sql, convoyId) : null;
+  const convoyFeatureBranch = convoyId
+    ? getConvoyFeatureBranch(sql, convoyId)
+    : null;
   const convoyMergeMode = convoyId ? getConvoyMergeMode(sql, convoyId) : null;
   const targetBranch =
-    convoyMergeMode === 'review-then-land' && convoyFeatureBranch
+    convoyMergeMode === "review-then-land" && convoyFeatureBranch
       ? convoyFeatureBranch
-      : (input.default_branch ?? 'main');
+      : (input.default_branch ?? "main");
 
   if (convoyId) {
     metadata.convoy_id = convoyId;
@@ -136,21 +152,21 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
     `,
     [
       id,
-      'merge_request',
-      'open',
+      "merge_request",
+      "open",
       `Review: ${input.branch}`,
       input.summary ?? null,
       input.rig_id,
       null,
       null, // assignee left null — refinery claims it via hookBead
-      'medium',
-      JSON.stringify(['gt:merge-request']),
+      "medium",
+      JSON.stringify(["gt:merge-request"]),
       JSON.stringify(metadata),
       input.agent_id, // created_by records who submitted
       timestamp,
       timestamp,
       null,
-    ]
+    ],
   );
 
   // Link MR bead → source bead via bead_dependencies so the DAG is queryable
@@ -163,7 +179,7 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
         ${bead_dependencies.columns.dependency_type}
       ) VALUES (?, ?, 'tracks')
     `,
-    [id, input.bead_id]
+    [id, input.bead_id],
   );
 
   // Create the review_metadata satellite
@@ -176,13 +192,13 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
         ${review_metadata.columns.pr_url}, ${review_metadata.columns.retry_count}
       ) VALUES (?, ?, ?, ?, ?, ?)
     `,
-    [id, input.branch, targetBranch, null, input.pr_url ?? null, 0]
+    [id, input.branch, targetBranch, null, input.pr_url ?? null, 0],
   );
 
   logBeadEvent(sql, {
     beadId: input.bead_id,
     agentId: input.agent_id,
-    eventType: 'review_submitted',
+    eventType: "review_submitted",
     newValue: input.branch,
     metadata: { branch: input.branch, target_branch: targetBranch },
   });
@@ -212,7 +228,7 @@ export function popReviewQueue(sql: SqlStorage): ReviewQueueEntry | null {
         ORDER BY ${beads.created_at} ASC
         LIMIT 1
       `,
-      []
+      [],
     ),
   ];
 
@@ -229,28 +245,28 @@ export function popReviewQueue(sql: SqlStorage): ReviewQueueEntry | null {
           ${beads.columns.updated_at} = ?
       WHERE ${beads.bead_id} = ?
     `,
-    [now(), entry.id]
+    [now(), entry.id],
   );
 
-  return { ...entry, status: 'running', processed_at: now() };
+  return { ...entry, status: "running", processed_at: now() };
 }
 
 export function completeReview(
   sql: SqlStorage,
   entryId: string,
-  status: 'merged' | 'failed'
+  status: "merged" | "failed",
 ): void {
   // Guard: don't overwrite terminal states (closed MR bead that was
   // already merged should never be set to 'failed' by a stale call)
   const current = getBead(sql, entryId);
-  if (current && (current.status === 'closed' || current.status === 'failed')) {
+  if (current && (current.status === "closed" || current.status === "failed")) {
     console.warn(
-      `[review-queue] completeReview: bead ${entryId} already ${current.status}, skipping`
+      `[review-queue] completeReview: bead ${entryId} already ${current.status}, skipping`,
     );
     return;
   }
 
-  const beadStatus = status === 'merged' ? 'closed' : 'failed';
+  const beadStatus = status === "merged" ? "closed" : "failed";
   const timestamp = now();
   query(
     sql,
@@ -261,7 +277,12 @@ export function completeReview(
           ${beads.columns.closed_at} = ?
       WHERE ${beads.bead_id} = ?
     `,
-    [beadStatus, timestamp, beadStatus === 'closed' ? timestamp : null, entryId]
+    [
+      beadStatus,
+      timestamp,
+      beadStatus === "closed" ? timestamp : null,
+      entryId,
+    ],
   );
 }
 
@@ -272,18 +293,20 @@ export function completeReviewWithResult(
   sql: SqlStorage,
   input: {
     entry_id: string;
-    status: 'merged' | 'failed' | 'conflict';
+    status: "merged" | "failed" | "conflict";
     message?: string;
     commit_sha?: string;
-  }
+  },
 ): void {
   // On conflict, mark the review entry as failed and create an escalation bead
-  const resolvedStatus = input.status === 'conflict' ? 'failed' : input.status;
+  const resolvedStatus = input.status === "conflict" ? "failed" : input.status;
   completeReview(sql, input.entry_id, resolvedStatus);
 
   // Find the review entry to get agent IDs
   const entryRows = [
-    ...query(sql, /* sql */ `${REVIEW_JOIN} WHERE ${beads.bead_id} = ?`, [input.entry_id]),
+    ...query(sql, /* sql */ `${REVIEW_JOIN} WHERE ${beads.bead_id} = ?`, [
+      input.entry_id,
+    ]),
   ];
   if (entryRows.length === 0) return;
   const parsed = MergeRequestBeadRecord.parse(entryRows[0]);
@@ -292,7 +315,7 @@ export function completeReviewWithResult(
   logBeadEvent(sql, {
     beadId: entry.bead_id,
     agentId: entry.agent_id,
-    eventType: 'review_completed',
+    eventType: "review_completed",
     newValue: input.status,
     metadata: {
       message: input.message,
@@ -300,12 +323,12 @@ export function completeReviewWithResult(
     },
   });
 
-  if (input.status === 'merged') {
+  if (input.status === "merged") {
     const mergeTimestamp = now();
     console.log(
       `[review-queue] completeReviewWithResult MERGED: entry_id=${input.entry_id} ` +
         `entry.bead_id (source)=${entry.bead_id} entry.id (MR)=${entry.id} — ` +
-        `calling closeBead on source`
+        `calling closeBead on source`,
     );
     closeBead(sql, entry.bead_id, entry.agent_id);
 
@@ -331,7 +354,7 @@ export function completeReviewWithResult(
               AND dep.${bead_dependencies.columns.dependency_type} = 'tracks'
           )
       `,
-      [mergeTimestamp, mergeTimestamp, input.entry_id, entry.bead_id]
+      [mergeTimestamp, mergeTimestamp, input.entry_id, entry.bead_id],
     );
 
     // closeBead → updateBeadStatus short-circuits when completeReview already
@@ -342,7 +365,7 @@ export function completeReviewWithResult(
 
     // If this was a convoy landing MR, also set landed_at on the convoy metadata
     const sourceBead = getBead(sql, entry.bead_id);
-    if (sourceBead?.type === 'convoy') {
+    if (sourceBead?.type === "convoy") {
       query(
         sql,
         /* sql */ `
@@ -350,16 +373,16 @@ export function completeReviewWithResult(
           SET ${convoy_metadata.columns.landed_at} = ?
           WHERE ${convoy_metadata.bead_id} = ?
         `,
-        [now(), entry.bead_id]
+        [now(), entry.bead_id],
       );
     }
-  } else if (input.status === 'conflict') {
+  } else if (input.status === "conflict") {
     // Create an escalation bead so the conflict is visible and actionable
     createBead(sql, {
-      type: 'escalation',
+      type: "escalation",
       title: `Merge conflict: ${input.message ?? entry.branch}`,
       body: input.message,
-      priority: 'high',
+      priority: "high",
       metadata: {
         source_bead_id: entry.bead_id,
         source_agent_id: entry.agent_id,
@@ -372,10 +395,10 @@ export function completeReviewWithResult(
     const conflictSourceBead = getBead(sql, entry.bead_id);
     if (
       conflictSourceBead &&
-      conflictSourceBead.status !== 'closed' &&
-      conflictSourceBead.status !== 'failed'
+      conflictSourceBead.status !== "closed" &&
+      conflictSourceBead.status !== "failed"
     ) {
-      updateBeadStatus(sql, entry.bead_id, 'open', entry.agent_id);
+      updateBeadStatus(sql, entry.bead_id, "open", entry.agent_id);
       query(
         sql,
         /* sql */ `
@@ -383,10 +406,10 @@ export function completeReviewWithResult(
           SET ${beads.columns.assignee_agent_bead_id} = NULL
           WHERE ${beads.bead_id} = ?
         `,
-        [entry.bead_id]
+        [entry.bead_id],
       );
     }
-  } else if (input.status === 'failed') {
+  } else if (input.status === "failed") {
     // Review failed (rework requested): return source bead to open so
     // the normal scheduling path (feedStrandedConvoys → hookBead →
     // schedulePendingWork → dispatch) handles rework. Clear the stale
@@ -394,8 +417,12 @@ export function completeReviewWithResult(
     // This avoids the fire-and-forget rework dispatch race in TownDO
     // where the dispatch fails and rehookOrphanedBeads churn.
     const sourceBead = getBead(sql, entry.bead_id);
-    if (sourceBead && sourceBead.status !== 'closed' && sourceBead.status !== 'failed') {
-      updateBeadStatus(sql, entry.bead_id, 'open', entry.agent_id);
+    if (
+      sourceBead &&
+      sourceBead.status !== "closed" &&
+      sourceBead.status !== "failed"
+    ) {
+      updateBeadStatus(sql, entry.bead_id, "open", entry.agent_id);
       query(
         sql,
         /* sql */ `
@@ -403,7 +430,7 @@ export function completeReviewWithResult(
           SET ${beads.columns.assignee_agent_bead_id} = NULL
           WHERE ${beads.bead_id} = ?
         `,
-        [entry.bead_id]
+        [entry.bead_id],
       );
     }
   }
@@ -418,7 +445,7 @@ export function completeReviewWithResult(
 /** Get review_metadata for an MR bead. */
 export function getReviewMetadata(
   sql: SqlStorage,
-  mrBeadId: string
+  mrBeadId: string,
 ): { branch: string; target_branch: string; pr_url: string | null } | null {
   const rows = z
     .object({
@@ -437,17 +464,23 @@ export function getReviewMetadata(
         FROM ${review_metadata}
         WHERE ${review_metadata.bead_id} = ?
       `,
-        [mrBeadId]
+        [mrBeadId],
       ),
     ]);
   return rows[0] ?? null;
 }
 
-export function setReviewPrUrl(sql: SqlStorage, entryId: string, prUrl: string): boolean {
+export function setReviewPrUrl(
+  sql: SqlStorage,
+  entryId: string,
+  prUrl: string,
+): boolean {
   // Reject non-HTTPS URLs to prevent storing garbage from LLM output.
   // Invalid URLs would cause pollPendingPRs to poll indefinitely.
-  if (!prUrl.startsWith('https://')) {
-    console.warn(`[review-queue] setReviewPrUrl: rejecting non-HTTPS pr_url: ${prUrl}`);
+  if (!prUrl.startsWith("https://")) {
+    console.warn(
+      `[review-queue] setReviewPrUrl: rejecting non-HTTPS pr_url: ${prUrl}`,
+    );
     return false;
   }
   query(
@@ -457,7 +490,7 @@ export function setReviewPrUrl(sql: SqlStorage, entryId: string, prUrl: string):
       SET ${review_metadata.columns.pr_url} = ?
       WHERE ${review_metadata.bead_id} = ?
     `,
-    [prUrl, entryId]
+    [prUrl, entryId],
   );
 
   // Also write to bead metadata so the PR URL is visible in the standard bead list
@@ -468,7 +501,7 @@ export function setReviewPrUrl(sql: SqlStorage, entryId: string, prUrl: string):
       SET ${beads.columns.metadata} = json_set(COALESCE(${beads.metadata}, '{}'), '$.pr_url', ?)
       WHERE ${beads.bead_id} = ?
     `,
-    [prUrl, entryId]
+    [prUrl, entryId],
   );
   return true;
 }
@@ -486,13 +519,17 @@ export function markReviewInReview(sql: SqlStorage, entryId: string): void {
           ${beads.columns.updated_at} = ?
       WHERE ${beads.bead_id} = ?
     `,
-    [new Date().toISOString(), entryId]
+    [new Date().toISOString(), entryId],
   );
 }
 
 // ── Agent Done ──────────────────────────────────────────────────────
 
-export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInput): void {
+export function agentDone(
+  sql: SqlStorage,
+  agentId: string,
+  input: AgentDoneInput,
+): void {
   const agent = getAgent(sql, agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
   if (!agent.current_hook_bead_id) {
@@ -504,7 +541,7 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     // but the hook was cleared by zombie detection. We MUST still complete
     // the review — otherwise the source bead stays open forever. Find the
     // most recent non-closed MR bead assigned to this agent and complete it.
-    if (agent.role === 'refinery') {
+    if (agent.role === "refinery") {
       const recentMrRows = [
         ...query(
           sql,
@@ -517,13 +554,15 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
             ORDER BY ${beads.updated_at} DESC
             LIMIT 1
           `,
-          [agentId]
+          [agentId],
         ),
       ];
       if (recentMrRows.length > 0) {
-        const mrBeadId = z.object({ bead_id: z.string() }).parse(recentMrRows[0]).bead_id;
+        const mrBeadId = z
+          .object({ bead_id: z.string() })
+          .parse(recentMrRows[0]).bead_id;
         console.log(
-          `[review-queue] agentDone: unhooked refinery ${agentId} — recovering MR bead ${mrBeadId}`
+          `[review-queue] agentDone: unhooked refinery ${agentId} — recovering MR bead ${mrBeadId}`,
         );
         if (input.pr_url) {
           const stored = setReviewPrUrl(sql, mrBeadId, input.pr_url);
@@ -532,15 +571,17 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
           } else {
             completeReviewWithResult(sql, {
               entry_id: mrBeadId,
-              status: 'failed',
+              status: "failed",
               message: `Refinery provided invalid pr_url: ${input.pr_url}`,
             });
           }
         } else {
           completeReviewWithResult(sql, {
             entry_id: mrBeadId,
-            status: 'merged',
-            message: input.summary ?? 'Merged by refinery agent (recovered from unhook)',
+            status: "merged",
+            message:
+              input.summary ??
+              "Merged by refinery agent (recovered from unhook)",
           });
         }
         return;
@@ -548,7 +589,7 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     }
 
     console.warn(
-      `[review-queue] agentDone: agent ${agentId} (role=${agent.role}) has no hooked bead — ignoring`
+      `[review-queue] agentDone: agent ${agentId} (role=${agent.role}) has no hooked bead — ignoring`,
     );
     return;
   }
@@ -558,7 +599,10 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
   // beads (created_by = 'patrol'). User-created beads that happen to carry
   // the gt:triage label go through normal review flow.
   const hookedBead = getBead(sql, agent.current_hook_bead_id);
-  if (hookedBead?.labels.includes('gt:triage') && hookedBead.created_by === 'patrol') {
+  if (
+    hookedBead?.labels.includes("gt:triage") &&
+    hookedBead.created_by === "patrol"
+  ) {
     closeBead(sql, agent.current_hook_bead_id, agentId);
     unhookBead(sql, agentId);
     return;
@@ -568,16 +612,16 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
   // to an existing branch (the one the refinery already reviewed). Closing
   // the rework bead unblocks the MR bead, and the reconciler re-dispatches
   // the refinery to re-review.
-  if (hookedBead?.labels.includes('gt:rework')) {
+  if (hookedBead?.labels.includes("gt:rework")) {
     console.log(
-      `[review-queue] agentDone: rework bead ${agent.current_hook_bead_id} — closing directly (skip review)`
+      `[review-queue] agentDone: rework bead ${agent.current_hook_bead_id} — closing directly (skip review)`,
     );
     closeBead(sql, agent.current_hook_bead_id, agentId);
     unhookBead(sql, agentId);
     return;
   }
 
-  if (agent.role === 'refinery') {
+  if (agent.role === "refinery") {
     // The refinery handles merging (direct strategy) or PR creation (pr strategy)
     // itself. When it calls gt_done:
     //  - With pr_url: refinery created a PR → store URL, mark as in_review, poll it
@@ -593,30 +637,30 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
         logBeadEvent(sql, {
           beadId: mrBeadId,
           agentId,
-          eventType: 'pr_created',
+          eventType: "pr_created",
           newValue: input.pr_url,
-          metadata: { pr_url: input.pr_url, created_by: 'refinery' },
+          metadata: { pr_url: input.pr_url, created_by: "refinery" },
         });
       } else {
         // Invalid URL — fail the review so it doesn't poll forever
         completeReviewWithResult(sql, {
           entry_id: mrBeadId,
-          status: 'failed',
+          status: "failed",
           message: `Refinery provided invalid pr_url: ${input.pr_url}`,
         });
         logBeadEvent(sql, {
           beadId: mrBeadId,
           agentId,
-          eventType: 'pr_creation_failed',
-          metadata: { pr_url: input.pr_url, reason: 'invalid_url' },
+          eventType: "pr_creation_failed",
+          metadata: { pr_url: input.pr_url, reason: "invalid_url" },
         });
       }
     } else {
       // Direct strategy: refinery already merged and pushed
       completeReviewWithResult(sql, {
         entry_id: mrBeadId,
-        status: 'merged',
-        message: input.summary ?? 'Merged by refinery agent',
+        status: "merged",
+        message: input.summary ?? "Merged by refinery agent",
       });
     }
 
@@ -625,7 +669,7 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     // refinery is available for new work. Without this, processReviewQueue
     // sees the refinery as 'working' and won't pop the next MR bead until
     // agentCompleted fires (when the container process eventually exits).
-    updateAgentStatus(sql, agentId, 'idle');
+    updateAgentStatus(sql, agentId, "idle");
     return;
   }
 
@@ -633,13 +677,13 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
 
   if (!agent.rig_id) {
     console.warn(
-      `[review-queue] agentDone: agent ${agentId} has null rig_id — review entry may fail in processReviewQueue`
+      `[review-queue] agentDone: agent ${agentId} has null rig_id — review entry may fail in processReviewQueue`,
     );
   }
 
   // Resolve the rig's default branch so submitToReviewQueue can use it
   // instead of hardcoding 'main' for standalone/review-and-merge beads.
-  const rigId = agent.rig_id ?? '';
+  const rigId = agent.rig_id ?? "";
   const rig = rigId ? getRig(sql, rigId) : null;
 
   submitToReviewQueue(sql, {
@@ -658,7 +702,7 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
   // worked on it. It will be closed (or returned to in_progress) by the
   // refinery after review.
   unhookBead(sql, agentId);
-  updateBeadStatus(sql, sourceBead, 'in_review', agentId);
+  updateBeadStatus(sql, sourceBead, "in_review", agentId);
 }
 
 /**
@@ -681,14 +725,14 @@ export type AgentCompletedResult = {
 export function agentCompleted(
   sql: SqlStorage,
   agentId: string,
-  input: { status: 'completed' | 'failed'; reason?: string }
+  input: { status: "completed" | "failed"; reason?: string },
 ): AgentCompletedResult {
   const result: AgentCompletedResult = { reworkSourceBeadId: null };
   const agent = getAgent(sql, agentId);
   if (!agent) return result;
 
   if (agent.current_hook_bead_id) {
-    if (agent.role === 'refinery') {
+    if (agent.role === "refinery") {
       // NEVER fail or unhook a refinery from agentCompleted.
       // agentCompleted races with gt_done: the process exits, the
       // container sends /completed, but gt_done's HTTP request may
@@ -709,16 +753,16 @@ export function agentCompleted(
       //    before calling gt_done. Don't close the bead — just unhook. The reconciler's
       //    Rule 3 will reset it to open after the staleness timeout.
       const hookedBead = getBead(sql, agent.current_hook_bead_id);
-      if (input.status === 'failed') {
-        updateBeadStatus(sql, agent.current_hook_bead_id, 'failed', agentId);
-      } else if (hookedBead && hookedBead.status === 'in_progress') {
+      if (input.status === "failed") {
+        updateBeadStatus(sql, agent.current_hook_bead_id, "failed", agentId);
+      } else if (hookedBead && hookedBead.status === "in_progress") {
         // Agent exited 'completed' but bead is still in_progress — gt_done was never called.
         // Don't close the bead. Rule 3 will handle rework.
         console.log(
           `[review-queue] agentCompleted: polecat ${agentId} exited without gt_done — ` +
-            `bead ${agent.current_hook_bead_id} stays in_progress (Rule 3 will recover)`
+            `bead ${agent.current_hook_bead_id} stays in_progress (Rule 3 will recover)`,
         );
-      } else if (hookedBead && hookedBead.status === 'open') {
+      } else if (hookedBead && hookedBead.status === "open") {
         // Bead is open (wasn't dispatched yet or was already reset). No-op.
       } else {
         // Bead is in_review, closed, or failed — gt_done already ran. No-op on bead.
@@ -727,7 +771,11 @@ export function agentCompleted(
     }
   }
 
-  // Mark agent idle.
+  // Mark agent idle — but ONLY if it hasn't been re-dispatched (status
+  // still 'working' on new work) since gt_done ran. agentCompleted can
+  // arrive after the agent has been re-hooked and dispatched for a new
+  // bead. Without this guard, the stale completion event would clobber
+  // the live dispatch.
   // For refineries, preserve dispatch_attempts so Rule 6's circuit-breaker
   // can track cumulative re-dispatch attempts across idle→dispatch cycles.
   // Resetting to 0 here was enabling infinite loops (#1342). Non-refineries
@@ -742,8 +790,12 @@ export function agentCompleted(
             ELSE 0
           END
       WHERE ${agent_metadata.bead_id} = ?
+        AND NOT (
+          ${agent_metadata.columns.status} = 'working'
+          AND ${agent_metadata.columns.current_hook_bead_id} IS NOT NULL
+        )
     `,
-    [agentId]
+    [agentId],
   );
 
   return result;
@@ -755,7 +807,11 @@ export function agentCompleted(
  * Create a molecule: a parent bead with type='molecule', child step beads
  * linked via parent_bead_id, and step ordering via bead_dependencies.
  */
-export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown): Molecule {
+export function createMolecule(
+  sql: SqlStorage,
+  beadId: string,
+  formula: unknown,
+): Molecule {
   const id = generateId();
   const timestamp = now();
   const formulaArr = Array.isArray(formula) ? formula : [];
@@ -775,21 +831,21 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
     `,
     [
       id,
-      'molecule',
-      'open',
+      "molecule",
+      "open",
       `Molecule for bead ${beadId}`,
       null,
       null,
       null,
       null,
-      'medium',
-      JSON.stringify(['gt:molecule']),
+      "medium",
+      JSON.stringify(["gt:molecule"]),
       JSON.stringify({ source_bead_id: beadId, formula }),
       null,
       timestamp,
       timestamp,
       null,
-    ]
+    ],
   );
 
   // Create child step beads and dependency chain
@@ -812,21 +868,22 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
       `,
       [
         stepId,
-        'issue',
-        'open',
-        z.object({ title: z.string() }).safeParse(step).data?.title ?? `Step ${i + 1}`,
-        typeof step === 'string' ? step : JSON.stringify(step),
+        "issue",
+        "open",
+        z.object({ title: z.string() }).safeParse(step).data?.title ??
+          `Step ${i + 1}`,
+        typeof step === "string" ? step : JSON.stringify(step),
         null,
         id,
         null,
-        'medium',
+        "medium",
         JSON.stringify([`gt:molecule-step`, `step:${i}`]),
         JSON.stringify({ step_index: i, step_data: step }),
         null,
         timestamp,
         timestamp,
         null,
-      ]
+      ],
     );
 
     // Chain dependencies: each step blocks on the previous
@@ -840,7 +897,7 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
             ${bead_dependencies.columns.dependency_type}
           ) VALUES (?, ?, ?)
         `,
-        [stepId, prevStepId, 'blocks']
+        [stepId, prevStepId, "blocks"],
       );
     }
     prevStepId = stepId;
@@ -854,32 +911,35 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
       SET ${beads.columns.metadata} = json_set(${beads.metadata}, '$.molecule_bead_id', ?)
       WHERE ${beads.bead_id} = ?
     `,
-    [id, beadId]
+    [id, beadId],
   );
 
   const mol = getMolecule(sql, id);
-  if (!mol) throw new Error('Failed to create molecule');
+  if (!mol) throw new Error("Failed to create molecule");
   return mol;
 }
 
 /**
  * Get a molecule by its bead_id. Derives current_step and status from children.
  */
-export function getMolecule(sql: SqlStorage, moleculeId: string): Molecule | null {
+export function getMolecule(
+  sql: SqlStorage,
+  moleculeId: string,
+): Molecule | null {
   const bead = getBead(sql, moleculeId);
-  if (!bead || bead.type !== 'molecule') return null;
+  if (!bead || bead.type !== "molecule") return null;
 
   const steps = getStepBeads(sql, moleculeId);
-  const closedCount = steps.filter(s => s.status === 'closed').length;
-  const failedCount = steps.filter(s => s.status === 'failed').length;
+  const closedCount = steps.filter((s) => s.status === "closed").length;
+  const failedCount = steps.filter((s) => s.status === "failed").length;
 
   const currentStep = closedCount;
   const status =
     failedCount > 0
-      ? 'failed'
+      ? "failed"
       : closedCount >= steps.length && steps.length > 0
-        ? 'completed'
-        : 'active';
+        ? "completed"
+        : "active";
 
   const formula: unknown = bead.metadata?.formula ?? [];
 
@@ -903,29 +963,32 @@ function getStepBeads(sql: SqlStorage, moleculeId: string): BeadRecord[] {
         WHERE ${beads.parent_bead_id} = ?
         ORDER BY ${beads.created_at} ASC
       `,
-      [moleculeId]
+      [moleculeId],
     ),
   ];
   return BeadRecord.array().parse(rows);
 }
 
-export function getMoleculeForBead(sql: SqlStorage, beadId: string): Molecule | null {
+export function getMoleculeForBead(
+  sql: SqlStorage,
+  beadId: string,
+): Molecule | null {
   const bead = getBead(sql, beadId);
   if (!bead) return null;
   const moleculeId: unknown = bead.metadata?.molecule_bead_id;
-  if (typeof moleculeId !== 'string') return null;
+  if (typeof moleculeId !== "string") return null;
   return getMolecule(sql, moleculeId);
 }
 
 export function getMoleculeCurrentStep(
   sql: SqlStorage,
-  agentId: string
+  agentId: string,
 ): { molecule: Molecule; step: unknown } | null {
   const agent = getAgent(sql, agentId);
   if (!agent?.current_hook_bead_id) return null;
 
   const mol = getMoleculeForBead(sql, agent.current_hook_bead_id);
-  if (!mol || mol.status !== 'active') return null;
+  if (!mol || mol.status !== "active") return null;
 
   const formula = mol.formula;
   if (!Array.isArray(formula)) return null;
@@ -937,7 +1000,7 @@ export function getMoleculeCurrentStep(
 export function advanceMoleculeStep(
   sql: SqlStorage,
   agentId: string,
-  _summary: string
+  _summary: string,
 ): Molecule | null {
   const current = getMoleculeCurrentStep(sql, agentId);
   if (!current) return null;
@@ -958,7 +1021,7 @@ export function advanceMoleculeStep(
             ${beads.columns.updated_at} = ?
         WHERE ${beads.bead_id} = ?
       `,
-      [timestamp, timestamp, currentStepBead.bead_id]
+      [timestamp, timestamp, currentStepBead.bead_id],
     );
   }
 
@@ -979,7 +1042,7 @@ export function advanceMoleculeStep(
             ${beads.columns.updated_at} = ?
         WHERE ${beads.bead_id} = ?
       `,
-      [timestamp, timestamp, molecule.id]
+      [timestamp, timestamp, molecule.id],
     );
   }
 

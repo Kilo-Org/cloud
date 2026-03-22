@@ -305,7 +305,7 @@ Previous values:
 
 - Trial duration: 30 days
 - Standard plan: $25/month, promotional codes allowed
-- Commit plan: $54/6 months
+- Commit plan: $9/6 months
 - Trial expiry warning: 5 days before expiry
 
 New values:

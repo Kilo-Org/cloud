@@ -234,27 +234,49 @@ export function RefineryActivityLog({
   // Groups are sorted by most recent activity (latestTimestamp descending)
   const { convoyGroups, standalone } = useMemo(() => groupActivityByConvoy(entries), [entries]);
 
-  // Paginate by convoy groups (keeps whole convoys together on a page).
-  // Each convoy group counts as its entry count toward the page budget;
-  // standalone entries fill the remaining budget after convoy groups.
-  const { visibleConvoyGroups, visibleStandalone, totalEntryCount, hasMore } = useMemo(() => {
-    const visibleConvoys: ConvoyActivityGroup[] = [];
+  // Merge convoy groups and standalone entries into a single list sorted by
+  // most-recent timestamp, then paginate over that unified list. This ensures
+  // the most recently active items (whether convoy or standalone) appear first,
+  // rather than showing all convoy groups before any standalone entries.
+  type DisplayItem =
+    | { kind: 'convoy'; group: ConvoyActivityGroup; sortKey: string }
+    | { kind: 'standalone'; entry: ActivityLogEntry; sortKey: string };
+
+  const { visibleItems, totalEntryCount, hasMore } = useMemo(() => {
+    const items: DisplayItem[] = [
+      ...convoyGroups.map(
+        (group): DisplayItem => ({
+          kind: 'convoy',
+          group,
+          sortKey: group.latestTimestamp,
+        })
+      ),
+      ...standalone.map(
+        (entry): DisplayItem => ({
+          kind: 'standalone',
+          entry,
+          sortKey: entry.event.created_at,
+        })
+      ),
+    ];
+
+    // Sort by most recent first
+    items.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+
+    // Paginate: each convoy group costs its entry count, each standalone costs 1
+    const visible: DisplayItem[] = [];
     let budget = visibleCount;
 
-    for (const group of convoyGroups) {
+    for (const item of items) {
       if (budget <= 0) break;
-      visibleConvoys.push(group);
-      budget -= group.entries.length;
+      visible.push(item);
+      budget -= item.kind === 'convoy' ? item.group.entries.length : 1;
     }
-
-    // Fill remaining budget with standalone entries (already sorted by recency from the query)
-    const standaloneSlice = budget > 0 ? standalone.slice(0, budget) : [];
 
     const total = convoyGroups.reduce((sum, g) => sum + g.entries.length, 0) + standalone.length;
 
     return {
-      visibleConvoyGroups: visibleConvoys,
-      visibleStandalone: standaloneSlice,
+      visibleItems: visible,
       totalEntryCount: total,
       hasMore: visibleCount < total,
     };
@@ -306,33 +328,26 @@ export function RefineryActivityLog({
   return (
     <div className="py-4">
       <div className="space-y-4">
-        {/* Convoy grouped entries — sorted by most recent activity */}
+        {/* Convoy groups and standalone entries interleaved by recency */}
         <AnimatePresence initial={false}>
-          {visibleConvoyGroups.map(group => (
-            <ConvoyActivityGroupCard
-              key={group.convoy.convoy_id}
-              convoy={group.convoy}
-              entries={group.entries}
-              townId={townId}
-            />
-          ))}
+          {visibleItems.map((item, idx) =>
+            item.kind === 'convoy' ? (
+              <ConvoyActivityGroupCard
+                key={item.group.convoy.convoy_id}
+                convoy={item.group.convoy}
+                entries={item.group.entries}
+                townId={townId}
+              />
+            ) : (
+              <TimelineEntry
+                key={item.entry.event.bead_event_id}
+                entry={item.entry}
+                isLast={idx === visibleItems.length - 1 && !hasMore}
+                delay={idx * 0.03}
+              />
+            )
+          )}
         </AnimatePresence>
-
-        {/* Standalone entries */}
-        {visibleStandalone.length > 0 && (
-          <div>
-            <AnimatePresence initial={false}>
-              {visibleStandalone.map((entry, i, arr) => (
-                <TimelineEntry
-                  key={entry.event.bead_event_id}
-                  entry={entry}
-                  isLast={i === arr.length - 1 && !hasMore}
-                  delay={i * 0.03}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
       </div>
 
       {hasMore && (

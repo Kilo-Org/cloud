@@ -226,6 +226,114 @@ const AlarmStatusOutput = z.object({
 export const RpcAlarmStatusOutput = rpcSafe(AlarmStatusOutput);
 export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);
 
+// ── Merge Queue ──────────────────────────────────────────────────────
+
+const MergeQueueBeadOutput = z.object({
+  bead_id: z.string(),
+  status: z.string(),
+  title: z.string(),
+  body: z.string().nullable(),
+  rig_id: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  metadata: z.record(z.string(), z.unknown()),
+});
+
+const ReviewMetadataOutput = z.object({
+  branch: z.string(),
+  target_branch: z.string(),
+  merge_commit: z.string().nullable(),
+  pr_url: z.string().nullable(),
+  retry_count: z.number(),
+});
+
+const SourceBeadOutput = z.object({
+  bead_id: z.string(),
+  title: z.string(),
+  status: z.string(),
+  body: z.string().nullable(),
+});
+
+const ConvoyRefOutput = z.object({
+  convoy_id: z.string(),
+  title: z.string(),
+  total_beads: z.number(),
+  closed_beads: z.number(),
+  feature_branch: z.string().nullable(),
+  merge_mode: z.string().nullable(),
+});
+
+const AgentRefOutput = z.object({
+  agent_id: z.string(),
+  name: z.string(),
+  role: z.string(),
+});
+
+const MergeQueueItemOutput = z.object({
+  mrBead: MergeQueueBeadOutput,
+  reviewMetadata: ReviewMetadataOutput,
+  sourceBead: SourceBeadOutput.nullable(),
+  convoy: ConvoyRefOutput.nullable(),
+  agent: AgentRefOutput.nullable(),
+  rigName: z.string().nullable(),
+  staleSince: z.string().nullable(),
+  failureReason: z.string().nullable(),
+});
+
+const ActivityLogEventOutput = z.object({
+  bead_event_id: z.string(),
+  bead_id: z.string(),
+  agent_id: z.string().nullable(),
+  event_type: z.string(),
+  old_value: z.string().nullable(),
+  new_value: z.string().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+  created_at: z.string(),
+});
+
+const ActivityLogMrBeadOutput = z.object({
+  bead_id: z.string(),
+  title: z.string(),
+  type: z.string(),
+  status: z.string(),
+  rig_id: z.string().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+});
+
+const ActivityLogReviewMetadataOutput = z.object({
+  pr_url: z.string().nullable(),
+  branch: z.string().nullable(),
+  target_branch: z.string().nullable(),
+  merge_commit: z.string().nullable(),
+});
+
+const ActivityLogSourceBeadOutput = z.object({
+  bead_id: z.string(),
+  title: z.string(),
+  status: z.string(),
+});
+
+const ActivityLogEntryOutput = z.object({
+  event: ActivityLogEventOutput,
+  mrBead: ActivityLogMrBeadOutput.nullable(),
+  sourceBead: ActivityLogSourceBeadOutput.nullable(),
+  convoy: ConvoyRefOutput.nullable(),
+  agent: AgentRefOutput.nullable(),
+  rigName: z.string().nullable(),
+  reviewMetadata: ActivityLogReviewMetadataOutput.nullable(),
+});
+
+export const MergeQueueDataOutput = z.object({
+  needsAttention: z.object({
+    openPRs: z.array(MergeQueueItemOutput),
+    failedReviews: z.array(MergeQueueItemOutput),
+    stalePRs: z.array(MergeQueueItemOutput),
+  }),
+  activityLog: z.array(ActivityLogEntryOutput),
+});
+
+export const RpcMergeQueueDataOutput = rpcSafe(MergeQueueDataOutput);
+
 // OrgTown (from GastownOrgDO)
 export const OrgTownOutput = z.object({
   id: z.string(),

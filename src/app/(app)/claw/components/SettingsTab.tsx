@@ -59,6 +59,94 @@ import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 // ---------------------------------------------------------------------------
+// 1Password setup guide dialog
+// ---------------------------------------------------------------------------
+
+function OnePasswordSetupGuide() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Info className="h-3.5 w-3.5" />
+          Setup Guide
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>1Password Setup</DialogTitle>
+          <DialogDescription>
+            Give your agent access to look up credentials and manage vault items.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+            <p className="text-amber-400 text-xs font-medium">
+              Warning: this gives your agent read/write access to the vault(s) you grant. Create a
+              dedicated vault with only the credentials your agent needs.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">1. Create a Service Account</p>
+            <p className="text-muted-foreground text-xs">
+              Go to{' '}
+              <a
+                href="https://developer.1password.com/docs/service-accounts/get-started/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                developer.1password.com
+              </a>{' '}
+              and create a new service account.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">2. Scope to a dedicated vault</p>
+            <p className="text-muted-foreground text-xs">
+              Grant the service account access to a dedicated &quot;Agent&quot; vault — not your
+              primary vault. Only store credentials your agent needs in this vault.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">3. Copy the token</p>
+            <p className="text-muted-foreground text-xs">
+              Copy the service account token (starts with{' '}
+              <code className="bg-muted rounded px-1">ops_</code>) and paste it into the field
+              above.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">4. Save and upgrade</p>
+            <p className="text-muted-foreground text-xs">
+              After saving, use <strong>Upgrade to latest</strong> (not just Redeploy) to activate
+              the integration. Your agent can then use the{' '}
+              <code className="bg-muted rounded px-1">op</code> CLI to look up credentials, e.g.{' '}
+              <code className="bg-muted rounded px-1">op item get &quot;My Login&quot;</code>.
+            </p>
+          </div>
+
+          <p className="text-muted-foreground border-t pt-3 text-xs">
+            Learn more at{' '}
+            <a
+              href="https://developer.1password.com/docs/service-accounts/get-started/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              1Password Service Accounts docs
+            </a>
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // AgentCard setup guide dialog
 // ---------------------------------------------------------------------------
 
@@ -683,6 +771,28 @@ export function SettingsTab({
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
                   actionRowExtra={<AgentCardSetupGuide />}
+                />
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Password Managers ── */}
+      {toolEntries.some(e => e.id === 'onepassword') && (
+        <div>
+          <h2 className="text-foreground mb-3 text-base font-semibold">Password Managers</h2>
+          <div className="space-y-3">
+            {toolEntries
+              .filter(e => e.id === 'onepassword')
+              .map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                  actionRowExtra={<OnePasswordSetupGuide />}
                 />
               ))}
           </div>

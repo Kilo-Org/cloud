@@ -267,6 +267,54 @@ export async function addReactionToPR(
 }
 
 /**
+ * Creates a new top-level comment on a PR (issue comment).
+ */
+export async function createPRComment(
+  installationId: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  body: string,
+  appType: GitHubAppType = 'standard'
+): Promise<void> {
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  await octokit.issues.createComment({
+    owner,
+    repo,
+    issue_number: prNumber,
+    body,
+  });
+
+  logExceptInTest('[createPRComment] Created comment', { owner, repo, prNumber });
+}
+
+/**
+ * Checks whether a comment containing the given marker already exists on a PR.
+ */
+export async function hasPRCommentWithMarker(
+  installationId: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  marker: string,
+  appType: GitHubAppType = 'standard'
+): Promise<boolean> {
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  const comments = await octokit.paginate(octokit.issues.listComments, {
+    owner,
+    repo,
+    issue_number: prNumber,
+    per_page: 100,
+  });
+
+  return comments.some(c => c.body?.includes(marker));
+}
+
+/**
  * Adds a reaction to a PR review comment
  * Used to acknowledge @kilo fix mentions on inline review comments
  * @param appType - The type of GitHub App to use (defaults to 'standard')

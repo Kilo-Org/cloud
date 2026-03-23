@@ -13,6 +13,8 @@ import {
   credit_transactions,
   kiloclaw_subscriptions,
   kiloclaw_earlybird_purchases,
+  kiloclaw_email_log,
+  kiloclaw_instances,
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
@@ -31,7 +33,7 @@ import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-rou
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import * as z from 'zod';
-import { eq, and, ne, or, ilike, desc, asc, sql, isNull } from 'drizzle-orm';
+import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { toNonNullish } from '@/lib/utils';
@@ -57,6 +59,7 @@ import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled
 import { kilo_pass_scheduled_changes } from '@kilocode/db/schema';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
+import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   getKilocodeRepoOpenPullRequestCounts,
   getKilocodeRepoOpenPullRequestsSummary,
@@ -541,37 +544,112 @@ export const adminRouter = createTRPCRouter({
           });
         }
 
-        if (subscription.status !== 'trialing') {
+        if (subscription.status !== 'trialing' && subscription.status !== 'canceled') {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'Only trialing KiloClaw subscriptions can have their trial end date edited',
+            message:
+              'Only trialing or canceled KiloClaw subscriptions can have their trial end date edited',
           });
         }
 
+        const isReset = subscription.status === 'canceled';
         const previousTrialEndsAt = subscription.trial_ends_at;
 
         await db.transaction(async tx => {
-          await tx
-            .update(kiloclaw_subscriptions)
-            .set({ trial_ends_at: input.trial_ends_at })
-            .where(eq(kiloclaw_subscriptions.user_id, input.userId));
+          if (isReset) {
+            // Reset canceled subscription to a new trial
+            await tx
+              .update(kiloclaw_subscriptions)
+              .set({
+                status: 'trialing',
+                plan: 'trial',
+                trial_started_at: new Date().toISOString(),
+                trial_ends_at: input.trial_ends_at,
+                stripe_subscription_id: null,
+                stripe_schedule_id: null,
+                scheduled_plan: null,
+                scheduled_by: null,
+                cancel_at_period_end: false,
+                current_period_start: null,
+                current_period_end: null,
+                commit_ends_at: null,
+                past_due_since: null,
+                suspended_at: null,
+                destruction_deadline: null,
+              })
+              .where(eq(kiloclaw_subscriptions.user_id, input.userId));
+
+            // Clear email logs so notifications can fire again for the new trial.
+            // Unlike autoResumeIfSuspended (which preserves trial warnings as one-time events),
+            // an admin reset creates a genuinely new trial, so trial warnings should repeat.
+            const emailTypesToClearOnTrialReset = [
+              'claw_trial_1d',
+              'claw_trial_5d',
+              'claw_suspended_trial',
+              'claw_suspended_subscription',
+              'claw_suspended_payment',
+              'claw_destruction_warning',
+              'claw_instance_destroyed',
+            ];
+            await tx
+              .delete(kiloclaw_email_log)
+              .where(
+                and(
+                  eq(kiloclaw_email_log.user_id, input.userId),
+                  inArray(kiloclaw_email_log.email_type, emailTypesToClearOnTrialReset)
+                )
+              );
+          } else {
+            // Just update the trial end date for an active trial
+            await tx
+              .update(kiloclaw_subscriptions)
+              .set({ trial_ends_at: input.trial_ends_at })
+              .where(eq(kiloclaw_subscriptions.user_id, input.userId));
+          }
 
           await createKiloClawAdminAuditLog({
-            action: 'kiloclaw.subscription.update_trial_end',
+            action: isReset
+              ? 'kiloclaw.subscription.reset_trial'
+              : 'kiloclaw.subscription.update_trial_end',
             actor_id: ctx.user.id,
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `KiloClaw trial end updated from ${
-              previousTrialEndsAt ?? 'unset'
-            } to ${input.trial_ends_at}`,
+            message: isReset
+              ? `KiloClaw subscription reset from canceled to trialing, trial ends ${input.trial_ends_at}`
+              : `KiloClaw trial end updated from ${previousTrialEndsAt ?? 'unset'} to ${input.trial_ends_at}`,
             metadata: {
+              isReset,
+              previousStatus: subscription.status,
               previousTrialEndsAt,
               newTrialEndsAt: input.trial_ends_at,
             },
             tx,
           });
         });
+
+        // For resets, attempt to start the instance (best effort, outside transaction)
+        if (isReset) {
+          const [activeInstance] = await db
+            .select({ id: kiloclaw_instances.id })
+            .from(kiloclaw_instances)
+            .where(
+              and(
+                eq(kiloclaw_instances.user_id, input.userId),
+                isNull(kiloclaw_instances.destroyed_at)
+              )
+            )
+            .limit(1);
+
+          if (activeInstance) {
+            try {
+              const client = new KiloClawInternalClient();
+              await client.start(input.userId);
+            } catch {
+              // Best effort — instance will be startable by the user from the dashboard
+            }
+          }
+        }
 
         return successResult();
       }),

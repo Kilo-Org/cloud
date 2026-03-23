@@ -100,7 +100,7 @@ function ActiveSubscriptionCard({
           >
             Cancel Switch
           </Button>
-        ) : !sub.scheduledPlan ? (
+        ) : (
           <Button
             variant="outline"
             size="sm"
@@ -109,7 +109,7 @@ function ActiveSubscriptionCard({
           >
             Switch to {otherPlan}
           </Button>
-        ) : null}
+        )}
         <Button variant="outline" size="sm" onClick={onCancelClick}>
           Cancel
         </Button>
@@ -217,9 +217,6 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
     window.location.href = result.url;
   }
 
-  // Trial is handled by BillingBanner — no card needed here
-
-  // Active subscription
   if (billing.subscription) {
     if (billing.subscription.status === 'past_due' || billing.subscription.status === 'unpaid') {
       return (

@@ -24,7 +24,7 @@ import {
   getConvoyFeatureBranch,
   getConvoyMergeMode,
 } from './beads';
-import { getAgent, unhookBead } from './agents';
+import { getAgent, unhookBead, updateAgentStatus } from './agents';
 import { getRig } from './rigs';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
 
@@ -621,6 +621,11 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     }
 
     unhookBead(sql, agentId);
+    // Set refinery to idle immediately — the review is done and the
+    // refinery is available for new work. Without this, processReviewQueue
+    // sees the refinery as 'working' and won't pop the next MR bead until
+    // agentCompleted fires (when the container process eventually exits).
+    updateAgentStatus(sql, agentId, 'idle');
     return;
   }
 
@@ -722,7 +727,11 @@ export function agentCompleted(
     }
   }
 
-  // Mark agent idle.
+  // Mark agent idle — but ONLY if it hasn't been re-dispatched (status
+  // still 'working' on new work) since gt_done ran. agentCompleted can
+  // arrive after the agent has been re-hooked and dispatched for a new
+  // bead. Without this guard, the stale completion event would clobber
+  // the live dispatch.
   // For refineries, preserve dispatch_attempts so Rule 6's circuit-breaker
   // can track cumulative re-dispatch attempts across idle→dispatch cycles.
   // Resetting to 0 here was enabling infinite loops (#1342). Non-refineries
@@ -737,6 +746,10 @@ export function agentCompleted(
             ELSE 0
           END
       WHERE ${agent_metadata.bead_id} = ?
+        AND NOT (
+          ${agent_metadata.columns.status} = 'working'
+          AND ${agent_metadata.columns.current_hook_bead_id} IS NOT NULL
+        )
     `,
     [agentId]
   );

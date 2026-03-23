@@ -35,6 +35,7 @@ export type KiloClawEventName =
   | 'instance.provisioned'
   | 'instance.started'
   | 'instance.stopped'
+  | 'instance.restarting'
   | 'instance.destroy_started'
   // Reconcile events (emitted via ReconcileContext.log as `reconcile.{action}`)
   // All reconcileLog actions are automatically prefixed — see log.ts.

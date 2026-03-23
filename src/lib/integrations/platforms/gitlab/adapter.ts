@@ -1099,6 +1099,84 @@ export async function updateKiloReviewNote(
 }
 
 /**
+ * Creates a new top-level note on a GitLab MR.
+ */
+export async function createMRNote(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  body: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<void> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ body }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab MR note creation failed: ${response.status} ${error}`);
+  }
+
+  logExceptInTest('[createMRNote] Created note', { projectId, mrIid });
+}
+
+/**
+ * Checks whether a note containing the given marker already exists on a GitLab MR.
+ * Paginates through all notes (consistent with findKiloReviewNote).
+ */
+export async function hasMRNoteWithMarker(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  marker: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<boolean> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const response = await fetch(
+      `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes?per_page=${perPage}&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab MR notes fetch failed: ${response.status} ${error}`);
+    }
+
+    const notes = (await response.json()) as Array<{ body: string }>;
+    if (notes.some(n => n.body?.includes(marker))) {
+      return true;
+    }
+
+    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    if (page >= totalPages) break;
+    page++;
+  }
+
+  return false;
+}
+
+/**
  * Fetches existing inline comments (discussions) on a GitLab MR
  * Used to detect duplicates and track outdated comments
  *

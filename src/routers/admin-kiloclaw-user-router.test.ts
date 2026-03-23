@@ -206,7 +206,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
     ).rejects.toThrow('No KiloClaw subscription found for this user');
   });
 
-  it('rejects non-trialing subscription rows', async () => {
+  it('rejects non-trialing and non-canceled subscription rows', async () => {
     await db.insert(kiloclaw_subscriptions).values({
       user_id: targetUser.id,
       plan: 'standard',
@@ -221,6 +221,59 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
         userId: targetUser.id,
         trial_ends_at: '2026-03-25T23:59:59.000Z',
       })
-    ).rejects.toThrow('Only trialing KiloClaw subscriptions can have their trial end date edited');
+    ).rejects.toThrow(
+      'Only trialing or canceled KiloClaw subscriptions can have their trial end date edited'
+    );
+  });
+
+  it('resets a canceled subscription to a new trial', async () => {
+    const previousTrialEndsAt = '2026-03-15T23:59:59.000Z';
+    const newTrialEndsAt = '2026-04-01T23:59:59.000Z';
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: targetUser.id,
+      plan: 'trial',
+      status: 'canceled',
+      trial_started_at: '2026-03-08T12:00:00.000Z',
+      trial_ends_at: previousTrialEndsAt,
+      suspended_at: '2026-03-16T00:00:00.000Z',
+      destruction_deadline: '2026-03-23T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.updateKiloClawTrialEndAt({
+      userId: targetUser.id,
+      trial_ends_at: newTrialEndsAt,
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const updatedSubscription = await db.query.kiloclaw_subscriptions.findFirst({
+      where: eq(kiloclaw_subscriptions.user_id, targetUser.id),
+    });
+    expect(updatedSubscription?.status).toBe('trialing');
+    expect(updatedSubscription?.plan).toBe('trial');
+    expectSameInstant(updatedSubscription?.trial_ends_at, newTrialEndsAt);
+    expect(updatedSubscription?.trial_started_at).not.toBeNull();
+    expect(updatedSubscription?.suspended_at).toBeNull();
+    expect(updatedSubscription?.destruction_deadline).toBeNull();
+    expect(updatedSubscription?.stripe_subscription_id).toBeNull();
+    expect(updatedSubscription?.cancel_at_period_end).toBe(false);
+
+    const [auditLog] = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(eq(kiloclaw_admin_audit_logs.target_user_id, targetUser.id));
+
+    expect(auditLog).toEqual(
+      expect.objectContaining({
+        action: 'kiloclaw.subscription.reset_trial',
+        actor_id: adminUser.id,
+        target_user_id: targetUser.id,
+      })
+    );
+    expect(auditLog.message).toContain('reset from canceled to trialing');
+    expect(auditLog.metadata?.isReset).toBe(true);
+    expect(auditLog.metadata?.previousStatus).toBe('canceled');
   });
 });

@@ -322,6 +322,20 @@ afterEach(() => {
 });
 
 describe('two-phase destroy', () => {
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.destroy().then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
+  });
+
   it('clears all state when both Fly deletes succeed', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage);
@@ -1243,6 +1257,22 @@ describe('alarm runs for all live statuses', () => {
     expect(flyClient.getVolume).toHaveBeenCalled();
     expect(flyClient.getMachine).toHaveBeenCalled();
     expect(storage._getAlarm()).not.toBeNull();
+  });
+});
+
+describe('start: not provisioned', () => {
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.start('user-1').then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
   });
 });
 
@@ -2887,6 +2917,20 @@ describe('stop: error propagation', () => {
 
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeDefined();
+  });
+
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.stop().then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
   });
 });
 

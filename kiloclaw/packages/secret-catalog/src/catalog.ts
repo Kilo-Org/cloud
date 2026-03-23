@@ -154,6 +154,28 @@ const SECRET_CATALOG_RAW = [
     helpText: 'Virtual debit cards for autonomous agent spending. See setup guide for details.',
     helpUrl: 'https://agentcard.sh',
   },
+  {
+    id: 'onepassword',
+    label: '1Password',
+    category: 'tool',
+    icon: 'lock',
+    order: 3,
+    fields: [
+      {
+        key: 'onepasswordServiceAccountToken',
+        label: 'Service Account Token',
+        placeholder: 'ops_...',
+        placeholderConfigured: 'Enter new token to replace',
+        envVar: 'OP_SERVICE_ACCOUNT_TOKEN',
+        validationPattern: '^ops_[A-Za-z0-9_\\-]{50,1500}$',
+        validationMessage:
+          '1Password service account tokens start with ops_ followed by a long base64-encoded string.',
+        maxLength: 2000,
+      },
+    ],
+    helpText: 'Create a service account at 1password.com with access to a dedicated vault.',
+    helpUrl: 'https://developer.1password.com/docs/service-accounts/get-started/',
+  },
 ] as const satisfies readonly SecretCatalogEntry[];
 
 // Runtime validation — fails fast at module load if catalog data is malformed
@@ -190,6 +212,11 @@ export const ENV_VAR_TO_FIELD_KEY: ReadonlyMap<string, string> = new Map(
 /** Map of field key → owning entry (used for allFieldsRequired checks) */
 export const FIELD_KEY_TO_ENTRY: ReadonlyMap<string, SecretCatalogEntry> = new Map(
   SECRET_CATALOG.flatMap(entry => entry.fields.map(field => [field.key, entry]))
+);
+
+/** Largest maxLength across all catalog fields (for blanket Zod schema caps) */
+export const MAX_SECRET_FIELD_LENGTH: number = Math.max(
+  ...SECRET_CATALOG.flatMap(entry => entry.fields.map(field => field.maxLength))
 );
 
 /** Set of all env var names from catalog entries (for SENSITIVE_KEYS classification) */

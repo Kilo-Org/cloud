@@ -690,7 +690,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     if (!this.s.userId || !this.s.sandboxId) {
-      throw new Error('Instance not provisioned');
+      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
     }
 
     const flyConfig = getFlyConfig(this.env, this.s);
@@ -944,7 +944,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
-      throw new Error('Instance not provisioned');
+      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
     }
     if (
       this.s.status === 'stopped' ||
@@ -990,8 +990,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async destroy(): Promise<DestroyResult> {
     await this.loadState();
 
-    if (!this.s.userId) {
-      throw new Error('Instance not provisioned');
+    if (!this.s.userId || !this.s.sandboxId) {
+      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
@@ -1430,6 +1430,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         })
       );
       await this.scheduleAlarm();
+
+      this.emitEvent({
+        event: 'instance.restarting',
+        status: 'restarting',
+        label: action,
+      });
 
       this.ctx.waitUntil(this.restartMachineInBackground());
       return { success: true };

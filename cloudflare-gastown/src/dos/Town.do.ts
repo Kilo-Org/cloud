@@ -240,7 +240,11 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private emitEvent(data: Omit<GastownEventData, 'userId' | 'delivery'>): void {
-    writeEvent(this.env, { ...data, delivery: 'internal', userId: this._ownerUserId });
+    writeEvent(this.env, {
+      ...data,
+      delivery: 'internal',
+      userId: this._ownerUserId,
+    });
   }
 
   /** Build the context object used by the scheduling sub-module. */
@@ -290,7 +294,9 @@ export class TownDO extends DurableObject<Env> {
           });
         }
 
-        return scheduling.dispatchAgent(schedulingCtx, agent, bead, { systemPromptOverride });
+        return scheduling.dispatchAgent(schedulingCtx, agent, bead, {
+          systemPromptOverride,
+        });
       },
       stopAgent: async agentId => {
         await dispatch.stopAgentInContainer(this.env, this.townId, agentId);
@@ -677,7 +683,9 @@ export class TownDO extends DurableObject<Env> {
       const townConfig = await this.getTownConfig();
       if (!townConfig.kilocode_token || townConfig.kilocode_token !== rigConfig.kilocodeToken) {
         console.log(`${TOWN_LOG} configureRig: propagating kilocodeToken to town config`);
-        await this.updateTownConfig({ kilocode_token: rigConfig.kilocodeToken });
+        await this.updateTownConfig({
+          kilocode_token: rigConfig.kilocodeToken,
+        });
       }
     }
 
@@ -1214,10 +1222,14 @@ export class TownDO extends DurableObject<Env> {
    * Return undelivered, non-expired nudges for an agent.
    * Urgent nudges are returned first, then FIFO within same priority.
    */
-  async getPendingNudges(
-    agentId: string
-  ): Promise<
-    { nudge_id: string; message: string; mode: string; priority: string; source: string }[]
+  async getPendingNudges(agentId: string): Promise<
+    {
+      nudge_id: string;
+      message: string;
+      mode: string;
+      priority: string;
+      source: string;
+    }[]
   > {
     const rows = [
       ...query(
@@ -1768,7 +1780,12 @@ export class TownDO extends DurableObject<Env> {
 
   /** Build the rig list for mayor agent startup (browse worktree setup on fresh containers). */
   private async rigListForMayor(): Promise<
-    Array<{ rigId: string; gitUrl: string; defaultBranch: string; platformIntegrationId?: string }>
+    Array<{
+      rigId: string;
+      gitUrl: string;
+      defaultBranch: string;
+      platformIntegrationId?: string;
+    }>
   > {
     const rigRecords = rigs.listRigs(this.sql);
     return Promise.all(
@@ -1792,7 +1809,10 @@ export class TownDO extends DurableObject<Env> {
     message: string,
     _model?: string,
     uiContext?: string
-  ): Promise<{ agentId: string; sessionStatus: 'idle' | 'active' | 'starting' }> {
+  ): Promise<{
+    agentId: string;
+    sessionStatus: 'idle' | 'active' | 'starting';
+  }> {
     const townId = this.townId;
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
@@ -1876,7 +1896,10 @@ export class TownDO extends DurableObject<Env> {
    * Called eagerly on page load so the terminal is available immediately
    * without requiring the user to send a message first.
    */
-  async ensureMayor(): Promise<{ agentId: string; sessionStatus: 'idle' | 'active' | 'starting' }> {
+  async ensureMayor(): Promise<{
+    agentId: string;
+    sessionStatus: 'idle' | 'active' | 'starting';
+  }> {
     const townId = this.townId;
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
@@ -2250,7 +2273,10 @@ export class TownDO extends DurableObject<Env> {
     tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
     merge_mode?: 'review-then-land' | 'review-and-merge';
     staged?: boolean;
-  }): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent | null }> }> {
+  }): Promise<{
+    convoy: ConvoyEntry;
+    beads: Array<{ bead: Bead; agent: Agent | null }>;
+  }> {
     // Resolve staged: explicit request wins, otherwise fall back to town config default.
     const townConfig = await this.getTownConfig();
     const isStaged = input.staged ?? townConfig.staged_convoys_default;
@@ -2449,9 +2475,10 @@ export class TownDO extends DurableObject<Env> {
   /**
    * Transition a staged convoy to active: hook agents and begin dispatch.
    */
-  async startConvoy(
-    convoyId: string
-  ): Promise<{ convoy: ConvoyEntry; beads: Array<{ bead: Bead; agent: Agent | null }> }> {
+  async startConvoy(convoyId: string): Promise<{
+    convoy: ConvoyEntry;
+    beads: Array<{ bead: Bead; agent: Agent | null }>;
+  }> {
     const convoy = this.getConvoy(convoyId);
     if (!convoy) throw new Error(`Convoy not found: ${convoyId}`);
     if (!convoy.staged) throw new Error(`Convoy is not staged: ${convoyId}`);
@@ -2994,9 +3021,14 @@ export class TownDO extends DurableObject<Env> {
       const violations = reconciler.checkInvariants(this.sql);
       metrics.invariantViolations = violations.length;
       if (violations.length > 0) {
-        console.error(
-          `${TOWN_LOG} [reconciler:invariants] town=${townId} ${violations.length} violation(s): ${JSON.stringify(violations)}`
-        );
+        // Emit as an analytics event for observability dashboards instead
+        // of console.error (which spams Workers logs every 5s per town).
+        this.emitEvent({
+          event: 'reconciler.invariant_violations',
+          townId,
+          label: violations.map(v => `[${v.invariant}] ${v.message}`).join('; '),
+          value: violations.length,
+        });
       }
     } catch (err) {
       console.warn(`${TOWN_LOG} [reconciler:invariants] town=${townId} check failed`, err);
@@ -3575,7 +3607,13 @@ export class TownDO extends DurableObject<Env> {
         []
       ),
     ];
-    const beadCounts = { open: 0, inProgress: 0, inReview: 0, failed: 0, triageRequests: 0 };
+    const beadCounts = {
+      open: 0,
+      inProgress: 0,
+      inReview: 0,
+      failed: 0,
+      triageRequests: 0,
+    };
     for (const row of beadRows) {
       const s = `${row.status as string}`;
       const c = Number(row.cnt);

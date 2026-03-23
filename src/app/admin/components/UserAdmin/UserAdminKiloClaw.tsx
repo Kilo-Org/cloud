@@ -19,6 +19,8 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { formatDate } from '@/lib/admin-utils';
 import { toast } from 'sonner';
 
+const DEFAULT_TRIAL_DAYS = 7;
+
 function formatDateOrDash(date: string | null): string {
   return date ? formatDate(date) : '—';
 }
@@ -70,8 +72,14 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     if (!dialogOpen) return;
 
     const currentTrialEndAt = data?.subscription?.trial_ends_at;
-    setSelectedDate(currentTrialEndAt ? toLocalDateInputValue(currentTrialEndAt) : '');
-  }, [data?.subscription?.trial_ends_at, dialogOpen]);
+    if (currentTrialEndAt && data?.subscription?.status !== 'canceled') {
+      setSelectedDate(toLocalDateInputValue(currentTrialEndAt));
+    } else {
+      const defaultTrialEnd = new Date();
+      defaultTrialEnd.setDate(defaultTrialEnd.getDate() + DEFAULT_TRIAL_DAYS);
+      setSelectedDate(toLocalDateInputValue(defaultTrialEnd.toISOString()));
+    }
+  }, [data?.subscription?.trial_ends_at, data?.subscription?.status, dialogOpen]);
 
   const updateTrialEndAt = useMutation(
     trpc.admin.users.updateKiloClawTrialEndAt.mutationOptions({
@@ -165,7 +173,8 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
   }
 
   const { subscription } = data;
-  const canEditTrialEnd = subscription.status === 'trialing';
+  const canEditTrialEnd = subscription.status === 'trialing' || subscription.status === 'canceled';
+  const isTrialReset = subscription.status === 'canceled';
 
   return (
     <>
@@ -178,7 +187,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
             </div>
             {canEditTrialEnd && (
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
-                Edit Trial End
+                {isTrialReset ? 'Reset Trial' : 'Edit Trial End'}
               </Button>
             )}
           </div>
@@ -263,10 +272,13 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit KiloClaw Trial End Date</DialogTitle>
+            <DialogTitle>
+              {isTrialReset ? 'Reset KiloClaw Trial' : 'Edit KiloClaw Trial End Date'}
+            </DialogTitle>
             <DialogDescription>
-              Set the day this user&apos;s KiloClaw trial ends. The trial will end at the end of the
-              selected day.
+              {isTrialReset
+                ? 'Reset this canceled subscription to a new trial. This will restore access, clear suspension state, and attempt to restart the instance.'
+                : "Set the day this user's KiloClaw trial ends. The trial will end at the end of the selected day."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-4">

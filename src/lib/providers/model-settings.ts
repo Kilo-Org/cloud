@@ -1,4 +1,3 @@
-import { giga_potato_model, giga_potato_thinking_model } from '@/lib/providers/gigapotato';
 import { isGemini3Model, isGeminiModel } from '@/lib/providers/google';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isMoonshotModel } from '@/lib/providers/moonshotai';
@@ -24,12 +23,7 @@ export function getModelSettings(model: string): ModelSettings | undefined {
 }
 
 export function getVersionedModelSettings(model: string): VersionedSettings | undefined {
-  if (
-    isGeminiModel(model) ||
-    isZaiModel(model) ||
-    model === giga_potato_model.public_id ||
-    model === giga_potato_thinking_model.public_id
-  ) {
+  if (isGeminiModel(model) || isZaiModel(model)) {
     return {
       '4.146.0': {
         included_tools: ['write_file', 'edit_file'],

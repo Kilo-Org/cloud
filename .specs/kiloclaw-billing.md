@@ -4,6 +4,7 @@
 
 Draft -- generated from branch `jdp/kiloclaw-billing` on 2026-03-13.
 Updated 2026-03-19 -- pricing and trial duration changes.
+Updated 2026-03-20 -- promotional codes and introductory pricing.
 
 ## Conventions
 
@@ -41,6 +42,22 @@ lapses, with email notifications at each stage.
    MUST NOT independently validate or enforce specific price amounts.
 7. The system MUST fail with an error at checkout time if a required
    plan price identifier is not configured.
+
+### Standard Plan Introductory Pricing
+
+1. New standard plan subscribers who do not have a prior canceled paid
+   subscription MUST receive an introductory price for their first
+   billing period. A canceled trial does not count as a prior paid
+   subscription. Returning subscribers with a previously canceled paid
+   subscription MUST receive the regular standard price.
+2. The system MUST automatically transition introductory-price
+   subscribers to the regular standard price at the end of the
+   introductory billing period.
+3. The automatic price transition MUST be transparent to the user: it
+   MUST NOT appear as a pending plan switch in billing status and MUST
+   NOT prevent the user from initiating a plan switch or canceling.
+4. Failure to set up the automatic price transition during subscription
+   creation MUST NOT block checkout completion.
 
 ### Trial Eligibility and Creation
 
@@ -81,21 +98,18 @@ lapses, with email notifications at each stage.
 2. The system MUST allow checkout when the existing subscription status
    is trialing or canceled.
 3. The system MUST verify with the payment provider that no subscription
-   in active or trialing (delayed-billing) status already exists for the
-   customer before creating a new checkout session, to guard against
-   concurrent checkouts. This check does not cover provider-side
-   subscriptions in past-due status.
-4. The system MUST NOT allow promotional codes for either plan.
-5. The system MUST apply a provider-configured first-month discount
-   coupon when creating a standard plan checkout session.
-6. When a configurable billing start date is set and is in the future,
-   the system MUST create the subscription with a delayed billing period
-   that begins on that date.
-7. When the billing start date is unset or is in the past, the system
-   MUST start billing immediately with no delayed period.
-8. The system SHOULD include referral tracking data in checkout sessions
+   in active or trialing status already exists for the customer before
+   creating a new checkout session, to guard against concurrent
+   checkouts. This check does not cover provider-side subscriptions in
+   past-due status.
+4. The system MUST allow promotional codes on checkout for both plans.
+5. For standard plan checkout, the system MUST use the introductory
+   price when the user has no prior canceled paid subscription, and the
+   regular price when the user has a previously canceled paid
+   subscription (see Standard Plan Introductory Pricing).
+6. The system SHOULD include referral tracking data in checkout sessions
    when a referral cookie is present.
-9. The system SHOULD attempt to expire open checkout sessions tagged as
+7. The system SHOULD attempt to expire open checkout sessions tagged as
    KiloClaw before creating a new checkout session, so users who
    abandoned a previous checkout can start fresh. Expiration is
    best-effort: errors from the payment provider (e.g. the session was
@@ -111,9 +125,8 @@ lapses, with email notifications at each stage.
    the subscription to the standard plan.
 2. When a commit subscription is created, the system MUST record a
    commit-period end date six calendar months from the billing start.
-   When a delayed-billing period is configured, the six months MUST
-   start from the delayed-billing end date, not from subscription
-   creation.
+   For pre-launch subscriptions that had a delayed-billing trial_end,
+   the six months starts from that trial boundary.
 3. When a subscription update is received and the commit-period end
    date is in the past, the system MUST extend it by six calendar
    months from the previous boundary, keeping the subscription on the
@@ -145,6 +158,15 @@ lapses, with email notifications at each stage.
    the commit-period end date to six calendar months from the
    transition date.
 8. The system MUST allow cancellation of user-initiated plan switches.
+9. The system MUST reject a plan switch if a user-initiated plan switch
+   is already pending.
+10. If an automatic price transition is pending when the user requests a
+    plan switch, the system MUST replace the automatic transition with
+    the user's requested switch.
+11. After canceling a user-initiated plan switch, if the subscription is
+    still on the introductory price, the system MUST restore the
+    automatic price transition. Failure to restore the transition MUST
+    NOT prevent the switch cancellation from succeeding.
 
 ### Cancellation and Reactivation
 
@@ -152,14 +174,19 @@ lapses, with email notifications at each stage.
    subscription with a payment provider ID exists.
 2. The system MUST reject a cancellation request if cancellation is
    already pending.
-3. When canceling a subscription that has a pending schedule, the system
-   MUST release the schedule before setting the cancel-at-period-end
-   flag.
+3. When canceling a subscription that has a pending schedule — whether
+   a user-initiated plan switch or an automatic price transition — the
+   system MUST release the schedule before setting the
+   cancel-at-period-end flag.
 4. Cancellation MUST NOT terminate access immediately; access MUST
    continue until the current billing period ends.
 5. The system MUST allow reactivation of a subscription that is pending
    cancellation.
 6. On reactivation, the system MUST clear the cancel-at-period-end flag.
+7. On reactivation, if the subscription is still on the introductory
+   price, the system MUST restore the automatic price transition.
+   Failure to restore the transition MUST NOT prevent the reactivation
+   from succeeding.
 
 ### Billing Lifecycle Background Job
 
@@ -169,6 +196,9 @@ lapses, with email notifications at each stage.
 2. Each sweep in the background job MUST process users independently;
    a failure for one user MUST NOT prevent processing of other users.
 3. All errors during sweep processing MUST be captured for monitoring.
+4. The background job MUST detect active subscriptions on the
+   introductory price that have no automatic price transition pending
+   and MUST set up the missing transition.
 
 ### Trial Expiry Warnings
 
@@ -258,8 +288,9 @@ lapses, with email notifications at each stage.
 ### Payment Provider Status Mapping
 
 1. When the payment provider reports a subscription as "trialing"
-   (delayed billing), the system MUST map this to active status
-   internally, since delayed billing is not a product-level trial.
+   (e.g. pre-launch delayed billing), the system MUST map this to
+   active status internally, since delayed billing is not a
+   product-level trial.
 2. When the payment provider reports "incomplete" or "paused" status,
    the system MUST map these to terminal statuses (unpaid or canceled
    respectively).
@@ -298,6 +329,28 @@ lapses, with email notifications at each stage.
    notification log entries for that user.
 
 ### Changelog
+
+#### 2026-03-21 -- Remove delayed-billing start date
+
+- Removed configurable billing start date (`STRIPE_KILOCLAW_BILLING_START`)
+  and associated checkout rules (former rules 6–7). New subscriptions now
+  always bill immediately.
+- Pre-launch subscriptions created with a delayed `trial_end` are still
+  handled correctly; the trialing→active status mapping remains until those
+  subscriptions transition.
+
+#### 2026-03-20 -- Promotional codes and introductory pricing
+
+Previous values:
+
+- Standard plan first-month discount: coupon applied at checkout
+- Promotional codes: not allowed on either plan
+
+New values:
+
+- Standard plan first-month discount: introductory price with automatic
+  transition to regular price at period end
+- Promotional codes: allowed on both plans at checkout
 
 #### 2026-03-19 -- Pricing and trial changes
 

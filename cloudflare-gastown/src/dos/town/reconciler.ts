@@ -249,7 +249,18 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       const agent = agents.getAgent(sql, event.agent_id);
       if (!agent) return;
 
-      // Only act on working/stalled agents whose container has stopped
+      // Only act on working/stalled agents whose container has stopped.
+      // For 'not_found': skip if the agent was dispatched recently (#1358).
+      // During a cold start the container may 404 on /agents/:id/status
+      // because the agent hasn't registered in the process manager yet.
+      // The 3-minute grace period covers the 60s HTTP timeout plus
+      // typical cold start time (git clone + worktree). Truly dead
+      // agents are caught by reconcileAgents after 90s of no heartbeats.
+      if (containerStatus === 'not_found' && agent.last_activity_at) {
+        const ageSec = (Date.now() - new Date(agent.last_activity_at).getTime()) / 1000;
+        if (ageSec < 180) return; // 3-minute grace for cold starts
+      }
+
       if (
         (agent.status === 'working' || agent.status === 'stalled') &&
         (containerStatus === 'exited' || containerStatus === 'not_found')
@@ -340,6 +351,9 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
   ]);
 
   for (const agent of workingAgents) {
+    // Mayors are always working with no hook — skip them
+    if (agent.role === 'mayor') continue;
+
     if (!agent.last_activity_at) {
       // No heartbeat ever received — container may have failed to start
       actions.push({
@@ -356,6 +370,18 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
         from: 'working',
         to: 'idle',
         reason: 'heartbeat lost (3 missed cycles)',
+      });
+    } else if (!agent.current_hook_bead_id) {
+      // Agent is working with fresh heartbeat but no hook — it's running
+      // in the container but has no bead to work on (gt_done already ran,
+      // or the hook was cleared by another code path). Set to idle so
+      // processReviewQueue / schedulePendingWork can use it.
+      actions.push({
+        type: 'transition_agent',
+        agent_id: agent.bead_id,
+        from: 'working',
+        to: 'idle',
+        reason: 'working agent has no hook (gt_done already completed)',
       });
     }
   }
@@ -599,18 +625,24 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
   for (const bead of staleInProgress) {
     if (!staleMs(bead.updated_at, STALE_IN_PROGRESS_TIMEOUT_MS)) continue;
 
-    // Check if any agent is hooked AND working/stalled
+    // Check if any agent is hooked AND (working/stalled OR has a recent
+    // heartbeat). The heartbeat check is defense-in-depth for #1358: if
+    // the agent's status is wrong (e.g. stuck on 'idle' due to a dispatch
+    // timeout race), a fresh heartbeat proves the agent is alive.
     const hookedAgent = z
-      .object({ status: z.string() })
+      .object({ status: z.string(), last_activity_at: z.string().nullable() })
       .array()
       .parse([
         ...query(
           sql,
           /* sql */ `
-          SELECT ${agent_metadata.status}
+          SELECT ${agent_metadata.status}, ${agent_metadata.last_activity_at}
           FROM ${agent_metadata}
           WHERE ${agent_metadata.current_hook_bead_id} = ?
-            AND ${agent_metadata.status} IN ('working', 'stalled')
+            AND (
+              ${agent_metadata.status} IN ('working', 'stalled')
+              OR ${agent_metadata.last_activity_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 seconds')
+            )
         `,
           [bead.bead_id]
         ),
@@ -991,7 +1023,11 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     }
 
     const mrRows = z
-      .object({ status: z.string(), type: z.string(), rig_id: z.string().nullable() })
+      .object({
+        status: z.string(),
+        type: z.string(),
+        rig_id: z.string().nullable(),
+      })
       .array()
       .parse([
         ...query(

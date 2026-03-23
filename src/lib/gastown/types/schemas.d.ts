@@ -781,6 +781,17 @@ export declare const RpcAlarmStatusOutput: z.ZodPipe<
         },
         z.core.$strip
       >;
+      throughput: z.ZodObject<
+        {
+          tokensPerSec: z.ZodNumber;
+          costPerSec: z.ZodNumber;
+          activeAgents: z.ZodNumber;
+          totalAgents: z.ZodNumber;
+          locAdditions: z.ZodNumber;
+          locDeletions: z.ZodNumber;
+        },
+        z.core.$strip
+      >;
       recentEvents: z.ZodArray<
         z.ZodObject<
           {
@@ -793,6 +804,31 @@ export declare const RpcAlarmStatusOutput: z.ZodPipe<
       >;
     },
     z.core.$strip
+  >
+>;
+export declare const RpcMetricsTimeseriesOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodArray<
+    z.ZodObject<
+      {
+        bucket: z.ZodString;
+        agents_working: z.ZodNumber;
+        agents_idle: z.ZodNumber;
+        agents_total: z.ZodNumber;
+        beads_open: z.ZodNumber;
+        beads_in_progress: z.ZodNumber;
+        beads_in_review: z.ZodNumber;
+        events_count: z.ZodNumber;
+        beads_created: z.ZodNumber;
+        beads_closed: z.ZodNumber;
+        input_tokens: z.ZodNumber;
+        output_tokens: z.ZodNumber;
+        cost_microdollars: z.ZodNumber;
+        loc_additions: z.ZodNumber;
+        loc_deletions: z.ZodNumber;
+      },
+      z.core.$strip
+    >
   >
 >;
 export declare const RpcRigDetailOutput: z.ZodPipe<

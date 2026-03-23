@@ -32,6 +32,7 @@ import {
   RpcRigDetailOutput,
   RpcConvoyDetailOutput,
   RpcAlarmStatusOutput,
+  RpcMetricsTimeseriesOutput,
   RpcOrgTownOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
@@ -631,6 +632,16 @@ export const gastownRouter = router({
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.setTownId(input.townId);
       return townStub.getAlarmStatus();
+    }),
+
+  getMetricsTimeseries: gastownProcedure
+    .input(z.object({ townId: z.string().uuid(), window: z.enum(['1h', '6h', '24h', '7d']) }))
+    .output(RpcMetricsTimeseriesOutput)
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.setTownId(input.townId);
+      return townStub.getMetricsTimeseries(input.window);
     }),
 
   ensureMayor: gastownProcedure

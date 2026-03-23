@@ -134,6 +134,11 @@ import {
   handleListEscalations,
   handleAcknowledgeEscalation,
 } from './handlers/town-escalations.handler';
+import {
+  handleReportUsage,
+  handleReportLoc,
+  handleGetMetricsTimeseries,
+} from './handlers/town-metrics.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -551,6 +556,20 @@ app.get('/api/towns/:townId/config', c =>
 );
 app.patch('/api/towns/:townId/config', c =>
   instrumented(c, 'PATCH /api/towns/:townId/config', () => handleUpdateTownConfig(c, c.req.param()))
+);
+
+// ── Town Metrics ────────────────────────────────────────────────────────
+
+app.post('/api/towns/:townId/usage', c =>
+  instrumented(c, 'POST /api/towns/:townId/usage', () => handleReportUsage(c, c.req.param()))
+);
+app.post('/api/towns/:townId/loc', c =>
+  instrumented(c, 'POST /api/towns/:townId/loc', () => handleReportLoc(c, c.req.param()))
+);
+app.get('/api/towns/:townId/metrics/timeseries', c =>
+  instrumented(c, 'GET /api/towns/:townId/metrics/timeseries', () =>
+    handleGetMetricsTimeseries(c, c.req.param())
+  )
 );
 
 // ── Town Events ─────────────────────────────────────────────────────────

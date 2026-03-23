@@ -241,6 +241,14 @@ type AlarmStatus = {
     stalledAgents: number;
     orphanedHooks: number;
   };
+  throughput: {
+    tokensPerSec: number;
+    costPerSec: number;
+    activeAgents: number;
+    totalAgents: number;
+    locAdditions: number;
+    locDeletions: number;
+  };
   recentEvents: Array<{ time: string; type: string; message: string }>;
 };
 

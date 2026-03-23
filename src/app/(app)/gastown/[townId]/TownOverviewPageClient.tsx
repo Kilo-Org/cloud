@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
+import { ThroughputGauges } from '@/components/gastown/ThroughputGauges';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
 
 type Agent = GastownOutputs['gastown']['listAgents'][number];
@@ -128,6 +129,33 @@ export function TownOverviewPageClient({
       onError: err => toast.error(err.message),
     })
   );
+
+  // Alarm status for throughput gauges (5s polling mirrors alarm tick rate)
+  const alarmStatusQuery = useQuery({
+    ...trpc.gastown.getAlarmStatus.queryOptions({ townId }),
+    refetchInterval: 5_000,
+  });
+  const throughput = alarmStatusQuery.data?.throughput ?? null;
+
+  // Gas tank balance (30s polling — balance changes slowly)
+  const balanceQuery = useQuery({
+    queryKey: ['gastown', 'balance', organizationId],
+    queryFn: async () => {
+      const params = organizationId ? `?organizationId=${organizationId}` : '';
+      const res = await fetch(`/api/gastown/balance${params}`);
+      if (!res.ok) return null;
+      const data: unknown = await res.json();
+      if (data && typeof data === 'object' && 'balance' in data) {
+        return (data as { balance: number }).balance;
+      }
+      return null;
+    },
+    refetchInterval: 30_000,
+  });
+  const gasTank =
+    balanceQuery.data !== undefined
+      ? { balanceDollars: balanceQuery.data, costPerSec: throughput?.costPerSec ?? 0 }
+      : undefined;
 
   const rigs = rigsQuery.data ?? [];
   const events = townEventsQuery.data ?? [];
@@ -241,6 +269,9 @@ export function TownOverviewPageClient({
       <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_380px]">
         {/* Left column: activity feed */}
         <div className="min-w-0 border-r border-white/[0.06]">
+          {/* Throughput gauges */}
+          <ThroughputGauges throughput={throughput} gasTank={gasTank} />
+
           {/* Stats strip */}
           <div
             className="grid border-b border-white/[0.06]"

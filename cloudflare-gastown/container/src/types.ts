@@ -119,6 +119,8 @@ export type ManagedAgent = {
   completionCallbackUrl: string | null;
   /** Model ID used for this agent's sessions (e.g. "anthropic/claude-sonnet-4.6") */
   model: string | null;
+  /** Default branch for git diff stats (e.g. "main") */
+  defaultBranch: string | null;
 };
 
 export type AgentStatusResponse = {

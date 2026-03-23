@@ -26,6 +26,7 @@ import * as config from './town/config';
 import * as rigs from './town/rigs';
 import * as dispatch from './town/container-dispatch';
 import * as patrol from './town/patrol';
+import * as metrics from './town/metrics';
 import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../util/platform-pr.util';
 
 // Table imports for beads-centric operations
@@ -226,6 +227,8 @@ export class TownDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private initPromise: Promise<void> | null = null;
   private _ownerUserId: string | undefined;
+  private usageAccumulator = metrics.createUsageAccumulator();
+  private lastSnapshotAt: string | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -442,6 +445,9 @@ export class TownDO extends DurableObject<Env> {
     for (const idx of getIndexesAgentNudges()) {
       query(this.sql, idx, []);
     }
+
+    // Metrics timeseries
+    metrics.initMetricsTables(this.sql);
 
     // Ensure the alarm loop is running. After a deploy/restart, the
     // Cloudflare runtime normally delivers missed alarms, but if the alarm
@@ -2970,6 +2976,14 @@ export class TownDO extends DurableObject<Env> {
     const interval = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
     await this.ctx.storage.setAlarm(Date.now() + interval);
 
+    // Collect metrics snapshot for timeseries charts
+    try {
+      metrics.collectSnapshot(this.sql, this.lastSnapshotAt, this.usageAccumulator);
+      this.lastSnapshotAt = new Date().toISOString();
+    } catch (err) {
+      console.warn(`${TOWN_LOG} alarm: metrics collection failed`, err);
+    }
+
     // Broadcast status snapshot to connected WebSocket clients
     try {
       const snapshot = await this.getAlarmStatus();
@@ -4228,6 +4242,14 @@ export class TownDO extends DurableObject<Env> {
       stalledAgents: number;
       orphanedHooks: number;
     };
+    throughput: {
+      tokensPerSec: number;
+      costPerSec: number;
+      activeAgents: number;
+      totalAgents: number;
+      locAdditions: number;
+      locDeletions: number;
+    };
     recentEvents: Array<{
       time: string;
       type: string;
@@ -4363,6 +4385,28 @@ export class TownDO extends DurableObject<Env> {
       message: formatEventMessage(row),
     }));
 
+    // Throughput gauges (5-minute rolling average)
+    let throughput: {
+      tokensPerSec: number;
+      costPerSec: number;
+      activeAgents: number;
+      totalAgents: number;
+      locAdditions: number;
+      locDeletions: number;
+    };
+    try {
+      throughput = metrics.computeThroughput(this.sql);
+    } catch {
+      throughput = {
+        tokensPerSec: 0,
+        costPerSec: 0,
+        activeAgents: agentCounts.working,
+        totalAgents: agentCounts.total,
+        locAdditions: 0,
+        locDeletions: 0,
+      };
+    }
+
     return {
       alarm: {
         nextFireAt: currentAlarm ? new Date(Number(currentAlarm)).toISOString() : null,
@@ -4377,8 +4421,46 @@ export class TownDO extends DurableObject<Env> {
         stalledAgents,
         orphanedHooks,
       },
+      throughput,
       recentEvents,
     };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Metrics & Throughput
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * Report token/cost usage from the container.
+   * Called by container agents after LLM requests complete.
+   */
+  async reportUsage(
+    inputTokens: number,
+    outputTokens: number,
+    costMicrodollars: number
+  ): Promise<void> {
+    await this.ensureInitialized();
+    metrics.addUsage(this.usageAccumulator, inputTokens, outputTokens, costMicrodollars);
+  }
+
+  /**
+   * Report LOC snapshot from the container.
+   * Called periodically by the container's diff stats poller.
+   * Values are absolute totals (additions/deletions vs base branch).
+   */
+  async reportLoc(additions: number, deletions: number): Promise<void> {
+    await this.ensureInitialized();
+    metrics.setLoc(this.usageAccumulator, additions, deletions);
+  }
+
+  /**
+   * Query timeseries metrics for chart display.
+   */
+  async getMetricsTimeseries(window: string): Promise<metrics.TimeseriesPointRecord[]> {
+    await this.ensureInitialized();
+    const parsed = metrics.TimeseriesWindow.safeParse(window);
+    if (!parsed.success) return [];
+    return metrics.queryTimeseries(this.sql, parsed.data);
   }
 
   async destroy(): Promise<void> {

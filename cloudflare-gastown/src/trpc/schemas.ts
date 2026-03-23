@@ -215,6 +215,14 @@ const AlarmStatusOutput = z.object({
     stalledAgents: z.number(),
     orphanedHooks: z.number(),
   }),
+  throughput: z.object({
+    tokensPerSec: z.number(),
+    costPerSec: z.number(),
+    activeAgents: z.number(),
+    totalAgents: z.number(),
+    locAdditions: z.number(),
+    locDeletions: z.number(),
+  }),
   recentEvents: z.array(
     z.object({
       time: z.string(),
@@ -224,6 +232,26 @@ const AlarmStatusOutput = z.object({
   ),
 });
 export const RpcAlarmStatusOutput = rpcSafe(AlarmStatusOutput);
+
+// Metrics timeseries
+const MetricsTimeseriesPointOutput = z.object({
+  bucket: z.string(),
+  agents_working: z.number(),
+  agents_idle: z.number(),
+  agents_total: z.number(),
+  beads_open: z.number(),
+  beads_in_progress: z.number(),
+  beads_in_review: z.number(),
+  events_count: z.number(),
+  beads_created: z.number(),
+  beads_closed: z.number(),
+  input_tokens: z.number(),
+  output_tokens: z.number(),
+  cost_microdollars: z.number(),
+  loc_additions: z.number(),
+  loc_deletions: z.number(),
+});
+export const RpcMetricsTimeseriesOutput = rpcSafe(z.array(MetricsTimeseriesPointOutput));
 export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);
 
 // OrgTown (from GastownOrgDO)

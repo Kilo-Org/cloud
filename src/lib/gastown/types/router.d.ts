@@ -365,12 +365,44 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           stalledAgents: number;
           orphanedHooks: number;
         };
+        throughput: {
+          tokensPerSec: number;
+          costPerSec: number;
+          activeAgents: number;
+          totalAgents: number;
+          locAdditions: number;
+          locDeletions: number;
+        };
         recentEvents: {
           time: string;
           type: string;
           message: string;
         }[];
       };
+      meta: object;
+    }>;
+    getMetricsTimeseries: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+        window: '1h' | '6h' | '24h' | '7d';
+      };
+      output: {
+        bucket: string;
+        agents_working: number;
+        agents_idle: number;
+        agents_total: number;
+        beads_open: number;
+        beads_in_progress: number;
+        beads_in_review: number;
+        events_count: number;
+        beads_created: number;
+        beads_closed: number;
+        input_tokens: number;
+        output_tokens: number;
+        cost_microdollars: number;
+        loc_additions: number;
+        loc_deletions: number;
+      }[];
       meta: object;
     }>;
     ensureMayor: import('@trpc/server').TRPCMutationProcedure<{
@@ -871,6 +903,14 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           guppEscalations: number;
           stalledAgents: number;
           orphanedHooks: number;
+        };
+        throughput: {
+          tokensPerSec: number;
+          costPerSec: number;
+          activeAgents: number;
+          totalAgents: number;
+          locAdditions: number;
+          locDeletions: number;
         };
         recentEvents: {
           time: string;
@@ -1390,12 +1430,44 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               stalledAgents: number;
               orphanedHooks: number;
             };
+            throughput: {
+              tokensPerSec: number;
+              costPerSec: number;
+              activeAgents: number;
+              totalAgents: number;
+              locAdditions: number;
+              locDeletions: number;
+            };
             recentEvents: {
               time: string;
               type: string;
               message: string;
             }[];
           };
+          meta: object;
+        }>;
+        getMetricsTimeseries: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+            window: '1h' | '6h' | '24h' | '7d';
+          };
+          output: {
+            bucket: string;
+            agents_working: number;
+            agents_idle: number;
+            agents_total: number;
+            beads_open: number;
+            beads_in_progress: number;
+            beads_in_review: number;
+            events_count: number;
+            beads_created: number;
+            beads_closed: number;
+            input_tokens: number;
+            output_tokens: number;
+            cost_microdollars: number;
+            loc_additions: number;
+            loc_deletions: number;
+          }[];
           meta: object;
         }>;
         ensureMayor: import('@trpc/server').TRPCMutationProcedure<{
@@ -1896,6 +1968,14 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               guppEscalations: number;
               stalledAgents: number;
               orphanedHooks: number;
+            };
+            throughput: {
+              tokensPerSec: number;
+              costPerSec: number;
+              activeAgents: number;
+              totalAgents: number;
+              locAdditions: number;
+              locDeletions: number;
             };
             recentEvents: {
               time: string;

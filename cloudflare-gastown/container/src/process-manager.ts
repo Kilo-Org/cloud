@@ -33,6 +33,9 @@ const eventAbortControllers = new Map<string, AbortController>();
 const eventSinks = new Set<(agentId: string, event: string, data: unknown) => void>();
 // Per-agent idle timers — fires exit when no nudges arrive
 const idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// LOC diff stats poller interval
+let locStatsTimer: ReturnType<typeof setInterval> | undefined;
+const LOC_STATS_INTERVAL_MS = 30_000; // 30s
 
 let nextPort = 4096;
 const startTime = Date.now();
@@ -132,6 +135,143 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
     ).catch(() => {
       // Best-effort persistence — don't block live streaming
     });
+  }
+}
+
+/**
+ * Report token/cost usage to TownDO for metrics aggregation.
+ * Extracts input_tokens, output_tokens, and cost from message.completed
+ * or assistant.completed event properties.
+ * Fire-and-forget — errors are silently ignored.
+ */
+function reportTokenUsage(agent: ManagedAgent, properties: Record<string, unknown>): void {
+  // The SDK emits usage data in various shapes depending on the provider.
+  // Common shapes: { usage: { inputTokens, outputTokens } },
+  // { input_tokens, output_tokens }, { usage: { input_tokens, output_tokens } }
+  const usage =
+    properties.usage && typeof properties.usage === 'object'
+      ? (properties.usage as Record<string, unknown>)
+      : properties;
+
+  const inputTokens = Number(usage.inputTokens ?? usage.input_tokens ?? 0) || 0;
+  const outputTokens = Number(usage.outputTokens ?? usage.output_tokens ?? 0) || 0;
+
+  // Cost might be in microdollars or dollars depending on provider
+  let costMicrodollars = 0;
+  if (usage.cost_microdollars != null) {
+    costMicrodollars = Number(usage.cost_microdollars) || 0;
+  } else if (usage.cost != null) {
+    // Assume cost is in dollars, convert to microdollars
+    costMicrodollars = Math.round((Number(usage.cost) || 0) * 1_000_000);
+  }
+
+  if (inputTokens === 0 && outputTokens === 0 && costMicrodollars === 0) return;
+
+  const apiUrl = agent.gastownApiUrl;
+  const authToken =
+    process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? agent.gastownSessionToken;
+  if (!apiUrl || !authToken) return;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${authToken}`,
+  };
+  if (process.env.GASTOWN_CONTAINER_TOKEN || agent.gastownContainerToken) {
+    headers['X-Gastown-Agent-Id'] = agent.agentId;
+    if (agent.rigId) headers['X-Gastown-Rig-Id'] = agent.rigId;
+  }
+
+  fetch(`${apiUrl}/api/towns/${agent.townId ?? '_'}/usage`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_microdollars: costMicrodollars,
+    }),
+  }).catch(() => {
+    // Best-effort — don't block the event loop
+  });
+}
+
+/**
+ * Poll git diff stats for all active agents and report aggregate LOC to TownDO.
+ * Uses the SDK's worktree.diffSummary() to compare against the default branch.
+ * Runs every 30s.
+ */
+async function pollLocStats(): Promise<void> {
+  let totalAdditions = 0;
+  let totalDeletions = 0;
+  let townId: string | null = null;
+  let apiUrl: string | null = null;
+  let authToken: string | null = null;
+
+  for (const agent of agents.values()) {
+    if (agent.status !== 'running' && agent.status !== 'starting') continue;
+    if (!agent.defaultBranch) continue;
+
+    // Capture credentials from first viable agent
+    if (!townId) {
+      townId = agent.townId;
+      apiUrl = agent.gastownApiUrl;
+      authToken =
+        process.env.GASTOWN_CONTAINER_TOKEN ??
+        agent.gastownContainerToken ??
+        agent.gastownSessionToken;
+    }
+
+    const instance = sdkInstances.get(agent.workdir);
+    if (!instance) continue;
+
+    try {
+      const base = `origin/${agent.defaultBranch}`;
+      const result = await instance.client.worktree.diffSummary(
+        { directory: agent.workdir, base },
+        { throwOnError: true }
+      );
+      const diffs = result.data;
+      if (Array.isArray(diffs)) {
+        for (const diff of diffs) {
+          const d = diff as { additions?: number; deletions?: number };
+          totalAdditions += Number(d.additions ?? 0);
+          totalDeletions += Number(d.deletions ?? 0);
+        }
+      }
+    } catch {
+      // Agent may not have a git worktree yet or diff may fail — skip
+    }
+  }
+
+  // Report aggregate LOC to TownDO
+  if (townId && apiUrl && authToken && (totalAdditions > 0 || totalDeletions > 0)) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`,
+    };
+    fetch(`${apiUrl}/api/towns/${townId}/loc`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ additions: totalAdditions, deletions: totalDeletions }),
+    }).catch(() => {});
+  }
+}
+
+function ensureLocStatsPoller(): void {
+  if (locStatsTimer) return;
+  locStatsTimer = setInterval(() => {
+    void pollLocStats();
+  }, LOC_STATS_INTERVAL_MS);
+  // Run immediately on first start
+  void pollLocStats();
+}
+
+function stopLocStatsPollerIfIdle(): void {
+  const hasActive = [...agents.values()].some(
+    a => a.status === 'running' || a.status === 'starting'
+  );
+  if (!hasActive && locStatsTimer) {
+    clearInterval(locStatsTimer);
+    locStatsTimer = undefined;
   }
 }
 
@@ -461,6 +601,14 @@ async function subscribeToEvents(
       // Broadcast to WebSocket sinks
       broadcastEvent(agent.agentId, event.type ?? 'unknown', event.properties ?? {});
 
+      // Report token usage to TownDO for throughput gauges
+      if (
+        (event.type === 'message.completed' || event.type === 'assistant.completed') &&
+        event.properties
+      ) {
+        reportTokenUsage(agent, event.properties as Record<string, unknown>);
+      }
+
       if (event.type === 'session.idle') {
         if (request.role === 'mayor') {
           // Mayor agents are persistent — session.idle means "turn done", not exit.
@@ -543,6 +691,7 @@ export async function startAgent(
     gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,
+    defaultBranch: request.defaultBranch ?? null,
   };
   agents.set(request.agentId, agent);
 
@@ -599,6 +748,9 @@ export async function startAgent(
       agent.status = 'running';
     }
     agent.messageCount = 1;
+
+    // Start LOC diff stats poller when first agent becomes active
+    ensureLocStatsPoller();
 
     log.info('agent.start', {
       agentId: request.agentId,
@@ -660,6 +812,7 @@ export async function stopAgent(agentId: string): Promise<void> {
   agent.exitReason = 'stopped';
   log.info('agent.exit', { agentId, reason: 'stopped', exitReason: 'stopped' });
   broadcastEvent(agentId, 'agent.exited', { reason: 'stopped' });
+  stopLocStatsPollerIfIdle();
 }
 
 /**

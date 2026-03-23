@@ -436,12 +436,18 @@ export function buildAuthenticatedGitUrl(
   return url.toString();
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
 export async function branchExistsOnRemote(
   session: ExecutionSession,
   repoUrl: string,
   branchName: string
 ): Promise<boolean> {
-  const result = await session.exec(`git ls-remote --heads '${repoUrl}' '${branchName}'`);
+  const result = await session.exec(
+    `git ls-remote --heads ${shellQuote(repoUrl)} ${shellQuote(branchName)}`
+  );
   if (result.exitCode !== 0) {
     // ls-remote itself failed (network, auth) — don't treat as "branch missing",
     // let the clone path handle the real error

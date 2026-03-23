@@ -653,7 +653,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   // ── Lifecycle ───────────────────────────────────────────────────────
 
-  async start(userId?: string): Promise<void> {
+  async start(userId?: string, opts?: { skipRecovery?: boolean; imageTag?: string }): Promise<void> {
     // Guard against concurrent start() calls — two overlapping invocations
     // (e.g. startAsync via waitUntil + a direct RPC start) can both see
     // flyMachineId as null and each create a Fly machine, orphaning one.
@@ -664,13 +664,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.startInProgress = true;
 
     try {
-      await this._startInner(userId);
+      await this._startInner(userId, opts);
     } finally {
       this.startInProgress = false;
     }
   }
 
-  private async _startInner(userId?: string): Promise<void> {
+  private async _startInner(userId?: string, opts?: { skipRecovery?: boolean; imageTag?: string }): Promise<void> {
     await this.loadState();
 
     if (this.s.status === 'destroying') {
@@ -697,7 +697,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // If the DO has identity but lost its machine ID, try to recover it
     // from Fly metadata before creating a duplicate machine.
-    if (!this.s.flyMachineId) {
+    if (!this.s.flyMachineId && !opts?.skipRecovery) {
       const recovered = await attemptMetadataRecovery(
         flyConfig,
         this.ctx,
@@ -760,7 +760,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
     const guest = guestFromSize(this.s.machineSize);
-    const imageTag = resolveImageTag(this.s, this.env);
+    const imageTag = opts?.imageTag ?? resolveImageTag(this.s, this.env);
     console.log(
       '[DO] startGateway: deploying with imageTag:',
       imageTag,

@@ -1,6 +1,6 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
+import { kiloclaw_instances, kiloclaw_version_pins, kilocode_users } from '@kilocode/db/schema';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import {
@@ -518,6 +518,27 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return await client.start(input.userId);
     } catch (err) {
       console.error('Failed to start machine for user:', input.userId, err);
+      throwKiloclawAdminError(err, fallbackMessage);
+    }
+  }),
+
+  machineCreate: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
+    const fallbackMessage = 'Failed to create machine';
+    try {
+      // Look up any version pin for this user so the new machine uses it.
+      const [pin] = await db
+        .select({ image_tag: kiloclaw_version_pins.image_tag })
+        .from(kiloclaw_version_pins)
+        .where(eq(kiloclaw_version_pins.user_id, input.userId))
+        .limit(1);
+
+      const client = new KiloClawInternalClient();
+      return await client.start(input.userId, {
+        skipRecovery: true,
+        imageTag: pin?.image_tag ?? undefined,
+      });
+    } catch (err) {
+      console.error('Failed to create machine for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
     }
   }),

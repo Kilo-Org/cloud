@@ -1094,7 +1094,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     void queryClient.invalidateQueries({ queryKey: trpc.admin.kiloclawInstances.get.queryKey() });
   };
 
-  const machineControlsEnabled = data?.destroyed_at === null && !!data?.workerStatus?.flyMachineId;
+  const machineControlsEnabled = data?.destroyed_at === null;
+  const hasMachine = !!data?.workerStatus?.flyMachineId;
 
   const invalidateMachineQueries = () => {
     void queryClient.invalidateQueries({ queryKey: trpc.admin.kiloclawInstances.get.queryKey() });
@@ -1108,6 +1109,18 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
       },
       onError: err => {
         toast.error(`Failed to start machine: ${err.message}`);
+      },
+    })
+  );
+
+  const { mutateAsync: machineCreate, isPending: isMachineCreating } = useMutation(
+    trpc.admin.kiloclawInstances.machineCreate.mutationOptions({
+      onSuccess: () => {
+        toast.success('Machine create requested');
+        invalidateMachineQueries();
+      },
+      onError: err => {
+        toast.error(`Failed to create machine: ${err.message}`);
       },
     })
   );
@@ -1259,7 +1272,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     machineStatus === 'starting' ||
     machineStatus === 'restarting';
   const machineActionPending =
-    isMachineStarting || isMachineStopping || isMachineRedeploying || isMachineUpgrading;
+    isMachineStarting ||
+    isMachineCreating ||
+    isMachineStopping ||
+    isMachineRedeploying ||
+    isMachineUpgrading;
   const gatewayActionPending =
     isGatewayStarting ||
     isGatewayStopping ||
@@ -1573,58 +1590,76 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={machineActionPending}
-                  onClick={() => void machineStart({ userId: data.user_id })}
-                >
-                  {isMachineStarting ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="mr-1 h-4 w-4" />
-                  )}
-                  Start Machine
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={machineActionPending}
-                  onClick={() => void machineStop({ userId: data.user_id })}
-                >
-                  {isMachineStopping ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Square className="mr-1 h-4 w-4" />
-                  )}
-                  Stop Machine
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={machineActionPending || machineRestartBlocked}
-                  onClick={() => void machineRedeploy({ instanceId: data.id, imageTag: undefined })}
-                >
-                  {isMachineRedeploying ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <RotateCw className="mr-1 h-4 w-4" />
-                  )}
-                  Redeploy
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={machineActionPending || machineRestartBlocked}
-                  onClick={() => void machineUpgrade({ instanceId: data.id, imageTag: 'latest' })}
-                >
-                  {isMachineUpgrading ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowUpCircle className="mr-1 h-4 w-4" />
-                  )}
-                  Upgrade to Latest
-                </Button>
+                {hasMachine ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={machineActionPending}
+                      onClick={() => void machineStart({ userId: data.user_id })}
+                    >
+                      {isMachineStarting ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Play className="mr-1 h-4 w-4" />
+                      )}
+                      Start Machine
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={machineActionPending}
+                      onClick={() => void machineStop({ userId: data.user_id })}
+                    >
+                      {isMachineStopping ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Square className="mr-1 h-4 w-4" />
+                      )}
+                      Stop Machine
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={machineActionPending || machineRestartBlocked}
+                      onClick={() => void machineRedeploy({ instanceId: data.id, imageTag: undefined })}
+                    >
+                      {isMachineRedeploying ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCw className="mr-1 h-4 w-4" />
+                      )}
+                      Redeploy
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={machineActionPending || machineRestartBlocked}
+                      onClick={() => void machineUpgrade({ instanceId: data.id, imageTag: 'latest' })}
+                    >
+                      {isMachineUpgrading ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <ArrowUpCircle className="mr-1 h-4 w-4" />
+                      )}
+                      Upgrade to Latest
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={machineActionPending}
+                    onClick={() => void machineCreate({ userId: data.user_id })}
+                  >
+                    {isMachineCreating ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="mr-1 h-4 w-4" />
+                    )}
+                    Create Machine
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

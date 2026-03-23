@@ -155,7 +155,10 @@ export async function buildUserEnvVars(
   }
 
   // Get the env encryption key from the App DO, creating it if needed.
+  // Call ensureApp first so the App DO has its flyAppName persisted — required
+  // by ensureEnvKey to set the Fly secret.
   const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(state.userId));
+  await appStub.ensureApp(state.userId);
   const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(state.userId);
 
   // Encrypt sensitive values and prefix their names with KILOCLAW_ENC_

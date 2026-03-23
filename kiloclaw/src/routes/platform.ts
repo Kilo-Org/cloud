@@ -911,14 +911,21 @@ platform.post('/doctor', async c => {
 });
 
 // POST /api/platform/start
+const StartRequestSchema = UserIdRequestSchema.extend({
+  skipRecovery: z.boolean().optional(),
+  imageTag: z.string().optional(),
+});
 platform.post('/start', async c => {
-  const result = await parseBody(c, UserIdRequestSchema);
+  const result = await parseBody(c, StartRequestSchema);
   if ('error' in result) return result.error;
 
   try {
+    const opts: { skipRecovery?: boolean; imageTag?: string } = {};
+    if (result.data.skipRecovery) opts.skipRecovery = true;
+    if (result.data.imageTag) opts.imageTag = result.data.imageTag;
     await withDORetry(
       instanceStubFactory(c.env, result.data.userId),
-      stub => stub.start(result.data.userId),
+      stub => stub.start(result.data.userId, Object.keys(opts).length ? opts : undefined),
       'start'
     );
     return c.json({ ok: true });

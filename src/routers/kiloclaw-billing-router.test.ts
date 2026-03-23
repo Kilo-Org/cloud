@@ -321,19 +321,19 @@ describe('createSubscriptionCheckout', () => {
 
     try {
       stripeMock.checkout.sessions.create.mockResolvedValue({
-      url: 'https://checkout.stripe.com/test',
-    });
+        url: 'https://checkout.stripe.com/test',
+      });
 
-    const caller = await createCallerForUser(user.id);
-    await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
+      const caller = await createCallerForUser(user.id);
+      await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
 
-    const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
-      string,
-      unknown
-    >;
-    const subscriptionData = callArgs.subscription_data as Record<string, unknown>;
-    const expectedTrialEnd = Math.floor(new Date('2026-03-23T00:00:00Z').getTime() / 1000);
-    expect(subscriptionData.trial_end).toBe(expectedTrialEnd);
+      const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
+      const subscriptionData = callArgs.subscription_data as Record<string, unknown>;
+      const expectedTrialEnd = Math.floor(new Date('2026-03-23T00:00:00Z').getTime() / 1000);
+      expect(subscriptionData.trial_end).toBe(expectedTrialEnd);
     } finally {
       Date.now = realDateNow;
     }

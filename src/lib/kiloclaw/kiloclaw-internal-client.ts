@@ -127,7 +127,10 @@ export class KiloClawInternalClient {
     );
   }
 
-  async start(userId: string, opts?: { skipRecovery?: boolean; imageTag?: string }): Promise<{ ok: true }> {
+  async start(
+    userId: string,
+    opts?: { skipRecovery?: boolean; imageTag?: string }
+  ): Promise<{ ok: true }> {
     return this.request(
       '/api/platform/start',
       {

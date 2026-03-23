@@ -653,7 +653,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   // ── Lifecycle ───────────────────────────────────────────────────────
 
-  async start(userId?: string, opts?: { skipRecovery?: boolean; imageTag?: string }): Promise<void> {
+  async start(
+    userId?: string,
+    opts?: { skipRecovery?: boolean; imageTag?: string }
+  ): Promise<void> {
     // Guard against concurrent start() calls — two overlapping invocations
     // (e.g. startAsync via waitUntil + a direct RPC start) can both see
     // flyMachineId as null and each create a Fly machine, orphaning one.
@@ -670,7 +673,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
-  private async _startInner(userId?: string, opts?: { skipRecovery?: boolean; imageTag?: string }): Promise<void> {
+  private async _startInner(
+    userId?: string,
+    opts?: { skipRecovery?: boolean; imageTag?: string }
+  ): Promise<void> {
     await this.loadState();
 
     if (this.s.status === 'destroying') {
@@ -698,7 +704,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // If the DO has identity but lost its machine ID, try to recover it
     // from Fly metadata before creating a duplicate machine.
     if (!this.s.flyMachineId && opts?.skipRecovery) {
-      console.warn('[DO] start: skipRecovery=true — bypassing metadata recovery, will create new machine');
+      console.warn(
+        '[DO] start: skipRecovery=true — bypassing metadata recovery, will create new machine'
+      );
     }
     if (!this.s.flyMachineId && !opts?.skipRecovery) {
       const recovered = await attemptMetadataRecovery(

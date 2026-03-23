@@ -1503,7 +1503,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                               const currentCpus = Number(machineSizeCpus);
                               const newCpus = cpuOpts.includes(currentCpus)
                                 ? currentCpus
-                                : cpuOpts[0]!;
+                                : (cpuOpts[0] ?? currentCpus);
                               setMachineSizeCpus(String(newCpus));
                               const memOpts = getValidMemoryOptions(kind, newCpus);
                               if (!memOpts.includes(Number(machineSizeMemory))) {

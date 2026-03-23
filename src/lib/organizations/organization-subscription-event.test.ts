@@ -1,18 +1,16 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { handleSubscriptionEvent } from '@/lib/organizations/organization-seats';
-import type { User, Organization, CreditTransaction } from '@kilocode/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
 import {
   organization_seats_purchases,
   organization_memberships,
   organizations,
-  credit_transactions,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { createOrganization } from '@/lib/organizations/organizations';
-import { toMicrodollars } from '@/lib/utils';
 import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@/lib/config.server';
 
 // Validate required environment variables at module load time
@@ -156,27 +154,6 @@ function createMockSubscription(overrides: Partial<Stripe.Subscription> = {}): S
   return { ...baseSubscription, ...overrides };
 }
 
-// Helper function to get credit transactions for an organization
-async function getCreditTransactionsForOrg(organizationId: string): Promise<CreditTransaction[]> {
-  return await db
-    .select()
-    .from(credit_transactions)
-    .where(eq(credit_transactions.organization_id, organizationId));
-}
-
-// Helper function to get organization balance
-async function getOrganizationBalance(organizationId: string): Promise<number> {
-  const org = await db
-    .select({
-      total_microdollars_acquired: organizations.total_microdollars_acquired,
-      microdollars_used: organizations.microdollars_used,
-    })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId))
-    .then(rows => rows[0]);
-  return (org?.total_microdollars_acquired ?? 0) - (org?.microdollars_used ?? 0);
-}
-
 describe('handleSubscriptionEvent', () => {
   let testUser: User;
   let testOrganization: Organization;
@@ -194,69 +171,6 @@ describe('handleSubscriptionEvent', () => {
         seats: '5',
       },
     });
-  });
-
-  test.skip('should create a new organization seat purchase record and grant credits', async () => {
-    const idempotencyKey = 'test-idempotency-key-1';
-
-    // Get initial balance
-    const initialBalance = await getOrganizationBalance(testOrganization.id);
-
-    await handleSubscriptionEvent(mockSubscription, idempotencyKey, true);
-
-    const purchases = await db
-      .select()
-      .from(organization_seats_purchases)
-      .where(eq(organization_seats_purchases.idempotency_key, idempotencyKey));
-
-    expect(purchases).toHaveLength(1);
-    expect(purchases[0].subscription_stripe_id).toBe(mockSubscription.id);
-    expect(purchases[0].organization_id).toBe(testOrganization.id);
-    expect(purchases[0].seat_count).toBe(5);
-    expect(purchases[0].amount_usd).toBe(50); // 5 seats * $10.00
-    expect(purchases[0].idempotency_key).toBe(idempotencyKey);
-    expect(purchases[0].subscription_status).toBe('active');
-
-    // Check that credit transaction was created (first subscription in interval)
-    const creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(1);
-    expect(creditTransactions[0].amount_microdollars).toBe(toMicrodollars(5 * 20)); // 5 seats * $20
-    expect(creditTransactions[0].is_free).toBe(true);
-    expect(creditTransactions[0].description).toBe('Seats credit for 5 seats');
-    expect(creditTransactions[0].organization_id).toBe(testOrganization.id);
-    expect(creditTransactions[0].kilo_user_id).toBe(testUser.id);
-
-    // Check that organization balance was updated
-    const finalBalance = await getOrganizationBalance(testOrganization.id);
-    expect(finalBalance).toBe(initialBalance + toMicrodollars(5 * 20));
-  });
-
-  test.skip('should not create duplicate records with same idempotency key and not grant duplicate credits', async () => {
-    const idempotencyKey = 'test-idempotency-key-duplicate';
-
-    // Get initial balance
-    const initialBalance = await getOrganizationBalance(testOrganization.id);
-
-    // First call
-    await handleSubscriptionEvent(mockSubscription, idempotencyKey, true);
-
-    // Second call with same idempotency key
-    await handleSubscriptionEvent(mockSubscription, idempotencyKey);
-
-    const purchases = await db
-      .select()
-      .from(organization_seats_purchases)
-      .where(eq(organization_seats_purchases.idempotency_key, idempotencyKey));
-
-    expect(purchases).toHaveLength(1);
-
-    // Check that only one credit transaction was created
-    const creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(1);
-
-    // Check that balance was only updated once
-    const finalBalance = await getOrganizationBalance(testOrganization.id);
-    expect(finalBalance).toBe(initialBalance + toMicrodollars(5 * 20));
   });
 
   test('should generate auto idempotency key when not provided', async () => {
@@ -1341,248 +1255,6 @@ describe('Organization seat count tracking', () => {
     expect(updatedOrg.seat_count).toBe(15);
   });
 
-  test.skip('should NOT grant credits for subsequent subscription updates in same interval', async () => {
-    const baseTime = Math.floor(Date.now() / 1000);
-    const initialBalance = await getOrganizationBalance(testOrganization.id);
-
-    // First subscription event (should grant credits)
-    const firstSubscription = createMockSubscription({
-      metadata: {
-        type: 'organization_seats',
-        kiloUserId: testUser.id,
-        organizationId: testOrganization.id,
-        seats: '5',
-      },
-      items: {
-        object: 'list',
-        data: [
-          {
-            ...createMockSubscription().items.data[0],
-            quantity: 5,
-            current_period_start: baseTime,
-            current_period_end: baseTime + 2592000,
-          },
-        ],
-        has_more: false,
-        url: '/v1/subscription_items',
-      },
-    });
-
-    await handleSubscriptionEvent(firstSubscription, 'test-first-credits', true);
-
-    // Check credits were granted for first subscription
-    let creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(1);
-    expect(creditTransactions[0].amount_microdollars).toBe(toMicrodollars(5 * 20));
-
-    const currentBalance = await getOrganizationBalance(testOrganization.id);
-    expect(currentBalance).toBe(initialBalance + toMicrodollars(5 * 20));
-
-    // Second subscription event with SAME starts_at (should NOT grant credits)
-    const secondSubscription = createMockSubscription({
-      id: `sub_test_${Math.random().toString(36).substring(7)}`, // Different subscription ID
-      metadata: {
-        type: 'organization_seats',
-        kiloUserId: testUser.id,
-        organizationId: testOrganization.id,
-        seats: '8', // Different seat count
-      },
-      items: {
-        object: 'list',
-        data: [
-          {
-            ...createMockSubscription().items.data[0],
-            quantity: 8,
-            current_period_start: baseTime, // SAME starts_at
-            current_period_end: baseTime + 2592000,
-          },
-        ],
-        has_more: false,
-        url: '/v1/subscription_items',
-      },
-    });
-
-    await handleSubscriptionEvent(secondSubscription, 'test-second-no-credits');
-
-    // Check that NO additional credits were granted
-    creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(1); // Still only 1 credit transaction
-
-    // Check that balance didn't change
-    const finalBalance = await getOrganizationBalance(testOrganization.id);
-    expect(finalBalance).toBe(currentBalance); // Same as before second subscription
-  });
-
-  test.skip('should grant credits for new billing cycle but not for updates within same cycle', async () => {
-    const baseTime = Math.floor(Date.now() / 1000);
-    const initialBalance = await getOrganizationBalance(testOrganization.id);
-
-    // First billing cycle - should grant credits
-    const firstCycleSubscription = createMockSubscription({
-      metadata: {
-        type: 'organization_seats',
-        kiloUserId: testUser.id,
-        organizationId: testOrganization.id,
-        seats: '3',
-      },
-      items: {
-        object: 'list',
-        data: [
-          {
-            ...createMockSubscription().items.data[0],
-            quantity: 3,
-            current_period_start: baseTime,
-            current_period_end: baseTime + 2592000,
-          },
-        ],
-        has_more: false,
-        url: '/v1/subscription_items',
-      },
-    });
-
-    await handleSubscriptionEvent(firstCycleSubscription, 'test-cycle1-credits', true);
-
-    // Check credits were granted
-    let creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(1);
-    expect(creditTransactions[0].amount_microdollars).toBe(toMicrodollars(3 * 20));
-
-    let currentBalance = await getOrganizationBalance(testOrganization.id);
-    expect(currentBalance).toBe(initialBalance + toMicrodollars(3 * 20));
-
-    // Update within same cycle - should NOT grant credits
-    const sameCycleUpdate = createMockSubscription({
-      id: `sub_test_${Math.random().toString(36).substring(7)}`,
-      metadata: {
-        type: 'organization_seats',
-        kiloUserId: testUser.id,
-        organizationId: testOrganization.id,
-        seats: '5',
-      },
-      items: {
-        object: 'list',
-        data: [
-          {
-            ...createMockSubscription().items.data[0],
-            quantity: 5,
-            current_period_start: baseTime, // Same cycle
-            current_period_end: baseTime + 2592000,
-          },
-        ],
-        has_more: false,
-        url: '/v1/subscription_items',
-      },
-    });
-
-    await handleSubscriptionEvent(sameCycleUpdate, 'test-cycle1-update');
-
-    // No additional credits
-    creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(1);
-
-    currentBalance = await getOrganizationBalance(testOrganization.id);
-    expect(currentBalance).toBe(initialBalance + toMicrodollars(3 * 20));
-
-    // Next billing cycle - should grant credits again
-    const nextCycleSubscription = createMockSubscription({
-      id: `sub_test_${Math.random().toString(36).substring(7)}`,
-      metadata: {
-        type: 'organization_seats',
-        kiloUserId: testUser.id,
-        organizationId: testOrganization.id,
-        seats: '7',
-      },
-      items: {
-        object: 'list',
-        data: [
-          {
-            ...createMockSubscription().items.data[0],
-            quantity: 7,
-            current_period_start: baseTime + 2592000, // Next cycle
-            current_period_end: baseTime + 5184000,
-          },
-        ],
-        has_more: false,
-        url: '/v1/subscription_items',
-      },
-    });
-
-    await handleSubscriptionEvent(nextCycleSubscription, 'test-cycle2-credits', true);
-
-    // Should have 2 credit transactions now
-    creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(2);
-
-    // Find the new credit transaction
-    const newCreditTransaction = creditTransactions.find(ct =>
-      ct.credit_category?.includes(nextCycleSubscription.id)
-    );
-    expect(newCreditTransaction).toBeDefined();
-    expect(newCreditTransaction!.amount_microdollars).toBe(toMicrodollars(7 * 20));
-
-    // Balance should include both credit grants
-    const finalBalance = await getOrganizationBalance(testOrganization.id);
-    expect(finalBalance).toBe(initialBalance + toMicrodollars(3 * 20) + toMicrodollars(7 * 20));
-  });
-
-  test('should not grant credits when subscription has ended', async () => {
-    const initialBalance = await getOrganizationBalance(testOrganization.id);
-
-    const endedSubscription = createMockSubscription({
-      metadata: {
-        type: 'organization_seats',
-        kiloUserId: testUser.id,
-        organizationId: testOrganization.id,
-        seats: '10',
-      },
-      ended_at: Math.floor(Date.now() / 1000), // Subscription ended
-      status: 'canceled',
-    });
-
-    await handleSubscriptionEvent(endedSubscription, 'test-ended-no-credits');
-
-    // No credits should be granted for ended subscriptions
-    const creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(0);
-
-    // Balance should remain unchanged
-    const finalBalance = await getOrganizationBalance(testOrganization.id);
-    expect(finalBalance).toBe(initialBalance);
-  });
-
-  test('should not grant credits when seat count is zero', async () => {
-    const initialBalance = await getOrganizationBalance(testOrganization.id);
-
-    const zeroSeatsSubscription = createMockSubscription({
-      metadata: {
-        type: 'organization_seats',
-        kiloUserId: testUser.id,
-        organizationId: testOrganization.id,
-        seats: '1', // Metadata needs positive number
-      },
-      items: {
-        object: 'list',
-        data: [
-          {
-            ...createMockSubscription().items.data[0],
-            quantity: 0, // But actual quantity is 0
-          },
-        ],
-        has_more: false,
-        url: '/v1/subscription_items',
-      },
-    });
-
-    await handleSubscriptionEvent(zeroSeatsSubscription, 'test-zero-seats-no-credits');
-
-    // No credits should be granted for zero seats
-    const creditTransactions = await getCreditTransactionsForOrg(testOrganization.id);
-    expect(creditTransactions).toHaveLength(0);
-
-    // Balance should remain unchanged
-    const finalBalance = await getOrganizationBalance(testOrganization.id);
-    expect(finalBalance).toBe(initialBalance);
-  });
 });
 
 describe('Organization plan type updates from subscription', () => {

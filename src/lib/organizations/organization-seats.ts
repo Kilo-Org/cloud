@@ -1,11 +1,7 @@
 import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
-import {
-  organization_seats_purchases,
-  organizations,
-  credit_transactions,
-} from '@kilocode/db/schema';
+import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
 import {
@@ -13,10 +9,8 @@ import {
   getOrganizationMembers,
   getOrganizationById,
 } from '@/lib/organizations/organizations';
-import { toMicrodollars } from '@/lib/utils';
 import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import { ENABLE_ORG_CREATION_FREE_CREDITS } from '@/lib/organizations/constants';
 import PostHogClient from '@/lib/posthog';
 import { findUserById } from '@/lib/user';
 import { after } from 'next/server';
@@ -235,43 +229,6 @@ async function handleSubscriptionEventInternal(
       updateData.plan = plan;
     }
     await tx.update(organizations).set(updateData).where(eq(organizations.id, meta.organizationId));
-
-    // We only want to apply credits for newly created subscriptions, not updates/cancellations etc
-    if (!isCreation) {
-      return;
-    }
-
-    if (!ENABLE_ORG_CREATION_FREE_CREDITS) {
-      return;
-    }
-
-    // 20 dollars of credit per seat...hard-coded for now.
-    const microdollarsOfCredit = toMicrodollars(maxSeatsForSubPeriod * 20);
-    const description = `Seats credit for ${maxSeatsForSubPeriod} seats; ${subscription.id}-${endDate.toISOString()}`;
-
-    // Fetch organization to get current microdollars_used for baseline
-    const [org] = await tx
-      .select({ microdollars_used: organizations.microdollars_used })
-      .from(organizations)
-      .where(eq(organizations.id, meta.organizationId));
-
-    await tx.insert(credit_transactions).values({
-      organization_id: meta.organizationId,
-      kilo_user_id: meta.kiloUserId,
-      amount_microdollars: microdollarsOfCredit,
-      is_free: true,
-      description,
-      original_baseline_microdollars_used: org?.microdollars_used ?? 0,
-    });
-
-    // Update organization balance
-    await tx
-      .update(organizations)
-      .set({
-        total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${Math.round(microdollarsOfCredit)}`,
-        microdollars_balance: sql`${organizations.microdollars_balance} + ${Math.round(microdollarsOfCredit)}`,
-      })
-      .where(eq(organizations.id, meta.organizationId));
   });
 
   if (isCreation) {

@@ -15,6 +15,8 @@ Of particular interest to us: cancel flows (replacing our hand-built UIs), pause
 
 Integrate [Churnkey](https://churnkey.co) cancel flows into KiloCode to replace our hand-built cancellation UIs. Churnkey provides a hosted modal that handles cancellation surveys, retention offers (discounts, pauses, plan switches), and cancel confirmation — all configured from their dashboard.
 
+https://docs.churnkey.co/cancel-flows/quick-start-guide
+
 ## What Churnkey Replaces
 
 Today, each product has its own cancel UX:

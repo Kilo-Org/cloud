@@ -1,5 +1,6 @@
 import type { ExecutionSession } from '../types.js';
 import { logger } from '../logger.js';
+import { shellQuote } from '../utils/shell.js';
 import {
   KiloClientError,
   KiloApiError,
@@ -250,7 +251,7 @@ export class KiloClient {
       curlArgs.push('--data-binary', `@${tempFile}`);
     }
 
-    const quotedUrl = `'${url.replace(/'/g, "'\\''")}'`;
+    const quotedUrl = shellQuote(url);
     curlArgs.push(quotedUrl);
 
     const command = curlArgs.join(' ');

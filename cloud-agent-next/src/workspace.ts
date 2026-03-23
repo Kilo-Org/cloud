@@ -3,6 +3,7 @@ import type { ExecResult, ExecOptions } from '@cloudflare/sandbox';
 import { logger } from './logger.js';
 import { findWrapperForSessionInProcesses } from './kilo/wrapper-manager.js';
 import { withTimeout } from '@kilocode/worker-utils';
+import { shellQuote } from './utils/shell.js';
 
 /**
  * Minimal interface for running shell commands.
@@ -434,10 +435,6 @@ export function buildAuthenticatedGitUrl(
   url.username = platform === 'gitlab' ? 'oauth2' : 'x-access-token';
   url.password = gitToken;
   return url.toString();
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 export async function branchExistsOnRemote(

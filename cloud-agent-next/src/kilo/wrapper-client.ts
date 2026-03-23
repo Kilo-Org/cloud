@@ -11,6 +11,7 @@ import { logger } from '../logger.js';
 import { findWrapperForSession, getWrapperSessionMarker } from './wrapper-manager.js';
 import { randomPort } from './ports.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
+import { shellQuote } from '../utils/shell.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,16 +150,12 @@ export class WrapperClient {
   private readonly port: number;
   private readonly baseUrl: string;
 
-  private shellQuote(value: string): string {
-    return `'${value.replace(/'/g, "'\\''")}'`;
-  }
-
   private async runPreflightChecks(options: {
     wrapperPath: string;
     workspacePath: string;
   }): Promise<void> {
     const { wrapperPath, workspacePath } = options;
-    const quotedWrapperPath = this.shellQuote(wrapperPath);
+    const quotedWrapperPath = shellQuote(wrapperPath);
 
     // Verify bun runtime and wrapper binary before the full start+waitForPort loop.
     // A fast `bun --version` catches SIGILL (exit 132) on hosts whose CPU lacks
@@ -249,11 +246,11 @@ export class WrapperClient {
 
     if (body) {
       // Escape single quotes in JSON
-      const json = this.shellQuote(JSON.stringify(body));
+      const json = shellQuote(JSON.stringify(body));
       command += ` -d ${json}`;
     }
 
-    command += ` ${this.shellQuote(url)}`;
+    command += ` ${shellQuote(url)}`;
 
     // Execute curl in the container
     const result = await this.session.exec(command);
@@ -335,12 +332,12 @@ export class WrapperClient {
       `WORKSPACE_PATH=${workspacePath}`,
       `WRAPPER_LOG_PATH=${wrapperLogPath}`,
     ];
-    const argParts = [`--user-id ${this.shellQuote(userId)}`];
+    const argParts = [`--user-id ${shellQuote(userId)}`];
     if (sessionId) {
-      argParts.push(`--session-id ${this.shellQuote(sessionId)}`);
+      argParts.push(`--session-id ${shellQuote(sessionId)}`);
     }
 
-    const command = `${envParts.join(' ')} bun run ${this.shellQuote(wrapperPath)} ${sessionMarker} ${argParts.join(' ')}`;
+    const command = `${envParts.join(' ')} bun run ${shellQuote(wrapperPath)} ${sessionMarker} ${argParts.join(' ')}`;
 
     logger.debug('WrapperClient: starting wrapper process', {
       command,

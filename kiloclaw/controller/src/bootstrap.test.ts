@@ -7,6 +7,7 @@ import {
   generateHooksToken,
   configureGitHub,
   runOnboardOrDoctor,
+  updateToolsMdGitHubSection,
   updateToolsMd1PasswordSection,
   buildGatewayArgs,
   bootstrap,
@@ -565,6 +566,79 @@ describe('runOnboardOrDoctor', () => {
     expect(doctorCall?.args).toContain('--fix');
     expect(doctorCall?.args).toContain('--non-interactive');
     expect(env.KILOCLAW_FRESH_INSTALL).toBe('false');
+  });
+});
+
+// ---- updateToolsMdGitHubSection ----
+
+describe('updateToolsMdGitHubSection', () => {
+  it('adds GitHub CLI section when GITHUB_TOKEN is set', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
+
+    const env: Record<string, string | undefined> = {
+      GITHUB_TOKEN: 'ghp_test123',
+    };
+
+    updateToolsMdGitHubSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(1);
+    expect(harness.writeCalls[0]!.data).toContain('<!-- BEGIN:github-cli -->');
+    expect(harness.writeCalls[0]!.data).toContain('gh');
+    expect(harness.writeCalls[0]!.data).toContain('<!-- END:github-cli -->');
+  });
+
+  it('skips adding when section already present', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# TOOLS\n<!-- BEGIN:github-cli -->\nexisting\n<!-- END:github-cli -->'
+    );
+
+    const env: Record<string, string | undefined> = {
+      GITHUB_TOKEN: 'ghp_test123',
+    };
+
+    updateToolsMdGitHubSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(0);
+  });
+
+  it('removes stale section when token is absent', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# TOOLS\n<!-- BEGIN:github-cli -->\nold section\n<!-- END:github-cli -->\n'
+    );
+
+    const env: Record<string, string | undefined> = {};
+
+    updateToolsMdGitHubSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(1);
+    expect(harness.writeCalls[0]!.data).not.toContain('<!-- BEGIN:github-cli -->');
+  });
+
+  it('no-ops when TOOLS.md does not exist', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    const env: Record<string, string | undefined> = {
+      GITHUB_TOKEN: 'ghp_test123',
+    };
+
+    updateToolsMdGitHubSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(0);
+  });
+
+  it('no-ops when token absent and no stale section exists', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
+
+    const env: Record<string, string | undefined> = {};
+
+    updateToolsMdGitHubSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(0);
   });
 });
 

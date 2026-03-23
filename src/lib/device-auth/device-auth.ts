@@ -1,13 +1,12 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
 import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
-import { eq, and, lt, sql } from 'drizzle-orm';
+import { eq, lt } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
 import { randomBytes } from 'node:crypto';
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
-const MAX_PENDING_REQUESTS_PER_IP = 5;
 
 /**
  * Generate a random device authorization code
@@ -33,28 +32,6 @@ export async function createDeviceAuthRequest(params: {
   ipAddress?: string;
 }): Promise<{ code: string; expiresAt: Date }> {
   const { userAgent, ipAddress } = params;
-
-  // Validate IP address on Production
-  if (process.env['NODE_ENV'] === 'production' && !ipAddress) {
-    throw new Error('IP address is required in production');
-  }
-
-  // Rate limiting: check pending requests from this IP
-  if (ipAddress) {
-    const [result] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(device_auth_requests)
-      .where(
-        and(
-          eq(device_auth_requests.ip_address, ipAddress),
-          eq(device_auth_requests.status, 'pending')
-        )
-      );
-
-    if (result && result.count >= MAX_PENDING_REQUESTS_PER_IP) {
-      throw new Error('Too many pending authorization requests from this IP');
-    }
-  }
 
   const code = generateDeviceCode();
   const expiresAt = new Date(Date.now() + CODE_EXPIRATION_MINUTES * 60 * 1000);

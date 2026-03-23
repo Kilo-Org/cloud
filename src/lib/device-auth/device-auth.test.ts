@@ -67,18 +67,15 @@ describe('Device Auth', () => {
       expect(request?.ip_address).toBe('127.0.0.1');
     });
 
-    test('enforces rate limiting per IP', async () => {
+    test('allows multiple requests from the same IP (no IP-based rate limit)', async () => {
       const ipAddress = '192.168.1.1';
 
-      // Create 5 pending requests (the limit)
-      for (let i = 0; i < 5; i++) {
-        await createDeviceAuthRequest({ ipAddress });
+      // Should allow more than 5 pending requests from the same IP
+      // (IP rate limiting removed in favor of Turnstile verification at the route level)
+      for (let i = 0; i < 6; i++) {
+        const result = await createDeviceAuthRequest({ ipAddress });
+        expect(result.code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
       }
-
-      // 6th request should fail
-      await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
-        'Too many pending authorization requests from this IP'
-      );
     });
   });
 

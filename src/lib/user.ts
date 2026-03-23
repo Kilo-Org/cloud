@@ -363,6 +363,7 @@ export async function linkAccountToExistingUser(
     email: authProviderData.google_user_email,
     avatar_url: authProviderData.google_user_image_url,
     hosted_domain: authProviderData.hosted_domain,
+    display_name: authProviderData.google_user_name,
   });
 
   if (!linkResult.success) {

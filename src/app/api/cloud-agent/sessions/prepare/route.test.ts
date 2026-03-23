@@ -98,6 +98,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     github_url: null,
     openrouter_upstream_safety_identifier: null,
     customer_source: null,
+    discord_server_membership_verified_at: null,
     ...overrides,
   };
 }

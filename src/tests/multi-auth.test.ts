@@ -57,6 +57,7 @@ describe('Multi-Auth System', () => {
         email: 'test@example.com',
         avatar_url: 'https://example.com/avatar.jpg',
         hosted_domain: null,
+        display_name: null,
       });
 
       expect(result.success).toBe(true);
@@ -79,6 +80,7 @@ describe('Multi-Auth System', () => {
         email: 'test2@example.com',
         avatar_url: 'https://example.com/avatar2.jpg',
         hosted_domain: null,
+        display_name: null,
       });
 
       expect(result.success).toBe(false);
@@ -100,6 +102,7 @@ describe('Multi-Auth System', () => {
           email: 'test3@example.com',
           avatar_url: 'https://example.com/avatar3.jpg',
           hosted_domain: null,
+          display_name: null,
         });
 
         expect(result.success).toBe(false);
@@ -126,6 +129,7 @@ describe('Multi-Auth System', () => {
         email: 'test@example.com',
         avatar_url: 'https://example.com/avatar.jpg',
         hosted_domain: null,
+        display_name: null,
       });
     });
 

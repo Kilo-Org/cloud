@@ -8,13 +8,12 @@ import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateApiToken, generateInternalServiceToken } from '@/lib/tokens';
+import { generateApiToken } from '@/lib/tokens';
 import {
   fetchSessionMessages,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
 } from '@/lib/session-ingest-client';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { sanitizeGitUrl } from '@/routers/cli-sessions-router';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
@@ -438,40 +437,18 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      if (!SESSION_INGEST_WORKER_URL) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'SESSION_INGEST_WORKER_URL is not configured',
-        });
-      }
-
-      const token = generateInternalServiceToken(session.kilo_user_id);
-      const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(input.kilo_session_id)}/share`;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Session share failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`,
-        });
-      }
-
-      const shareResponseSchema = z.object({ public_id: z.string() });
-      let body: z.infer<typeof shareResponseSchema>;
       try {
-        body = shareResponseSchema.parse(await response.json());
-      } catch {
+        const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
+        return { share_id: result.public_id, session_id: input.kilo_session_id };
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Session not found') {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        }
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Session share succeeded but response was malformed',
+          message: 'Failed to share session',
+          cause: error,
         });
       }
-
-      return { share_id: body.public_id, session_id: input.kilo_session_id };
     }),
 });

@@ -48,6 +48,8 @@ export async function fetchWithBackoff(
         );
         return response;
       }
+      // Drain the body of retried responses to free the underlying socket/buffer.
+      response.body?.cancel().catch(() => {});
     } catch (err) {
       if (hasElapsed()) {
         captureException(err, {

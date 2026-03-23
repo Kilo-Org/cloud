@@ -1,4 +1,5 @@
 import { captureException } from '@sentry/nextjs';
+import type { fetchWithBackoff as fetchWithBackoffType } from '@/lib/fetchWithBackoff';
 import { generateInternalServiceToken } from '@/lib/tokens';
 import type { SessionSnapshot } from './session-ingest-client';
 import {
@@ -24,11 +25,21 @@ jest.mock('@/lib/tokens', () => ({
   generateInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
 }));
 
+// Passthrough to global.fetch so existing single-response mocks keep working.
+jest.mock('@/lib/fetchWithBackoff', () => ({
+  fetchWithBackoff: jest.fn((input: RequestInfo | URL, init?: RequestInit) =>
+    global.fetch(input, init)
+  ),
+}));
+
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const mockCaptureException = jest.mocked(captureException);
 const mockGenerateInternalServiceToken = jest.mocked(generateInternalServiceToken);
+const mockFetchWithBackoff = jest.mocked(
+  jest.requireMock<{ fetchWithBackoff: typeof fetchWithBackoffType }>('@/lib/fetchWithBackoff')
+).fetchWithBackoff;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -172,6 +183,83 @@ describe('fetchSessionSnapshot', () => {
       })
     );
   });
+});
+
+// ---------------------------------------------------------------------------
+// fetchSessionSnapshot — retry integration (real fetchWithBackoff)
+// ---------------------------------------------------------------------------
+
+describe('fetchSessionSnapshot retry integration', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+
+    // Swap to the real fetchWithBackoff for this describe block.
+    const real = jest.requireActual<{ fetchWithBackoff: typeof fetchWithBackoffType }>(
+      '@/lib/fetchWithBackoff'
+    );
+    mockFetchWithBackoff.mockImplementation(real.fetchWithBackoff);
+  });
+
+  afterEach(() => {
+    mockFetchWithBackoff.mockImplementation((input: RequestInfo | URL, init?: RequestInit) =>
+      global.fetch(input, init)
+    );
+  });
+
+  it('succeeds after a transient 500 without reporting to Sentry', async () => {
+    const snapshot = makeSnapshot([
+      { role: 'assistant', parts: [{ type: 'text', text: 'hello' }] },
+    ]);
+
+    // First call: transient 500. Second call: success.
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        text: () => Promise.resolve('transient'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(snapshot),
+      });
+
+    const result = await fetchSessionSnapshot('ses_retry', 'user_123');
+
+    expect(result).toEqual(snapshot);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // captureException should NOT have been called — the retry recovered.
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('reports to Sentry only after retries are exhausted', async () => {
+    // Always return 500 — fetchWithBackoff will exhaust its 10s budget.
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('persistent failure'),
+    });
+
+    await expect(fetchSessionSnapshot('ses_exhaust', 'user_123')).rejects.toThrow(
+      'Session ingest export failed: 500 Internal Server Error - persistent failure'
+    );
+
+    // Sentry should be called exactly once, after all retries failed.
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'export' },
+        extra: { sessionId: 'ses_exhaust', status: 500 },
+      })
+    );
+    // fetchWithBackoff should have retried multiple times.
+    expect(mockFetch.mock.calls.length).toBeGreaterThan(1);
+  }, 15_000);
 });
 
 // ---------------------------------------------------------------------------

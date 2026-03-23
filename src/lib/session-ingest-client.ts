@@ -3,6 +3,7 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { fetchWithBackoff } from '@/lib/fetchWithBackoff';
 import { generateInternalServiceToken } from '@/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 
@@ -62,9 +63,11 @@ export async function fetchSessionSnapshot(
   const token = generateInternalServiceToken(userId);
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/export`;
 
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetchWithBackoff(
+    url,
+    { headers: { Authorization: `Bearer ${token}` } },
+    { maxDelayMs: 10_000 }
+  );
 
   if (response.status === 404) {
     return null;
@@ -125,10 +128,11 @@ export async function shareSession(
   const token = generateInternalServiceToken(userId);
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/share`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetchWithBackoff(
+    url,
+    { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
+    { maxDelayMs: 10_000 }
+  );
 
   if (response.status === 404) {
     throw new Error('Session not found');
@@ -168,10 +172,11 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
   const token = generateInternalServiceToken(userId);
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}`;
 
-  const response = await fetch(url, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetchWithBackoff(
+    url,
+    { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+    { maxDelayMs: 10_000 }
+  );
 
   if (response.status === 404) {
     // Session already deleted or was never ingested — treat as success (idempotent delete).

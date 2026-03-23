@@ -1,9 +1,7 @@
 // Set stripe price env vars before any module loads
 process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
 process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
-process.env.STRIPE_KILOCLAW_STANDARD_FIRST_MONTH_COUPON_ID ||=
-  'coupon_test_kiloclaw_standard_first_month';
-process.env.STRIPE_KILOCLAW_BILLING_START ||= '2026-03-23T00:00:00Z';
+process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
 
 import {
   describe,
@@ -36,7 +34,12 @@ jest.mock('@/lib/stripe-client', () => {
   const { errors } = require('stripe').default ?? require('stripe');
   const stripeMock = {
     subscriptions: { retrieve: jest.fn(), update: jest.fn(), list: jest.fn() },
-    subscriptionSchedules: { create: jest.fn(), update: jest.fn(), release: jest.fn() },
+    subscriptionSchedules: {
+      create: jest.fn(),
+      update: jest.fn(),
+      release: jest.fn(),
+      retrieve: jest.fn(),
+    },
     checkout: { sessions: { create: jest.fn(), list: jest.fn(), expire: jest.fn() } },
     billingPortal: { sessions: { create: jest.fn() } },
     errors,
@@ -50,11 +53,16 @@ jest.mock('@/lib/rewardful', () => ({
 
 jest.mock('@/lib/kiloclaw/stripe-price-ids.server', () => ({
   getStripePriceIdForClawPlan: jest.fn(() => 'price_test_kiloclaw'),
+  getStripePriceIdForClawPlanIntro: jest.fn((plan: string) =>
+    plan === 'standard' ? 'price_standard_intro' : 'price_commit'
+  ),
   getClawPlanForStripePriceId: jest.fn((priceId: string) => {
     if (priceId === 'price_commit') return 'commit';
     if (priceId === 'price_standard') return 'standard';
+    if (priceId === 'price_standard_intro') return 'standard';
     return null;
   }),
+  isIntroPriceId: jest.fn((priceId: string) => priceId === 'price_standard_intro'),
 }));
 
 jest.mock('next/headers', () => {
@@ -95,7 +103,7 @@ type StripeMockShape = {
   checkout: { sessions: { create: AnyMock; list: AnyMock; expire: AnyMock } };
   billingPortal: { sessions: { create: AnyMock } };
   subscriptions: { retrieve: AnyMock; update: AnyMock; list: AnyMock };
-  subscriptionSchedules: { create: AnyMock; update: AnyMock; release: AnyMock };
+  subscriptionSchedules: { create: AnyMock; update: AnyMock; release: AnyMock; retrieve: AnyMock };
   errors: Stripe['errors'];
 };
 
@@ -132,6 +140,20 @@ beforeEach(async () => {
   stripeMock.subscriptionSchedules.create.mockReset();
   stripeMock.subscriptionSchedules.update.mockReset();
   stripeMock.subscriptionSchedules.release.mockReset();
+  stripeMock.subscriptionSchedules.retrieve.mockReset();
+
+  // Default mock returns for live-fetch calls
+  stripeMock.subscriptions.retrieve.mockResolvedValue({
+    schedule: null,
+    items: { data: [{ price: { id: 'price_standard' } }] },
+  });
+  stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+    id: 'sub_sched_test',
+    metadata: {},
+    phases: [],
+    end_behavior: 'release',
+    status: 'active',
+  });
 
   // Reset rewardful mock
   const { getRewardfulReferral } = jest.requireMock<{
@@ -240,7 +262,7 @@ describe('getBillingStatus', () => {
 });
 
 describe('createSubscriptionCheckout', () => {
-  it('applies the configured first-month coupon for standard plan', async () => {
+  it('uses the intro price and allow_promotion_codes for new standard subscribers', async () => {
     stripeMock.checkout.sessions.create.mockResolvedValue({
       url: 'https://checkout.stripe.com/test',
     });
@@ -252,27 +274,15 @@ describe('createSubscriptionCheckout', () => {
       string,
       unknown
     >;
-    expect(callArgs.discounts).toEqual([{ coupon: 'coupon_test_kiloclaw_standard_first_month' }]);
-    expect(callArgs.allow_promotion_codes).toBeUndefined();
-  });
-
-  it('does not set discounts or promotion codes for commit plan', async () => {
-    stripeMock.checkout.sessions.create.mockResolvedValue({
-      url: 'https://checkout.stripe.com/test',
-    });
-
-    const caller = await createCallerForUser(user.id);
-    await caller.kiloclaw.createSubscriptionCheckout({ plan: 'commit' });
-
-    const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
-      string,
-      unknown
-    >;
+    // Should use intro price
+    expect(callArgs.line_items).toEqual([{ price: 'price_standard_intro', quantity: 1 }]);
+    // Should allow promotion codes (for Rewardful promo codes)
+    expect(callArgs.allow_promotion_codes).toBe(true);
+    // Should NOT have discounts (coupon removed)
     expect(callArgs.discounts).toBeUndefined();
-    expect(callArgs.allow_promotion_codes).toBeUndefined();
   });
 
-  it('does not apply the first-month coupon for returning canceled subscribers', async () => {
+  it('uses the regular price for returning canceled standard subscribers', async () => {
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       plan: 'standard',
@@ -291,8 +301,48 @@ describe('createSubscriptionCheckout', () => {
       string,
       unknown
     >;
+    // Should use regular price (via getStripePriceIdForClawPlan mock which returns 'price_test_kiloclaw')
+    expect(callArgs.line_items).toEqual([{ price: 'price_test_kiloclaw', quantity: 1 }]);
+    expect(callArgs.allow_promotion_codes).toBe(true);
     expect(callArgs.discounts).toBeUndefined();
-    expect(callArgs.allow_promotion_codes).toBeUndefined();
+  });
+
+  it('uses the intro price for users whose trial expired without a paid subscription', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      plan: 'trial',
+      status: 'canceled',
+    });
+
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
+
+    const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    // A canceled trial is not a prior paid subscription — should get intro price
+    expect(callArgs.line_items).toEqual([{ price: 'price_standard_intro', quantity: 1 }]);
+  });
+
+  it('uses allow_promotion_codes for commit plan', async () => {
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.createSubscriptionCheckout({ plan: 'commit' });
+
+    const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(callArgs.allow_promotion_codes).toBe(true);
+    expect(callArgs.discounts).toBeUndefined();
   });
 
   it('includes client_reference_id when rewardful cookie is set', async () => {
@@ -313,48 +363,6 @@ describe('createSubscriptionCheckout', () => {
         client_reference_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       })
     );
-  });
-
-  it('sets trial_end in subscription_data when before March 23', async () => {
-    // Today (March 12, 2026) is before March 23 — no fake timers needed
-    stripeMock.checkout.sessions.create.mockResolvedValue({
-      url: 'https://checkout.stripe.com/test',
-    });
-
-    const caller = await createCallerForUser(user.id);
-    await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
-
-    const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
-      string,
-      unknown
-    >;
-    const subscriptionData = callArgs.subscription_data as Record<string, unknown>;
-    const expectedTrialEnd = Math.floor(new Date('2026-03-23T00:00:00Z').getTime() / 1000);
-    expect(subscriptionData.trial_end).toBe(expectedTrialEnd);
-  });
-
-  it('does not set trial_end when after March 23', async () => {
-    // Temporarily override Date.now to simulate being after March 23
-    const realDateNow = Date.now;
-    Date.now = () => new Date('2026-04-01T00:00:00Z').getTime();
-
-    try {
-      stripeMock.checkout.sessions.create.mockResolvedValue({
-        url: 'https://checkout.stripe.com/test',
-      });
-
-      const caller = await createCallerForUser(user.id);
-      await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
-
-      const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
-        string,
-        unknown
-      >;
-      const subscriptionData = callArgs.subscription_data as Record<string, unknown>;
-      expect(subscriptionData.trial_end).toBeUndefined();
-    } finally {
-      Date.now = realDateNow;
-    }
   });
 });
 
@@ -674,6 +682,129 @@ describe('handleKiloClawSubscriptionCreated', () => {
     expect(row.stripe_subscription_id).toBe('sub_current');
     expect(row.plan).toBe('standard');
   });
+
+  it('calls ensureAutoIntroSchedule for intro-price subscription', async () => {
+    // Set up stripe.subscriptions.retrieve to return intro price
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard_intro' } }] },
+    });
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sub_sched_auto',
+      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const subscription = makeStripeSubscription({
+      id: 'sub_intro',
+      metadata: { type: 'kiloclaw', plan: 'standard', kiloUserId: user.id },
+      status: 'active',
+      priceId: 'price_standard_intro',
+    });
+
+    await handleKiloClawSubscriptionCreated({
+      eventId: 'evt_intro_created',
+      subscription,
+    });
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_subscription_id).toBe('sub_intro');
+    expect(row.plan).toBe('standard');
+    // ensureAutoIntroSchedule should have been invoked
+    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
+    expect(row.stripe_schedule_id).toBe('sub_sched_auto');
+    expect(row.scheduled_plan).toBe('standard');
+    expect(row.scheduled_by).toBe('auto');
+  });
+
+  it('repairs half-configured auto-intro schedule on retry', async () => {
+    // Simulate: first attempt created the schedule (from_subscription) and tagged
+    // it auto-intro, but the 2-phase rewrite never completed. On retry, the
+    // subscription has a schedule attached with auto-intro metadata but only 1 phase.
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: 'sched_half',
+      items: { data: [{ price: { id: 'price_standard_intro' } }] },
+    });
+    stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+      id: 'sched_half',
+      metadata: { origin: 'auto-intro' },
+      // Only 1 phase — the 2-phase rewrite never completed
+      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      status: 'active',
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const subscription = makeStripeSubscription({
+      id: 'sub_half_repair',
+      metadata: { type: 'kiloclaw', plan: 'standard', kiloUserId: user.id },
+      status: 'active',
+      priceId: 'price_standard_intro',
+    });
+
+    await handleKiloClawSubscriptionCreated({
+      eventId: 'evt_half_repair',
+      subscription,
+    });
+
+    // Should have rewritten the schedule with 2 phases
+    expect(stripeMock.subscriptionSchedules.update).toHaveBeenCalledWith(
+      'sched_half',
+      expect.objectContaining({
+        end_behavior: 'release',
+        phases: expect.arrayContaining([
+          expect.objectContaining({
+            items: [{ price: 'price_standard_intro' }],
+          }),
+          expect.objectContaining({
+            items: [{ price: 'price_test_kiloclaw' }],
+          }),
+        ]),
+      })
+    );
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+    expect(row.stripe_schedule_id).toBe('sched_half');
+    expect(row.scheduled_by).toBe('auto');
+  });
+
+  it('does not create auto schedule for regular-price subscription (returning subscriber)', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      plan: 'standard',
+      status: 'canceled',
+      stripe_subscription_id: 'sub_old_canceled',
+    });
+
+    // Regular price — isIntroPriceId returns false
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    const subscription = makeStripeSubscription({
+      id: 'sub_regular_return',
+      metadata: { type: 'kiloclaw', plan: 'standard', kiloUserId: user.id },
+      status: 'active',
+      priceId: 'price_standard',
+    });
+
+    await handleKiloClawSubscriptionCreated({
+      eventId: 'evt_regular_created',
+      subscription,
+    });
+
+    // Should NOT create a schedule
+    expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('cancelSubscription', () => {
@@ -685,6 +816,7 @@ describe('cancelSubscription', () => {
       status: 'active',
     });
 
+    stripeMock.subscriptions.retrieve.mockResolvedValue({ schedule: null });
     stripeMock.subscriptions.update.mockResolvedValue({});
 
     const caller = await createCallerForUser(user.id);
@@ -716,6 +848,7 @@ describe('cancelSubscription', () => {
       scheduled_by: 'user',
     });
 
+    stripeMock.subscriptions.retrieve.mockResolvedValue({ schedule: null });
     stripeMock.subscriptionSchedules.release.mockResolvedValue({});
     stripeMock.subscriptions.update.mockResolvedValue({});
 
@@ -747,6 +880,7 @@ describe('cancelSubscription', () => {
       scheduled_by: 'user',
     });
 
+    stripeMock.subscriptions.retrieve.mockResolvedValue({ schedule: null });
     stripeMock.subscriptionSchedules.release.mockRejectedValue(
       new Error('This schedule is not active and cannot be released')
     );
@@ -769,6 +903,7 @@ describe('cancelSubscription', () => {
       scheduled_by: 'user',
     });
 
+    stripeMock.subscriptions.retrieve.mockResolvedValue({ schedule: null });
     stripeMock.subscriptionSchedules.release.mockRejectedValue(new Error('Stripe API timeout'));
 
     const caller = await createCallerForUser(user.id);
@@ -785,6 +920,28 @@ describe('cancelSubscription', () => {
 
     expect(row.stripe_schedule_id).toBe('sched_fail');
     expect(row.cancel_at_period_end).toBe(false);
+  });
+
+  it('detects and releases hidden schedule when DB has no pointer but Stripe has schedule', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_hidden_sched',
+      plan: 'standard',
+      status: 'active',
+      // No stripe_schedule_id in DB
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: 'sched_hidden',
+    });
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+    stripeMock.subscriptions.update.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelSubscription();
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sched_hidden');
   });
 });
 
@@ -821,6 +978,431 @@ describe('reactivateSubscription', () => {
     expect(row.cancel_at_period_end).toBe(false);
     // commit_ends_at preserved (compare as dates to avoid format mismatch)
     expect(new Date(row.commit_ends_at!).getTime()).toBe(new Date(futureCommitEnd).getTime());
+  });
+
+  it('restores auto intro schedule after reactivating a standard intro-price subscription', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_reactivate_intro',
+      plan: 'standard',
+      status: 'active',
+      cancel_at_period_end: true,
+    });
+
+    stripeMock.subscriptions.update.mockResolvedValue({});
+    // ensureAutoIntroSchedule will call stripe.subscriptions.retrieve
+    // Return intro price to trigger schedule creation
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard_intro' } }] },
+    });
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sub_sched_restored',
+      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.reactivateSubscription();
+
+    expect(result).toEqual({ success: true });
+    // Schedule should have been created
+    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
+  });
+
+  it('succeeds even if ensureAutoIntroSchedule throws after reactivation', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_reactivate_fail',
+      plan: 'standard',
+      status: 'active',
+      cancel_at_period_end: true,
+    });
+
+    stripeMock.subscriptions.update.mockResolvedValue({});
+    // Make ensureAutoIntroSchedule fail
+    stripeMock.subscriptions.retrieve.mockRejectedValue(new Error('Stripe timeout'));
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.reactivateSubscription();
+
+    // Should still succeed — reactivation is the primary operation
+    expect(result).toEqual({ success: true });
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+    expect(row.cancel_at_period_end).toBe(false);
+  });
+});
+
+describe('switchPlan', () => {
+  it('creates a fresh schedule when switching standard to commit with no existing schedule', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_switch',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sub_sched_new',
+      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.switchPlan({ toPlan: 'commit' });
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
+    expect(stripeMock.subscriptionSchedules.update).toHaveBeenCalled();
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+    expect(dbRow.stripe_schedule_id).toBe('sub_sched_new');
+    expect(dbRow.scheduled_plan).toBe('commit');
+    expect(dbRow.scheduled_by).toBe('user');
+  });
+
+  it('rejects switch when user-initiated schedule already exists', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_switch_reject',
+      plan: 'standard',
+      status: 'active',
+      stripe_schedule_id: 'sched_user_pending',
+      scheduled_plan: 'commit',
+      scheduled_by: 'user',
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: 'sched_user_pending',
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'commit' })).rejects.toThrow(
+      'A plan switch is already pending'
+    );
+  });
+
+  it('updates auto schedule in place when switching standard (intro) to commit', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_switch_auto',
+      plan: 'standard',
+      status: 'active',
+      stripe_schedule_id: 'sched_auto',
+      scheduled_plan: 'standard',
+      scheduled_by: 'auto',
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: 'sched_auto',
+      items: { data: [{ price: { id: 'price_standard_intro' } }] },
+    });
+    stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+      id: 'sched_auto',
+      metadata: { origin: 'auto-intro' },
+      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      status: 'active',
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.switchPlan({ toPlan: 'commit' });
+
+    expect(result).toEqual({ success: true });
+    // Should update existing schedule, not create a new one
+    expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+    expect(stripeMock.subscriptionSchedules.update).toHaveBeenCalledWith(
+      'sched_auto',
+      expect.objectContaining({
+        end_behavior: 'release',
+      })
+    );
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+    expect(row.stripe_schedule_id).toBe('sched_auto');
+    expect(row.scheduled_plan).toBe('commit');
+    expect(row.scheduled_by).toBe('user');
+  });
+
+  it('detects hidden auto schedule via live fetch and updates it in place', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_hidden_auto',
+      plan: 'standard',
+      status: 'active',
+      // No stripe_schedule_id in DB
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: 'sched_hidden_auto',
+      items: { data: [{ price: { id: 'price_standard_intro' } }] },
+    });
+    stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+      id: 'sched_hidden_auto',
+      metadata: { origin: 'auto-intro' },
+      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+      status: 'active',
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.switchPlan({ toPlan: 'commit' });
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+    expect(row.scheduled_by).toBe('user');
+    expect(row.scheduled_plan).toBe('commit');
+  });
+
+  it('releases hidden non-auto schedule and creates fresh schedule', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_hidden_user',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: 'sched_hidden_user',
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+    stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+      id: 'sched_hidden_user',
+      metadata: {},
+      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      status: 'active',
+    });
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sched_fresh',
+      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.switchPlan({ toPlan: 'commit' });
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sched_hidden_user');
+    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
+  });
+
+  it('rejects switch to same plan', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_same',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'standard' })).rejects.toThrow(
+      'Already on this plan'
+    );
+  });
+
+  it('aborts when releasing hidden non-auto schedule fails with transient error', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_hidden_fail',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: 'sched_hidden_transient',
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+    stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({
+      id: 'sched_hidden_transient',
+      metadata: {},
+      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+      status: 'active',
+    });
+    // Transient error — not "not active" or "released" or "canceled"
+    stripeMock.subscriptionSchedules.release.mockRejectedValue(new Error('Stripe API timeout'));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'commit' })).rejects.toThrow(
+      'Unable to switch plan: failed to release existing schedule'
+    );
+  });
+
+  it('derives phase-1 price from the newly created schedule, not the stale live fetch', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_fresh_price',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    // Live fetch returns the old intro price (stale by the time the schedule is created)
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard_intro' } }] },
+    });
+    // But from_subscription mirrors the subscription's current state at create time,
+    // which has already rolled over to the regular price
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sched_fresh_price',
+      phases: [{ items: [{ price: 'price_standard' }], start_date: 1000, end_date: 2000 }],
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.switchPlan({ toPlan: 'commit' });
+
+    expect(result).toEqual({ success: true });
+    // Phase 1 should use the fresh price from the schedule ('price_standard'),
+    // not the stale intro price from the earlier subscriptions.retrieve()
+    const updateArgs = stripeMock.subscriptionSchedules.update.mock.calls[0]?.[1] as Record<
+      string,
+      unknown
+    >;
+    const phases = updateArgs.phases as Array<{ items: Array<{ price: string }> }>;
+    expect(phases[0].items[0].price).toBe('price_standard');
+  });
+});
+
+describe('cancelPlanSwitch', () => {
+  it('releases user schedule and clears DB fields', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_cancel_switch',
+      plan: 'standard',
+      status: 'active',
+      stripe_schedule_id: 'sched_user_switch',
+      scheduled_plan: 'commit',
+      scheduled_by: 'user',
+    });
+
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+    // ensureAutoIntroSchedule will check price — return regular price so it no-ops
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelPlanSwitch();
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sched_user_switch');
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+    expect(row.stripe_schedule_id).toBeNull();
+    expect(row.scheduled_plan).toBeNull();
+    expect(row.scheduled_by).toBeNull();
+  });
+
+  it('restores auto schedule when canceling switch during intro month', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_cancel_switch_intro',
+      plan: 'standard',
+      status: 'active',
+      stripe_schedule_id: 'sched_user_intro',
+      scheduled_plan: 'commit',
+      scheduled_by: 'user',
+    });
+
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+    // Return intro price so ensureAutoIntroSchedule creates a schedule
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard_intro' } }] },
+    });
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sched_auto_restored',
+      phases: [{ items: [{ price: 'price_standard_intro' }], start_date: 1000, end_date: 2000 }],
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelPlanSwitch();
+
+    expect(result).toEqual({ success: true });
+    // Should have restored the auto schedule
+    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+    // After ensureAutoIntroSchedule, DB should have the restored schedule
+    expect(row.stripe_schedule_id).toBe('sched_auto_restored');
+    expect(row.scheduled_plan).toBe('standard');
+    expect(row.scheduled_by).toBe('auto');
+  });
+
+  it('rejects when no user-initiated schedule exists', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_no_switch',
+      plan: 'standard',
+      status: 'active',
+      stripe_schedule_id: 'sched_auto_only',
+      scheduled_plan: 'standard',
+      scheduled_by: 'auto',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelPlanSwitch()).rejects.toThrow(
+      'No user-initiated plan switch to cancel'
+    );
+  });
+
+  it('succeeds when schedule is already released', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_already_released',
+      plan: 'standard',
+      status: 'active',
+      stripe_schedule_id: 'sched_gone',
+      scheduled_plan: 'commit',
+      scheduled_by: 'user',
+    });
+
+    stripeMock.subscriptionSchedules.release.mockRejectedValue(
+      new Error('This schedule is not active and cannot be released')
+    );
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelPlanSwitch();
+
+    expect(result).toEqual({ success: true });
   });
 });
 
@@ -878,5 +1460,412 @@ describe('createSubscriptionCheckout — concurrent checkout guard', () => {
     await expect(caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' })).rejects.toThrow(
       'You already have an active subscription'
     );
+  });
+});
+
+// ── switchPlan ─────────────────────────────────────────────────────────────
+
+describe('switchPlan', () => {
+  const now = Math.floor(Date.now() / 1000);
+
+  function setupActiveSubscription(plan: 'commit' | 'standard') {
+    return db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_switch_test',
+      plan,
+      status: 'active',
+    });
+  }
+
+  function mockStripeForSwitchPlan(scheduleOnSub: string | null = null) {
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      id: 'sub_switch_test',
+      schedule: scheduleOnSub,
+    });
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sub_sched_new',
+      phases: [
+        { start_date: now, end_date: now + 86400 * 30, items: [{ price: 'price_test_kiloclaw' }] },
+      ],
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({
+      id: 'sub_sched_new',
+      status: 'active',
+    });
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+  }
+
+  it('creates a schedule and writes it to the DB on happy path', async () => {
+    await setupActiveSubscription('commit');
+    mockStripeForSwitchPlan();
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.switchPlan({ toPlan: 'standard' });
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalledWith({
+      from_subscription: 'sub_switch_test',
+    });
+    expect(stripeMock.subscriptionSchedules.update).toHaveBeenCalledWith(
+      'sub_sched_new',
+      expect.objectContaining({ end_behavior: 'release' })
+    );
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_schedule_id).toBe('sub_sched_new');
+    expect(row.scheduled_plan).toBe('standard');
+    expect(row.scheduled_by).toBe('user');
+  });
+
+  it('rejects when user is already on the target plan', async () => {
+    await setupActiveSubscription('standard');
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'standard' })).rejects.toThrow(
+      'Already on this plan'
+    );
+  });
+
+  it('rejects when subscription is not active', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_canceled',
+      plan: 'standard',
+      status: 'canceled',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'commit' })).rejects.toThrow(
+      'No active subscription to switch'
+    );
+  });
+
+  it('rejects when a pending plan switch already exists in the DB', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_switch_test',
+      plan: 'commit',
+      status: 'active',
+      stripe_schedule_id: 'sub_sched_existing',
+      scheduled_plan: 'standard',
+      scheduled_by: 'user',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'standard' })).rejects.toThrow(
+      'A plan switch is already pending'
+    );
+
+    // Should NOT have created or released anything on Stripe
+    expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+  });
+
+  it('releases an orphaned Stripe schedule not tracked in the DB', async () => {
+    await setupActiveSubscription('commit');
+    // DB has no stripe_schedule_id, but Stripe has an orphaned schedule attached
+    mockStripeForSwitchPlan('sub_sched_orphaned');
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.switchPlan({ toPlan: 'standard' });
+
+    // Should have released the orphaned schedule first, then created a new one
+    expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sub_sched_orphaned');
+    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalledWith({
+      from_subscription: 'sub_switch_test',
+    });
+  });
+
+  it('aborts when orphaned schedule release fails with a transient error', async () => {
+    await setupActiveSubscription('commit');
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      id: 'sub_switch_test',
+      schedule: 'sub_sched_orphaned',
+    });
+    stripeMock.subscriptionSchedules.release.mockRejectedValue(new Error('Stripe network timeout'));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'standard' })).rejects.toThrow(
+      'Unable to switch plan: failed to release existing schedule'
+    );
+
+    // Should NOT have attempted to create a new schedule
+    expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+  });
+
+  it('proceeds when orphaned schedule release says already released', async () => {
+    await setupActiveSubscription('commit');
+
+    const alreadyReleasedError = new stripeMock.errors.StripeInvalidRequestError({
+      message: 'This schedule has already been released',
+      type: 'invalid_request_error',
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      id: 'sub_switch_test',
+      schedule: 'sub_sched_orphaned',
+    });
+    stripeMock.subscriptionSchedules.release.mockRejectedValueOnce(alreadyReleasedError);
+    // Subsequent release calls (cleanup) succeed
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sub_sched_new',
+      phases: [
+        { start_date: now, end_date: now + 86400 * 30, items: [{ price: 'price_test_kiloclaw' }] },
+      ],
+    });
+    stripeMock.subscriptionSchedules.update.mockResolvedValue({
+      id: 'sub_sched_new',
+      status: 'active',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.switchPlan({ toPlan: 'standard' });
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
+  });
+
+  it('cleans up orphaned schedule when stripe schedule update fails', async () => {
+    await setupActiveSubscription('commit');
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      id: 'sub_switch_test',
+      schedule: null,
+    });
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sub_sched_orphan',
+      phases: [
+        { start_date: now, end_date: now + 86400 * 30, items: [{ price: 'price_test_kiloclaw' }] },
+      ],
+    });
+    stripeMock.subscriptionSchedules.update.mockRejectedValue(new Error('Stripe update failed'));
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'standard' })).rejects.toThrow(
+      'Stripe update failed'
+    );
+
+    // Best-effort cleanup should have released the orphaned schedule
+    expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sub_sched_orphan');
+
+    // DB should NOT have been updated with the orphaned schedule
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_schedule_id).toBeNull();
+  });
+
+  it('uses optimistic concurrency to prevent double-write race', async () => {
+    await setupActiveSubscription('commit');
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      id: 'sub_switch_test',
+      schedule: null,
+    });
+    stripeMock.subscriptionSchedules.create.mockResolvedValue({
+      id: 'sub_sched_race',
+      phases: [
+        { start_date: now, end_date: now + 86400 * 30, items: [{ price: 'price_test_kiloclaw' }] },
+      ],
+    });
+    // Simulate a concurrent request writing a schedule to the DB while our
+    // Stripe schedule update is in-flight — after the DB guard passed but
+    // before our optimistic DB write.
+    stripeMock.subscriptionSchedules.update.mockImplementation(async () => {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({
+          stripe_schedule_id: 'sub_sched_concurrent',
+          scheduled_plan: 'standard',
+          scheduled_by: 'user',
+        })
+        .where(eq(kiloclaw_subscriptions.user_id, user.id));
+      return { id: 'sub_sched_race', status: 'active' };
+    });
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.switchPlan({ toPlan: 'standard' })).rejects.toThrow(
+      'A plan switch is already pending'
+    );
+
+    // Should have released the schedule it created since the DB write lost the race
+    expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sub_sched_race');
+
+    // DB should still have the concurrent request's schedule
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_schedule_id).toBe('sub_sched_concurrent');
+  });
+});
+
+// ── cancelPlanSwitch ───────────────────────────────────────────────────────
+
+describe('cancelPlanSwitch', () => {
+  it('releases the schedule and clears DB fields on happy path', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_cancel_test',
+      plan: 'commit',
+      status: 'active',
+      stripe_schedule_id: 'sub_sched_cancel',
+      scheduled_plan: 'standard',
+      scheduled_by: 'user',
+    });
+
+    stripeMock.subscriptionSchedules.release.mockResolvedValue({});
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelPlanSwitch();
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith('sub_sched_cancel');
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_schedule_id).toBeNull();
+    expect(row.scheduled_plan).toBeNull();
+    expect(row.scheduled_by).toBeNull();
+  });
+
+  it('rejects when no pending plan switch exists', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_no_schedule',
+      plan: 'commit',
+      status: 'active',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelPlanSwitch()).rejects.toThrow(
+      'No pending plan switch to cancel'
+    );
+  });
+
+  it('rejects when the pending switch was not user-initiated', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_system_switch',
+      plan: 'commit',
+      status: 'active',
+      stripe_schedule_id: 'sub_sched_system',
+      scheduled_plan: 'standard',
+      scheduled_by: 'auto',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelPlanSwitch()).rejects.toThrow(
+      'No user-initiated plan switch to cancel'
+    );
+  });
+
+  it('clears DB when Stripe says schedule is already released', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_already_released',
+      plan: 'commit',
+      status: 'active',
+      stripe_schedule_id: 'sub_sched_gone',
+      scheduled_plan: 'standard',
+      scheduled_by: 'user',
+    });
+
+    const alreadyReleasedError = new stripeMock.errors.StripeInvalidRequestError({
+      message: 'This schedule has already been released',
+      type: 'invalid_request_error',
+    });
+    stripeMock.subscriptionSchedules.release.mockRejectedValue(alreadyReleasedError);
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelPlanSwitch();
+
+    expect(result).toEqual({ success: true });
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_schedule_id).toBeNull();
+    expect(row.scheduled_plan).toBeNull();
+  });
+
+  it('clears DB when Stripe says schedule is already canceled', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_already_canceled',
+      plan: 'commit',
+      status: 'active',
+      stripe_schedule_id: 'sub_sched_canceled',
+      scheduled_plan: 'standard',
+      scheduled_by: 'user',
+    });
+
+    const alreadyCanceledError = new stripeMock.errors.StripeInvalidRequestError({
+      message: 'This schedule has already been canceled',
+      type: 'invalid_request_error',
+    });
+    stripeMock.subscriptionSchedules.release.mockRejectedValue(alreadyCanceledError);
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelPlanSwitch();
+
+    expect(result).toEqual({ success: true });
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_schedule_id).toBeNull();
+    expect(row.scheduled_plan).toBeNull();
+  });
+
+  it('rethrows non-already-released Stripe errors', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      stripe_subscription_id: 'sub_stripe_fail',
+      plan: 'commit',
+      status: 'active',
+      stripe_schedule_id: 'sub_sched_fail',
+      scheduled_plan: 'standard',
+      scheduled_by: 'user',
+    });
+
+    stripeMock.subscriptionSchedules.release.mockRejectedValue(new Error('Stripe network timeout'));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelPlanSwitch()).rejects.toThrow(
+      'Failed to release pending plan schedule'
+    );
+
+    // DB should NOT have been cleared since Stripe failed
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_schedule_id).toBe('sub_sched_fail');
   });
 });

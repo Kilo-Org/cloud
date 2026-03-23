@@ -52,3 +52,7 @@ When creating or updating a pull request, you **must** follow the PR template in
 - Do not leave HTML comments from the template in the final description — replace them with actual content.
 - PR descriptions must be accurate and valuable to reviewers. Generic or boilerplate descriptions waste reviewer time.
 - Review all commits on the branch (not just the latest) when writing the summary.
+
+## KiloClaw Billing
+
+Before making **any** changes related to KiloClaw billing — including bug fixes, new features, refactors, or reviews — you **must** first read the billing spec at `.specs/kiloclaw-billing.md`. This applies to all code paths that touch billing logic, pricing, invoicing, usage metering, or payment flows.

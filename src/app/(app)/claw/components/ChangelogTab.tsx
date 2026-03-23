@@ -23,6 +23,10 @@ const DEPLOY_HINT_STYLES = {
     label: 'Redeploy Required',
     className: 'border-red-500/30 bg-red-500/15 text-red-400',
   },
+  upgrade_required: {
+    label: 'Upgrade Required',
+    className: 'border-purple-500/30 bg-purple-500/15 text-purple-400',
+  },
 } as const;
 
 function ChangelogRow({ entry }: { entry: ChangelogEntry }) {

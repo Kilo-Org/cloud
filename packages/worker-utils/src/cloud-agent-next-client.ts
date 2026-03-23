@@ -87,7 +87,10 @@ export type CloudAgentInterruptOutput = {
 
 /**
  * Valid terminal reasons for code review failures.
- * Keep in sync with CodeReviewTerminalReason in packages/db/src/schema-types.ts.
+ * KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS / CodeReviewTerminalReason
+ * in packages/db/src/schema-types.ts — both lists must contain the same
+ * literal values. A mismatch will cause the orchestrator to send a reason
+ * that normalizePayload rejects via its allowlist check.
  */
 export type CloudAgentTerminalReason =
   | 'billing'

@@ -151,14 +151,14 @@ const FRONTIER_MODE_TO_MODEL = new Map<string, ResolvedAutoModel>([
 
 const KIMI_K25_MODEL_ID = 'moonshotai/kimi-k2.5';
 
-const MINIMAX_M25_MODEL_ID = 'minimax/minimax-m2.5';
+const MINIMAX_M27_MODEL_ID = 'minimax/minimax-m2.7';
 
 const BALANCED_CODE_MODEL: ResolvedAutoModel = {
-  model: MINIMAX_M25_MODEL_ID,
+  model: MINIMAX_M27_MODEL_ID,
 };
 
 // Mode → model mappings for kilo-auto/balanced routing.
-// Uses Kimi K2.5 where Frontier uses Opus, Minimax M2.5 where Frontier uses Sonnet.
+// Uses Kimi K2.5 where Frontier uses Opus, Minimax M2.7 where Frontier uses Sonnet.
 const BALANCED_MODE_TO_MODEL = new Map<string, ResolvedAutoModel>([
   ['plan', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
   ['general', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
@@ -166,8 +166,8 @@ const BALANCED_MODE_TO_MODEL = new Map<string, ResolvedAutoModel>([
   ['orchestrator', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
   ['ask', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
   ['debug', { model: KIMI_K25_MODEL_ID, reasoning: { enabled: true } }],
-  ['build', { model: MINIMAX_M25_MODEL_ID }],
-  ['explore', { model: MINIMAX_M25_MODEL_ID }],
+  ['build', { model: MINIMAX_M27_MODEL_ID }],
+  ['explore', { model: MINIMAX_M27_MODEL_ID }],
   ['code', BALANCED_CODE_MODEL],
 ]);
 
@@ -178,20 +178,6 @@ const legacyMapping: Record<string, AutoModel | undefined> = {
   [KILO_AUTO_FREE_MODEL_DEPRECATED]: KILO_AUTO_FREE_MODEL,
   'kilo/auto-small': KILO_AUTO_SMALL_MODEL,
 };
-
-export function deprecatedAutoModelsToPreventNewExtensionModelPickerFromGettingStuck(): AutoModel[] {
-  return Object.entries(legacyMapping)
-    .map(([legacyId, model]) => {
-      if (!model) return null;
-      return {
-        ...model,
-        id: legacyId,
-        name: 'Deprecated ' + model.name,
-        description: `${legacyId} is deprecated, use ${model.id} instead`,
-      };
-    })
-    .filter(m => m !== null);
-}
 
 export function resolveAutoModel(model: string, modeHeader: string | null): ResolvedAutoModel {
   const mappedModel = legacyMapping[model]?.id ?? model;

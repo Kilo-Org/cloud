@@ -17,6 +17,8 @@ describe('buildConfiguredSecrets', () => {
       slack: false,
       github: false,
       agentcard: false,
+      onepassword: false,
+      'brave-search': false,
     });
   });
 
@@ -36,7 +38,10 @@ describe('buildConfiguredSecrets', () => {
     expect(partial.slack).toBe(false);
 
     const full = buildConfiguredSecrets({
-      encryptedSecrets: { SLACK_BOT_TOKEN: envelope, SLACK_APP_TOKEN: envelope },
+      encryptedSecrets: {
+        SLACK_BOT_TOKEN: envelope,
+        SLACK_APP_TOKEN: envelope,
+      },
     });
     expect(full.slack).toBe(true);
   });
@@ -107,12 +112,16 @@ describe('buildConfiguredSecrets', () => {
     expect(keys).toContain('telegram');
     expect(keys).toContain('discord');
     expect(keys).toContain('slack');
-    expect(keys).toHaveLength(5);
+    expect(keys).toContain('onepassword');
+    expect(keys).toContain('brave-search');
+    expect(keys).toHaveLength(7);
   });
 
   it('treats null values as not configured', () => {
     const result = buildConfiguredSecrets({
-      encryptedSecrets: { TELEGRAM_BOT_TOKEN: null as unknown as Record<string, unknown> },
+      encryptedSecrets: {
+        TELEGRAM_BOT_TOKEN: null as unknown as Record<string, unknown>,
+      },
     });
     expect(result.telegram).toBe(false);
   });

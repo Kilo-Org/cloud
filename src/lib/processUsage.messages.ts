@@ -1,5 +1,3 @@
-// TODO review this file
-
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -16,11 +14,10 @@ import type { GatewayMessagesRequest } from '@/lib/providers/openrouter/types';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/processUsage.constants';
 import type Anthropic from '@anthropic-ai/sdk';
 
-// ref: https://docs.anthropic.com/en/api/messages
 // Anthropic usage combined with OpenRouter cost fields
 // ref: https://docs.anthropic.com/en/api/messages
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
-type MessagesApiUsage = Anthropic.Messages.Usage & {
+type MessagesApiUsage = Anthropic.Messages.MessageDeltaUsage & {
   cost?: number;
   is_byok?: boolean | null;
   cost_details?: { upstream_inference_cost: number };
@@ -30,10 +27,10 @@ function processMessagesApiUsage(
   usage: MessagesApiUsage | null | undefined,
   coreProps: NotYetCostedUsageStats
 ): JustTheCostsUsageStats {
-  const inputTokens = usage?.input_tokens ?? 0;
-  const outputTokens = usage?.output_tokens ?? 0;
   const cacheHitTokens = usage?.cache_read_input_tokens ?? 0;
   const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
+  const inputTokens = (usage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens;
+  const outputTokens = usage?.output_tokens ?? 0;
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {
@@ -99,8 +96,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   const reportedError = statusCode >= 400;
   const startedAt = performance.now();
   let firstTokenReceived = false;
-  let inputUsage: MessagesApiUsage | null = null;
-  let outputTokens = 0;
+  let usage: MessagesApiUsage | null = null;
   let finish_reason: string | null = null;
 
   const reader = stream.getReader();
@@ -117,6 +113,10 @@ export async function parseMessagesMicrodollarUsageFromStream(
         timeToFirstTokenSpan.end();
       }
 
+      if (event.data === '[DONE]') {
+        return;
+      }
+
       const json = JSON.parse(event.data) as Anthropic.Messages.MessageStreamEvent;
 
       if (!json) {
@@ -126,19 +126,9 @@ export async function parseMessagesMicrodollarUsageFromStream(
         return;
       }
 
-      //if (json.type === 'error') {
-      //  reportedError = true;
-      //  captureException(new Error(`Messages API error: ${json.error.message}`), {
-      //    tags: { source: 'messages_sse_processing' },
-      //    extra: { json, event },
-      //  });
-      //  return;
-      //}
-
       if (json.type === 'message_start') {
         messageId = json.message.id;
         model = json.message.model;
-        inputUsage = json.message.usage;
       }
 
       if (
@@ -151,7 +141,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
       if (json.type === 'message_delta') {
         finish_reason = json.delta.stop_reason;
-        outputTokens = json.usage.output_tokens;
+        usage ??= json.usage;
       }
     },
   });
@@ -174,17 +164,13 @@ export async function parseMessagesMicrodollarUsageFromStream(
     streamProcessingSpan.end();
   }
 
-  if (!reportedError && !inputUsage) {
+  if (!reportedError && !usage) {
     captureMessage('SUSPICIOUS: No usage in Messages API stream', {
       level: 'warning',
       tags: { source: 'messages_usage_processing' },
       extra: { kiloUserId, provider, messageId, model },
     });
   }
-
-  // Merge input and output usage together
-  const usage: MessagesApiUsage | null =
-    inputUsage !== null ? Object.assign({}, inputUsage, { output_tokens: outputTokens }) : null;
 
   const coreProps = {
     messageId,

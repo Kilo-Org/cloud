@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   Table,
@@ -23,7 +23,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ChevronLeft, ChevronRight, X, Bomb } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 import {
@@ -219,6 +229,66 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
   );
 }
 
+// --- Dev Nuke All Button ---
+
+function DevNukeAllButton() {
+  if (process.env.NODE_ENV !== 'development') return null;
+
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const nukeAll = useMutation(
+    trpc.admin.kiloclawInstances.devNukeAll.mutationOptions({
+      onSuccess(data) {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.list.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.stats.queryKey(),
+        });
+        const errorSuffix =
+          data.errors.length > 0
+            ? `\n${data.errors.length} failed:\n${data.errors.map(e => `  ${e.userId}: ${e.error}`).join('\n')}`
+            : '';
+        alert(`Destroyed ${data.destroyed}/${data.total} instances${errorSuffix}`);
+      },
+    })
+  );
+
+  return (
+    <>
+      <Button variant="destructive" onClick={() => setOpen(true)} disabled={nukeAll.isPending}>
+        <Bomb className="mr-2 h-4 w-4" />
+        {nukeAll.isPending ? 'Nuking...' : 'Nuke All'}
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Nuke all KiloClaw instances?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will destroy every active KiloClaw instance. This action cannot be undone. Only
+              available in development mode.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                nukeAll.mutate();
+                setOpen(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Nuke All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 // --- Main Page ---
 
 export function KiloclawInstancesPage() {
@@ -378,6 +448,8 @@ export function KiloclawInstancesPage() {
             <SelectItem value="destroyed">Destroyed Only</SelectItem>
           </SelectContent>
         </Select>
+
+        <DevNukeAllButton />
       </div>
 
       {/* Table */}

@@ -824,6 +824,7 @@ export const kiloPassRouter = createTRPCRouter({
         }
 
         const updatedSchedule = await stripe.subscriptionSchedules.update(schedule.id, {
+          metadata: { origin: 'kilo-pass-switch' },
           // We want the subscription to continue normally after the final phase starts.
           // Without this, Stripe may require the last phase to specify `duration`/`end_date`.
           end_behavior: 'release',

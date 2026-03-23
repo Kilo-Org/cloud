@@ -273,6 +273,28 @@ export function createConnectionManager(
     return false;
   }
 
+  function getTerminalErrorText(eventType: string, properties: Record<string, unknown>): string {
+    const error = properties.error;
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    if (isRecord(error)) {
+      if (typeof error.message === 'string') {
+        return error.message;
+      }
+
+      const data = error.data;
+      if (isRecord(data) && typeof data.message === 'string') {
+        return data.message;
+      }
+
+      return JSON.stringify(error);
+    }
+
+    return `Insufficient credits: ${eventType}`;
+  }
+
   /**
    * Start the SDK event subscription. Runs in the background.
    * Replaces the old SSE consumer with a typed event stream from the SDK.
@@ -367,7 +389,7 @@ export function createConnectionManager(
 
           // Terminal error detection
           if (isTerminalError(eventType, properties)) {
-            callbacks.onTerminalError(eventType);
+            callbacks.onTerminalError(getTerminalErrorText(eventType, properties));
             return;
           }
 

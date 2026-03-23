@@ -57,6 +57,8 @@
       "id": "1f406d747ead4a5896b750c1000973e0",
     },
   ],
+  "analytics_engine_datasets": [{ "binding": "KILOCLAW_AE", "dataset": "kiloclaw_events" }],
+
   // Hyperdrive binding for Postgres (pepper validation, instance registry)
   "hyperdrive": [
     {

@@ -993,7 +993,9 @@ export async function getStripeTopUpCheckoutUrl(
   stripeCustomerId: User['stripe_customer_id'],
   amount: number,
   origin: string = 'web',
-  organizationId?: string | null
+  organizationId?: string | null,
+  /** Optional internal path to redirect to when the user cancels checkout. */
+  cancelPath?: string | null
 ): Promise<string | null> {
   const line_items = amount
     ? [
@@ -1016,9 +1018,13 @@ export async function getStripeTopUpCheckoutUrl(
       ];
 
   const isOrganizationTopUp = Boolean(organizationId);
-  let cancelUrl = `${APP_URL}/profile?payment_status=topup_cancelled&origin=${origin}`;
-  if (isOrganizationTopUp) {
+  let cancelUrl: string;
+  if (cancelPath) {
+    cancelUrl = `${APP_URL}${cancelPath}`;
+  } else if (isOrganizationTopUp) {
     cancelUrl = `${APP_URL}/organizations/${organizationId}?${TOPUP_CANCELED_QUERY_STRING_KEY}=true`;
+  } else {
+    cancelUrl = `${APP_URL}/profile?payment_status=topup_cancelled&origin=${origin}`;
   }
 
   const rewardfulReferral = await getRewardfulReferral();

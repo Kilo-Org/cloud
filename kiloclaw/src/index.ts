@@ -22,6 +22,7 @@ import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { registerVersionIfNeeded } from './lib/image-version';
 import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
+import { timingMiddleware } from './middleware/analytics';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
@@ -134,6 +135,7 @@ async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
 const app = new Hono<AppEnv>();
 
 // Global middleware (all routes)
+app.use('*', timingMiddleware);
 app.use('*', logRequest);
 
 // Public routes (no auth)

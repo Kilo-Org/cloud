@@ -1735,6 +1735,14 @@ export class TownDO extends DurableObject<Env> {
     return reviewQueue.advanceMoleculeStep(this.sql, agentId, summary);
   }
 
+  async getMergeQueueData(params: {
+    rigId?: string;
+    limit?: number;
+    since?: string;
+  }): Promise<reviewQueue.MergeQueueData> {
+    return reviewQueue.getMergeQueueData(this.sql, params);
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // Atomic Sling (create bead + agent + hook)
   // ══════════════════════════════════════════════════════════════════
@@ -3028,9 +3036,14 @@ export class TownDO extends DurableObject<Env> {
       const violations = reconciler.checkInvariants(this.sql);
       metrics.invariantViolations = violations.length;
       if (violations.length > 0) {
-        console.error(
-          `${TOWN_LOG} [reconciler:invariants] town=${townId} ${violations.length} violation(s): ${JSON.stringify(violations)}`
-        );
+        // Emit as an analytics event for observability dashboards instead
+        // of console.error (which spams Workers logs every 5s per town).
+        this.emitEvent({
+          event: 'reconciler.invariant_violations',
+          townId,
+          label: violations.map(v => `[${v.invariant}] ${v.message}`).join('; '),
+          value: violations.length,
+        });
       }
     } catch (err) {
       console.warn(`${TOWN_LOG} [reconciler:invariants] town=${townId} check failed`, err);

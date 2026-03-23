@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -113,8 +113,36 @@ export function ProvisioningStep({
   return <ProvisioningStepView />;
 }
 
+const PROVISIONING_MESSAGES = [
+  'Reticulating splines...',
+  'Warming up the flux capacitor...',
+  'Convincing the hamsters to run faster...',
+  'Downloading more RAM...',
+  'Generating witty loading messages...',
+  'Consulting the magic 8-ball...',
+  'Untangling the internet tubes...',
+  'Feeding the code monkeys...',
+  'Aligning the bits...',
+  'Compiling the compilers...',
+  'Herding the electrons...',
+  'Calibrating the cloud...',
+];
+
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
 export function ProvisioningStepView() {
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setMessageIndex(i => (i + 1) % PROVISIONING_MESSAGES.length);
+        setVisible(true);
+      }, 300);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
   return (
     <OnboardingStepView
       currentStep={4}
@@ -168,6 +196,14 @@ export function ProvisioningStepView() {
           we&apos;ll play a sound as soon as it&apos;s ready.
         </p>
       </div>
+
+      {/* Cycling fun message */}
+      <p
+        className="text-muted-foreground h-5 text-sm italic transition-opacity duration-300"
+        style={{ opacity: visible ? 1 : 0 }}
+      >
+        {PROVISIONING_MESSAGES[messageIndex]}
+      </p>
 
       {/* Sound banner */}
       <div className="border-border flex w-full items-center gap-3 rounded-lg border p-4">

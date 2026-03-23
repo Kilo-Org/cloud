@@ -1,5 +1,5 @@
 type ChangelogCategory = 'feature' | 'bugfix';
-type ChangelogDeployHint = 'redeploy_suggested' | 'redeploy_required' | null;
+type ChangelogDeployHint = 'redeploy_suggested' | 'redeploy_required' | 'upgrade_required' | null;
 
 export type ChangelogEntry = {
   date: string; // ISO date string, e.g. "2026-02-18"
@@ -10,6 +10,20 @@ export type ChangelogEntry = {
 
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  {
+    date: '2026-03-23',
+    description:
+      'Added Brave Search integration. Connect your Brave Search API key in Settings to enable the web_search tool. Brave Search removed their free tier, so an API key is now required.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
+    date: '2026-03-19',
+    description:
+      'Added 1Password integration. Connect a service account token in Settings to give your agent access to the op CLI for looking up credentials and managing vault items.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
   {
     date: '2026-03-19',
     description:

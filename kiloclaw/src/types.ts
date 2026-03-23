@@ -7,6 +7,7 @@ import type { KiloClawApp } from './durable-objects/kiloclaw-app';
 export type KiloClawEnv = {
   KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
+  KILOCLAW_AE?: AnalyticsEngineDataset;
   HYPERDRIVE?: Hyperdrive;
   KV_CLAW_CACHE: KVNamespace;
 
@@ -55,5 +56,6 @@ export type AppEnv = {
     userId: string;
     authToken: string;
     sandboxId: string;
+    requestStartTime: number;
   };
 };

@@ -19,7 +19,13 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-export function VersionPinCard() {
+export function VersionPinCard({
+  trackedImageTag,
+  latestImageTag,
+}: {
+  trackedImageTag: string | null;
+  latestImageTag: string | null;
+}) {
   const { data: myPin, isLoading: pinLoading } = useKiloClawMyPin();
   const { data: versions, isLoading: versionsLoading } = useKiloClawAvailableVersions(0, 50);
   const mutations = useKiloClawMutations();
@@ -94,20 +100,76 @@ export function VersionPinCard() {
         <Pin className="size-4" />
         Version Pinning
       </h3>
-      {/* Description + Current Status */}
-      <div className="mb-6 grid grid-cols-2 items-start gap-6">
-        {/* Left: Description + Info */}
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-sm">
-            Pin your instance to a specific OpenClaw version or follow the latest
-          </p>
-          <div className="text-muted-foreground flex items-start gap-1 text-xs">
-            <Info className="mt-0.5 h-3 w-3 shrink-0" />
-            <span>
-              Pinning locks your instance to a specific version. You won&apos;t receive automatic
-              updates until you unpin.
-            </span>
+      <div className="grid grid-cols-2 items-start gap-6">
+        {/* Left: Description + Pinning Controls */}
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-sm">
+              Pin your instance to a specific OpenClaw version or follow the latest
+            </p>
+            <div className="text-muted-foreground flex items-start gap-1 text-xs">
+              <Info className="mt-0.5 h-3 w-3 shrink-0" />
+              <span>
+                Pinning locks your instance to a specific version. You won&apos;t receive automatic
+                updates until you unpin.
+              </span>
+            </div>
           </div>
+
+          {!isPinned ? (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="version-select" className="text-sm">
+                  Select Version
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Select value={selectedImageTag} onValueChange={setSelectedImageTag}>
+                    <SelectTrigger id="version-select">
+                      <SelectValue placeholder="Choose a version to pin..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {versions?.items.map(version => (
+                        <SelectItem key={version.image_tag} value={version.image_tag}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {version.openclaw_version} / {version.variant}
+                            </span>
+                            <span
+                              className="text-muted-foreground text-xs"
+                              title={version.image_tag}
+                            >
+                              {truncateTag(version.image_tag)}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={handlePin}
+                    disabled={!selectedImageTag || isPinning}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    {isPinning ? 'Pinning...' : 'Pin to this version'}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pin-reason" className="text-sm">
+                  Reason (optional)
+                </Label>
+                <Textarea
+                  id="pin-reason"
+                  placeholder="Why are you pinning to this version?"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  rows={3}
+                  maxLength={500}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Right: Current Status */}
@@ -168,70 +230,51 @@ export function VersionPinCard() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-100">
-                Following latest
-              </span>
-              <span className="text-muted-foreground text-xs">
-                Automatically uses newest version
-              </span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-100">
+                  Following latest
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  Automatically uses newest version
+                </span>
+              </div>
+              {(trackedImageTag || latestImageTag) && (
+                <table className="text-sm">
+                  <tbody>
+                    {trackedImageTag && (
+                      <tr>
+                        <td className="text-muted-foreground pr-3 align-top">Current image</td>
+                        <td>
+                          <code
+                            className="bg-muted rounded px-1.5 py-0.5 text-xs"
+                            title={trackedImageTag}
+                          >
+                            {truncateTag(trackedImageTag)}
+                          </code>
+                        </td>
+                      </tr>
+                    )}
+                    {latestImageTag && (
+                      <tr>
+                        <td className="text-muted-foreground pr-3 pt-1 align-top">Latest image</td>
+                        <td className="pt-1">
+                          <code
+                            className="bg-muted rounded px-1.5 py-0.5 text-xs"
+                            title={latestImageTag}
+                          >
+                            {truncateTag(latestImageTag)}
+                          </code>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
         </div>
       </div>
-
-      {/* Row 3: Pin/Unpin Controls */}
-      {!isPinned ? (
-        <div className="grid grid-cols-2 items-start gap-6">
-          {/* Left Column: Version Selector + Reason */}
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="version-select" className="text-sm">
-                Select Version
-              </Label>
-              <Select value={selectedImageTag} onValueChange={setSelectedImageTag}>
-                <SelectTrigger id="version-select">
-                  <SelectValue placeholder="Choose a version to pin..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {versions?.items.map(version => (
-                    <SelectItem key={version.image_tag} value={version.image_tag}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">
-                          {version.openclaw_version} / {version.variant}
-                        </span>
-                        <span className="text-muted-foreground text-xs" title={version.image_tag}>
-                          {truncateTag(version.image_tag)}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pin-reason" className="text-sm">
-                Reason (optional)
-              </Label>
-              <Textarea
-                id="pin-reason"
-                placeholder="Why are you pinning to this version?"
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                rows={3}
-                maxLength={500}
-              />
-            </div>
-          </div>
-
-          {/* Right Column: Pin Button */}
-          <div>
-            <Button onClick={handlePin} disabled={!selectedImageTag || isPinning} size="sm">
-              {isPinning ? 'Pinning...' : 'Pin to this version'}
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

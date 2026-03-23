@@ -75,6 +75,10 @@ export function ClawDashboard({
   const onSecretsChanged = useCallback((entryId: string) => {
     setDirtySecrets(prev => new Set([...prev, entryId]));
   }, []);
+  const [upgradeRequested, setUpgradeRequested] = useState(false);
+  const onRequestUpgrade = useCallback(() => setUpgradeRequested(true), []);
+  const onUpgradeHandled = useCallback(() => setUpgradeRequested(false), []);
+
   const onRedeploySuccess = useCallback(() => {
     setDirtySecrets(new Set());
   }, []);
@@ -236,6 +240,8 @@ export function ClawDashboard({
                 status={instanceStatus}
                 mutations={mutations}
                 onRedeploySuccess={onRedeploySuccess}
+                upgradeRequested={upgradeRequested}
+                onUpgradeHandled={onUpgradeHandled}
               />
             </CardContent>
             <Tabs defaultValue="instance">
@@ -276,6 +282,7 @@ export function ClawDashboard({
                     mutations={mutations}
                     onSecretsChanged={onSecretsChanged}
                     dirtySecrets={dirtySecrets}
+                    onRequestUpgrade={onRequestUpgrade}
                   />
                 </TabsContent>
                 <TabsContent value="changelog" className="mt-0">

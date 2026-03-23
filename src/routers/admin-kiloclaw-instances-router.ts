@@ -637,6 +637,51 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
+  devNukeAll: adminProcedure.mutation(async ({ ctx }) => {
+    if (process.env.NODE_ENV !== 'development') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'This endpoint is only available in development mode',
+      });
+    }
+
+    const activeInstances = await db
+      .select({
+        id: kiloclaw_instances.id,
+        user_id: kiloclaw_instances.user_id,
+      })
+      .from(kiloclaw_instances)
+      .where(isNull(kiloclaw_instances.destroyed_at));
+
+    console.log(
+      `[admin-kiloclaw] DevNukeAll triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}): ${activeInstances.length} active instances`
+    );
+
+    const client = new KiloClawInternalClient();
+    let destroyed = 0;
+    const errors: Array<{ userId: string; error: string }> = [];
+
+    for (const instance of activeInstances) {
+      const destroyedRow = await markActiveInstanceDestroyed(instance.user_id);
+      try {
+        await client.destroy(instance.user_id);
+        destroyed++;
+      } catch (err) {
+        if (destroyedRow) {
+          await restoreDestroyedInstance(destroyedRow.id);
+        }
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        errors.push({ userId: instance.user_id, error: message });
+        console.error(
+          `[admin-kiloclaw] DevNukeAll: failed to destroy instance ${instance.id} (user: ${instance.user_id}):`,
+          err
+        );
+      }
+    }
+
+    return { total: activeInstances.length, destroyed, errors };
+  }),
+
   reassociateVolume: adminProcedure
     .input(
       z.object({

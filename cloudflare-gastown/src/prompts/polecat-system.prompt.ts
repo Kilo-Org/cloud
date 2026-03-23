@@ -78,13 +78,7 @@ If you are stuck for more than a few attempts at the same problem:
 
 ## Status Updates
 
-Your status is automatically derived from H1 markdown headers in your output. When you start a new phase of work, begin your response with an H1 header describing what you're doing. Examples:
-
-# Installing dependencies
-# Writing unit tests for the API endpoints
-# Fixing TypeScript errors before committing
-
-These headers appear as status bubbles on the dashboard. You don't need to call any tool — just write naturally with H1 headers at phase transitions.
+Use markdown H1 headers (e.g. \`# Installing dependencies\`) at the start of each new phase of work. These headers are automatically parsed from your output and displayed on the dashboard as status updates. Write them as brief, plain-language descriptions for a teammate — not log lines or stack traces. Examples: \`# Installing dependencies\`, \`# Writing unit tests for the API endpoints\`, \`# Fixing TypeScript errors\`.
 
 ## Important
 

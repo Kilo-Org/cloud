@@ -35,6 +35,18 @@ const eventSinks = new Set<(agentId: string, event: string, data: unknown) => vo
 const idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
 // Tracks last H1 status posted per agent to deduplicate status updates
 const lastStatusForAgent = new Map<string, string>();
+// Accumulates streaming text deltas per "agentId:partId" key so we can scan for
+// H1 headers. SDK events send part.text as empty during delta streaming; the
+// actual content arrives incrementally in the `delta` field.
+const accumulatedPartText = new Map<string, string>();
+
+/** Remove all accumulated part text entries for a given agent. */
+function clearAccumulatedText(agentId: string): void {
+  const prefix = `${agentId}:`;
+  for (const key of accumulatedPartText.keys()) {
+    if (key.startsWith(prefix)) accumulatedPartText.delete(key);
+  }
+}
 
 let nextPort = 4096;
 const startTime = Date.now();
@@ -147,8 +159,12 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
   }
 
   // Parse H1 markdown headers from streaming text parts and post as agent status.
-  // This gives dashboard visibility into what an agent is doing without requiring
-  // the agent to call gt_status explicitly.
+  // This gives dashboard visibility into what an agent is doing — agents write
+  // natural H1 headers like "# Installing dependencies" which become status updates.
+  //
+  // During streaming, the SDK sends part.text as empty and the actual content in
+  // the `delta` field. We accumulate deltas per part ID so we can scan the full
+  // text for completed H1 headers (those followed by a newline).
   if (event === 'message.part.updated' || event === 'message_part.updated') {
     const dataObj = data != null && typeof data === 'object' ? data : undefined;
     const part =
@@ -159,26 +175,45 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
       part &&
       'type' in part &&
       part.type === 'text' &&
-      'text' in part &&
-      typeof part.text === 'string'
+      'id' in part &&
+      typeof part.id === 'string'
     ) {
+      const partKey = `${agentId}:${part.id}`;
+      const delta =
+        dataObj && 'delta' in dataObj && typeof dataObj.delta === 'string'
+          ? dataObj.delta
+          : undefined;
+      // Accumulate text: if delta is present, append it; otherwise use part.text
+      // as the full snapshot (non-streaming mode).
+      let fullText: string;
+      if (delta !== undefined) {
+        const prev = accumulatedPartText.get(partKey) ?? '';
+        fullText = prev + delta;
+        accumulatedPartText.set(partKey, fullText);
+      } else if ('text' in part && typeof part.text === 'string') {
+        fullText = part.text;
+        accumulatedPartText.set(partKey, fullText);
+      } else {
+        fullText = accumulatedPartText.get(partKey) ?? '';
+      }
+
       // Use last H1 match — most current status when agent writes multiple headers.
       // Require a trailing newline so we only match completed headings; without it,
       // every streaming delta would match the partial heading being typed and spam
       // the /status endpoint with incremental fragments.
-      const matches = [...part.text.matchAll(/(?:^|\n)# (.+)\n/g)];
+      const matches = [...fullText.matchAll(/(?:^|\n)# (.+)\n/g)];
       const lastMatch = matches.length > 0 ? matches[matches.length - 1] : null;
       if (lastMatch) {
         const statusText = lastMatch[1].slice(0, 120);
         if (statusText !== lastStatusForAgent.get(agentId)) {
           lastStatusForAgent.set(agentId, statusText);
-          // Post to status API (fire-and-forget, same pattern as event persistence above)
           const agentMeta = agents.get(agentId);
           const statusAuthToken =
             process.env.GASTOWN_CONTAINER_TOKEN ??
             agentMeta?.gastownContainerToken ??
             agentMeta?.gastownSessionToken;
           if (agentMeta?.gastownApiUrl && statusAuthToken) {
+            const statusUrl = `${agentMeta.gastownApiUrl}/api/towns/${agentMeta.townId ?? '_'}/rigs/${agentMeta.rigId ?? '_'}/agents/${agentId}/status`;
             const statusHeaders: Record<string, string> = {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${statusAuthToken}`,
@@ -187,14 +222,31 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
               statusHeaders['X-Gastown-Agent-Id'] = agentId;
               if (agentMeta.rigId) statusHeaders['X-Gastown-Rig-Id'] = agentMeta.rigId;
             }
-            fetch(
-              `${agentMeta.gastownApiUrl}/api/towns/${agentMeta.townId ?? '_'}/rigs/${agentMeta.rigId ?? '_'}/agents/${agentId}/status`,
-              {
-                method: 'POST',
-                headers: statusHeaders,
-                body: JSON.stringify({ message: statusText }),
-              }
-            ).catch(() => {});
+            console.log(
+              `${MANAGER_LOG} H1 status for agent ${agentId}: "${statusText}" → POST ${statusUrl}`
+            );
+            fetch(statusUrl, {
+              method: 'POST',
+              headers: statusHeaders,
+              body: JSON.stringify({ message: statusText }),
+            })
+              .then(resp => {
+                if (!resp.ok) {
+                  console.warn(
+                    `${MANAGER_LOG} H1 status POST failed: ${resp.status} ${resp.statusText}`
+                  );
+                }
+              })
+              .catch(err => {
+                console.warn(
+                  `${MANAGER_LOG} H1 status POST error:`,
+                  err instanceof Error ? err.message : err
+                );
+              });
+          } else {
+            console.warn(
+              `${MANAGER_LOG} H1 status: cannot post for agent ${agentId} — missing apiUrl=${!!agentMeta?.gastownApiUrl} authToken=${!!statusAuthToken}`
+            );
           }
         }
       }
@@ -481,6 +533,7 @@ async function subscribeToEvents(
     agent.status = 'exited';
     agent.exitReason = 'completed';
     lastStatusForAgent.delete(agent.agentId);
+    clearAccumulatedText(agent.agentId);
     broadcastEvent(agent.agentId, 'agent.exited', { reason: 'completed' });
     void reportAgentCompleted(agent, 'completed');
 
@@ -564,6 +617,7 @@ async function subscribeToEvents(
       if (agent.status === 'running') {
         clearIdleTimer(agent.agentId);
         lastStatusForAgent.delete(agent.agentId);
+        clearAccumulatedText(agent.agentId);
         agent.status = 'failed';
         agent.exitReason = 'Event stream error';
         broadcastEvent(agent.agentId, 'agent.exited', {
@@ -726,6 +780,7 @@ export async function stopAgent(agentId: string): Promise<void> {
   // Cancel any pending idle timer
   clearIdleTimer(agentId);
   lastStatusForAgent.delete(agentId);
+  clearAccumulatedText(agentId);
 
   // Abort event subscription
   const controller = eventAbortControllers.get(agentId);
@@ -823,6 +878,7 @@ export async function stopAll(): Promise<void> {
   }
   idleTimers.clear();
   lastStatusForAgent.clear();
+  accumulatedPartText.clear();
 
   // Abort all event subscriptions
   for (const [, controller] of eventAbortControllers) {

@@ -137,13 +137,6 @@ export class GastownClient {
     });
   }
 
-  async updateAgentStatusMessage(message: string): Promise<void> {
-    await this.request<void>(this.agentPath('/status'), {
-      method: 'POST',
-      body: JSON.stringify({ message }),
-    });
-  }
-
   // -- Rig-scoped endpoints --
 
   async getBead(beadId: string): Promise<Bead> {
@@ -443,7 +436,10 @@ export class MayorGastownClient {
 
   async updateConvoy(
     convoyId: string,
-    input: { merge_mode?: 'review-then-land' | 'review-and-merge'; feature_branch?: string }
+    input: {
+      merge_mode?: 'review-then-land' | 'review-and-merge';
+      feature_branch?: string;
+    }
   ): Promise<void> {
     await this.request<void>(this.mayorPath(`/convoys/${convoyId}`), {
       method: 'PATCH',

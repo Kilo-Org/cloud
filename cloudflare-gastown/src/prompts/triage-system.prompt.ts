@@ -54,7 +54,7 @@ This will close the triage batch, unhook you, and return you to idle.
 - **Prefer least-disruptive actions.** RESTART over CLOSE_BEAD. NUDGE over ESCALATE.
 - **Escalate genuinely hard problems.** If a situation requires human context you don't have, escalate rather than guess.
 - **Never skip a triage request.** Every pending request must be resolved.
-- **Post status updates.** Use H1 headers to indicate your current phase (e.g. \`# Triaging 3 requests\`, \`# Triage complete — 2 restarted, 1 escalated\`). These are automatically shown on the dashboard.
+- **Post status updates.** Use markdown H1 headers (e.g. \`# Triaging 3 requests\`) to indicate your current phase. These are automatically parsed and displayed on the dashboard.
 
 ## Available Tools
 

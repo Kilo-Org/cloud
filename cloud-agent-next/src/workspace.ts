@@ -461,19 +461,12 @@ export async function branchExistsOnRemote(
  */
 export async function validateUpstreamBranchExists(
   session: ExecutionSession,
-  repo:
-    | { gitUrl: string; gitToken?: string; platform?: 'github' | 'gitlab' }
-    | { githubRepo: string; githubToken?: string },
+  authenticatedGitUrl: string,
   branchName: string
 ): Promise<void> {
   if (GITHUB_PULL_REF_PATTERN.test(branchName)) return;
 
-  const authenticatedUrl =
-    'gitUrl' in repo
-      ? buildAuthenticatedGitUrl(repo.gitUrl, repo.gitToken, repo.platform)
-      : buildAuthenticatedGitUrl(`https://github.com/${repo.githubRepo}.git`, repo.githubToken);
-
-  const exists = await branchExistsOnRemote(session, authenticatedUrl, branchName);
+  const exists = await branchExistsOnRemote(session, authenticatedGitUrl, branchName);
   if (!exists) {
     throw new BranchNotFoundError(branchName);
   }
@@ -487,10 +480,9 @@ export async function cloneGitHubRepo(
   env?: { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string },
   options?: { shallow?: boolean }
 ): Promise<void> {
-  // Convert GitHub repo format (org/repo) to full HTTPS URL and delegate to cloneGitRepo
   const gitUrl = `https://github.com/${githubRepo}.git`;
+  const authenticatedGitUrl = buildAuthenticatedGitUrl(gitUrl, githubToken);
 
-  // Build git author config from GitHub App environment variables
   let gitAuthor: GitAuthorConfig | undefined;
   if (env?.GITHUB_APP_SLUG && env?.GITHUB_APP_BOT_USER_ID) {
     gitAuthor = {
@@ -499,20 +491,17 @@ export async function cloneGitHubRepo(
     };
   }
 
-  await cloneGitRepo(session, workspacePath, gitUrl, githubToken, gitAuthor, options);
+  await cloneGitRepo(session, workspacePath, authenticatedGitUrl, gitAuthor, options);
 }
 
 export async function cloneGitRepo(
   session: ExecutionSession,
   workspacePath: string,
-  gitUrl: string,
-  gitToken?: string,
+  authenticatedGitUrl: string,
   gitAuthor?: GitAuthorConfig,
-  options?: { shallow?: boolean; platform?: 'github' | 'gitlab' }
+  options?: { shallow?: boolean }
 ): Promise<void> {
-  const repoUrl = buildAuthenticatedGitUrl(gitUrl, gitToken, options?.platform);
-
-  const sanitizedGitUrl = sanitizeGitUrlForLogging(gitUrl);
+  const sanitizedGitUrl = sanitizeGitUrlForLogging(authenticatedGitUrl);
   const shallow = options?.shallow ?? false;
   logger.setTags({ gitUrl: sanitizedGitUrl, workspacePath, shallow });
   logger.info('Cloning generic git repository');
@@ -521,7 +510,7 @@ export async function cloneGitRepo(
     // Git clone with 2-minute timeout to prevent indefinite hangs
     const CLONE_TIMEOUT_MS = 120_000; // 2 minutes
     const result = await withTimeout(
-      session.gitCheckout(repoUrl, {
+      session.gitCheckout(authenticatedGitUrl, {
         targetDir: workspacePath,
         // Use depth: 1 for shallow clones (faster, less disk space)
         ...(shallow && { depth: 1 }),
@@ -569,9 +558,12 @@ export async function restoreWorkspace(
   options: RestoreWorkspaceOptions
 ): Promise<void> {
   if (options.gitUrl) {
-    await cloneGitRepo(session, workspacePath, options.gitUrl, options.gitToken, undefined, {
-      platform: options.platform,
-    });
+    const authenticatedGitUrl = buildAuthenticatedGitUrl(
+      options.gitUrl,
+      options.gitToken,
+      options.platform
+    );
+    await cloneGitRepo(session, workspacePath, authenticatedGitUrl);
   } else if (options.githubRepo) {
     await cloneGitHubRepo(
       session,
@@ -605,17 +597,14 @@ export async function updateGitRemoteToken(
   gitToken: string,
   platform?: 'github' | 'gitlab'
 ): Promise<void> {
-  // Build new URL with token embedded (GitLab uses 'oauth2', others use 'x-access-token')
-  const newUrl = new URL(gitUrl);
-  newUrl.username = platform === 'gitlab' ? 'oauth2' : 'x-access-token';
-  newUrl.password = gitToken;
+  const newUrl = buildAuthenticatedGitUrl(gitUrl, gitToken, platform);
 
   const sanitizedGitUrl = sanitizeGitUrlForLogging(gitUrl);
   logger.setTags({ workspacePath, gitUrl: sanitizedGitUrl });
   logger.info('Updating git remote URL with new token');
 
   const result = await session.exec(
-    `cd '${workspacePath}' && git remote set-url origin '${newUrl.toString()}'`
+    `cd '${workspacePath}' && git remote set-url origin '${newUrl}'`
   );
 
   if (result.exitCode !== 0) {

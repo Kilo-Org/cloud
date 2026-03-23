@@ -128,13 +128,13 @@ describe('manageBranch', () => {
       it('skips validation for GitHub pull refs', async () => {
         await validateUpstreamBranchExists(
           fakeSession,
-          { gitUrl: 'https://github.com/org/repo.git', gitToken: 'tok' },
+          'https://x-access-token:tok@github.com/org/repo.git',
           'refs/pull/42/head'
         );
         expect(mockExec).not.toHaveBeenCalled();
       });
 
-      it('resolves when branch exists on remote with gitUrl repo', async () => {
+      it('resolves when branch exists on remote', async () => {
         mockExec.mockResolvedValueOnce({
           exitCode: 0,
           stdout: 'abc123\trefs/heads/main\n',
@@ -144,24 +144,8 @@ describe('manageBranch', () => {
         await expect(
           validateUpstreamBranchExists(
             fakeSession,
-            { gitUrl: 'https://github.com/org/repo.git', gitToken: 'tok', platform: 'github' },
+            buildAuthenticatedGitUrl('https://github.com/org/repo.git', 'tok', 'github'),
             'main'
-          )
-        ).resolves.toBeUndefined();
-      });
-
-      it('resolves when branch exists on remote with githubRepo', async () => {
-        mockExec.mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: 'abc123\trefs/heads/feature\n',
-          stderr: '',
-        });
-
-        await expect(
-          validateUpstreamBranchExists(
-            fakeSession,
-            { githubRepo: 'org/repo', githubToken: 'tok' },
-            'feature'
           )
         ).resolves.toBeUndefined();
       });
@@ -176,7 +160,7 @@ describe('manageBranch', () => {
         await expect(
           validateUpstreamBranchExists(
             fakeSession,
-            { gitUrl: 'https://github.com/org/repo.git' },
+            'https://github.com/org/repo.git',
             'nonexistent'
           )
         ).rejects.toThrow(BranchNotFoundError);
@@ -192,24 +176,25 @@ describe('manageBranch', () => {
         await expect(
           validateUpstreamBranchExists(
             fakeSession,
-            { gitUrl: 'https://github.com/org/repo.git', gitToken: 'tok' },
+            buildAuthenticatedGitUrl('https://github.com/org/repo.git', 'tok'),
             'main'
           )
         ).resolves.toBeUndefined();
       });
 
-      it('passes platform to git URL for gitlab repos', async () => {
+      it('uses the pre-built authenticated URL as-is', async () => {
         mockExec.mockResolvedValueOnce({
           exitCode: 0,
           stdout: 'abc123\trefs/heads/main\n',
           stderr: '',
         });
 
-        await validateUpstreamBranchExists(
-          fakeSession,
-          { gitUrl: 'https://gitlab.com/org/repo.git', gitToken: 'tok', platform: 'gitlab' },
-          'main'
+        const authenticatedUrl = buildAuthenticatedGitUrl(
+          'https://gitlab.com/org/repo.git',
+          'tok',
+          'gitlab'
         );
+        await validateUpstreamBranchExists(fakeSession, authenticatedUrl, 'main');
 
         const cmd = mockExec.mock.calls[0][0] as string;
         expect(cmd).toContain('oauth2:');
@@ -629,12 +614,11 @@ describe('disk space checking', () => {
   });
 
   describe('cloneGitRepo', () => {
-    it('should clone repository (disk space check is separate)', async () => {
+    it('should clone repository with plain URL (no credentials)', async () => {
       mockExec
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
 
-      // Mock gitCheckout to succeed
       mockGitCheckout.mockResolvedValue({
         success: true,
         exitCode: 0,
@@ -642,31 +626,32 @@ describe('disk space checking', () => {
 
       await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
 
-      // Verify clone was called
       expect(mockGitCheckout).toHaveBeenCalled();
     });
 
-    it('should include token in URL when provided', async () => {
+    it('should pass pre-built authenticated URL directly to gitCheckout', async () => {
       mockExec
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
 
-      // Mock gitCheckout to succeed
       mockGitCheckout.mockResolvedValue({
         success: true,
         exitCode: 0,
       });
 
-      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git', 'test-token');
+      const authenticatedUrl = buildAuthenticatedGitUrl(
+        'https://example.com/repo.git',
+        'test-token'
+      );
+      await cloneGitRepo(fakeSession, '/workspace', authenticatedUrl);
 
-      // Verify gitCheckout was called with URL containing token
       expect(mockGitCheckout).toHaveBeenCalledWith(
         expect.stringContaining('x-access-token:test-token'),
         expect.any(Object)
       );
     });
 
-    it('should use oauth2 username for gitlab platform', async () => {
+    it('should pass gitlab authenticated URL directly to gitCheckout', async () => {
       mockExec
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
@@ -676,64 +661,15 @@ describe('disk space checking', () => {
         exitCode: 0,
       });
 
-      await cloneGitRepo(
-        fakeSession,
-        '/workspace',
+      const authenticatedUrl = buildAuthenticatedGitUrl(
         'https://gitlab.com/repo.git',
         'test-token',
-        undefined,
-        {
-          platform: 'gitlab',
-        }
+        'gitlab'
       );
+      await cloneGitRepo(fakeSession, '/workspace', authenticatedUrl);
 
       expect(mockGitCheckout).toHaveBeenCalledWith(
         expect.stringContaining('oauth2:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username for github platform', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(
-        fakeSession,
-        '/workspace',
-        'https://example.com/repo.git',
-        'test-token',
-        undefined,
-        {
-          platform: 'github',
-        }
-      );
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username when platform is undefined', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git', 'test-token');
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:test-token'),
         expect.any(Object)
       );
     });

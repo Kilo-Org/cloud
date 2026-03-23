@@ -6,6 +6,7 @@ import { GitHubTokenService } from '../services/github-token-service.js';
 import { InstallationLookupService } from '../services/installation-lookup-service.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import {
+  buildAuthenticatedGitUrl,
   checkDiskAndCleanBeforeSetup,
   setupWorkspace,
   cloneGitHubRepo,
@@ -140,14 +141,12 @@ export async function executePreparationSteps(
 
   const cloneOptions = input.shallow ? { shallow: true } : undefined;
   if (input.gitUrl) {
-    await cloneGitRepo(
-      session,
-      workspacePath,
+    const authenticatedGitUrl = buildAuthenticatedGitUrl(
       input.gitUrl,
       input.gitToken,
-      undefined,
-      cloneOptions
+      input.platform
     );
+    await cloneGitRepo(session, workspacePath, authenticatedGitUrl, undefined, cloneOptions);
   } else if (input.githubRepo) {
     await cloneGitHubRepo(
       session,

@@ -21,10 +21,10 @@ import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
 import {
   checkDiskAndCleanBeforeSetup,
   setupWorkspace,
-  cloneGitHubRepo,
   cloneGitRepo,
   manageBranch,
   validateUpstreamBranchExists,
+  buildAuthenticatedGitUrl,
   BranchNotFoundError,
 } from '../../workspace.js';
 import { WrapperClient } from '../../kilo/wrapper-client.js';
@@ -361,24 +361,37 @@ const prepareSessionHandler = internalApiProtectedProcedure
         input.mcpServers
       );
 
-      // 7. Clone repository
+      // 7. Build authenticated git URL once for both validation and clone
       const cloneOptions = input.shallow ? { shallow: true } : undefined;
-      logger.info('Cloning repository');
+      let authenticatedGitUrl: string;
+      let gitAuthor: { name: string; email: string } | undefined;
+
+      if (input.gitUrl) {
+        authenticatedGitUrl = buildAuthenticatedGitUrl(
+          input.gitUrl,
+          input.gitToken,
+          input.platform
+        );
+      } else if (input.githubRepo) {
+        const gitUrl = `https://github.com/${input.githubRepo}.git`;
+        authenticatedGitUrl = buildAuthenticatedGitUrl(gitUrl, resolvedGithubToken);
+        if (ctx.env.GITHUB_APP_SLUG && ctx.env.GITHUB_APP_BOT_USER_ID) {
+          gitAuthor = {
+            name: `${ctx.env.GITHUB_APP_SLUG}[bot]`,
+            email: `${ctx.env.GITHUB_APP_BOT_USER_ID}+${ctx.env.GITHUB_APP_SLUG}[bot]@users.noreply.github.com`,
+          };
+        }
+      } else {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Either githubRepo or gitUrl must be provided',
+        });
+      }
+
       // Pre-validate upstream branch exists before cloning (saves 30-120s of wasted compute)
       if (input.upstreamBranch) {
-        const repo = input.gitUrl
-          ? { gitUrl: input.gitUrl, gitToken: input.gitToken, platform: input.platform }
-          : input.githubRepo
-            ? { githubRepo: input.githubRepo, githubToken: resolvedGithubToken }
-            : undefined;
-        if (!repo) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Either githubRepo or gitUrl must be provided',
-          });
-        }
         try {
-          await validateUpstreamBranchExists(session, repo, input.upstreamBranch);
+          await validateUpstreamBranchExists(session, authenticatedGitUrl, input.upstreamBranch);
         } catch (err) {
           if (err instanceof BranchNotFoundError) {
             throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
@@ -387,33 +400,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
         }
       }
 
-      if (input.gitUrl) {
-        await cloneGitRepo(
-          session,
-          workspacePath,
-          input.gitUrl,
-          input.gitToken,
-          undefined,
-          cloneOptions
-        );
-      } else if (input.githubRepo) {
-        await cloneGitHubRepo(
-          session,
-          workspacePath,
-          input.githubRepo,
-          resolvedGithubToken,
-          {
-            GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
-            GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
-          },
-          cloneOptions
-        );
-      } else {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Either githubRepo or gitUrl must be provided',
-        });
-      }
+      logger.info('Cloning repository');
+      await cloneGitRepo(session, workspacePath, authenticatedGitUrl, gitAuthor, cloneOptions);
 
       // 8. Branch management
       logger

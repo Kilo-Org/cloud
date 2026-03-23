@@ -5,6 +5,18 @@ vi.mock('@cloudflare/sandbox', () => ({
 }));
 
 vi.mock('./workspace.js', () => {
+  function buildAuthenticatedGitUrl(
+    gitUrl: string,
+    gitToken?: string,
+    platform?: 'github' | 'gitlab'
+  ): string {
+    if (!gitToken) return gitUrl;
+    const url = new URL(gitUrl);
+    url.username = platform === 'gitlab' ? 'oauth2' : 'x-access-token';
+    url.password = gitToken;
+    return url.toString();
+  }
+
   const setupWorkspace = vi.fn();
   const cloneGitHubRepo = vi.fn();
   const cloneGitRepo = vi.fn();
@@ -14,6 +26,7 @@ vi.mock('./workspace.js', () => {
   const cleanupWorkspace = vi.fn().mockResolvedValue(undefined);
 
   return {
+    buildAuthenticatedGitUrl,
     setupWorkspace,
     cloneGitHubRepo,
     cloneGitRepo,

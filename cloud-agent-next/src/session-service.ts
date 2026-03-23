@@ -10,6 +10,7 @@ import type {
 import type { ExecutionParams as _ExecutionParams } from './schema.js';
 import { generateSandboxId } from './sandbox-id.js';
 import {
+  buildAuthenticatedGitUrl,
   checkDiskAndCleanBeforeSetup,
   cloneGitHubRepo,
   cloneGitRepo,
@@ -869,10 +870,8 @@ export class SessionService {
     // Shallow clone (depth: 1) can be enabled for faster checkout and reduced disk usage
     const cloneOptions = shallow ? { shallow: true } : undefined;
     if (gitUrl) {
-      await cloneGitRepo(session, workspacePath, gitUrl, gitToken, undefined, {
-        ...cloneOptions,
-        platform: context.platform,
-      });
+      const authenticatedGitUrl = buildAuthenticatedGitUrl(gitUrl, gitToken, context.platform);
+      await cloneGitRepo(session, workspacePath, authenticatedGitUrl, undefined, cloneOptions);
     } else if (githubRepo) {
       await cloneGitHubRepo(
         session,
@@ -1037,9 +1036,8 @@ export class SessionService {
 
     // Clone repository using appropriate method
     if (gitUrl) {
-      await cloneGitRepo(session, workspacePath, gitUrl, gitToken, undefined, {
-        platform: context.platform,
-      });
+      const authenticatedGitUrl = buildAuthenticatedGitUrl(gitUrl, gitToken, context.platform);
+      await cloneGitRepo(session, workspacePath, authenticatedGitUrl);
     } else if (githubRepo) {
       await cloneGitHubRepo(
         session,

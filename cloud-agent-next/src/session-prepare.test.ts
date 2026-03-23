@@ -44,13 +44,26 @@ vi.mock('./workspace.js', () => {
       this.name = 'BranchNotFoundError';
     }
   }
+
+  function buildAuthenticatedGitUrl(
+    gitUrl: string,
+    gitToken?: string,
+    platform?: 'github' | 'gitlab'
+  ): string {
+    if (!gitToken) return gitUrl;
+    const url = new URL(gitUrl);
+    url.username = platform === 'gitlab' ? 'oauth2' : 'x-access-token';
+    url.password = gitToken;
+    return url.toString();
+  }
+
   return {
+    buildAuthenticatedGitUrl,
     checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
     setupWorkspace: vi.fn().mockResolvedValue({
       workspacePath: '/workspace/test',
       sessionHome: '/home/test',
     }),
-    cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
     cloneGitRepo: vi.fn().mockResolvedValue(undefined),
     manageBranch: vi.fn().mockResolvedValue(undefined),
     validateUpstreamBranchExists: vi.fn().mockResolvedValue(undefined),

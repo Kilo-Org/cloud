@@ -242,7 +242,7 @@ export function RefineryActivityLog({
     | { kind: 'convoy'; group: ConvoyActivityGroup; sortKey: string }
     | { kind: 'standalone'; entry: ActivityLogEntry; sortKey: string };
 
-  const { visibleItems, totalEntryCount, hasMore } = useMemo(() => {
+  const { visibleItems, totalEntryCount, visibleEntryCount, hasMore } = useMemo(() => {
     const items: DisplayItem[] = [
       ...convoyGroups.map(
         (group): DisplayItem => ({
@@ -266,11 +266,14 @@ export function RefineryActivityLog({
     // Paginate: each convoy group costs its entry count, each standalone costs 1
     const visible: DisplayItem[] = [];
     let budget = visibleCount;
+    let visibleEntries = 0;
 
     for (const item of items) {
       if (budget <= 0) break;
+      const cost = item.kind === 'convoy' ? item.group.entries.length : 1;
       visible.push(item);
-      budget -= item.kind === 'convoy' ? item.group.entries.length : 1;
+      budget -= cost;
+      visibleEntries += cost;
     }
 
     const total = convoyGroups.reduce((sum, g) => sum + g.entries.length, 0) + standalone.length;
@@ -278,7 +281,8 @@ export function RefineryActivityLog({
     return {
       visibleItems: visible,
       totalEntryCount: total,
-      hasMore: visibleCount < total,
+      visibleEntryCount: visibleEntries,
+      hasMore: visibleEntries < total,
     };
   }, [convoyGroups, standalone, visibleCount]);
 
@@ -357,7 +361,7 @@ export function RefineryActivityLog({
         >
           Show more
           <span className="font-mono text-[10px] text-white/20">
-            {totalEntryCount - visibleCount} remaining
+            {totalEntryCount - visibleEntryCount} remaining
           </span>
         </button>
       )}
@@ -416,7 +420,9 @@ function ConvoyActivityGroupCard({
           <motion.div
             className="h-full rounded-full bg-emerald-500/60"
             initial={{ width: 0 }}
-            animate={{ width: `${(convoy.closed_beads / convoy.total_beads) * 100}%` }}
+            animate={{
+              width: `${(convoy.closed_beads / convoy.total_beads) * 100}%`,
+            }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
           />
         </div>
@@ -492,7 +498,11 @@ function TimelineEntry({
         <div className="flex items-center gap-2 text-[11px] text-white/30">
           {rigName && <span>{rigName}</span>}
           {rigName && <span className="text-white/15">&middot;</span>}
-          <span>{formatDistanceToNow(new Date(entry.event.created_at), { addSuffix: true })}</span>
+          <span>
+            {formatDistanceToNow(new Date(entry.event.created_at), {
+              addSuffix: true,
+            })}
+          </span>
           <Icon className="ml-auto size-3 text-white/15" />
         </div>
 

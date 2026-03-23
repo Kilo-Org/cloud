@@ -2,6 +2,7 @@
 
 import { useState, useMemo, Fragment } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
@@ -39,7 +40,11 @@ type ConvoyGroup = {
   items: MergeQueueItem[];
 };
 
-type ConfirmAction = { beadId: string; title: string; action: 'fail' | 'retry' };
+type ConfirmAction = {
+  beadId: string;
+  title: string;
+  action: 'fail' | 'retry';
+};
 
 // ── Status badges ────────────────────────────────────────────────────
 
@@ -106,6 +111,8 @@ export function NeedsAttention({
   data: MergeQueueData['needsAttention'];
   townId: string;
 }) {
+  const session = useSession();
+  const isAdmin = session?.data?.isAdmin ?? false;
   const totalCount = data.openPRs.length + data.failedReviews.length + data.stalePRs.length;
 
   // Tag each item with its category for rendering
@@ -153,7 +160,12 @@ export function NeedsAttention({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
           >
-            <ConvoyGroupCard group={group} categoryByBeadId={categoryByBeadId} townId={townId} />
+            <ConvoyGroupCard
+              group={group}
+              categoryByBeadId={categoryByBeadId}
+              townId={townId}
+              isAdmin={isAdmin}
+            />
           </motion.div>
         ))}
       </AnimatePresence>
@@ -172,6 +184,7 @@ export function NeedsAttention({
               item={item}
               category={categoryByBeadId.get(item.mrBead.bead_id) ?? 'openPR'}
               townId={townId}
+              isAdmin={isAdmin}
             />
           </motion.div>
         ))}
@@ -186,10 +199,12 @@ function ConvoyGroupCard({
   group,
   categoryByBeadId,
   townId,
+  isAdmin,
 }: {
   group: ConvoyGroup;
   categoryByBeadId: Map<string, Category>;
   townId: string;
+  isAdmin: boolean;
 }) {
   const { open: openDrawer } = useDrawerStack();
   const { convoy, items } = group;
@@ -231,7 +246,9 @@ function ConvoyGroupCard({
           <motion.div
             className="h-full rounded-full bg-emerald-500/60"
             initial={{ width: 0 }}
-            animate={{ width: `${(convoy.closed_beads / convoy.total_beads) * 100}%` }}
+            animate={{
+              width: `${(convoy.closed_beads / convoy.total_beads) * 100}%`,
+            }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
           />
         </div>
@@ -246,6 +263,7 @@ function ConvoyGroupCard({
               item={item}
               category={categoryByBeadId.get(item.mrBead.bead_id) ?? 'openPR'}
               townId={townId}
+              isAdmin={isAdmin}
             />
           </Fragment>
         ))}
@@ -260,14 +278,16 @@ function AttentionItemCard({
   item,
   category,
   townId,
+  isAdmin,
 }: {
   item: MergeQueueItem;
   category: Category;
   townId: string;
+  isAdmin: boolean;
 }) {
   return (
     <div className="rounded-lg border border-white/[0.06] bg-white/[0.02]">
-      <AttentionItemRow item={item} category={category} townId={townId} />
+      <AttentionItemRow item={item} category={category} townId={townId} isAdmin={isAdmin} />
     </div>
   );
 }
@@ -278,10 +298,12 @@ function AttentionItemRow({
   item,
   category,
   townId,
+  isAdmin,
 }: {
   item: MergeQueueItem;
   category: Category;
   townId: string;
+  isAdmin: boolean;
 }) {
   const { open: openDrawer } = useDrawerStack();
   const trpc = useGastownTRPC();
@@ -367,7 +389,11 @@ function AttentionItemRow({
             <button
               onClick={() => {
                 if (item.sourceBead) {
-                  openDrawer({ type: 'bead', beadId: item.sourceBead.bead_id, rigId });
+                  openDrawer({
+                    type: 'bead',
+                    beadId: item.sourceBead.bead_id,
+                    rigId,
+                  });
                 }
               }}
               className="min-w-0 truncate text-sm text-white/75 transition-colors hover:text-white/90"
@@ -382,7 +408,9 @@ function AttentionItemRow({
             {item.rigName && <span>{item.rigName}</span>}
             {item.agent && <span>{item.agent.name}</span>}
             <span>
-              {formatDistanceToNow(new Date(item.mrBead.created_at), { addSuffix: true })}
+              {formatDistanceToNow(new Date(item.mrBead.created_at), {
+                addSuffix: true,
+              })}
             </span>
             {item.reviewMetadata.retry_count > 0 && (
               <span className="text-amber-400/60">
@@ -392,7 +420,10 @@ function AttentionItemRow({
             )}
             {category === 'stale' && item.staleSince && (
               <span className="text-amber-400/60">
-                stale since {formatDistanceToNow(new Date(item.staleSince), { addSuffix: true })}
+                stale since{' '}
+                {formatDistanceToNow(new Date(item.staleSince), {
+                  addSuffix: true,
+                })}
               </span>
             )}
             {category === 'failed' && item.failureReason && (
@@ -432,7 +463,11 @@ function AttentionItemRow({
           <button
             onClick={() => {
               if (item.sourceBead) {
-                openDrawer({ type: 'bead', beadId: item.sourceBead.bead_id, rigId });
+                openDrawer({
+                  type: 'bead',
+                  beadId: item.sourceBead.bead_id,
+                  rigId,
+                });
               }
             }}
             className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
@@ -440,19 +475,21 @@ function AttentionItemRow({
           >
             <Eye className="size-3.5" />
           </button>
-          <button
-            onClick={() =>
-              setConfirmAction({
-                beadId: item.mrBead.bead_id,
-                title: sourceBeadTitle,
-                action: 'fail',
-              })
-            }
-            className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-red-500/10 hover:text-red-400"
-            title="Fail Bead"
-          >
-            <AlertTriangle className="size-3.5" />
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() =>
+                setConfirmAction({
+                  beadId: item.mrBead.bead_id,
+                  title: sourceBeadTitle,
+                  action: 'fail',
+                })
+              }
+              className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-red-500/10 hover:text-red-400"
+              title="Fail Bead"
+            >
+              <AlertTriangle className="size-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

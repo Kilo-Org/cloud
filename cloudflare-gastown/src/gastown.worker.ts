@@ -216,7 +216,7 @@ app.post('/debug/towns/:townId/reconcile-dry-run', async c => {
 
 app.post('/debug/towns/:townId/replay-events', async c => {
   const townId = c.req.param('townId');
-  const body = (await c.req.json()) as { from?: string; to?: string };
+  const body: { from?: string; to?: string } = await c.req.json();
   if (!body.from || !body.to) {
     return c.json({ error: 'Missing required fields: from, to (ISO timestamps)' }, 400);
   }

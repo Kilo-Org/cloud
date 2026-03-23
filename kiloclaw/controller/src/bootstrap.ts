@@ -442,7 +442,64 @@ export function updateToolsMdGoogleSection(env: EnvLike, deps: BootstrapDeps): v
   }
 }
 
-// ---- Step 8: TOOLS.md 1Password section ----
+// ---- Step 8: TOOLS.md GitHub section ----
+
+const GH_MARKER_BEGIN = '<!-- BEGIN:github -->';
+const GH_MARKER_END = '<!-- END:github -->';
+
+const GH_TOOLS_SECTION = `
+${GH_MARKER_BEGIN}
+## GitHub
+
+You have the \`gh\` CLI installed, configured, and authenticated. Whenever the user asks you to interact with GitHub — including managing issues, pull requests, releases, repos, or pushing/pulling code — use the \`gh\` CLI.
+
+- Auth status: \`gh auth status\`
+- List repos: \`gh repo list\`
+- Clone a repo: \`gh repo clone <owner>/<repo>\`
+- Create a PR: \`gh pr create --title "..." --body "..."\`
+- List PRs: \`gh pr list\`
+- View a PR: \`gh pr view <number>\`
+- List issues: \`gh issue list\`
+- Create an issue: \`gh issue create --title "..." --body "..."\`
+- Run \`gh --help\` and \`gh <command> --help\` for all available commands.
+${GH_MARKER_END}`;
+
+/**
+ * Manage the GitHub section in TOOLS.md.
+ *
+ * When GITHUB_TOKEN is present (gh CLI is authenticated), append a bounded
+ * section so the agent knows gh is available. When absent, remove any stale
+ * section. Idempotent: skips if the marker is already present.
+ */
+export function updateToolsMdGitHubSection(env: EnvLike, deps: BootstrapDeps): void {
+  if (!deps.existsSync(TOOLS_MD_DEST)) return;
+
+  const content = deps.readFileSync(TOOLS_MD_DEST, 'utf8');
+
+  if (env.GITHUB_TOKEN) {
+    // GitHub connected — add section if not already present
+    if (!content.includes(GH_MARKER_BEGIN)) {
+      deps.writeFileSync(TOOLS_MD_DEST, content + GH_TOOLS_SECTION);
+      console.log('TOOLS.md: added GitHub section');
+    } else {
+      console.log('TOOLS.md: GitHub section already present');
+    }
+  } else {
+    // GitHub not connected — remove stale section if present
+    if (content.includes(GH_MARKER_BEGIN)) {
+      const beginIdx = content.indexOf(GH_MARKER_BEGIN);
+      const endIdx = content.indexOf(GH_MARKER_END);
+      if (beginIdx !== -1 && endIdx !== -1) {
+        const before = content.slice(0, beginIdx).replace(/\n+$/, '\n');
+        const after = content.slice(endIdx + GH_MARKER_END.length).replace(/^\n+/, '');
+        deps.writeFileSync(TOOLS_MD_DEST, before + after);
+        console.log('TOOLS.md: removed stale GitHub section');
+      }
+    }
+  }
+}
+
+// ---- Step 9: TOOLS.md 1Password section ----
 
 const OP_MARKER_BEGIN = '<!-- BEGIN:1password -->';
 const OP_MARKER_END = '<!-- END:1password -->';
@@ -502,7 +559,7 @@ export function updateToolsMd1PasswordSection(env: EnvLike, deps: BootstrapDeps)
   }
 }
 
-// ---- Step 9: Gateway args ----
+// ---- Step 10: Gateway args ----
 
 /**
  * Build the gateway CLI arguments array.
@@ -557,6 +614,7 @@ export async function bootstrap(
   await yieldToEventLoop();
 
   updateToolsMdGoogleSection(env, deps);
+  updateToolsMdGitHubSection(env, deps);
   updateToolsMd1PasswordSection(env, deps);
 
   // Write mcporter config for MCP servers (AgentCard, etc.)

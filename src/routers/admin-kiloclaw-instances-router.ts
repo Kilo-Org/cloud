@@ -523,25 +523,20 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   }),
 
   machineCreate: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    // Look up any version pin so the new machine uses it (non-fatal).
-    let imageTag: string | undefined;
+    const fallbackMessage = 'Failed to create machine';
     try {
+      // Look up any version pin so the new machine uses the pinned tag.
+      // Fatal if DB fails — deploying the wrong version is worse than failing.
       const [pin] = await db
         .select({ image_tag: kiloclaw_version_pins.image_tag })
         .from(kiloclaw_version_pins)
         .where(eq(kiloclaw_version_pins.user_id, input.userId))
         .limit(1);
-      imageTag = pin?.image_tag || undefined;
-    } catch (err) {
-      console.error('Failed to look up version pin for user:', input.userId, err);
-    }
 
-    const fallbackMessage = 'Failed to create machine';
-    try {
       const client = new KiloClawInternalClient();
       return await client.start(input.userId, {
         skipRecovery: true,
-        imageTag,
+        imageTag: pin?.image_tag || undefined,
       });
     } catch (err) {
       console.error('Failed to create machine for user:', input.userId, err);

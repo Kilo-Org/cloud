@@ -913,7 +913,12 @@ platform.post('/doctor', async c => {
 // POST /api/platform/start
 const StartRequestSchema = UserIdRequestSchema.extend({
   skipRecovery: z.boolean().optional(),
-  imageTag: z.string().min(1).optional(),
+  imageTag: z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/)
+    .optional(),
 });
 platform.post('/start', async c => {
   const result = await parseBody(c, StartRequestSchema);

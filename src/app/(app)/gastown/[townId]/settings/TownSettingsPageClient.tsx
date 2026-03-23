@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useUser } from '@/hooks/useUser';
@@ -49,10 +49,12 @@ const SECTIONS = [
 
 function useScrollSpy(sectionIds: readonly string[]) {
   const [activeId, setActiveId] = useState<string>(sectionIds[0]);
+  const suppressRef = useRef(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
+        if (suppressRef.current) return;
         // Find the topmost visible section
         const visible = entries
           .filter(e => e.isIntersecting)
@@ -61,7 +63,7 @@ function useScrollSpy(sectionIds: readonly string[]) {
           setActiveId(visible[0].target.id);
         }
       },
-      { rootMargin: '-80px 0px -60% 0px', threshold: 0 }
+      { rootMargin: '-56px 0px -60% 0px', threshold: 0 }
     );
 
     for (const id of sectionIds) {
@@ -72,14 +74,26 @@ function useScrollSpy(sectionIds: readonly string[]) {
     return () => observer.disconnect();
   }, [sectionIds]);
 
-  return activeId;
-}
+  function scrollTo(id: string) {
+    const el = document.getElementById(id);
+    const header = document.getElementById('settings-sticky-header');
+    if (!el) return;
 
-function scrollToSection(id: string) {
-  const el = document.getElementById(id);
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Immediately highlight the target and suppress observer during scroll
+    setActiveId(id);
+    suppressRef.current = true;
+
+    const headerHeight = header?.getBoundingClientRect().height ?? 0;
+    const top = el.getBoundingClientRect().top + window.scrollY - headerHeight - 24;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+
+    // Re-enable observer after scroll settles
+    setTimeout(() => {
+      suppressRef.current = false;
+    }, 1000);
   }
+
+  return { activeId, scrollTo };
 }
 
 export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
@@ -149,7 +163,9 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
     setInitialized(true);
   }
 
-  const activeSection = useScrollSpy(SECTIONS.map(s => s.id));
+  const { activeId: activeSection, scrollTo: scrollToSection } = useScrollSpy(
+    SECTIONS.map(s => s.id)
+  );
 
   function handleSave() {
     const envVarObj: Record<string, string> = {};
@@ -228,9 +244,12 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div>
       {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
+      <div
+        id="settings-sticky-header"
+        className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3"
+      >
         <div className="flex items-center gap-2.5">
           <Settings className="size-4 text-white/40" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Settings</h1>
@@ -255,12 +274,12 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
         )}
       </div>
 
-      {/* Two-column body — single scroll container so sticky works */}
-      <div className="flex-1 overflow-y-auto scroll-smooth">
-        <div className="flex">
+      {/* Two-column body — viewport scrolls so sticky works */}
+      <div className="scroll-smooth">
+        <div className="mx-auto flex max-w-4xl px-6">
           {/* Main content */}
           <div className="min-w-0 flex-1">
-            <div className="mx-auto max-w-2xl space-y-8 px-6 pt-6 pb-24">
+            <div className="space-y-8 pt-6" style={{ paddingBottom: '75vh' }}>
               {/* ── Git Authentication ──────────────────────────────── */}
               <SettingsSection
                 id="git-auth"
@@ -617,8 +636,8 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
           </div>
 
           {/* Right sidebar — sticky scrollspy nav */}
-          <div className="hidden w-52 shrink-0 lg:block">
-            <nav className="sticky top-6 px-4 pt-6">
+          <div className="hidden w-52 shrink-0 lg:sticky lg:top-[53px] lg:self-start lg:block">
+            <nav className="px-4 pt-6">
               <div className="mb-3 text-[10px] font-medium tracking-wide text-white/25 uppercase">
                 On this page
               </div>
@@ -631,19 +650,23 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
                     <li key={section.id}>
                       <button
                         onClick={() => scrollToSection(section.id)}
-                        className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition-colors ${
+                        className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs whitespace-nowrap overflow-hidden text-ellipsis transition-colors ${
                           isActive
                             ? 'bg-white/[0.06] text-white/80'
                             : 'text-white/35 hover:bg-white/[0.03] hover:text-white/55'
                         }`}
                       >
                         <SectionIcon className="size-3 shrink-0" />
-                        <span>{section.label}</span>
+                        <span className="truncate">{section.label}</span>
                         {isActive && (
                           <motion.div
                             layoutId="settings-nav-indicator"
                             className="ml-auto size-1 rounded-full bg-[color:oklch(95%_0.15_108)]"
-                            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                            transition={{
+                              type: 'spring',
+                              stiffness: 350,
+                              damping: 30,
+                            }}
                           />
                         )}
                       </button>
@@ -700,7 +723,6 @@ function SettingsSection({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.06, duration: 0.35 }}
-      className="scroll-mt-6"
     >
       <div className="mb-4 flex items-start justify-between">
         <div className="flex items-start gap-3">

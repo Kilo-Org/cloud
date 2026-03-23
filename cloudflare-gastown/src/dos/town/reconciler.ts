@@ -1267,6 +1267,7 @@ export function reconcileGUPP(sql: SqlStorage): Action[] {
         FROM ${agent_metadata}
         LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
         WHERE ${agent_metadata.status} IN ('working', 'stalled')
+          AND ${agent_metadata.role} != 'mayor'
       `,
       []
     ),

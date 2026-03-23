@@ -101,8 +101,7 @@ function formatMachineSizeLabel(
 ): string {
   if (!ms) return 'Default (shared-cpu-2x / 3 GB)';
   const kind = ms.cpu_kind ?? 'shared';
-  const preset =
-    kind === 'shared' ? `shared-cpu-${ms.cpus}x` : `performance-${ms.cpus}x`;
+  const preset = kind === 'shared' ? `shared-cpu-${ms.cpus}x` : `performance-${ms.cpus}x`;
   return `${preset} / ${formatMemory(ms.memory_mb)}`;
 }
 
@@ -1527,10 +1526,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                             value={machineSizeCpus}
                             onValueChange={v => {
                               setMachineSizeCpus(v);
-                              const memOpts = getValidMemoryOptions(
-                                machineSizeCpuKind,
-                                Number(v)
-                              );
+                              const memOpts = getValidMemoryOptions(machineSizeCpuKind, Number(v));
                               if (!memOpts.includes(Number(machineSizeMemory))) {
                                 setMachineSizeMemory(String(memOpts[0]));
                               }
@@ -1551,9 +1547,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                           </Select>
                         </div>
                         <div>
-                          <label className="text-muted-foreground mb-1 block text-xs">
-                            Memory
-                          </label>
+                          <label className="text-muted-foreground mb-1 block text-xs">Memory</label>
                           <Select value={machineSizeMemory} onValueChange={setMachineSizeMemory}>
                             <SelectTrigger>
                               <SelectValue />
@@ -1571,9 +1565,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                           </Select>
                         </div>
                       </div>
-                      <p className="text-muted-foreground text-xs">
-                        Takes effect on next restart.
-                      </p>
+                      <p className="text-muted-foreground text-xs">Takes effect on next restart.</p>
                       <div className="flex gap-2">
                         <Button
                           size="sm"

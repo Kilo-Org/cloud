@@ -348,7 +348,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   ): Promise<{ machineSize: MachineSize | null }> {
     await this.loadState();
 
-    if (this.s.status === 'unprovisioned') {
+    if (this.s.status === null) {
       throw new Error('Instance is not provisioned');
     }
     if (this.s.userId !== userId) {

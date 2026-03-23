@@ -4,25 +4,25 @@ import { Users, Zap } from 'lucide-react';
 import { useFeatureFlagVariantKey } from 'posthog-js/react';
 
 const GROUP_VARIANTS = {
+  control: {
+    headline: 'Learn to build your own AI assistant with OpenClaw.',
+    body: 'Free weekly live session. We walk through real setups — email, calendar, messaging — so you can start building on your own.',
+  },
   'social-proof': {
     headline: 'See how people are using OpenClaw to automate their work.',
     body: 'Free weekly live session. Watch real use cases — email triage, calendar management, messaging — and see what\u2019s possible.',
-  },
-  'hands-on': {
-    headline: 'Learn to build your own AI assistant with OpenClaw.',
-    body: 'Free weekly live session. We walk through real setups — email, calendar, messaging — so you can start building on your own.',
   },
 } as const;
 
 type GroupVariant = keyof typeof GROUP_VARIANTS;
 
 function isGroupVariant(v: unknown): v is GroupVariant {
-  return v === 'social-proof' || v === 'hands-on';
+  return v === 'control' || v === 'social-proof';
 }
 
 export function TrainingCards() {
-  const rawVariant = useFeatureFlagVariantKey('claw-group-training-variant');
-  const variant: GroupVariant = isGroupVariant(rawVariant) ? rawVariant : 'social-proof';
+  const rawVariant = useFeatureFlagVariantKey('join-group-onboarding');
+  const variant: GroupVariant = isGroupVariant(rawVariant) ? rawVariant : 'control';
   const group = GROUP_VARIANTS[variant];
 
   return (

@@ -24,6 +24,8 @@ import {
   cloneGitHubRepo,
   cloneGitRepo,
   manageBranch,
+  validateUpstreamBranchExists,
+  BranchNotFoundError,
 } from '../../workspace.js';
 import { WrapperClient } from '../../kilo/wrapper-client.js';
 import { withDORetry } from '../../utils/do-retry.js';
@@ -362,6 +364,29 @@ const prepareSessionHandler = internalApiProtectedProcedure
       // 7. Clone repository
       const cloneOptions = input.shallow ? { shallow: true } : undefined;
       logger.info('Cloning repository');
+      // Pre-validate upstream branch exists before cloning (saves 30-120s of wasted compute)
+      if (input.upstreamBranch) {
+        const repo = input.gitUrl
+          ? { gitUrl: input.gitUrl, gitToken: input.gitToken, platform: input.platform }
+          : input.githubRepo
+            ? { githubRepo: input.githubRepo, githubToken: resolvedGithubToken }
+            : undefined;
+        if (!repo) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Either githubRepo or gitUrl must be provided',
+          });
+        }
+        try {
+          await validateUpstreamBranchExists(session, repo, input.upstreamBranch);
+        } catch (err) {
+          if (err instanceof BranchNotFoundError) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+          }
+          throw err;
+        }
+      }
+
       if (input.gitUrl) {
         await cloneGitRepo(
           session,
@@ -396,7 +421,17 @@ const prepareSessionHandler = internalApiProtectedProcedure
         .info('Managing branch');
       if (input.upstreamBranch) {
         // For upstream branches, use manageBranch (verifies exists remotely)
-        await manageBranch(session, workspacePath, branchName, true);
+        try {
+          await manageBranch(session, workspacePath, branchName, true);
+        } catch (err) {
+          if (err instanceof BranchNotFoundError) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: err.message,
+            });
+          }
+          throw err;
+        }
       } else {
         // For session branches, create directly (can't exist remotely with UUID-based name)
         const result = await session.exec(`cd ${workspacePath} && git checkout -b '${branchName}'`);

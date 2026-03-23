@@ -415,6 +415,67 @@ export async function createSandboxUsageEvent(
   };
 }
 
+export class BranchNotFoundError extends Error {
+  constructor(branchName: string) {
+    super(
+      `Branch "${branchName}" not found in repository. Please ensure the branch exists remotely.`
+    );
+    this.name = 'BranchNotFoundError';
+  }
+}
+
+export function buildAuthenticatedGitUrl(
+  gitUrl: string,
+  gitToken?: string,
+  platform?: 'github' | 'gitlab'
+): string {
+  if (!gitToken) return gitUrl;
+  const url = new URL(gitUrl);
+  url.username = platform === 'gitlab' ? 'oauth2' : 'x-access-token';
+  url.password = gitToken;
+  return url.toString();
+}
+
+export async function branchExistsOnRemote(
+  session: ExecutionSession,
+  repoUrl: string,
+  branchName: string
+): Promise<boolean> {
+  const result = await session.exec(`git ls-remote --heads '${repoUrl}' '${branchName}'`);
+  if (result.exitCode !== 0) {
+    // ls-remote itself failed (network, auth) — don't treat as "branch missing",
+    // let the clone path handle the real error
+    return true;
+  }
+  return result.stdout.trim().length > 0;
+}
+
+/**
+ * Pre-validate that an upstream branch exists on the remote before cloning.
+ * Skips validation for GitHub pull refs (e.g. refs/pull/123/head).
+ * Returns silently when the branch exists or when ls-remote fails (letting the clone path surface the real error).
+ * Throws BranchNotFoundError when the branch is confirmed missing.
+ */
+export async function validateUpstreamBranchExists(
+  session: ExecutionSession,
+  repo:
+    | { gitUrl: string; gitToken?: string; platform?: 'github' | 'gitlab' }
+    | { githubRepo: string; githubToken?: string },
+  branchName: string
+): Promise<void> {
+  if (GITHUB_PULL_REF_PATTERN.test(branchName)) return;
+
+  const authenticatedUrl =
+    'gitUrl' in repo
+      ? buildAuthenticatedGitUrl(repo.gitUrl, repo.gitToken, repo.platform)
+      : buildAuthenticatedGitUrl(`https://github.com/${repo.githubRepo}.git`, repo.githubToken);
+
+  const exists = await branchExistsOnRemote(session, authenticatedUrl, branchName);
+  if (!exists) {
+    throw new BranchNotFoundError(branchName);
+  }
+}
+
 export async function cloneGitHubRepo(
   session: ExecutionSession,
   workspacePath: string,
@@ -446,15 +507,7 @@ export async function cloneGitRepo(
   gitAuthor?: GitAuthorConfig,
   options?: { shallow?: boolean; platform?: 'github' | 'gitlab' }
 ): Promise<void> {
-  // Build URL with token if available (for private repos)
-  // GitLab OAuth tokens require username 'oauth2'; all other providers use 'x-access-token'
-  let repoUrl = gitUrl;
-  if (gitToken) {
-    const url = new URL(gitUrl);
-    url.username = options?.platform === 'gitlab' ? 'oauth2' : 'x-access-token';
-    url.password = gitToken;
-    repoUrl = url.toString();
-  }
+  const repoUrl = buildAuthenticatedGitUrl(gitUrl, gitToken, options?.platform);
 
   const sanitizedGitUrl = sanitizeGitUrlForLogging(gitUrl);
   const shallow = options?.shallow ?? false;
@@ -658,7 +711,7 @@ async function createNewBranch(
   }
 }
 
-const GITHUB_PULL_REF_PATTERN = /^refs\/pull\/\d+\/head$/;
+export const GITHUB_PULL_REF_PATTERN = /^refs\/pull\/\d+\/head$/;
 
 async function fetchPullRefAndCheckout(
   session: ExecutionSession,
@@ -750,9 +803,7 @@ export async function manageBranch(
         return branchName;
       }
 
-      throw new Error(
-        `Branch "${branchName}" not found in repository. Please ensure the branch exists remotely.`
-      );
+      throw new BranchNotFoundError(branchName);
     }
     await createNewBranch(session, workspacePath, branchName);
   }

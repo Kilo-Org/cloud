@@ -35,16 +35,28 @@ vi.mock('@cloudflare/sandbox', () => ({
 }));
 
 // Mock workspace functions
-vi.mock('./workspace.js', () => ({
-  checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
-  setupWorkspace: vi.fn().mockResolvedValue({
-    workspacePath: '/workspace/test',
-    sessionHome: '/home/test',
-  }),
-  cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
-  cloneGitRepo: vi.fn().mockResolvedValue(undefined),
-  manageBranch: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock('./workspace.js', () => {
+  class BranchNotFoundError extends Error {
+    constructor(branchName: string) {
+      super(
+        `Branch "${branchName}" not found in repository. Please ensure the branch exists remotely.`
+      );
+      this.name = 'BranchNotFoundError';
+    }
+  }
+  return {
+    checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
+    setupWorkspace: vi.fn().mockResolvedValue({
+      workspacePath: '/workspace/test',
+      sessionHome: '/home/test',
+    }),
+    cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
+    cloneGitRepo: vi.fn().mockResolvedValue(undefined),
+    manageBranch: vi.fn().mockResolvedValue(undefined),
+    validateUpstreamBranchExists: vi.fn().mockResolvedValue(undefined),
+    BranchNotFoundError,
+  };
+});
 
 // Mock WrapperClient.ensureWrapper (wrapper now starts kilo server in-process)
 vi.mock('./kilo/wrapper-client.js', () => ({

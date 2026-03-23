@@ -8,6 +8,10 @@ import {
   checkDiskAndCleanBeforeSetup,
   cleanupStaleWorkspaces,
   createSandboxUsageEvent,
+  buildAuthenticatedGitUrl,
+  branchExistsOnRemote,
+  validateUpstreamBranchExists,
+  BranchNotFoundError,
   LOW_DISK_THRESHOLD_MB,
   STALE_DIR_MIN_AGE_SECONDS,
 } from './workspace';
@@ -110,6 +114,108 @@ describe('manageBranch', () => {
       });
     });
 
+    describe('validateUpstreamBranchExists', () => {
+      let fakeSession: ExecutionSession;
+      let mockExec: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        mockExec = vi.fn();
+        fakeSession = {
+          exec: mockExec,
+        } as unknown as ExecutionSession;
+      });
+
+      it('skips validation for GitHub pull refs', async () => {
+        await validateUpstreamBranchExists(
+          fakeSession,
+          { gitUrl: 'https://github.com/org/repo.git', gitToken: 'tok' },
+          'refs/pull/42/head'
+        );
+        expect(mockExec).not.toHaveBeenCalled();
+      });
+
+      it('resolves when branch exists on remote with gitUrl repo', async () => {
+        mockExec.mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: 'abc123\trefs/heads/main\n',
+          stderr: '',
+        });
+
+        await expect(
+          validateUpstreamBranchExists(
+            fakeSession,
+            { gitUrl: 'https://github.com/org/repo.git', gitToken: 'tok', platform: 'github' },
+            'main'
+          )
+        ).resolves.toBeUndefined();
+      });
+
+      it('resolves when branch exists on remote with githubRepo', async () => {
+        mockExec.mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: 'abc123\trefs/heads/feature\n',
+          stderr: '',
+        });
+
+        await expect(
+          validateUpstreamBranchExists(
+            fakeSession,
+            { githubRepo: 'org/repo', githubToken: 'tok' },
+            'feature'
+          )
+        ).resolves.toBeUndefined();
+      });
+
+      it('throws BranchNotFoundError when branch does not exist', async () => {
+        mockExec.mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: '',
+          stderr: '',
+        });
+
+        await expect(
+          validateUpstreamBranchExists(
+            fakeSession,
+            { gitUrl: 'https://github.com/org/repo.git' },
+            'nonexistent'
+          )
+        ).rejects.toThrow(BranchNotFoundError);
+      });
+
+      it('resolves (does not throw) when ls-remote fails — lets clone surface the error', async () => {
+        mockExec.mockResolvedValueOnce({
+          exitCode: 128,
+          stdout: '',
+          stderr: 'fatal: could not read from remote',
+        });
+
+        await expect(
+          validateUpstreamBranchExists(
+            fakeSession,
+            { gitUrl: 'https://github.com/org/repo.git', gitToken: 'tok' },
+            'main'
+          )
+        ).resolves.toBeUndefined();
+      });
+
+      it('passes platform to git URL for gitlab repos', async () => {
+        mockExec.mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: 'abc123\trefs/heads/main\n',
+          stderr: '',
+        });
+
+        await validateUpstreamBranchExists(
+          fakeSession,
+          { gitUrl: 'https://gitlab.com/org/repo.git', gitToken: 'tok', platform: 'gitlab' },
+          'main'
+        );
+
+        const cmd = mockExec.mock.calls[0][0] as string;
+        expect(cmd).toContain('oauth2:');
+      });
+    });
+
     describe('and it is an upstream branch', () => {
       it('should fetch and checkout GitHub pull refs', async () => {
         mockExec
@@ -149,6 +255,118 @@ describe('manageBranch', () => {
           'Branch "main" not found in repository'
         );
       });
+    });
+  });
+
+  describe('buildAuthenticatedGitUrl', () => {
+    it('returns URL unchanged when no token is provided', () => {
+      const url = 'https://github.com/org/repo.git';
+      expect(buildAuthenticatedGitUrl(url)).toBe(url);
+      expect(buildAuthenticatedGitUrl(url, undefined)).toBe(url);
+      expect(buildAuthenticatedGitUrl(url, '')).toBe(url);
+    });
+
+    it('embeds token with x-access-token username by default', () => {
+      const result = buildAuthenticatedGitUrl('https://github.com/org/repo.git', 'ghp_abc123');
+      const parsed = new URL(result);
+      expect(parsed.username).toBe('x-access-token');
+      expect(parsed.password).toBe('ghp_abc123');
+      expect(parsed.hostname).toBe('github.com');
+      expect(parsed.pathname).toBe('/org/repo.git');
+    });
+
+    it('embeds token with x-access-token username for github platform', () => {
+      const result = buildAuthenticatedGitUrl(
+        'https://github.com/org/repo.git',
+        'ghp_abc123',
+        'github'
+      );
+      const parsed = new URL(result);
+      expect(parsed.username).toBe('x-access-token');
+      expect(parsed.password).toBe('ghp_abc123');
+    });
+
+    it('uses oauth2 username when platform is gitlab', () => {
+      const result = buildAuthenticatedGitUrl(
+        'https://gitlab.com/org/repo.git',
+        'glpat-xyz789',
+        'gitlab'
+      );
+      const parsed = new URL(result);
+      expect(parsed.username).toBe('oauth2');
+      expect(parsed.password).toBe('glpat-xyz789');
+      expect(parsed.hostname).toBe('gitlab.com');
+    });
+
+    it('percent-encodes special characters in token', () => {
+      const token = 'tok/en@with:special#chars';
+      const result = buildAuthenticatedGitUrl('https://github.com/org/repo.git', token);
+      // The raw URL string should NOT contain the unencoded token
+      expect(result).not.toContain(`:${token}@`);
+      // Parsing the result back should preserve the encoded password
+      const parsed = new URL(result);
+      expect(parsed.username).toBe('x-access-token');
+      // URL.password returns the percent-encoded form
+      expect(decodeURIComponent(parsed.password)).toBe(token);
+      expect(parsed.hostname).toBe('github.com');
+    });
+  });
+
+  describe('branchExistsOnRemote', () => {
+    let mockExec: ReturnType<typeof vi.fn>;
+    let fakeSession: ExecutionSession;
+
+    beforeEach(() => {
+      mockExec = vi.fn();
+      fakeSession = { exec: mockExec } as unknown as ExecutionSession;
+    });
+
+    it('returns true when branch is found in ls-remote output', async () => {
+      mockExec.mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: 'abc123def456\trefs/heads/my-branch\n',
+        stderr: '',
+      });
+
+      const result = await branchExistsOnRemote(
+        fakeSession,
+        'https://github.com/org/repo.git',
+        'my-branch'
+      );
+      expect(result).toBe(true);
+      expect(mockExec).toHaveBeenCalledWith(
+        "git ls-remote --heads 'https://github.com/org/repo.git' 'my-branch'"
+      );
+    });
+
+    it('returns false when branch is not found', async () => {
+      mockExec.mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+      });
+
+      const result = await branchExistsOnRemote(
+        fakeSession,
+        'https://github.com/org/repo.git',
+        'nonexistent-branch'
+      );
+      expect(result).toBe(false);
+    });
+
+    it('returns true as fallback when ls-remote fails', async () => {
+      mockExec.mockResolvedValueOnce({
+        exitCode: 128,
+        stdout: '',
+        stderr: 'fatal: could not read from remote repository',
+      });
+
+      const result = await branchExistsOnRemote(
+        fakeSession,
+        'https://github.com/org/repo.git',
+        'some-branch'
+      );
+      expect(result).toBe(true);
     });
   });
 

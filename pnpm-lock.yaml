@@ -73,6 +73,7 @@ overrides:
   serialize-javascript: '>=7.0.3'
   hono: ^4.12.7
   undici@^6: ^6.24.1
+  '@types/pg': ^8.18.0
 
 patchedDependencies:
   '@storybook/nextjs@9.1.20':
@@ -248,6 +249,9 @@ importers:
       '@trpc/tanstack-react-query':
         specifier: ^11.13.0
         version: 11.13.0(@tanstack/react-query@5.90.21(react@19.2.4))(@trpc/client@11.13.0(@trpc/server@11.13.0(typescript@5.9.3))(typescript@5.9.3))(@trpc/server@11.13.0(typescript@5.9.3))(react@19.2.4)(typescript@5.9.3)
+      '@types/canvas-confetti':
+        specifier: ^1.9.0
+        version: 1.9.0
       '@types/js-cookie':
         specifier: ^3.0.6
         version: 3.0.6
@@ -278,6 +282,9 @@ importers:
       ai:
         specifier: ^6.0.116
         version: 6.0.116(zod@4.3.6)
+      canvas-confetti:
+        specifier: ^1.9.4
+        version: 1.9.4
       chat:
         specifier: ^4.20.1
         version: 4.20.1
@@ -310,7 +317,7 @@ importers:
         version: 14.25.1
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       event-source-polyfill:
         specifier: ^1.0.31
         version: 1.0.31
@@ -557,7 +564,7 @@ importers:
         version: 11.13.0(typescript@5.9.3)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.3
@@ -630,7 +637,7 @@ importers:
         version: 11.13.0(typescript@5.9.3)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -692,7 +699,7 @@ importers:
     devDependencies:
       '@types/bun':
         specifier: latest
-        version: 1.3.10
+        version: 1.3.11
       '@types/node':
         specifier: ^20.19.37
         version: 20.19.37
@@ -707,7 +714,7 @@ importers:
     devDependencies:
       '@types/bun':
         specifier: latest
-        version: 1.3.10
+        version: 1.3.11
       '@types/node':
         specifier: ^20.19.37
         version: 20.19.37
@@ -725,7 +732,7 @@ importers:
         version: link:../packages/worker-utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -774,7 +781,7 @@ importers:
         version: 8.0.3
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.3
@@ -1087,7 +1094,7 @@ importers:
         version: 11.13.0(typescript@5.9.3)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -1182,7 +1189,7 @@ importers:
         version: 8.2.0
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -1290,7 +1297,7 @@ importers:
         version: link:../packages/worker-utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -1333,7 +1340,7 @@ importers:
         version: link:../packages/db
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       workers-tagged-logger:
         specifier: 'catalog:'
         version: 1.0.0
@@ -1367,7 +1374,7 @@ importers:
         version: link:../packages/db
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -1401,7 +1408,7 @@ importers:
         version: 0.0.22
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -1456,7 +1463,7 @@ importers:
         version: link:../packages/worker-utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -1514,7 +1521,7 @@ importers:
         version: link:../packages/worker-utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -1570,7 +1577,7 @@ importers:
     dependencies:
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0)
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       pg:
         specifier: ^8.20.0
         version: 8.20.0
@@ -6361,6 +6368,12 @@ packages:
   '@types/bun@1.3.10':
     resolution: {integrity: sha512-0+rlrUrOrTSskibryHbvQkDOWRJwJZqZlxrUs1u4oOoTln8+WIXBPmAuCF35SWB2z4Zl3E84Nl/D0P7803nigQ==}
 
+  '@types/bun@1.3.11':
+    resolution: {integrity: sha512-5vPne5QvtpjGpsGYXiFyycfpDF2ECyPcTSsFBMa0fraoxiQyMJ3SmuQIGhzPg2WJuWxVBoxWJ2kClYTcw/4fAg==}
+
+  '@types/canvas-confetti@1.9.0':
+    resolution: {integrity: sha512-aBGj/dULrimR1XDZLtG9JwxX1b4HPRF6CX9Yfwh3NvstZEm1ZL7RBnel4keCPSqs1ANRu1u2Aoz9R+VmtjYuTg==}
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -6477,9 +6490,6 @@ packages:
 
   '@types/pg-pool@2.0.7':
     resolution: {integrity: sha512-U4CwmGVQcbEuqpyju8/ptOKg6gEC+Tqsvj2xS9o1g71bUh8twxnC6ZL5rZKCsGN0iyH0CwgUyc9VR5owNQF9Ng==}
-
-  '@types/pg@8.15.6':
-    resolution: {integrity: sha512-NoaMtzhxOrubeL/7UZuNTrejB4MPAJ0RpxZqXQf2qXuVlTPuG6Y8p4u9dKRaue4yjmC7ZhzVO2/Yyyn25znrPQ==}
 
   '@types/pg@8.18.0':
     resolution: {integrity: sha512-gT+oueVQkqnj6ajGJXblFR4iavIXWsGAFCk3dP4Kki5+a9R4NMt0JARdk6s8cUKcfUoqP5dAtDSLU8xYUTFV+Q==}
@@ -7414,6 +7424,9 @@ packages:
   bun-types@1.3.10:
     resolution: {integrity: sha512-tcpfCCl6XWo6nCVnpcVrxQ+9AYN1iqMIzgrSKYMB/fjLtV2eyAVEg7AxQJuCq/26R6HpKWykQXuSOq/21RYcbg==}
 
+  bun-types@1.3.11:
+    resolution: {integrity: sha512-1KGPpoxQWl9f6wcZh57LvrPIInQMn2TQ7jsgxqpRzg+l0QPOFvJVH7HmvHo/AiPgwXy+/Thf6Ov3EdVn1vOabg==}
+
   bytes@3.1.2:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
     engines: {node: '>= 0.8'}
@@ -7455,6 +7468,9 @@ packages:
 
   caniuse-lite@1.0.30001779:
     resolution: {integrity: sha512-U5og2PN7V4DMgF50YPNtnZJGWVLFjjsN3zb6uMT5VGYIewieDj1upwfuVNXf4Kor+89c3iCRJnSzMD5LmTvsfA==}
+
+  canvas-confetti@1.9.4:
+    resolution: {integrity: sha512-yxQbJkAVrFXWNbTUjPqjF7G+g6pDotOUHGbkZq2NELZUMDpiJ85rIEazVb8GTaAptNW2miJAXbs1BtioA251Pw==}
 
   case-sensitive-paths-webpack-plugin@2.4.0:
     resolution: {integrity: sha512-roIFONhcxog0JSSWbvVAh3OocukmSgpqOH6YpMkCvav/ySIV3JKg4Dc8vYtQjYi/UxpNE36r/9v+VqTQqgkYmw==}
@@ -8123,7 +8139,7 @@ packages:
       '@prisma/client': '*'
       '@tidbcloud/serverless': '*'
       '@types/better-sqlite3': '*'
-      '@types/pg': '*'
+      '@types/pg': ^8.18.0
       '@types/sql.js': '*'
       '@upstash/redis': '>=1.34.7'
       '@vercel/postgres': '>=0.8.0'
@@ -15502,7 +15518,7 @@ snapshots:
       '@opentelemetry/instrumentation': 0.211.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.40.0
       '@opentelemetry/sql-common': 0.41.2(@opentelemetry/api@1.9.0)
-      '@types/pg': 8.15.6
+      '@types/pg': 8.18.0
       '@types/pg-pool': 2.0.7
     transitivePeerDependencies:
       - supports-color
@@ -18076,6 +18092,12 @@ snapshots:
     dependencies:
       bun-types: 1.3.10
 
+  '@types/bun@1.3.11':
+    dependencies:
+      bun-types: 1.3.11
+
+  '@types/canvas-confetti@1.9.0': {}
+
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -18202,13 +18224,7 @@ snapshots:
 
   '@types/pg-pool@2.0.7':
     dependencies:
-      '@types/pg': 8.15.6
-
-  '@types/pg@8.15.6':
-    dependencies:
-      '@types/node': 22.19.15
-      pg-protocol: 1.13.0
-      pg-types: 2.2.0
+      '@types/pg': 8.18.0
 
   '@types/pg@8.18.0':
     dependencies:
@@ -19255,6 +19271,10 @@ snapshots:
     dependencies:
       '@types/node': 22.19.15
 
+  bun-types@1.3.11:
+    dependencies:
+      '@types/node': 25.5.0
+
   bytes@3.1.2: {}
 
   cac@6.7.14: {}
@@ -19295,6 +19315,8 @@ snapshots:
   camelcase@6.3.0: {}
 
   caniuse-lite@1.0.30001779: {}
+
+  canvas-confetti@1.9.4: {}
 
   case-sensitive-paths-webpack-plugin@2.4.0: {}
 
@@ -19974,12 +19996,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.10)(pg@8.20.0):
+  drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260313.1
       '@opentelemetry/api': 1.9.0
       '@types/pg': 8.18.0
-      bun-types: 1.3.10
+      bun-types: 1.3.11
       pg: 8.20.0
 
   dset@3.1.4: {}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
+import { Sparkles, TriangleAlert, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
   useKiloClawGatewayStatus,
@@ -9,7 +9,6 @@ import {
   useKiloClawServiceDegraded,
 } from '@/hooks/useKiloClaw';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
@@ -17,10 +16,10 @@ import { ClawHeader } from './ClawHeader';
 import { CreateInstanceCard } from './CreateInstanceCard';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
-import { OpenClawButton } from './OpenClawButton';
 import { SettingsTab } from './SettingsTab';
 import { ChangelogTab } from './ChangelogTab';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
+import { CompletionStep } from './CompletionStep';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep } from './ProvisioningStep';
 import type { ExecPreset } from './claw.types';
@@ -174,61 +173,12 @@ export function ClawDashboard({
             onComplete={() => setOnboardingStep('done')}
           />
         ) : isNewSetup ? (
-          <Card className="mt-6 overflow-hidden">
-            <CardContent className="flex flex-col items-center justify-center gap-6 pt-12">
-              <div className="relative">
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-emerald-700/30 bg-emerald-900/50">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-emerald-500">
-                    <Check className="h-6 w-6 text-emerald-500" />
-                  </div>
-                </div>
-                <div className="absolute -top-3 -right-3 flex h-6 w-6 items-center justify-center rounded-full bg-[#09090b] text-amber-400">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center gap-2">
-                <h2 className="text-2xl font-bold">Your instance is ready!</h2>
-                <p className="text-muted-foreground max-w-md text-center">
-                  KiloClaw has been provisioned and configured with your settings. You&apos;re all
-                  set to start.
-                </p>
-              </div>
-
-              {instanceStatus?.flyRegion && (
-                <div className="border-border/50 flex items-center gap-2 rounded-full border px-4 py-2">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  </span>
-                  <span className="text-muted-foreground flex items-center gap-2 text-sm">
-                    Active ·{' '}
-                    <span className="text-foreground font-bold">
-                      {instanceStatus.flyRegion.toUpperCase()}
-                    </span>{' '}
-                    region
-                  </span>
-                </div>
-              )}
-              <div className="flex w-full flex-col gap-3">
-                <OpenClawButton
-                  canShow={gatewayStatus?.state === 'running'}
-                  gatewayUrl={gatewayUrl}
-                  look="hero"
-                  label="Open KiloClaw"
-                  className="w-full py-6 text-base"
-                />
-                <Button
-                  className="w-full py-6 text-base"
-                  variant="outline"
-                  onClick={() => onNewSetupChange(false)}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Close Wizard
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <CompletionStep
+            flyRegion={instanceStatus?.flyRegion ?? null}
+            canOpenClaw={gatewayStatus?.state === 'running'}
+            gatewayUrl={gatewayUrl}
+            onClose={() => onNewSetupChange(false)}
+          />
         ) : (
           <Card className="mt-6">
             <CardContent className="border-b p-5">

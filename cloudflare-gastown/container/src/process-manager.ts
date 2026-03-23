@@ -162,8 +162,11 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
       'text' in part &&
       typeof part.text === 'string'
     ) {
-      // Use last H1 match — most current status when agent writes multiple headers
-      const matches = [...part.text.matchAll(/(?:^|\n)# (.+)/g)];
+      // Use last H1 match — most current status when agent writes multiple headers.
+      // Require a trailing newline so we only match completed headings; without it,
+      // every streaming delta would match the partial heading being typed and spam
+      // the /status endpoint with incremental fragments.
+      const matches = [...part.text.matchAll(/(?:^|\n)# (.+)\n/g)];
       const lastMatch = matches.length > 0 ? matches[matches.length - 1] : null;
       if (lastMatch) {
         const statusText = lastMatch[1].slice(0, 120);

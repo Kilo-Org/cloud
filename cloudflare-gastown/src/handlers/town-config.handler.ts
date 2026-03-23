@@ -70,6 +70,7 @@ function maskSensitiveValues(config: TownConfig): TownConfig {
   return {
     ...config,
     kilocode_token: maskToken(config.kilocode_token),
+    github_cli_pat: maskToken(config.github_cli_pat),
     env_vars: envVars,
     git_auth: {
       ...config.git_auth,

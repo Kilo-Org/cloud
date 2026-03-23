@@ -271,6 +271,12 @@ export const TownConfigSchema = z.object({
    *  Git clone/push still uses the integration token from git_auth. */
   github_cli_pat: z.string().optional(),
 
+  /** GitHub username resolved from OAuth Device Flow (display only). */
+  github_cli_oauth_username: z.string().optional(),
+
+  /** ISO timestamp of when GitHub was connected via OAuth. */
+  github_cli_oauth_connected_at: z.string().optional(),
+
   /** Custom git commit author name. When set, the user becomes the primary author
    *  and the AI agent is added as co-author (unless disable_ai_coauthor is true). */
   git_author_name: z.string().optional(),
@@ -327,6 +333,8 @@ export const TownConfigUpdateSchema = z.object({
     .optional(),
   staged_convoys_default: z.boolean().optional(),
   github_cli_pat: z.string().optional(),
+  github_cli_oauth_username: z.string().optional(),
+  github_cli_oauth_connected_at: z.string().optional(),
   git_author_name: z.string().optional(),
   git_author_email: z.string().optional(),
   disable_ai_coauthor: z.boolean().optional(),

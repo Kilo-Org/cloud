@@ -33,6 +33,8 @@ const eventAbortControllers = new Map<string, AbortController>();
 const eventSinks = new Set<(agentId: string, event: string, data: unknown) => void>();
 // Per-agent idle timers — fires exit when no nudges arrive
 const idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// Tracks last H1 status posted per agent to deduplicate status updates
+const lastStatusForAgent = new Map<string, string>();
 
 let nextPort = 4096;
 const startTime = Date.now();
@@ -142,6 +144,61 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
     ).catch(() => {
       // Best-effort persistence — don't block live streaming
     });
+  }
+
+  // Parse H1 markdown headers from streaming text parts and post as agent status.
+  // This gives dashboard visibility into what an agent is doing without requiring
+  // the agent to call gt_status explicitly.
+  if (event === 'message.part.updated' || event === 'message_part.updated') {
+    const dataObj = data != null && typeof data === 'object' ? data : undefined;
+    const part =
+      dataObj && 'part' in dataObj && dataObj.part != null && typeof dataObj.part === 'object'
+        ? dataObj.part
+        : undefined;
+    if (
+      part &&
+      'type' in part &&
+      part.type === 'text' &&
+      'text' in part &&
+      typeof part.text === 'string'
+    ) {
+      // Use last H1 match — most current status when agent writes multiple headers.
+      // Require a trailing newline so we only match completed headings; without it,
+      // every streaming delta would match the partial heading being typed and spam
+      // the /status endpoint with incremental fragments.
+      const matches = [...part.text.matchAll(/(?:^|\n)# (.+)\n/g)];
+      const lastMatch = matches.length > 0 ? matches[matches.length - 1] : null;
+      if (lastMatch) {
+        const statusText = lastMatch[1].slice(0, 120);
+        if (statusText !== lastStatusForAgent.get(agentId)) {
+          lastStatusForAgent.set(agentId, statusText);
+          // Post to status API (fire-and-forget, same pattern as event persistence above)
+          const agentMeta = agents.get(agentId);
+          const statusAuthToken =
+            process.env.GASTOWN_CONTAINER_TOKEN ??
+            agentMeta?.gastownContainerToken ??
+            agentMeta?.gastownSessionToken;
+          if (agentMeta?.gastownApiUrl && statusAuthToken) {
+            const statusHeaders: Record<string, string> = {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${statusAuthToken}`,
+            };
+            if (process.env.GASTOWN_CONTAINER_TOKEN || agentMeta.gastownContainerToken) {
+              statusHeaders['X-Gastown-Agent-Id'] = agentId;
+              if (agentMeta.rigId) statusHeaders['X-Gastown-Rig-Id'] = agentMeta.rigId;
+            }
+            fetch(
+              `${agentMeta.gastownApiUrl}/api/towns/${agentMeta.townId ?? '_'}/rigs/${agentMeta.rigId ?? '_'}/agents/${agentId}/status`,
+              {
+                method: 'POST',
+                headers: statusHeaders,
+                body: JSON.stringify({ message: statusText }),
+              }
+            ).catch(() => {});
+          }
+        }
+      }
+    }
   }
 }
 
@@ -423,6 +480,7 @@ async function subscribeToEvents(
     });
     agent.status = 'exited';
     agent.exitReason = 'completed';
+    lastStatusForAgent.delete(agent.agentId);
     broadcastEvent(agent.agentId, 'agent.exited', { reason: 'completed' });
     void reportAgentCompleted(agent, 'completed');
 
@@ -505,6 +563,7 @@ async function subscribeToEvents(
       });
       if (agent.status === 'running') {
         clearIdleTimer(agent.agentId);
+        lastStatusForAgent.delete(agent.agentId);
         agent.status = 'failed';
         agent.exitReason = 'Event stream error';
         broadcastEvent(agent.agentId, 'agent.exited', {
@@ -666,6 +725,7 @@ export async function stopAgent(agentId: string): Promise<void> {
 
   // Cancel any pending idle timer
   clearIdleTimer(agentId);
+  lastStatusForAgent.delete(agentId);
 
   // Abort event subscription
   const controller = eventAbortControllers.get(agentId);
@@ -762,6 +822,7 @@ export async function stopAll(): Promise<void> {
     clearTimeout(timer);
   }
   idleTimers.clear();
+  lastStatusForAgent.clear();
 
   // Abort all event subscriptions
   for (const [, controller] of eventAbortControllers) {

@@ -1467,7 +1467,7 @@ function hasRecentNudge(sql: SqlStorage, agentId: string, tier: string): boolean
         SELECT 1 FROM ${agent_nudges}
         WHERE ${agent_nudges.agent_bead_id} = ?
           AND ${agent_nudges.source} = ?
-          AND ${agent_nudges.created_at} > datetime('now', '-60 minutes')
+          AND datetime(${agent_nudges.created_at}) > datetime('now', '-60 minutes')
         LIMIT 1
       `,
       [agentId, `reconciler:${tier}`]

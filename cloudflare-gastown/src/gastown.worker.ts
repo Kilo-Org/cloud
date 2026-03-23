@@ -7,7 +7,6 @@ import { cors } from 'hono/cors';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { getTownDOStub } from './dos/Town.do';
 import { resError } from './util/res.util';
-import { dashboardHtml } from './ui/dashboard.ui';
 import {
   authMiddleware,
   agentOnlyMiddleware,
@@ -186,12 +185,9 @@ const corsMiddleware = cors({
 app.use('/api/*', corsMiddleware);
 app.use('/trpc/*', corsMiddleware);
 
-// ── Dashboard UI ────────────────────────────────────────────────────────
-
-app.get('/', c => c.html(dashboardHtml()));
-
 // ── Health ──────────────────────────────────────────────────────────────
 
+app.get('/', c => c.json({ service: 'gastown', status: 'ok' }));
 app.get('/health', c => c.json({ status: 'ok' }));
 
 // ── DEBUG: unauthenticated town introspection — REMOVE after debugging ──

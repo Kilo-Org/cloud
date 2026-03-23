@@ -590,52 +590,5 @@ export function createMayorTools(client: MayorGastownClient) {
         return `Bug report filed: #${issue.number} — ${issue.html_url}`;
       },
     }),
-
-    gt_bead_add_dependency: tool({
-      description:
-        'Add a dependency between two beads. The bead at bead_id will be blocked by depends_on_bead_id — ' +
-        'it will not be dispatched until the dependency is closed.',
-      args: {
-        rig_id: tool.schema.string().describe('The UUID of the rig the beads belong to'),
-        bead_id: tool.schema.string().describe('The UUID of the bead that should be blocked'),
-        depends_on_bead_id: tool.schema
-          .string()
-          .describe('The UUID of the bead that must close first'),
-        dependency_type: tool.schema
-          .enum(['blocks', 'parent-child'])
-          .describe('Type of dependency (default: blocks)')
-          .optional(),
-      },
-      async execute(args) {
-        await client.addBeadDependency({
-          rig_id: args.rig_id,
-          bead_id: args.bead_id,
-          depends_on_bead_id: args.depends_on_bead_id,
-          dependency_type: args.dependency_type ?? 'blocks',
-        });
-        return `Dependency added: bead ${args.bead_id} now depends on ${args.depends_on_bead_id} (type: ${args.dependency_type ?? 'blocks'}).`;
-      },
-    }),
-
-    gt_bead_remove_dependency: tool({
-      description:
-        'Remove a dependency between two beads. If removing the dependency unblocks the bead, ' +
-        'it will be dispatched automatically.',
-      args: {
-        rig_id: tool.schema.string().describe('The UUID of the rig the beads belong to'),
-        bead_id: tool.schema.string().describe('The UUID of the dependent bead'),
-        depends_on_bead_id: tool.schema
-          .string()
-          .describe('The UUID of the bead it currently depends on'),
-      },
-      async execute(args) {
-        await client.removeBeadDependency({
-          rig_id: args.rig_id,
-          bead_id: args.bead_id,
-          depends_on_bead_id: args.depends_on_bead_id,
-        });
-        return `Dependency removed: bead ${args.bead_id} no longer depends on ${args.depends_on_bead_id}. If this was the last blocker, the bead will be dispatched automatically.`;
-      },
-    }),
   };
 }

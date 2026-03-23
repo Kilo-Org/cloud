@@ -19,6 +19,19 @@ jest.mock('@/lib/config.server', () => {
   };
 });
 
+const mockShareSession = jest.fn<
+  Promise<{ public_id: string }>,
+  [sessionId: string, userId: string]
+>();
+
+jest.mock('@/lib/session-ingest-client', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/session-ingest-client');
+  return {
+    ...actual,
+    shareSession: (...args: [string, string]) => mockShareSession(...args),
+  };
+});
+
 let regularUser: User;
 let otherUser: User;
 let testOrganization: Organization;
@@ -84,7 +97,6 @@ describe('cli-sessions-v2-router', () => {
     });
 
     const v2SessionId = 'ses_test_share_v2_session_1234';
-    let fetchSpy: jest.SpyInstance;
 
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values({
@@ -93,16 +105,11 @@ describe('cli-sessions-v2-router', () => {
         created_on_platform: 'webhook',
       });
 
-      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ success: true, public_id: 'test-public-uuid' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      );
+      mockShareSession.mockResolvedValue({ public_id: 'test-public-uuid' });
     });
 
     afterEach(async () => {
-      fetchSpy.mockRestore();
+      mockShareSession.mockReset();
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, v2SessionId));
     });
 
@@ -119,13 +126,8 @@ describe('cli-sessions-v2-router', () => {
         session_id: v2SessionId,
       });
 
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-      const [fetchUrl, fetchOpts] = fetchSpy.mock.calls[0];
-      expect(fetchUrl).toBe(
-        `https://test-ingest.example.com/api/session/${encodeURIComponent(v2SessionId)}/share`
-      );
-      expect(fetchOpts.method).toBe('POST');
-      expect(fetchOpts.headers.Authorization).toMatch(/^Bearer .+/);
+      expect(mockShareSession).toHaveBeenCalledTimes(1);
+      expect(mockShareSession).toHaveBeenCalledWith(v2SessionId, regularUser.id);
     });
 
     it('should throw NOT_FOUND for non-existent v2 session', async () => {
@@ -142,11 +144,8 @@ describe('cli-sessions-v2-router', () => {
     });
 
     it('should throw INTERNAL_SERVER_ERROR when session-ingest returns an error', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        new Response('Internal Server Error', {
-          status: 500,
-          statusText: 'Internal Server Error',
-        })
+      mockShareSession.mockRejectedValueOnce(
+        new Error('Session ingest share failed: 500 Internal Server Error')
       );
 
       const caller = await createCallerForUser(regularUser.id);
@@ -156,7 +155,7 @@ describe('cli-sessions-v2-router', () => {
           kilo_session_id: v2SessionId,
           trigger_id: testTriggerId,
         })
-      ).rejects.toThrow('Session share failed: 500 Internal Server Error');
+      ).rejects.toThrow('Failed to share session');
     });
 
     it('should throw NOT_FOUND when session belongs to a different user (personal trigger)', async () => {

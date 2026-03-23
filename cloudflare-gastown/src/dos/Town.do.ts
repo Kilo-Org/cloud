@@ -3013,6 +3013,31 @@ export class TownDO extends DurableObject<Env> {
     metrics.pendingEventCount = events.pendingEventCount(this.sql);
     this._lastReconcilerMetrics = metrics;
 
+    // Emit reconciler metrics to Analytics Engine for Grafana dashboards.
+    // Field mapping:
+    //   double1  = wallClockMs
+    //   double2  = eventsDrained
+    //   double3  = actionsEmitted
+    //   double4  = sideEffectsAttempted
+    //   double5  = sideEffectsSucceeded
+    //   double6  = sideEffectsFailed
+    //   double7  = invariantViolations
+    //   double8  = pendingEventCount
+    //   blob10   = JSON-encoded actionsByType breakdown
+    this.emitEvent({
+      event: 'reconciler_tick',
+      townId,
+      durationMs: metrics.wallClockMs,
+      value: metrics.eventsDrained,
+      double3: metrics.actionsEmitted,
+      double4: metrics.sideEffectsAttempted,
+      double5: metrics.sideEffectsSucceeded,
+      double6: metrics.sideEffectsFailed,
+      double7: metrics.invariantViolations,
+      double8: metrics.pendingEventCount,
+      label: JSON.stringify(metrics.actionsByType),
+    });
+
     // ── Phase 3: Housekeeping (independent, all parallelizable) ────
     await Promise.allSettled([
       this.deliverPendingMail().catch(err =>

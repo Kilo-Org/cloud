@@ -697,6 +697,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // If the DO has identity but lost its machine ID, try to recover it
     // from Fly metadata before creating a duplicate machine.
+    if (!this.s.flyMachineId && opts?.skipRecovery) {
+      console.warn('[DO] start: skipRecovery=true — bypassing metadata recovery, will create new machine');
+    }
     if (!this.s.flyMachineId && !opts?.skipRecovery) {
       const recovered = await attemptMetadataRecovery(
         flyConfig,

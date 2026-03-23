@@ -56,3 +56,6 @@ export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE
 
 export const PROMOTION_MAX_REQUESTS = 10000;
 export const PROMOTION_WINDOW_HOURS = 24;
+
+// Fly.io Grafana org ID for admin dashboard links (client-side, inlined at build time)
+export const FLY_GRAFANA_ORG_ID = process.env.NEXT_PUBLIC_FLY_GRAFANA_ORG_ID ?? '';

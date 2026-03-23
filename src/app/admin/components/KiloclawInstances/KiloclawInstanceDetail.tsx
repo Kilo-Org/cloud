@@ -59,6 +59,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { FLY_GRAFANA_ORG_ID } from '@/lib/constants';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
@@ -1315,7 +1316,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     <BarChart className="text-muted-foreground h-4 w-4 shrink-0" />
                     <DetailField label="Metrics">
                       <a
-                        href={`https://fly-metrics.net/d/fly-instance/fly-instance?from=now-1h&orgId=1480569&to=now&var-app=${data.workerStatus.flyAppName}&var-instance=${data.workerStatus.flyMachineId}`}
+                        href={`https://fly-metrics.net/d/fly-instance/fly-instance?from=now-1h&orgId=${FLY_GRAFANA_ORG_ID}&to=now&var-app=${data.workerStatus.flyAppName}&var-instance=${data.workerStatus.flyMachineId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline"

@@ -151,6 +151,9 @@ export function ChatInput({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ignore keyboard events during IME composition (Chinese, Japanese, Korean input)
+    if (e.nativeEvent.isComposing) return;
+
     if (showAutocomplete && filteredCommands.length > 0) {
       switch (e.key) {
         case 'ArrowDown':

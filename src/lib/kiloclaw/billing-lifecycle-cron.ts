@@ -76,7 +76,22 @@ async function trySendEmail(
     return false;
   }
   try {
-    await sendEmail({ to: userEmail, templateName, templateVars, subjectOverride });
+    const emailResult = await sendEmail({
+      to: userEmail,
+      templateName,
+      templateVars,
+      subjectOverride,
+    });
+    if (!emailResult.sent) {
+      // Remove idempotency guard so the next cron run can retry
+      await database
+        .delete(kiloclaw_email_log)
+        .where(
+          and(eq(kiloclaw_email_log.user_id, userId), eq(kiloclaw_email_log.email_type, emailType))
+        );
+      summary.emails_skipped++;
+      return false;
+    }
   } catch (error) {
     try {
       await database

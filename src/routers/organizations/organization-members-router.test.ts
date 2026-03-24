@@ -5,7 +5,7 @@ import type { User, Organization } from '@kilocode/db/schema';
 
 // Mock the email service to prevent actual API calls during tests
 jest.mock('@/lib/email', () => ({
-  sendOrganizationInviteEmail: jest.fn().mockResolvedValue(undefined),
+  sendOrganizationInviteEmail: jest.fn().mockResolvedValue({ sent: true }),
 }));
 
 // Test users and organization will be created dynamically

@@ -29,7 +29,7 @@ const toMicrodollars = (dollars: number) => dollars * 1_000_000;
 
 // Mock email sending to avoid CustomerIO errors in tests
 jest.mock('@/lib/email', () => ({
-  sendAutoTopUpFailedEmail: jest.fn().mockResolvedValue(undefined),
+  sendAutoTopUpFailedEmail: jest.fn().mockResolvedValue({ sent: true }),
 }));
 
 jest.mock('@/lib/stripe-client', () => {

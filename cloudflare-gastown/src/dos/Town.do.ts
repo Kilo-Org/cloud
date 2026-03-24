@@ -3044,6 +3044,29 @@ export class TownDO extends DurableObject<Env> {
           label: violations.map(v => `[${v.invariant}] ${v.message}`).join('; '),
           value: violations.length,
         });
+
+        for (const violation of violations) {
+          Sentry.captureMessage(
+            `Reconciler invariant #${violation.invariant} violated: ${violation.message}`,
+            {
+              level: 'error',
+              extra: {
+                invariant: violation.invariant,
+                message: violation.message,
+                townId,
+              },
+              tags: {
+                invariant: String(violation.invariant),
+                townId,
+              },
+            }
+          );
+
+          // TODO: auto-recovery for invariant #7 (working agent with no hook).
+          // Transitioning to idle requires unhooking side-effects (container stop,
+          // bead status rollback) that live in agents.ts — needs a dedicated
+          // recovery action in the reconciler rather than a raw SQL update here.
+        }
       }
     } catch (err) {
       console.warn(`${TOWN_LOG} [reconciler:invariants] town=${townId} check failed`, err);

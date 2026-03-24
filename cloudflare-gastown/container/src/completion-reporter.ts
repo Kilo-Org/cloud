@@ -21,7 +21,9 @@ export async function reportMayorWaiting(agent: ManagedAgent): Promise<void> {
   const authToken =
     process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? agent.gastownSessionToken;
   if (!apiUrl || !authToken) {
-    console.warn(`Cannot report mayor ${agent.agentId} waiting: no API credentials on agent record`);
+    console.warn(
+      `Cannot report mayor ${agent.agentId} waiting: no API credentials on agent record`
+    );
     return;
   }
 

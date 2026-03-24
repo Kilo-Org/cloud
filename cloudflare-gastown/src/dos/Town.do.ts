@@ -2024,7 +2024,8 @@ export class TownDO extends DurableObject<Env> {
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     if (isAlive) {
-      const isActive = mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting';
+      const isActive =
+        mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting';
       return { agentId: mayor.id, sessionStatus: isActive ? 'active' : 'idle' };
     }
 
@@ -3329,8 +3330,7 @@ export class TownDO extends DurableObject<Env> {
   private async refreshContainerToken(): Promise<void> {
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
     const now = Date.now();
-    const lastRefresh =
-      (await this.ctx.storage.get<number>('container:lastTokenRefreshAt')) ?? 0;
+    const lastRefresh = (await this.ctx.storage.get<number>('container:lastTokenRefreshAt')) ?? 0;
     if (now - lastRefresh < TOKEN_REFRESH_INTERVAL_MS) return;
 
     const townId = this.townId;

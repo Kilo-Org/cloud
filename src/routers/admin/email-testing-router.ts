@@ -1,10 +1,8 @@
 import { TRPCError } from '@trpc/server';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { NEXTAUTH_URL } from '@/lib/config.server';
-import { sendViaCustomerIo } from '@/lib/email-customerio';
 import { sendViaMailgun } from '@/lib/email-mailgun';
 import {
-  templates,
   subjects,
   creditsVars,
   renderTemplate,
@@ -39,12 +37,6 @@ const templateNames: [TemplateName, ...TemplateName[]] = [
 ];
 
 const TemplateNameSchema = z.enum(templateNames);
-
-const providerNames = ['customerio', 'mailgun'] as const;
-
-type ProviderName = (typeof providerNames)[number];
-
-const ProviderNameSchema = z.enum(providerNames);
 
 function fixtureTemplateVars(template: TemplateName): Record<string, string | RawHtml> {
   const formatDate = (d: Date) => format(d, 'MMMM d, yyyy');
@@ -162,29 +154,13 @@ export const emailTestingRouter = createTRPCRouter({
     return templateNames.map(name => ({ name, subject: subjects[name] }));
   }),
 
-  getProviders: adminProcedure.query((): ProviderName[] => {
-    return [...providerNames];
-  }),
-
   getPreview: adminProcedure
-    .input(z.object({ template: TemplateNameSchema, provider: ProviderNameSchema }))
+    .input(z.object({ template: TemplateNameSchema }))
     .query(({ input }) => {
       const vars = fixtureTemplateVars(input.template);
-      if (input.provider === 'mailgun') {
-        return {
-          type: 'mailgun' as const,
-          subject: subjects[input.template],
-          html: renderTemplate(input.template, { ...vars, year: String(new Date().getFullYear()) }),
-        };
-      }
-      const messageData: Record<string, string> = Object.fromEntries(
-        Object.entries(vars).map(([k, v]) => [k, v instanceof RawHtml ? v.html : v])
-      );
       return {
-        type: 'customerio' as const,
-        transactional_message_id: templates[input.template],
         subject: subjects[input.template],
-        message_data: messageData,
+        html: renderTemplate(input.template, { ...vars, year: String(new Date().getFullYear()) }),
       };
     }),
 
@@ -192,33 +168,11 @@ export const emailTestingRouter = createTRPCRouter({
     .input(
       z.object({
         template: TemplateNameSchema,
-        provider: ProviderNameSchema,
         recipient: z.string().email(),
       })
     )
     .mutation(async ({ input }) => {
       const vars = fixtureTemplateVars(input.template);
-
-      if (input.provider === 'customerio') {
-        const messageData: Record<string, string> = Object.fromEntries(
-          Object.entries(vars).map(([k, v]) => [k, v instanceof RawHtml ? v.html : v])
-        );
-        const result = await sendViaCustomerIo({
-          transactional_message_id: templates[input.template],
-          to: input.recipient,
-          message_data: messageData,
-          identifiers: { email: input.recipient },
-          reply_to: 'hi@kilocode.ai',
-        });
-        if (!result) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'CUSTOMERIO_EMAIL_API_KEY is not configured — email was not sent',
-          });
-        }
-        return { provider: input.provider, recipient: input.recipient };
-      }
-
       const subject = subjects[input.template];
       const html = renderTemplate(input.template, {
         ...vars,
@@ -231,6 +185,6 @@ export const emailTestingRouter = createTRPCRouter({
           message: 'MAILGUN_API_KEY/MAILGUN_DOMAIN is not configured — email was not sent',
         });
       }
-      return { provider: input.provider, recipient: input.recipient };
+      return { recipient: input.recipient };
     }),
 });

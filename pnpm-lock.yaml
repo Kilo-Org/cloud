@@ -308,9 +308,6 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      customerio-node:
-        specifier: ^4.3.0
-        version: 4.3.0
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -8573,9 +8570,6 @@ packages:
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
-
-  customerio-node@4.3.0:
-    resolution: {integrity: sha512-umNxZzBNmyT+OQRQE1M7IgARgrgvnoY8bw+XGAuazB9QMfPTktkPnXImmyR8WAQHhnyfnsi8pqc1PzzToZmB5g==}
 
   cwd@0.10.0:
     resolution: {integrity: sha512-YGZxdTTL9lmLkCUTpg4j0zQ7IhRB5ZmqNBbGCl3Tg6MP/d5/6sY7L5mmTjzbc6JKgVZYiqTQTNhPFsbXNGlRaA==}
@@ -22847,8 +22841,6 @@ snapshots:
   cssesc@3.0.0: {}
 
   csstype@3.2.3: {}
-
-  customerio-node@4.3.0: {}
 
   cwd@0.10.0:
     dependencies:

@@ -2,9 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import type { Organization } from '@kilocode/db/schema';
 import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
-import { EMAIL_PROVIDER, NEXTAUTH_URL } from '@/lib/config.server';
-import { sendViaCustomerIo } from '@/lib/email-customerio';
+import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendViaMailgun } from '@/lib/email-mailgun';
+import { verifyEmail } from '@/lib/email-neverbounce';
 
 export const templates = {
   orgSubscription: '10',
@@ -93,9 +93,6 @@ export function buildCreditsSection(monthlyCreditsUsd: number): RawHtml {
   );
 }
 
-// CIO templates still use Liquid {% if has_credits %}{{ monthly_credits_usd }}{% endif %}.
-// Mailgun templates use {{ credits_section }} instead. Pass both so each provider
-// gets the vars it needs; unrecognized keys are harmlessly ignored by both paths.
 export function creditsVars(monthlyCreditsUsd: number): TemplateVars {
   return {
     credits_section: buildCreditsSection(monthlyCreditsUsd),
@@ -113,30 +110,17 @@ type SendParams = {
 };
 
 export async function send(params: SendParams) {
-  if (EMAIL_PROVIDER === 'mailgun') {
-    const subject = params.subjectOverride ?? subjects[params.templateName];
-    const html = renderTemplate(params.templateName, {
-      ...params.templateVars,
-      year: String(new Date().getFullYear()),
-    });
-    return sendViaMailgun({ to: params.to, subject, html });
+  const isSafeToSend = await verifyEmail(params.to);
+  if (!isSafeToSend) {
+    return;
   }
-  // Customer.io handles its own rendering; pass raw string values.
-  // If a subjectOverride is provided, include it as `subject` in message_data
-  // so CIO templates can reference it via Liquid ({{ subject }}).
-  const messageData: Record<string, string> = Object.fromEntries(
-    Object.entries(params.templateVars).map(([k, v]) => [k, v instanceof RawHtml ? v.html : v])
-  );
-  if (params.subjectOverride) {
-    messageData.subject = params.subjectOverride;
-  }
-  return sendViaCustomerIo({
-    transactional_message_id: templates[params.templateName],
-    to: params.to,
-    message_data: messageData,
-    identifiers: { email: params.to },
-    reply_to: 'hi@kilocode.ai',
+
+  const subject = params.subjectOverride ?? subjects[params.templateName];
+  const html = renderTemplate(params.templateName, {
+    ...params.templateVars,
+    year: String(new Date().getFullYear()),
   });
+  return sendViaMailgun({ to: params.to, subject, html });
 }
 
 type OrganizationInviteEmailData = {

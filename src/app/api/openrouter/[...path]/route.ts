@@ -136,7 +136,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed = { kind: 'chat_completions', body };
     } else if (path === '/messages') {
       const body: GatewayMessagesRequest = JSON.parse(requestBodyText);
-      if (!body.cache_control && body.messages.length > 1) {
+      if (!body.cache_control && (body.messages ?? []).length > 1) {
         body.cache_control = { type: 'ephemeral' };
       }
       requestBodyParsed = { kind: 'messages', body };

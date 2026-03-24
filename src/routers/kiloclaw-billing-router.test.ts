@@ -364,54 +364,6 @@ describe('createSubscriptionCheckout', () => {
       })
     );
   });
-
-  it('sets trial_end in subscription_data when before March 23', async () => {
-    const realDateNow = Date.now;
-    Date.now = () => new Date('2026-03-12T00:00:00Z').getTime();
-
-    try {
-      stripeMock.checkout.sessions.create.mockResolvedValue({
-        url: 'https://checkout.stripe.com/test',
-      });
-
-      const caller = await createCallerForUser(user.id);
-      await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
-
-      const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
-        string,
-        unknown
-      >;
-      const subscriptionData = callArgs.subscription_data as Record<string, unknown>;
-      const expectedTrialEnd = Math.floor(new Date('2026-03-23T00:00:00Z').getTime() / 1000);
-      expect(subscriptionData.trial_end).toBe(expectedTrialEnd);
-    } finally {
-      Date.now = realDateNow;
-    }
-  });
-
-  it('does not set trial_end when after March 23', async () => {
-    // Temporarily override Date.now to simulate being after March 23
-    const realDateNow = Date.now;
-    Date.now = () => new Date('2026-04-01T00:00:00Z').getTime();
-
-    try {
-      stripeMock.checkout.sessions.create.mockResolvedValue({
-        url: 'https://checkout.stripe.com/test',
-      });
-
-      const caller = await createCallerForUser(user.id);
-      await caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' });
-
-      const callArgs = stripeMock.checkout.sessions.create.mock.calls[0]?.[0] as Record<
-        string,
-        unknown
-      >;
-      const subscriptionData = callArgs.subscription_data as Record<string, unknown>;
-      expect(subscriptionData.trial_end).toBeUndefined();
-    } finally {
-      Date.now = realDateNow;
-    }
-  });
 });
 
 describe('handleKiloClawSubscriptionUpdated', () => {

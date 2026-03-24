@@ -1920,9 +1920,12 @@ export class TownDO extends DurableObject<Env> {
       const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, combinedMessage);
       if (sent) {
         // Transition waiting → working so the alarm runs at the active cadence
-        // while the mayor processes this prompt.
+        // while the mayor processes this prompt. Also reschedule the alarm
+        // immediately — the idle alarm may be up to 5 min away, and we need
+        // the reconciler/health-check loop to resume promptly.
         if (mayor.status === 'waiting') {
           agents.updateAgentStatus(this.sql, mayor.id, 'working');
+          await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
         }
         sessionStatus = 'active';
       } else {

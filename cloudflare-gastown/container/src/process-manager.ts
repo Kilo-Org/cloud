@@ -9,7 +9,7 @@
 import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import type { ManagedAgent, StartAgentRequest } from './types';
-import { reportAgentCompleted } from './completion-reporter';
+import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import { buildKiloConfigContent } from './agent-runner';
 import { log } from './logger';
 
@@ -485,6 +485,11 @@ async function subscribeToEvents(
       if (event.type === 'session.idle') {
         if (request.role === 'mayor') {
           // Mayor agents are persistent — session.idle means "turn done", not exit.
+          // Notify the TownDO so it can transition the mayor to "waiting"
+          // (alive in container, not doing LLM work). This lets the alarm
+          // drop to the idle cadence and stops health-check pings that
+          // would reset the container's sleepAfter timer.
+          void reportMayorWaiting(agent);
           continue;
         }
         // Non-mayor: check for pending nudges before deciding to exit.

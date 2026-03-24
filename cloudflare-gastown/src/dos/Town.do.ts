@@ -2003,7 +2003,9 @@ export class TownDO extends DurableObject<Env> {
         smallModel
       );
       if (updated) {
-        console.log(`${TOWN_LOG} updateMayorModel: hot-updated mayor ${mayor.id} to model=${model}`);
+        console.log(
+          `${TOWN_LOG} updateMayorModel: hot-updated mayor ${mayor.id} to model=${model}`
+        );
       } else {
         console.warn(`${TOWN_LOG} updateMayorModel: failed to hot-update mayor ${mayor.id}`);
       }

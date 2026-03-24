@@ -793,6 +793,10 @@ export async function updateAgentModel(
   if (!oldInstance) throw new Error(`No SDK instance for agent ${agentId}`);
 
   const oldSessionId = agent.sessionId;
+  const oldPort = agent.serverPort;
+  const oldModel = agent.model;
+  const prevConfigContent = process.env.KILO_CONFIG_CONTENT;
+  const prevOpenCodeContent = process.env.OPENCODE_CONFIG_CONTENT;
 
   console.log(
     `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
@@ -801,15 +805,7 @@ export async function updateAgentModel(
   // 1. Preserve organizationId from the current config before we replace it
   const organizationId = extractOrganizationId();
 
-  // 2. Abort the event subscription so it doesn't interfere with shutdown
-  const controller = eventAbortControllers.get(agentId);
-  if (controller) controller.abort();
-
-  // 3. Close the old SDK server (kills the kilo serve child process)
-  oldInstance.server.close();
-  sdkInstances.delete(agent.workdir);
-
-  // 4. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
+  // 2. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
   //    so the next createKilo() spawns kilo serve with fresh config.
   const kilocodeToken = process.env.KILOCODE_TOKEN;
   if (kilocodeToken) {
@@ -823,61 +819,83 @@ export async function updateAgentModel(
     process.env.OPENCODE_CONFIG_CONTENT = configJson;
   }
 
-  // 5. Update the agent's model field for per-message overrides
+  // 3. Remove the old instance from the map so ensureSDKServer creates a
+  //    new one — but DON'T close the old server yet. If the new server
+  //    fails to start we can restore the old one.
+  sdkInstances.delete(agent.workdir);
   agent.model = model;
 
-  // 6. Create a new SDK server (spawns a fresh kilo serve with updated env)
-  const { client, port } = await ensureSDKServer(agent.workdir, {});
-  agent.serverPort = port;
+  try {
+    // 4. Create a new SDK server (spawns a fresh kilo serve with updated env)
+    const { client, port } = await ensureSDKServer(agent.workdir, {});
+    agent.serverPort = port;
 
-  // 7. Create a new session and send the startup prompt
-  //    The system prompt lives in AGENTS.md (on disk), so kilo serve picks
-  //    it up automatically for every session.
-  const sessionResult = await client.session.create({ body: {} });
-  const rawSession: unknown = sessionResult.data ?? sessionResult;
-  const parsed = SessionResponse.safeParse(rawSession);
-  if (!parsed.success) {
-    throw new Error('SDK session.create response missing required "id" field');
+    // 5. Create a new session and send the startup prompt.
+    //    The system prompt lives in AGENTS.md (on disk), so kilo serve picks
+    //    it up automatically for every session.
+    const sessionResult = await client.session.create({ body: {} });
+    const rawSession: unknown = sessionResult.data ?? sessionResult;
+    const parsed = SessionResponse.safeParse(rawSession);
+    if (!parsed.success) {
+      throw new Error('SDK session.create response missing required "id" field');
+    }
+    agent.sessionId = parsed.data.id;
+
+    const newInstance = sdkInstances.get(agent.workdir);
+    if (newInstance) {
+      newInstance.sessionCount++;
+    }
+
+    // Send the startup prompt so the mayor is ready for instructions.
+    const modelParam = { providerID: 'kilo', modelID: model };
+    await client.session.prompt({
+      path: { id: agent.sessionId },
+      body: {
+        parts: [{ type: 'text', text: MAYOR_STARTUP_PROMPT }],
+        model: modelParam,
+      },
+    });
+    agent.messageCount = 1;
+
+    // 6. New server is healthy — now tear down the old one.
+    const oldController = eventAbortControllers.get(agentId);
+    if (oldController) oldController.abort();
+    oldInstance.server.close();
+
+    // 7. Re-subscribe to events on the new session
+    void subscribeToEvents(client, agent, {
+      agentId: agent.agentId,
+      role: agent.role,
+      name: agent.name,
+      model,
+      prompt: MAYOR_STARTUP_PROMPT,
+      rigId: agent.rigId,
+      townId: agent.townId,
+      identity: '',
+      gitUrl: '',
+      branch: '',
+      defaultBranch: '',
+    });
+
+    console.log(
+      `${MANAGER_LOG} updateAgentModel: SDK server restarted for agent ${agentId}, ` +
+        `old session=${oldSessionId} new session=${agent.sessionId} model=${model}`
+    );
+  } catch (err) {
+    // Restore the old server so the mayor keeps running on the previous model
+    console.warn(
+      `${MANAGER_LOG} updateAgentModel: failed for ${agentId}, restoring old server:`,
+      err
+    );
+    sdkInstances.set(agent.workdir, oldInstance);
+    agent.model = oldModel;
+    agent.sessionId = oldSessionId;
+    agent.serverPort = oldPort;
+    if (prevConfigContent !== undefined) process.env.KILO_CONFIG_CONTENT = prevConfigContent;
+    if (prevOpenCodeContent !== undefined)
+      process.env.OPENCODE_CONFIG_CONTENT = prevOpenCodeContent;
+    throw err;
   }
-  agent.sessionId = parsed.data.id;
-
-  // Track session count
-  const newInstance = sdkInstances.get(agent.workdir);
-  if (newInstance) {
-    newInstance.sessionCount++;
-  }
-
-  // Send the startup prompt so the mayor is ready for instructions.
-  // This mirrors the initial dispatch in ensureMayor().
-  const modelParam = { providerID: 'kilo', modelID: model };
-  await client.session.prompt({
-    path: { id: agent.sessionId },
-    body: {
-      parts: [{ type: 'text', text: MAYOR_STARTUP_PROMPT }],
-      model: modelParam,
-    },
-  });
-  agent.messageCount = 1;
-
-  // 8. Re-subscribe to events on the new session
-  void subscribeToEvents(client, agent, {
-    agentId: agent.agentId,
-    role: agent.role,
-    name: agent.name,
-    model,
-    prompt: MAYOR_STARTUP_PROMPT,
-    rigId: agent.rigId,
-    townId: agent.townId,
-    identity: '',
-    gitUrl: '',
-    branch: '',
-    defaultBranch: '',
-  });
-
-  console.log(
-    `${MANAGER_LOG} updateAgentModel: SDK server restarted for agent ${agentId}, ` +
-    `old session=${oldSessionId} new session=${agent.sessionId} model=${model}`
-  );
 }
 
 export function getAgentStatus(agentId: string): ManagedAgent | null {

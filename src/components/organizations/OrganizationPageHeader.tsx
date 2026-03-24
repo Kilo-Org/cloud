@@ -2,6 +2,7 @@
 
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { BackButton } from '@/components/BackButton';
+import { useSetTopBarTitle } from '@/components/TopBar';
 import type { ReactNode } from 'react';
 
 type OrganizationPageHeaderProps = {
@@ -28,6 +29,9 @@ export function OrganizationPageHeader({
   const finalTitle =
     typeof title === 'string' ? title.replace('<org name>', organizationName) : title;
 
+  // Push resolved string titles into the topbar
+  useSetTopBarTitle(typeof finalTitle === 'string' ? finalTitle : null);
+
   return (
     <div className="flex w-full flex-col gap-y-4">
       {showBackButton && (
@@ -36,7 +40,7 @@ export function OrganizationPageHeader({
         </div>
       )}
       <div className="flex items-center gap-3">
-        <h1 className="text-3xl font-bold">{finalTitle}</h1>
+        <h1 className="text-3xl font-bold md:hidden">{finalTitle}</h1>
         {badge}
       </div>
     </div>

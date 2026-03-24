@@ -12,29 +12,7 @@ import {
 import * as z from 'zod';
 import { format } from 'date-fns';
 
-const templateNames: [TemplateName, ...TemplateName[]] = [
-  'orgSubscription',
-  'orgRenewed',
-  'orgCancelled',
-  'orgSSOUserJoined',
-  'orgInvitation',
-  'magicLink',
-  'balanceAlert',
-  'autoTopUpFailed',
-  'ossInviteNewUser',
-  'ossInviteExistingUser',
-  'ossExistingOrgProvisioned',
-  'deployFailed',
-  'clawTrialEndingSoon',
-  'clawTrialExpiresTomorrow',
-  'clawSuspendedTrial',
-  'clawSuspendedSubscription',
-  'clawSuspendedPayment',
-  'clawDestructionWarning',
-  'clawInstanceDestroyed',
-  'clawEarlybirdEndingSoon',
-  'clawEarlybirdExpiresTomorrow',
-];
+const templateNames = Object.keys(subjects) as [TemplateName, ...TemplateName[]];
 
 const TemplateNameSchema = z.enum(templateNames);
 
@@ -88,16 +66,6 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         ...creditsVars(500),
       };
     case 'ossInviteExistingUser':
-      return {
-        organization_name: 'Acme OSS',
-        organization_url,
-        integrations_url,
-        code_reviews_url,
-        tier_name: 'Premier',
-        seats: '25',
-        seat_value: '48,000',
-        ...creditsVars(500),
-      };
     case 'ossExistingOrgProvisioned':
       return {
         organization_name: 'Acme OSS',
@@ -118,17 +86,10 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
     case 'clawTrialEndingSoon':
       return { days_remaining: '5', claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawTrialExpiresTomorrow':
+    case 'clawInstanceDestroyed':
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawSuspendedTrial':
-      return {
-        destruction_date: formatDate(new Date(Date.now() + 7 * 86_400_000)),
-        claw_url: `${NEXTAUTH_URL}/claw`,
-      };
     case 'clawSuspendedSubscription':
-      return {
-        destruction_date: formatDate(new Date(Date.now() + 7 * 86_400_000)),
-        claw_url: `${NEXTAUTH_URL}/claw`,
-      };
     case 'clawSuspendedPayment':
       return {
         destruction_date: formatDate(new Date(Date.now() + 7 * 86_400_000)),
@@ -139,8 +100,6 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         destruction_date: formatDate(new Date(Date.now() + 2 * 86_400_000)),
         claw_url: `${NEXTAUTH_URL}/claw`,
       };
-    case 'clawInstanceDestroyed':
-      return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawEarlybirdEndingSoon':
       return { days_remaining: '14', expiry_date: '2026-09-26', claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawEarlybirdExpiresTomorrow':

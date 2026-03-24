@@ -6,7 +6,7 @@ import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
 
-// Subject lines for each template — used by Mailgun and the admin testing page
+// Subject lines for each template — also serves as the canonical list of template names
 export const subjects = {
   orgSubscription: 'Welcome to Kilo for Teams!',
   orgRenewed: 'Kilo: Your Teams Subscription Renewal',

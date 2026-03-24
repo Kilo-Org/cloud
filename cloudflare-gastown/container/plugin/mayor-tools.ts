@@ -520,10 +520,10 @@ export function createMayorTools(client: MayorGastownClient) {
           'Content-Type': 'application/json',
         };
 
-        // Search for potential duplicates
+        // Search for potential duplicates (match both Mayor-filed and user-filed bug issues)
         const searchKeywords = args.title.split(/\s+/).slice(0, 5).join(' ');
         const searchQuery = encodeURIComponent(
-          `repo:${repo} is:issue is:open label:gastown label:bug ${searchKeywords}`
+          `repo:${repo} is:issue is:open label:bug ${searchKeywords}`
         );
 
         let duplicates: Array<{ number: number; title: string; html_url: string }> = [];

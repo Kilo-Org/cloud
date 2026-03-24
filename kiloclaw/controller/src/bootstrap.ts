@@ -25,6 +25,8 @@ const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
 const HEARTBEAT_MD_SOURCE = '/usr/local/share/kiloclaw/heartbeat.md';
 const HEARTBEAT_MD_DEST = '/root/.openclaw/workspace/heartbeat.md';
+const WORKSPACE_SYNC_SKILL_SOURCE = '/usr/local/share/kiloclaw/workspace-sync-SKILL.md';
+const WORKSPACE_SYNC_SKILL_DEST = '/root/.openclaw/workspace/skills/workspace-sync/SKILL.md';
 
 const ENC_PREFIX = 'KILOCLAW_ENC_';
 const VALUE_PREFIX = 'enc:v1:';
@@ -585,7 +587,35 @@ export function updateHeartbeatMdWorkspaceSync(_env: EnvLike, deps: BootstrapDep
   }
 }
 
-// ---- Step 11: Gateway args ----
+// ---- Step 11: workspace-sync skill file ----
+
+/**
+ * Ensure the workspace-sync skill file exists in the workspace.
+ * 
+ * Creates the skills/workspace-sync/SKILL.md file if it doesn't exist,
+ * copying from the container template. This skill is always available
+ * for workspace synchronization operations.
+ * Idempotent: skips if the file already exists.
+ */
+export function updateWorkspaceSyncSkillFile(_env: EnvLike, deps: BootstrapDeps): void {
+  // Create the skills directory structure if it doesn't exist
+  const skillDir = path.dirname(WORKSPACE_SYNC_SKILL_DEST);
+  deps.mkdirSync(skillDir, { recursive: true });
+
+  // Only copy the template if the file doesn't already exist
+  if (!deps.existsSync(WORKSPACE_SYNC_SKILL_DEST)) {
+    if (deps.existsSync(WORKSPACE_SYNC_SKILL_SOURCE)) {
+      deps.copyFileSync(WORKSPACE_SYNC_SKILL_SOURCE, WORKSPACE_SYNC_SKILL_DEST);
+      console.log('workspace-sync: copied SKILL.md template to workspace');
+    } else {
+      console.warn('workspace-sync: template file not found, skill file not created');
+    }
+  } else {
+    console.log('workspace-sync: SKILL.md already exists in workspace');
+  }
+}
+
+// ---- Step 12: Gateway args ----
 
 /**
  * Build the gateway CLI arguments array.
@@ -645,6 +675,9 @@ export async function bootstrap(
 
   // Update heartbeat.md with workspace-sync skill
   updateHeartbeatMdWorkspaceSync(env, deps);
+
+  // Ensure workspace-sync skill file exists
+  updateWorkspaceSyncSkillFile(env, deps);
 
   // Write mcporter config for MCP servers (AgentCard, etc.)
   writeMcporterConfig(env);

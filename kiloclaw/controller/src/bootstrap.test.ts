@@ -10,6 +10,7 @@ import {
   updateToolsMdKiloCliSection,
   updateToolsMd1PasswordSection,
   updateHeartbeatMdWorkspaceSync,
+  updateWorkspaceSyncSkillFile,
   buildGatewayArgs,
   bootstrap,
 } from './bootstrap';
@@ -732,6 +733,74 @@ describe('updateHeartbeatMdWorkspaceSync', () => {
     updateHeartbeatMdWorkspaceSync(env, harness.deps);
 
     expect(harness.writeCalls).toHaveLength(0);
+  });
+});
+
+// ---- updateWorkspaceSyncSkillFile ----
+
+describe('updateWorkspaceSyncSkillFile', () => {
+  it('copies workspace-sync skill template when file does not exist', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(true)  // template exists
+      .mockReturnValueOnce(false); // destination doesn't exist
+
+    const env: Record<string, string | undefined> = {};
+
+    updateWorkspaceSyncSkillFile(env, harness.deps);
+
+    expect(harness.mkdirCalls).toContain('/root/.openclaw/workspace/skills/workspace-sync');
+    expect(harness.copyCalls).toHaveLength(1);
+    expect(harness.copyCalls[0]!.src).toBe('/usr/local/share/kiloclaw/workspace-sync-SKILL.md');
+    expect(harness.copyCalls[0]!.dest).toBe('/root/.openclaw/workspace/skills/workspace-sync/SKILL.md');
+  });
+
+  it('skips copying when skill file already exists', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(true)  // template exists
+      .mockReturnValueOnce(true); // destination exists
+
+    const env: Record<string, string | undefined> = {};
+
+    updateWorkspaceSyncSkillFile(env, harness.deps);
+
+    expect(harness.copyCalls).toHaveLength(0);
+  });
+
+  it('warns when template file does not exist', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(false) // template doesn't exist
+      .mockReturnValueOnce(false); // destination doesn't exist
+
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const env: Record<string, string | undefined> = {};
+
+    updateWorkspaceSyncSkillFile(env, harness.deps);
+
+    expect(harness.copyCalls).toHaveLength(0);
+    expect(consoleSpy).toHaveBeenCalledWith('workspace-sync: template file not found, skill file not created');
+    
+    consoleSpy.mockRestore();
+  });
+
+  it('creates directory structure even if template is missing', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(false) // template doesn't exist
+      .mockReturnValueOnce(false); // destination doesn't exist
+
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const env: Record<string, string | undefined> = {};
+
+    updateWorkspaceSyncSkillFile(env, harness.deps);
+
+    expect(harness.mkdirCalls).toContain('/root/.openclaw/workspace/skills/workspace-sync');
+    
+    consoleSpy.mockRestore();
   });
 });
 

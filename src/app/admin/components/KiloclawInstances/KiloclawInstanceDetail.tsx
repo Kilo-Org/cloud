@@ -88,8 +88,9 @@ function getValidMemoryOptions(cpuKind: 'shared' | 'performance', cpus: number):
   const flyMax = (cpuKind === 'shared' ? 2048 : 8192) * cpus;
   const floorMin = Math.max(3072, flyMin);
   const effectiveMin = Math.ceil(floorMin / step) * step;
-  const presets = [3072, 4096, 6144, 8192, 12288, 16384, 24576, 32768, 49152, 65536];
-  return presets.filter(s => s >= effectiveMin && s <= flyMax && s % step === 0);
+  const schemaMax = 16384;
+  const presets = [3072, 4096, 6144, 8192, 12288, 16384];
+  return presets.filter(s => s >= effectiveMin && s <= flyMax && s <= schemaMax && s % step === 0);
 }
 
 function formatMemory(mb: number): string {

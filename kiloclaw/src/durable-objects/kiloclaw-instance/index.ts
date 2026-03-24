@@ -356,9 +356,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('User ID mismatch');
     }
 
-    this.s.machineSize = machineSize;
-    await this.persist({ machineSize });
-
     let applied = false;
     if (applyNow && this.s.flyMachineId) {
       const flyConfig = getFlyConfig(this.env, this.s);
@@ -369,14 +366,34 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
       const updatedConfig: FlyMachineConfig = {
         ...machine.config,
-        guest: guestFromSize(this.s.machineSize),
+        guest: guestFromSize(machineSize),
       };
 
-      await fly.updateMachine(flyConfig, this.s.flyMachineId, updatedConfig);
-      await fly.waitForState(flyConfig, this.s.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
+      const updated = await fly.updateMachine(flyConfig, this.s.flyMachineId, updatedConfig);
+
+      // Handle stopped machines: updateMachine applies config without
+      // starting, so we need an explicit start like restartMachineInBackground.
+      if (machine.state === 'stopped' || machine.state === 'created') {
+        await fly.startMachine(flyConfig, this.s.flyMachineId);
+      }
+
+      // Pass instance_id so waitForState waits for the new version,
+      // not a stale pre-update started state.
+      await fly.waitForState(
+        flyConfig,
+        this.s.flyMachineId,
+        'started',
+        STARTUP_TIMEOUT_SECONDS,
+        updated.instance_id
+      );
       console.log('[DO] Machine size applied immediately:', this.s.flyMachineId);
       applied = true;
     }
+
+    // Persist only after successful apply (or when not applying) so a
+    // failed Fly update doesn't leave a stale size in storage.
+    this.s.machineSize = machineSize;
+    await this.persist({ machineSize });
 
     return { machineSize: this.s.machineSize, applied };
   }

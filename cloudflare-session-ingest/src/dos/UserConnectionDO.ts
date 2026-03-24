@@ -291,11 +291,29 @@ export class UserConnectionDO extends DurableObject<Env> {
     const updatedAttachment: WSAttachment = { role: 'cli', connectionId, sessions };
     ws.serializeAttachment(updatedAttachment);
 
-    this.broadcastToWeb({
-      type: 'system',
-      event: 'sessions.heartbeat',
-      data: { connectionId, sessions },
-    });
+    // Send heartbeat only to web clients subscribed to sessions from this connection.
+    // Include subscribers for just-removed sessions so they learn the session is gone.
+    const subscribers = new Set<WebSocket>();
+    for (const session of sessions) {
+      const subs = this.webSubscriptions.get(session.id);
+      if (subs) for (const ws2 of subs) subscribers.add(ws2);
+    }
+    for (const prev of previousSessions) {
+      if (!currentIds.has(prev.id)) {
+        const subs = this.webSubscriptions.get(prev.id);
+        if (subs) for (const ws2 of subs) subscribers.add(ws2);
+      }
+    }
+    if (subscribers.size > 0) {
+      const msg: WebInboundMessage = {
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId, sessions },
+      };
+      for (const ws2 of subscribers) {
+        this.sendToWeb(ws2, msg);
+      }
+    }
   }
 
   private handleCliEvent(

@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button';
 type PermissionContextValue = {
   cloudAgentSessionId: string | null;
   organizationId: string | null;
+  /** When set, PermissionCard routes through the session manager instead of tRPC. */
+  respondToPermission?: (requestId: string, response: 'once' | 'always' | 'reject') => Promise<void>;
 };
 
 const PermissionContext = createContext<PermissionContextValue>({
@@ -32,11 +34,12 @@ type PermissionContextProviderProps = PermissionContextValue & {
 export function PermissionContextProvider({
   cloudAgentSessionId,
   organizationId,
+  respondToPermission,
   children,
 }: PermissionContextProviderProps) {
   const value = useMemo(
-    () => ({ cloudAgentSessionId, organizationId }),
-    [cloudAgentSessionId, organizationId]
+    () => ({ cloudAgentSessionId, organizationId, respondToPermission }),
+    [cloudAgentSessionId, organizationId, respondToPermission]
   );
   return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }
@@ -66,33 +69,38 @@ export function PermissionCard({
   const [error, setError] = useState<string | null>(null);
 
   const trpcClient = useRawTRPCClient();
-  const { cloudAgentSessionId: sessionId, organizationId } = usePermissionContext();
+  const { cloudAgentSessionId: sessionId, organizationId, respondToPermission } = usePermissionContext();
 
   const respond = useCallback(
     async (response: PermissionResponse) => {
-      if (!sessionId || pending) return;
+      if (pending) return;
 
       setPending(response);
       setError(null);
 
       try {
-        if (organizationId) {
-          await trpcClient.organizations.cloudAgentNext.answerPermission.mutate(
-            { organizationId, sessionId, permissionId: requestId, response },
-            { context: { skipBatch: true } }
-          );
+        if (respondToPermission) {
+          await respondToPermission(requestId, response);
         } else {
-          await trpcClient.cloudAgentNext.answerPermission.mutate(
-            { sessionId, permissionId: requestId, response },
-            { context: { skipBatch: true } }
-          );
+          if (!sessionId) return;
+          if (organizationId) {
+            await trpcClient.organizations.cloudAgentNext.answerPermission.mutate(
+              { organizationId, sessionId, permissionId: requestId, response },
+              { context: { skipBatch: true } }
+            );
+          } else {
+            await trpcClient.cloudAgentNext.answerPermission.mutate(
+              { sessionId, permissionId: requestId, response },
+              { context: { skipBatch: true } }
+            );
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to respond to permission');
         setPending(null);
       }
     },
-    [sessionId, organizationId, requestId, pending, trpcClient]
+    [sessionId, organizationId, requestId, pending, trpcClient, respondToPermission]
   );
 
   const isAlreadyAllowed = always.includes(permission);

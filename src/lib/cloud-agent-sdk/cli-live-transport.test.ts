@@ -386,6 +386,73 @@ describe('CliLiveTransport system events', () => {
 
     transport.destroy();
   });
+
+  it('heartbeat from non-owner connection does not fire stopped', () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+
+    // First heartbeat establishes owner as 'owner-conn'
+    sendInbound({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'owner-conn',
+        sessions: [
+          { id: KILO_SESSION_ID, status: 'active', title: 'My Session', connectionId: 'owner-conn' },
+        ],
+      },
+    });
+
+    // Heartbeat from a different connection that doesn't list our session
+    sendInbound({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'other-conn',
+        sessions: [{ id: 'other-session', status: 'active', title: 'Other' }],
+      },
+    });
+
+    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
+
+    transport.destroy();
+  });
+
+  it('heartbeat from owner connection without session fires stopped', () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+
+    // First heartbeat establishes owner as 'owner-conn'
+    sendInbound({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'owner-conn',
+        sessions: [
+          { id: KILO_SESSION_ID, status: 'active', title: 'My Session', connectionId: 'owner-conn' },
+        ],
+      },
+    });
+
+    // Owner connection heartbeat no longer lists our session
+    sendInbound({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'owner-conn',
+        sessions: [],
+      },
+    });
+
+    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(1);
+    expect(serviceEvents.at(-1)).toEqual({ type: 'stopped', reason: 'disconnected' });
+
+    transport.destroy();
+  });
 });
 
 describe('CliLiveTransport snapshot preload', () => {

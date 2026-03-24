@@ -275,6 +275,8 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     questionRequestIds,
     cloudAgentSessionId: sessionId,
     organizationId,
+    answerQuestion: ctxAnswerQuestion,
+    rejectQuestion: ctxRejectQuestion,
   } = useQuestionContext();
 
   const requestId = isStandalone
@@ -402,7 +404,7 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
   const hasAnyAnswer = questions.some((_, i) => getEffectiveAnswers(i).length > 0);
 
   const handleSubmit = useCallback(async () => {
-    if (!requestId || !sessionId || isSubmitting) return;
+    if (!requestId || isSubmitting) return;
 
     const answers: string[][] = questions.map((_, i) => getEffectiveAnswers(i));
 
@@ -410,16 +412,21 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     setSubmitError(null);
 
     try {
-      if (organizationId) {
-        await trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
-          { sessionId, questionId: requestId, answers, organizationId },
-          { context: { skipBatch: true } }
-        );
+      if (ctxAnswerQuestion) {
+        await ctxAnswerQuestion(requestId, answers);
       } else {
-        await trpcClient.cloudAgentNext.answerQuestion.mutate(
-          { sessionId, questionId: requestId, answers },
-          { context: { skipBatch: true } }
-        );
+        if (!sessionId) return;
+        if (organizationId) {
+          await trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
+            { sessionId, questionId: requestId, answers, organizationId },
+            { context: { skipBatch: true } }
+          );
+        } else {
+          await trpcClient.cloudAgentNext.answerQuestion.mutate(
+            { sessionId, questionId: requestId, answers },
+            { context: { skipBatch: true } }
+          );
+        }
       }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to submit answer');
@@ -434,32 +441,38 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     getEffectiveAnswers,
     isSubmitting,
     trpcClient,
+    ctxAnswerQuestion,
   ]);
 
   const handleDismiss = useCallback(async () => {
-    if (!requestId || !sessionId || isSubmitting) return;
+    if (!requestId || isSubmitting) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      if (organizationId) {
-        await trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
-          { sessionId, questionId: requestId, organizationId },
-          { context: { skipBatch: true } }
-        );
+      if (ctxRejectQuestion) {
+        await ctxRejectQuestion(requestId);
       } else {
-        await trpcClient.cloudAgentNext.rejectQuestion.mutate(
-          { sessionId, questionId: requestId },
-          { context: { skipBatch: true } }
-        );
+        if (!sessionId) return;
+        if (organizationId) {
+          await trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
+            { sessionId, questionId: requestId, organizationId },
+            { context: { skipBatch: true } }
+          );
+        } else {
+          await trpcClient.cloudAgentNext.rejectQuestion.mutate(
+            { sessionId, questionId: requestId },
+            { context: { skipBatch: true } }
+          );
+        }
       }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to dismiss question');
     } finally {
       setIsSubmitting(false);
     }
-  }, [requestId, sessionId, organizationId, isSubmitting, trpcClient]);
+  }, [requestId, sessionId, organizationId, isSubmitting, trpcClient, ctxRejectQuestion]);
 
   // Running state: always expanded, interactive (only if we have a requestId to submit answers)
   if (isRunning && requestId) {

@@ -98,6 +98,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   // -- Manager atoms --------------------------------------------------------
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const isLoading = useAtomValue(manager.atoms.isLoading);
+  const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   const canSend = useAtomValue(manager.atoms.canSend);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
@@ -171,6 +172,22 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     setSoundEnabled(prev => !prev);
   }, [setSoundEnabled]);
 
+  const handleAnswerQuestion = useCallback(
+    (requestId: string, answers: string[][]) => manager.answerQuestion(requestId, answers),
+    [manager]
+  );
+
+  const handleRejectQuestion = useCallback(
+    (requestId: string) => manager.rejectQuestion(requestId),
+    [manager]
+  );
+
+  const handleRespondToPermission = useCallback(
+    (requestId: string, response: 'once' | 'always' | 'reject') =>
+      manager.respondToPermission(requestId, response),
+    [manager]
+  );
+
   const handleModeChange = useCallback(
     (mode: AgentMode) => {
       if (sessionConfig) setSessionConfig({ ...sessionConfig, mode });
@@ -215,10 +232,13 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       questionRequestIds={questionRequestIds}
       cloudAgentSessionId={sessionId}
       organizationId={organizationId ?? null}
+      answerQuestion={handleAnswerQuestion}
+      rejectQuestion={handleRejectQuestion}
     >
       <PermissionContextProvider
         cloudAgentSessionId={sessionId}
         organizationId={organizationId ?? null}
+        respondToPermission={handleRespondToPermission}
       >
         <div className="flex h-full w-full flex-col overflow-hidden">
           {showChatInterface ? (
@@ -303,7 +323,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                 />
               </div>
 
-              {!canSend && !isLoading && sessionIdFromParams && (
+              {isReadOnly && !isLoading && sessionIdFromParams && (
                 <div className="border-border bg-muted/50 text-muted-foreground border-t px-4 py-2 text-center text-xs">
                   This is a completed session — read only
                 </div>

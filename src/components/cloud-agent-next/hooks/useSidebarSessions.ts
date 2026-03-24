@@ -53,7 +53,7 @@ function dbSessionToStoredSession(session: DbSession | DbSessionV2): StoredSessi
 type UseSidebarSessionsOptions = {
   organizationId?: string | null;
   searchQuery?: string;
-  createdOnPlatform?: string;
+  createdOnPlatform?: string | string[];
   gitUrl?: string;
 };
 

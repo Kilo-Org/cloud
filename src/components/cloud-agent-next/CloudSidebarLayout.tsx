@@ -45,7 +45,8 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const { sessions, refetchSessions, renameSessionLocally } = useSidebarSessions({
     organizationId: organizationId ?? null,
     searchQuery,
-    createdOnPlatform: platformFilter,
+    createdOnPlatform:
+      platformFilter === 'cloud-agent' ? ['cloud-agent', 'cloud-agent-web'] : platformFilter,
     gitUrl: projectFilter,
   });
   const { activeSessions } = useActiveSessions();

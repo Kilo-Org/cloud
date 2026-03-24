@@ -466,7 +466,10 @@ export function ChatSidebar({
                   <div
                     key={activeS.id}
                     onClick={() => handleSessionClick(activeS.id)}
-                    className="group hover:bg-accent flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors"
+                    className={cn(
+                      'group hover:bg-accent flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+                      activeS.id === currentSessionId && 'bg-accent font-medium'
+                    )}
                   >
                     <span className="relative shrink-0">
                       <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />

@@ -308,7 +308,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     answer: payload => {
       if (transport?.sendCommand) {
         return transport.sendCommand('question_reply', {
-          requestId: payload.requestId,
+          requestID: payload.requestId,
           answers: payload.answers,
         });
       }
@@ -320,9 +320,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     },
     reject: payload => {
       if (transport?.sendCommand) {
-        return transport.sendCommand('permission_respond', {
-          requestId: payload.requestId,
-          accepted: false,
+        return transport.sendCommand('question_reject', {
+          requestID: payload.requestId,
         });
       }
       const reject = config.transport.reject;
@@ -334,8 +333,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     respondToPermission: payload => {
       if (transport?.sendCommand) {
         return transport.sendCommand('permission_respond', {
-          requestId: payload.requestId,
-          response: payload.response,
+          requestID: payload.requestId,
+          reply: payload.response,
         });
       }
       const respondToPermission = config.transport.respondToPermission;

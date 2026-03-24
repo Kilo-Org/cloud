@@ -394,7 +394,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // were awaiting Fly API calls. Without this check, persist() would
     // recreate a partial row containing only machineSize.
     const currentStatus = await this.ctx.storage.get('status');
-    if (currentStatus === null) {
+    if (currentStatus == null) {
       throw new Error('Instance was destroyed during machine size update');
     }
 

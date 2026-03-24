@@ -6,7 +6,7 @@ import {
   subjects,
   creditsVars,
   renderTemplate,
-  RawHtml,
+  type RawHtml,
   type TemplateName,
 } from '@/lib/email';
 import * as z from 'zod';

@@ -352,7 +352,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(failedPromptAtom, null);
   }
 
-  function subscribeToServiceState(session: CloudAgentSession): void {
+  function subscribeToServiceState(
+    session: CloudAgentSession,
+    opts?: { onFirstActivity?: () => void }
+  ): void {
+    let firstActivityFired = false;
     let prevAct = '';
     let prevSk = '';
     let prevCsk = '';
@@ -369,6 +373,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       const st = session.state.getStatus();
       const cs = session.state.getCloudStatus();
       store.set(activityAtom, act);
+      if (!firstActivityFired && act.type !== 'connecting') {
+        firstActivityFired = true;
+        opts?.onFirstActivity?.();
+      }
       store.set(agentStatusAtom, st);
       store.set(cloudStatusAtom, cs);
       store.set(isStreamingAtom, act.type === 'busy');
@@ -547,7 +555,25 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       return;
     }
     currentSession = session;
-    subscribeToServiceState(session);
+    subscribeToServiceState(session, {
+      onFirstActivity: () => {
+        if (!store.get(isLoadingAtom)) return;
+        // Fallback: clear loading state when events start flowing even if
+        // no root session.created was replayed (e.g. CLI snapshot failure).
+        // Reset all per-session atoms first, same as the onSessionCreated
+        // path, so stale UI state from the previous session doesn't leak.
+        clearAllAtoms();
+        store.set(sessionConfigAtom, {
+          sessionId: data.cloudAgentSessionId ?? kiloSessionId,
+          repository: data.repository ?? '',
+          mode: data.mode ?? '',
+          model: data.model ?? '',
+        });
+        store.set(sessionIdAtom, data.cloudAgentSessionId);
+        store.set(sessionStorageAtom, jotaiStorage);
+        store.set(isLoadingAtom, false);
+      },
+    });
     session.connect();
   }
 

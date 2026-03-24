@@ -188,12 +188,12 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'session.created': {
       const r = sessionCreatedDataSchema.safeParse(data);
-      if (!r.success || r.data.info.id === undefined) return null;
+      if (!r.success) return null;
       const rawCreated = r.data.info;
       return {
         type: 'session.created',
         info: {
-          id: String(rawCreated.id),
+          id: rawCreated.id,
           parentID: rawCreated.parentID != null ? String(rawCreated.parentID) : undefined,
         },
       };
@@ -201,12 +201,12 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'session.updated': {
       const r = sessionUpdatedDataSchema.safeParse(data);
-      if (!r.success || r.data.info.id === undefined) return null;
+      if (!r.success) return null;
       const rawUpdated = r.data.info;
       return {
         type: 'session.updated',
         info: {
-          id: String(rawUpdated.id),
+          id: rawUpdated.id,
           parentID: rawUpdated.parentID != null ? String(rawUpdated.parentID) : undefined,
         },
       };

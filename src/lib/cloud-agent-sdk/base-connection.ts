@@ -61,6 +61,9 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
       connectInternal(0, expectedGeneration);
     } catch (err) {
       console.error('[Connection] Failed to refresh auth:', err);
+      if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+      config.onUnexpectedDisconnect?.();
+      scheduleReconnect(0, expectedGeneration);
     }
   }
 

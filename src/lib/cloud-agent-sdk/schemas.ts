@@ -172,12 +172,12 @@ export const sessionStatusDataSchema = z.object({
 export type SessionStatusData = z.infer<typeof sessionStatusDataSchema>;
 
 export const sessionCreatedDataSchema = z.object({
-  info: z.object({ id: z.unknown() }).passthrough(),
+  info: z.object({ id: z.string() }).passthrough(),
 });
 export type SessionCreatedData = z.infer<typeof sessionCreatedDataSchema>;
 
 export const sessionUpdatedDataSchema = z.object({
-  info: z.object({ id: z.unknown() }).passthrough(),
+  info: z.object({ id: z.string() }).passthrough(),
 });
 export type SessionUpdatedData = z.infer<typeof sessionUpdatedDataSchema>;
 

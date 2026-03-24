@@ -571,15 +571,26 @@ export function createMayorTools(client: MayorGastownClient) {
         bodyParts.push('*Filed automatically by the Mayor via `gt_report_bug`.*');
         const body = bodyParts.join('\n\n');
 
-        const createRes = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+        const issuePayload = {
+          title: `[Gastown] ${args.title}`,
+          body,
+          labels: ['bug', 'gt:mayor'],
+        };
+
+        let createRes = await fetch(`https://api.github.com/repos/${repo}/issues`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            title: `[Gastown] ${args.title}`,
-            body,
-            labels: ['gastown', 'bug', 'reported-by-mayor'],
-          }),
+          body: JSON.stringify(issuePayload),
         });
+
+        // If labeling failed (e.g. token lacks label permissions), retry without labels
+        if (!createRes.ok && createRes.status === 422) {
+          createRes = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ title: issuePayload.title, body: issuePayload.body }),
+          });
+        }
 
         if (!createRes.ok) {
           const errText = await createRes.text();

@@ -502,10 +502,42 @@ describe('mayor tools', () => {
       const createCall = fetchSpy.mock.calls[1];
       const body = JSON.parse(createCall[1]?.body as string);
       expect(body.title).toBe('[Gastown] New bug');
-      expect(body.labels).toEqual(['gastown', 'bug', 'reported-by-mayor']);
+      expect(body.labels).toEqual(['bug', 'gt:mayor']);
       expect(body.body).toContain('town-123');
       expect(body.body).toContain('rig-5');
       expect(body.body).toContain('connection refused');
+    });
+
+    it('retries without labels on 422 (label permission error)', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }))
+        .mockResolvedValueOnce(
+          new Response('Validation Failed: label permissions', { status: 422 })
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              number: 100,
+              html_url: 'https://github.com/Kilo-Org/cloud/issues/100',
+            }),
+            { status: 201 }
+          )
+        );
+
+      const result = await tools.gt_report_bug.execute(
+        { title: 'Label bug', description: 'Labels fail', area: 'Other' as const },
+        CTX
+      );
+
+      expect(result).toContain('#100');
+      expect(result).toContain('Bug report filed');
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+      // Retry call should omit labels
+      const retryCall = fetchSpy.mock.calls[2];
+      const retryBody = JSON.parse(retryCall[1]?.body as string);
+      expect(retryBody.labels).toBeUndefined();
     });
 
     it('handles create failure gracefully', async () => {

@@ -1,8 +1,5 @@
-'use client';
-
-import { useState } from 'react';
-import { ChevronDown, Loader2, XCircle, Globe } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Globe } from 'lucide-react';
+import { ToolCardShell } from './ToolCardShell';
 import type { ToolPart } from './types';
 
 type WebSearchToolCardProps = {
@@ -14,19 +11,6 @@ type WebSearchInput = {
   numResults?: number;
   type?: string;
 };
-
-function getStatusIndicator(status: 'pending' | 'running' | 'completed' | 'error') {
-  switch (status) {
-    case 'error':
-      return <XCircle className="h-4 w-4 shrink-0 text-red-500" />;
-    case 'completed':
-      return <Globe className="text-muted-foreground h-4 w-4 shrink-0" />;
-    case 'pending':
-    case 'running':
-    default:
-      return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />;
-  }
-}
 
 type SearchResult = {
   title: string;
@@ -88,8 +72,6 @@ function formatDate(dateStr: string): string {
 }
 
 export function WebSearchToolCard({ toolPart }: WebSearchToolCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
   const state = toolPart.state;
   const input = state.input as WebSearchInput;
   const output = state.status === 'completed' ? state.output : undefined;
@@ -99,83 +81,71 @@ export function WebSearchToolCard({ toolPart }: WebSearchToolCardProps) {
   const resultCount = results.length;
 
   return (
-    <div className="border-muted bg-muted/30 rounded-md border">
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        {getStatusIndicator(state.status)}
-        <code className="min-w-0 flex-1 truncate text-sm">{input.query}</code>
-        {state.status === 'completed' && resultCount > 0 && (
+    <ToolCardShell
+      icon={Globe}
+      title="WebSearch"
+      subtitle={input.query}
+      status={state.status}
+      badge={
+        state.status === 'completed' && resultCount > 0 ? (
           <span className="text-muted-foreground shrink-0 text-xs">
             {resultCount} {resultCount === 1 ? 'result' : 'results'}
           </span>
-        )}
-        <ChevronDown
-          className={cn(
-            'text-muted-foreground h-4 w-4 shrink-0 transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
-
-      {isExpanded && (
-        <div className="border-muted space-y-2 border-t px-3 py-2">
-          {/* Results list */}
-          {results.length > 0 && (
-            <div className="bg-background max-h-60 space-y-2 overflow-auto rounded-md p-2">
-              {results.map((result, idx) => (
-                <div key={idx} className="text-xs">
-                  <a
-                    href={result.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-blue-400 hover:underline"
-                  >
-                    {result.title}
-                  </a>
-                  <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-2">
-                    {result.author && <span>{result.author}</span>}
-                    {result.publishedDate && <span>{formatDate(result.publishedDate)}</span>}
-                  </div>
-                </div>
-              ))}
+        ) : undefined
+      }
+    >
+      {/* Results list */}
+      {results.length > 0 && (
+        <div className="bg-background max-h-60 space-y-2 overflow-auto rounded-md p-2">
+          {results.map((result, idx) => (
+            <div key={idx} className="text-xs">
+              <a
+                href={result.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-blue-400 hover:underline"
+              >
+                {result.title}
+              </a>
+              <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-2">
+                {result.author && <span>{result.author}</span>}
+                {result.publishedDate && <span>{formatDate(result.publishedDate)}</span>}
+              </div>
             </div>
-          )}
-
-          {/* Fallback: show raw output if no results parsed */}
-          {state.status === 'completed' && results.length === 0 && output && (
-            <div className="bg-background max-h-60 overflow-auto rounded-md p-2">
-              <pre className="text-xs whitespace-pre-wrap">{output}</pre>
-            </div>
-          )}
-
-          {state.status === 'completed' && !output && (
-            <div className="text-muted-foreground text-xs italic">No results found</div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div>
-              <div className="text-muted-foreground mb-1 text-xs">Error:</div>
-              <pre className="bg-background overflow-auto rounded-md p-2 text-xs text-red-500">
-                <code>{error}</code>
-              </pre>
-            </div>
-          )}
-
-          {/* Running state */}
-          {state.status === 'running' && (
-            <div className="text-muted-foreground text-xs italic">Searching the web...</div>
-          )}
-
-          {/* Pending state */}
-          {state.status === 'pending' && (
-            <div className="text-muted-foreground text-xs italic">Waiting to search...</div>
-          )}
+          ))}
         </div>
       )}
-    </div>
+
+      {/* Fallback: show raw output if no results parsed */}
+      {state.status === 'completed' && results.length === 0 && output && (
+        <div className="bg-background max-h-60 overflow-auto rounded-md p-2">
+          <pre className="text-xs whitespace-pre-wrap">{output}</pre>
+        </div>
+      )}
+
+      {state.status === 'completed' && !output && (
+        <div className="text-muted-foreground text-xs italic">No results found</div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div>
+          <div className="text-muted-foreground mb-1 text-xs">Error:</div>
+          <pre className="bg-background overflow-auto rounded-md p-2 text-xs text-red-500">
+            <code>{error}</code>
+          </pre>
+        </div>
+      )}
+
+      {/* Running state */}
+      {state.status === 'running' && (
+        <div className="text-muted-foreground text-xs italic">Searching the web...</div>
+      )}
+
+      {/* Pending state */}
+      {state.status === 'pending' && (
+        <div className="text-muted-foreground text-xs italic">Waiting to search...</div>
+      )}
+    </ToolCardShell>
   );
 }

@@ -1,7 +1,7 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import { CloudNextSessionsPage } from '@/components/cloud-agent-next/CloudNextSessionsPage';
+import { NewSessionPanel } from '@/components/cloud-agent-next/NewSessionPanel';
 import { CloudSessionsPage } from '@/components/cloud-agent/CloudSessionsPage';
 
 export default async function OrganizationCloudPage({
@@ -22,7 +22,7 @@ export default async function OrganizationCloudPage({
       params={params}
       render={({ organization }) =>
         useNextAgent ? (
-          <CloudNextSessionsPage organizationId={organization.id} />
+          <NewSessionPanel organizationId={organization.id} />
         ) : (
           <CloudSessionsPage organizationId={organization.id} />
         )

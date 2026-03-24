@@ -1,8 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { needsResumeConfiguration } from './session-config';
 import type { SessionConfig } from './types';
-import type { ResumeConfig } from './ResumeConfigModal';
-import type { StreamResumeConfig } from './hooks/useResumeConfigModal';
+import type { ResumeConfig, StreamResumeConfig } from './types';
 
 describe('needsResumeConfiguration', () => {
   it('returns false when no session is loaded', () => {

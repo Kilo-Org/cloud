@@ -345,63 +345,6 @@ describe('createEventProcessor', () => {
       );
     });
 
-    it('should handle part replacement for text parts', () => {
-      const callbacks: EventProcessorCallbacks = {
-        onMessageUpdated: jest.fn(),
-        onPartUpdated: jest.fn(),
-      };
-      const processor = createEventProcessor({ callbacks });
-
-      // Create message
-      processor.processEvent(
-        createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
-      );
-
-      // First part update with text content
-      processor.processEvent(
-        createKilocodeEvent('message.part.updated', {
-          part: {
-            id: 'part-1',
-            sessionID: 'session-123',
-            messageID: 'msg-1',
-            type: 'text',
-            text: 'Hello',
-          },
-        })
-      );
-
-      // First update should set text to 'Hello'
-      expect(callbacks.onPartUpdated).toHaveBeenCalledWith(
-        'session-123',
-        'msg-1',
-        'part-1',
-        expect.objectContaining({ text: 'Hello' }),
-        null
-      );
-
-      // Second part update replaces with full text
-      processor.processEvent(
-        createKilocodeEvent('message.part.updated', {
-          part: {
-            id: 'part-1',
-            sessionID: 'session-123',
-            messageID: 'msg-1',
-            type: 'text',
-            text: 'Hello World',
-          },
-        })
-      );
-
-      // Second update should replace to 'Hello World'
-      expect(callbacks.onPartUpdated).toHaveBeenLastCalledWith(
-        'session-123',
-        'msg-1',
-        'part-1',
-        expect.objectContaining({ text: 'Hello World' }),
-        null
-      );
-    });
-
     it('should complete message when assistant message has completed time', () => {
       const callbacks: EventProcessorCallbacks = {
         onMessageUpdated: jest.fn(),

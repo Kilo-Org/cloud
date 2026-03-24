@@ -1,6 +1,6 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import { CloudNextSessionsPage } from '@/components/cloud-agent-next/CloudNextSessionsPage';
+import { NewSessionPanel } from '@/components/cloud-agent-next/NewSessionPanel';
 import { CloudSessionsPage } from '@/components/cloud-agent/CloudSessionsPage';
 
 export default async function PersonalCloudPage() {
@@ -9,7 +9,7 @@ export default async function PersonalCloudPage() {
   const useNextAgent = isDevelopment || (await isFeatureFlagEnabled('cloud-agent-next', user.id));
 
   if (useNextAgent) {
-    return <CloudNextSessionsPage />;
+    return <NewSessionPanel />;
   }
 
   return <CloudSessionsPage />;

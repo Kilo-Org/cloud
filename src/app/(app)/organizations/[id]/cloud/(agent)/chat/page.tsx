@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
-import { CloudChatPageWrapper } from './CloudChatPageWrapper';
+import { LegacySessionViewer } from '@/components/cloud-agent-next/LegacySessionViewer';
 import { CloudChatPageWrapperNext } from './CloudChatPageWrapperNext';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { signInUrlWithCallbackPath } from '@/lib/user.server';
@@ -28,5 +28,5 @@ export default async function OrganizationCloudChatPage({ params, searchParams }
     return <CloudChatPageWrapperNext organizationId={organizationId} />;
   }
 
-  return <CloudChatPageWrapper organizationId={organizationId} />;
+  return <LegacySessionViewer sessionId={sessionId} organizationId={organizationId} />;
 }

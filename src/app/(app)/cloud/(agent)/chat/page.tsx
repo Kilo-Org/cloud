@@ -1,6 +1,6 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
-import { CloudChatPageWrapper } from './CloudChatPageWrapper';
+import { LegacySessionViewer } from '@/components/cloud-agent-next/LegacySessionViewer';
 import { CloudChatPageWrapperNext } from './CloudChatPageWrapperNext';
 
 type PageProps = {
@@ -15,5 +15,5 @@ export default async function PersonalCloudChatPage({ searchParams }: PageProps)
     return <CloudChatPageWrapperNext />;
   }
 
-  return <CloudChatPageWrapper />;
+  return <LegacySessionViewer sessionId={sessionId} />;
 }

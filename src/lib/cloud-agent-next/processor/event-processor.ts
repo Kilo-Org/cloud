@@ -6,7 +6,7 @@
  * updates can still merge into the final message before the consumer renders it.
  *
  * Key behavior:
- * - Messages are stored internally for delta accumulation, pending parts, and late updates
+ * - Messages are stored internally for pending parts and late updates
  * - When a message completes, onMessageCompleted is called and the buffered message is retained
  *
  * Storage uses composite keys (sessionId:messageId) for unified handling of
@@ -113,7 +113,7 @@ export type EventProcessor = {
  *
  * The processor buffers in-flight (streaming) messages and handles:
  * - Message creation and updates via message.updated events
- * - Part updates via message.part.updated events
+ * - Part updates (upsert by part id)
  * - Pending parts queue for parts that arrive before their message
  * - Session parent tracking (sessions with parentID are child sessions)
  * - Session status management (idle/busy/retry)
@@ -183,7 +183,7 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   }
 
   /**
-   * Apply a part update to a message.
+   * Apply a part update to a message — upsert by part id.
    */
   function applyPartToMessage(message: ProcessedMessage, part: Part): void {
     const existingIndex = message.parts.findIndex(p => p.id === part.id);

@@ -342,7 +342,10 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       return transport?.sendCommand !== undefined || config.transport.send !== undefined;
     },
     get canInterrupt() {
-      return transport?.sendCommand !== undefined || config.transport.interrupt !== undefined;
+      return (
+        transport?.sendCommand !== undefined ||
+        (config.transport.interrupt !== undefined && resolvedCloudAgentSessionId !== null)
+      );
     },
     connect() {
       console.log(

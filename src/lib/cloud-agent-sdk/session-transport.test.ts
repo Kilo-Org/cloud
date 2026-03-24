@@ -338,11 +338,12 @@ describe('session capabilities', () => {
     session.destroy();
   });
 
-  it('canInterrupt is true when transport.interrupt is configured', () => {
+  it('canInterrupt is true when transport.interrupt is configured and session is resolved', async () => {
     const session = createResolvedSession({
       getTicket: () => 'ticket',
       interrupt: jest.fn(),
     });
+    await connectSession(session);
     expect(session.canInterrupt).toBe(true);
     session.destroy();
   });

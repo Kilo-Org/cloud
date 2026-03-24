@@ -125,7 +125,12 @@ export function reconstructConversation(rawEvents: unknown[]): ConversationTurn[
   //
   // For each unique messageID seen in parts, build one turn.
   // Order by the minimum event ID of parts within each message.
-  type RawTurn = { messageId: string; role: 'user' | 'assistant'; text: string; minEventId: number };
+  type RawTurn = {
+    messageId: string;
+    role: 'user' | 'assistant';
+    text: string;
+    minEventId: number;
+  };
   const turnMap = new Map<string, RawTurn>();
 
   for (const [messageId, parts] of partsByMessage) {
@@ -159,6 +164,14 @@ export function reconstructConversation(rawEvents: unknown[]): ConversationTurn[
 }
 
 /**
+ * Sanitize turn content so it cannot break the `<prior-conversation>`
+ * wrapper. Escapes closing tags that would prematurely end the block.
+ */
+function sanitizeTurnContent(text: string): string {
+  return text.replaceAll('</prior-conversation>', '&lt;/prior-conversation&gt;');
+}
+
+/**
  * Format a conversation transcript into a string suitable for injection
  * into an agent's initial prompt context.
  */
@@ -167,7 +180,7 @@ export function formatTranscriptForPrompt(turns: ConversationTurn[]): string {
 
   const lines = turns.map(t => {
     const label = t.role === 'user' ? 'User' : 'Assistant';
-    return `${label}: ${t.content}`;
+    return `${label}: ${sanitizeTurnContent(t.content)}`;
   });
 
   return [

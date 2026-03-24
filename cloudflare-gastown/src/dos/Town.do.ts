@@ -1898,7 +1898,7 @@ export class TownDO extends DurableObject<Env> {
         role: 'mayor',
         identity: mayor.identity,
         beadId: '',
-        beadTitle: message,
+        beadTitle: combinedMessage,
         beadBody: '',
         checkpoint: agents.readCheckpoint(this.sql, mayor.id),
         conversationHistory: await this.reconstructConversation(mayor.id),

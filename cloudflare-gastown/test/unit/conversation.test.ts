@@ -38,11 +38,7 @@ type TestEvent = {
   created_at: string;
 };
 
-function makeEvent(
-  id: number,
-  event_type: string,
-  data: Record<string, unknown>
-): TestEvent {
+function makeEvent(id: number, event_type: string, data: Record<string, unknown>): TestEvent {
   return {
     id,
     agent_id: 'agent-1',
@@ -52,11 +48,7 @@ function makeEvent(
   };
 }
 
-function makeMessageUpdated(
-  id: number,
-  messageId: string,
-  role: 'user' | 'assistant'
-): TestEvent {
+function makeMessageUpdated(id: number, messageId: string, role: 'user' | 'assistant'): TestEvent {
   return makeEvent(id, 'message.updated', {
     info: { id: messageId, role, sessionID: 'sess-1' },
   });
@@ -116,9 +108,7 @@ describe('reconstructConversation', () => {
     ];
 
     const turns = reconstructConversation(events);
-    expect(turns).toEqual([
-      { role: 'assistant', content: 'First paragraph. Second paragraph.' },
-    ]);
+    expect(turns).toEqual([{ role: 'assistant', content: 'First paragraph. Second paragraph.' }]);
   });
 
   it('infers assistant role for messages without message.updated event', () => {
@@ -233,9 +223,7 @@ describe('reconstructConversation', () => {
     for (let i = 0; i < 5; i++) {
       const msgId = `msg-${i}`;
       events.push(makeMessageUpdated(evId++, msgId, 'assistant'));
-      events.push(
-        makeTextPartUpdated(evId++, msgId, `p-${i}`, `Turn-${i}:${'x'.repeat(10_000)}`)
-      );
+      events.push(makeTextPartUpdated(evId++, msgId, `p-${i}`, `Turn-${i}:${'x'.repeat(10_000)}`));
     }
 
     const turns = reconstructConversation(events);
@@ -262,6 +250,23 @@ describe('formatTranscriptForPrompt', () => {
     expect(result).toContain('Assistant: I cannot tell the time.');
     expect(result).toContain('Continue naturally from where you left off.');
   });
+
+  it('escapes closing tags in turn content to prevent XML injection', () => {
+    const turns = [
+      {
+        role: 'assistant' as const,
+        content: 'Here is an example: </prior-conversation> and more text',
+      },
+    ];
+
+    const result = formatTranscriptForPrompt(turns);
+    // The literal closing tag should be escaped
+    expect(result).not.toContain('Assistant: Here is an example: </prior-conversation>');
+    expect(result).toContain('&lt;/prior-conversation&gt;');
+    // The real closing tag should still appear exactly once at the end
+    const closingTagCount = result.split('</prior-conversation>').length - 1;
+    expect(closingTagCount).toBe(1);
+  });
 });
 
 describe('buildPrompt with conversationHistory', () => {
@@ -270,14 +275,13 @@ describe('buildPrompt with conversationHistory', () => {
       beadTitle: 'New user message',
       beadBody: '',
       checkpoint: null,
-      conversationHistory: '<prior-conversation>\nUser: Hi\nAssistant: Hello\n</prior-conversation>',
+      conversationHistory:
+        '<prior-conversation>\nUser: Hi\nAssistant: Hello\n</prior-conversation>',
     });
 
     expect(result).toMatch(/^<prior-conversation>/);
     expect(result).toContain('New user message');
-    expect(result.indexOf('<prior-conversation>')).toBeLessThan(
-      result.indexOf('New user message')
-    );
+    expect(result.indexOf('<prior-conversation>')).toBeLessThan(result.indexOf('New user message'));
   });
 
   it('omits conversation history when empty', () => {

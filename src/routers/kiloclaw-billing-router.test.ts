@@ -365,7 +365,6 @@ describe('createSubscriptionCheckout', () => {
     );
   });
 
-
   it('sets trial_end in subscription_data when before March 23', async () => {
     const realDateNow = Date.now;
     Date.now = () => new Date('2026-03-12T00:00:00Z').getTime();

@@ -22,11 +22,16 @@ export type StreamEventType =
   | 'wrapper_resumed' // Wrapper reconnected after disconnect (may have lost events)
   | 'autocommit_started' // Auto-commit process began
   | 'autocommit_completed' // Auto-commit finished (success, skip, or failure)
+  // Wrapper -> DO (kilo server state snapshot on connect)
+  | 'kilo_snapshot' // Initial kilo server state sent by wrapper on ingest WS connect
   // DO -> /stream clients (connection status)
   | 'wrapper_disconnected' // Wrapper WebSocket closed unexpectedly
   | 'wrapper_reconnected' // Wrapper reconnected successfully
   // DO -> /stream clients (async preparation progress)
-  | 'preparing'; // Async preparation step progress (autoInitiate flow)
+  | 'preparing' // Async preparation step progress (autoInitiate flow)
+  // DO -> /stream clients (cloud infrastructure lifecycle)
+  | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
+  | 'connected'; // Sent on WebSocket connect with current service state
 
 /**
  * Event envelope sent by wrapper to DO via /ingest WebSocket.
@@ -40,7 +45,10 @@ export type IngestEvent = {
 /**
  * Commands sent from DO to wrapper via /ingest WebSocket.
  */
-export type WrapperCommand = { type: 'kill'; signal?: 'SIGTERM' | 'SIGKILL' } | { type: 'ping' };
+export type WrapperCommand =
+  | { type: 'kill'; signal?: 'SIGTERM' | 'SIGKILL' }
+  | { type: 'ping' }
+  | { type: 'request_snapshot' };
 
 /**
  * Data included in 'complete' events.
@@ -101,6 +109,46 @@ export type PreparingStep =
 export type PreparingEventData = {
   step: PreparingStep;
   message: string;
+};
+
+/** Cloud infrastructure status types. */
+export type CloudStatusType = 'preparing' | 'ready' | 'finalizing' | 'error';
+
+/** Data included in 'cloud.status' events. */
+export type CloudStatusData = {
+  cloudStatus: {
+    type: CloudStatusType;
+    step?: string;
+    message?: string;
+  };
+};
+
+/** Session status as reported by the Kilo server via kilo_snapshot. */
+export type SessionStatus =
+  | { type: 'busy' }
+  | { type: 'idle' }
+  | { type: 'retry'; attempt: number; message: string; next: number };
+
+/** Data included in 'connected' events. */
+export type ConnectedEventData = {
+  sessionStatus?: SessionStatus;
+  cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
+  question?: { requestId: string; callId?: string };
+  permission?: {
+    requestId: string;
+    callId?: string;
+    permission: string;
+    patterns: string[];
+    metadata: Record<string, unknown>;
+    always: string[];
+  };
+};
+
+/** Data included in 'kilo_snapshot' events (wrapper→DO only, not broadcast to /stream clients). */
+export type KiloSnapshotData = {
+  sessionStatus: SessionStatus;
+  question?: ConnectedEventData['question'];
+  permission?: ConnectedEventData['permission'];
 };
 
 /**

@@ -134,5 +134,43 @@ export function createSessionQuestionHandlers() {
           }
         });
       }),
+
+    answerPermission: protectedProcedure
+      .input(
+        z.object({
+          sessionId: sessionIdSchema,
+          permissionId: z.string().min(1),
+          response: z.enum(['once', 'always', 'reject']),
+        })
+      )
+      .output(z.object({ success: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        return withLogTags({ source: 'answerPermission' }, async () => {
+          const sessionId = input.sessionId as SessionId;
+          const { userId, env } = ctx;
+
+          logger.setTags({ userId, sessionId });
+          logger.info('Answering permission', { permissionId: input.permissionId });
+
+          try {
+            const wrapperClient = await resolveWrapperClient({
+              sessionId,
+              userId,
+              env,
+              authToken: ctx.authToken,
+            });
+            const result = await wrapperClient.answerPermission(input.permissionId, input.response);
+            return { success: result.success };
+          } catch (error) {
+            if (error instanceof TRPCError) throw error;
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            logger.withFields({ error: errorMsg }).error('Failed to answer permission');
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Failed to answer permission: ${errorMsg}`,
+            });
+          }
+        });
+      }),
   };
 }

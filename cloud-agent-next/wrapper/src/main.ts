@@ -265,6 +265,10 @@ async function main() {
             timestamp: new Date().toISOString(),
           });
         }
+        if (cmd.type === 'request_snapshot') {
+          // Fire-and-forget: reuse the existing snapshot logic from connection manager.
+          void connectionManager.sendKiloSnapshot();
+        }
       },
       onDisconnect: (reason: string) => {
         logToFile(`disconnect: ${reason}`);

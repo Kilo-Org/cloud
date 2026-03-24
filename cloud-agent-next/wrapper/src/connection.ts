@@ -10,7 +10,7 @@
  */
 
 import type { WrapperState } from './state.js';
-import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
+import type { IngestEvent, WrapperCommand, KiloSnapshotData } from '../../src/shared/protocol.js';
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
 import type { WrapperKiloClient } from './kilo-api.js';
@@ -86,6 +86,8 @@ export type ConnectionManager = {
   isReconnecting: () => boolean;
   /** Abort and restart the SDK event subscription (does not tear down ingest WS). */
   reconnectEventSubscription: () => void;
+  /** Fetch fresh kilo server state and send a kilo_snapshot event to the DO. Best-effort. */
+  sendKiloSnapshot: () => Promise<void>;
 };
 
 /**
@@ -155,6 +157,66 @@ export function createConnectionManager(
     }
     eventBuffer.length = 0;
     bufferOverflowed = false;
+  }
+
+  /**
+   * Fetch current kilo server state and send a kilo_snapshot event to the DO.
+   * Called after ingest WS opens (initial connect and reconnect).
+   * Best-effort: failures are logged but don't block the connection.
+   */
+  async function sendKiloSnapshot(): Promise<void> {
+    try {
+      const kiloSessionId = state.currentJob?.kiloSessionId;
+      if (!kiloSessionId) {
+        logToFile('skipping kilo snapshot: no kiloSessionId');
+        return;
+      }
+
+      const [statuses, questions, permissions] = await Promise.all([
+        config.kiloClient.getSessionStatuses(),
+        config.kiloClient.getQuestions(),
+        config.kiloClient.getPermissions(),
+      ]);
+
+      const statusEntry = statuses[kiloSessionId];
+      const sessionStatus = (statusEntry ?? { type: 'idle' }) as KiloSnapshotData['sessionStatus'];
+
+      const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
+
+      const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);
+
+      const snapshot: KiloSnapshotData = { sessionStatus };
+      if (pendingQuestion) {
+        snapshot.question = {
+          requestId: pendingQuestion.id,
+          callId: pendingQuestion.tool?.callID,
+        };
+      }
+      if (pendingPermission) {
+        snapshot.permission = {
+          requestId: pendingPermission.id,
+          callId: pendingPermission.tool?.callID,
+          permission: pendingPermission.permission,
+          patterns: pendingPermission.patterns,
+          metadata: pendingPermission.metadata,
+          always: pendingPermission.always,
+        };
+      }
+
+      sendToIngest({
+        streamEventType: 'kilo_snapshot',
+        data: snapshot,
+        timestamp: new Date().toISOString(),
+      });
+
+      logToFile(
+        `kilo snapshot sent: status=${sessionStatus.type}, question=${pendingQuestion?.id ?? 'none'}, permission=${pendingPermission?.id ?? 'none'}`
+      );
+    } catch (err) {
+      logToFile(
+        `failed to send kilo snapshot: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   /**
@@ -393,24 +455,6 @@ export function createConnectionManager(
             return;
           }
 
-          // Auto-reject permission requests — Cloud Agent has no UI to answer them,
-          // so unanswered permissions would block the session indefinitely.
-          if (eventType === 'permission.asked') {
-            const permissionId = typeof properties.id === 'string' ? properties.id : undefined;
-            if (permissionId) {
-              const permissionType =
-                typeof properties.permission === 'string' ? properties.permission : 'unknown';
-              logToFile(`auto-rejecting permission: id=${permissionId} type=${permissionType}`);
-              config.kiloClient
-                .answerPermission(permissionId, 'reject')
-                .catch((err: unknown) =>
-                  logToFile(
-                    `failed to auto-reject permission ${permissionId}: ${err instanceof Error ? err.message : String(err)}`
-                  )
-                );
-            }
-          }
-
           // session.idle is the primary completion signal - it means the assistant finished
           // and the session is waiting for the next user input.
           // Only the root session's idle event should trigger completion — child sessions
@@ -469,6 +513,8 @@ export function createConnectionManager(
     if (ingestWs && existingAbort) {
       state.setConnections(ingestWs, existingAbort);
     }
+    // Send fresh kilo state snapshot after reconnecting
+    void sendKiloSnapshot();
     callbacks.onReconnected?.();
   }
 
@@ -534,6 +580,9 @@ export function createConnectionManager(
       // Open ingest WS first
       await openIngestWs();
 
+      // Send initial kilo state snapshot before starting event subscription
+      await sendKiloSnapshot();
+
       // Start SDK event subscription (runs in background)
       startEventSubscription();
 
@@ -581,5 +630,7 @@ export function createConnectionManager(
       // so no separate abort call is needed here.
       startEventSubscription();
     },
+
+    sendKiloSnapshot,
   };
 }

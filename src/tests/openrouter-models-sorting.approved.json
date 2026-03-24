@@ -137,52 +137,6 @@
       "isFree": true
     },
     {
-      "id": "xiaomi/mimo-v2-pro:free",
-      "canonical_slug": "xiaomi/mimo-v2-pro:free",
-      "hugging_face_id": "",
-      "name": "Xiaomi: MiMo-V2-Pro (free)",
-      "created": 1756238927,
-      "description": "MiMo V2 Pro is a frontier-scale open-source large language model with over 1 trillion parameters, developed in China and optimized specifically for agentic workflows. It excels in frameworks such as OpenClaw, with native 1M-token context support that enables reliable handling of complex, long-horizon, multi-step tasks. In agentic reasoning, tool use, and multi-step execution benchmarks, its performance sits between Claude 4.6 Sonnet and Claude 4.6 Opus.",
-      "context_length": 1048576,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000000"
-      },
-      "top_provider": {
-        "context_length": 1048576,
-        "max_completion_tokens": 131072,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "preferredIndex": 3,
-      "isFree": true
-    },
-    {
       "id": "anthropic/claude-sonnet-4",
       "name": "Claude Sonnet 4",
       "created": 1714000000,
@@ -585,51 +539,6 @@
           "edit_file"
         ]
       }
-    },
-    {
-      "id": "xiaomi/mimo-v2-omni:free",
-      "canonical_slug": "xiaomi/mimo-v2-omni:free",
-      "hugging_face_id": "",
-      "name": "Xiaomi: MiMo-V2-Omni (free)",
-      "created": 1756238927,
-      "description": "MiMo-V2-Omni is a frontier omni-modal model that natively processes image, video, and audio inputs within a unified architecture. It combines strong multimodal perception with agentic capability — visual grounding, multi-step planning, tool use, and code execution — making it well-suited for complex real-world tasks that span modalities. 256K context window.",
-      "context_length": 262144,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000000"
-      },
-      "top_provider": {
-        "context_length": 262144,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "isFree": true
     },
     {
       "id": "x-ai/grok-code-fast-1:optimized:free",
